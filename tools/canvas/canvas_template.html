@@ -1,0 +1,120 @@
+<title>{{TITLE}}</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Barlow:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-window pan/zoom stage holding the canvas boards at their canvas.json positions; toolbar on top.
+   The boards are drawn in a fixed light blueprint style, so the page deliberately stays single-theme. */
+:root { --paper: #F3F5F9; --board: #FFFFFF; --ink: #1A1D23; --navy: #1C2B57; --blue: #4A6BB0; --tint: #EAF0F9;
+  --display: "Barlow Condensed", "Arial Narrow", sans-serif; --body: "Barlow", system-ui, sans-serif; color-scheme: light; }
+html, body { height: 100%; }
+body { background: var(--paper); color: var(--ink); font-family: var(--body); overflow: hidden; display: flex; flex-direction: column; }
+a { color: #3A5A9E; }
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; background: var(--board); border-bottom: 1px solid #D5DCE7;
+  padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); z-index: 2; }
+.bar h1 { margin: 0; font: 600 20px var(--display); color: var(--navy); letter-spacing: .02em; white-space: nowrap; }
+.bar nav, .bar .zoom { display: flex; flex-wrap: wrap; gap: 6px; }
+.bar .zoom { margin-left: auto; align-items: center; }
+.bar button { font: 500 13px var(--display); letter-spacing: .06em; text-transform: uppercase; color: var(--navy);
+  background: var(--board); border: 1px solid var(--blue); padding: 4px 10px; cursor: pointer; }
+.bar button:hover, .bar button[aria-pressed="true"] { background: var(--tint); }
+.bar button:focus-visible, .zoomlink:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+#pct { font: 500 13px "IBM Plex Mono", monospace; min-width: 4.5ch; text-align: right; font-variant-numeric: tabular-nums; }
+.hint { font-size: 12px; color: #5A6372; }
+#stage { position: relative; flex: 1; overflow: hidden; touch-action: none; cursor: grab; }
+#stage.drag { cursor: grabbing; }
+#world { position: absolute; left: 0; top: 0; width: {{W}}px; height: {{H}}px; transform-origin: 0 0; }
+.board { position: absolute; box-shadow: 0 1px 2px rgba(28,43,87,.08), 0 8px 24px rgba(28,43,87,.08); background: var(--board); }
+.board > div:not(.btitle) { position: absolute; left: 0; top: 0; }
+.btitle { position: absolute; left: 0; bottom: 100%; padding-bottom: 10px; font: 600 28px var(--display); color: var(--navy); white-space: nowrap; letter-spacing: .02em; }
+.note { position: absolute; font: 600 64px var(--display); color: var(--navy); white-space: nowrap; letter-spacing: .01em; }
+.zoomlink { cursor: pointer; box-shadow: 0 0 0 4px rgba(74,107,176,.25); }
+.zoomlink:hover { background: var(--navy) !important; }
+@media (prefers-reduced-motion: no-preference) { #world.anim { transition: transform .35s ease; } }
+</style>
+
+<div class="bar">
+  <h1>{{TITLE}}</h1>
+  <nav aria-label="Boards">
+      <button type="button" id="go-all" data-go="all" aria-pressed="false">Whole canvas</button>
+      {{NAV}}
+  </nav>
+  <div class="zoom">
+    <span class="hint">Drag to pan · scroll or pinch to zoom · click 00–03 to zoom in</span>
+    <button type="button" id="zout" aria-label="Zoom out">−</button>
+    <span id="pct">100%</span>
+    <button type="button" id="zin" aria-label="Zoom in">+</button>
+  </div>
+</div>
+<div id="stage">
+  <div id="world">
+{{BOARDS}}
+  </div>
+</div>
+
+<script>
+(() => {
+  const stage = document.getElementById('stage'), world = document.getElementById('world'), pct = document.getElementById('pct');
+  const W = {{W}}, H = {{H}};
+  let s = 1, tx = 0, ty = 0, current = 'all';
+  const apply = (anim) => {
+    world.classList.toggle('anim', !!anim);
+    world.style.transform = `translate(${tx}px, ${ty}px) scale(${s})`;
+    pct.textContent = Math.round(s * 100) + '%';
+  };
+  const rectOf = (key) => {
+    if (key === 'all') return { x: 0, y: 0, w: W, h: H };
+    const el = document.querySelector(`[data-board="${key}"]`);
+    return { x: el.offsetLeft, y: el.offsetTop - 50, w: el.offsetWidth, h: el.offsetHeight + 50 };
+  };
+  const fit = (key, anim = true) => {
+    current = key;
+    const r = rectOf(key), vw = stage.clientWidth, vh = stage.clientHeight, pad = 24;
+    s = Math.min((vw - pad * 2) / r.w, (vh - pad * 2) / r.h, 2);
+    tx = (vw - r.w * s) / 2 - r.x * s; ty = (vh - r.h * s) / 2 - r.y * s;
+    document.querySelectorAll('.bar nav button').forEach(b => b.setAttribute('aria-pressed', b.dataset.go === key));
+    apply(anim);
+    try { localStorage.setItem('cc-canvas-view', key); } catch (e) {}
+  };
+  const zoomAt = (f, cx, cy) => {
+    const ns = Math.min(4, Math.max(0.05, s * f));
+    tx = cx - (cx - tx) * (ns / s); ty = cy - (cy - ty) * (ns / s); s = ns; apply(false);
+  };
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest('[data-go]');
+    if (t) fit(t.dataset.go);
+  });
+  document.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.classList?.contains('zoomlink')) { e.preventDefault(); fit(e.target.dataset.go); }
+  });
+  document.getElementById('zin').onclick = () => zoomAt(1.25, stage.clientWidth / 2, stage.clientHeight / 2);
+  document.getElementById('zout').onclick = () => zoomAt(0.8, stage.clientWidth / 2, stage.clientHeight / 2);
+  stage.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const r = stage.getBoundingClientRect();
+    zoomAt(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), e.clientX - r.left, e.clientY - r.top);
+  }, { passive: false });
+  const pts = new Map(); let last = null, moved = false;
+  stage.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('.zoomlink')) return;
+    stage.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); moved = false;
+    stage.classList.add('drag'); last = null;
+  });
+  stage.addEventListener('pointermove', (e) => {
+    if (!pts.has(e.pointerId)) return;
+    const prev = pts.get(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]);
+    if (pts.size === 1) { tx += e.clientX - prev[0]; ty += e.clientY - prev[1]; moved = true; apply(false); }
+    else if (pts.size === 2) {
+      const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]), r = stage.getBoundingClientRect();
+      if (last) zoomAt(d / last, (a[0] + b[0]) / 2 - r.left, (a[1] + b[1]) / 2 - r.top);
+      last = d;
+    }
+  });
+  const up = (e) => { pts.delete(e.pointerId); last = null; if (!pts.size) stage.classList.remove('drag'); };
+  stage.addEventListener('pointerup', up); stage.addEventListener('pointercancel', up);
+  window.addEventListener('resize', () => fit(current, false));
+  let start = 'Main.dc.html';
+  try { start = localStorage.getItem('cc-canvas-view') || start; } catch (e) {}
+  if (start !== 'all' && !document.querySelector(`[data-board="${start}"]`)) start = 'all';
+  fit(start, false);
+})();
+</script>
