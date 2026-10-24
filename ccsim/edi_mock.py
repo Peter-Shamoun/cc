@@ -601,7 +601,8 @@ class Generator:
 
             def schedule(e, day):
                 day = _next_business_day(day)
-                e["received"] = e.get("received") or day
+                # DTM*050: the payer received the claim a business day after it was sent
+                e["received"] = e.get("received") or _next_business_day(e["claim"].submitted + timedelta(days=1))
                 pending.setdefault((day, e["payer_id"]), []).append(e)
 
             d = sc.start
@@ -825,9 +826,8 @@ class Generator:
                                                           {k for ln in e["lines"] for g_, k, _ in ln["cas"] if g_ == "CO"}),
                                           lines=[dict(cpt=ln["cpt"], adjudicated_cpt=ln["adjudicated_cpt"],
                                                       paid=ln["paid"], allowed=ln["allowed"],
-                                                      denied=ln["paid"] == 0 and any(g_ == "CO" and k != "45"
-                                                                                     for g_, k, _ in ln["cas"]))
-                                                 for ln in e["lines"]]))
+                                                      co_carcs=sorted({k for g_, k, _ in ln["cas"] if g_ == "CO"}))
+                                                 for ln in ([] if e["claim_level_only"] else e["lines"])]))
         body = interchange(payer.delimiters, payer.payer_id, t.sender_id, day, self._next_ctl(), "HP", "005010X221A1",
                            [tx[0] for tx in txs], "835")
         out = [dict(day=day, kind="835", name=f"{t.code}_835_{payer.payer_id}_{day:%Y%m%d}.x12", body=body,
@@ -866,6 +866,10 @@ def _finalize(claims: dict) -> dict:
             remitted = cur is not None and cur["status"] != "22"
             recorded = remitted and cur["status"] == "4"
             signal = remitted and cur["paid"] == 0 and any(k in DENIAL_CARCS for k in cur["co_carcs"])
+            if cur:                                               # line rule: $0, not a reversal, and a reviewed
+                for ln in cur["lines"]:                           # CO CARC on the line or a denied claim
+                    ln["denied"] = (remitted and ln["paid"] == 0 and
+                                    (any(k in DENIAL_CARCS for k in ln["co_carcs"]) or recorded or signal))
             a.update(remitted_current=remitted, denied=recorded or signal, denied_recorded=recorded,
                      denied_signal_v3=signal and not recorded, paid_current=cur["paid"] if remitted else 0.0,
                      status_current=cur["status"] if cur else None, ever_reversed=any(e["status"] == "22" for e in evs),

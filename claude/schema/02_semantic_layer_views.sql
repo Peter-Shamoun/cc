@@ -540,8 +540,10 @@ SELECT
     p.file_id                         AS source_file_id
 FROM r835.payment p
 JOIN sem_int.payer_835 py ON py.payment_uid = p.payment_uid
+JOIN edi.source_file sf   ON sf.file_id = p.file_id
 LEFT JOIN clp ON clp.payment_uid = p.payment_uid
-LEFT JOIN plb ON plb.payment_uid = p.payment_uid;
+LEFT JOIN plb ON plb.payment_uid = p.payment_uid
+WHERE sf.duplicate_of_file_id IS NULL AND sf.superseded_by_file_id IS NULL;   -- a re-delivered 835 is one payment
 
 -- 8) sem.provider_adjustments — GRAIN: one PLB reason/amount pair.
 CREATE OR REPLACE VIEW sem.provider_adjustments AS
@@ -555,7 +557,9 @@ SELECT
 FROM r835.provider_adjustment pa
 JOIN r835.payment p ON p.payment_uid = pa.payment_uid
 JOIN sem_int.payer_835 py ON py.payment_uid = pa.payment_uid
-LEFT JOIN ref.plb_reason r ON r.code = pa.reason_code;
+JOIN edi.source_file sf   ON sf.file_id = pa.file_id
+LEFT JOIN ref.plb_reason r ON r.code = pa.reason_code
+WHERE sf.duplicate_of_file_id IS NULL AND sf.superseded_by_file_id IS NULL;   -- count re-delivered PLBs once
 
 -- 9) sem.diagnoses — GRAIN: one diagnosis code on one 837P claim submission.
 CREATE OR REPLACE VIEW sem.diagnoses AS
