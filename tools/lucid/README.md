@@ -1,4 +1,3 @@
-<!-- STATUS: CURRENT (tooling) - how the draw.io/Lucid pipeline runs | source: chat "Draw.io arrows from Zoom" (2026-10-23) | FLAG: reconstructed from Write + appended section -->
 # Lucid pre-flight loop
 
 Three scripts, Python 3 + `jsonschema` + `Pillow`:

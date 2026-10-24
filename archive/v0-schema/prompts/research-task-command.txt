@@ -1,4 +1,3 @@
-# STATUS: REFERENCE - prompt that produced the v0 schema research | source: chat "EDI 835/837 parquet schema" (2026-10-22)
 GOAL: Design and deliver a Parquet table schema (NOT a research report) for an agentic "analyst chatbot" that queries all claim and remittance data for one healthcare customer (Labcorp) from X12 EDI 837P (professional claims) and 835 (electronic remittance advice) files. The final output must be the schema itself: table list, columns with types, keys, relationships, partitioning, and a short, plain-language rationale for each major design decision, so the user can understand the schema and the "why" quickly. Research only to inform the design; keep any research findings brief and only where they justify a decision.
 
 CONTEXT (from the user):

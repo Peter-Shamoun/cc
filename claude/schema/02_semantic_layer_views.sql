@@ -1,4 +1,3 @@
--- STATUS: CURRENT (design) - the semantic layer (gold); replaces the 7-table analytics layer in archive/v0-schema. Partly outdated: header says only remit_event + line_match get materialized; superseded by the data-backend plan (every sem.* view materialized to semantic_layer/ each batch) | source: project knowledge file (added 2026-10-22)
 -- =============================================================================
 -- CC — SEMANTIC LAYER (views over the lossless schema)
 -- =============================================================================

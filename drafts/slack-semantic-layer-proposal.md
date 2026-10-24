@@ -1,4 +1,3 @@
-<!-- STATUS: REFERENCE - Slack draft; whether/which version was sent is unknown | source: chat "SOTA agent chatbot best practices" (2026-10-23) | FLAG: blockquote markers stripped -->
 Hey all, I had an idea for the CC / NBA data backend (Parquet + DuckDB).
 
 Both projects have agents turning a user's question into a SQL query. From what I've been reading, the common practice for this is to give the agent a "semantic layer" instead of the raw tables. That's a small, curated set of tables with clear names and business definitions (e.g., "denied" computed once in one place) that's easy for the agent to understand.

@@ -1,4 +1,3 @@
-# STATUS: REFERENCE - your pasted AI_APPEAL_SFTP Oracle table definitions (input) | source: chat "EDI 835/837 parquet schema" (2026-10-22) | FLAG: Tabs and trailing spaces kept as the transcript returned them; the original clipboard bytes cannot be checked | Turn 6 (user message 4): pasted AI_APPEAL_SFTP_* Oracle tables, without the system-reminder line
 It is rediculous that there are 40 agent facing tables for 2 file types
 
 I was expecting claim, claimline. remit, remitline. I know there are likely more intracies, example: batch and payer, but this is absolutley ridiculous

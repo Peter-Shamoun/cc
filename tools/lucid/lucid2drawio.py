@@ -1,4 +1,3 @@
-# STATUS: CURRENT (tooling) - Lucid pipeline; Lucid import still unresolved | source: chat "Draw.io arrows from Zoom" (2026-10-23) | FLAG: reconstructed from Write + 1 sed patch
 """Write a "Lucid-safe" draw.io file from a validated .lucid layout.
 
 Lucid's draw.io importer mishandles HTML labels, web fonts, vendor stencil shapes,

@@ -1,4 +1,3 @@
-<!-- STATUS: LEGACY - replaced by the live note in memory-and-preferences.md | source: chat "Mermaid flowchart of AI pipeline" (2026-10-23) | FLAG: SUPERSEDED: memory note as first written in this chat; current version is in memory-and-preferences.md -->
 ---
 name: preferences
 description: How the user wants Claude to work in this project — keep the CC current-state memory live

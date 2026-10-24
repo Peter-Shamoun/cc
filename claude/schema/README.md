@@ -1,4 +1,3 @@
-<!-- STATUS: CURRENT (design) - latest agreed data model, not yet loaded (parser not built). Partly outdated: header says only remit_event + line_match get materialized; superseded by the data-backend plan (every sem.* view materialized to semantic_layer/ each batch); open: run_semantic_sql only allows sem.*, but the plan lets the agent escalate to the lossless schema (lane 2); not reconciled yet | source: project knowledge file (added 2026-10-22) -->
 # CC — lossless EDI schema + semantic layer + agent interface
 
 | File | What it is |

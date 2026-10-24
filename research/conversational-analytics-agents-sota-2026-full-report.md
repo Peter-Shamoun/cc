@@ -1,4 +1,3 @@
-<!-- STATUS: LEGACY - original research report; replaced by research/agent-chatbot-best-practices.md | source: chat "SOTA agent chatbot best practices" (2026-10-23) | FLAG: original research report; later trimmed/rewritten into research/agent-chatbot-best-practices.md; citation metadata not included -->
 # Conversational Analytics Agents in October 2026: State of the Art, Best Practices, and a Gap Analysis for CC
 
 CC's core design follows the pattern the field has settled on for high-stakes "talk to your data" systems. The LLM plans and chooses from a governed vocabulary. Deterministic code compiles and runs the queries. A separate, constrained step writes the prose. The biggest risks are not in this core. They are in four things around it: no measured evaluation harness, a hard coverage cliff where the registry ends, an unwired free-form SQL lane, and multi-tenant and PHI controls that still need to be engineered before the pilot becomes a product.

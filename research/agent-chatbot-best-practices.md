@@ -1,4 +1,3 @@
-<!-- STATUS: REFERENCE - final version of the best-practices research doc | source: chat "SOTA agent chatbot best practices" (2026-10-23) | exported from the live Claude Docs doc https://claude.ai/artifact/Dy1HpPpeYD2frCjCen8qmG (rev 33) -->
 # Conversational Analytics Agents: SOTA (2025–2026)
 
 Oct 22, 2026 · @ShiShamoun

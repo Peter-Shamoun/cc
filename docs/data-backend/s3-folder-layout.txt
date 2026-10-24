@@ -1,4 +1,3 @@
-# STATUS: CURRENT (design) - per-customer S3 layout (raw/ parquet/ semantic_layer/ staging/ quarantine/) | source: chat "Data pipeline plan and diagram" (2026-10-23)
 s3://cc-prod/customer_b/
 ├── raw/                                   # bronze, never touched
 │   └── received_date=2026-10-23/

@@ -1,4 +1,3 @@
-<!-- STATUS: LEGACY - earlier doc version; replaced by research/agent-chatbot-best-practices.md | source: chat "SOTA agent chatbot best practices" (2026-10-23) | FLAG: reassembled-from-section-writes | Turn 5: pruned doc version (two reference designs + CC changes + plan/sources), reassembled verbatim from the insert skeleton and 3 section payloads -->
 # Conversational Analytics Agents: SOTA (2025–2026) and CC Gap Analysis
 
 CC's core already matches the 2026 consensus: the LLM plans from a governed vocabulary, code compiles the queries, and a constrained step writes the prose. What it lacks is what the best systems are built around: an eval suite, a way to grow coverage, and tenant-level isolation for PHI.

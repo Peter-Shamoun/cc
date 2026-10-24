@@ -1,4 +1,3 @@
-# STATUS: CURRENT (tooling) - Lucid pipeline; Lucid import still unresolved | source: chat "Draw.io arrows from Zoom" (2026-10-23) | FLAG: reconstructed from Write + 3 patches
 """Pre-flight validator for Lucid Standard Import (.lucid) files.
 
 Encodes the rules published at https://lucid.readme.io/docs/standard-import/llms.txt

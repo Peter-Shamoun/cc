@@ -1,4 +1,3 @@
-<!-- STATUS: REFERENCE - prompt that produced the research report | source: chat "SOTA agent chatbot best practices" (2026-10-23) -->
 Deep-dive research on best practices and state-of-the-art (SOTA, as of October 2026) techniques for building a chatbot interface backed by an agent that performs data analysis over structured data (the "talk to your data" / conversational analytics / text-to-SQL / text-to-Cypher / data-analysis agent problem). The user says this is an extremely well-documented, very common agentic-engineering task and wants a thorough survey of best practices and SOTA, then applied to their own project.
 
 USER'S PROJECT CONTEXT (CC, at Xifin, healthcare revenue cycle; internal pilot in dev, being built "for many customers, heading to production"):
