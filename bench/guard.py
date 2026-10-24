@@ -21,6 +21,26 @@ class GuardError(ValueError):
     pass
 
 
+FORBIDDEN_NODES = {"Insert", "Update", "Delete", "Create", "Drop", "Alter", "Merge", "Command", "Copy", "Set",
+                   "Pragma", "Attach", "Detach", "Use", "Summarize", "Describe", "Show", "Install", "Load", "Export",
+                   "Transaction", "Commit", "Rollback", "Refresh", "Cache", "Uncache", "LoadData"}
+_IDENT = __import__("re").compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def _visible_ctes(node) -> set[str]:
+    """CTE names in scope for `node`: those of every WITH on the path to the root (lexical scoping)."""
+    names = set()
+    cur = node
+    while cur is not None:
+        if isinstance(cur, exp.With):                              # inside a CTE body: its siblings are visible
+            names |= {c.alias_or_name.lower() for c in cur.expressions}
+        w = (cur.args.get("with_") or cur.args.get("with")) if isinstance(cur, exp.Expression) else None
+        if isinstance(w, exp.With):
+            names |= {c.alias_or_name.lower() for c in w.expressions}
+        cur = cur.parent
+    return names
+
+
 def guard(sql: str, row_limit: int = 1000, escalate: bool = False) -> str:
     allowed = ESCALATION_SCHEMAS if escalate else ALLOWED_SCHEMAS
     try:
@@ -33,18 +53,21 @@ def guard(sql: str, row_limit: int = 1000, escalate: bool = False) -> str:
     if not isinstance(tree, (exp.Select, exp.Union, exp.Intersect, exp.Except)):
         raise GuardError("only SELECT queries are allowed")
     for node in tree.walk():
-        if isinstance(node, (exp.Insert, exp.Update, exp.Delete, exp.Create, exp.Drop, exp.Alter, exp.Command,
-                             exp.Copy, exp.Set, exp.Pragma, exp.Attach, exp.Detach, exp.Use)):
+        if type(node).__name__ in FORBIDDEN_NODES:
             raise GuardError(f"{type(node).__name__} is not allowed")
-    ctes = {c.alias_or_name.lower() for c in tree.find_all(exp.CTE)}
+    for cte in tree.find_all(exp.CTE):
+        if not _IDENT.fullmatch(cte.alias_or_name or ""):
+            raise GuardError(f"CTE name {cte.alias_or_name!r} must be a plain identifier")
     for t in tree.find_all(exp.Table):
         if isinstance(t.this, (exp.Anonymous, exp.Func)):
             name = t.this.name.lower() if isinstance(t.this, exp.Anonymous) else t.this.sql_name().lower()
             raise GuardError(f"table function {name}() is not allowed")
+        if not isinstance(t.this, exp.Identifier) or t.this.quoted and not _IDENT.fullmatch(t.name):
+            raise GuardError(f"relation {t.sql()} is not allowed")
         schema, name = (t.db or "").lower(), t.name.lower()
         if t.catalog:
             raise GuardError("catalog-qualified names are not allowed")
-        if not schema and name in ctes:
+        if not schema and name in _visible_ctes(t):
             continue
         if schema not in allowed:
             raise GuardError(f"relation {t.sql()} is not allowed; use {', '.join(sorted(s + '.*' for s in allowed))}")

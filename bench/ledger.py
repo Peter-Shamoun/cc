@@ -171,7 +171,21 @@ def payers_remitting(T):
 
 
 def unbalanced_payments(T):
-    return [(0,)]
+    """Re-derive each delivered 835 transaction's total from the ledger's own events and PLBs and compare it with
+    the BPR total the generator wrote: BPR02 = sum(CLP04) - sum(PLB)."""
+    paid, plb = defaultdict(float), defaultdict(float)
+    for c in _claims(T):
+        for a in c["adjudications"].values():
+            for e in a["events"]:
+                paid[e["trn"]] += e["paid"]
+    for p in T["plb"]:
+        plb[p["trn"]] += p["amount"]
+    bad = 0
+    for f in T["files"]:
+        if f["kind"] == "835" and f["expect"] == "parsed":
+            for trn, total in zip(f["trns"], f["totals"]):
+                bad += round(paid[trn] - plb[trn], 2) != round(total, 2)
+    return [(bad,)]
 
 
 def rejected_files(T):

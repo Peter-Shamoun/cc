@@ -51,20 +51,28 @@ def _expected(con, c):
     return con.execute(c["gold_sql"]).fetchall()
 
 
-def selftest(path: Path) -> dict:
-    """The benchmark is only trustworthy if: gold == ledger; every alt_sql is accepted; every wrong_sql is
-    rejected (otherwise it does not discriminate on this dataset and is reported)."""
+def selftest(path: Path, strict: bool = True) -> dict:
+    """The benchmark is trustworthy on a dataset only if:
+      - gold SQL == ledger answer for every question that has a ledger function (else: a data-layer finding)
+      - every alt_sql is accepted, and the oracle agent scores 100%
+      - (strict) every wrong_sql is rejected, and no gold answer is empty or all zeros unless allow_trivial;
+        otherwise the question does not discriminate on this dataset."""
     truth = load_truth(path)
-    report = dict(ledger_mismatch=[], alt_rejected=[], wrong_accepted=[], checked=0)
+    report = dict(ledger_mismatch=[], alt_rejected=[], wrong_accepted=[], trivial=[], checked=0)
     for c in load_cases():
         if c.get("expect_refusal"):
             continue
         con = open_snapshot(path, escalate=c.get("escalate", False))
         gold = _expected(con, c)
         report["checked"] += 1
+        if not c.get("allow_trivial") and (not gold or all(all((_v or 0) == 0 for _v in r if not isinstance(_v, str))
+                                                            for r in gold)):
+            report["trivial"].append(c["id"])
         if c.get("ledger"):
             want = ledger_answer(c["ledger"], truth["tenant"], truth)
-            ok, why = match(want, gold, {k: v for k, v in _spec(c).items() if k not in ("order", "n", "metric_col")})
+            spec = {k: v for k, v in _spec(c).items() if k not in ("order", "n", "metric_col", "optional_cols",
+                                                                     "percent_cols", "sign_cols")}
+            ok, why = match(want, gold, spec)
             if not ok:
                 report["ledger_mismatch"].append(dict(id=c["id"], why=why, gold=gold[:8], ledger=sorted(want)[:8]))
         for alt in c.get("alt_sql", []):
@@ -75,7 +83,11 @@ def selftest(path: Path) -> dict:
             ok, _ = match(gold, con.execute(w["sql"]).fetchall(), _spec(c))
             if ok:
                 report["wrong_accepted"].append(dict(id=c["id"], label=w["label"]))
-    report["sound"] = not (report["ledger_mismatch"] or report["alt_rejected"])
+    oracle = run("gold", path)
+    report["oracle_accuracy"] = oracle["accuracy"]
+    report["data_layer_ok"] = not report["ledger_mismatch"]
+    report["sound"] = (report["data_layer_ok"] and not report["alt_rejected"] and oracle["accuracy"] == 1.0
+                       and (not strict or not (report["wrong_accepted"] or report["trivial"])))
     return report
 
 
@@ -104,11 +116,14 @@ def run(agent_name: str, path: Path, repeats: int = 1, use_judge: bool = False, 
                     r["correct"], r["why"] = match(gold, ans.rows, _spec(c))
                     r["matcher"] = r["correct"]
                     if not r["correct"] and use_judge:
-                        v = judge(c["question"], c["gold_sql"], gold, ans.sql, ans.rows)
+                        v = judge(c["question"], c["gold_sql"], gold, ans.sql, ans.rows,
+                                  top_n=_spec(c).get("n") if _spec(c).get("order") == "topn" else None)
                         r["judge"] = v
                         r["correct"] = v["correct"]
             except Exception as e:                                    # noqa: BLE001 - agent crash = wrong
-                r.update(correct=False, why=f"{type(e).__name__}: {e}"[:300], agent_s=round(time.perf_counter() - t, 3))
+                r.update(correct=False, why=f"{type(e).__name__}: {e}"[:300], agent_s=round(time.perf_counter() - t, 3),
+                         sql_calls=len(tools.calls), sql_errors=sum(not x["ok"] for x in tools.calls),
+                         usage=getattr(e, "usage", {}), crashed=True)
             rows.append(r)
     return summarize(agent_name, path, rows, repeats, use_judge)
 
@@ -163,7 +178,8 @@ def calibrate(path: Path) -> dict:
         for label, sql, should in [("alt", s, True) for s in c.get("alt_sql", [])] + \
                                   [(w["label"], w["sql"], False) for w in c.get("wrong_sql", [])]:
             rows = con.execute(sql).fetchall()
-            v = judge(c["question"], c["gold_sql"], gold, sql, rows)
+            v = judge(c["question"], c["gold_sql"], gold, sql, rows,
+                      top_n=_spec(c).get("n") if _spec(c).get("order") == "topn" else None)
             key = "alt" if should else "wrong"
             stats[f"{key}_total"] += 1
             stats["alt_accepted" if should else "wrong_rejected"] += v["correct"] == should

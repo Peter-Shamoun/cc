@@ -26,26 +26,31 @@ Question: {question}
 
 Reference SQL:
 {gold_sql}
-Reference result ({gold_n} rows, first 25): {gold_rows}
+Reference result ({gold_n} rows{gold_note}): {gold_rows}
 
 Candidate SQL:
 {cand_sql}
-Candidate result ({cand_n} rows, first 25): {cand_rows}
+Candidate result ({cand_n} rows{cand_note}): {cand_rows}
 
 Reply with JSON only: {{"correct": true or false, "error_type": "none|filter|grain|definition|join|aggregation|rounding|other", "reason": "one sentence"}}"""
 
 
-def judge(question, gold_sql, gold_rows, cand_sql, cand_rows, model: str | None = None) -> dict:
+def judge(question, gold_sql, gold_rows, cand_sql, cand_rows, model: str | None = None, top_n: int | None = None) -> dict:
+    """top_n: for ranking questions the reference is the full ranking; the judge is told any valid top-N is fine."""
     import anthropic
+    limit = 200
+    if top_n:
+        question = f"{question}\n(Reference shows the full ranking; any {top_n} rows that form a valid top-{top_n} are correct.)"
     msg = anthropic.Anthropic().messages.create(
         model=model or MODEL, max_tokens=300,
         messages=[{"role": "user", "content": PROMPT.format(
-            glossary=GLOSSARY, question=question, gold_sql=gold_sql, gold_n=len(gold_rows), gold_rows=gold_rows[:25],
-            cand_sql=cand_sql, cand_n=len(cand_rows), cand_rows=cand_rows[:25])}])
+            glossary=GLOSSARY, question=question, gold_sql=gold_sql, gold_n=len(gold_rows), gold_rows=gold_rows[:limit],
+            gold_note=f", first {limit}" if len(gold_rows) > limit else "", cand_sql=cand_sql, cand_n=len(cand_rows),
+            cand_rows=cand_rows[:limit], cand_note=f", first {limit}" if len(cand_rows) > limit else "")}])
     text = "".join(b.text for b in msg.content if b.type == "text")
     try:
         out = json.loads(text[text.index("{"): text.rindex("}") + 1])
-        out["correct"] = bool(out.get("correct"))
+        out["correct"] = out.get("correct") is True                # "false" / "no" strings are not a pass
         return out
     except ValueError:
         return {"correct": False, "error_type": "other", "reason": "unparseable judge reply: " + text[:200]}

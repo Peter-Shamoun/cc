@@ -1,12 +1,17 @@
-"""Deterministic answer matching. An agent's result is correct when it contains the expected result:
+"""Deterministic answer matching.
 
-- Column-tolerant: the expected columns must map one-to-one onto candidate columns (any order, any names);
-  extra candidate columns are fine.
-- Row-exact: same number of rows, same multiset of rows over the mapped columns. Order is checked only
-  when the question asks for a ranking (`order: strict`), and `order: topn` accepts any valid top-N under
-  ties at the cut-off.
-- Numbers compare with an absolute tolerance per question; `allow_percent` also accepts rates given as
-  percentages (0.25 vs 25.0); `sign_insensitive` accepts a sign flip (credits reported as positive amounts).
+A candidate result is correct when it states the expected answer and nothing that contradicts it:
+
+- Columns are matched by value, not name (agents name columns freely). Every numeric column the candidate
+  returns must map to an expected column, so a result that lists several alternative numbers fails. Extra text
+  columns (labels, names next to ids) are allowed. Expected columns are required unless the question marks
+  them `optional_cols` (e.g. a supporting count).
+- Measures keep the expected column order, so two counts cannot be swapped.
+- Rows must match as a multiset within `tol`. `order: strict` also checks order. `order: topn` (with `n` and
+  `metric_col`) accepts any valid top-N when there are ties at the cut-off.
+- `percent_cols` and `sign_cols` allow, per listed column and for the whole column at once, a rate given as a
+  percentage or a credit given with the opposite sign.
+- Booleans count as 0/1, numeric strings as numbers, a 'YYYY-MM' month as that month's first day.
 
 Anything this rejects can still be appealed to the LLM judge, which sees both results.
 """
@@ -14,95 +19,122 @@ from __future__ import annotations
 
 import itertools
 import math
-from collections import Counter
+import re
 from datetime import date, datetime
 from decimal import Decimal
+
+_MONTH = re.compile(r"^\d{4}-\d{2}$")
+_NUMSTR = re.compile(r"^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$")
 
 
 def _num(v):
     if isinstance(v, bool):
-        return None
+        return float(v)
     if isinstance(v, (int, float, Decimal)):
         f = float(v)
         return None if math.isnan(f) else f
+    if isinstance(v, str) and _NUMSTR.match(v.strip()):
+        return float(v)
     return None
 
 
-def _cell_eq(g, c, tol: float, pct: bool, sign: bool) -> bool:
+def _text(v) -> str | None:
+    if v is None:
+        return None
+    if isinstance(v, (date, datetime)):
+        return str(v)[:10]
+    if isinstance(v, str) and _MONTH.match(v.strip()):
+        return v.strip() + "-01"
+    if isinstance(v, (list, tuple)):
+        return "|".join(sorted(map(str, v)))
+    return str(v).strip().lower()
+
+
+def _is_numeric_col(rows, j) -> bool:
+    vals = [r[j] for r in rows if r[j] is not None]
+    return bool(vals) and all(_num(v) is not None and not isinstance(v, str) for v in vals)
+
+
+def _eq(g, c, tol, factor) -> bool:
     gn, cn = _num(g), _num(c)
-    if gn is not None and cn is not None:
-        opts = [cn] + ([cn / 100] if pct else []) + ([-cn] if sign else []) + ([-cn / 100] if pct and sign else [])
-        return any(abs(gn - x) <= tol + 1e-12 for x in opts)
+    if gn is not None and cn is not None and not isinstance(g, str):     # expected text never compares as a number
+        return abs(gn - cn * factor) <= tol + 1e-12
     if g is None or c is None:
         return g is None and c is None
-    if isinstance(g, (date, datetime)) or isinstance(c, (date, datetime)):
-        return str(g)[:10] == str(c)[:10]
-    if isinstance(g, (list, tuple)) and isinstance(c, (list, tuple)):
-        return sorted(map(str, g)) == sorted(map(str, c))
-    return str(g).strip().lower() == str(c).strip().lower()
+    return _text(g) == _text(c)
 
 
-def _key(v, tol):
-    n = _num(v)
-    if n is not None:
-        return ("n", round(n / max(tol, 1e-9)))
-    if isinstance(v, (date, datetime)):
-        return ("s", str(v)[:10])
-    if isinstance(v, (list, tuple)):
-        return ("l", tuple(sorted(map(str, v))))
-    return ("s", "" if v is None else str(v).strip().lower())
-
-
-def _rows_match(gold, cand, mapping, spec) -> bool:
-    tol, pct, sign = spec.get("tol", 0.005), spec.get("allow_percent", False), spec.get("sign_insensitive", False)
-    proj = [tuple(r[j] for j in mapping) for r in cand]
-    if spec.get("order") == "strict":
-        return all(all(_cell_eq(g, c, tol, pct, sign) for g, c in zip(gr, cr)) for gr, cr in zip(gold, proj))
-    # order-insensitive: greedy matching over a sort, then a full check (handles tolerance at bucket edges)
-    remaining = list(proj)
-    for gr in gold:
-        hit = next((i for i, cr in enumerate(remaining) if all(_cell_eq(g, c, tol, pct, sign) for g, c in zip(gr, cr))), None)
+def _rows_equal(gold_rows, cand_rows, factors, tol) -> bool:
+    """Multiset equality of (already projected) rows; greedy is exact here because equality is per cell."""
+    remaining = list(cand_rows)
+    for gr in gold_rows:
+        hit = next((i for i, cr in enumerate(remaining)
+                    if all(_eq(g, c, tol, f) for g, c, f in zip(gr, cr, factors))), None)
         if hit is None:
             return False
         remaining.pop(hit)
-    return True
+    return not remaining
+
+
+def _mappings(gold, cand, spec):
+    """Yield (gold_cols, cand_cols, factors): injective mappings honoring the rules in the module docstring."""
+    k, m = len(gold[0]), len(cand[0])
+    req = set(spec.get("required_cols", range(k))) - set(spec.get("optional_cols", []))
+    opt = [j for j in range(k) if j not in req]
+    g_num = {j for j in range(k) if _is_numeric_col(gold, j)}
+    c_num = {j for j in range(m) if _is_numeric_col(cand, j)}
+    c_numstr = {j for j in range(m) if j not in c_num and all(_num(r[j]) is not None for r in cand if r[j] is not None)}
+    pct, sgn = set(spec.get("percent_cols", [])), set(spec.get("sign_cols", []))
+    for r in range(len(opt) + 1):
+        for extra in itertools.combinations(opt, r):
+            gcols = sorted(req | set(extra))
+            if len(gcols) > m:
+                continue
+            for ccols in itertools.permutations(range(m), len(gcols)):
+                if not c_num <= set(ccols):                       # every candidate number must be explained
+                    continue
+                if any((g in g_num) != (c in c_num or (g in g_num and c in c_numstr)) for g, c in zip(gcols, ccols)):
+                    continue
+                nums = [c for g, c in zip(gcols, ccols) if g in g_num]
+                if nums != sorted(nums):                          # measures keep the expected order
+                    continue
+                opts = []
+                for g in gcols:
+                    f = [1.0]
+                    if g in pct:
+                        f.append(0.01)
+                    if g in sgn:
+                        f += [-x for x in f]
+                    opts.append(f)
+                for factors in itertools.product(*opts):
+                    yield gcols, ccols, factors
 
 
 def match(gold: list[tuple], cand: list[tuple], spec: dict | None = None) -> tuple[bool, str]:
     spec = spec or {}
+    tol = spec.get("tol", 0.005)
     if spec.get("order") == "topn":
         return _match_topn(gold, cand, spec)
     if not gold:
-        return (not cand, "expected no rows" if cand else "ok")
+        return (not cand, "ok" if not cand else "expected no rows")
     if not cand:
         return False, "no rows returned"
-    if len(gold) == 1 and len(gold[0]) == 1 and len(cand) == 1:          # scalar: any cell may hold it
-        tol, pct, sign = spec.get("tol", 0.005), spec.get("allow_percent", False), spec.get("sign_insensitive", False)
-        ok = any(_cell_eq(gold[0][0], c, tol, pct, sign) for c in cand[0])
-        return ok, "ok" if ok else f"expected {gold[0][0]}, got {cand[0]}"
     if len(gold) != len(cand):
         return False, f"expected {len(gold)} rows, got {len(cand)}"
-    k, m = len(gold[0]), len(cand[0])
-    if m < k:
-        return False, f"expected at least {k} columns, got {m}"
-    tol = spec.get("tol", 0.005)
-    # prune: a gold column can only map to candidate columns with a compatible value multiset
-    sig = lambda rows, j: Counter(_key(r[j], tol) for r in rows)
-    options = []
-    for i in range(k):
-        gsig = sig(gold, i)
-        opts = [j for j in range(m) if sig(cand, j) == gsig] or list(range(m))
-        options.append(opts)
-    for mapping in itertools.product(*options):
-        if len(set(mapping)) == k and _rows_match(gold, cand, mapping, spec):
+    for gcols, ccols, factors in _mappings(gold, cand, spec):
+        g = [tuple(r[j] for j in gcols) for r in gold]
+        c = [tuple(r[j] for j in ccols) for r in cand]
+        if spec.get("order") == "strict":
+            if all(all(_eq(a, b, tol, f) for a, b, f in zip(gr, cr, factors)) for gr, cr in zip(g, c)):
+                return True, "ok"
+        elif _rows_equal(g, c, factors, tol):
             return True, "ok"
-    return False, "values differ"
+    return False, "values differ (or extra / missing columns)"
 
 
 def _match_topn(gold_full: list[tuple], cand: list[tuple], spec: dict) -> tuple[bool, str]:
-    """gold_full: every candidate row, sorted best-first, with the ranking metric in column `metric_col`.
-    A valid answer has exactly N rows (fewer only if there are fewer), all with correct values, containing every
-    row strictly better than the N-th metric and otherwise any rows tied with it."""
+    """gold_full: every candidate row, best first, metric in `metric_col`. Valid answer: exactly N rows (fewer only if
+    fewer exist) with correct values, containing every row strictly better than the N-th and otherwise rows tied with it."""
     n, mc, tol = spec["n"], spec.get("metric_col", 1), spec.get("tol", 0.005)
     if not gold_full:
         return (not cand, "ok" if not cand else "expected no rows")
@@ -110,15 +142,29 @@ def _match_topn(gold_full: list[tuple], cand: list[tuple], spec: dict) -> tuple[
     if len(cand) != n:
         return False, f"expected {n} rows, got {len(cand)}"
     cutoff = _num(gold_full[n - 1][mc])
-    better = lambda r: _num(r[mc]) is not None and (_num(r[mc]) > cutoff + tol if not spec.get("ascending") else _num(r[mc]) < cutoff - tol)
-    tied = lambda r: _num(r[mc]) is not None and abs(_num(r[mc]) - cutoff) <= tol
-    must = [r for r in gold_full if better(r)]
-    may = [r for r in gold_full if tied(r)]
-    for size in (len(must),):
-        for extra in itertools.combinations(may, n - size):
-            ok, why = match(must + list(extra), cand, {**spec, "order": None})
-            if ok:
-                return True, "ok"
-            if len(may) > 12:                                               # bound the search on huge ties
+    asc = spec.get("ascending", False)
+    better = [r for r in gold_full if (_num(r[mc]) < cutoff - tol if asc else _num(r[mc]) > cutoff + tol)]
+    tied = [r for r in gold_full if abs(_num(r[mc]) - cutoff) <= tol]
+    for gcols, ccols, factors in _mappings(gold_full, cand, spec):
+        proj_g = lambda rows: [tuple(r[j] for j in gcols) for r in rows]
+        c = [tuple(r[j] for j in ccols) for r in cand]
+        remaining = list(c)
+        ok = True
+        for gr in proj_g(better):                                 # every strictly-better row must be there
+            hit = next((i for i, cr in enumerate(remaining) if all(_eq(a, b, tol, f) for a, b, f in zip(gr, cr, factors))), None)
+            if hit is None:
+                ok = False
                 break
+            remaining.pop(hit)
+        if not ok:
+            continue
+        pool = proj_g(tied)                                       # the rest: distinct rows from the tied set
+        for cr in remaining:
+            hit = next((i for i, gr in enumerate(pool) if all(_eq(a, b, tol, f) for a, b, f in zip(gr, cr, factors))), None)
+            if hit is None:
+                ok = False
+                break
+            pool.pop(hit)
+        if ok:
+            return True, "ok"
     return False, "not a valid top-N"
