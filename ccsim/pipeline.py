@@ -7,7 +7,7 @@ from __future__ import annotations
 import hashlib
 import tempfile
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import duckdb
@@ -58,7 +58,7 @@ def parse_batch(ctx) -> dict:
     c, day, B = ctx.overrides["customer"], ctx.overrides["received_date"], ctx.overrides["bucket"]
     run_id = f"run_{day.replace('-', '')}_{uuid.uuid4().hex[:6]}"
     s3 = ctx.client("s3")
-    started = datetime.utcnow()
+    started = datetime.now(UTC).replace(tzinfo=None)
     raw_keys = [o["Key"] for o in s3.list_objects_v2(Bucket=B, Prefix=f"{c}/raw/received_date={day}/")["Contents"]
                 if o["Key"].endswith(".x12")]
 
@@ -66,7 +66,7 @@ def parse_batch(ctx) -> dict:
     silver = s3.local_prefix(B, f"{c}/parquet/")
     sf_dir = silver / "edi.source_file"
     if sf_dir.exists():
-        for sha, fid in duckdb.sql(f"SELECT sha256, file_id FROM read_parquet('{sf_dir}/**/*.parquet', hive_partitioning=false) "
+        for sha, fid in duckdb.execute(f"SELECT sha256, file_id FROM read_parquet('{sf_dir}/**/*.parquet', hive_partitioning=false) "
                                    "WHERE duplicate_of_file_id IS NULL").fetchall():
             known[sha] = fid
 
@@ -101,7 +101,7 @@ def parse_batch(ctx) -> dict:
             _insert(con, t, rows.get(t, []))
         loaded += 1
     con.execute("UPDATE edi.ingest_run SET finished_at = ?, files_seen = ?, files_loaded = ?, files_rejected = ? "
-                "WHERE ingest_run_id = ?", [datetime.utcnow(), len(raw_keys), loaded, rejected, run_id])
+                "WHERE ingest_run_id = ?", [datetime.now(UTC).replace(tzinfo=None), len(raw_keys), loaded, rejected, run_id])
     month = day[:7]
     with tempfile.TemporaryDirectory() as tmp:
         for t in SILVER_TABLES:                           # staging: one file per table for this run
