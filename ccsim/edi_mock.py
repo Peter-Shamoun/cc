@@ -52,6 +52,7 @@ FIRST = ["AVERY", "JORDAN", "TAYLOR", "MORGAN", "CASEY", "RILEY", "QUINN", "JAMI
          "DREW", "SAGE", "EMERY", "HARPER", "LOGAN", "REESE", "BLAKE", "DAKOTA", "FINLEY"]
 LAST = ["ACMEFIELD", "TESTWOOD", "SAMPLEMAN", "MOCKLER", "DUMMIT", "FAKERSON", "PLACEHOLT", "SYNTHIA", "NULLMAN",
         "FIXTURE", "STUBBS", "EXAMPLAR", "PROTOTOV", "DEMOSKI", "TRIALSON"]
+PROVIDER_LAST = ["OSLERTON", "HIPPOCRAS", "GALENSKI", "CURIEWOOD", "PASTEURO", "LISTERMAN", "SNOWDEN", "BLACKWELLO"]
 CITIES = [("BURLINGTON", "NC", "27215"), ("RALEIGH", "NC", "27601"), ("AUSTIN", "TX", "78701"), ("DENVER", "CO", "80202")]
 
 
@@ -151,7 +152,7 @@ class Generator:
         self.tenants = tenants or list(TENANTS)
         self.ctl = 1
         self.patients = [self._patient(i) for i in range(400)]
-        self.referring = [dict(last=self.rng.choice(LAST), first=self.rng.choice(FIRST), npi=npi(9000 + i)) for i in range(25)]
+        self.referring = [dict(last=self.rng.choice(PROVIDER_LAST), first=self.rng.choice(FIRST), npi=npi(9000 + i)) for i in range(25)]
 
     def _patient(self, i):
         r = self.rng
