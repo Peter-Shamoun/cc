@@ -1,4 +1,3 @@
-# STATUS: CURRENT (design) - agent tools + compiler for the semantic layer; not wired into the app yet (build week Sun). open: run_semantic_sql only allows sem.*, but the plan lets the agent escalate to the lossless schema (lane 2); not reconciled yet | source: chat "835/837p EDI analytics schema" (2026-10-23) | FLAG: 1 later Edit applied; compiles
 """
 ClaimClarity — agent interface to the semantic layer.
 

@@ -1,4 +1,3 @@
-# STATUS: CURRENT (tooling) - generates the draw.io version of the data-backend canvas. Open: Lucid import still rejected | source: chat "Draw.io arrows from Zoom" (2026-10-23) | FLAG: reconstructed from the Write call plus every later patch in the transcript; compiles
 """Generate ClaimClarity Data Backend canvas as an editable draw.io file."""
 from xml.sax.saxutils import escape
 import sys

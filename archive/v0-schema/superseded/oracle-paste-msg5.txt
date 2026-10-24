@@ -1,4 +1,3 @@
-# STATUS: REFERENCE - your pasted AI_APPEAL_SFTP Oracle table definitions (input) | source: chat "EDI 835/837 parquet schema" (2026-10-22) | FLAG: Same whitespace caveat as msg4 | Turn 8 (user message 5): leading sentence plus the re-pasted Oracle tables, without the system-reminder line
 to be honest im starting to think this is just the schema we should choose, with the rest of the details as columns instead of the start and stop byte index:
 Requested Tables
 AI_APPEAL_SFTP_FILE

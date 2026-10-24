@@ -1,4 +1,3 @@
-# STATUS: LEGACY - replaced by diagrams/data-backend-canvas/* | source: chat "Data pipeline plan and diagram" (2026-10-23) | FLAG: SUPERSEDED: early flow sketch from turn 1
 SFTP → copy script → s3://.../<customer>/raw/ + _SUCCESS
      → EventBridge → Fargate parser (customer role) → silver/ → gold/
 User → Entra/Cognito token → backend (customer from token) → STS creds

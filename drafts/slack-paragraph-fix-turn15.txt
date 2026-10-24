@@ -1,2 +1,1 @@
-# STATUS: REFERENCE - one-paragraph fix for your Slack draft | source: chat "SOTA agent chatbot best practices" (2026-10-23) | FLAG: may-duplicate-already-extracted-slack-draft | Turn 15: rewritten single paragraph of the Slack message (user asked to return only that part fixed)
 In our case, we could keep all our data in one lossless Parquet schema and build a curated layer from it, a few simple tables or views generated automatically, that can answer about 90% of user queries.

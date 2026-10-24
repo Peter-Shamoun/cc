@@ -1,4 +1,3 @@
-<!-- STATUS: LEGACY - duplicate rebuilt from chat edits; the exact export is research/agent-chatbot-best-practices.md | source: chat "SOTA agent chatbot best practices" (2026-10-23) | FLAG: SUPERSEDED/cross-check: the doc rebuilt from the chat edits; the exact export is research/agent-chatbot-best-practices.md -->
 # Conversational Analytics Agents: SOTA (2025–2026)
 
 2026-10-22 · @me

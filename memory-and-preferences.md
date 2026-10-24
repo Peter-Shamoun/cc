@@ -1,4 +1,3 @@
-<!-- STATUS: CURRENT (built) - live ClaimClarity current-state note (2026-10-24) + preferences; the account-level note at the end is an older 2026-10-02 copy | source: claude.ai memory store, project + account-level ClaimClarity files, as stored on 2026-10-24 -->
 ## /projects/01a164c7-7161-7219-b75d-d1f0dbd461c6/areas/implementations-neo4j-chatbot.md  (updated 2026-10-24T17:42:42Z)
 
 ---

@@ -1,4 +1,3 @@
-<!-- STATUS: REFERENCE - memory unrelated to ClaimClarity | source: claude.ai memory store, account-level files unrelated to ClaimClarity (NBA, payer-policy benchmark, React library), as stored on 2026-10-24 -->
 ## /areas/next-best-action-model.md  (account-level; updated 2026-10-13T21:59:59Z)
 
 ---

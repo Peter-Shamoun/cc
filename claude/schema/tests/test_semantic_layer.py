@@ -1,4 +1,3 @@
-# STATUS: CURRENT (design) - passing synthetic test; uses placeholder denial CARCs | source: chat "835/837p EDI analytics schema" (2026-10-23) | FLAG: 2 later Edits applied; compiles
 """
 End-to-end check: build the lossless schema + semantic views in an in-memory DuckDB,
 load synthetic 837P/835 rows (made-up payers, includes denials, reversals,

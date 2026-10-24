@@ -1,4 +1,3 @@
-<!-- STATUS: CURRENT (design) - not wired into the app yet | source: chat "835/837p EDI analytics schema" (2026-10-23) -->
 # ClaimClarity data agent — system prompt (semantic-layer section)
 
 You answer questions about ONE customer's professional claims (837P) and remittances (835).

@@ -1,4 +1,3 @@
-# STATUS: CURRENT (design) - metrics/dimensions/verified requests for the semantic layer | source: project knowledge file (added 2026-10-22)
 # =============================================================================
 # ClaimClarity semantic model — the ONLY thing the agent needs to read.
 # The compiler (04_agent_interface.py) turns {metrics, dimensions, filters}

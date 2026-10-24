@@ -1,4 +1,3 @@
-<!-- STATUS: LEGACY - earlier doc version; replaced by research/agent-chatbot-best-practices.md | source: chat "SOTA agent chatbot best practices" (2026-10-23) | FLAG: reassembled-from-section-writes | Turn 3: first Claude Docs version 'Conversational Analytics Agents: SOTA (2025-2026) and ClaimClarity Gap Analysis', 10 sections reassembled verbatim from section update payloads; title line from create call; date/mention byline blocks omitted -->
 # Conversational Analytics Agents: SOTA (2025–2026) and ClaimClarity Gap Analysis
 
 ## TL;DR

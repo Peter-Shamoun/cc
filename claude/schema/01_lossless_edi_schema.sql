@@ -1,4 +1,3 @@
--- STATUS: CURRENT (design) - the lossless (silver) schema; replaces archive/v0-schema/claimclarity-lossless-parquet-schema.md. Open: how superseded files are recorded on edi.source_file | source: project knowledge file (added 2026-10-22)
 -- =============================================================================
 -- ClaimClarity — LOSSLESS EDI STORAGE SCHEMA (835 5010X221A1 + 837P 5010X222A1)
 -- Target: DuckDB over Parquet (one Parquet dataset per table), one copy per

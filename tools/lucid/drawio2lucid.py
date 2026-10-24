@@ -1,4 +1,3 @@
-# STATUS: CURRENT (tooling) - Lucid pipeline; Lucid import still unresolved | source: chat "Draw.io arrows from Zoom" (2026-10-23) | FLAG: reconstructed from Write + 4 patches; hard-coded /tmp paths
 """Convert the (uncompressed) ClaimClarity draw.io diagram into a Lucid Standard Import (.lucid) file.
 
 Handles the subset of draw.io used by gen.py: nested containers, rectangles, text,

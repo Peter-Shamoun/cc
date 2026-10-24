@@ -1,4 +1,3 @@
-<!-- STATUS: REFERENCE - your messages + what was decided/built/left open | source: chat "EDI 835/837 parquet schema" (2026-10-22) -->
 ## User messages (verbatim)
 
 ### Message 1

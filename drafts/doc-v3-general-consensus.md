@@ -1,4 +1,3 @@
-<!-- STATUS: LEGACY - earlier doc version; replaced by research/agent-chatbot-best-practices.md | source: chat "SOTA agent chatbot best practices" (2026-10-23) | FLAG: reassembled-from-section-writes | Turn 7: retitled general-consensus version (pre-jargon-removal), reassembled verbatim from skeleton + 8 section payloads with the one find/replace applied; turn 9 then rewrote it into the final doc -->
 # Conversational Analytics Agents: SOTA (2025–2026)
 
 The 2026 consensus for chat-over-data agents: the model decides *what* to compute, governed code decides *how*, and accuracy comes mostly from curated context and a measured eval loop, not from the model choice.

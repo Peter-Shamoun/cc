@@ -1,4 +1,3 @@
-<!-- STATUS: REFERENCE - your messages + what was decided/built/left open | source: chat "Draw.io arrows from Zoom" (2026-10-23) -->
 ## User messages (verbatim)
 
 ### Message 1
