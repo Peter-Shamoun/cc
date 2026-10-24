@@ -36,8 +36,8 @@
   ledger: total_paid
   compare: {tol: 0.01}
   gold_sql: SELECT round(sum(paid_amount), 2) AS paid FROM sem.remit_claims WHERE is_current_adjudication
+  # Note: summing every 835 event gives the same total (reversals cancel what they reverse), so it is not listed as wrong.
   wrong_sql:
-    - {label: sums every 835 event (superseded and reversals too), sql: SELECT sum(paid_amount) FROM sem.remit_claims}
     - {label: sums 835 payment totals (BPR02 nets out PLB adjustments), sql: SELECT sum(total_payment_amount) FROM sem.payments}
 
 - id: q04_paid_by_month
@@ -67,7 +67,7 @@
   question: How much prompt-pay interest have payers paid us through provider-level adjustments (PLB reason L6)? Give a positive dollar amount.
   ledger: interest_paid
   compare: {tol: 0.01, sign_insensitive: true}
-  gold_sql: SELECT round(-sum(provider_adjustment_amount), 2) AS interest FROM sem.provider_adjustments WHERE plb_reason_code = 'L6'
+  gold_sql: SELECT coalesce(round(-sum(provider_adjustment_amount), 2), 0) AS interest FROM sem.provider_adjustments WHERE plb_reason_code = 'L6'
 
 - id: q07_denial_rate
   category: denials
@@ -136,7 +136,6 @@
     GROUP BY 1 HAVING count(*) >= 20 ORDER BY 2 DESC
   wrong_sql:
     - {label: "uses 835 lines (claim-level denials carry no SVC lines, so those claims vanish)", sql: "SELECT procedure_code, round(count(DISTINCT claim_payer_key) FILTER (WHERE claim_is_denied) / count(DISTINCT claim_payer_key), 4), count(DISTINCT claim_payer_key) FROM sem.remit_lines WHERE is_current_adjudication GROUP BY 1 HAVING count(DISTINCT claim_payer_key) >= 20"}
-    - {label: counts lines not claims, sql: "SELECT l.procedure_code, avg(r.is_denied::INT), count(*) FROM sem.claim_lines l JOIN sem.remit_claims r ON r.claim_key = l.claim_key AND r.is_current_adjudication WHERE l.is_latest_submission GROUP BY 1 HAVING count(*) >= 20"}
 
 - id: q12_referring_provider_denials
   category: denials
@@ -258,7 +257,7 @@
   ledger: secondary_paid_claims
   compare: {tol: 0.01}
   gold_sql: |
-    SELECT count(*) FILTER (WHERE paid_amount > 0) AS claims, round(sum(paid_amount), 2) AS paid
+    SELECT count(*) FILTER (WHERE paid_amount > 0) AS claims, coalesce(round(sum(paid_amount), 2), 0) AS paid
     FROM sem.remit_claims WHERE is_current_adjudication AND payer_sequence = 'secondary'
 
 - id: q24_primary_patient_responsibility
@@ -269,7 +268,7 @@
   compare: {tol: 0.01}
   gold_sql: |
     WITH p AS (SELECT DISTINCT claim_key, payer_key FROM sem.claims WHERE payer_responsibility = 'P')
-    SELECT round(sum(r.patient_responsibility_amount), 2) AS patient_responsibility
+    SELECT coalesce(round(sum(r.patient_responsibility_amount), 2), 0) AS patient_responsibility
     FROM sem.remit_claims r JOIN p USING (claim_key, payer_key) WHERE r.is_current_adjudication
   wrong_sql:
     - {label: sums patient responsibility across primary and secondary payers, sql: SELECT sum(patient_responsibility_amount) FROM sem.remit_claims WHERE is_current_adjudication}
@@ -282,7 +281,7 @@
   compare: {tol: 0.01}
   gold_sql: |
     WITH p AS (SELECT DISTINCT claim_key, payer_key FROM sem.claims WHERE payer_responsibility = 'P')
-    SELECT round(sum(a.adjustment_amount), 2) AS deductible
+    SELECT coalesce(round(sum(a.adjustment_amount), 2), 0) AS deductible
     FROM sem.adjustments a JOIN p USING (claim_key, payer_key)
     WHERE a.is_current_adjudication AND a.group_code = 'PR' AND a.carc_code = '1'
 

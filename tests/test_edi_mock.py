@@ -235,3 +235,25 @@ def test_default_benchmark_scenario_exercises_money_features(tmp_path):
     assert {p["code"] for p in t["plb"]} >= {"WO", "L6"}, {p["code"] for p in t["plb"]}
     assert any(c["voided"] for c in t["claims"].values())
     assert any(a["seq"] == 1 and a["paid_current"] > 0 for c in t["claims"].values() for a in c["adjudications"].values())
+
+
+def test_every_parsed_value_survives_into_the_lossless_tables(stress):
+    """Parser rows -> constrained DDL tables (as the Fargate task stages them): no field may be dropped."""
+    import duckdb
+    from ccsim.pipeline import DDL_LOSSLESS, _insert
+    from ccsim.parser import TABLES
+    out, truth = stress
+    tc, f, body = next((tc, f, b) for tc, f, b in _files(out, truth) if f["kind"] == "837" and b"\nSVD*" in b)
+    rows = parse_file(body.decode(), "F1", tc, dict(s3_uri="x", s3_bucket="x", s3_key="x", size_bytes=1, sha256="x"),
+                      "r1", datetime(2026, 1, 1))
+    con = duckdb.connect()
+    con.execute(DDL_LOSSLESS)
+    _insert(con, "edi.ingest_run", [dict(ingest_run_id="r1", started_at=datetime(2026, 1, 1), status="SUCCEEDED",
+                                         parser_name="t", parser_version="0", schema_version="1")])
+    for t in TABLES:
+        _insert(con, t, rows.get(t, []))
+    for t in TABLES:
+        for col in {k for r in rows.get(t, []) for k, v in r.items() if v not in (None, [], "")}:
+            n_rows = sum(1 for r in rows[t] if r.get(col) not in (None, [], ""))
+            n_tab = con.execute(f'SELECT count(*) FROM {t} WHERE "{col}" IS NOT NULL').fetchone()[0]
+            assert n_tab == n_rows, f"{t}.{col}: {n_rows} parsed, {n_tab} stored"

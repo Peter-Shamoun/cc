@@ -79,7 +79,10 @@ def seed_ref(con: duckdb.DuckDBPyConnection):
 def _insert(con, table: str, rows: list[dict]):
     if not rows:
         return
-    con.register("_rows", pa.Table.from_pylist(rows))
+    # Columns are the union of every row's keys: pa.Table.from_pylist infers them from the first row only and
+    # would silently drop fields the first row lacks (an HL-20 has no SBR, a submitter NM1 has no address).
+    keys = list(dict.fromkeys(k for r in rows for k in r))
+    con.register("_rows", pa.table({k: [r.get(k) for r in rows] for k in keys}))
     con.execute(f"INSERT INTO {table} BY NAME SELECT * FROM _rows")
     con.unregister("_rows")
 
