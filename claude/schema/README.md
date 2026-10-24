@@ -43,13 +43,13 @@ The compiler sees `procedure_code` isn't on `sem.remit_claims`, picks `sem.remit
 6. **The agent never picks a view.** Metrics declare which views can compute them; the compiler picks the coarsest one that has every requested field and returns a model-readable error otherwise.
 
 ## Fit with what already exists
-- `query_metrics` is the typed-task path (server compiles SQL; no model-written SQL on the live path). `run_semantic_sql` is a lane-2 (ADR-009) style escape hatch, but scoped to `sem.*` and parsed with sqlglot.
+- `query_metrics` is the typed-task path (server compiles SQL; no model-written SQL on the live path). `run_semantic_sql` is a lane-2 (ADR-009) style escape hatch, scoped to `sem.*` and parsed with sqlglot. The data-backend design widens lane 2 to guarded SQL over PHI-stripped views of the lossless (silver) tables, loaded only when needed; those views and the matching guard change are not built yet, so the code still allows only `sem.*`.
 - The denial definitions are the existing ones (recorded = CLP02 4; signal v3 = non-reversal, $0 paid, CO CAS in the reviewed CARC list). **`ref.denial_carc` must be loaded with the 23 reviewed CARCs** — the test uses placeholders.
 - The dedupe in `sem_int.remit_event` (file-level `duplicate_of_file_id` / `superseded_by_file_id` + "latest event per PCN+payer") is the fix for the `keys.remittances` duplicate-key failure.
 
 ## Known gaps / next steps
 - **Parser not included**: the DDL defines the target; the X12 → Parquet loader still needs to populate it (including `loop_path`, the copied REF*6R columns, and `edi.segment`).
-- **Materialize** `sem_int.remit_event` and `sem_int.line_match` at load time for large tenants.
+- **Materialize** every `sem.*` view to Parquet once per batch (`semantic_layer/v=<run_id>/` plus a `CURRENT` pointer; see `docs/data-backend/s3-folder-layout.txt`). The view SQL here is what the parser runs; the agent reads the materialized files.
 - **Payer matching** between 837 2010BB and 835 1000A relies on `ref.payer_alias`; until populated, payer_key is a normalized name, so the same payer can appear twice if names differ across sides.
 - **Line matching** is heuristic when REF*6R is missing; `remit_match_method` records which tier matched.
 - **Time-range presets** anchor to today by default; historical conversion files should use `anchor: data`.

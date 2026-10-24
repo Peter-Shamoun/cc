@@ -9,8 +9,9 @@ The agent gets five tools. Four of them never let the model write SQL:
   get_claim_timeline        everything that happened to one claim key, in order
   run_semantic_sql          escape hatch: model-written SELECT, but only over sem.* (parsed + guarded)
 
-The lossless schema (edi / c837 / r835) is unreachable from all five. Escalation to it
-is a separate, human-gated path (see LOSSLESS_ESCALATION_TOOL), deliberately not wired here.
+The lossless schema (edi / c837 / r835) is unreachable from all five. The data-backend
+design lets the agent escalate to guarded SQL over PHI-stripped views of it (lane 2);
+until those views exist, LOSSLESS_ESCALATION_TOOL is a human-gated placeholder, not wired here.
 
 Usage:
     import duckdb
