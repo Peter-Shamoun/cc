@@ -1,0 +1,506 @@
+<!-- STATUS: LEGACY - rejected 48-table agent surface; replaced by claude/schema/* | source: chat "EDI 835/837 parquet schema" (2026-10-22) | FLAG: Turn 3: first full Write of cc-schema.html, the 48-table lossless catalog page, before the turn-5 edits -->
+<title>CC Schema v1</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: reference manual — sticky table index on the left, sections + catalog on the right; one column on phones. */
+:root{
+  --bg:#f6f8f9; --surface:#ffffff; --sunk:#eef2f4; --fg:#16232b; --muted:#56656f; --line:#d6dee3;
+  --accent:#0d5e78; --accent-soft:#dcedf3;
+  --l-lin:#6a7480; --l-837:#2457a6; --l-835:#1d7a4f; --l-match:#8a4fb0; --l-ref:#a8640c; --l-view:#0d5e78;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"Instrument Sans", "Segoe UI", system-ui, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0f161b; --surface:#152028; --sunk:#1b2831; --fg:#e3eaee; --muted:#93a3ad; --line:#2a3943;
+  --accent:#5fb6d3; --accent-soft:#16323e;
+  --l-lin:#9aa4ae; --l-837:#7aa6ec; --l-835:#5fc493; --l-match:#c296e0; --l-ref:#e3a457; --l-view:#5fb6d3; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0f161b; --surface:#152028; --sunk:#1b2831; --fg:#e3eaee; --muted:#93a3ad; --line:#2a3943;
+  --accent:#5fb6d3; --accent-soft:#16323e;
+  --l-lin:#9aa4ae; --l-837:#7aa6ec; --l-835:#5fc493; --l-match:#c296e0; --l-ref:#e3a457; --l-view:#5fb6d3; color-scheme:dark }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:15px/1.6 var(--body);margin:0}
+.wrap{max-width:1240px;margin:0 auto;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:32px 64px}
+h1,h2,h3{font-family:var(--display);line-height:1.15;text-wrap:balance;margin:0}
+h1{font-size:clamp(28px,4.5vw,42px);letter-spacing:-.01em}
+h2{font-size:24px;margin-bottom:12px}
+h3{font-size:18px}
+code,.mono{font-family:var(--mono);font-size:.86em}
+p{margin:0;max-width:72ch}
+a{color:var(--accent)}
+.eyebrow{font:500 12px/1 var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+header.top{display:grid;gap:14px;padding-bottom:28px;border-bottom:1px solid var(--line);margin-bottom:28px}
+.lede{font-size:17px;color:var(--fg)}
+.stats{display:flex;flex-wrap:wrap;gap:8px 20px;font:500 13px var(--mono);color:var(--muted)}
+.stats b{color:var(--fg);font-weight:500}
+.layout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:40px;align-items:start}
+nav.idx{position:sticky;top:calc(env(safe-area-inset-top, 0px) + 16px);max-height:calc(100vh - 32px);overflow:auto;font-size:13px;display:grid;gap:14px;padding-right:4px}
+nav.idx .grp{display:grid;gap:2px}
+nav.idx .grp > span{font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:2px}
+nav.idx a{font-family:var(--mono);font-size:12.5px;text-decoration:none;color:var(--fg);padding:2px 6px;border-radius:4px;border-left:2px solid transparent}
+nav.idx a:hover{background:var(--sunk)}
+nav.idx a.hide{display:none}
+main{display:grid;gap:48px;min-width:0}
+section{display:grid;gap:14px;min-width:0}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.layers{display:grid;gap:8px}
+.layer{display:grid;grid-template-columns:150px minmax(0,1fr);gap:16px;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--c);border-radius:6px}
+.layer .who{font:500 12px var(--mono);color:var(--muted)}
+.layer .nm{font-weight:600}
+.layer .tbls{font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+.diagram{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px;overflow-x:auto}
+.diagram pre{margin:0;font:12.5px/1.55 var(--mono);color:var(--fg)}
+.conv{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.conv div{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;display:grid;gap:4px;font-size:14px}
+.conv code{color:var(--accent);font-weight:500}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;position:sticky;top:env(safe-area-inset-top, 0px);background:var(--bg);padding-block:10px;z-index:5;border-bottom:1px solid var(--line)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top, 0px);z-index:10;background:var(--bg)}
+#q{flex:1 1 240px;min-width:0;font:14px var(--body);padding:8px 12px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--fg)}
+#q:focus,button:focus-visible,nav.idx a:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.chip{font:500 12px var(--mono);padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+#count{font:12px var(--mono);color:var(--muted)}
+.tcard{background:var(--surface);border:1px solid var(--line);border-radius:8px;scroll-margin-top:80px;min-width:0}
+.tcard header{padding:14px 16px;display:grid;gap:8px;border-bottom:1px solid var(--line)}
+.tname{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:baseline}
+.tname h3{font-family:var(--mono);font-size:17px;font-weight:500}
+.badge{font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;padding:3px 8px;border-radius:4px;color:var(--c);border:1px solid var(--c)}
+.aud{font:11px var(--mono);color:var(--muted)}
+.meta{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:3px 14px;font-size:13.5px}
+.meta dt{font:500 11.5px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding-top:2px}
+.meta dd{margin:0}
+.why{font-size:13.5px;color:var(--muted)}
+.cols{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th{text-align:left;font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:8px 12px;background:var(--sunk);white-space:nowrap}
+td{padding:6px 12px;border-top:1px solid var(--line);vertical-align:top}
+td.c{font-family:var(--mono);font-size:12.5px;white-space:nowrap}
+td.t{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap}
+td.x{font-family:var(--mono);font-size:11.5px;color:var(--accent);white-space:nowrap}
+tr.hit td.c{background:var(--accent-soft)}
+.pk{font:500 10px var(--mono);color:var(--accent);margin-left:6px}
+.lin{font-size:12.5px;color:var(--muted);padding:8px 12px;border-top:1px solid var(--line)}
+.lin code{color:var(--fg)}
+.decisions{display:grid;gap:10px}
+.dec{display:grid;grid-template-columns:200px minmax(0,1fr);gap:16px;padding:12px 0;border-top:1px solid var(--line)}
+.dec b{font-weight:600}
+pre.sql{margin:0;background:var(--sunk);border:1px solid var(--line);border-radius:6px;padding:12px 14px;overflow-x:auto;font:12.5px/1.55 var(--mono)}
+.q{display:grid;gap:8px}
+.q p{font-weight:600}
+.rules{display:grid;gap:8px;padding-left:20px;margin:0}
+.callout{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px 16px;display:grid;gap:6px;font-size:14px}
+ul.plain{margin:0;padding-left:20px;display:grid;gap:6px}
+@media (max-width:860px){
+  .layout{grid-template-columns:minmax(0,1fr)}
+  nav.idx{display:none}
+  .layer,.dec{grid-template-columns:minmax(0,1fr);gap:4px}
+}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div class="eyebrow">CC · Labcorp · 837P 005010X222A1 + 835 005010X221A1</div>
+  <h1>CC Schema v1</h1>
+  <p class="lede">A normalized, lossless set of Parquet tables at the true X12 grain: file → transaction → claim → service line → adjustment. Every row traces back to its S3 object and segment span. The agent queries a small set of decoded views; engineers get a byte-exact copy of every segment.</p>
+  <div class="stats" id="stats"></div>
+</header>
+
+<div class="layout">
+<nav class="idx" id="idx" aria-label="Table index"></nav>
+
+<main>
+<section id="layers">
+  <h2>How the pieces stack</h2>
+  <p>Five layers. The agent starts at the top and only goes down when a question needs it.</p>
+  <div class="layers">
+    <div class="layer" style="--c:var(--l-view)"><div><div class="nm">Agent views</div><div class="who">default surface</div></div><div><p>Pre-joined, codes decoded to plain English, reversals already netted. Logical DuckDB views, never stale.</p><div class="tbls">v_claim · v_claim_line · v_remit_claim · v_adjustment_detail · v_remark_detail · v_payment_reconciliation</div></div></div>
+    <div class="layer" style="--c:var(--l-837)"><div><div class="nm">837P claims</div><div class="who">core, lossless</div></div><div><p>What Labcorp billed. One table per real one-to-many relation.</p><div class="tbls">claim · claim_line · claim_diagnosis · claim_party · claim_other_payer · …</div></div></div>
+    <div class="layer" style="--c:var(--l-835)"><div><div class="nm">835 remittances</div><div class="who">core, lossless</div></div><div><p>What payers paid and why. One row per CAS trio, PLB pair and remark.</p><div class="tbls">remit_payment · remit_claim · remit_service_line · remit_adjustment · …</div></div></div>
+    <div class="layer" style="--c:var(--l-match)"><div><div class="nm">Claim ↔ remit match</div><div class="who">derived at ingest</div></div><div><p>837-to-835 linking done once, with an explicit method and rank, so the agent never invents join logic.</p><div class="tbls">claim_remit_match · claim_line_remit_match</div></div></div>
+    <div class="layer" style="--c:var(--l-ref)"><div><div class="nm">Code lookups</div><div class="who">reloaded Mar / Jul / Nov</div></div><div><p>CARC, RARC, status, POS and every X12 qualifier list, with start and stop dates.</p><div class="tbls">ref_carc · ref_rarc · ref_cas_group · ref_x12_qualifier · data_dictionary · …</div></div></div>
+    <div class="layer" style="--c:var(--l-lin)"><div><div class="nm">Lineage &amp; raw</div><div class="who">engineers</div></div><div><p>S3 object, envelope control numbers, and every segment byte-for-byte. This is what makes the set lossless.</p><div class="tbls">source_file · edi_transaction · raw_segment · ingest_issue</div></div></div>
+  </div>
+</section>
+
+<section id="er">
+  <h2>Relationships</h2>
+  <p>Arrows read "one to many". Every core row also joins to <code>raw_segment</code> through its segment span.</p>
+  <div class="diagram"><pre>source_file ─1:*─ edi_transaction
+     │                 ├─ (837) claim ─┬─ claim_line ── claim_line_adjudication (2430)
+     │                 │               ├─ claim_diagnosis
+     │                 │               ├─ claim_party            (opt. claim_line_id)
+     │                 │               ├─ claim_reference / claim_date / claim_amount
+     │                 │               ├─ claim_other_payer ── claim_cob_adjustment
+     │                 │               └─ claim_misc_segment
+     │                 └─ (835) remit_payment ─┬─ remit_claim ─┬─ remit_service_line
+     │                                         │               ├─ remit_adjustment  (claim or line level)
+     │                                         │               ├─ remit_remark      (claim or line level)
+     │                                         │               └─ remit_party / _reference / _date / _amount / _quantity
+     │                                         ├─ remit_provider_adjustment (PLB)
+     │                                         └─ remit_misc_segment
+     └─1:*─ raw_segment   ON source_file_id AND segment_position
+                          BETWEEN source_segment_start AND source_segment_end
+
+claim       ─*  claim_remit_match       *─ remit_claim
+claim_line  ─*  claim_line_remit_match  *─ remit_service_line
+ref_* tables join on code columns, e.g. remit_adjustment.adjustment_reason_code = ref_carc.carc_code</pre></div>
+</section>
+
+<section id="conventions">
+  <h2>Naming and type conventions</h2>
+  <p>The goal is that a column name alone tells the agent what it holds and how to join it. X12 element references live in comments, never in names.</p>
+  <div class="conv">
+    <div><code>_id</code><span>Surrogate key, VARCHAR. Deterministic <span class="mono">md5(source_file_id:segment_start)</span>, so re-ingesting a file is idempotent.</span></div>
+    <div><code>_number</code><span>An identifier the business or payer assigned (PCN, ICN, trace number).</span></div>
+    <div><code>_code</code><span>Coded value, always VARCHAR so <span class="mono">"01"</span> and <span class="mono">"B7"</span> survive. Decoded in ref tables.</span></div>
+    <div><code>_amount</code><span>DECIMAL(18,2), stored as sent with its sign. CAS and PLB positive values <b>reduce</b> payment.</span></div>
+    <div><code>_date</code> · <code>_at</code><span>DATE, and TIMESTAMP in UTC. RD8 ranges split into <span class="mono">_start_date</span> / <span class="mono">_end_date</span>.</span></div>
+    <div><code>is_</code> · <code>_count</code><span>BOOLEAN flags; counts and quantities are DECIMAL(15,3).</span></div>
+    <div><code>one concept, one name</code><span><span class="mono">patient_control_number</span> means CLM01 and CLP01 alike, so <span class="mono">JOIN … USING</span> works.</span></div>
+    <div><code>prefixes</code><span><span class="mono">claim_</span> 837P · <span class="mono">remit_</span> 835 · <span class="mono">ref_</span> lookups · <span class="mono">v_</span> views · <span class="mono">source_ / edi_ / raw_</span> lineage.</span></div>
+    <div><code>+ lineage block</code><span>Every core row carries <span class="mono">source_file_id</span>, <span class="mono">transaction_id</span>, <span class="mono">source_segment_start</span>, <span class="mono">source_segment_end</span>.</span></div>
+  </div>
+</section>
+
+<section id="catalog">
+  <h2>Table catalog</h2>
+  <p>Search by table or column name. X12 column shows the loop / segment / element each value comes from.</p>
+  <div class="toolbar">
+    <input id="q" type="search" placeholder="Search tables and columns, e.g. trace_number, CAS, 6R" aria-label="Search tables and columns">
+    <div id="chips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+    <span id="count"></span>
+  </div>
+  <div id="tables" style="display:grid;gap:18px"></div>
+</section>
+
+<section id="matching">
+  <h2>How 837 claims link to 835 remits</h2>
+  <p>CLM01 = CLP01 looks like a clean key but is not unique over time: resubmissions, secondary payers and reversals all share it, and REF*6R only comes back when it was sent. So matching runs once at ingest and writes its method.</p>
+  <div class="callout">
+    <b>Claim level · claim_remit_match</b>
+    <ol class="rules">
+      <li><span class="mono">pcn_payer_charge</span>: same PCN, compatible payer, CLP03 = CLM02 (or its negative on a reversal), payment on or after submission.</li>
+      <li><span class="mono">pcn_payer</span>: the same, without the charge test.</li>
+      <li><span class="mono">pcn_only</span>: PCN alone, lowest confidence.</li>
+      <li><span class="mono">payer_claim_control_number</span>: a later replacement or void 837 whose REF*F8 equals the remit's CLP07.</li>
+    </ol>
+  </div>
+  <div class="callout">
+    <b>Line level · claim_line_remit_match</b>
+    <ol class="rules">
+      <li><span class="mono">line_item_control_number</span>: REF*6R sent on the 837 and returned on the 835.</li>
+      <li><span class="mono">procedure_date_charge</span>: submitted procedure (SVC06, else SVC01), modifiers, service date and charge, inside an already-matched claim pair.</li>
+      <li><span class="mono">unmatched_bundled</span>: payer bundled or split the line.</li>
+    </ol>
+  </div>
+</section>
+
+<section id="s3">
+  <h2>S3 layout and multitenancy</h2>
+  <p>Each customer gets an identical tree under its own prefix, with IAM scoped to that prefix. Tenant isolation lives in the path, not in a WHERE clause.</p>
+  <div class="diagram"><pre>s3://xifin-cc-&lt;env&gt;/tenants/labcorp/
+  landing/837p/YYYY/MM/DD/&lt;original_file_name&gt;     immutable raw EDI (Object Lock)
+  landing/835/YYYY/MM/DD/&lt;original_file_name&gt;
+  warehouse/v1/
+    source_file/ingest_month=2026-10/part-000.parquet
+    edi_transaction/ingest_month=2026-10/…
+    raw_segment/transaction_type=835/ingest_month=2026-10/…
+    claim/submission_month=2026-10/…          every claim_* table uses submission_month
+    remit_payment/payment_month=2026-10/…     every remit_* table uses payment_month
+    claim_remit_match/  claim_line_remit_match/
+    ref/ref_carc/as_of=2026-11-01/ref_carc.parquet
+  catalog/cc_v1.duckdb            views + COMMENT ON + data_dictionary for this tenant only</pre></div>
+  <ul class="plain">
+    <li>Child tables carry the parent's partition column, so one date filter prunes every table in a join.</li>
+    <li>Month partitions keep files large. If a month of a table is under about 100 MB, switch that table to year.</li>
+    <li>Inside a partition, sort by date then <span class="mono">patient_control_number</span>; ZSTD; 100K to 1M row groups so DuckDB skips row groups on stats.</li>
+    <li><span class="mono">v1</span> in the path lets a breaking schema change run alongside the old one.</li>
+  </ul>
+</section>
+
+<section id="decisions">
+  <h2>Key decisions and why</h2>
+  <div class="decisions" id="dec"></div>
+</section>
+
+<section id="examples">
+  <h2>What the agent writes</h2>
+  <p>Six questions and the SQL against this schema. Most need zero or one join.</p>
+  <div id="ex" style="display:grid;gap:22px"></div>
+</section>
+
+<section id="caveats">
+  <h2>Open items before DDL</h2>
+  <ul class="plain">
+    <li>Element and qualifier lists come from public TR3-derived references and payer companion guides. Check a few AMT, QTY and REF qualifier names against the licensed TR3 before finalizing.</li>
+    <li>Match rules are a starting heuristic. Calibrate on real Labcorp files, especially PCN reuse across payers and crossover remits (CLP02 19/20, NM1*TT).</li>
+    <li><span class="mono">is_denied</span> only means CLP02 = 4. Business definitions of "denial" belong in views or few-shot examples.</li>
+    <li>Confirm partition granularity against actual Labcorp volumes after the first months load.</li>
+  </ul>
+</section>
+</main>
+</div>
+</div>
+
+<script>
+const LAYERS = {
+  lin:{label:"Lineage", c:"--l-lin"}, c837:{label:"837P", c:"--l-837"}, c835:{label:"835", c:"--l-835"},
+  match:{label:"Match", c:"--l-match"}, ref:{label:"Reference", c:"--l-ref"}, view:{label:"View", c:"--l-view"}
+};
+// [name, type, x12, description]
+const T = [
+{n:"source_file",l:"lin",aud:"engineer",grain:"One S3 object ingested",pk:"source_file_id",fk:"—",part:"ingest_month",lin:false,
+ why:"Deduplicates re-deliveries by content hash and stores the delimiters needed to rebuild the file exactly.",
+ cols:[["source_file_id","VARCHAR","","sha256 of file bytes",1],["tenant_id","VARCHAR","","labcorp; guard against cross-tenant mixing"],["s3_bucket","VARCHAR","","landing bucket"],["s3_key","VARCHAR","","landing key"],["s3_version_id","VARCHAR","","object version"],["s3_etag","VARCHAR","",""],["file_name","VARCHAR","","base name of the key"],["file_size_bytes","BIGINT","",""],["transaction_type","VARCHAR","ST01+GS08","837P or 835"],["element_separator","VARCHAR","ISA pos 4",""],["component_separator","VARCHAR","ISA16",""],["repetition_separator","VARCHAR","ISA11",""],["segment_terminator","VARCHAR","ISA end",""],["segment_count","INTEGER","","segments parsed"],["received_at","TIMESTAMP","","S3 LastModified"],["ingested_at","TIMESTAMP","","parse time"],["ingest_run_id","VARCHAR","",""],["parser_name","VARCHAR","",""],["parser_version","VARCHAR","",""],["parse_status","VARCHAR","","parsed / parsed_with_warnings / rejected"],["ingest_month","VARCHAR","","partition YYYY-MM"]]},
+{n:"edi_transaction",l:"lin",aud:"engineer",grain:"One ST/SE transaction set, with ISA/GS envelope copied on",pk:"transaction_id",fk:"source_file_id",part:"ingest_month",lin:false,
+ why:"Envelope values are small; copying them saves two join hops when tracing control numbers.",
+ cols:[["transaction_id","VARCHAR","","surrogate key",1],["source_file_id","VARCHAR","","FK"],["interchange_sender_qualifier","VARCHAR","ISA05",""],["interchange_sender_id","VARCHAR","ISA06",""],["interchange_receiver_qualifier","VARCHAR","ISA07",""],["interchange_receiver_id","VARCHAR","ISA08",""],["interchange_date","VARCHAR","ISA09","as sent"],["interchange_time","VARCHAR","ISA10","as sent"],["interchange_control_number","VARCHAR","ISA13",""],["interchange_usage_indicator","VARCHAR","ISA15","P production / T test"],["isa_authorization_and_security_raw","VARCHAR","ISA01–04","as sent"],["functional_id_code","VARCHAR","GS01","HC (837) / HP (835)"],["group_sender_code","VARCHAR","GS02",""],["group_receiver_code","VARCHAR","GS03",""],["group_date","VARCHAR","GS04",""],["group_time","VARCHAR","GS05",""],["group_control_number","VARCHAR","GS06",""],["implementation_version","VARCHAR","GS08/ST03","005010X222A1, 005010X221A1, A2 errata accepted"],["transaction_set_code","VARCHAR","ST01","837 / 835"],["transaction_control_number","VARCHAR","ST02",""],["transaction_segment_count","INTEGER","SE01",""],["bht_purpose_code","VARCHAR","BHT02","837 only"],["bht_reference_number","VARCHAR","BHT03",""],["bht_creation_date","DATE","BHT04",""],["bht_creation_time","VARCHAR","BHT05",""],["bht_claim_type_code","VARCHAR","BHT06",""],["submitter_name","VARCHAR","1000A NM103",""],["submitter_id","VARCHAR","1000A NM109",""],["receiver_name","VARCHAR","1000B NM103",""],["receiver_id","VARCHAR","1000B NM109",""],["ingest_month","VARCHAR","","partition"]]},
+{n:"raw_segment",l:"lin",aud:"engineer",grain:"One segment of every file",pk:"(source_file_id, segment_position)",fk:"source_file_id, transaction_id",part:"transaction_type, ingest_month",lin:false,
+ why:"The lossless guarantee. Any element a typed table does not cover is still here, byte for byte.",
+ cols:[["source_file_id","VARCHAR","","FK",1],["segment_position","INTEGER","","1-based ordinal in file",1],["transaction_id","VARCHAR","","null for ISA/GS/GE/IEA"],["segment_id","VARCHAR","","e.g. CLP"],["loop_id","VARCHAR","","e.g. 2110, 2010BB, HEADER"],["hl_id","VARCHAR","HL01","enclosing 837 HL"],["hl_parent_id","VARCHAR","HL02",""],["segment_text","VARCHAR","","exact segment, no terminator"],["elements","LIST(VARCHAR)","","split elements (engineer use)"],["anchor_table","VARCHAR","","typed table this segment belongs to"],["anchor_id","VARCHAR","","row id in anchor_table"],["transaction_type","VARCHAR","","partition"],["ingest_month","VARCHAR","","partition"]]},
+{n:"ingest_issue",l:"lin",aud:"engineer",grain:"One parse, validation or balancing issue",pk:"ingest_issue_id",fk:"source_file_id",part:"ingest_month",lin:false,
+ why:"Balancing failures are data, not log lines, so they can be queried.",
+ cols:[["ingest_issue_id","VARCHAR","","",1],["source_file_id","VARCHAR","","FK"],["segment_position","INTEGER","",""],["issue_type","VARCHAR","","parse_error, unknown_segment, balance_line, balance_claim, balance_transaction, se_count_mismatch"],["severity","VARCHAR","",""],["message","VARCHAR","",""],["expected_amount","DECIMAL(18,2)","",""],["actual_amount","DECIMAL(18,2)","",""],["ingest_month","VARCHAR","","partition"]]},
+
+{n:"claim",l:"c837",aud:"agent",grain:"One CLM occurrence (2300). A replacement is a new row.",pk:"claim_id",fk:"transaction_id",part:"submission_month",lin:true,
+ why:"The HL hierarchy (billing provider → subscriber → patient) is flattened onto the claim so the agent never walks HL trees.",
+ cols:[["claim_id","VARCHAR","","surrogate key",1],["patient_control_number","VARCHAR","CLM01","provider claim ID; = 835 CLP01"],["total_charge_amount","DECIMAL(18,2)","CLM02","billed"],["place_of_service_code","VARCHAR","CLM05-1","→ ref_place_of_service"],["facility_code_qualifier","VARCHAR","CLM05-2",""],["claim_frequency_code","VARCHAR","CLM05-3","1 original, 7 replacement, 8 void"],["provider_signature_indicator","VARCHAR","CLM06",""],["assignment_participation_code","VARCHAR","CLM07",""],["benefits_assignment_indicator","VARCHAR","CLM08",""],["release_of_information_code","VARCHAR","CLM09",""],["patient_signature_source_code","VARCHAR","CLM10",""],["related_cause_code_1 … _3","VARCHAR","CLM11-1..3",""],["related_cause_state_code","VARCHAR","CLM11-4",""],["related_cause_country_code","VARCHAR","CLM11-5",""],["special_program_code","VARCHAR","CLM12",""],["delay_reason_code","VARCHAR","CLM20",""],["original_payer_claim_control_number","VARCHAR","REF*F8","payer claim being replaced/voided"],["prior_authorization_number","VARCHAR","REF*G1",""],["referral_number","VARCHAR","REF*9F",""],["clia_number","VARCHAR","REF*X4","lab CLIA certificate"],["medical_record_number","VARCHAR","REF*EA",""],["clearinghouse_trace_number","VARCHAR","REF*D9",""],["patient_paid_amount","DECIMAL(18,2)","AMT*F5",""],["claim_note_text","VARCHAR","NTE02",""],["principal_diagnosis_code","VARCHAR","HI01-2 ABK","copy of first claim_diagnosis row"],["diagnosis_count","INTEGER","","derived"],["service_line_count","INTEGER","","derived"],["billing_provider_npi","VARCHAR","2010AA NM109",""],["billing_provider_name","VARCHAR","2010AA NM103",""],["billing_provider_tax_id","VARCHAR","REF*EI/SY",""],["billing_provider_taxonomy_code","VARCHAR","2000A PRV03",""],["payer_name","VARCHAR","2010BB NM103","destination payer"],["payer_id","VARCHAR","2010BB NM109",""],["payer_responsibility_code","VARCHAR","SBR01","P / S / T"],["claim_filing_indicator_code","VARCHAR","SBR09","→ ref_claim_filing_indicator"],["subscriber_group_number","VARCHAR","SBR03",""],["subscriber_group_name","VARCHAR","SBR04",""],["insurance_type_code","VARCHAR","SBR05",""],["subscriber_member_id","VARCHAR","2010BA NM109",""],["subscriber_last_name","VARCHAR","2010BA NM103","PHI"],["subscriber_first_name","VARCHAR","2010BA NM104","PHI"],["subscriber_birth_date","DATE","DMG02","PHI"],["subscriber_gender_code","VARCHAR","DMG03",""],["is_patient_the_subscriber","BOOLEAN","2000C absent",""],["patient_relationship_code","VARCHAR","SBR02/PAT01",""],["patient_last_name","VARCHAR","2010CA/BA","PHI"],["patient_first_name","VARCHAR","2010CA/BA","PHI"],["patient_birth_date","DATE","DMG02","PHI"],["patient_gender_code","VARCHAR","DMG03",""],["rendering_provider_npi","VARCHAR","2310B NM109",""],["referring_provider_npi","VARCHAR","2310A NM109",""],["service_facility_npi","VARCHAR","2310C NM109",""],["billing_provider_hl_id","VARCHAR","HL01","hierarchy trace"],["subscriber_hl_id","VARCHAR","HL01",""],["patient_hl_id","VARCHAR","HL01",""],["submission_date","DATE","BHT04",""],["submission_month","VARCHAR","","partition"]]},
+{n:"claim_line",l:"c837",aud:"agent",grain:"One 2400 service line (≤ 50 per claim)",pk:"claim_line_id",fk:"claim_id",part:"submission_month",lin:true,
+ why:"Line-level providers are null when the claim-level provider applies, which matches how X12 inherits them.",
+ cols:[["claim_line_id","VARCHAR","","",1],["claim_id","VARCHAR","","FK"],["line_number","INTEGER","LX01",""],["procedure_code_qualifier","VARCHAR","SV101-1","HC = CPT/HCPCS"],["procedure_code","VARCHAR","SV101-2",""],["procedure_modifier_1 … _4","VARCHAR","SV101-3..6",""],["procedure_description","VARCHAR","SV101-7",""],["line_charge_amount","DECIMAL(18,2)","SV102",""],["unit_basis_code","VARCHAR","SV103","UN / MJ"],["service_unit_count","DECIMAL(15,3)","SV104",""],["place_of_service_code","VARCHAR","SV105","overrides claim POS"],["diagnosis_pointer_1 … _4","INTEGER","SV107-1..4","→ claim_diagnosis.diagnosis_sequence"],["emergency_indicator","VARCHAR","SV109",""],["epsdt_indicator","VARCHAR","SV111",""],["family_planning_indicator","VARCHAR","SV112",""],["copay_status_code","VARCHAR","SV115",""],["service_start_date","DATE","DTP*472",""],["service_end_date","DATE","DTP*472",""],["line_item_control_number","VARCHAR","REF*6R","line match key to 835"],["line_prior_authorization_number","VARCHAR","REF*G1",""],["line_clia_number","VARCHAR","REF*X4",""],["referring_clia_number","VARCHAR","REF*F4",""],["ndc_code","VARCHAR","2410 LIN03",""],["drug_unit_count","DECIMAL(15,3)","CTP04",""],["drug_unit_code","VARCHAR","CTP05-1",""],["line_note_text","VARCHAR","NTE02",""],["rendering_provider_npi","VARCHAR","2420A NM109",""],["ordering_provider_npi","VARCHAR","2420E NM109",""],["referring_provider_npi","VARCHAR","2420F NM109",""],["submission_month","VARCHAR","","partition"]]},
+{n:"claim_diagnosis",l:"c837",aud:"agent",grain:"One HI diagnosis (≤ 12 per claim)",pk:"(claim_id, diagnosis_sequence)",fk:"claim_id",part:"submission_month",lin:true,
+ why:"Twelve diagnosis columns would make 'claims with dx X anywhere' a 12-way OR.",
+ cols:[["claim_id","VARCHAR","","FK",1],["diagnosis_sequence","INTEGER","","1–12; what SV107 points to",1],["diagnosis_code_qualifier","VARCHAR","HI0x-1","ABK principal / ABF other"],["diagnosis_code","VARCHAR","HI0x-2","ICD-10-CM, no decimal"],["is_principal","BOOLEAN","",""],["submission_month","VARCHAR","","partition"]]},
+{n:"claim_party",l:"c837",aud:"agent",grain:"One NM1 entity loop (2010*, 2310*, 2330*, 2420*)",pk:"claim_party_id",fk:"claim_id, claim_line_id?, other_payer_sequence?",part:"submission_month",lin:true,
+ why:"Every party in one shape with a readable entity_role, so 'who was the ordering provider' is a filter, not a loop-ID lookup.",
+ cols:[["claim_party_id","VARCHAR","","",1],["claim_id","VARCHAR","","never null; hierarchy parties repeated per claim"],["claim_line_id","VARCHAR","","2420 loops only"],["other_payer_sequence","INTEGER","","2330 loops only"],["loop_id","VARCHAR","",""],["entity_role","VARCHAR","","billing_provider, subscriber, payer, patient, rendering_provider, ordering_provider, …"],["entity_identifier_code","VARCHAR","NM101",""],["entity_type_qualifier","VARCHAR","NM102",""],["last_or_organization_name","VARCHAR","NM103",""],["first_name","VARCHAR","NM104",""],["middle_name","VARCHAR","NM105",""],["name_prefix","VARCHAR","NM106",""],["name_suffix","VARCHAR","NM107",""],["id_code_qualifier","VARCHAR","NM108",""],["id_code","VARCHAR","NM109",""],["address_line_1","VARCHAR","N301",""],["address_line_2","VARCHAR","N302",""],["city","VARCHAR","N401",""],["state_code","VARCHAR","N402",""],["postal_code","VARCHAR","N403",""],["country_code","VARCHAR","N404",""],["provider_role_code","VARCHAR","PRV01",""],["taxonomy_code","VARCHAR","PRV03",""],["birth_date","DATE","DMG02",""],["gender_code","VARCHAR","DMG03",""],["contact_name","VARCHAR","PER02","first PER"],["contact_phone","VARCHAR","PER04",""],["contact_email","VARCHAR","PER0x",""],["is_inherited_from_hierarchy","BOOLEAN","",""],["submission_month","VARCHAR","","partition"]]},
+{n:"claim_reference",l:"c837",aud:"agent",grain:"One REF occurrence anywhere in a claim",pk:"claim_reference_id",fk:"claim_id, claim_line_id?, claim_party_id?",part:"submission_month",lin:true,
+ why:"Holds every REF, including the ones promoted to typed columns, so nothing is lost and rare qualifiers are still queryable.",
+ cols:[["claim_reference_id","VARCHAR","","",1],["claim_id","VARCHAR","",""],["claim_line_id","VARCHAR","","null at claim level"],["claim_party_id","VARCHAR","","REFs under NM1 loops"],["other_payer_sequence","INTEGER","",""],["loop_id","VARCHAR","",""],["reference_qualifier","VARCHAR","REF01","→ ref_x12_qualifier"],["reference_value","VARCHAR","REF02",""],["reference_description","VARCHAR","REF03",""],["reference_composite_raw","VARCHAR","REF04",""],["submission_month","VARCHAR","","partition"]]},
+{n:"claim_date",l:"c837",aud:"agent",grain:"One DTP occurrence anywhere in a claim",pk:"claim_date_id",fk:"claim_id, claim_line_id?",part:"submission_month",lin:true,
+ why:"Same pattern as claim_reference: complete long table, common dates also promoted.",
+ cols:[["claim_date_id","VARCHAR","","",1],["claim_id","VARCHAR","",""],["claim_line_id","VARCHAR","",""],["other_payer_sequence","INTEGER","",""],["loop_id","VARCHAR","",""],["date_qualifier","VARCHAR","DTP01","431, 454, 304, 439, 472, 573…"],["date_format_qualifier","VARCHAR","DTP02","D8 / RD8"],["start_date","DATE","DTP03",""],["end_date","DATE","DTP03",""],["date_raw","VARCHAR","DTP03","as sent"],["submission_month","VARCHAR","","partition"]]},
+{n:"claim_amount",l:"c837",aud:"agent",grain:"One AMT occurrence anywhere in a claim",pk:"claim_amount_id",fk:"claim_id, claim_line_id?",part:"submission_month",lin:true,
+ why:"Complete long table of AMT segments.",
+ cols:[["claim_amount_id","VARCHAR","","",1],["claim_id","VARCHAR","",""],["claim_line_id","VARCHAR","",""],["other_payer_sequence","INTEGER","",""],["loop_id","VARCHAR","",""],["amount_qualifier","VARCHAR","AMT01","F5, D, A8, EAF, T…"],["amount","DECIMAL(18,2)","AMT02",""],["submission_month","VARCHAR","","partition"]]},
+{n:"claim_other_payer",l:"c837",aud:"agent",grain:"One 2320 other-subscriber loop (≤ 10 per claim)",pk:"(claim_id, other_payer_sequence)",fk:"claim_id",part:"submission_month",lin:true,
+ why:"COB is how secondary claims are understood; 2330A/B are summarized in-row to avoid another join.",
+ cols:[["claim_id","VARCHAR","","FK",1],["other_payer_sequence","INTEGER","","",1],["payer_responsibility_code","VARCHAR","SBR01",""],["individual_relationship_code","VARCHAR","SBR02",""],["group_number","VARCHAR","SBR03",""],["claim_filing_indicator_code","VARCHAR","SBR09",""],["other_payer_paid_amount","DECIMAL(18,2)","AMT*D",""],["non_covered_amount","DECIMAL(18,2)","AMT*A8",""],["remaining_patient_liability_amount","DECIMAL(18,2)","AMT*EAF",""],["benefits_assignment_indicator","VARCHAR","OI03",""],["release_of_information_code","VARCHAR","OI06",""],["other_payer_name","VARCHAR","2330B NM103",""],["other_payer_id","VARCHAR","2330B NM109",""],["other_payer_adjudication_date","DATE","DTP*573",""],["other_payer_claim_control_number","VARCHAR","2330B REF*F8",""],["other_subscriber_member_id","VARCHAR","2330A NM109",""],["submission_month","VARCHAR","","partition"]]},
+{n:"claim_line_adjudication",l:"c837",aud:"agent",grain:"One 2430 prior-payer line adjudication (≤ 15 per line)",pk:"claim_line_adjudication_id",fk:"claim_line_id",part:"submission_month",lin:true,
+ why:"Shows what an earlier payer did on this line, as reported on the secondary claim.",
+ cols:[["claim_line_adjudication_id","VARCHAR","","",1],["claim_line_id","VARCHAR","","FK"],["other_payer_primary_id","VARCHAR","SVD01",""],["paid_amount","DECIMAL(18,2)","SVD02",""],["procedure_code_qualifier","VARCHAR","SVD03-1",""],["procedure_code","VARCHAR","SVD03-2",""],["procedure_modifier_1 … _4","VARCHAR","SVD03-3..6",""],["paid_unit_count","DECIMAL(15,3)","SVD05",""],["bundled_line_number","INTEGER","SVD06",""],["adjudication_date","DATE","DTP*573",""],["remaining_patient_liability_amount","DECIMAL(18,2)","AMT*EAF",""],["submission_month","VARCHAR","","partition"]]},
+{n:"claim_cob_adjustment",l:"c837",aud:"agent",grain:"One CAS trio in 2320 (claim) or 2430 (line)",pk:"claim_cob_adjustment_id",fk:"claim_id, claim_line_id?, claim_line_adjudication_id?",part:"submission_month",lin:true,
+ why:"Same shape as remit_adjustment, so the agent uses one mental model for CAS everywhere.",
+ cols:[["claim_cob_adjustment_id","VARCHAR","","",1],["claim_id","VARCHAR","",""],["claim_line_id","VARCHAR","","null at claim level"],["other_payer_sequence","INTEGER","",""],["claim_line_adjudication_id","VARCHAR","",""],["adjustment_level","VARCHAR","","claim / service_line"],["cas_segment_sequence","INTEGER","",""],["trio_position","INTEGER","","1–6"],["adjustment_group_code","VARCHAR","CAS01",""],["adjustment_reason_code","VARCHAR","CAS02…","CARC"],["adjustment_amount","DECIMAL(18,2)","CAS03…",""],["adjustment_quantity","DECIMAL(15,3)","CAS04…",""],["submission_month","VARCHAR","","partition"]]},
+{n:"claim_misc_segment",l:"c837",aud:"engineer",grain:"One rarely used 837P segment",pk:"claim_misc_segment_id",fk:"claim_id, claim_line_id?",part:"submission_month",lin:true,
+ why:"Keeps PWK, CN1, K3, CR1, CRC, MEA, etc. without dozens of near-empty typed columns. Promote any that turn out to be heavily used.",
+ cols:[["claim_misc_segment_id","VARCHAR","","",1],["claim_id","VARCHAR","",""],["claim_line_id","VARCHAR","",""],["loop_id","VARCHAR","",""],["segment_id","VARCHAR","",""],["qualifier","VARCHAR","","first element"],["element_01 … element_15","VARCHAR","",""],["segment_text","VARCHAR","",""],["submission_month","VARCHAR","","partition"]]},
+
+{n:"remit_payment",l:"c835",aud:"agent",grain:"One 835 transaction (one payment or advice)",pk:"remit_payment_id",fk:"transaction_id (1:1)",part:"payment_month",lin:true,
+ why:"Carries the balance check (ΣCLP04 − ΣPLB = BPR02) as a column, so reconciliation is a filter.",
+ cols:[["remit_payment_id","VARCHAR","","",1],["transaction_id","VARCHAR","","FK"],["transaction_handling_code","VARCHAR","BPR01","C/D/H/I/P/U/X"],["total_payment_amount","DECIMAL(18,2)","BPR02","money actually paid"],["credit_debit_flag_code","VARCHAR","BPR03",""],["payment_method_code","VARCHAR","BPR04","ACH/CHK/BOP/FWT/NON"],["payment_format_code","VARCHAR","BPR05","CCP/CTX"],["sender_dfi_number","VARCHAR","BPR07",""],["sender_account_number_last4","VARCHAR","BPR09","masked; full value in raw_segment only"],["receiver_dfi_number","VARCHAR","BPR13",""],["receiver_account_number_last4","VARCHAR","BPR15","masked"],["payer_identifier","VARCHAR","BPR10",""],["originating_company_supplemental_code","VARCHAR","BPR11",""],["payment_date","DATE","BPR16","check issue / EFT effective"],["trace_type_code","VARCHAR","TRN01",""],["trace_number","VARCHAR","TRN02","check/EFT trace; ties to bank deposit"],["trace_originator_id","VARCHAR","TRN03",""],["currency_code","VARCHAR","CUR02","null = USD"],["receiver_identifier","VARCHAR","REF*EV",""],["production_date","DATE","DTM*405",""],["payer_name","VARCHAR","1000A N102",""],["payer_id_qualifier","VARCHAR","1000A N103",""],["payer_id","VARCHAR","1000A N104",""],["payee_name","VARCHAR","1000B N102",""],["payee_id_qualifier","VARCHAR","1000B N103","XX NPI / FI TIN"],["payee_id","VARCHAR","1000B N104",""],["payee_npi","VARCHAR","","resolved"],["payee_tax_id","VARCHAR","REF*TJ","resolved"],["remittance_delivery_method_code","VARCHAR","RDM01",""],["remit_claim_count","INTEGER","","derived"],["sum_claim_payment_amount","DECIMAL(18,2)","","derived ΣCLP04"],["sum_provider_adjustment_amount","DECIMAL(18,2)","","derived ΣPLB"],["is_balanced","BOOLEAN","","ΣCLP04 − ΣPLB = BPR02"],["payment_month","VARCHAR","","partition"]]},
+{n:"remit_claim",l:"c835",aud:"agent",grain:"One 2100 CLP loop. A reversal and its correction are two rows.",pk:"remit_claim_id",fk:"remit_payment_id, transaction_id",part:"payment_month",lin:true,
+ why:"Payment date, trace number and payer are copied down so most questions need no join.",
+ cols:[["remit_claim_id","VARCHAR","","",1],["remit_payment_id","VARCHAR","","FK"],["header_number","INTEGER","2000 LX01",""],["claim_sequence","INTEGER","","order within transaction"],["patient_control_number","VARCHAR","CLP01","= 837 CLM01"],["claim_status_code","VARCHAR","CLP02","→ ref_claim_status"],["is_reversal","BOOLEAN","CLP02=22",""],["is_denied","BOOLEAN","CLP02=4","payer's own denied status only"],["total_charge_amount","DECIMAL(18,2)","CLP03","negative on reversals"],["claim_payment_amount","DECIMAL(18,2)","CLP04",""],["patient_responsibility_amount","DECIMAL(18,2)","CLP05",""],["claim_filing_indicator_code","VARCHAR","CLP06",""],["payer_claim_control_number","VARCHAR","CLP07","payer ICN/DCN; for appeals"],["facility_type_code","VARCHAR","CLP08",""],["claim_frequency_code","VARCHAR","CLP09",""],["drg_code","VARCHAR","CLP11","rare for professional"],["drg_weight","DECIMAL","CLP12",""],["discharge_fraction","DECIMAL","CLP13",""],["yes_no_condition_code","VARCHAR","CLP14",""],["patient_last_name","VARCHAR","NM1*QC","PHI"],["patient_first_name","VARCHAR","NM1*QC","PHI"],["patient_member_id","VARCHAR","NM1*QC NM109",""],["insured_member_id","VARCHAR","NM1*IL NM109",""],["rendering_provider_npi","VARCHAR","NM1*82 NM109",""],["crossover_carrier_name","VARCHAR","NM1*TT","claim forwarded to"],["crossover_carrier_id","VARCHAR","NM1*TT",""],["corrected_priority_payer_name","VARCHAR","NM1*PR",""],["corrected_priority_payer_id","VARCHAR","NM1*PR",""],["outpatient_reimbursement_rate","DECIMAL(9,4)","MOA01",""],["hcpcs_payable_amount","DECIMAL(18,2)","MOA02",""],["esrd_payment_amount","DECIMAL(18,2)","MOA08",""],["nonpayable_professional_component_amount","DECIMAL(18,2)","MOA09",""],["statement_start_date","DATE","DTM*232",""],["statement_end_date","DATE","DTM*233",""],["coverage_expiration_date","DATE","DTM*036",""],["payer_received_date","DATE","DTM*050",""],["coverage_amount","DECIMAL(18,2)","AMT*AU",""],["interest_amount","DECIMAL(18,2)","AMT*I",""],["patient_amount_paid","DECIMAL(18,2)","AMT*F5",""],["group_or_policy_number","VARCHAR","REF*1L",""],["original_reference_number","VARCHAR","REF*F8",""],["prior_authorization_number","VARCHAR","REF*G1",""],["payment_date","DATE","","copied"],["trace_number","VARCHAR","","copied"],["payer_name","VARCHAR","","copied"],["payer_id","VARCHAR","","copied"],["payment_month","VARCHAR","","partition"]]},
+{n:"remit_service_line",l:"c835",aud:"agent",grain:"One 2110 SVC loop (≤ 999 per claim)",pk:"remit_service_line_id",fk:"remit_claim_id, remit_payment_id",part:"payment_month",lin:true,
+ why:"Keeps both the code as adjudicated (SVC01) and as billed (SVC06) so recoding is visible.",
+ cols:[["remit_service_line_id","VARCHAR","","",1],["remit_claim_id","VARCHAR","","FK"],["remit_payment_id","VARCHAR","","FK"],["service_line_sequence","INTEGER","",""],["procedure_code_qualifier","VARCHAR","SVC01-1",""],["procedure_code","VARCHAR","SVC01-2","as adjudicated"],["procedure_modifier_1 … _4","VARCHAR","SVC01-3..6",""],["procedure_description","VARCHAR","SVC01-7",""],["line_charge_amount","DECIMAL(18,2)","SVC02",""],["line_payment_amount","DECIMAL(18,2)","SVC03",""],["revenue_code","VARCHAR","SVC04",""],["paid_unit_count","DECIMAL(15,3)","SVC05",""],["submitted_procedure_code_qualifier","VARCHAR","SVC06-1",""],["submitted_procedure_code","VARCHAR","SVC06-2","as billed, if payer changed it"],["submitted_procedure_modifier_1 … _4","VARCHAR","SVC06-3..6",""],["submitted_procedure_description","VARCHAR","SVC06-7",""],["submitted_unit_count","DECIMAL(15,3)","SVC07",""],["service_start_date","DATE","DTM*472/150",""],["service_end_date","DATE","DTM*472/151",""],["line_item_control_number","VARCHAR","REF*6R","= 837 2400 REF*6R"],["allowed_amount","DECIMAL(18,2)","AMT*B6",""],["late_filing_reduction_amount","DECIMAL(18,2)","AMT*KH",""],["healthcare_policy_id","VARCHAR","REF*0K","first"],["rendering_provider_id","VARCHAR","2110 REF",""],["payment_date","DATE","","copied"],["payment_month","VARCHAR","","partition"]]},
+{n:"remit_adjustment",l:"c835",aud:"agent",grain:"One CAS reason/amount/quantity trio, claim or line level",pk:"remit_adjustment_id",fk:"remit_payment_id, remit_claim_id, remit_service_line_id?",part:"payment_month",lin:true,
+ why:"One table for both levels, with remit_claim_id always filled, so 'all adjustments on this claim' never misses line-level CAS.",
+ cols:[["remit_adjustment_id","VARCHAR","","",1],["remit_payment_id","VARCHAR","","always populated"],["remit_claim_id","VARCHAR","","always populated"],["remit_service_line_id","VARCHAR","","null for claim-level CAS"],["adjustment_level","VARCHAR","","claim / service_line"],["cas_segment_sequence","INTEGER","","≤ 99 per loop"],["trio_position","INTEGER","","1–6"],["adjustment_group_code","VARCHAR","CAS01","CO/PR/OA/PI → ref_cas_group"],["adjustment_reason_code","VARCHAR","CAS02/05/08…","CARC → ref_carc"],["adjustment_amount","DECIMAL(18,2)","CAS03/06/…","positive reduces payment"],["adjustment_quantity","DECIMAL(15,3)","CAS04/07/…",""],["payment_date","DATE","","copied"],["payer_id","VARCHAR","","copied"],["payment_month","VARCHAR","","partition"]]},
+{n:"remit_remark",l:"c835",aud:"agent",grain:"One remark code (MOA, MIA or LQ)",pk:"remit_remark_id",fk:"remit_claim_id, remit_service_line_id?",part:"payment_month",lin:true,
+ why:"Remarks come from three different segments; one table removes that distinction for the agent.",
+ cols:[["remit_remark_id","VARCHAR","","",1],["remit_payment_id","VARCHAR","",""],["remit_claim_id","VARCHAR","",""],["remit_service_line_id","VARCHAR","","null at claim level"],["remark_level","VARCHAR","","claim / service_line"],["source_segment","VARCHAR","","MOA / MIA / LQ"],["source_element","VARCHAR","","e.g. MOA03, LQ02"],["code_list_qualifier","VARCHAR","LQ01","HE = RARC, RX = NCPDP"],["remark_code","VARCHAR","","→ ref_rarc"],["payment_month","VARCHAR","","partition"]]},
+{n:"remit_provider_adjustment",l:"c835",aud:"agent",grain:"One PLB reason/amount pair (6 per PLB segment)",pk:"remit_provider_adjustment_id",fk:"remit_payment_id",part:"payment_month",lin:true,
+ why:"PLB explains why a deposit doesn't equal the sum of claim payments (recoupments, interest, forwarding balances).",
+ cols:[["remit_provider_adjustment_id","VARCHAR","","",1],["remit_payment_id","VARCHAR","","FK"],["plb_segment_sequence","INTEGER","",""],["pair_position","INTEGER","",""],["provider_identifier","VARCHAR","PLB01",""],["fiscal_period_date","DATE","PLB02",""],["adjustment_reason_code","VARCHAR","PLB03-1","WO, FB, L6, 72, CS… → ref_provider_adjustment_reason"],["adjustment_reference_identifier","VARCHAR","PLB03-2","as sent"],["referenced_patient_control_number","VARCHAR","","best-effort parse"],["referenced_payer_claim_control_number","VARCHAR","","best-effort parse"],["adjustment_amount","DECIMAL(18,2)","PLB04…","positive reduces payment"],["payment_date","DATE","","copied"],["trace_number","VARCHAR","","copied"],["payment_month","VARCHAR","","partition"]]},
+{n:"remit_party",l:"c835",aud:"agent",grain:"One N1 (1000A/B) or 2100 NM1 entity",pk:"remit_party_id",fk:"remit_payment_id, remit_claim_id?",part:"payment_month",lin:true,
+ why:"Same column shape as claim_party.",
+ cols:[["remit_party_id","VARCHAR","","",1],["remit_payment_id","VARCHAR","",""],["remit_claim_id","VARCHAR","","null for 1000A/B"],["loop_id","VARCHAR","",""],["entity_role","VARCHAR","","payer, payee, patient, insured, rendering_provider, crossover_carrier…"],["…","","","same columns as claim_party"],["payment_month","VARCHAR","","partition"]]},
+{n:"remit_reference",l:"c835",aud:"agent",grain:"One REF occurrence (header, 1000, 2100, 2110)",pk:"remit_reference_id",fk:"remit_payment_id, remit_claim_id?, remit_service_line_id?",part:"payment_month",lin:true,
+ why:"Complete long table; typed columns above are promoted copies.",
+ cols:[["remit_reference_id","VARCHAR","","",1],["remit_payment_id","VARCHAR","",""],["remit_claim_id","VARCHAR","",""],["remit_service_line_id","VARCHAR","",""],["loop_id","VARCHAR","",""],["reference_qualifier","VARCHAR","REF01",""],["reference_value","VARCHAR","REF02",""],["payment_month","VARCHAR","","partition"]]},
+{n:"remit_date",l:"c835",aud:"agent",grain:"One DTM occurrence",pk:"remit_date_id",fk:"same as remit_reference",part:"payment_month",lin:true,why:"Complete long table.",
+ cols:[["remit_date_id","VARCHAR","","",1],["remit_payment_id / remit_claim_id / remit_service_line_id","VARCHAR","",""],["loop_id","VARCHAR","",""],["date_qualifier","VARCHAR","DTM01",""],["date_value","DATE","DTM02",""],["payment_month","VARCHAR","","partition"]]},
+{n:"remit_amount",l:"c835",aud:"agent",grain:"One AMT occurrence (≤ 13 per claim)",pk:"remit_amount_id",fk:"same as remit_reference",part:"payment_month",lin:true,why:"Complete long table.",
+ cols:[["remit_amount_id","VARCHAR","","",1],["remit_payment_id / remit_claim_id / remit_service_line_id","VARCHAR","",""],["loop_id","VARCHAR","",""],["amount_qualifier","VARCHAR","AMT01",""],["amount","DECIMAL(18,2)","AMT02",""],["payment_month","VARCHAR","","partition"]]},
+{n:"remit_quantity",l:"c835",aud:"agent",grain:"One QTY occurrence (≤ 14 per claim)",pk:"remit_quantity_id",fk:"same as remit_reference",part:"payment_month",lin:true,why:"Complete long table.",
+ cols:[["remit_quantity_id","VARCHAR","","",1],["remit_payment_id / remit_claim_id / remit_service_line_id","VARCHAR","",""],["loop_id","VARCHAR","",""],["quantity_qualifier","VARCHAR","QTY01",""],["quantity","DECIMAL(15,3)","QTY02",""],["payment_month","VARCHAR","","partition"]]},
+{n:"remit_misc_segment",l:"c835",aud:"engineer",grain:"One long-tail 835 segment (TS3, TS2, MIA non-remark, PER…)",pk:"remit_misc_segment_id",fk:"remit_payment_id, remit_claim_id?",part:"payment_month",lin:true,
+ why:"Same pattern as claim_misc_segment.",
+ cols:[["remit_misc_segment_id","VARCHAR","","",1],["remit_payment_id","VARCHAR","",""],["remit_claim_id","VARCHAR","",""],["remit_service_line_id","VARCHAR","",""],["loop_id","VARCHAR","",""],["segment_id","VARCHAR","",""],["qualifier","VARCHAR","",""],["element_01 … element_24","VARCHAR","",""],["segment_text","VARCHAR","",""],["payment_month","VARCHAR","","partition"]]},
+
+{n:"claim_remit_match",l:"match",aud:"agent",grain:"One candidate (claim, remit claim) pair",pk:"(claim_id, remit_claim_id)",fk:"claim_id, remit_claim_id",part:"none (or payment_month if large)",lin:false,
+ why:"The hardest join in the domain, solved once. The agent filters is_best_match.",
+ cols:[["claim_id","VARCHAR","","FK",1],["remit_claim_id","VARCHAR","","FK",1],["patient_control_number","VARCHAR","","shared key"],["payer_claim_control_number","VARCHAR","CLP07",""],["match_method","VARCHAR","","pcn_payer_charge / pcn_payer / pcn_only / payer_claim_control_number"],["match_rank","INTEGER","","1 = best for this remit claim"],["is_best_match","BOOLEAN","",""],["remit_sequence_for_claim","INTEGER","","original, reversal, correction, secondary… by payment date"],["days_submission_to_payment","INTEGER","",""]]},
+{n:"claim_line_remit_match",l:"match",aud:"agent",grain:"One (claim line, remit service line) pair",pk:"(claim_line_id, remit_service_line_id)",fk:"claim_line_id, remit_service_line_id",part:"none",lin:false,
+ why:"Line matching uses 6R when present, otherwise procedure + date + charge.",
+ cols:[["claim_line_id","VARCHAR","","FK",1],["remit_service_line_id","VARCHAR","","FK",1],["claim_id","VARCHAR","",""],["remit_claim_id","VARCHAR","",""],["match_method","VARCHAR","","line_item_control_number / procedure_date_charge / unmatched_bundled"],["is_best_match","BOOLEAN","",""]]},
+
+{n:"ref_carc",l:"ref",aud:"agent",grain:"One Claim Adjustment Reason Code",pk:"carc_code",fk:"—",part:"as_of",lin:false,why:"X12-maintained; updated around Mar 1, Jul 1, Nov 1. Retired codes kept with stop dates.",
+ cols:[["carc_code","VARCHAR","","",1],["description","VARCHAR","",""],["start_date","DATE","",""],["stop_date","DATE","",""],["last_modified_date","DATE","",""],["notes","VARCHAR","",""],["source","VARCHAR","",""],["as_of_date","DATE","",""]]},
+{n:"ref_rarc",l:"ref",aud:"agent",grain:"One Remittance Advice Remark Code",pk:"rarc_code",fk:"—",part:"as_of",lin:false,why:"CMS-maintained; same columns as ref_carc.",cols:[["rarc_code","VARCHAR","","",1],["description","VARCHAR","",""],["start_date / stop_date","DATE","",""],["source","VARCHAR","",""],["as_of_date","DATE","",""]]},
+{n:"ref_cas_group",l:"ref",aud:"agent",grain:"One CAS group code",pk:"group_code",fk:"—",part:"—",lin:false,why:"Five rows that answer 'who owes this'.",cols:[["group_code","VARCHAR","","CO, PR, OA, PI, legacy CR",1],["description","VARCHAR","",""],["who_is_responsible","VARCHAR","","plain-language"]]},
+{n:"ref_claim_status",l:"ref",aud:"agent",grain:"One CLP02 status",pk:"claim_status_code",fk:"—",part:"—",lin:false,why:"",cols:[["claim_status_code","VARCHAR","","1, 2, 3, 4, 19, 20, 21, 22, 23, 25",1],["description","VARCHAR","",""]]},
+{n:"ref_claim_frequency",l:"ref",aud:"agent",grain:"One CLM05-3 / CLP09 frequency code",pk:"claim_frequency_code",fk:"—",part:"—",lin:false,why:"",cols:[["claim_frequency_code","VARCHAR","","1, 7, 8…",1],["description","VARCHAR","",""]]},
+{n:"ref_place_of_service",l:"ref",aud:"agent",grain:"One CMS POS code",pk:"place_of_service_code",fk:"—",part:"—",lin:false,why:"",cols:[["place_of_service_code","VARCHAR","","",1],["description","VARCHAR","",""]]},
+{n:"ref_claim_filing_indicator",l:"ref",aud:"agent",grain:"One SBR09 / CLP06 code",pk:"claim_filing_indicator_code",fk:"—",part:"—",lin:false,why:"",cols:[["claim_filing_indicator_code","VARCHAR","","MB, MC, CI, BL…",1],["description","VARCHAR","",""]]},
+{n:"ref_provider_adjustment_reason",l:"ref",aud:"agent",grain:"One PLB03-1 reason",pk:"provider_adjustment_reason_code",fk:"—",part:"—",lin:false,why:"",cols:[["provider_adjustment_reason_code","VARCHAR","","WO, FB, L6, 72, CS, 50, 90…",1],["description","VARCHAR","",""]]},
+{n:"ref_x12_qualifier",l:"ref",aud:"agent",grain:"One qualifier code in any X12 qualifier list",pk:"(transaction_type, element_reference, code)",fk:"—",part:"—",lin:false,why:"Decodes REF01, DTP01/DTM01, AMT01, QTY01, NM101, N101, BPR01, BPR04, LQ01 and the rest in one place.",
+ cols:[["transaction_type","VARCHAR","","837P / 835",1],["element_reference","VARCHAR","","e.g. REF01",1],["code","VARCHAR","","",1],["description","VARCHAR","",""]]},
+{n:"ref_icd10cm / ref_hcpcs",l:"ref",aud:"agent",grain:"One code",pk:"code",fk:"—",part:"—",lin:false,why:"Free CMS lists. CPT descriptions need an AMA license; load only if Xifin holds one.",cols:[["code","VARCHAR","","",1],["description","VARCHAR","",""]]},
+{n:"data_dictionary",l:"ref",aud:"agent",grain:"One column of any table or view",pk:"(table_name, column_name)",fk:"—",part:"—",lin:false,why:"Mirrors COMMENT ON, and also covers views (DuckLake rejects view column comments). Tags PHI for later guardrails.",
+ cols:[["table_name","VARCHAR","","",1],["column_name","VARCHAR","","",1],["description","VARCHAR","",""],["x12_reference","VARCHAR","",""],["example_values","VARCHAR","",""],["synonyms","VARCHAR","",""],["audience","VARCHAR","","agent / engineer"],["is_phi","BOOLEAN","",""]]},
+
+{n:"v_claim",l:"view",aud:"agent",grain:"One 837 claim submission",pk:"claim_id",fk:"—",part:"logical view",lin:false,why:"The default table for claim questions; reversals netted out.",
+ cols:[["claim.*","","","billing provider, payer, patient fields"],["remit_count","INTEGER","",""],["has_remit","BOOLEAN","",""],["latest_claim_status_code","VARCHAR","",""],["latest_claim_status_description","VARCHAR","",""],["net_paid_amount","DECIMAL(18,2)","","Σ CLP04 across all matched remits"],["net_patient_responsibility_amount","DECIMAL(18,2)","",""],["first_payment_date","DATE","",""],["last_payment_date","DATE","",""]]},
+{n:"v_claim_line",l:"view",aud:"agent",grain:"One 837 line",pk:"claim_line_id",fk:"—",part:"logical view",lin:false,why:"Billed line beside its best-matched paid line.",
+ cols:[["claim_line.*","","",""],["allowed_amount","DECIMAL(18,2)","",""],["line_payment_amount","DECIMAL(18,2)","",""],["adjustment_total_amount","DECIMAL(18,2)","",""],["primary_carc_code","VARCHAR","",""],["primary_carc_description","VARCHAR","",""]]},
+{n:"v_remit_claim",l:"view",aud:"agent",grain:"One CLP",pk:"remit_claim_id",fk:"—",part:"logical view",lin:false,why:"",cols:[["remit_claim.*","","",""],["claim_status_description","VARCHAR","",""],["claim_id","VARCHAR","","best-matched 837 claim"]]},
+{n:"v_adjustment_detail",l:"view",aud:"agent",grain:"One CAS trio",pk:"remit_adjustment_id",fk:"—",part:"logical view",lin:false,why:"Denial and adjustment analysis without any joins.",
+ cols:[["remit_adjustment.*","","",""],["group_description","VARCHAR","",""],["carc_description","VARCHAR","",""],["procedure_code","VARCHAR","",""],["payer_name","VARCHAR","",""],["patient_control_number","VARCHAR","",""],["claim_id","VARCHAR","","matched 837 claim"]]},
+{n:"v_remark_detail",l:"view",aud:"agent",grain:"One remark",pk:"remit_remark_id",fk:"—",part:"logical view",lin:false,why:"",cols:[["remit_remark.*","","",""],["rarc_description","VARCHAR","",""],["payer_name / patient_control_number / procedure_code","VARCHAR","","context"]]},
+{n:"v_payment_reconciliation",l:"view",aud:"agent",grain:"One 835",pk:"remit_payment_id",fk:"—",part:"logical view",lin:false,why:"Deposit tie-out in one row.",
+ cols:[["trace_number","VARCHAR","",""],["total_payment_amount","DECIMAL(18,2)","","BPR02"],["sum_claim_payment_amount","DECIMAL(18,2)","","ΣCLP04"],["sum_provider_adjustment_amount","DECIMAL(18,2)","","ΣPLB"],["plb_breakdown","VARCHAR","","by reason"],["is_balanced","BOOLEAN","",""]]}
+];
+
+const DEC = [
+ ["Lossless: yes","raw_segment keeps every segment byte for byte, and source_file stores the delimiters to rebuild each file. Typed tables add meaning on top. Rare segments go to *_misc_segment instead of dozens of near-empty columns that would confuse the agent."],
+ ["Normalized at the X12 grain","CAS, PLB, remarks and diagnoses are real one-to-many relations (up to 99 CAS, 999 lines). One row per trio makes 'sum CO-45 dollars' a single GROUP BY instead of adding up adjustment_1..n columns."],
+ ["One adjustment table, both levels","remit_claim_id is always filled, so 'all adjustments on this claim' includes line-level CAS. Missing those is the most common 835 analysis bug."],
+ ["Promote common, keep the long tail","Typed columns for what analysts ask about (6R, F8, G1, X4, B6, 472, 050). Long REF/DTP/AMT/QTY tables hold every occurrence."],
+ ["Flatten the HL hierarchy","Billing provider, subscriber and patient are copied onto claim. LLMs handle recursive HL parent joins poorly, and the hierarchy is fixed per claim."],
+ ["Precompute 837 ↔ 835 matching","PCN is not unique over time and 6R only returns when sent. Solving it once in claim_remit_match is safer than having every prompt reinvent it."],
+ ["Keep reversals as rows","CLP02 = 22 rows stay, flagged is_reversal. Views net them out so 'paid' means what actually settled."],
+ ["Codes in core, text in ref and views","CARC/RARC text changes three times a year. Core files stay immutable; the agent still reads plain English through views."],
+ ["Document sign conventions","Positive CAS and PLB amounts reduce payment; reversals are negative. Stated in comments and data_dictionary because it is the likeliest source of wrong money answers."],
+ ["Mask bank accounts, tag PHI","Account numbers keep the last 4 digits in typed tables. PHI columns are tagged so later guardrails can target them without a schema change."],
+ ["Views logical, matches physical","Match logic is complex and stable, so it is written to Parquet. Agent views are cheap DuckDB views that can't go stale; materialize v_claim only if latency demands it."]
+];
+
+const EX = [
+ ["Top 10 adjustment reasons by dollars for UnitedHealthcare in Q3 2026, excluding patient responsibility.",
+`SELECT adjustment_group_code, adjustment_reason_code, carc_description,
+       SUM(adjustment_amount) AS adjusted_dollars,
+       COUNT(DISTINCT remit_claim_id) AS claims
+FROM v_adjustment_detail
+WHERE payer_name ILIKE '%UNITED%'
+  AND payment_date BETWEEN DATE '2026-07-01' AND DATE '2026-09-30'
+  AND adjustment_group_code <> 'PR'
+GROUP BY ALL ORDER BY adjusted_dollars DESC LIMIT 10;`],
+ ["What happened to claim LC12345678?",
+`SELECT c.submission_date, c.claim_frequency_code, c.total_charge_amount,
+       r.payment_date, r.claim_status_code, s.description AS status_description,
+       r.claim_payment_amount, r.patient_responsibility_amount,
+       r.payer_claim_control_number, r.trace_number
+FROM claim c
+LEFT JOIN claim_remit_match m ON m.claim_id = c.claim_id AND m.is_best_match
+LEFT JOIN remit_claim r       ON r.remit_claim_id = m.remit_claim_id
+LEFT JOIN ref_claim_status s  ON s.claim_status_code = r.claim_status_code
+WHERE c.patient_control_number = 'LC12345678'
+ORDER BY c.submission_date, r.payment_date;`],
+ ["Does EFT trace 1234567890 tie out to the deposit, and if not, why?",
+`SELECT trace_number, total_payment_amount, sum_claim_payment_amount,
+       sum_provider_adjustment_amount, is_balanced
+FROM v_payment_reconciliation WHERE trace_number = '1234567890';
+
+SELECT adjustment_reason_code, adjustment_reference_identifier, adjustment_amount
+FROM remit_provider_adjustment WHERE trace_number = '1234567890';`],
+ ["Average allowed vs. paid for CPT 80053 by payer in 2026.",
+`SELECT r.payer_name, COUNT(*) AS lines,
+       AVG(l.allowed_amount) AS avg_allowed,
+       AVG(l.line_payment_amount) AS avg_paid
+FROM remit_service_line l JOIN remit_claim r USING (remit_claim_id)
+WHERE l.procedure_code = '80053'
+  AND l.payment_month BETWEEN '2026-01' AND '2026-12'
+  AND NOT r.is_reversal
+GROUP BY ALL ORDER BY lines DESC;`],
+ ["Claims submitted more than 45 days ago with no remittance yet.",
+`SELECT patient_control_number, payer_name, submission_date, total_charge_amount
+FROM v_claim
+WHERE NOT has_remit AND claim_frequency_code <> '8'
+  AND submission_date < current_date - INTERVAL 45 DAY
+ORDER BY total_charge_amount DESC;`],
+ ["(Engineer) Show me the raw EDI behind this remit claim.",
+`SELECT f.s3_bucket, f.s3_key, t.interchange_control_number,
+       t.group_control_number, t.transaction_control_number,
+       s.segment_position, s.segment_text
+FROM remit_claim r
+JOIN source_file f     USING (source_file_id)
+JOIN edi_transaction t USING (transaction_id)
+JOIN raw_segment s ON s.source_file_id = r.source_file_id
+                  AND s.segment_position BETWEEN r.source_segment_start AND r.source_segment_end
+WHERE r.remit_claim_id = :id ORDER BY s.segment_position;`]
+];
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const slug = n => "t-" + n.replace(/[^a-z0-9]+/gi,"-");
+
+// stats
+const counts = {}; T.forEach(t => counts[t.l] = (counts[t.l]||0)+1);
+document.getElementById("stats").innerHTML =
+  Object.entries(LAYERS).map(([k,v]) => `<span><span class="dot" style="background:var(${v.c})"></span><b>${counts[k]||0}</b> ${v.label}</span>`).join("")
+  + `<span>Format <b>Parquet + DuckDB views</b></span>`;
+
+// nav
+const nav = document.getElementById("idx");
+nav.innerHTML = `<div class="grp"><span>Sections</span>
+  <a href="#layers">Layers</a><a href="#er">Relationships</a><a href="#conventions">Conventions</a><a href="#catalog">Catalog</a>
+  <a href="#matching">Matching</a><a href="#s3">S3 layout</a><a href="#decisions">Decisions</a><a href="#examples">Examples</a></div>`
+  + Object.entries(LAYERS).map(([k,v]) => `<div class="grp"><span><span class="dot" style="background:var(${v.c})"></span>${v.label}</span>`
+    + T.filter(t=>t.l===k).map(t=>`<a href="#${slug(t.n)}" data-t="${esc(t.n)}">${esc(t.n)}</a>`).join("") + `</div>`).join("");
+
+// cards
+const box = document.getElementById("tables");
+box.innerHTML = T.map(t => {
+  const L = LAYERS[t.l];
+  return `<article class="tcard" id="${slug(t.n)}" data-l="${t.l}">
+  <header>
+    <div class="tname"><h3>${esc(t.n)}</h3><span class="badge" style="--c:var(${L.c})">${L.label}</span><span class="aud">${t.aud==="engineer"?"engineer-facing":"agent-facing"}</span></div>
+    <dl class="meta"><dt>Grain</dt><dd>${esc(t.grain)}</dd><dt>Key</dt><dd class="mono">${esc(t.pk)}</dd>
+      <dt>Joins</dt><dd class="mono">${esc(t.fk)}</dd><dt>Partition</dt><dd class="mono">${esc(t.part)}</dd></dl>
+    ${t.why?`<p class="why">${esc(t.why)}</p>`:""}
+  </header>
+  <div class="cols"><table><thead><tr><th>Column</th><th>Type</th><th>X12</th><th>Meaning</th></tr></thead><tbody>
+  ${t.cols.map(c=>`<tr data-c="${esc(c[0].toLowerCase()+" "+c[2].toLowerCase())}"><td class="c">${esc(c[0])}${c[4]?'<span class="pk">PK</span>':""}</td><td class="t">${esc(c[1])}</td><td class="x">${esc(c[2])}</td><td>${esc(c[3])}</td></tr>`).join("")}
+  </tbody></table></div>
+  ${t.lin?`<div class="lin">+ lineage block: <code>source_file_id</code> · <code>transaction_id</code> · <code>source_segment_start</code> · <code>source_segment_end</code></div>`:""}
+</article>`;}).join("");
+
+// decisions + examples
+document.getElementById("dec").innerHTML = DEC.map(d=>`<div class="dec"><b>${esc(d[0])}</b><p>${esc(d[1])}</p></div>`).join("");
+document.getElementById("ex").innerHTML = EX.map(e=>`<div class="q"><p>${esc(e[0])}</p><pre class="sql">${esc(e[1])}</pre></div>`).join("");
+
+// filter
+let layer = "all";
+const chips = document.getElementById("chips");
+chips.innerHTML = [["all","All"],...Object.entries(LAYERS).map(([k,v])=>[k,v.label])]
+  .map(([k,v])=>`<button class="chip" id="chip-${k}" data-k="${k}" aria-pressed="${k==="all"}">${v}</button>`).join("");
+chips.addEventListener("click", e => {
+  const b = e.target.closest("button"); if(!b) return;
+  layer = b.dataset.k;
+  chips.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed", x===b));
+  apply();
+});
+const q = document.getElementById("q");
+q.addEventListener("input", apply);
+function apply(){
+  const s = q.value.trim().toLowerCase(); let shown = 0;
+  box.querySelectorAll(".tcard").forEach(card => {
+    const name = card.id.slice(2).replace(/-/g,"_").toLowerCase();
+    const okL = layer==="all" || card.dataset.l===layer;
+    let hit = !s || card.querySelector("h3").textContent.toLowerCase().includes(s);
+    card.querySelectorAll("tbody tr").forEach(tr => {
+      const m = s && tr.dataset.c.includes(s);
+      tr.classList.toggle("hit", !!m); if(m) hit = true;
+    });
+    const vis = okL && hit; card.hidden = !vis; if(vis) shown++;
+    const a = nav.querySelector(`a[href="#${card.id}"]`); if(a) a.classList.toggle("hide", !vis);
+  });
+  document.getElementById("count").textContent = `${shown} of ${T.length} tables`;
+}
+apply();
+</script>

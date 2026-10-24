@@ -1,0 +1,156 @@
+<!-- STATUS: LEGACY - ER diagram of the 9-table design; never redrawn for later designs | source: chat "EDI 835/837 parquet schema" (2026-10-22) | FLAG: superseded 9-table design | live artifact "CC ER Diagram" -->
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>CC ER Diagram</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one wide ER canvas (837 left, 835 right, reasons far right), then a plain table of every relationship. */
+:root{
+  --bg:#f6f8f9; --surface:#ffffff; --sunk:#eef2f4; --fg:#16232b; --muted:#56656f; --line:#b9c6ce;
+  --accent:#b0421f;
+  --c-file:#6a7480; --c-837:#2457a6; --c-835:#1d7a4f; --c-adj:#a8640c;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"Instrument Sans", "Segoe UI", system-ui, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0f161b; --surface:#152028; --sunk:#1b2831; --fg:#e3eaee; --muted:#93a3ad; --line:#3a4b56;
+  --accent:#f08a63; --c-file:#9aa4ae; --c-837:#7aa6ec; --c-835:#5fc493; --c-adj:#e3a457; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0f161b; --surface:#152028; --sunk:#1b2831; --fg:#e3eaee; --muted:#93a3ad; --line:#3a4b56;
+  --accent:#f08a63; --c-file:#9aa4ae; --c-837:#7aa6ec; --c-835:#5fc493; --c-adj:#e3a457; color-scheme:dark }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:15px/1.6 var(--body);margin:0}
+.wrap{max-width:1280px;margin:0 auto;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:32px 64px;display:grid;gap:28px}
+h1,h2{font-family:var(--display);line-height:1.15;margin:0;text-wrap:balance}
+h1{font-size:clamp(26px,4vw,36px)}
+h2{font-size:22px}
+p{margin:0;max-width:75ch}
+.eyebrow{font:500 12px/1 var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:8px 20px;font:12.5px var(--mono);color:var(--muted);align-items:center}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+.canvas{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow-x:auto;padding:8px}
+.canvas svg{display:block;min-width:1000px;width:100%;height:auto}
+.rel{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{text-align:left;font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:8px 12px;background:var(--sunk);white-space:nowrap}
+td{padding:8px 12px;border-top:1px solid var(--line);vertical-align:top}
+td.m{font-family:var(--mono);font-size:12.5px;white-space:nowrap}
+tr.cross td:first-child{border-left:3px solid var(--accent)}
+.notes{display:grid;gap:10px}
+.note{display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px;padding-top:10px;border-top:1px solid var(--line)}
+.note b{font-weight:600}
+code{font-family:var(--mono);font-size:.86em}
+@media (max-width:760px){.note{grid-template-columns:minmax(0,1fr);gap:4px}}
+</style>
+
+<div class="wrap">
+<header style="display:grid;gap:10px">
+  <div class="eyebrow">CC · Labcorp · 9 tables</div>
+  <h1>CC ER Diagram</h1>
+  <p>Solid lines are parent-to-child joins inside one side. The two dashed lines are the only links between the 837 and the 835, and both are filled in at ingest. Boxes show keys and the main columns only; every column is listed on the schema page.</p>
+  <div class="legend">
+    <span><i class="sw" style="background:var(--c-file)"></i>source</span>
+    <span><i class="sw" style="background:var(--c-837)"></i>837P (billed)</span>
+    <span><i class="sw" style="background:var(--c-835)"></i>835 (paid)</span>
+    <span><i class="sw" style="background:var(--c-adj)"></i>835 reasons</span>
+    <span>── one to many</span>
+    <span style="color:var(--accent)">- - - 837 ↔ 835 match</span>
+  </div>
+</header>
+
+<div class="canvas"><svg id="er" viewBox="0 0 1200 790" role="img" aria-label="Entity relationship diagram of the nine CC tables"></svg></div>
+
+<section style="display:grid;gap:12px">
+  <h2>Every relationship</h2>
+  <div class="rel"><table>
+    <thead><tr><th>From (parent)</th><th>To (child)</th><th>Join column</th><th>Cardinality</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="m">file</td><td class="m">claim_batch</td><td class="m">file_id</td><td>1 → many</td><td>Payer groups in one 837 file</td></tr>
+      <tr><td class="m">claim_batch</td><td class="m">claim</td><td class="m">claim_batch_id</td><td>1 → many</td><td></td></tr>
+      <tr><td class="m">claim</td><td class="m">claim_service_line</td><td class="m">claim_id</td><td>1 → many</td><td>Up to 50 lines per claim</td></tr>
+      <tr><td class="m">file</td><td class="m">remit_batch</td><td class="m">file_id</td><td>1 → many</td><td>Checks / EFTs in one 835 file</td></tr>
+      <tr><td class="m">remit_batch</td><td class="m">remit</td><td class="m">remit_batch_id</td><td>1 → many</td><td></td></tr>
+      <tr><td class="m">remit_batch</td><td class="m">remit_batch_adjustment</td><td class="m">remit_batch_id</td><td>1 → many</td><td>PLB: why the check ≠ sum of claims</td></tr>
+      <tr><td class="m">remit</td><td class="m">remit_service_line</td><td class="m">remit_id</td><td>1 → many</td><td></td></tr>
+      <tr><td class="m">remit</td><td class="m">remit_adjustment</td><td class="m">remit_id</td><td>1 → many</td><td>Every CAS row, claim- and line-level</td></tr>
+      <tr><td class="m">remit_service_line</td><td class="m">remit_adjustment</td><td class="m">remit_service_line_id</td><td>1 → many</td><td>Line-level CAS only; null on claim-level rows</td></tr>
+      <tr class="cross"><td class="m">claim</td><td class="m">remit</td><td class="m">claim_id</td><td>1 → many</td><td>Matched on PCN (CLM01 = CLP01) + payer + charge. Many because of reversals, corrections and secondary payers.</td></tr>
+      <tr class="cross"><td class="m">claim_service_line</td><td class="m">remit_service_line</td><td class="m">claim_service_line_id</td><td>1 → many</td><td>Matched on REF*6R when sent, else CPT + service date + charge inside the matched claim.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="notes">
+  <h2>Corrections to the mental model</h2>
+  <div class="note"><b>PCN is the match key, but not the join key</b><p>The same PCN shows up on resubmissions (frequency 7/8) and on remits from more than one payer. So the match runs once at ingest using PCN plus payer and charge, and the result is stored as <code>remit.claim_id</code>. The agent joins on <code>claim_id</code>, never on PCN directly.</p></div>
+  <div class="note"><b>Yes, SVC links to SV1</b><p>REF*6R (line item control number) is echoed back on the 835 line when Labcorp sends it. When it's missing, match on procedure code, service date and charge within the already-matched claim. Payers can bundle or split lines, so some remit lines will have no match.</p></div>
+  <div class="note"><b>Batches don't link across sides</b><p>One EFT pays claims from many 837 files, and payer names rarely match exactly between the two files. To compare by payer, group on <code>payer_name</code> at the claim/remit level instead.</p></div>
+  <div class="note"><b>One soft link, not drawn</b><p><code>remit_batch_adjustment.patient_control_number</code> is parsed from the PLB reference when a recoupment names a claim. It's useful for lookups but not reliable enough to be a foreign key.</p></div>
+</section>
+</div>
+
+<script>
+const R = 20, H = 30, W = 260;
+const boxes = {
+  file:{x:470,y:20,c:"--c-file",rows:[["file_id","PK"],["s3_uri",""],["parsed_s3_uri",""],["file_type",""]]},
+  claim_batch:{x:40,y:180,c:"--c-837",rows:[["claim_batch_id","PK"],["file_id","FK"],["payer_name",""],["payer_secondary_id  (REF*2U)",""]]},
+  claim:{x:40,y:380,c:"--c-837",rows:[["claim_id","PK"],["claim_batch_id","FK"],["patient_control_number","match"],["charge_amount",""],["start_index / end_index",""]]},
+  claim_service_line:{x:40,y:600,c:"--c-837",rows:[["claim_service_line_id","PK"],["claim_id","FK"],["procedure_code","match"],["line_item_control_number","match"],["charge_amount",""]]},
+  remit_batch:{x:620,y:180,c:"--c-835",rows:[["remit_batch_id","PK"],["file_id","FK"],["payer_name",""],["payer_secondary_id  (REF*2U)",""],["trace_number",""],["payment_amount",""]]},
+  remit:{x:620,y:380,c:"--c-835",rows:[["remit_id","PK"],["remit_batch_id","FK"],["claim_id","FK"],["patient_control_number","match"],["payer_claim_number",""],["paid_amount",""]]},
+  remit_service_line:{x:620,y:600,c:"--c-835",rows:[["remit_service_line_id","PK"],["remit_id","FK"],["claim_service_line_id","FK"],["procedure_code","match"],["line_item_control_number","match"],["paid_amount",""]]},
+  remit_batch_adjustment:{x:920,y:180,c:"--c-adj",rows:[["remit_batch_adjustment_id","PK"],["remit_batch_id","FK"],["reason_code",""],["reference_id",""],["amount",""]]},
+  remit_adjustment:{x:920,y:480,c:"--c-adj",rows:[["remit_adjustment_id","PK"],["remit_id","FK"],["remit_service_line_id","FK"],["group_code",""],["reason_code",""],["amount",""]]}
+};
+const esc = s => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+let s = `<defs>
+  <marker id="many" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="12" markerHeight="12" orient="auto-start-reverse">
+    <path d="M11 6 L1 1 M11 6 L1 11 M11 6 L1 6" stroke="var(--muted)" stroke-width="1.4" fill="none"/></marker>
+  <marker id="manyA" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="12" markerHeight="12" orient="auto-start-reverse">
+    <path d="M11 6 L1 1 M11 6 L1 11 M11 6 L1 6" stroke="var(--accent)" stroke-width="1.4" fill="none"/></marker>
+  <marker id="one" viewBox="0 0 12 12" refX="2" refY="6" markerWidth="12" markerHeight="12" orient="auto-start-reverse">
+    <path d="M6 1 L6 11" stroke="var(--muted)" stroke-width="1.6" fill="none"/></marker>
+  <marker id="oneA" viewBox="0 0 12 12" refX="2" refY="6" markerWidth="12" markerHeight="12" orient="auto-start-reverse">
+    <path d="M6 1 L6 11" stroke="var(--accent)" stroke-width="1.6" fill="none"/></marker>
+</defs>`;
+// side headers
+s += `<text x="170" y="165" text-anchor="middle" font-family="var(--mono)" font-size="12" fill="var(--c-837)" letter-spacing="1.5">837P · BILLED</text>`;
+s += `<text x="750" y="165" text-anchor="middle" font-family="var(--mono)" font-size="12" fill="var(--c-835)" letter-spacing="1.5">835 · PAID</text>`;
+s += `<text x="1050" y="165" text-anchor="middle" font-family="var(--mono)" font-size="12" fill="var(--c-adj)" letter-spacing="1.5">REASONS</text>`;
+// connectors: [path, dashed]
+const L = (d, a) => `<path d="${d}" fill="none" stroke="${a?'var(--accent)':'var(--muted)'}" stroke-width="${a?2:1.5}" ${a?'stroke-dasharray="7 5"':''} marker-start="url(#${a?'oneA':'one'})" marker-end="url(#${a?'manyA':'many'})"/>`;
+s += L("M600 130 V150 H170 V180");
+s += L("M600 130 V150 H750 V180");
+s += L("M170 296 V380");
+s += L("M170 510 V600");
+s += L("M750 336 V380");
+s += L("M750 530 V600");
+s += L("M880 245 H920");
+s += L("M880 470 H900 V530 H920");
+s += L("M880 680 H905 V610 H920");
+s += L("M300 455 H620", true);
+s += L("M300 680 H620", true);
+// cross labels
+const lab = (x,y,t1,t2) => `<text x="${x}" y="${y}" text-anchor="middle" font-family="var(--mono)" font-size="11.5" fill="var(--accent)">${esc(t1)}</text><text x="${x}" y="${y+16}" text-anchor="middle" font-family="var(--body)" font-size="11" fill="var(--muted)">${esc(t2)}</text>`;
+s += lab(460,440-16,"remit.claim_id","matched on PCN + payer + charge");
+s += lab(460,665-16,"remit_service_line.claim_service_line_id","matched on REF*6R, else CPT + date + charge");
+// boxes
+for (const [name,b] of Object.entries(boxes)) {
+  const h = H + b.rows.length*R + 6;
+  s += `<g><rect x="${b.x}" y="${b.y}" width="${W}" height="${h}" rx="6" fill="var(--surface)" stroke="var(${b.c})" stroke-width="1.5"/>`;
+  s += `<rect x="${b.x}" y="${b.y}" width="${W}" height="${H}" rx="6" fill="var(${b.c})"/><rect x="${b.x}" y="${b.y+H-6}" width="${W}" height="6" fill="var(${b.c})"/>`;
+  s += `<text x="${b.x+12}" y="${b.y+20}" font-family="var(--mono)" font-size="13" font-weight="500" fill="var(--surface)">${esc(name)}</text>`;
+  b.rows.forEach((r,i) => {
+    const y = b.y + H + 16 + i*R;
+    const tagc = r[1]==="PK" ? "var(--fg)" : r[1]==="FK" ? `var(${b.c})` : r[1]==="match" ? "var(--accent)" : "var(--muted)";
+    s += `<text x="${b.x+12}" y="${y}" font-family="var(--mono)" font-size="12" fill="var(--fg)" ${r[1]==="PK"?'font-weight="500"':''}>${esc(r[0])}</text>`;
+    if (r[1]) s += `<text x="${b.x+W-10}" y="${y}" text-anchor="end" font-family="var(--mono)" font-size="10" fill="${tagc}">${r[1]}</text>`;
+  });
+  s += `</g>`;
+}
+document.getElementById("er").innerHTML = s;
+</script>
+
+</body></html>

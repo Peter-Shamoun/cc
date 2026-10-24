@@ -1,0 +1,1 @@
+<!-- STATUS: REFERENCE - project has no instructions set | source: claude.ai project "ClaimClairity" instructions (as of 2026-10-24) | the project has NO instructions set; this file is intentionally empty -->

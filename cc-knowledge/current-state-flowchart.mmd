@@ -1,0 +1,28 @@
+%% STATUS: CURRENT (built) - your repo copy of the current-state flowchart | source: chat "Mermaid flowchart of AI pipeline" (2026-10-23) | FLAG: user-authored Mermaid pasted in the chat; filename guessed
+  flowchart TD
+      U["User question"] --> I
+
+      subgraph AI1["AI: plan"]
+          I["Investigator<br/>picks typed tasks"]
+      end
+
+      I -->|"run_tasks"| S
+      S["Server checks the plan<br/>against business definitions"] --> P{"Payer name<br/>clear?"}
+      P -->|"no"| R["Payer Resolver (AI)<br/>suggests names"] --> C["User picks payers"] --> Q
+      P -->|"yes"| Q["Server builds the query<br/>from fixed definitions"]
+      Q --> D[("Claims data<br/>Neo4j / DuckDB")]
+      D --> E["Results + evidence"]
+      E -.->|"short summary,<br/>may plan another step"| I
+      E --> F["Server builds tables,<br/>charts, findings"]
+
+      subgraph AI2["AI: write"]
+          W["Writer<br/>prose with placeholders"]
+      end
+
+      F --> W
+      W --> V["Server fills in numbers<br/>and checks each sentence"]
+      V --> A["Answer saved, then shown"]
+
+      X["Lane 2: AI-written SQL<br/>(built, not connected)"]:::off -.-> D
+
+      classDef off stroke-dasharray: 5 5,color:#888

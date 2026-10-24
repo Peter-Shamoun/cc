@@ -1,0 +1,325 @@
+<!-- STATUS: LEGACY - final "Schema v1" page (edi + 7-table analytics layer); replaced by claude/schema/* (sem.* views + semantic model) | source: chat "EDI 835/837 parquet schema" (2026-10-22) | FLAG: superseded by claude/schema/* | live artifact "CC Schema v1" -->
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>CC Schema v1</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: reference manual — sticky contents on the left; layer overview, rules, metric glossary, semantic tables, storage catalog on the right. */
+:root{
+  --bg:#f6f8f9; --surface:#ffffff; --sunk:#eef2f4; --fg:#16232b; --muted:#56656f; --line:#d6dee3;
+  --accent:#0d5e78; --sem:#7a3fa6; --store:#5b6773;
+  --c-837:#2457a6; --c-835:#1d7a4f; --c-ref:#a8640c;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"Instrument Sans", "Segoe UI", system-ui, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0f161b; --surface:#152028; --sunk:#1b2831; --fg:#e3eaee; --muted:#93a3ad; --line:#2a3943;
+  --accent:#5fb6d3; --sem:#c296e0; --store:#9aa4ae; --c-837:#7aa6ec; --c-835:#5fc493; --c-ref:#e3a457; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0f161b; --surface:#152028; --sunk:#1b2831; --fg:#e3eaee; --muted:#93a3ad; --line:#2a3943;
+  --accent:#5fb6d3; --sem:#c296e0; --store:#9aa4ae; --c-837:#7aa6ec; --c-835:#5fc493; --c-ref:#e3a457; color-scheme:dark }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:15px/1.6 var(--body);margin:0}
+.wrap{max-width:1200px;margin:0 auto;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:32px 64px}
+h1,h2,h3{font-family:var(--display);line-height:1.15;text-wrap:balance;margin:0}
+h1{font-size:clamp(28px,4.5vw,42px);letter-spacing:-.01em}
+h2{font-size:24px}
+code,.mono{font-family:var(--mono);font-size:.86em}
+p{margin:0;max-width:74ch}
+.eyebrow{font:500 12px/1 var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+header.top{display:grid;gap:14px;padding-bottom:28px;border-bottom:1px solid var(--line);margin-bottom:28px}
+.lede{font-size:17px}
+.layout{display:grid;grid-template-columns:210px minmax(0,1fr);gap:40px;align-items:start}
+nav.idx{position:sticky;top:calc(env(safe-area-inset-top, 0px) + 16px);display:grid;gap:14px;font-size:13px;max-height:calc(100vh - 32px);overflow:auto}
+nav.idx .grp{display:grid;gap:2px}
+nav.idx .grp > span{font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:2px}
+nav.idx a{font-family:var(--mono);font-size:12.5px;text-decoration:none;color:var(--fg);padding:2px 6px;border-radius:4px}
+nav.idx a:hover{background:var(--sunk)}
+nav.idx a:focus-visible{outline:2px solid var(--accent)}
+main{display:grid;gap:52px;min-width:0}
+section{display:grid;gap:14px;min-width:0}
+.flow{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto minmax(0,.7fr);gap:12px;align-items:stretch}
+.flow .box{background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--c);border-radius:6px;padding:14px;display:grid;gap:6px;align-content:start}
+.flow .box b{font-family:var(--display);font-size:17px}
+.flow .box .s{font:12px var(--mono);color:var(--muted)}
+.flow .arrow{align-self:center;font:500 12px var(--mono);color:var(--muted);text-align:center;max-width:120px}
+.callout{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--sem);border-radius:6px;padding:14px 16px;display:grid;gap:6px}
+.rules{display:grid;gap:0}
+.rule{display:grid;grid-template-columns:230px minmax(0,1fr);gap:16px;padding:12px 0;border-top:1px solid var(--line)}
+.rule b{font-weight:600}
+.rule .how{display:grid;gap:4px}
+.rule .how small{font-size:13px;color:var(--muted)}
+.gl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th{text-align:left;font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:8px 12px;background:var(--sunk);white-space:nowrap}
+td{padding:7px 12px;border-top:1px solid var(--line);vertical-align:top}
+td.c{font-family:var(--mono);font-size:12.5px;white-space:nowrap}
+td.t{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap}
+tr.sub td{background:var(--sunk);font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:5px 12px}
+.tcard{background:var(--surface);border:1px solid var(--line);border-radius:8px;scroll-margin-top:16px;min-width:0}
+.tcard header{padding:14px 16px;display:grid;gap:8px;border-bottom:1px solid var(--line)}
+.tname{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:baseline}
+.tname h3{font-family:var(--mono);font-size:18px;font-weight:500}
+.badge{font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;padding:3px 8px;border-radius:4px;color:var(--c);border:1px solid var(--c)}
+.meta{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 14px;font-size:13.5px}
+.meta dt{font:500 11.5px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding-top:2px}
+.meta dd{margin:0}
+.cols{overflow-x:auto}
+.key{font:500 10px var(--mono);margin-left:6px;color:var(--sem)}
+pre.sql{margin:0;background:var(--sunk);border:1px solid var(--line);border-radius:6px;padding:12px 14px;overflow-x:auto;font:12.5px/1.55 var(--mono)}
+.q{display:grid;gap:8px}
+.q p{font-weight:600}
+ul.plain{margin:0;padding-left:20px;display:grid;gap:6px}
+.store td:first-child{font-family:var(--mono);font-size:12.5px;white-space:nowrap}
+.store tr.g td{background:var(--sunk);font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+@media (max-width:900px){
+  .layout{grid-template-columns:minmax(0,1fr)}
+  nav.idx{display:none}
+  .flow{grid-template-columns:minmax(0,1fr)}
+  .flow .arrow{max-width:none}
+  .rule{grid-template-columns:minmax(0,1fr);gap:4px}
+}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div class="eyebrow">CC · Labcorp · 837P + 835 · one copy per tenant</div>
+  <h1>CC Schema v1</h1>
+  <p class="lede">Two layers. <b>edi</b> is the lossless storage schema: every segment of every file, normalized at the X12 grain. <b>analytics</b> is the semantic layer the agent queries: seven tables shaped around claims, lines, events, reasons and deposits, with the business rules (reversals, resubmissions, what counts as a denial, payer naming) settled once in their definitions.</p>
+</header>
+
+<div class="layout">
+<nav class="idx" aria-label="Contents">
+  <div class="grp"><span>Overview</span><a href="#layers">Two layers</a><a href="#why">Why the old subset failed</a><a href="#rules">Rules it settles</a><a href="#metrics">Metric definitions</a></div>
+  <div class="grp"><span>analytics</span><div id="navt" style="display:grid;gap:2px"></div></div>
+  <div class="grp"><span>Reference</span><a href="#examples">Example SQL</a><a href="#escalate">Going to edi</a><a href="#storage">edi storage tables</a><a href="#build">How it's built</a><a href="#open">Open decisions</a></div>
+</nav>
+
+<main>
+<section id="layers">
+  <h2>Two layers</h2>
+  <div class="flow">
+    <div class="box" style="--c:var(--store)"><b>edi</b><span class="s">lossless storage · ~37 tables</span><p>File → transaction → claim → line → adjustment, plus raw segments and S3 lineage. Shaped like the X12 files. For engineers and for drill-down.</p></div>
+    <div class="arrow">rules applied once at build</div>
+    <div class="box" style="--c:var(--sem)"><b>analytics</b><span class="s">semantic layer · 7 tables</span><p>Shaped like the questions. Amounts already net of reversals, statuses already decided, codes already explained.</p></div>
+    <div class="arrow">default query surface</div>
+    <div class="box" style="--c:var(--accent)"><b>Agent</b><span class="s">lane 2 SQL tool</span><p>Starts in <code>analytics</code>. Drops to <code>edi</code> only when the semantic layer can't answer, entering through the source IDs on the rows it already found.</p></div>
+  </div>
+</section>
+
+<section id="why">
+  <h2>Why the earlier subsets were unconvincing</h2>
+  <div class="callout">
+    <p>Both earlier "agent" layers were still shaped like the files: batch, claim, line on each side. That moved the hard part onto the agent. To answer "what's our denial rate with Aetna" it still had to know that a reversal cancels a prior payment, that a replacement 837 supersedes the original, that CO-45 is a write-off but CO-50 is a denial, and that "AETNA LIFE" on the 837 is "AETNA" on the 835. Every one of those is a place for the agent to be quietly wrong.</p>
+    <p>A semantic layer earns its place by deciding those things once. The test for each table below is: can the agent answer its question with a WHERE and a GROUP BY, without knowing any X12 rules?</p>
+  </div>
+</section>
+
+<section id="rules">
+  <h2>Rules the semantic layer settles</h2>
+  <p>These live in the view definitions, not in the agent prompt.</p>
+  <div class="rules" id="rulelist"></div>
+</section>
+
+<section id="metrics">
+  <h2>Metric definitions</h2>
+  <p>Every money column in <code>analytics</code> means exactly one of these. Column comments repeat them.</p>
+  <div class="gl"><table>
+    <thead><tr><th>Metric</th><th>Definition</th><th>Source</th></tr></thead>
+    <tbody id="gloss"></tbody>
+  </table></div>
+</section>
+
+<div id="tables" style="display:grid;gap:22px"></div>
+
+<section id="examples">
+  <h2>What the agent writes</h2>
+  <p>One table per question in most cases, and no X12 knowledge in any of them.</p>
+  <div id="ex" style="display:grid;gap:22px"></div>
+</section>
+
+<section id="escalate">
+  <h2>When the agent goes to edi</h2>
+  <p>The semantic layer covers the common questions. Anything else, such as a REF value, a secondary payer's 2320 loop, an attachment segment, or the raw text of a remit, lives only in <code>edi</code>. The agent can go there, but the business rules don't come with it, so a few habits keep the answers right.</p>
+  <div class="rules">
+    <div class="rule"><b>Try analytics first</b><div class="how"><p>Escalate only when no analytics column or table holds the field, or when the user asks for source-level detail ("show me the raw 835", "what REF*G1 did we send").</p></div></div>
+    <div class="rule"><b>Enter through source IDs</b><div class="how"><p>Find the claims or lines in <code>analytics</code> first, then follow <code>source_claim_ids</code>, <code>source_remit_claim_ids</code>, <code>source_claim_line_id</code> or <code>source_row_id</code> into <code>edi</code>. Scope, payer and reversal handling are then already right.</p><small class="mono">SELECT … FROM edi.claim_reference WHERE claim_id IN (SELECT unnest(source_claim_ids) FROM claims WHERE …)</small></div></div>
+    <div class="rule"><b>Don't recompute metrics in edi</b><div class="how"><p>Paid, denied and allowed totals always come from <code>analytics</code>. Summing <code>edi.remit_claim.claim_payment_amount</code> directly double counts reversals and ignores resubmissions. edi supplies extra attributes; analytics supplies the numbers.</p></div></div>
+    <div class="rule"><b>Say when it escalated</b><div class="how"><p>The answer notes that it used source-level data, so the user knows the result sits outside the defined metrics.</p></div></div>
+    <div class="rule"><b>Log every escalation</b><div class="how"><p>Record which edi tables and columns were used. Fields that keep showing up get promoted into an analytics table, so the semantic layer grows from real questions instead of guesses.</p></div></div>
+    <div class="rule"><b>edi needs descriptions too</b><div class="how"><p>Because the agent can read edi, every edi column gets a <code>COMMENT ON</code> with its X12 reference and meaning, and <code>raw_segment</code> stays engineer-only. Those comments are what make escalation workable.</p></div></div>
+  </div>
+</section>
+
+<section id="storage">
+  <h2>edi storage tables (lossless)</h2>
+  <p>Unchanged from the original design. Column-level detail is in that design; this is the map. The agent reaches these only by escalating, as described above.</p>
+  <div class="gl"><table class="store">
+    <thead><tr><th>Table</th><th>Grain (one row per…)</th></tr></thead>
+    <tbody id="storelist"></tbody>
+  </table></div>
+</section>
+
+<section id="build">
+  <h2>How it's built</h2>
+  <ul class="plain">
+    <li><code>claims</code>, <code>claim_lines</code>, <code>claim_events</code> and <code>adjustments</code> are materialized to Parquet after each load. They need window logic over versions and reversals, and the agent should never wait on that.</li>
+    <li><code>deposits</code>, <code>deposit_adjustments</code> and <code>payers</code> are plain DuckDB views over <code>edi</code>.</li>
+    <li>Two small curated tables feed the rules: <code>edi.payer_alias</code> (837 and 835 payer names and IDs → one payer) and <code>edi.carc_category</code> (each CARC → contractual, denial, patient responsibility, other payer, other; seeded from the 23 reviewed denial CARCs).</li>
+    <li>Layout per tenant: <code>tenants/labcorp/edi/…</code> and <code>tenants/labcorp/analytics/…</code>. The agent's catalog attaches both, as two schemas, with <code>analytics</code> first on the search path.</li>
+  </ul>
+</section>
+
+<section id="open">
+  <h2>Open decisions</h2>
+  <ul class="plain">
+    <li><b>Claim grain.</b> A claim here is one PCN sent to one payer. A PCN billed to primary then secondary is two claims. Confirm that matches how the implementations team talks about claims.</li>
+    <li><b>Denial definition.</b> Reuses the current rule (recorded CLP02 = 4, or the v3 signal). If the team changes it, only <code>edi.carc_category</code> and two view definitions change.</li>
+    <li><b>Contractual list.</b> Which CO reasons count as normal write-offs rather than denials (45, 253 to start) needs an owner.</li>
+    <li><b>Payer aliases.</b> Someone has to curate <code>payer_alias</code> per tenant; the existing payer resolver could propose matches for review.</li>
+  </ul>
+</section>
+</main>
+</div>
+</div>
+
+<script>
+const RULES = [
+ ["What a claim is","One row per patient control number per payer. Resubmissions (frequency 7) collapse into the claim; the latest version supplies billed amounts. A void (8) sets status voided.","edi.claim grouped on patient_control_number + payer_key"],
+ ["Which remit counts","The current adjudication is the latest non-reversal remit for the claim. Reversed adjudications drop out of statuses and reasons but stay in the event history.","edi.remit_claim via claim_remit_match, ordered by payment_date"],
+ ["How money nets","paid_amount sums every remit for the claim, reversals included, so it equals money actually kept. Allowed, patient responsibility and adjustments come from the current adjudication only, so nothing double counts.","CLP04 across all matched remits; CLP05, AMT*B6, CAS from current"],
+ ["What a denial is","Your existing rule: recorded denial (CLP02 = 4) or denial signal v3 (non-reversal, $0 paid, CO-group CAS in the 23 reviewed CARCs). is_denied is true for either; denial_source says which.","edi.remit_claim, edi.remit_adjustment, edi.carc_category"],
+ ["What each reason means","Every adjustment row gets one adjustment_category: contractual, denial, patient_responsibility, other_payer, other. 'Denied dollars' is just SUM where category = 'denial'.","edi.carc_category (curated)"],
+ ["Who the payer is","837 and 835 names and IDs map to one payer_key and payer_name, so 'Aetna' means the same thing on both sides.","edi.payer_alias (curated)"],
+ ["Codes in words","Every code column has a description next to it: status, CARC, RARC, PLB reason, place of service, financial class.","edi.ref_*"],
+ ["Line matching","Each billed line is joined to its paid line (REF*6R first, then CPT + date + charge). Paid lines the payer bundled or split appear with match_method 'unmatched'; their money still counts at claim level.","edi.claim_line_remit_match"]
+];
+
+const GLOSS = [
+ ["billed_amount","What Labcorp charged, from the latest submitted version of the claim or line.","CLM02 / SV102"],
+ ["allowed_amount","What the payer allows under contract on the current adjudication. If the payer didn't send it, paid + patient responsibility.","AMT*B6"],
+ ["paid_amount","Net money kept from the payer: every payment minus every reversal.","Σ CLP04 / Σ SVC03"],
+ ["patient_responsibility_amount","What the patient owes per the current adjudication (deductible, coinsurance, copay).","CLP05, PR-group CAS"],
+ ["contractual_adjustment_amount","Normal write-off down to the contract rate. Not a denial.","CAS where category = contractual"],
+ ["denied_amount","Dollars adjusted for denial reasons on the current adjudication.","CAS where category = denial"],
+ ["is_denied","Recorded denial (CLP02 = 4) or denial signal v3.","see Rules"],
+ ["days_to_first_payment","First adjudication payment date minus first submitted date.","BHT04 → BPR16"],
+ ["deposit_amount","What actually hit the bank for one check or EFT.","BPR02"],
+ ["payer_adjustment_total","Amounts taken from or added to a deposit outside any claim on it (recoupments, interest).","Σ PLB"]
+];
+
+// [name, type, meaning, tag] | ["#", section]
+const T = [
+{n:"claims",grain:"One row per claim: a patient control number sent to one payer.",
+ answers:"Status, denial rates, payment timing, outstanding claims, anything 'per claim'.",
+ from:"edi.claim, claim_remit_match, remit_claim, remit_adjustment, carc_category, payer_alias",
+ cols:[["claim_key","VARCHAR","patient_control_number + payer_key","PK"],["patient_control_number","VARCHAR","Labcorp claim number (CLM01 / CLP01)"],
+ ["#","Payer"],["payer_key","VARCHAR","→ payers"],["payer_name","VARCHAR","canonical name, same on both sides"],["financial_class","VARCHAR","Medicare, Medicaid, Commercial, BCBS…"],["payer_responsibility","VARCHAR","primary, secondary, tertiary"],
+ ["#","Status"],["claim_status","VARCHAR","pending, paid, paid_with_denials, denied, patient_responsibility, reversed, voided"],["is_denied","BOOLEAN","see Metric definitions"],["denial_source","VARCHAR","recorded, signal, both, or null"],["primary_denial_reason_code","VARCHAR","CARC with the most denied dollars"],["primary_denial_reason","VARCHAR","its description"],["remark_codes","VARCHAR[]","RARCs on the current adjudication"],["remark_descriptions","VARCHAR[]",""],
+ ["#","Money"],["billed_amount","DECIMAL(18,2)",""],["allowed_amount","DECIMAL(18,2)",""],["paid_amount","DECIMAL(18,2)","net of reversals"],["patient_responsibility_amount","DECIMAL(18,2)",""],["contractual_adjustment_amount","DECIMAL(18,2)",""],["denied_amount","DECIMAL(18,2)",""],["interest_amount","DECIMAL(18,2)",""],
+ ["#","Timing"],["first_service_date","DATE",""],["last_service_date","DATE",""],["first_submitted_date","DATE",""],["last_submitted_date","DATE",""],["submission_count","INTEGER","1 + replacements"],["first_paid_date","DATE",""],["last_paid_date","DATE",""],["days_to_first_payment","INTEGER",""],["adjudication_count","INTEGER","non-reversal remits"],["was_reversed","BOOLEAN",""],
+ ["#","Who"],["payer_claim_number","VARCHAR","latest payer ICN"],["billing_provider_npi","VARCHAR",""],["ordering_provider_npi","VARCHAR","referring provider on the 837"],["place_of_service","VARCHAR","code + description"],["principal_diagnosis_code","VARCHAR",""],["line_count","INTEGER",""],["patient_member_id","VARCHAR","PHI"],["patient_name","VARCHAR","PHI"],["patient_birth_date","DATE","PHI"],
+ ["#","Drill-down"],["source_claim_ids","BIGINT[]","→ edi.claim rows (every version)"],["source_remit_claim_ids","BIGINT[]","→ edi.remit_claim rows (every remit)"]]},
+
+{n:"claim_lines",grain:"One row per billed service line on the latest version of a claim.",
+ answers:"Anything per CPT: allowed and paid rates, line denials, recoding, units.",
+ from:"edi.claim_line, claim_line_remit_match, remit_service_line, remit_adjustment, carc_category",
+ cols:[["claim_key","VARCHAR","→ claims","PK"],["line_number","INTEGER","LX01","PK"],["patient_control_number","VARCHAR",""],["payer_name","VARCHAR",""],["financial_class","VARCHAR",""],
+ ["#","Service"],["procedure_code","VARCHAR","CPT / HCPCS billed"],["procedure_description","VARCHAR","HCPCS text where licensed"],["modifiers","VARCHAR[]",""],["units","DECIMAL(15,3)",""],["service_date","DATE",""],["diagnosis_codes","VARCHAR[]","pointers resolved"],
+ ["#","Outcome"],["line_status","VARCHAR","pending, paid, denied, patient_responsibility, not_on_remit"],["is_denied","BOOLEAN","same rule as claims, applied to the line"],["primary_denial_reason_code","VARCHAR",""],["primary_denial_reason","VARCHAR",""],["paid_procedure_code","VARCHAR","code the payer paid under"],["was_recoded","BOOLEAN","paid code ≠ billed code"],["remark_codes","VARCHAR[]",""],
+ ["#","Money"],["billed_amount","DECIMAL(18,2)",""],["allowed_amount","DECIMAL(18,2)",""],["paid_amount","DECIMAL(18,2)","net of reversals"],["patient_responsibility_amount","DECIMAL(18,2)",""],["contractual_adjustment_amount","DECIMAL(18,2)",""],["denied_amount","DECIMAL(18,2)",""],
+ ["#","Drill-down"],["match_method","VARCHAR","line_item_control_number, procedure_date_charge, unmatched"],["source_claim_line_id","BIGINT","→ edi.claim_line"],["source_remit_service_line_ids","BIGINT[]","→ edi.remit_service_line"]]},
+
+{n:"claim_events",grain:"One row per thing that happened to a claim, in order.",
+ answers:"\"What happened to claim X?\" Timeline of submissions, payments, reversals and forwarding.",
+ from:"edi.claim (each version), edi.remit_claim (each remit), source_file",
+ cols:[["claim_key","VARCHAR","→ claims","PK"],["event_sequence","INTEGER","1, 2, 3… by date","PK"],["patient_control_number","VARCHAR",""],["event_date","DATE",""],["event_type","VARCHAR","submitted, resubmitted, voided, adjudicated, reversed, forwarded"],["description","VARCHAR","plain sentence, e.g. 'Payer denied: CO-50 not medically necessary'"],["status_code","VARCHAR","CLM05-3 or CLP02"],["status_description","VARCHAR",""],["billed_amount","DECIMAL(18,2)",""],["paid_amount","DECIMAL(18,2)","negative on reversals"],["patient_responsibility_amount","DECIMAL(18,2)",""],["payer_claim_number","VARCHAR","ICN on 835 events"],["trace_number","VARCHAR","check / EFT on 835 events"],["s3_uri","VARCHAR","source file"],["source_row_id","BIGINT","→ edi.claim or edi.remit_claim"]]},
+
+{n:"adjustments",grain:"One row per adjustment reason on the current adjudication of a claim or line.",
+ answers:"Why money was reduced: top denial reasons, write-offs, patient responsibility breakdown.",
+ from:"edi.remit_adjustment, remit_remark, carc_category, ref_carc, ref_cas_group",
+ cols:[["claim_key","VARCHAR","→ claims"],["line_number","INTEGER","→ claim_lines; null for claim-level reasons"],["patient_control_number","VARCHAR",""],["payer_name","VARCHAR",""],["financial_class","VARCHAR",""],["payment_date","DATE",""],["procedure_code","VARCHAR","null for claim-level"],["adjustment_category","VARCHAR","contractual, denial, patient_responsibility, other_payer, other"],["group_code","VARCHAR","CO, PR, OA, PI"],["group_description","VARCHAR","who bears it"],["reason_code","VARCHAR","CARC"],["reason_description","VARCHAR",""],["amount","DECIMAL(18,2)","positive = less money paid"],["remark_codes","VARCHAR[]","RARCs on the same line or claim"],["trace_number","VARCHAR",""],["source_remit_adjustment_id","BIGINT","→ edi.remit_adjustment"]]},
+
+{n:"deposits",grain:"One row per check or EFT.",
+ answers:"What a payer paid on a date, whether a deposit ties out, recoupment and interest totals.",
+ from:"edi.remit_payment, remit_provider_adjustment, payer_alias",
+ cols:[["trace_number","VARCHAR","check / EFT number","PK"],["payer_key","VARCHAR","→ payers"],["payer_name","VARCHAR",""],["payment_date","DATE",""],["payment_method","VARCHAR","ACH, check, none"],["deposit_amount","DECIMAL(18,2)","BPR02"],["claim_payment_total","DECIMAL(18,2)","Σ claim payments on this deposit"],["payer_adjustment_total","DECIMAL(18,2)","Σ PLB"],["recoupment_amount","DECIMAL(18,2)","PLB WO / overpayment recovery"],["interest_amount","DECIMAL(18,2)","PLB L6"],["is_balanced","BOOLEAN","claim_payment_total − payer_adjustment_total = deposit_amount"],["claim_count","INTEGER",""],["s3_uri","VARCHAR","source file"]]},
+
+{n:"deposit_adjustments",grain:"One row per payer-level adjustment (PLB) on a deposit.",
+ answers:"Why a deposit is short or long: recoupments, interest, forwarding balances.",
+ from:"edi.remit_provider_adjustment, ref_provider_adjustment_reason",
+ cols:[["trace_number","VARCHAR","→ deposits"],["payer_name","VARCHAR",""],["payment_date","DATE",""],["category","VARCHAR","recoupment, interest, forwarding_balance, other"],["reason_code","VARCHAR","PLB03-1"],["reason_description","VARCHAR",""],["amount","DECIMAL(18,2)","positive = less money deposited"],["referenced_patient_control_number","VARCHAR","claim named in the PLB, when parseable"],["claim_key","VARCHAR","→ claims, when resolvable"]]},
+
+{n:"payers",grain:"One row per payer, after merging 837 and 835 names.",
+ answers:"Which payers exist, how they're named, and lets the agent resolve 'Aetna' to one key.",
+ from:"edi.payer_alias (curated), claim, remit_payment",
+ cols:[["payer_key","VARCHAR","","PK"],["payer_name","VARCHAR","canonical"],["financial_class","VARCHAR",""],["aliases","VARCHAR[]","every name seen in 837s and 835s"],["payer_ids","VARCHAR[]","every payer ID seen"],["claim_count","INTEGER",""],["first_seen_date","DATE",""],["last_seen_date","DATE",""]]}
+];
+
+const EX = [
+ ["What's our denial rate by payer for claims submitted last quarter?",
+`SELECT payer_name, COUNT(*) AS claims,
+       AVG(is_denied::INT) AS denial_rate
+FROM claims
+WHERE first_submitted_date BETWEEN DATE '2026-07-01' AND DATE '2026-09-30'
+  AND claim_status NOT IN ('pending', 'voided')
+GROUP BY ALL ORDER BY claims DESC;`],
+ ["Top denial reasons by dollars for Aetna.",
+`SELECT reason_code, reason_description, SUM(amount) AS denied_dollars
+FROM adjustments
+WHERE adjustment_category = 'denial' AND payer_name = 'Aetna'
+GROUP BY ALL ORDER BY denied_dollars DESC LIMIT 10;`],
+ ["What happened to claim LC12345678?",
+`SELECT event_date, event_type, description, paid_amount, trace_number
+FROM claim_events
+WHERE patient_control_number = 'LC12345678'
+ORDER BY claim_key, event_sequence;`],
+ ["Average allowed and paid for CPT 80053 by payer.",
+`SELECT payer_name, COUNT(*) AS lines,
+       AVG(allowed_amount) AS avg_allowed, AVG(paid_amount) AS avg_paid
+FROM claim_lines
+WHERE procedure_code = '80053' AND line_status <> 'pending'
+GROUP BY ALL ORDER BY lines DESC;`],
+ ["Claims with no payment after 45 days.",
+`SELECT patient_control_number, payer_name, first_submitted_date, billed_amount
+FROM claims
+WHERE claim_status = 'pending'
+  AND first_submitted_date < current_date - INTERVAL 45 DAY
+ORDER BY billed_amount DESC;`],
+ ["Why doesn't EFT 1234567890 match the deposit?",
+`SELECT deposit_amount, claim_payment_total, payer_adjustment_total, is_balanced
+FROM deposits WHERE trace_number = '1234567890';
+
+SELECT category, reason_description, referenced_patient_control_number, amount
+FROM deposit_adjustments WHERE trace_number = '1234567890';`]
+];
+
+const STORE = [
+ ["#","Lineage"],["source_file","S3 object, with delimiters to rebuild it"],["edi_transaction","ST/SE transaction set, with ISA/GS envelope"],["raw_segment","segment, byte-exact (the lossless guarantee)"],["ingest_issue","parse or balancing issue"],
+ ["#","837P"],["claim","CLM submission (each version is a row)"],["claim_line","SV1 service line"],["claim_diagnosis","HI diagnosis"],["claim_party","NM1 party (providers, subscriber, payer…)"],["claim_reference / claim_date / claim_amount","REF / DTP / AMT occurrence"],["claim_other_payer","2320 other-payer loop"],["claim_line_adjudication","2430 prior-payer line adjudication"],["claim_cob_adjustment","CAS on a secondary claim"],["claim_misc_segment","rarely used 837 segment"],
+ ["#","835"],["remit_payment","check / EFT (BPR, TRN)"],["remit_claim","CLP"],["remit_service_line","SVC"],["remit_adjustment","CAS reason (claim or line)"],["remit_remark","RARC"],["remit_provider_adjustment","PLB reason"],["remit_party","N1 / NM1 party"],["remit_reference / remit_date / remit_amount / remit_quantity","REF / DTM / AMT / QTY occurrence"],["remit_misc_segment","rarely used 835 segment"],
+ ["#","Matching and lookups"],["claim_remit_match","candidate claim ↔ remit pair, with method and rank"],["claim_line_remit_match","candidate line ↔ line pair"],["ref_* (carc, rarc, cas_group, claim_status, …)","code and description"],["carc_category","CARC → semantic category (new, curated)"],["payer_alias","payer name or ID → payer_key (new, curated)"]
+];
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+document.getElementById("rulelist").innerHTML = RULES.map(r=>`<div class="rule"><b>${esc(r[0])}</b><div class="how"><p>${esc(r[1])}</p><small class="mono">${esc(r[2])}</small></div></div>`).join("");
+document.getElementById("gloss").innerHTML = GLOSS.map(g=>`<tr><td class="c">${esc(g[0])}</td><td>${esc(g[1])}</td><td class="t">${esc(g[2])}</td></tr>`).join("");
+document.getElementById("navt").innerHTML = T.map(t=>`<a href="#t-${t.n}">${t.n}</a>`).join("");
+document.getElementById("tables").innerHTML = `<section style="gap:6px"><h2>analytics: the 7 tables the agent sees</h2><p>Joins are by <code>claim_key</code> (plus <code>line_number</code> for lines) or <code>trace_number</code>. Nothing else.</p></section>` +
+ T.map(t => `<article class="tcard" id="t-${t.n}">
+  <header>
+    <div class="tname"><h3>${t.n}</h3><span class="badge" style="--c:var(--sem)">analytics</span></div>
+    <dl class="meta"><dt>Grain</dt><dd>${esc(t.grain)}</dd><dt>Answers</dt><dd>${esc(t.answers)}</dd><dt>Built from</dt><dd class="mono">${esc(t.from)}</dd></dl>
+  </header>
+  <div class="cols"><table><thead><tr><th>Column</th><th>Type</th><th>Meaning</th></tr></thead><tbody>
+  ${t.cols.map(c => c[0]==="#" ? `<tr class="sub"><td colspan="3">${esc(c[1])}</td></tr>`
+    : `<tr><td class="c">${esc(c[0])}${c[3]?`<span class="key">${c[3]}</span>`:""}</td><td class="t">${esc(c[1])}</td><td>${esc(c[2])}</td></tr>`).join("")}
+  </tbody></table></div>
+</article>`).join("");
+document.getElementById("ex").innerHTML = EX.map(e=>`<div class="q"><p>${esc(e[0])}</p><pre class="sql">${esc(e[1])}</pre></div>`).join("");
+document.getElementById("storelist").innerHTML = STORE.map(r => r[0]==="#" ? `<tr class="g"><td colspan="2">${esc(r[1])}</td></tr>` : `<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join("");
+</script>
+
+</body></html>

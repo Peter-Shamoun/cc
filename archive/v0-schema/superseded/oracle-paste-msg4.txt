@@ -1,0 +1,94 @@
+# STATUS: REFERENCE - your pasted AI_APPEAL_SFTP Oracle table definitions (input) | source: chat "EDI 835/837 parquet schema" (2026-10-22) | FLAG: Tabs and trailing spaces kept as the transcript returned them; the original clipboard bytes cannot be checked | Turn 6 (user message 4): pasted AI_APPEAL_SFTP_* Oracle tables, without the system-reminder line
+It is rediculous that there are 40 agent facing tables for 2 file types
+
+I was expecting claim, claimline. remit, remitline. I know there are likely more intracies, example: batch and payer, but this is absolutley ridiculous
+
+example, not saying to copy this or mimic it: AI_APPEAL_SFTP_FILE
+
+Tracks every file received from S3.
+
+Column	Type	Constraints	Description
+PK_SEQ_ID	NUMBER(28)	PK, sequence	Auto-generated primary key
+S3_URI	VARCHAR2(1000)	UNIQUE, NOT NULL	Full S3 path; doubles as idempotency key
+FILE_TYPE	VARCHAR2(3)	NOT NULL	'835' or '837'
+PARSED_S3_URI	VARCHAR2(1000)	UNIQUE, NOT NULL	The S3 path of the parsed EDI file
+UPLOAD_DT	DATE	NOT NULL	When the file appeared in S3
+PARSED_DT	DATE	 	When the file was parsed
+B_PARSED	NUMBER(1)	NOT NULL, CHECK (0/1)	1 = parsed successfully
+ERR_MSG	VARCHAR2(4000)	 	Null on success; error detail on failure
+AUD_USER	VARCHAR2(50)	 	 
+AUD_DT	DATE	DEFAULT SYSDATE	 
+AUD_REC_ID	NUMBER(10)	 	 
+ 
+
+AI_APPEAL_SFTP_CLAIM_BATCH
+
+One row per batch within a 837
+
+Column	Type	Constraints	Description
+PK_SEQ_ID	NUMBER(28)	PK, sequence	Auto-generated primary key
+FK_AI_APPEAL_SFTP_FILE_ID	NUMBER(28)	FK → FILE, NOT NULL	Source file
+PYR_NM	VARCHAR2(100)	NOT NULL	Payor name/identifier — join key; NM1*PR segment, NM1-03
+PYR_EAR_ID	VARCHAR2(100)	 	REF*2U segment, REF-02
+AUD_USER	VARCHAR2(50)	 	 
+AUD_DT	DATE	DEFAULT SYSDATE	 
+AUD_REC_ID	NUMBER(10)	 	 
+AI_APPEAL_SFTP_CLAIM
+
+Individual claims parsed from 837 files. One row per CLM01 within a batch.
+
+Column	Type	Constraints	Description
+PK_SEQ_ID	NUMBER(28)	PK, sequence	Auto-generated primary key
+FK_AI_APPEAL_SFTP_CLAIM_BATCH_ID	NUMBER(28)	FK → FILE, NOT NULL	Source file batch
+PTNT_CTRL_NO	VARCHAR2(50)	NOT NULL	CLM01 from the 837 — join key
+START_INDEX	VARCHAR2(100)	NOT NULL	The start position of the claim within the parsed SFTP file
+END_INDEX	VARCHAR2(100)	NOT NULL	The end position of the claim within the parsed SFTP file
+AUD_USER	VARCHAR2(50)	 	 
+AUD_DT	DATE	DEFAULT SYSDATE	 
+AUD_REC_ID	NUMBER(10)	 	 
+ 
+
+AI_APPEAL_SFTP_REMIT_BATCH
+
+One row per batch within an 835
+
+Column	Type	Constraints	Description
+PK_SEQ_ID	NUMBER(28)	PK, sequence	Auto-generated primary key
+FK_AI_APPEAL_SFTP_FILE_ID	NUMBER(28)	FK → FILE, NOT NULL	Source file
+PYR_NM	VARCHAR2(100)	NOT NULL	Payor name/identifier — join key
+PYR_EAR_ID	VARCHAR2(100)	 	REF*2U segment, REF-02
+PYR_TAX_ID	VARCHAR2(100)	 	TRN-03
+AUD_USER	VARCHAR2(50)	 	 
+AUD_DT	DATE	DEFAULT SYSDATE	 
+AUD_REC_ID	NUMBER(10)	 	 
+AI_APPEAL_SFTP_REMIT
+
+Individual remittances parsed from 835 files. One row per ICN within a batch.
+
+Column	Type	Constraints	Description
+PK_SEQ_ID	NUMBER(28)	PK, sequence	Auto-generated primary key
+FK_AI_APPEAL_SFTP_REMIT_BATCH_ID	NUMBER(28)	FK → FILE, NOT NULL	Source file batch
+ICN	VARCHAR2(50)	 	Internal Control Number
+STATUS_CODE	NUMBER(10)	 	Claim status code; 1=initial, 22=reversal
+PTNT_CTRL_NO	VARCHAR2(50)	NOT NULL	Patient Control Number — join key
+START_INDEX	VARCHAR2(100)	NOT NULL	The start index of the remit within the parsed SFTP file 
+END_INDEX	VARCHAR2(100)	NOT NULL	The end index of the remit within the parsed SFTP file
+AUD_USER	VARCHAR2(50)	 	 
+AUD_DT	DATE	DEFAULT SYSDATE	 
+AUD_REC_ID	NUMBER(10)	 	 
+ 
+
+AI_APPEAL_SFTP_CANDIDATE
+
+Identified appeal candidates. Each row is a claim+remit pair that passed criteria filtering.
+
+Column	Type	Constraints	Description
+PK_SEQ_ID	NUMBER(28)	PK, sequence	Auto-generated primary key
+FK_AI_APPEAL_SFTP_CLAIM_ID	NUMBER(28)	FK → CLAIM, NOT NULL	The matched claim
+FK_AI_APPEAL_SFTP_REMIT_ID	NUMBER(28)	FK → REMIT, NOT NULL, UNIQUE	The matched remit (unique — each remit used at most once)
+CANDIDATE_BATCH_ID	VARCHAR2(50)	NOT NULL	Groups candidates from the same identification run
+IDENTIFIED_DT	DATE	NOT NULL	When this candidate was identified
+B_EXPORTED	NUMBER(1)	NOT NULL, CHECK (0/1), DEFAULT 0	1 after CSV is generated and uploaded
+AUD_USER	VARCHAR2(50)	 	 
+AUD_DT	DATE	DEFAULT SYSDATE	 
+AUD_REC_ID	NUMBER(10)

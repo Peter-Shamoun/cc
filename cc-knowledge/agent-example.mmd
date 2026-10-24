@@ -1,0 +1,29 @@
+%% STATUS: CURRENT (built) - your repo copy of the Northwind sequence example | source: chat "Mermaid flowchart of AI pipeline" (2026-10-23) | FLAG: user-authored Mermaid pasted in the chat
+  sequenceDiagram
+      autonumber
+      actor U as User
+      participant S as Server
+      participant I as Investigator (AI)
+      participant R as Payer Resolver (AI)
+      participant D as Claims data
+      participant W as Writer (AI)
+
+      U->>S: "Which CPTs have the highest denial rate for Northwind?"
+      S->>I: question + what the server can compute
+      I->>S: run_tasks: denial rate by CPT, payer = "Northwind", final
+      S->>S: check plan: claims from 835s, rate = recorded denials / remitted claims, min 20 claims per CPT
+      S->>D: is "Northwind" an exact loaded payer name?
+      D-->>S: no
+      S->>R: suggest loaded names for "Northwind"
+      R-->>S: Northwind Health Plan, Northwind Medicare
+      S-->>U: card: which payers did you mean?
+      Note over S,U: turn pauses here, no answer yet
+      U->>S: ticks both names
+      Note over S: resume runs the stored task, no new planning call
+      S->>D: compiled, parameterized query
+      D-->>S: rows: CPT 81479 = 18.4% (46 of 250), CPT 87798 = 12.1% (29 of 240) ...
+      S->>S: build table + chart + finding, save evidence
+      S->>W: brief of named facts (no raw records)
+      W-->>S: "CPT {{e1_r0_label}} has the highest rate at {{e1_r0_rate}} ..."
+      S->>S: fill in values, check each sentence
+      S-->>U: answer: prose + table + chart + "how this was counted"

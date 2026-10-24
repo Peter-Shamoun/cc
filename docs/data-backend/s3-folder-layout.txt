@@ -1,0 +1,23 @@
+# STATUS: CURRENT (design) - per-customer S3 layout (raw/ parquet/ semantic_layer/ staging/ quarantine/) | source: chat "Data pipeline plan and diagram" (2026-10-23)
+s3://cc-prod/customer_b/
+├── raw/                                   # bronze, never touched
+│   └── received_date=2026-10-23/
+│       ├── 837/  835/  277/
+│       └── _SUCCESS
+├── parquet/                               # silver: one folder per table
+│   ├── edi.segment/received_month=2026-10/
+│   │   ├── part-run_20261022.parquet
+│   │   └── part-run_20261023.parquet      # one new file per day
+│   ├── r835.claim_payment/received_month=2026-10/...
+│   ├── r835.service_payment/...
+│   ├── c837.claim/...
+│   └── ...                                # ~28 EDI tables + ref.*
+├── semantic_layer/                        # gold: full rebuild per batch
+│   ├── CURRENT                            # text file: "v=run_20261023"
+│   ├── v=run_20261022/                    # previous version, kept briefly
+│   └── v=run_20261023/
+│       ├── sem.remit_claims/part-0.parquet
+│       ├── sem.remit_lines/...
+│       └── ...                            # the 10 sem.* tables
+├── staging/<run_id>/
+└── quarantine/

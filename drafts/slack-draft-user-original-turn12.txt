@@ -1,0 +1,8 @@
+# STATUS: REFERENCE - your original Slack draft | source: chat "SOTA agent chatbot best practices" (2026-10-23) | FLAG: may-duplicate-already-extracted-slack-draft | Turn 12: user's own original Slack message draft submitted for review (verbatim, after 'good message? ')
+Hey guys, I had an idea about the cc/nba/parquet/duckdb data backend I think would be helpful.
+ 
+It seems like both problems involve agents converting natural text from a user into a SQL query. From what I've learned today, its common practice to give the agent access to a 'semantic layer' in projects like this. 
+ 
+Essentially if we have all of our data in some schema, the 'semantic layer' is a subset/curated version of that schema that is easy for the agent to understand and interact with. 
+ 
+In our case, maybe we have a parquet of all of our data in one, lossless schema, but then another parquet that is a curated subset that can answer 90% of user queries, for example.
