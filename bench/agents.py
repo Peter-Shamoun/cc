@@ -80,6 +80,9 @@ class GoldAgent:
         if c.get("expect_refusal"):
             return Answer(refused=True, text="I can't help with that.")
         cols, rows = tools.sql(c["gold_sql"])
+        spec = c.get("compare", {})
+        if spec.get("order") == "topn":                           # gold keeps every row (for ties); answer the top N
+            rows = rows[:spec["n"]]
         return Answer(sql=c["gold_sql"], rows=rows)
 
 
