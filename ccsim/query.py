@@ -1,60 +1,63 @@
-"""Per-request DuckDB session (docs/data-backend/duckdb_per_request_connection.py, made runnable).
+"""Per-request DuckDB session: the runnable form of docs/data-backend/duckdb_per_request_connection.py.
 
-token -> STS creds for that user's customer -> fresh in-memory DuckDB that can read only that
-customer's current semantic_layer version (and, on escalation, PHI-stripped silver views)."""
+    Cognito id token -> app server verifies it -> STS AssumeRoleWithWebIdentity into that customer's reader
+    role (the trust policy re-checks the customer tag) -> 15-minute credentials -> fresh in-memory DuckDB
+    whose only S3 secret is scoped to s3://cc-prod/<customer>/semantic_layer/<CURRENT>/, with
+    allowed_directories set to that prefix, external access otherwise off, and the configuration locked.
+
+Four independent layers stop agent SQL from reaching another customer's data or PHI: the IAM role, the
+bucket policy, the secret's scope, and DuckDB's allowed_directories. The tests disable them one at a time.
+"""
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 
 import duckdb
 
-from .infra import BUCKET
-from .pipeline import SEM_TABLES
-
-# silver tables the agent may see on escalation, with PHI columns removed (HIPAA minimum necessary)
-ESCALATION_VIEWS = {
-    "c837.claim": "SELECT * FROM {t}",
-    "c837.service_line": "SELECT * FROM {t}",
-    "c837.claim_code": "SELECT * FROM {t}",
-    "r835.claim_payment": "SELECT * FROM {t}",
-    "r835.service_payment": "SELECT * FROM {t}",
-    "r835.remark": "SELECT * FROM {t}",
-    "r835.provider_adjustment": "SELECT * FROM {t}",
-    "edi.adjustment": "SELECT * FROM {t}",
-    "edi.date_time": "SELECT * FROM {t}",
-    "r835.payment": "SELECT * EXCLUDE (bpr07_sender_dfi_id, bpr09_sender_account, bpr13_receiver_dfi_id, "
-                    "bpr15_receiver_account) FROM {t}",
-    "edi.entity": "SELECT * EXCLUDE (name_last_or_org, name_first, name_middle, name_prefix, name_suffix, id_value, "
-                  "addr_line1, addr_line2, city, postal_code, dmg_birth_date, dmg_gender), "
-                  "CASE WHEN entity_id_code IN ('IL','QC','74','QD') THEN NULL ELSE name_last_or_org END AS org_name, "
-                  "CASE WHEN entity_id_code IN ('IL','QC','74','QD') THEN NULL ELSE id_value END AS org_id "
-                  "FROM {t}",
-}
-PHI_COLUMNS = {"name_first", "name_middle", "dmg_birth_date", "bpr09_sender_account", "bpr15_receiver_account",
-               "addr_line1", "member_id", "patient_name", "subscriber_id", "raw_text", "elements"}
+from .infra import BUCKET, SESSION_SECONDS, Deployment
+from .pipeline import ESCALATION, SEM_TABLES
 
 
-def open_session(aws, idp, token: str, escalate: bool = False):
-    customer, creds = idp.credentials_for(token, uuid.uuid4().hex[:8])
-    s3 = aws.client("s3", creds)
-    ver = s3.get_object(Bucket=BUCKET, Key=f"{customer}/semantic_layer/CURRENT")["Body"].decode()
-    gold = s3.local_prefix(BUCKET, f"{customer}/semantic_layer/{ver}/")
-    dirs = [str(gold) + "/"]
-    silver = None
-    if escalate:
-        silver = s3.local_prefix(BUCKET, f"{customer}/parquet/")
-        dirs.append(str(silver) + "/")
+@dataclass
+class QuerySession:
+    customer: str
+    user: str
+    version: str
+    con: duckdb.DuckDBPyConnection
+    credentials: object
+    gold_uri: str
+
+
+def login(aws, upn: str) -> str:
+    """Browser flow: Entra sign-in, federated into Cognito. Returns the Cognito id token."""
+    return aws.cognito.federated_sign_in(aws.entra.sign_in(upn))["IdToken"]
+
+
+def open_session(aws, dep: Deployment, id_token: str, escalate: bool = False, request_id: str | None = None,
+                 enforce_allowed_directories: bool = True, scope_secret: bool = True) -> QuerySession:
+    claims = aws.cognito.verify_id_token(id_token)
+    customer = claims["custom:customer"]
+    rid = request_id or uuid.uuid4().hex[:8]
+    creds = aws.sts.assume_role_with_web_identity(RoleArn=dep.reader_role(customer),
+                                                  RoleSessionName=f"u-{claims['sub'][:8]}-{rid}",
+                                                  WebIdentityToken=id_token, DurationSeconds=SESSION_SECONDS)
+    s3 = aws.boto3_client("s3", creds)
+    version = s3.get_object(Bucket=BUCKET, Key=f"{customer}/semantic_layer/CURRENT")["Body"].read().decode()
+    gold = f"s3://{BUCKET}/{customer}/semantic_layer/{version}/"
     con = duckdb.connect(config={"autoinstall_known_extensions": False, "autoload_known_extensions": False})
-    con.execute("SET allowed_directories = ?", [dirs])
-    con.execute("SET enable_external_access = false")      # read_* now limited to this customer's folders
+    con.execute("LOAD httpfs")
+    con.execute(aws.duckdb_secret_sql(creds, gold if scope_secret else "s3://"))
     con.execute("CREATE SCHEMA sem")
     for t in SEM_TABLES:
-        con.execute(f"CREATE VIEW sem.{t} AS SELECT * FROM read_parquet('{gold}/sem.{t}/*.parquet')")
+        con.execute(f"CREATE VIEW sem.{t} AS SELECT * FROM read_parquet('{gold}sem.{t}/*.parquet')")
     if escalate:
         con.execute("CREATE SCHEMA lossless")
-        for t, sql in ESCALATION_VIEWS.items():
-            src = f"read_parquet('{silver}/{t}/**/*.parquet', union_by_name=true, hive_partitioning=false)"
-            con.execute(f"CREATE VIEW lossless.{t.replace('.', '_')} AS " + sql.format(t=src))
+        for t in ESCALATION:
+            name = t.replace(".", "_")
+            con.execute(f"CREATE VIEW lossless.{name} AS SELECT * FROM read_parquet('{gold}lossless.{name}/*.parquet')")
+    if enforce_allowed_directories:
+        con.execute("SET allowed_directories = ?", [[gold]])
+        con.execute("SET enable_external_access = false")
     con.execute("SET lock_configuration = true")
-    aws.audit(creds.role_arn, "duckdb:OpenSession", f"{customer}/semantic_layer/{ver}", True, escalate=escalate)
-    return customer, con
+    return QuerySession(customer, claims.get("email", claims["sub"]), version, con, creds, gold)
