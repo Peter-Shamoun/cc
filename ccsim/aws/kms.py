@@ -30,6 +30,7 @@ class Key:
     rotation_enabled: bool = False
     backing: list[bytes] = field(default_factory=list)         # index = backing-key version
     aliases: list[str] = field(default_factory=list)
+    grants: list[dict] = field(default_factory=list)
 
     @property
     def arn(self) -> str:
@@ -46,7 +47,11 @@ class KMS:
         self.keys: dict[str, Key] = {}
         self.aliases: dict[str, str] = {}                      # alias/name -> key id
 
+    iam = None                                                 # set by LocalAWS: validates principals in key policies
+
     def create_key(self, policy: dict, description: str = "", alias: str | None = None) -> Key:
+        from .iam import validate_policy
+        validate_policy(policy, resource_policy=True, principal_exists=self.iam.role_exists if self.iam else None)
         k = Key(str(uuid.uuid4()), policy, description, backing=[AESGCM.generate_key(256)])
         self.keys[k.key_id] = k
         if alias:
@@ -102,6 +107,41 @@ class KMS:
 
     def put_key_policy(self, key_ref, policy: dict):
         self.resolve(key_ref).policy = policy
+
+    # -- calls a principal makes (authorized against the key policy, like any KMS API) ---------------
+    def _authorize(self, principal, session, iam, action, key: Key):
+        from .errors import AccessDenied
+        from .iam import decide
+        role = iam.role_by_arn(principal.role_arn) if principal.role_arn else None
+        d = decide(principal, action, key.arn, {"kms:CallerAccount": ACCOUNT}, role.policies if role else [], key.policy,
+                   session.session_policies if session else (), role.boundary if role else None,
+                   require_resource_allow=True)
+        if not d:
+            raise AccessDenied(f"{principal.arn} is not authorized to perform: {action} on resource: {key.arn}")
+
+    def put_key_policy_as(self, principal, session, iam, key_ref: str, policy: dict):
+        from .iam import MalformedPolicy, validate_policy
+        k = self.resolve(key_ref)
+        self._authorize(principal, session, iam, "kms:PutKeyPolicy", k)
+        validate_policy(policy, resource_policy=True, principal_exists=iam.role_exists)
+        k.policy = policy
+
+    def create_grant_as(self, principal, session, iam, key_ref: str, grantee: str, operations: list[str],
+                        constraints: dict | None = None) -> str:
+        """A grant lets `grantee` use the key for `operations` regardless of the key policy's conditions."""
+        k = self.resolve(key_ref)
+        self._authorize(principal, session, iam, "kms:CreateGrant", k)
+        gid = uuid.uuid4().hex
+        k.grants.append(dict(id=gid, grantee=grantee, operations=list(operations), constraints=constraints or {}))
+        return gid
+
+    def grant_allows(self, key: Key, principal, operation: str, context: dict) -> bool:
+        for g in key.grants:
+            if g["grantee"] in principal.arns and operation in g["operations"]:
+                eq = g["constraints"].get("EncryptionContextEquals")
+                if eq is None or eq == context:
+                    return True
+        return False
 
     # data plane (callers authorize with iam.decide(..., require_resource_allow=True) first)
     def generate_data_key(self, key_ref: str, context: dict | None) -> tuple[bytes, bytes, Key]:
