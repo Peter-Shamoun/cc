@@ -678,6 +678,7 @@ class Generator:
     def _ledger_claim(self, c: Claim) -> dict:
         return dict(pcn=c.pcn, dos=str(c.dos), submitted=str(c.submitted), order_type=c.order_type,
                     cpts=[l.cpt for l in c.lines], units=[l.units for l in c.lines],
+                    modifiers=[list(l.modifiers) for l in c.lines],
                     line_charges=[l.charge for l in c.lines], charge=round(sum(l.charge for l in c.lines), 2),
                     dx=c.dx, principal_dx=c.dx[0], referring_npi=c.referring.npi, risky_provider=c.referring.risky,
                     dependent=c.patient.coverages[0].relationship != "18",
@@ -817,7 +818,11 @@ class Generator:
                 led = claims[e["pcn"]]["adjudications"].setdefault(e["payer_id"], dict(
                     payer_id=e["payer_id"], payer=PAYER_BY_ID[e["payer_id"]].name, seq=e["seq"],
                     payer_class=PAYER_BY_ID[e["payer_id"]].payer_class, events=[]))
+                cas_totals: dict = {}
+                for g_, k, amt in e["claim_cas"] + [x for ln in e["lines"] for x in ln["cas"]]:
+                    cas_totals[f"{g_}-{k}"] = round(cas_totals.get(f"{g_}-{k}", 0) + amt, 2)
                 led["events"].append(dict(date=str(day), status=e["status"], icn=e["icn"], paid=e["paid"], pr=e["pr"],
+                                          charge=round(sum(ln["charge"] for ln in e["lines"]), 2), cas=cas_totals,
                                           claim_level_only=e["claim_level_only"], trn=trn,
                                           duplicate_denial=bool(e.get("duplicate_denial")),
                                           carcs=sorted({k for _, k, _ in e["claim_cas"]} |

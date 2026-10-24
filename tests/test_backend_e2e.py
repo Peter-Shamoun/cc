@@ -216,6 +216,19 @@ def test_admin_with_star_permissions_still_cannot_read_phi(world):
     admin = aws.sts.assume_role(service_principal("ec2.amazonaws.com"), None, role_arn("data-eng-admin"), "admin")
     with pytest.raises(AccessDenied):
         aws.client("s3", admin).get_object(Bucket=BUCKET, Key="acme_labs/semantic_layer/CURRENT")
+    # ...and cannot remove the guards: bucket policy, key policy, grants
+    from ccsim.infra import bucket_policy
+    with pytest.raises(AccessDenied):
+        aws.client("s3", admin).delete_bucket_policy(Bucket=BUCKET)
+    with pytest.raises(AccessDenied):
+        aws.client("s3", admin).put_bucket_policy(Bucket=BUCKET, Policy={"Version": "2012-10-17", "Statement": []})
+    key = world.dep.keys["acme_labs"].arn
+    with pytest.raises(AccessDenied):
+        aws.kms.put_key_policy_as(admin.principal(), admin, aws.iam, key, {"Version": "2012-10-17", "Statement": [
+            {"Effect": "Allow", "Principal": {"AWS": role_arn("data-eng-admin")}, "Action": "kms:*", "Resource": "*"}]})
+    with pytest.raises(AccessDenied):
+        aws.kms.create_grant_as(admin.principal(), admin, aws.iam, key, role_arn("data-eng-admin"), ["Decrypt"])
+    assert aws.s3.bucket(BUCKET).policy == bucket_policy()
     denied = [e for e in aws.trail.denied() if "data-eng-admin" in e["userIdentity"].get("arn", "")]
     assert denied and denied[-1]["errorCode"] == "AccessDenied"
 
@@ -227,16 +240,26 @@ def test_raw_is_write_once_and_undeletable(world):
     key = next(f for f in world.truth["tenants"][c]["files"] if f["kind"] == "837")
     k = f"{c}/raw/received_date={key['day']}/837/{key['name']}"
     s3 = aws.client("s3", sftp)
+    import base64
+    import hashlib
+    ck = base64.b64encode(hashlib.sha256(b"tampered").digest()).decode()
+    seven_years = aws.clock() + 2555 * 86400
     kw = dict(ServerSideEncryption="aws:kms", SSEKMSKeyId=world.dep.keys[c].arn, ObjectLockMode="COMPLIANCE",
-              ObjectLockRetainUntilDate=aws.clock() + 86400)
+              ObjectLockRetainUntilDate=seven_years, ChecksumSHA256=ck)
     with pytest.raises(AccessDenied):
         s3.put_object(Bucket=BUCKET, Key=k, Body=b"tampered", **kw)                     # no If-None-Match
     from ccsim.aws.errors import PreconditionFailed
     with pytest.raises(PreconditionFailed):
         s3.put_object(Bucket=BUCKET, Key=k, Body=b"tampered", IfNoneMatch="*", **kw)    # exists
     with pytest.raises(AccessDenied):
-        s3.put_object(Bucket=BUCKET, Key=k + ".new", Body=b"x", IfNoneMatch="*",
+        s3.put_object(Bucket=BUCKET, Key=k + ".new", Body=b"tampered", IfNoneMatch="*",
                       ServerSideEncryption="aws:kms", SSEKMSKeyId=world.dep.keys[c].arn)  # no retention
+    with pytest.raises(AccessDenied):                                                      # retention too short
+        s3.put_object(Bucket=BUCKET, Key=k + ".new", Body=b"tampered", IfNoneMatch="*", **dict(
+            kw, ObjectLockRetainUntilDate=aws.clock() + 30 * 86400))
+    with pytest.raises(AccessDenied):                                                      # another customer's key
+        s3.put_object(Bucket=BUCKET, Key=k + ".new", Body=b"tampered", IfNoneMatch="*", **dict(
+            kw, SSEKMSKeyId=world.dep.keys["acme_diagnostics"].arn))
     with pytest.raises(AccessDenied):
         s3.delete_object(Bucket=BUCKET, Key=k)
 
@@ -280,3 +303,9 @@ def test_policy_export_is_valid_json(tmp_path):
     assert "s3_bucket_policy.json" in files
     for f in files:
         json.loads((tmp_path / f).read_text())
+
+
+def test_bucket_policy_is_constant_size_for_any_number_of_customers():
+    import json
+    from ccsim.infra import bucket_policy
+    assert len(json.dumps(bucket_policy(), separators=(",", ":"))) < 5 * 1024

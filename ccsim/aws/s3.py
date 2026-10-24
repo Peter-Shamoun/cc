@@ -145,6 +145,9 @@ class S3:
         d = decide(p, action, key.arn, ctx, role.policies if role else [], key.policy,
                    rc.session.session_policies if rc.session else (), role.boundary if role else None,
                    require_resource_allow=True)
+        if not d and d.reason != "explicitDeny" and self.kms.grant_allows(key, p, action.split(":")[1], context):
+            from .iam import Decision
+            d = Decision(True, "allowed", "grant")
         self.audit.record("kms.amazonaws.com", action.split(":")[1], rc.principal,
                           {"keyId": key.arn, "encryptionContext": context}, resources=[key.arn],
                           error=None if d else ("AccessDenied", d.reason), invokedBy=VIA_S3)
@@ -208,7 +211,8 @@ class S3:
                    BucketKeyEnabled: bool | None = None, IfNoneMatch: str | None = None, IfMatch: str | None = None,
                    Metadata: dict | None = None, ObjectLockMode: str | None = None,
                    ObjectLockRetainUntilDate: float | None = None, ObjectLockLegalHoldStatus: str | None = None,
-                   ChecksumSHA256: str | None = None, _reason: str = "PutObject") -> dict:
+                   ChecksumSHA256: str | None = None, ContentMD5: str | None = None,
+                   _reason: str = "PutObject") -> dict:
         b = self.bucket(Bucket)
         self.request_count += 1
         res = f"{b.arn}/{Key}"
@@ -224,8 +228,25 @@ class S3:
             extra["s3:if-none-match"] = IfNoneMatch
         if IfMatch is not None:
             extra["s3:if-match"] = IfMatch
+        extra["s3:ObjectCreationOperation"] = True
         if ObjectLockMode:
             extra["s3:object-lock-mode"] = ObjectLockMode
+        if ObjectLockRetainUntilDate is not None:
+            extra["s3:object-lock-retain-until-date"] = ObjectLockRetainUntilDate
+            extra["s3:object-lock-remaining-retention-days"] = int((ObjectLockRetainUntilDate - self.clock()) // 86400)
+        if ObjectLockLegalHoldStatus:
+            extra["s3:object-lock-legal-hold"] = ObjectLockLegalHoldStatus
+        if bool(ObjectLockMode) != (ObjectLockRetainUntilDate is not None):
+            raise InvalidArgument("x-amz-object-lock-mode and x-amz-object-lock-retain-until-date must both be supplied")
+        if ObjectLockMode and ObjectLockMode not in ("GOVERNANCE", "COMPLIANCE"):
+            raise InvalidArgument("Unknown wormMode directive")
+        if ObjectLockRetainUntilDate is not None and ObjectLockRetainUntilDate <= self.clock():
+            raise InvalidArgument("The retain until date must be in the future")
+        if (ObjectLockMode or ObjectLockLegalHoldStatus) and not (ChecksumSHA256 or ContentMD5):
+            raise InvalidRequest("Content-MD5 or x-amz-checksum header is required for Put Object requests with "
+                                 "Object Lock parameters")
+        if ContentMD5 and base64.b64encode(hashlib.md5(Body).digest()).decode() != ContentMD5:
+            raise InvalidRequest("The Content-MD5 you specified did not match what we received.", code="BadDigest")
         self._authorize(rc, b, "s3:PutObject", res, "PutObject", req, extra)
         if (ObjectLockMode or ObjectLockRetainUntilDate) and not b.object_lock:
             raise InvalidRequest("Bucket is missing Object Lock Configuration")
@@ -368,7 +389,7 @@ class S3:
         b, res, row = self._head(rc, Bucket, Key, VersionId, "GetObject", IfMatch, IfNoneMatch)
         body = self._decrypt_body(rc, row)
         out = self._meta(b, row)
-        if Range:
+        if Range and parse_range(Range, len(body)) is not None:
             start, end = parse_range(Range, len(body))
             out["ContentRange"] = f"bytes {start}-{end}/{len(body)}"
             body = body[start:end + 1]
@@ -421,6 +442,8 @@ class S3:
             contents.append({"Key": entry_key, "Size": size, "ETag": f'"{etag}"', "LastModified": lm,
                              "StorageClass": "STANDARD"})
             last = entry_key
+        if MaxKeys == 0:
+            truncated = False
         out = {"Name": Bucket, "Prefix": Prefix, "MaxKeys": MaxKeys, "KeyCount": len(contents) + len(prefixes),
                "IsTruncated": truncated, "Contents": contents, "CommonPrefixes": prefixes}
         if Delimiter:
@@ -505,12 +528,35 @@ class S3:
             self._authorize(rc, b, "s3:BypassGovernanceRetention", res, "DeleteObject", {"key": row["key"]})
 
     def copy_object(self, rc: RequestContext, Bucket: str, Key: str, CopySource: dict, **put_kwargs) -> dict:
-        src = self.get_object(rc, CopySource["Bucket"], CopySource["Key"], CopySource.get("VersionId"))
         put_kwargs = {k: v for k, v in put_kwargs.items() if v not in (None, {})}
+        if "IfNoneMatch" in put_kwargs or "IfMatch" in put_kwargs:
+            from .errors import NotImplementedOp
+            raise NotImplementedOp("A header you provided implies functionality that is not implemented (conditional CopyObject)")
+        src = self.get_object(rc, CopySource["Bucket"], CopySource["Key"], CopySource.get("VersionId"))
         put_kwargs.setdefault("ContentType", src.get("ContentType"))
         put_kwargs.setdefault("Metadata", src.get("Metadata"))      # MetadataDirective=COPY
         out = self.put_object(rc, Bucket, Key, src["Body"], _reason="CopyObject", **put_kwargs)
         return {"CopyObjectResult": {"ETag": out["ETag"]}, **{k: v for k, v in out.items() if k != "ETag"}}
+
+    # -- bucket configuration calls that a principal (not Terraform bootstrap) makes -------------------
+    def put_bucket_policy(self, rc: RequestContext, Bucket: str, Policy: dict | str):
+        from .iam import validate_policy
+        b = self.bucket(Bucket)
+        doc = json.loads(Policy) if isinstance(Policy, str) else Policy
+        self._authorize(rc, b, "s3:PutBucketPolicy", b.arn, "PutBucketPolicy", {"bucketName": Bucket})
+        set_bucket_policy(self, b, doc)
+        self._ok(rc, "PutBucketPolicy", {"bucketName": Bucket}, b.arn)
+
+    def delete_bucket_policy(self, rc: RequestContext, Bucket: str):
+        b = self.bucket(Bucket)
+        self._authorize(rc, b, "s3:DeleteBucketPolicy", b.arn, "DeleteBucketPolicy", {"bucketName": Bucket})
+        b.policy = None
+        self._ok(rc, "DeleteBucketPolicy", {"bucketName": Bucket}, b.arn)
+
+    def put_bucket_lifecycle_configuration(self, rc: RequestContext, Bucket: str, Rules: list):
+        b = self.bucket(Bucket)
+        self._authorize(rc, b, "s3:PutLifecycleConfiguration", b.arn, "PutBucketLifecycleConfiguration", {"bucketName": Bucket})
+        b.lifecycle = list(Rules)
 
     # -- lifecycle (S3 runs this daily; tests call it) ------------------------------------------------
     def run_lifecycle(self) -> int:
@@ -541,9 +587,27 @@ class S3:
         return removed
 
 
-def parse_range(header: str, size: int) -> tuple[int, int]:
+MAX_BUCKET_POLICY_BYTES = 20 * 1024
+
+
+def set_bucket_policy(s3: "S3", b: Bucket, doc: dict):
+    """S3's write-time checks: valid policy, existing principals, 20 KB size limit."""
+    from .errors import AWSError
+    from .iam import MalformedPolicy, validate_policy
+    try:
+        validate_policy(doc, resource_policy=True, principal_exists=s3.iam.role_exists)
+    except MalformedPolicy as e:
+        raise AWSError(str(e), code="MalformedPolicy", status=400) from None
+    size = len(json.dumps(doc, separators=(",", ":")))
+    if size > MAX_BUCKET_POLICY_BYTES:
+        raise AWSError(f"Policies must be less than 20 KB ({size} bytes)", code="PolicyTooLarge", status=400)
+    b.policy = doc
+
+
+def parse_range(header: str, size: int) -> tuple[int, int] | None:
+    """None = ignore the header and return the whole object (what S3 does for malformed or inverted ranges)."""
     if not header.startswith("bytes=") or "," in header:
-        raise InvalidRange("only single byte ranges are supported")
+        return None
     a, _, b = header[6:].partition("-")
     try:
         if a == "":
@@ -555,7 +619,9 @@ def parse_range(header: str, size: int) -> tuple[int, int]:
             start = int(a)
             end = int(b) if b else size - 1
     except ValueError:
-        raise InvalidRange("bad Range header") from None
-    if start >= size or start > end:
+        return None
+    if start > end:
+        return None
+    if start >= size:
         raise InvalidRange("The requested range is not satisfiable", ActualObjectSize=size)
     return start, min(end, size - 1)

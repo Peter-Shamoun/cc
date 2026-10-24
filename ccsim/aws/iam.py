@@ -85,19 +85,24 @@ class Principal:
     service: str | None = None
     federated: str | None = None
 
-    def matches(self, principal_element) -> bool:
+    def matches(self, principal_element, for_not_principal: bool = False) -> bool:
+        """Principal elements match exactly: "*", an account id / root ARN, or a full ARN (IAM rejects partial
+        wildcards such as role/cc-* in Principal). For NotPrincipal an assumed-role session is exempt only if
+        its session ARN is listed; listing the role ARN alone does not exempt its sessions."""
         if principal_element == "*":
             return True
         if isinstance(principal_element, str):
             principal_element = {"AWS": principal_element}
+        own = (self.arn,) if (for_not_principal and self.kind == "AssumedRole") else self.arns
         for typ, vals in principal_element.items():
             for v in _list(vals):
                 if v == "*":
                     return True
                 if typ == "AWS":
-                    if v in (self.account, f"arn:aws:iam::{self.account}:root") and self.kind != "Service":
+                    if self.account and v in (self.account, f"arn:aws:iam::{self.account}:root") \
+                            and self.kind not in ("Service", "Anonymous"):
                         return True
-                    if any(_glob(v, a) for a in self.arns):
+                    if v in own:
                         return True
                 elif typ == "Service" and self.service == v:
                     return True
@@ -201,7 +206,9 @@ def condition_ok(cond: dict | None, ctx: dict) -> bool:
                 continue
             if op not in _OPS:
                 return False                                   # unknown operator: never matches
-            if have is None:
+            if have is None or have == []:
+                if set_op == "ForAnyValue":
+                    return False                               # ForAnyValue over no values is false
                 if if_exists or op in _NEGATED or set_op == "ForAllValues":
                     continue
                 return False
@@ -247,7 +254,7 @@ def statement_applies(st: dict, action: str, resource: str, ctx: dict, principal
     if is_resource_policy:
         if "Principal" in st and not (principal and principal.matches(st["Principal"])):
             return False
-        if "NotPrincipal" in st and principal and principal.matches(st["NotPrincipal"]):
+        if "NotPrincipal" in st and principal and principal.matches(st["NotPrincipal"], for_not_principal=True):
             return False
         if "Principal" not in st and "NotPrincipal" not in st:
             return False                                       # resource policy statements must name principals
@@ -293,8 +300,14 @@ def decide(principal: Principal, action: str, resource: str, ctx: dict, identity
            resource_policy: dict | None = None, session_policies=(), boundary: dict | None = None,
            require_resource_allow: bool = False) -> Decision:
     ctx = dict(ctx)
-    ctx.setdefault("aws:PrincipalArn", principal.role_arn or principal.arn)
-    ctx.setdefault("aws:PrincipalAccount", principal.account)
+    if principal.kind in ("Service", "Anonymous"):
+        if principal.kind == "Service":
+            ctx.setdefault("aws:PrincipalIsAWSService", True)
+            ctx.setdefault("aws:PrincipalServiceName", principal.service)
+    else:
+        ctx.setdefault("aws:PrincipalArn", principal.role_arn or principal.arn)
+        ctx.setdefault("aws:PrincipalAccount", principal.account)
+        ctx.setdefault("aws:PrincipalIsAWSService", False)
     ctx.setdefault("aws:PrincipalType", principal.kind)
     if principal.token_issue_time is not None:
         ctx.setdefault("aws:TokenIssueTime", principal.token_issue_time)
@@ -319,9 +332,13 @@ def decide(principal: Principal, action: str, resource: str, ctx: dict, identity
         names_session = any(principal.arn == a for st in statements(resource_policy) if st.get("Effect") == "Allow"
                             and isinstance(st.get("Principal"), dict)
                             for a in _list(st["Principal"].get("AWS")))
-        if names_session or all(_scan([s], "Allow", action, resource, ctx, principal, False) for s in sess):
+        if names_session:
             return Decision(True, "allowed", res_allow)
-        return Decision(False, "implicitDeny", "session policy")
+        if not all(_scan([s], "Allow", action, resource, ctx, principal, False) for s in sess):
+            return Decision(False, "implicitDeny", "session policy")
+        if bnd and not _scan(bnd, "Allow", action, resource, ctx, principal, False):
+            return Decision(False, "implicitDeny", "permissions boundary")
+        return Decision(True, "allowed", res_allow)
     # No resource policy, or it only delegates to the account root: identity policies decide.
     id_allow = _scan(ident, "Allow", action, resource, ctx, principal, False)
     if not id_allow:
@@ -331,6 +348,46 @@ def decide(principal: Principal, action: str, resource: str, ctx: dict, identity
     if bnd and not _scan(bnd, "Allow", action, resource, ctx, principal, False):
         return Decision(False, "implicitDeny", "permissions boundary")
     return Decision(True, "allowed", id_allow)
+
+
+class MalformedPolicy(ValueError):
+    code = "MalformedPolicyDocument"
+
+
+_KNOWN_OPS = set(_OPS) | {"Null"}
+
+
+def validate_policy(doc: dict, resource_policy: bool = False, principal_exists=None):
+    """What IAM / S3 / KMS check when a policy is written: structure, known condition operators, principals
+    that are exact ARNs (no partial wildcards) and, when `principal_exists` is given, that they exist."""
+    if not isinstance(doc, dict) or "Statement" not in doc:
+        raise MalformedPolicy("policy must have a Statement")
+    for st in statements(doc):
+        if st.get("Effect") not in ("Allow", "Deny"):
+            raise MalformedPolicy("Effect must be Allow or Deny")
+        if ("Action" in st) == ("NotAction" in st):
+            raise MalformedPolicy("exactly one of Action / NotAction")
+        if resource_policy and ("Principal" in st) == ("NotPrincipal" in st):
+            raise MalformedPolicy("resource policies need exactly one of Principal / NotPrincipal")
+        if not resource_policy and ("Principal" in st or "NotPrincipal" in st):
+            raise MalformedPolicy("identity policies cannot have Principal")
+        for raw_op in (st.get("Condition") or {}):
+            op = raw_op.split(":", 1)[-1]
+            op = op[:-len("IfExists")] if op.endswith("IfExists") else op
+            if op not in _KNOWN_OPS:
+                raise MalformedPolicy(f"unknown condition operator {raw_op}")
+        for key in ("Principal", "NotPrincipal"):
+            pe = st.get(key)
+            if pe is None or pe == "*":
+                continue
+            pe = {"AWS": pe} if isinstance(pe, str) else pe
+            for typ, vals in pe.items():
+                for v in _list(vals):
+                    if v != "*" and "*" in v:
+                        raise MalformedPolicy(f"invalid principal {v}: partial wildcards are not allowed")
+                    if typ == "AWS" and principal_exists and v != "*" and ":role/" in v and not principal_exists(v):
+                        raise MalformedPolicy(f"invalid principal in policy: {v}")
+    return doc
 
 
 @dataclass
@@ -362,11 +419,19 @@ class IAM:
         if not 3600 <= max_session_duration <= 43200:
             from .errors import ValidationError
             raise ValidationError("MaxSessionDuration must be between 3600 and 43200 seconds")
+        validate_policy(trust_policy, resource_policy=True, principal_exists=self.role_exists)
         self.roles[name] = Role(name, trust_policy, {}, max_session_duration, boundary, dict(tags or {}))
         return self.roles[name]
 
+    def role_exists(self, arn: str) -> bool:
+        return self.role_by_arn(arn) is not None
+
     def put_role_policy(self, role: str, name: str, document: dict):
+        validate_policy(document)
         self.roles[role].inline_policies[name] = document
+
+    def tag_role(self, role: str, tags: dict):
+        self.roles[role].tags.update(tags)
 
     def role_by_arn(self, arn: str) -> Role | None:
         name = arn.rsplit("/", 1)[-1]

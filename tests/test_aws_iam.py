@@ -98,10 +98,42 @@ def test_permissions_boundary_caps_identity_policy():
     assert decide(P, "s3:GetObject", OBJ, {}, [allow("s3:*")], boundary=allow("s3:GetObject"))
 
 
-def test_not_principal_deny():
-    bp = {"Statement": [{"Effect": "Deny", "NotPrincipal": {"AWS": ROLE}, "Action": "s3:*", "Resource": "*"}]}
-    assert decide(P, "s3:GetObject", OBJ, {}, [allow("s3:*")], bp)
-    assert not decide(OTHER, "s3:GetObject", OBJ, {}, [allow("s3:*")], bp)
+def test_not_principal_needs_the_session_arn():
+    """AWS: to exempt an assumed-role session via NotPrincipal, list its assumed-role ARN; the role ARN alone
+    does not exempt it (which is why the design uses aws:PrincipalArn conditions instead)."""
+    role_only = {"Statement": [{"Effect": "Deny", "NotPrincipal": {"AWS": ROLE}, "Action": "s3:*", "Resource": "*"}]}
+    assert not decide(P, "s3:GetObject", OBJ, {}, [allow("s3:*")], role_only)
+    both = {"Statement": [{"Effect": "Deny", "NotPrincipal": {"AWS": [ROLE, SESSION]}, "Action": "s3:*", "Resource": "*"}]}
+    assert decide(P, "s3:GetObject", OBJ, {}, [allow("s3:*")], both)
+    assert not decide(OTHER, "s3:GetObject", OBJ, {}, [allow("s3:*")], both)
+
+
+def test_principal_wildcards_are_rejected_and_exact_match_only():
+    from ccsim.aws.iam import MalformedPolicy, validate_policy
+    with pytest.raises(MalformedPolicy):
+        validate_policy({"Statement": [{"Effect": "Allow", "Principal": {"AWS": "arn:aws:iam::111122223333:role/cc-*"},
+                                        "Action": "s3:*", "Resource": "*"}]}, resource_policy=True)
+    assert not P.matches({"AWS": "arn:aws:iam::111122223333:role/cc-*"})
+    with pytest.raises(MalformedPolicy):
+        validate_policy({"Statement": [{"Effect": "Deny", "Action": "s3:*", "Resource": "*",
+                                        "Condition": {"StringEqualz": {"k": "v"}}}]})
+    with pytest.raises(MalformedPolicy):
+        validate_policy({"Statement": [{"Effect": "Allow", "Principal": "*", "Action": "s3:*", "Resource": "*"}]})
+
+
+def test_anonymous_and_service_principals_have_no_account():
+    anon = Principal("anonymous", ("*",), "Anonymous", None)
+    bp = {"Statement": [{"Effect": "Allow", "Principal": "*", "Action": "s3:GetObject", "Resource": "*",
+                         "Condition": {"StringEquals": {"aws:PrincipalAccount": ACCOUNT}}}]}
+    assert not decide(anon, "s3:GetObject", OBJ, {}, [], bp)
+    assert decide(P, "s3:GetObject", OBJ, {}, [], bp)
+
+
+def test_boundary_caps_resource_grant_to_role_but_not_to_session():
+    to_role = {"Statement": [{"Effect": "Allow", "Principal": {"AWS": ROLE}, "Action": "s3:PutObject", "Resource": "*"}]}
+    to_session = {"Statement": [{"Effect": "Allow", "Principal": {"AWS": SESSION}, "Action": "s3:PutObject", "Resource": "*"}]}
+    assert not decide(P, "s3:PutObject", OBJ, {}, [], to_role, boundary=allow("s3:GetObject"))
+    assert decide(P, "s3:PutObject", OBJ, {}, [], to_session, boundary=allow("s3:GetObject"))
 
 
 def test_principal_arn_condition_pattern_used_by_bucket_policy():
@@ -144,6 +176,7 @@ def test_policy_variables():
     ({"ForAllValues:StringEquals": {"aws:TagKeys": ["customer", "user"]}}, {"aws:TagKeys": ["customer"]}, True),
     ({"ForAllValues:StringEquals": {"aws:TagKeys": ["customer"]}}, {"aws:TagKeys": ["customer", "admin"]}, False),
     ({"ForAnyValue:StringEquals": {"aws:TagKeys": ["admin"]}}, {"aws:TagKeys": ["customer", "admin"]}, True),
+    ({"ForAnyValue:StringNotEquals": {"aws:TagKeys": ["admin"]}}, {}, False),  # ForAnyValue over nothing is false
     ({"StringEquals": {"S3:Prefix": "a/"}}, {"s3:prefix": "a/"}, True),     # condition keys are case-insensitive
     ({"NoSuchOperator": {"k": "a"}}, {"k": "a"}, False),
 ])

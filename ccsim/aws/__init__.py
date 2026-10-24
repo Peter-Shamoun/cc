@@ -68,11 +68,11 @@ class _InProcessS3:
 
     def __getattr__(self, op):
         fn = getattr(self.aws.s3, op, None)
-        if fn is None or op.startswith("_") or op in ("create_bucket", "bucket", "run_lifecycle"):
+        if fn is None or op.startswith("_") or op in ("create_bucket", "bucket", "run_lifecycle", "db"):
             raise AttributeError(op)
 
         def call(**kw):
-            out = fn(self._rc(), **kw)
+            out = fn(self._rc(), **kw) or {}
             if "Body" in out:
                 out = dict(out, Body=StreamingBody(out["Body"]))
             return out
@@ -104,6 +104,7 @@ class LocalAWS:
         self.trail = CloudTrail(self.root / "cloudtrail.jsonl", self.clock)
         self.iam = IAM()
         self.kms = KMS(self.clock)
+        self.kms.iam = self.iam
         self.sts = STS(self.iam, self.clock, self.trail)
         self.events = EventBridge(self.clock, self._service_assume("events.amazonaws.com"), self.trail, seed)
         self.s3 = S3(self.root, self.clock, self.iam, self.kms, self.events, self.trail)

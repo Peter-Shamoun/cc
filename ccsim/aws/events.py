@@ -137,6 +137,8 @@ class EventBridge:
         self.delivered: list[dict] = []
         self.auto_drain = True
         self._draining = False
+        import threading
+        self._lock = threading.RLock()
 
     def put_rule(self, name: str, pattern: dict) -> Rule:
         self.rules[name] = Rule(name, pattern)
@@ -149,22 +151,31 @@ class EventBridge:
         evt = {"version": "0", "id": str(uuid.uuid4()), "detail-type": detail_type, "source": source,
                "account": ACCOUNT, "time": datetime.fromtimestamp(self.clock(), timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                "region": REGION, "resources": list(resources), "detail": detail}
-        for rule in self.rules.values():
-            if rule.enabled and matches(rule.pattern, evt):
-                for t in rule.targets:
-                    self.queue.append((rule, t, evt))
-                    if self.duplicate_rate and self.rng.random() < self.duplicate_rate:
-                        self.queue.append((rule, t, evt))          # at-least-once: same event id twice
-        if self.auto_drain and not self._draining:
+        with self._lock:
+            for rule in self.rules.values():
+                if rule.enabled and matches(rule.pattern, evt):
+                    for t in rule.targets:
+                        self.queue.append((rule, t, evt))
+                        if self.duplicate_rate and self.rng.random() < self.duplicate_rate:
+                            self.queue.append((rule, t, evt))      # at-least-once: same event id twice
+            busy = self._draining
+        if self.auto_drain and not busy:
             self.drain()
         return evt
 
     def drain(self) -> int:
         n = 0
-        self._draining = True
+        with self._lock:
+            if self._draining:
+                return 0
+            self._draining = True
         try:
-            while self.queue:
-                rule, t, evt = self.queue.popleft()
+            while True:
+                with self._lock:
+                    if not self.queue:
+                        self._draining = False
+                        break
+                    rule, t, evt = self.queue.popleft()
                 n += 1
                 for attempt in range(1, t.max_attempts + 1):
                     try:
@@ -180,5 +191,6 @@ class EventBridge:
                                               {"rule": rule.name, "target": t.id},
                                               error=("FailedInvocation", str(e)[:300]), resources=[rule.arn])
         finally:
-            self._draining = False
+            with self._lock:
+                self._draining = False
         return n

@@ -262,7 +262,7 @@ class _Handler(BaseHTTPRequestHandler):
                       Metadata={k[11:]: v for k, v in h.items() if k.lower().startswith("x-amz-meta-")},
                       ObjectLockMode=h.get("x-amz-object-lock-mode"),
                       ObjectLockLegalHoldStatus=h.get("x-amz-object-lock-legal-hold"),
-                      ChecksumSHA256=h.get("x-amz-checksum-sha256"))
+                      ChecksumSHA256=h.get("x-amz-checksum-sha256"), ContentMD5=h.get("Content-MD5"))
             if h.get("x-amz-server-side-encryption-bucket-key-enabled"):
                 kw["BucketKeyEnabled"] = h["x-amz-server-side-encryption-bucket-key-enabled"].lower() == "true"
             if h.get("x-amz-object-lock-retain-until-date"):
@@ -274,7 +274,7 @@ class _Handler(BaseHTTPRequestHandler):
                 sb, sk = src_path.split("/", 1)
                 vid = dict(parse_qsl(src_q)).get("versionId")
                 kw.pop("ChecksumSHA256", None)
-                kw.pop("IfMatch", None)
+                kw.pop("ContentMD5", None)
                 r = s3.copy_object(rc, bucket, key, {"Bucket": sb, "Key": sk, "VersionId": vid}, **kw)
                 xml = (f'<CopyObjectResult xmlns="{S3NS}"><ETag>{escape(r["CopyObjectResult"]["ETag"])}</ETag>'
                        f'<LastModified>{_iso(time.time())}</LastModified></CopyObjectResult>')

@@ -26,9 +26,6 @@ def code(e):
 def acct(tmp_path):
     clock = Clock()
     aws = LocalAWS(tmp_path, clock)
-    key = aws.kms.create_key({"Version": V, "Statement": [
-        {"Effect": "Allow", "Principal": {"AWS": f"arn:aws:iam::{ACCT}:role/app"}, "Action": ["kms:Decrypt", "kms:GenerateDataKey"],
-         "Resource": "*"}]}, alias="alias/test")
     aws.s3.create_bucket("b", versioning="Enabled", object_lock=True, eventbridge=True)
     aws.iam.create_role("app", {"Version": V, "Statement": [
         {"Effect": "Allow", "Principal": {"Service": "ecs-tasks.amazonaws.com"}, "Action": "sts:AssumeRole"}]})
@@ -38,6 +35,9 @@ def acct(tmp_path):
         {"Effect": "Allow", "Principal": {"Service": "ecs-tasks.amazonaws.com"}, "Action": "sts:AssumeRole"}]})
     aws.iam.put_role_policy("other", "p", {"Version": V, "Statement": [
         {"Effect": "Allow", "Action": ["s3:*", "kms:*"], "Resource": "*"}]})
+    key = aws.kms.create_key({"Version": V, "Statement": [
+        {"Effect": "Allow", "Principal": {"AWS": f"arn:aws:iam::{ACCT}:role/app"}, "Action": ["kms:Decrypt", "kms:GenerateDataKey"],
+         "Resource": "*"}]}, alias="alias/test")
     s = aws.sts.assume_role(service_principal("ecs-tasks.amazonaws.com"), None, f"arn:aws:iam::{ACCT}:role/app", "s1")
     o = aws.sts.assume_role(service_principal("ecs-tasks.amazonaws.com"), None, f"arn:aws:iam::{ACCT}:role/other", "o1")
     yield aws, key, s, o, clock
@@ -48,9 +48,14 @@ def fresh(aws, role="app"):
     return aws.sts.assume_role(service_principal("ecs-tasks.amazonaws.com"), None, f"arn:aws:iam::{ACCT}:role/{role}", "re")
 
 
+def sha(body):
+    import hashlib
+    return base64.b64encode(hashlib.sha256(body).digest()).decode()
+
+
 def kput(aws, s, key, k, body=b"x", **kw):
     return aws.client("s3", s).put_object(Bucket="b", Key=k, Body=body, ServerSideEncryption="aws:kms",
-                                          SSEKMSKeyId=key.arn, **kw)
+                                          SSEKMSKeyId=key.arn, ChecksumSHA256=sha(body), **kw)
 
 
 # --- S3 ------------------------------------------------------------------------------------------
@@ -179,6 +184,7 @@ def test_ranges(acct):
     assert c.get_object(Bucket="b", Key="r", Range="bytes=8-100")["Body"].read() == b"89"
     with pytest.raises(InvalidRange):
         c.get_object(Bucket="b", Key="r", Range="bytes=10-12")
+    assert c.get_object(Bucket="b", Key="r", Range="bytes=5-2")["Body"].read() == b"0123456789"   # ignored, not 416
 
 
 def test_list_pagination_delimiter_and_utf8_order(acct):
@@ -460,3 +466,57 @@ def test_cloudtrail_records_allow_and_deny(acct):
     assert puts and puts[0]["userIdentity"]["arn"].endswith("assumed-role/app/s1")
     kms_denied = [e for e in ev if e["eventSource"] == "kms.amazonaws.com" and e.get("errorCode") == "AccessDenied"]
     assert kms_denied and kms_denied[0]["requestParameters"]["encryptionContext"] == {"aws:s3:arn": "arn:aws:s3:::b/p/a"}
+
+
+def test_object_lock_parameters_are_validated(acct):
+    aws, key, s, _, clock = acct
+    from ccsim.aws.errors import InvalidArgument, InvalidRequest
+    with pytest.raises(InvalidArgument):
+        kput(aws, s, key, "l/a", ObjectLockMode="COMPLIANCE")                       # no retain-until date
+    with pytest.raises(InvalidArgument):
+        kput(aws, s, key, "l/a", ObjectLockMode="COMPLIANCE", ObjectLockRetainUntilDate=clock() - 1)
+    with pytest.raises(InvalidRequest):                                             # no checksum
+        aws.client("s3", s).put_object(Bucket="b", Key="l/a", Body=b"x", ServerSideEncryption="aws:kms",
+                                       SSEKMSKeyId=key.arn, ObjectLockMode="COMPLIANCE",
+                                       ObjectLockRetainUntilDate=clock() + 60)
+
+
+def test_conditional_copy_is_not_implemented(acct):
+    aws, key, s, _, _ = acct
+    from ccsim.aws.errors import NotImplementedOp
+    kput(aws, s, key, "c/src")
+    with pytest.raises(NotImplementedOp):
+        aws.client("s3", s).copy_object(Bucket="b", Key="c/dst", CopySource={"Bucket": "b", "Key": "c/src"},
+                                        IfNoneMatch="*", ServerSideEncryption="aws:kms", SSEKMSKeyId=key.arn)
+
+
+def test_kms_grant_bypasses_key_policy_conditions(acct):
+    """Why the design must not let admins call kms:CreateGrant: a grant is honored without the key policy."""
+    aws, key, s, o, _ = acct
+    kput(aws, s, key, "p/a")
+    with pytest.raises(AccessDenied):
+        aws.kms.create_grant_as(o.principal(), o, aws.iam, key.arn, o.role_arn, ["Decrypt"])   # key policy says no
+    key.policy["Statement"].append({"Effect": "Allow", "Principal": {"AWS": o.role_arn}, "Action": "kms:CreateGrant",
+                                    "Resource": "*"})
+    aws.kms.create_grant_as(o.principal(), o, aws.iam, key.arn, o.role_arn, ["Decrypt"])
+    assert aws.client("s3", o).get_object(Bucket="b", Key="p/a")["Body"].read() == b"x"
+
+
+def test_bucket_policy_changes_are_authorized_and_size_limited(acct):
+    aws, key, s, o, _ = acct
+    from ccsim.aws.errors import AWSError
+    deny_admin = {"Version": V, "Statement": [{"Effect": "Deny", "Principal": "*", "Action": ["s3:PutBucketPolicy",
+                  "s3:DeleteBucketPolicy"], "Resource": "arn:aws:s3:::b",
+                  "Condition": {"StringNotLike": {"aws:PrincipalArn": f"arn:aws:iam::{ACCT}:role/app"}}}]}
+    aws.client("s3", s).put_bucket_policy(Bucket="b", Policy=deny_admin)
+    with pytest.raises(AccessDenied):
+        aws.client("s3", o).delete_bucket_policy(Bucket="b")                     # role with s3:* still denied
+    big = {"Version": V, "Statement": [dict(deny_admin["Statement"][0], Sid=f"S{i}") for i in range(200)]}
+    with pytest.raises(AWSError) as e:
+        aws.client("s3", s).put_bucket_policy(Bucket="b", Policy=big)
+    assert e.value.code == "PolicyTooLarge"
+    ghost = {"Version": V, "Statement": [{"Effect": "Allow", "Principal": {"AWS": f"arn:aws:iam::{ACCT}:role/ghost"},
+             "Action": "s3:GetObject", "Resource": "arn:aws:s3:::b/*"}]}
+    with pytest.raises(AWSError) as e:
+        aws.client("s3", s).put_bucket_policy(Bucket="b", Policy=ghost)
+    assert e.value.code == "MalformedPolicy"

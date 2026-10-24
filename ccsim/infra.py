@@ -4,13 +4,19 @@ Every policy below is plain AWS policy JSON. `python -m ccsim.infra --export DIR
 per resource, ready to paste into aws_iam_role / aws_s3_bucket_policy / aws_kms_key resources.
 
 Layers of protection for customer C's folder s3://cc-prod/C/
-  1. IAM roles per customer (parser / reader / sftp-copy), each scoped to C's prefixes and actions.
-  2. Bucket policy: explicit Deny for any principal that is not one of C's roles, for any non-TLS request,
-     for PUTs not encrypted with C's KMS key, and for raw/ writes that could overwrite or lack retention.
-  3. A KMS key per customer whose key policy grants data use only to C's roles via S3, for objects under C/.
-     The account root gets key administration but not Decrypt, so an IAM admin with kms:* cannot read PHI.
-  4. Raw is write-once: versioning + Object Lock COMPLIANCE retention on every raw object, If-None-Match
-     required on raw PUTs, and deletes of raw denied.
+  1. IAM roles per customer (parser / reader / sftp-copy), each scoped to C's prefixes and actions and tagged
+     customer=C, kms_key_arn=<C's key>.
+  2. Bucket policy (ABAC, constant size for any number of customers): object access only under
+     ${aws:PrincipalTag/customer}/, listing only with that prefix, PUTs only with that principal's KMS key, TLS
+     only, raw/ write-once with >= 7 years COMPLIANCE retention, raw never deleted, and bucket configuration
+     (policy, lifecycle, versioning, Object Lock, encryption) changeable only by the Terraform role.
+  3. A KMS key per customer. Its key policy allows Decrypt / GenerateDataKey only for C's roles, only through
+     S3, and only for objects under C/. Key administration goes to a dedicated key-admin role, which gets
+     neither data use nor CreateGrant nor PutKeyPolicy. PutKeyPolicy is for the Terraform role only.
+     Consequence: an IAM admin with "*:*" can neither read C's objects nor change the policies that guard them.
+     The Terraform role is the trusted path. Protect it with an SCP and CloudTrail alerts, outside this account model.
+  4. Raw is write-once: versioning plus Object Lock COMPLIANCE retention on every raw object, If-None-Match
+     required on raw PUTs (multipart parts exempt via s3:ObjectCreationOperation), and deletes of raw denied.
 """
 from __future__ import annotations
 
@@ -22,8 +28,10 @@ from .aws.events import Target
 
 BUCKET = "cc-prod"
 CLUSTER = "cc"
-RAW_RETENTION_DAYS = 2555                        # 7 years (HIPAA documentation rules require >= 6)
+RAW_RETENTION_DAYS = 2555                        # 7 years (HIPAA documentation retention is >= 6)
 SESSION_SECONDS = 900                            # per-request reader credentials
+TERRAFORM_ROLE = "cc-terraform"                  # the deploy pipeline
+KEY_ADMIN_ROLE = "cc-key-admin"                  # humans who rotate / disable keys
 
 
 def role_arn(name: str) -> str:
@@ -40,44 +48,52 @@ def obj(prefix: str) -> str:
 
 BUCKET_ARN = f"arn:aws:s3:::{BUCKET}"
 V = "2012-10-17"
+OBJECT_ACTIONS = ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:DeleteObject", "s3:DeleteObjectVersion",
+                  "s3:PutObjectRetention", "s3:PutObjectLegalHold", "s3:BypassGovernanceRetention"]
+BUCKET_ADMIN_ACTIONS = ["s3:PutBucketPolicy", "s3:DeleteBucketPolicy", "s3:PutLifecycleConfiguration",
+                        "s3:PutBucketVersioning", "s3:PutBucketObjectLockConfiguration", "s3:PutEncryptionConfiguration"]
 
 
-def bucket_policy(customers: dict[str, str]) -> dict:
-    """customers: name -> KMS key ARN"""
-    st = [
+def bucket_policy() -> dict:
+    """Same document for 2 or 2,000 customers: isolation comes from each role's customer / kms_key_arn tags."""
+    terraform = role_arn(TERRAFORM_ROLE)
+    return {"Version": V, "Statement": [
         {"Sid": "DenyInsecureTransport", "Effect": "Deny", "Principal": "*", "Action": "s3:*",
          "Resource": [BUCKET_ARN, obj("*")], "Condition": {"Bool": {"aws:SecureTransport": "false"}}},
-        {"Sid": "DenyListOutsideACustomerPrefix", "Effect": "Deny", "Principal": "*", "Action": "s3:ListBucket",
-         "Resource": BUCKET_ARN, "Condition": {"StringNotLike": {"s3:prefix": [f"{c}/*" for c in customers]}}},
-        {"Sid": "RawIsWriteOnce", "Effect": "Deny", "Principal": "*", "Action": "s3:PutObject",
-         "Resource": obj("*/raw/*"), "Condition": {"Null": {"s3:if-none-match": "true"}}},
+        {"Sid": "OnlyTerraformChangesBucketConfig", "Effect": "Deny", "Principal": "*", "Action": BUCKET_ADMIN_ACTIONS,
+         "Resource": BUCKET_ARN, "Condition": {"StringNotEquals": {"aws:PrincipalArn": terraform}}},
+        {"Sid": "DenyPrincipalsWithoutACustomer", "Effect": "Deny", "Principal": "*", "Action": "s3:*",
+         "Resource": [BUCKET_ARN, obj("*")],
+         "Condition": {"Null": {"aws:PrincipalTag/customer": "true"}, "StringNotEquals": {"aws:PrincipalArn": terraform}}},
+        {"Sid": "ObjectsOnlyUnderOwnCustomer", "Effect": "Deny", "Principal": "*", "Action": OBJECT_ACTIONS,
+         "NotResource": obj("${aws:PrincipalTag/customer}/*")},
+        {"Sid": "ListOnlyOwnCustomerPrefix", "Effect": "Deny", "Principal": "*",
+         "Action": ["s3:ListBucket", "s3:ListBucketVersions"], "Resource": BUCKET_ARN,
+         "Condition": {"StringNotLike": {"s3:prefix": "${aws:PrincipalTag/customer}/*"},
+                       "StringNotEquals": {"aws:PrincipalArn": terraform}}},
+        {"Sid": "PutsUseOwnCustomerKey", "Effect": "Deny", "Principal": "*", "Action": "s3:PutObject", "Resource": obj("*"),
+         "Condition": {"StringNotEquals": {"s3:x-amz-server-side-encryption-aws-kms-key-id": "${aws:PrincipalTag/kms_key_arn}"}}},
+        {"Sid": "RawIsWriteOnce", "Effect": "Deny", "Principal": "*", "Action": "s3:PutObject", "Resource": obj("*/raw/*"),
+         "Condition": {"Null": {"s3:if-none-match": "true"}, "Bool": {"s3:ObjectCreationOperation": "true"}}},
         {"Sid": "RawNeedsComplianceRetention", "Effect": "Deny", "Principal": "*", "Action": "s3:PutObject",
          "Resource": obj("*/raw/*"), "Condition": {"StringNotEquals": {"s3:object-lock-mode": "COMPLIANCE"}}},
+        {"Sid": "RawRetentionAtLeastSevenYears", "Effect": "Deny", "Principal": "*", "Action": "s3:PutObject",
+         "Resource": obj("*/raw/*"),
+         "Condition": {"NumericLessThan": {"s3:object-lock-remaining-retention-days": str(RAW_RETENTION_DAYS - 1)}}},
         {"Sid": "RawIsNeverDeleted", "Effect": "Deny", "Principal": "*",
          "Action": ["s3:DeleteObject", "s3:DeleteObjectVersion"], "Resource": obj("*/raw/*")},
-    ]
-    for c, key_arn in customers.items():
-        arns = [role_arn(n) for n in names(c).values()]
-        st += [
-            {"Sid": f"Only{c}RolesTouch{c}", "Effect": "Deny", "Principal": "*", "Action": "s3:*",
-             "Resource": obj(f"{c}/*"), "Condition": {"StringNotLike": {"aws:PrincipalArn": arns}}},
-            {"Sid": f"Only{c}RolesList{c}", "Effect": "Deny", "Principal": "*", "Action": "s3:ListBucket",
-             "Resource": BUCKET_ARN, "Condition": {"StringLike": {"s3:prefix": [f"{c}/*", c]},
-                                                   "StringNotLike": {"aws:PrincipalArn": arns}}},
-            {"Sid": f"{c}ObjectsUse{c}Key", "Effect": "Deny", "Principal": "*", "Action": "s3:PutObject",
-             "Resource": obj(f"{c}/*"),
-             "Condition": {"StringNotEquals": {"s3:x-amz-server-side-encryption-aws-kms-key-id": key_arn}}},
-        ]
-    return {"Version": V, "Statement": st}
+    ]}
 
 
 def key_policy(c: str) -> dict:
     arns = [role_arn(n) for n in names(c).values()]
     return {"Version": V, "Statement": [
-        {"Sid": "KeyAdministrationOnly", "Effect": "Allow", "Principal": {"AWS": f"arn:aws:iam::{ACCOUNT}:root"},
-         "Action": ["kms:Create*", "kms:Describe*", "kms:Enable*", "kms:List*", "kms:Put*", "kms:Update*",
-                    "kms:Revoke*", "kms:Disable*", "kms:Get*", "kms:Delete*", "kms:TagResource",
-                    "kms:UntagResource", "kms:ScheduleKeyDeletion", "kms:CancelKeyDeletion", "kms:RotateKeyOnDemand"],
+        {"Sid": "TerraformManagesTheKeyPolicy", "Effect": "Allow", "Principal": {"AWS": role_arn(TERRAFORM_ROLE)},
+         "Action": ["kms:PutKeyPolicy", "kms:GetKeyPolicy", "kms:DescribeKey", "kms:TagResource", "kms:UntagResource",
+                    "kms:EnableKeyRotation", "kms:ScheduleKeyDeletion", "kms:CancelKeyDeletion"], "Resource": "*"},
+        {"Sid": "KeyAdministrationWithoutDataAccess", "Effect": "Allow", "Principal": {"AWS": role_arn(KEY_ADMIN_ROLE)},
+         "Action": ["kms:Describe*", "kms:Get*", "kms:List*", "kms:EnableKey", "kms:DisableKey", "kms:EnableKeyRotation",
+                    "kms:DisableKeyRotation", "kms:RotateKeyOnDemand", "kms:ScheduleKeyDeletion", "kms:CancelKeyDeletion"],
          "Resource": "*"},
         {"Sid": f"DataUseBy{c}RolesThroughS3Only", "Effect": "Allow", "Principal": {"AWS": arns},
          "Action": ["kms:Decrypt", "kms:GenerateDataKey"], "Resource": "*",
@@ -114,10 +130,11 @@ def reader_policy(c: str) -> dict:
 
 
 def trust_ecs_tasks() -> dict:
+    # ECS supports aws:SourceArn only as a wildcard over the account's ECS resources (not a specific cluster)
     return {"Version": V, "Statement": [{"Effect": "Allow", "Principal": {"Service": "ecs-tasks.amazonaws.com"},
                                          "Action": "sts:AssumeRole",
                                          "Condition": {"StringEquals": {"aws:SourceAccount": ACCOUNT},
-                                                       "ArnLike": {"aws:SourceArn": f"arn:aws:ecs:{REGION}:{ACCOUNT}:task/{CLUSTER}/*"}}}]}
+                                                       "ArnLike": {"aws:SourceArn": f"arn:aws:ecs:{REGION}:{ACCOUNT}:*"}}}]}
 
 
 def trust_reader(c: str, provider_arn: str, client_id: str) -> dict:
@@ -149,14 +166,29 @@ def success_pattern(c: str) -> dict:
 
 
 def lifecycle_rules(customers) -> list[dict]:
-    """S3 lifecycle prefixes are literal (no wildcards): one rule per customer layer. Raw has none:
-    its versions are under COMPLIANCE retention and are never expired."""
+    """Internal form (the sim's lifecycle runner). S3 lifecycle prefixes are literal (no wildcards): one rule per
+    customer layer. Raw has none: its versions are under COMPLIANCE retention and are never expired."""
     rules = [{"Prefix": "", "ExpiredObjectDeleteMarker": True}]
     for c in customers:
         rules += [{"Prefix": f"{c}/semantic_layer/", "NoncurrentDays": 1},
                   {"Prefix": f"{c}/staging/", "NoncurrentDays": 1},
                   {"Prefix": f"{c}/parquet/", "NoncurrentDays": 7}]
     return rules
+
+
+def lifecycle_configuration(customers) -> dict:
+    """The same rules in S3's PutBucketLifecycleConfiguration shape (what Terraform's
+    aws_s3_bucket_lifecycle_configuration takes)."""
+    out = []
+    for i, r in enumerate(lifecycle_rules(customers)):
+        rule = {"ID": f"rule-{i}-{r['Prefix'].rstrip('/').replace('/', '-') or 'all'}", "Status": "Enabled",
+                "Filter": {"Prefix": r["Prefix"]}}
+        if "NoncurrentDays" in r:
+            rule["NoncurrentVersionExpiration"] = {"NoncurrentDays": r["NoncurrentDays"]}
+        if r.get("ExpiredObjectDeleteMarker"):
+            rule["Expiration"] = {"ExpiredObjectDeleteMarker": True}
+        out.append(rule)
+    return {"Rules": out}
 
 
 class Deployment:
@@ -171,20 +203,28 @@ class Deployment:
 
 def provision(aws: LocalAWS, customers: list[str], parser_entrypoint, tenant_id: str = "xifin.example",
               app_group: str = "cc-users") -> Deployment:
+    """Resources in dependency order (IAM, KMS and S3 reject policies that name principals that do not exist)."""
+    from .aws.s3 import set_bucket_policy
     provider_arn = aws.create_identity(tenant_id, [app_group])
+    sso = {"Version": V, "Statement": [{"Effect": "Allow", "Principal": {"Service": "ec2.amazonaws.com"},
+                                        "Action": "sts:AssumeRole"}]}
+    aws.iam.create_role(TERRAFORM_ROLE, sso)
+    aws.iam.create_role(KEY_ADMIN_ROLE, sso)
+    aws.iam.create_role("it-sftp-runner", sso)                 # IT's SFTP host (EC2 instance profile)
+    for c in customers:
+        n = names(c)
+        aws.iam.create_role(n["parser"], trust_ecs_tasks(), max_session_duration=3600, tags={"customer": c})
+        aws.iam.create_role(n["reader"], trust_reader(c, provider_arn, aws.cognito.client_id), tags={"customer": c})
+        aws.iam.create_role(n["sftp"], trust_role(role_arn("it-sftp-runner")), tags={"customer": c})
     keys = {}
     for c in customers:
         keys[c] = aws.kms.create_key(key_policy(c), f"CC data key for {c}", alias=f"alias/cc/{c}")
         n = names(c)
-        aws.iam.create_role(n["parser"], trust_ecs_tasks(), max_session_duration=3600)
+        for r in n.values():
+            aws.iam.tag_role(r, {"kms_key_arn": keys[c].arn})
         aws.iam.put_role_policy(n["parser"], "parser", parser_policy(c))
-        aws.iam.create_role(n["reader"], trust_reader(c, provider_arn, aws.cognito.client_id))
         aws.iam.put_role_policy(n["reader"], "reader", reader_policy(c))
-        aws.iam.create_role(n["sftp"], trust_role(role_arn("it-sftp-runner")))
         aws.iam.put_role_policy(n["sftp"], "sftp", sftp_policy(c))
-    # IT's SFTP host (an EC2 instance profile) may assume each customer's copy role
-    aws.iam.create_role("it-sftp-runner", {"Version": V, "Statement": [
-        {"Effect": "Allow", "Principal": {"Service": "ec2.amazonaws.com"}, "Action": "sts:AssumeRole"}]})
     aws.iam.put_role_policy("it-sftp-runner", "assume-copy-roles", {"Version": V, "Statement": [
         {"Effect": "Allow", "Action": "sts:AssumeRole", "Resource": [role_arn(names(c)["sftp"]) for c in customers]}]})
 
@@ -195,7 +235,7 @@ def provision(aws: LocalAWS, customers: list[str], parser_entrypoint, tenant_id:
                          "Resource": "*"}]}, "bucket default (never valid for customer prefixes)",
                         alias="alias/cc/platform").arn,
                     "BucketKeyEnabled": False}
-    b.policy = bucket_policy({c: keys[c].arn for c in customers})
+    set_bucket_policy(aws.s3, b, bucket_policy())
     b.lifecycle = lifecycle_rules(customers)
 
     aws.iam.create_role("cc-events-run-parser", {"Version": V, "Statement": [
@@ -232,21 +272,25 @@ def sftp_drop(aws: LocalAWS, dep: Deployment, c: str, local_day_dir, day: str, v
     from datetime import datetime, timezone
     kw = dict(ServerSideEncryption="aws:kms", SSEKMSKeyId=dep.keys[c].arn, IfNoneMatch="*", ObjectLockMode="COMPLIANCE",
               ObjectLockRetainUntilDate=datetime.fromtimestamp(retain, timezone.utc) if via_http else retain)
+    import base64
+    import hashlib
+    checksum = lambda b: base64.b64encode(hashlib.sha256(b).digest()).decode()
     for f in sorted(Path(local_day_dir).rglob("*")):
         if f.is_file():
             rel = f.relative_to(local_day_dir).as_posix()
-            s3.put_object(Bucket=BUCKET, Key=f"{c}/raw/received_date={day}/{rel}", Body=f.read_bytes(), **kw)
-    s3.put_object(Bucket=BUCKET, Key=f"{c}/raw/received_date={day}/_SUCCESS", Body=b"", **kw)
+            body = f.read_bytes()
+            s3.put_object(Bucket=BUCKET, Key=f"{c}/raw/received_date={day}/{rel}", Body=body,
+                          ChecksumSHA256=checksum(body), **kw)
+    s3.put_object(Bucket=BUCKET, Key=f"{c}/raw/received_date={day}/_SUCCESS", Body=b"", ChecksumSHA256=checksum(b""), **kw)
 
 
 def export(dest: str | Path, customers=("acme_labs", "acme_diagnostics")):
     """Write every policy document as JSON (placeholders for ARNs that only exist after apply)."""
     dest = Path(dest)
     dest.mkdir(parents=True, exist_ok=True)
-    keys = {c: f"arn:aws:kms:{REGION}:{ACCOUNT}:key/<{c}-key-id>" for c in customers}
     provider = f"arn:aws:iam::{ACCOUNT}:oidc-provider/cognito-idp.{REGION}.amazonaws.com/<user-pool-id>"
-    docs = {"s3_bucket_policy.json": bucket_policy(keys), "events_run_parser_policy.json": events_role_policy(customers),
-            "trust_ecs_tasks.json": trust_ecs_tasks(), "lifecycle_rules.json": lifecycle_rules(customers)}
+    docs = {"s3_bucket_policy.json": bucket_policy(), "events_run_parser_policy.json": events_role_policy(customers),
+            "trust_ecs_tasks.json": trust_ecs_tasks(), "s3_lifecycle_configuration.json": lifecycle_configuration(customers)}
     for c in customers:
         docs[f"kms_key_policy_{c}.json"] = key_policy(c)
         docs[f"role_{names(c)['parser']}.json"] = parser_policy(c)
@@ -254,6 +298,7 @@ def export(dest: str | Path, customers=("acme_labs", "acme_diagnostics")):
         docs[f"role_{names(c)['sftp']}.json"] = sftp_policy(c)
         docs[f"trust_{names(c)['reader']}.json"] = trust_reader(c, provider, "<app-client-id>")
         docs[f"events_pattern_{c}.json"] = success_pattern(c)
+        docs[f"role_tags_{c}.json"] = {"customer": c, "kms_key_arn": f"<arn of alias/cc/{c}>"}
     for name, d in docs.items():
         (dest / name).write_text(json.dumps(d, indent=2) + "\n")
     return sorted(docs)

@@ -39,8 +39,11 @@ class Session:
     def arn(self) -> str:
         return f"arn:aws:sts::{ACCOUNT}:assumed-role/{self.role_name}/{self.session_name}"
 
+    role_tags: dict = field(default_factory=dict)
+
     def principal(self) -> Principal:
-        return Principal(self.arn, (self.arn, self.role_arn), "AssumedRole", ACCOUNT, dict(self.tags),
+        """aws:PrincipalTag/* = the role's tags overlaid with the session's tags (session tags win)."""
+        return Principal(self.arn, (self.arn, self.role_arn), "AssumedRole", ACCOUNT, {**self.role_tags, **self.tags},
                          self.role_arn, self.session_name, self.issued_at)
 
     def credentials(self) -> dict:
@@ -50,7 +53,7 @@ class Session:
 
 
 def service_principal(service: str) -> Principal:
-    return Principal(service, (service,), "Service", ACCOUNT, service=service)
+    return Principal(service, (service,), "Service", None, service=service)
 
 
 class STS:
@@ -74,7 +77,7 @@ class STS:
         now = self.clock()
         s = Session("ASIA" + secrets.token_hex(8).upper(), secrets.token_urlsafe(30), secrets.token_urlsafe(48),
                     now + duration, now, role.arn, session_name, dict(tags), tuple(transitive), tuple(policies),
-                    chained, source)
+                    chained, source, dict(role.tags))
         self.sessions[s.access_key_id] = s
         return s
 
