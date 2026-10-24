@@ -103,6 +103,13 @@ def main(days, scale, latencies, out_dir):
         row = {}
         r0 = ep.requests
         row["session_open_ms"] = timed(lambda: open_session(aws, w.dep, tok), reps=2)
+        cold = {}
+        for k, q in QUERIES.items():                                 # fresh session: nothing cached yet
+            fresh_s = open_session(aws, w.dep, tok)
+            r0, t0 = ep.requests, time.perf_counter()
+            fresh_s.con.execute(q).fetchall()
+            cold[k] = dict(ms=round((time.perf_counter() - t0) * 1000, 1), requests=ep.requests - r0)
+        row["gold_cold"] = cold
         s = open_session(aws, w.dep, tok)
         row["gold_ms"] = {k: timed(lambda q=q: s.con.execute(q).fetchall()) for k, q in QUERIES.items()}
         for label, base in (("silver_live", f"s3://{BUCKET}/{C}/parquet"), ("silver_compact", f"s3://{BUCKET}/{C}/parquet/_compacted")):
@@ -132,11 +139,15 @@ def render(r) -> str:
              "| parser batch | seconds | HTTP requests |", "|---|---|---|"]
     for i in sorted({0, len(b) // 4, len(b) // 2, 3 * len(b) // 4, len(b) - 1}):
         lines.append(f"| #{i + 1} ({b[i]['day']}) | {b[i]['s']} | {b[i]['requests']:,} |")
-    lines += ["", "| S3 latency | session open | gold query (median of 3) | silver load: daily files | silver load: compacted |",
-              "|---|---|---|---|---|"]
+    lines += ["", "Wall-clock times below come from a single-process Python endpoint (AES decryption, GIL) that hides per-request "
+              "latency behind DuckDB's parallel range reads; HTTP request counts are the number that carries over to S3.", "",
+              "| S3 latency | session open | gold first query (cold) | gold repeat (cached) | silver load: daily files | silver load: compacted |",
+              "|---|---|---|---|---|---|"]
     for lat, row in r["by_latency"].items():
         g = statistics.median(row["gold_ms"].values())
-        lines.append(f"| {lat} ms | {row['session_open_ms']} ms | {g} ms | {row['silver_live_load_ms']:,} ms "
+        c = row["gold_cold"]
+        cold = f"{statistics.median(v['ms'] for v in c.values())} ms ({max(v['requests'] for v in c.values())} req)"
+        lines.append(f"| {lat} ms | {row['session_open_ms']} ms | {cold} | {g} ms | {row['silver_live_load_ms']:,} ms "
                      f"({row['silver_live_load_requests']:,} req) | {row['silver_compact_load_ms']:,} ms "
                      f"({row['silver_compact_load_requests']:,} req) |")
     return "\n".join(lines) + "\n"
