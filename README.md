@@ -30,9 +30,22 @@ Design work for ClaimClarity, a conversational analytics agent over 837P claims 
 
 ## Open issues
 
-- `claude/schema` says only `sem_int.remit_event` and `sem_int.line_match` get materialized and calls `edi.segment` "silver"; the newer data-backend plan materializes every `sem.*` view into `semantic_layer/` (gold) and calls the `parquet/` lossless tables "silver". The data-backend plan wins.
-- `run_semantic_sql` only allows `sem.*`, while the plan lets the agent escalate to the lossless schema. Unresolved.
+- Lane 2: the design lets the agent escalate to guarded SQL over PHI-stripped views of the lossless tables. Those views, and widening `run_semantic_sql`'s guard to them, are not built; today it allows only `sem.*`.
 - The built turn flow uses Neo4j/DuckDB typed tasks; moving the agent onto `query_metrics` over `sem.*` is scheduled in the build-week plan, not done.
 - The turn-flow diagrams still label the Payer Resolver "(AI)".
 - Lucid import of the draw.io files is still rejected.
 - `ref.denial_carc` must be loaded with the 23 reviewed CARCs; the test uses placeholders.
+
+## Layers
+
+Per customer in S3 (`docs/data-backend/s3-folder-layout.txt`): `raw/` is bronze (EDI as received), `parquet/` is silver (the lossless tables in `claude/schema/01_lossless_edi_schema.sql`), and `semantic_layer/` is gold (every `sem.*` view from `02_semantic_layer_views.sql`, materialized once per batch). Older notes in `chat-notes/` and `archive/` use other names for these layers; this is the current one.
+
+## Tests
+
+```sh
+python -m venv .venv && . .venv/bin/activate
+pip install -e ".[dev]"
+pytest
+```
+
+`claude/schema/tests/test_semantic_layer.py` builds the schema and views in in-memory DuckDB, loads synthetic 837P/835 data and checks the agent tools against independently computed results. It also runs on its own: `python claude/schema/tests/test_semantic_layer.py`.

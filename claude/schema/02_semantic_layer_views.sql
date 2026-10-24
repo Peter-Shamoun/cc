@@ -17,9 +17,10 @@
 --                           the submitted code only when the payer changed it).
 --
 -- Performance: every view is plain SQL so it stays correct as rules change.
--- In production, materialize sem_int.remit_event and sem_int.line_match to
--- Parquet at load time (they are the only expensive steps) and point the views
--- at the materialized copies.
+-- In production the parser runs this file once per batch and materializes every
+-- sem.* view to Parquet under semantic_layer/v=<run_id>/ (gold), then switches
+-- the CURRENT pointer. The agent reads those Parquet files, never these views
+-- over the lossless (silver) tables directly.
 -- =============================================================================
 
 CREATE SCHEMA IF NOT EXISTS sem_int;
