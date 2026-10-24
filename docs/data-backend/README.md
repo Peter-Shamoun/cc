@@ -1,6 +1,6 @@
 # CC data backend
 
-This is the written companion to the canvas: [`canvas.html`](canvas.html) (published at https://claude.ai/artifact/Q4XqDXcMvkXBbatExDweK4). Its source is `diagrams/data-backend-canvas/`. Each section below matches one board, and the six numbered AWS gates on the diagram are explained in their own table.
+Your own write-up of this design is [`design-doc.md`](design-doc.md). This file is a board-by-board companion to the canvas: [`canvas.html`](canvas.html) (published at https://claude.ai/artifact/Q4XqDXcMvkXBbatExDweK4). Its source is `diagrams/data-backend-canvas/`. Each section below matches one board, and the six numbered AWS gates on the diagram are explained in their own table.
 
 ## Overview
 
