@@ -1,0 +1,292 @@
+<title>ClaimClarity Design State</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column of numbered claims; diagrams break wider. Blueprint palette borrowed from the data-backend canvas. */
+:root {
+  --bg: #F6F8FB; --panel: #FFFFFF; --fg: #1A1D23; --muted: #5A6372; --rule: #D5DCE7;
+  --navy: #1C2B57; --blue: #4A6BB0; --tint: #EAF0F9;
+  --ok: #2E7D4F; --ok-bg: #E4F2EA; --warn: #9A6400; --warn-bg: #FBF0DB; --bad: #A63A32; --bad-bg: #F8E3E1;
+  --display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --body: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11151D; --panel: #181E29; --fg: #E4E8EF; --muted: #98A2B3; --rule: #2C3545;
+  --navy: #9DB4E8; --blue: #7E9CDA; --tint: #1F2A3D;
+  --ok: #7CCB9A; --ok-bg: #18301F; --warn: #E3B35C; --warn-bg: #33280F; --bad: #EE8E86; --bad-bg: #3A1D1B; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #11151D; --panel: #181E29; --fg: #E4E8EF; --muted: #98A2B3; --rule: #2C3545;
+  --navy: #9DB4E8; --blue: #7E9CDA; --tint: #1F2A3D;
+  --ok: #7CCB9A; --ok-bg: #18301F; --warn: #E3B35C; --warn-bg: #33280F; --bad: #EE8E86; --bad-bg: #3A1D1B; color-scheme: dark }
+
+body { background: var(--bg); color: var(--fg); font: 15px/1.6 var(--body); }
+.wrap { max-width: 980px; margin: 0 auto; padding-block: 40px 80px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 48px; }
+h1, h2, h3 { font-family: var(--display); color: var(--navy); text-wrap: balance; margin: 0; letter-spacing: .01em; }
+h1 { font-size: 44px; line-height: 1.05; font-weight: 700; }
+h2 { font-size: 28px; font-weight: 600; }
+h3 { font-size: 19px; font-weight: 600; }
+p { margin: 0; max-width: 68ch; }
+code, .mono { font-family: var(--mono); font-size: .88em; }
+.eyebrow { font: 600 13px var(--display); letter-spacing: .12em; text-transform: uppercase; color: var(--blue); }
+header { display: grid; gap: 12px; }
+.lede { color: var(--muted); font-size: 16px; }
+section { display: grid; gap: 18px; }
+.how { border: 1.5px dashed var(--blue); background: var(--tint); padding: 14px 18px; display: grid; gap: 4px; }
+
+.diagram { background: var(--panel); border: 1px solid var(--rule); padding: 20px; overflow-x: auto; }
+.diagram pre.mermaid { margin: 0; background: transparent; text-align: center; }
+.cap { font-size: 13px; color: var(--muted); }
+
+ol.claims { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; border-top: 1px solid var(--rule); }
+ol.claims li { display: grid; grid-template-columns: 52px 92px 1fr; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--rule); align-items: baseline; }
+ol.claims li > div { min-width: 0; }
+.id { font: 600 15px var(--mono); color: var(--navy); }
+.chip { font: 600 12px var(--display); letter-spacing: .08em; text-transform: uppercase; padding: 2px 8px; justify-self: start; white-space: nowrap; }
+.built { color: var(--ok); background: var(--ok-bg); }
+.designed { color: var(--blue); background: var(--tint); }
+.open { color: var(--warn); background: var(--warn-bg); }
+.conflict { color: var(--bad); background: var(--bad-bg); }
+.unsure { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+@media (max-width: 560px) {
+  ol.claims li { grid-template-columns: 44px 1fr; }
+  ol.claims li > div { grid-column: 1 / -1; }
+}
+
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.grid2 > * { min-width: 0; }
+.tree { background: var(--panel); border: 1px solid var(--rule); padding: 16px; overflow-x: auto; font: 13px/1.55 var(--mono); white-space: pre; margin: 0; }
+
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+.tblwrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--rule); }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; font-size: 14px; }
+th { font: 600 13px var(--display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+tr.today td { background: var(--tint); }
+tr.today td:first-child { box-shadow: inset 3px 0 0 var(--navy); }
+
+.qs { margin: 0; padding-left: 22px; display: grid; gap: 8px; }
+footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--rule); padding-top: 16px; }
+</style>
+
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Read-back · as of Sat Oct 24, 2026</div>
+  <h1>Where ClaimClarity's design stands</h1>
+  <p class="lede">This is my understanding of the current design, pieced together from the repo: the schema in <code>claude/schema/</code>, the data-backend canvas, the chat notes, the build-week plan and the project memory. Every claim has an ID so you can correct it by number.</p>
+  <div class="how">
+    <strong>How to correct me</strong>
+    <span>Reply with IDs and the fix, e.g. "B4 wrong: the API runs on Fargate" or "S6 is decided: we keep Neo4j for payer search." Chips show how settled I think each claim is: <span class="chip built">Built</span> <span class="chip designed">Designed</span> <span class="chip open">Open</span> <span class="chip conflict">Conflict</span></span>
+  </div>
+</header>
+
+<section id="overview">
+  <div class="eyebrow">01 · The product</div>
+  <h2>What it is</h2>
+  <ol class="claims">
+    <li><span class="id">P1</span><span class="chip built">Built</span><div>ClaimClarity is a chat analyst for Xifin's implementations team. It answers questions over a customer's 837P claims and 835 remittances so the team can size up a new customer before pitch and conversion conversations.</div></li>
+    <li><span class="id">P2</span><span class="chip built">Built</span><div>It is an internal pilot in dev and not deployed to end users. Only LabCorp data is loaded. The rule since Oct 16 is "build for many customers, heading to production."</div></li>
+    <li><span class="id">P3</span><span class="chip designed">Designed</span><div>The target is a hosted, multi-tenant service with strict PHI boundaries, formally deployed by <strong>Thu Oct 29</strong>.</div></li>
+    <li><span class="id">P4</span><span class="chip built">Built</span><div>The app code lives in another repo (main @ <code>ca5df10</code>). This repo holds only the design, data model, diagrams, tooling and research.</div></li>
+  </ol>
+</section>
+
+<section id="backend">
+  <div class="eyebrow">02 · Data backend</div>
+  <h2>Write path and read path</h2>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  subgraph EXT["Outside our scope"]
+    SFTP[("Customer SFTP")]
+  end
+  COPY["Copy script<br/>(reuses LabCorp IT script)<br/>daily / weekly"]
+  SFTP --> COPY
+
+  subgraph BUCKET["Prod S3 · claimclarity/ · PHI-approved"]
+    direction TB
+    subgraph CB["customer_b/ · own KMS key + IAM role"]
+      RAW["raw/ · bronze<br/>EDI as received"]
+      SUC["_SUCCESS manifest<br/>file list + sha256"]
+      PQ["parquet/ · silver<br/>lossless tables"]
+      SL["semantic_layer/ · gold<br/>all sem.* as Parquet<br/>v=run_id + CURRENT"]
+    end
+    CA["customer_a/ · no access"]
+  end
+  COPY --> RAW
+  COPY --> SUC
+
+  SUC -->|"Gate 1: rule matches B?"| EB["EventBridge"]
+  EB -->|"Gate 2: PassRole allowed?"| FG["Fargate parser<br/>runs as Role B<br/>one batch, then destroyed"]
+  GH["GitHub<br/>view SQL (code only)"] -.->|"run by parser"| FG
+  RAW --> FG
+  FG -->|"Gate 3: IAM + KMS allow?"| PQ
+  FG --> SL
+
+  U["Xifin user"] --> ENTRA["Entra ID login"] --> COG["Cognito<br/>signed JWT names customer"]
+  COG -->|"Gate 4: token valid?"| API["API server · EC2"]
+  API -->|"Gate 5: trust policy allows B?"| STS["STS<br/>15-min Role B creds"]
+  API --> DDB["DuckDB<br/>fresh per request<br/>scoped S3 secret"]
+  API <--> LLM["Claude via Bedrock<br/>under BAA"]
+  DDB -->|"Gate 6: IAM + KMS allow?"| SL
+</pre>
+  </div>
+  <p class="cap">Simplified redraw of <code>diagrams/data-backend-canvas/Main.dc.html</code>, which stays the source of truth. Shown for customer B; every customer gets the same setup.</p>
+
+  <ol class="claims">
+    <li><span class="id">B1</span><span class="chip designed">Designed</span><div>One prod S3 bucket with a <code>claimclarity/</code> prefix and one folder per customer. Each folder has its own SSE-KMS key and IAM role, and a bucket policy denies cross-prefix access. Tenant isolation is physical, so data tables have no tenant column.</div></li>
+    <li><span class="id">B2</span><span class="chip designed">Designed</span><div>The SFTP-to-S3 copy reuses LabCorp's existing IT script. It writes <code>raw/received_date=…/</code> plus a <code>_SUCCESS</code> manifest (file list and sha256). Bronze is never edited.</div></li>
+    <li><span class="id">B3</span><span class="chip designed">Designed</span><div>The S3 event and EventBridge rule start a <strong>short-lived ECS Fargate task per customer batch</strong>. It runs as that customer's role, then exits and its credentials expire. There is no EC2 instance per customer, and the launcher only has <code>iam:PassRole</code>.</div></li>
+    <li><span class="id">B4</span><span class="chip designed">Designed</span><div>Files are parsed one at a time, and any file whose sha256 is already in <code>edi.source_file</code> is skipped. Writes go to <code>staging/&lt;run_id&gt;/</code>. Promotion into <code>parquet/</code> and the semantic-layer rebuild happen <strong>once per batch</strong>. Bad files go to <code>quarantine/</code>.</div></li>
+    <li><span class="id">B5</span><span class="chip designed">Designed</span><div>The view SQL lives in GitHub (placeholder path <code>semantic/views/</code>). Only the parser runs it, to materialize every <code>sem.*</code> view into <code>semantic_layer/v=&lt;run_id&gt;/</code>, then it flips <code>CURRENT</code>. DuckDB reads only the materialized Parquet and never the SQL.</div></li>
+    <li><span class="id">B6</span><span class="chip designed">Designed</span><div>Parquet files are only ever added, never edited, at about one new file per table per day. There is no compaction job for now. If one is added later, it compacts within a partition and never touches bronze.</div></li>
+    <li><span class="id">B7</span><span class="chip designed">Designed</span><div>Read path: Entra ID login, then a Cognito JWT. The customer comes from Entra group membership (e.g. <code>ClaimClarity-LABCORP</code>). The API verifies the token and gets 15-minute STS credentials for that customer's role, with SourceIdentity set to the user.</div></li>
+    <li><span class="id">B8</span><span class="chip designed">Designed</span><div>The API runs on EC2 and embeds DuckDB. Each request opens a fresh in-memory connection with an S3 secret scoped to that customer's prefix and <code>lock_configuration = true</code>, and closes it afterwards.<span class="unsure">This conflicts with the ADRs; see S5.</span></div></li>
+    <li><span class="id">B9</span><span class="chip designed">Designed</span><div>Claude is called through Bedrock under a BAA, with invocation logging off or kept inside the PHI boundary.</div></li>
+    <li><span class="id">B10</span><span class="chip open">Open</span><div>Logging: CloudTrail S3 data events and KMS logs go to a separate Object-Lock log bucket and are queried with Athena. The recommended app audit log would hold the question, SQL, tables and row counts, but no result data. Whether to keep chat transcripts at all (and for 30 to 90 days if so) is undecided, and retention needs compliance sign-off.</div></li>
+    <li><span class="id">B11</span><span class="chip open">Open</span><div>277 files arrive later and are not part of the first build.</div></li>
+  </ol>
+</section>
+
+<section id="layers">
+  <div class="eyebrow">03 · Data model</div>
+  <h2>Two schemas: lossless storage and an agent-facing semantic layer</h2>
+  <div class="grid2">
+    <div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  B["Bronze · raw/<br/>837P / 835 EDI bytes"]
+  S["Silver · parquet/<br/>41 tables: 28 EDI + 13 ref/config<br/>edi.* · c837.* · r835.* · ref.*"]
+  I["sem_int.* plumbing<br/>remit_event dedupe · line_match<br/>payer_835/837 · claim_cas"]
+  G["Gold · semantic_layer/<br/>10 sem.* tables, one grain each"]
+  M["Semantic model YAML<br/>36 metrics · 48 dimensions<br/>13 verified requests"]
+  B -->|"X12 parser (not built)"| S --> I --> G
+  M -.->|"compiler picks the view"| G
+</pre>
+    </div>
+<pre class="tree">s3://claimclarity-prod/customer_b/
+├── raw/received_date=2026-10-23/
+│   ├── 837/  835/  277/
+│   └── _SUCCESS
+├── parquet/
+│   ├── edi.segment/received_month=2026-10/
+│   │   └── part-run_20261023.parquet
+│   ├── r835.claim_payment/…
+│   └── c837.claim/…
+├── semantic_layer/
+│   ├── CURRENT   → "v=run_20261023"
+│   └── v=run_20261023/sem.remit_claims/…
+├── staging/&lt;run_id&gt;/
+└── quarantine/</pre>
+  </div>
+  <ol class="claims">
+    <li><span class="id">D1</span><span class="chip built">Built</span><div>Silver is <strong>lossless at two levels</strong>. <code>edi.segment</code> can rebuild files byte for byte, and the typed tables are lossless at the element level, with each row pointing back to its <code>seg_ord</code>. Rare segments go to <code>edi.misc_segment</code>. Every file carries its S3 provenance.</div></li>
+    <li><span class="id">D2</span><span class="chip built">Built</span><div>A PCN is not a key. Surrogate keys are <code>file_id:seg_ord</code>, and "current adjudication" is computed from event order. The dedupe in <code>sem_int.remit_event</code> is the fix for the Oct 20 load failure (8,294 duplicate keys in <code>keys.remittances</code>).</div></li>
+    <li><span class="id">D3</span><span class="chip built">Built</span><div>Gold is the 10 <code>sem.*</code> views: remit_claims, remit_lines, claims, claim_lines, adjustments, remarks, payments, provider_adjustments, diagnoses, payers. They contain no patient names, member IDs, DOBs or bank accounts.</div></li>
+    <li><span class="id">D4</span><span class="chip built">Built</span><div>The denial definitions are unchanged. A recorded denial is CLP02 = 4. A signal-v3 denial is a non-reversal 835 with $0 paid and CO-group CAS in the reviewed CARC list. "Denied" means either one. Rates grouped by CPT need at least 20 owners by default.</div></li>
+    <li><span class="id">D5</span><span class="chip built">Built</span><div>Business rules live in views and <code>ref.*</code> config (<code>denial_carc</code>, <code>tenant_setting</code>, <code>payer_alias</code>), so they can change without a reload. "Built" here means DDL plus a synthetic DuckDB test that passes in CI. <strong>Nothing has been loaded with real data yet.</strong></div></li>
+    <li><span class="id">D6</span><span class="chip open">Open</span><div>Still to do: the X12 → Parquet parser (the plan is to port it from Appeals), loading <code>ref.denial_carc</code> with the 23 reviewed CARCs, populating <code>payer_alias</code>, and deciding how <code>source_file</code> supersession works when Parquet is append-only (rewrite each batch, or a separate log table).</div></li>
+  </ol>
+</section>
+
+<section id="agent">
+  <div class="eyebrow">04 · Agent</div>
+  <h2>Turn flow: as built today, and the target</h2>
+  <div class="grid2">
+    <div>
+      <h3>As built (main @ ca5df10)</h3>
+      <div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  Q["User question"] --> INV["Investigator · Sonnet<br/>tool: run_tasks<br/>≤4 turns · 8 tasks · 25 s"]
+  INV --> SRV["Server validates tasks<br/>vs registry, resolves scope"]
+  SRV --> PAY{"Payer clear?"}
+  PAY -->|"no"| CARD["Payer card<br/>turn pauses"] --> SRV
+  PAY -->|"yes"| CMP["Compiles fixed Cypher /<br/>DuckDB SQL"]
+  CMP --> DB[("Neo4j / DuckDB")]
+  DB -.->|"≤20-row digests"| INV
+  DB --> FIND["Server builds findings,<br/>tables, charts"]
+  FIND --> WR["Writer · one streamed call<br/>{{placeholders}}"]
+  WR --> CHK["Server binds numbers,<br/>checks each sentence"]
+  CHK --> SAVE["SQLite commit → shown"]
+</pre>
+      </div>
+    </div>
+    <div>
+      <h3>Target (this repo's schema)</h3>
+      <div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  Q2["User question"] --> AG["Agent"]
+  AG -->|"default, ~90%"| QM["query_metrics<br/>metrics + dimensions by name"]
+  QM --> COMP["Compiler owns joins,<br/>grain, rules, min group"]
+  COMP --> SEM[("sem.* gold")]
+  AG --> AUX["lookup_values ·<br/>get_claim_timeline ·<br/>describe_semantic_layer"]
+  AUX --> SEM
+  AG -->|"long tail"| RSS["run_semantic_sql<br/>sqlglot guard · sem.* only"]
+  RSS --> SEM
+  AG -.->|"Lane 2 · not built"| LL["Guarded SQL over<br/>PHI-stripped silver views"]
+  LL -.-> SIL[("parquet/ silver")]
+  AG -.->|"not wired"| HUM["request_lossless_query<br/>human-approved"]
+</pre>
+      </div>
+    </div>
+  </div>
+  <ol class="claims">
+    <li><span class="id">A1</span><span class="chip built">Built</span><div>Today no query is written by the model on the live path. The Investigator picks typed tasks, the server compiles them, and the Writer writes prose only. Every number in the answer is bound by the server.</div></li>
+    <li><span class="id">A2</span><span class="chip built">Built</span><div>A payer resolves without the user only on an exact match or a single normalized match. Otherwise the turn pauses on a payer card, and resuming reruns the stored tasks with no new Investigator call.</div></li>
+    <li><span class="id">A3</span><span class="chip designed">Designed</span><div>The bet: the agent works from the semantic layer about 90% of the time and loads the lossless schema only when it truly needs to. We accept less data completeness in exchange for accuracy, based on dbt's 2026 benchmark (98.2% through a semantic layer vs 90.0% with text-to-SQL for Sonnet 4.6).</div></li>
+    <li><span class="id">A4</span><span class="chip open">Open</span><div>Moving the agent onto <code>query_metrics</code> over <code>sem.*</code> is scheduled in the build-week plan but not done. I'm not sure whether it <em>replaces</em> the Investigator's typed tasks or becomes a new task type inside <code>run_tasks</code>.</div></li>
+    <li><span class="id">A5</span><span class="chip open">Open</span><div>Lane 2 (ADR-009): P2a is merged (PR #21) but unreachable, and P2b hasn't started. The silver views it needs, and widening the SQL guard to allow them, are not built.</div></li>
+    <li><span class="id">A6</span><span class="chip open">Open</span><div>Whether the Payer Resolver makes an AI call. The diagrams label it "(AI)", but the aggregate describes lexical, vector and initials search.</div></li>
+  </ol>
+</section>
+
+<section id="status">
+  <div class="eyebrow">05 · Decisions and blockers</div>
+  <h2>What's unsettled</h2>
+  <ol class="claims">
+    <li><span class="id">S1</span><span class="chip conflict">Conflict</span><div>ADR-010 (Accepted: central DuckDB on EC2 over Quack) vs ADR-011 (Proposed: interim two-EC2 dev, long-term ECS Fargate with embedded DuckDB). ADR-010 stands until you accept 011.</div></li>
+    <li><span class="id">S2</span><span class="chip conflict">Conflict</span><div>The data-backend canvas draws a third option: <strong>DuckDB embedded in an EC2 API server, a new connection per request</strong>. This matches neither ADR exactly, and it needs to be settled before Terraform.</div></li>
+    <li><span class="id">S3</span><span class="chip open">Open</span><div>Governance: Cognito approval is waiting on the CoE (10/19). DuckDB, Quack and SQLite aren't in the XiFin AI Standard Platform catalog. The DEV PHI-bucket policy is undecided, and so is whether LabCorp PHI files can be processed locally at all.</div></li>
+    <li><span class="id">S4</span><span class="chip open">Open</span><div>Neo4j's future. DuckDB mode still uses Neo4j for payer search. Either host Neo4j, or move payer search to <code>ref.payer_alias</code> + <code>sem.payers</code> and drop Neo4j.</div></li>
+    <li><span class="id">S5</span><span class="chip open">Open</span><div>Chat logs and telemetry: none are assumed for now, but it's undecided (see B10).</div></li>
+    <li><span class="id">S6</span><span class="chip open">Open</span><div>Diagram housekeeping: Lucid still rejects the draw.io imports, and the turn-flow SVGs still say "Payer Resolver (AI)".</div></li>
+  </ol>
+</section>
+
+<section id="plan">
+  <div class="eyebrow">06 · Build week</div>
+  <h2>Where we are on the plan</h2>
+  <div class="tblwrap">
+  <table>
+    <thead><tr><th>Day</th><th>Planned</th><th>My read of status</th></tr></thead>
+    <tbody>
+      <tr><td>Fri 10/23</td><td>Jaewon handoff · AWS diagram · finalize silver/gold · port Appeals parser and run on LCA S3 files · scope Terraform</td><td>Diagram and schemas are done. Parser port: no sign of it in this repo. Jaewon outcome: unknown to me.</td></tr>
+      <tr class="today"><td>Sat–Sun 10/24–25</td><td>Multitenancy/PHI and scale review (rate limits, queues) · cost/accuracy/safety pass · golden eval set (30–50 Qs) · OpenAI-style frontend · EDI knowledge base with admin role · semantic layer + premade queries · MVP cut line Sunday</td><td>Today. The repo was set up and the schema docs aligned with the backend design. The rest hasn't started, as far as I can see.</td></tr>
+      <tr><td>Mon 10/26</td><td>Design review · Terraform with Owen</td><td>Owen's availability is unconfirmed. S1/S2 block this.</td></tr>
+      <tr><td>Tue 10/27</td><td>Hosted and testable by EOD</td><td>—</td></tr>
+      <tr><td>Wed 10/28</td><td>Testing (Haiku swarm, eval set)</td><td>—</td></tr>
+      <tr><td>Thu 10/29</td><td>Formal deployment · demo · architecture breakdown · Confluence</td><td>Hard deadline</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="questions">
+  <div class="eyebrow">07 · Where I'm least sure</div>
+  <h2>Questions for you</h2>
+  <ol class="qs">
+    <li>Which read-side compute is real: ADR-010, ADR-011, or the EC2-embedded DuckDB on the canvas? (S1, S2)</li>
+    <li>Does <code>query_metrics</code> replace the Investigator/typed-task loop, or plug into it? (A4)</li>
+    <li>Is Lane 2 in scope for the Oct 29 MVP, or is the MVP semantic-layer only? (A5)</li>
+    <li>What did the Jaewon meeting decide about what's locked vs open to change?</li>
+    <li>Has the Appeals parser port started, and does it live in the app repo?</li>
+    <li>Does Neo4j survive into the hosted MVP? (S4)</li>
+  </ol>
+</section>
+
+<footer>Built from <code>README.md</code>, <code>memory-and-preferences.md</code>, <code>claude/schema/</code>, <code>docs/data-backend/</code>, <code>diagrams/data-backend-canvas/Main.dc.html</code> and <code>chat-notes/</code> on branch <code>claude/trusting-heisenberg-8xvazk</code> @ 88448de.</footer>
+</div>
