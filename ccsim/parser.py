@@ -48,7 +48,19 @@ def _el(e: list, i: int):
     return e[i] if len(e) > i and e[i] != "" else None
 
 
+def normalize(text: str) -> str:
+    """Delivery noise that is not part of the interchange: a UTF-8 BOM or whitespace before ISA, 80-column
+    line wrapping (CR/LF inside segments), and space / NUL padding after IEA (fixed-block transfers)."""
+    text = text.lstrip("\ufeff \t\r\n")
+    if "\n" in text[:106] or "\r" in text[:106]:
+        text = text.replace("\r", "").replace("\n", "")
+    if len(text) >= 106 and text[105] not in "\r\n":
+        text = text.replace("\r", "").replace("\n", "")
+    return text.rstrip(" \t\r\n\x00")
+
+
 def split_segments(text: str):
+    text = normalize(text)
     if not text.startswith("ISA") or len(text) < 106:
         raise ParseError("not an X12 interchange (no ISA)")
     el, rep, comp, term = text[3], text[82], text[104], text[105]
@@ -57,7 +69,7 @@ def split_segments(text: str):
     out, pos = [], 0
     for raw in text.split(term):
         lead = len(raw) - len(raw.lstrip("\r\n"))
-        seg = raw.strip("\r\n")
+        seg = raw.strip("\r\n\x00 ") if term not in " " else raw.strip("\r\n\x00")
         if seg:
             out.append((pos + lead, seg.split(el), seg))
         pos += len(raw) + 1
