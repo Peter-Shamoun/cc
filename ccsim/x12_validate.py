@@ -16,6 +16,7 @@ clearinghouse or a payer's front end would apply:
 from __future__ import annotations
 
 import sys
+from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
 
@@ -47,10 +48,15 @@ def _date_ok(v: str) -> bool:
 
 
 def tokenize(text: str):
+    text = text.lstrip("\ufeff \t\r\n")
+    if "\n" in text[:106] or "\r" in text[:106]:              # fixed-width wrapped file
+        text = text.replace("\r", "").replace("\n", "")
     if len(text) < 106 or not text.startswith("ISA"):
         raise ValueError("not an X12 interchange")
     el, rep, comp, term = text[3], text[82], text[104], text[105]
-    segs = [s.strip("\r\n") for s in text.split(term)]
+    if term not in "\r\n":
+        text = text.replace("\r", "").replace("\n", "")
+    segs = [s.strip("\r\n \x00") for s in text.split(term)]
     segs = [s for s in segs if s]
     return [s.split(el) for s in segs], el, comp, rep
 
@@ -61,19 +67,36 @@ def validate(text: str) -> list[str]:
         segs, el, comp, rep = tokenize(text)
     except ValueError as e:
         return [str(e)]
-    isa = segs[0]
-    raw_isa = text[:106]
+    if len({el, comp, rep}) != 3:
+        errs.append("delimiters are not distinct")
+    blocks, cur = [], None
+    for s in segs:
+        if s[0] == "ISA":
+            if cur is not None:
+                errs.append("ISA before the previous interchange's IEA")
+            cur = [s]
+        elif cur is None:
+            errs.append(f"segment {s[0]} outside an interchange")
+        else:
+            cur.append(s)
+            if s[0] == "IEA":
+                blocks.append(cur)
+                cur = None
+    if cur is not None:
+        errs.append("missing IEA trailer")
+    for blk in blocks:
+        errs += _check_interchange(blk, comp)
+    return errs
+
+
+def _check_interchange(segs, comp) -> list[str]:
+    errs = []
+    isa, iea = segs[0], segs[-1]
     if len(isa) != 17:
         errs.append(f"ISA has {len(isa) - 1} elements, expected 16")
-    if raw_isa[105] in (el, comp) or len(set([el, comp, rep, raw_isa[105]])) != 4:
-        errs.append("delimiters are not distinct")
-    if segs[-1][0] != "IEA":
-        errs.append("missing IEA trailer")
-        return errs
-    if segs[-1][2] != isa[13]:
+    if iea[2] != isa[13]:
         errs.append("IEA02 != ISA13")
-    groups = [s for s in segs if s[0] == "GS"]
-    if int(segs[-1][1]) != len(groups):
+    if int(iea[1]) != sum(1 for s in segs if s[0] == "GS"):
         errs.append("IEA01 != number of GS")
     i, st_start, st_count_in_gs, gs = 1, None, 0, None
     tx_segments: list[list[list[str]]] = []
@@ -116,9 +139,27 @@ def validate(text: str) -> list[str]:
 
 def _check_837(tx, comp) -> list[str]:
     errs, ids = [], set()
+    hl_rows = []
     clm, line_sum, lx_expected, has_hi = None, Decimal(0), 1, False
+    in_claim = False
+    sv1 = None
+    svd_paid, svd_cas = defaultdict(Decimal), defaultdict(Decimal)   # per other-payer id, current line
+    amt_d, svd_total = {}, defaultdict(Decimal)                      # per other payer, current claim
+    other_payer_ids = []
+    cur_svd = None
+
+    def close_line():
+        nonlocal sv1, cur_svd
+        if sv1 is not None:
+            for pid in set(svd_paid) | set(svd_cas):
+                if _dec(sv1[2]) != svd_paid[pid] + svd_cas[pid]:
+                    errs.append(f"CLM {clm[1]}: SV102 {sv1[2]} != SVD02 {svd_paid[pid]} + 2430 CAS {svd_cas[pid]} ({pid})")
+        sv1, cur_svd = None, None
+        svd_paid.clear()
+        svd_cas.clear()
 
     def close():
+        close_line()
         if clm is not None:
             if _dec(clm[2]) != line_sum:
                 errs.append(f"CLM {clm[1]}: CLM02 {clm[2]} != sum(SV102) {line_sum}")
@@ -126,24 +167,42 @@ def _check_837(tx, comp) -> list[str]:
                 errs.append(f"CLM {clm[1]}: no HI segment")
             if lx_expected == 1:
                 errs.append(f"CLM {clm[1]}: no service lines")
+            for pid, amt in amt_d.items():
+                if svd_total.get(pid, Decimal(0)) != amt:
+                    errs.append(f"CLM {clm[1]}: 2320 AMT*D {amt} != sum(SVD02) {svd_total.get(pid, 0)} for {pid}")
+    last_op, pending_amt = None, None
     for s in tx:
         sid = s[0]
         if sid == "HL":
             close()
-            clm = None
+            clm, in_claim = None, False
+            amt_d, svd_total = {}, defaultdict(Decimal)
             if s[1] in ids or (s[2] and s[2] not in ids):
                 errs.append(f"HL {s[1]}: duplicate id or unknown parent {s[2]}")
             if int(s[1]) != len(ids) + 1:
                 errs.append(f"HL ids not sequential at {s[1]}")
             ids.add(s[1])
+            hl_rows.append(s)
         elif sid == "CLM":
             close()
-            clm, line_sum, lx_expected, has_hi = s, Decimal(0), 1, False
+            clm, line_sum, lx_expected, has_hi, in_claim = s, Decimal(0), 1, False, True
+            amt_d, svd_total, last_op = {}, defaultdict(Decimal), None
             if len(s[5].split(comp)) != 3:
                 errs.append(f"CLM {s[1]}: CLM05 must be POS:B:frequency")
+        elif sid == "SBR" and in_claim:
+            if len(s) < 3 or not s[2]:
+                errs.append(f"CLM {clm[1]}: 2320 SBR02 (relationship) is required")
+            last_op, pending_amt = "pending", None
+        elif sid == "AMT" and in_claim and s[1] == "D" and last_op == "pending":
+            pending_amt = _dec(s[2])                       # 2320 AMT precedes the loop's 2330B NM1*PR
+        elif sid == "NM1" and in_claim and s[1] == "PR" and last_op == "pending":
+            last_op = s[9] if len(s) > 9 else "?"
+            if pending_amt is not None:
+                amt_d[last_op] = pending_amt
         elif sid == "HI":
             has_hi = True
         elif sid == "LX":
+            close_line()
             if int(s[1]) != lx_expected:
                 errs.append(f"CLM {clm and clm[1]}: LX {s[1]} out of order")
             lx_expected += 1
@@ -151,6 +210,13 @@ def _check_837(tx, comp) -> list[str]:
             if not s[1].startswith("HC" + comp):
                 errs.append("SV101 must start with HC")
             line_sum += _dec(s[2])
+            sv1 = s
+        elif sid == "SVD":
+            cur_svd = s[1]
+            svd_paid[cur_svd] += _dec(s[2])
+            svd_total[cur_svd] += _dec(s[2])
+        elif sid == "CAS" and cur_svd is not None:
+            svd_cas[cur_svd] += sum((_dec(s[k]) for k in range(3, len(s), 3)), Decimal(0))
         elif sid == "NM1" and s[1] == "85" and (len(s) < 10 or s[8] != "XX" or not _luhn_npi(s[9])):
             errs.append("billing provider NPI missing or fails Luhn")
         elif sid == "DTP" and s[2] == "D8" and not _date_ok(s[3]):
@@ -158,6 +224,11 @@ def _check_837(tx, comp) -> list[str]:
         elif sid == "DMG" and not _date_ok(s[2]):
             errs.append(f"bad birth date {s[2]}")
     close()
+    parents = {h[2] for h in hl_rows if h[2]}
+    for h in hl_rows:
+        has_child = h[1] in parents
+        if len(h) > 4 and h[4] in ("0", "1") and (h[4] == "1") != has_child:
+            errs.append(f"HL {h[1]}: HL04={h[4]} but it {'has' if has_child else 'has no'} child HL")
     return errs
 
 
@@ -198,6 +269,10 @@ def _check_835(tx, comp) -> list[str]:
             close_clp()
             clp = s
             clp_paid += _dec(s[4])
+            if s[2] == "4" and _dec(s[4]) != 0:
+                errs.append(f"CLP {s[1]}: status 4 (denied) with a payment {s[4]}")
+            if s[2] == "22" and (_dec(s[3]) > 0 or _dec(s[4]) > 0):
+                errs.append(f"CLP {s[1]}: reversal (22) must carry negative amounts")
         elif sid == "SVC":
             close_svc()
             svc = s
@@ -218,6 +293,8 @@ def _check_835(tx, comp) -> list[str]:
             plb_total += sum((_dec(s[k]) for k in range(4, len(s), 2)), Decimal(0))
         elif sid == "N1" and s[1] == "PE" and (len(s) < 5 or s[3] != "XX" or not _luhn_npi(s[4])):
             errs.append("payee NPI missing or fails Luhn")
+        elif sid == "DTM" and not _date_ok(s[2]):
+            errs.append(f"bad date {s[2]}")
         elif sid in ("SE",):
             close_clp()
     close_clp()

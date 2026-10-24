@@ -82,7 +82,7 @@ PAYER_BY_ID = {p.payer_id: p for p in PAYERS}
 PAYER_MIX = [30, 20, 15, 15, 10, 10]
 PLANS = {  # deductible, coinsurance, copay per claim (labs), patients billed?
     "ppo": (500, .2, 0), "hdhp": (2500, .1, 0), "hmo": (0, 0, 10), "ma": (0, 0, 0), "medicaid": (0, 0, 0)}
-SECONDARY_FOR = {"ma": ["TSM05", "AHP01"], "ppo": ["WGB06"], "hdhp": ["AHP01"], "hmo": [], "medicaid": []}
+SECONDARY_FOR = {"ppo": ["WGB06", "AHP01", "TSM05"], "hdhp": ["AHP01", "TSM05"], "hmo": [], "ma": [], "medicaid": []}
 
 
 @dataclass(frozen=True)
@@ -310,6 +310,30 @@ def interchange(style: str, sender: str, receiver: str, d: date, ctl: int, gs_co
     return "".join(s + term + nl for s in out)
 
 
+def cas_segments(cas: list) -> list[list]:
+    """CAS as payers send it: one segment per group code, up to six reason/amount triplets each."""
+    by_group: dict[str, list] = {}
+    for grp, carc, amt in cas:
+        by_group.setdefault(grp, []).append((carc, amt))
+    out = []
+    for grp, pairs in by_group.items():
+        for i in range(0, len(pairs), 6):
+            seg = ["CAS", grp]
+            for carc, amt in pairs[i:i + 6]:
+                seg += [carc, money(amt), ""]
+            out.append(seg)
+    return out
+
+
+# payer re-coding of billed procedures (panel unbundled / downcoded)
+RECODE = {"80053": "80048", "80061": "82465", "0240U": "87631", "G0480": "80307", "87798": "87797"}
+
+# RARCs that accompany each denial CARC (CARC 16 requires one)
+RARC_FOR = {"16": ["N264", "M127", "N290"], "50": ["N386", "N115"], "11": ["M76", "N386"], "167": ["N386"],
+            "197": ["N54"], "204": ["N130"], "109": ["N418"], "96": ["N130"], "4": ["M20"], "29": ["N211"],
+            "97": ["M15"], "27": ["N30"], "18": ["N111"]}
+
+
 # --- generator -------------------------------------------------------------------------------------
 def _next_business_day(d: date) -> date:
     while d.weekday() >= 5:
@@ -328,6 +352,8 @@ class Generator:
         self.rng = random.Random(sc.seed)
         self.tenant_codes = list(tenants or TENANTS)
         self.ctl = 100
+        self.plb_log: dict = {}
+        self.paid_history: dict = {}                              # (tenant, payer) -> ICNs paid in earlier 835s
 
     # people and providers
     def _person(self) -> Person:
@@ -347,8 +373,9 @@ class Generator:
                 sub, rel = pat, "18"
             covs = [Coverage(primary, f"{primary.payer_id[:2]}{r.randint(10**8, 10**9 - 1)}", f"G{r.randint(1000, 9999)}",
                              sub, rel)]
-            if SECONDARY_FOR[primary.plan] and r.random() < self.sc.p_secondary_coverage:
-                sp = PAYER_BY_ID[r.choice(SECONDARY_FOR[primary.plan])]
+            if [p for p in SECONDARY_FOR[primary.plan] if p != primary.payer_id] and r.random() < self.sc.p_secondary_coverage:
+                choices = [p for p in SECONDARY_FOR[primary.plan] if p != primary.payer_id]
+                sp = PAYER_BY_ID[r.choice(choices)]
                 covs.append(Coverage(sp, f"{sp.payer_id[:2]}{r.randint(10**8, 10**9 - 1)}", f"G{r.randint(1000, 9999)}",
                                      pat, "18"))
             out.append(Patient(i, pat, covs))
@@ -403,9 +430,9 @@ class Generator:
         x.s("NM1", "DN", "1", r.last, r.first, "", "", "", "XX", r.npi)
         if prior:                                                 # 2320 / 2330A / 2330B: the primary's adjudication
             pcov = c.patient.coverages[0]
-            x.s("SBR", "P", "18" if pcov.relationship == "18" else "", pcov.group, "", "", "", "", "", pcov.payer.sbr09)
-            for grp, carc, amt in prior["claim_cas"]:
-                x.s("CAS", grp, carc, money(amt))
+            x.s("SBR", "P", pcov.relationship, pcov.group, "", "", "", "", "", pcov.payer.sbr09)
+            for seg in cas_segments(prior["claim_cas"]):
+                x.s(*seg)
             x.s("AMT", "D", money(prior["paid"]))
             x.s("OI", "", "", "Y", "", "", "Y")
             x.s("NM1", "IL", "1", pcov.subscriber.last, pcov.subscriber.first, "", "", "", "MI", pcov.member_id)
@@ -419,8 +446,8 @@ class Generator:
                 pl = prior["lines"][i - 1]
                 x.s("SVD", c.patient.coverages[0].payer.payer_id, money(pl["paid"]), x.c("HC", l.cpt, *l.modifiers), "",
                     l.units)
-                for grp, carc, amt in pl["cas"]:
-                    x.s("CAS", grp, carc, money(amt))
+                for seg in cas_segments(pl["cas"]):
+                    x.s(*seg)
                 x.s("DTP", "573", "D8", f"{prior['date']:%Y%m%d}")
 
     def _file_837(self, t: Tenant, d: date, items: list) -> str:
@@ -447,7 +474,7 @@ class Generator:
         cov = c.patient.coverages[seq]
         payer = cov.payer
         deductible, coins, copay = PLANS[payer.plan]
-        acc_key = (c.patient.pid, payer.payer_id, d.year)
+        acc_key = (c.patient.pid, payer.payer_id, c.dos.year)
         ded_left = accum.setdefault(acc_key, deductible)
         lines, copay_left = [], copay
         deny_line = r.randrange(len(c.lines)) if outcome == "partial" else None
@@ -466,7 +493,7 @@ class Generator:
                 code = carc if i != deny_line else ("97" if l.cpt == "36415" else self._denial_carc(c, l))
                 paid, allowed = 0.0, 0.0
                 cas.append(("CO", code, l.charge))
-                rarc = r.choice(["N130", "M127", "N290", "N522"]) if outcome != "claim_level_denied" else None
+                rarc = r.choice(RARC_FOR.get(code, ["N130"])) if outcome != "claim_level_denied" else None
             elif outcome == "zero_fee":
                 paid, allowed = 0.0, 0.0
                 cas.append(("CO", "45", l.charge))
@@ -498,8 +525,10 @@ class Generator:
             e["claim_cas"] = [("CO", carc, round(sum(l.charge for l in c.lines), 2))]
             for ln in lines:
                 ln["cas"] = []
-        if outcome == "paid" and seq == 0 and r.random() < payer.svc06_rate and lines[0]["cpt"] == "80053":
-            lines[0]["adjudicated_cpt"] = "80048"                 # payer re-coded: SVC01 = paid code, SVC06 = billed
+        if outcome in ("paid", "partial") and seq == 0:
+            for ln in lines:                                      # payer re-coded: SVC01 = paid code, SVC06 = billed
+                if ln["cpt"] in RECODE and r.random() < payer.svc06_rate * 4:
+                    ln["adjudicated_cpt"] = RECODE[ln["cpt"]]
         e["no_6r"] = r.random() > payer.ref6r_rate
         e["paid"] = round(sum(ln["paid"] for ln in lines), 2)
         e["pr"] = round(sum(a for ln in lines for g, _, a in ln["cas"] if g == "PR"), 2)
@@ -552,9 +581,11 @@ class Generator:
             c: Claim = e["claim"]
             charge = round(sum(ln["charge"] for ln in e["lines"]), 2)
             x.s("CLP", c.pcn, e["status"], money(charge), money(e["paid"]), money(e["pr"]) if e["pr"] else "",
-                payer.clp06, e["icn"], "81", "1")
-            for grp, carc, amt in e["claim_cas"]:
-                x.s("CAS", grp, carc, money(amt))
+                payer.clp06, e["icn"], "81", e.get("freq", "1"))
+            for seg in cas_segments(e["claim_cas"]):
+                x.s(*seg)
+            if e["claim_level_only"] and e["claim_cas"]:                 # claim-level remark codes (MOA03..)
+                x.s("MOA", "", "", RARC_FOR.get(e["claim_cas"][0][1], ["N130"])[0])
             cov = c.patient.coverages[e["seq"]]
             p = c.patient.person
             x.s("NM1", "QC", "1", p.last, p.first, "", "", "", "MI" if cov.relationship == "18" else "", cov.member_id
@@ -571,8 +602,8 @@ class Generator:
                 x.s("SVC", adjud, money(ln["charge"]), money(ln["paid"]), "", ln["units"],
                     billed if ln["adjudicated_cpt"] != ln["cpt"] else "")
                 x.s("DTM", "472", f"{c.dos:%Y%m%d}")
-                for grp, carc, amt in ln["cas"]:
-                    x.s("CAS", grp, carc, money(amt))
+                for seg in cas_segments(ln["cas"]):
+                    x.s(*seg)
                 if not e["no_6r"]:
                     x.s("REF", "6R", f"{c.pcn}-{i}")
                 if ln["allowed"] or ln["paid"]:
@@ -651,8 +682,6 @@ class Generator:
                 led.pop("_claim", None)
         return truth
 
-    plb_log: dict = {}
-
     def _new_claim(self, t: Tenant, n: int, d: date, patients, providers) -> Claim:
         r = self.rng
         otype = r.choices(list(ORDERS), weights=[o[0] for o in ORDERS.values()])[0]
@@ -714,7 +743,7 @@ class Generator:
             name = None
         if name == "rev":
             e = add(self._adjudicate(c, 0, "paid", None, accum, pay_day), pay_day, "1")
-            later = pay_day + timedelta(days=r.randint(14, 40))
+            later = pay_day + timedelta(days=r.randint(5, 20))
             add(self._reverse(e), later, "22")
             return
         if name == "revcor":
@@ -730,7 +759,9 @@ class Generator:
             e = add(self._adjudicate(c, 0, "paid", None, accum, pay_day), pay_day, "1")
             void_day = _next_business_day(pay_day + timedelta(days=r.randint(3, 10)))
             outbox.setdefault(void_day, []).append((c, 0, "8", None, e["icn"]))
-            add(self._reverse(e), void_day + timedelta(days=r.randint(*payer.lag)), "22")
+            rv = self._reverse(e)
+            rv["freq"] = "8"
+            add(rv, void_day + timedelta(days=r.randint(3, 12)), "22")
             return
         if name == "zero":
             add(self._adjudicate(c, 0, "zero_fee", None, accum, pay_day), pay_day, "1")
@@ -751,7 +782,8 @@ class Generator:
                 outbox.setdefault(rs, []).append((c, 0, "7", None, e["icn"]))
                 fixed = self._adjudicate(c, 0, "paid", None, accum, rs)
                 fixed["icn"] = e["icn"] + "R"
-                fixed["received"] = rs
+                fixed["received"] = _next_business_day(rs + timedelta(days=1))
+                fixed["freq"] = "7"
                 add(fixed, rs + timedelta(days=r.randint(*payer.lag)), "1")
             return
         e = add(self._adjudicate(c, 0, "paid", None, accum, pay_day), pay_day, "1")
@@ -760,7 +792,8 @@ class Generator:
             outbox.setdefault(dup_day, []).append((c, 0, "1", None, None))
             dup = self._adjudicate(c, 0, "denied", "18", accum, dup_day)
             dup["icn"], dup["received"], dup["duplicate_denial"] = e["icn"] + "D", dup_day, True
-            add(dup, dup_day + timedelta(days=r.randint(*payer.lag)), "4")
+            add(dup, max(_next_business_day(pay_day) + timedelta(days=r.randint(1, 10)),
+                         dup_day + timedelta(days=r.randint(*payer.lag))), "4")
         self._maybe_secondary(c, e, pay_day, schedule, outbox, accum)
 
     def _maybe_secondary(self, c, primary_event, pay_day, schedule, outbox, accum):
@@ -768,12 +801,13 @@ class Generator:
             return
         r = self.rng
         sec_payer = c.patient.coverages[1].payer
+        pay_day = _next_business_day(pay_day)
         bill_day = _next_business_day(pay_day + timedelta(days=r.randint(2, 6)))
         prior = dict(paid=primary_event["paid"], date=pay_day, claim_cas=primary_event["claim_cas"],
                      lines=[dict(paid=ln["paid"], cas=ln["cas"]) for ln in primary_event["lines"]])
         outbox.setdefault(bill_day, []).append((c, 1, "1", prior, None))
         e = self._adjudicate(c, 1, "paid", None, accum, bill_day, prior)
-        e["received"] = bill_day
+        e["received"] = _next_business_day(bill_day + timedelta(days=1))
         e = dict(e, status="2", claim=c)
         schedule(e, bill_day + timedelta(days=r.randint(*sec_payer.lag)))
 
@@ -794,11 +828,10 @@ class Generator:
             plbs = []
             if fwd.get(payer.payer_id):
                 plbs.append(("FB", f"FWD{payer.payer_id}", fwd.pop(payer.payer_id)))   # recover last forward balance
-            if r.random() < sc.p_plb_recoupment:
-                paid = [e for e in g if e["status"] == "1" and e["paid"] > 0]
-                if paid:
-                    e = r.choice(paid)
-                    plbs.append(("WO", e["icn"], round(min(e["paid"], r.uniform(5, 40)), 2)))
+            earlier = self.paid_history.get((t.code, payer.payer_id), [])
+            if r.random() < sc.p_plb_recoupment and earlier:
+                icn, amt = r.choice(earlier)                      # overpayment found on an earlier remit
+                plbs.append(("WO", icn, round(min(amt, r.uniform(5, 40)), 2)))
             if payer.interest_rate:
                 late = [e for e in g if e["paid"] > 0 and (day - e["received"]).days > 30]
                 if late:
@@ -814,6 +847,8 @@ class Generator:
                 dict(day=str(day), payer_id=payer.payer_id, trn=trn, code=code, reference=ref, amount=amt)
                 for code, ref, amt in plbs)
             txs.append((x, bpr, trn))
+            self.paid_history.setdefault((t.code, payer.payer_id), []).extend(
+                (e["icn"], e["paid"]) for e in g if e["status"] in ("1", "2") and e["paid"] > 0)
             for e in g:
                 led = claims[e["pcn"]]["adjudications"].setdefault(e["payer_id"], dict(
                     payer_id=e["payer_id"], payer=PAYER_BY_ID[e["payer_id"]].name, seq=e["seq"],
@@ -891,7 +926,6 @@ def _finalize(claims: dict) -> dict:
 
 def generate(out_dir: str | Path, scenario: Scenario | None = None, tenants=None) -> dict:
     g = Generator(scenario or Scenario(), tenants)
-    g.plb_log = {}
     truth = g.run(out_dir)
     Path(out_dir).mkdir(parents=True, exist_ok=True)
     (Path(out_dir) / "truth.json").write_text(json.dumps(truth, indent=1, default=str))

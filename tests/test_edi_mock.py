@@ -102,6 +102,7 @@ def _sub(text, pattern, repl):
     ("835", r"^(SVC\*[^*]+\*[0-9.-]+\*)([0-9.-]+)", r"\g<1>12345", "SVC"),
     ("835", r"^(CAS\*[A-Z]{2}\*\w+\*)([0-9.-]+)", r"\g<1>0.01", "CLP"),
     ("835", r"^(N1\*PE\*[^*]+\*XX\*\d{9})\d", r"\g<1>0", "NPI"),
+    ("835", r"^(DTM\*472\*)\d{8}", r"\g<1>20260231", "bad date"),
 ])
 def test_validator_catches_each_mutation(samples, which, pattern, repl, expect):
     text = samples[0] if which == "837" else samples[1]
@@ -167,3 +168,70 @@ def test_npis_pass_luhn_and_identities_are_synthetic():
     assert all(npi_is_valid(npi(s)) for s in range(500))
     assert npi_is_valid("1234567893") and not npi_is_valid("1234567890")   # CMS's published example
     assert all(p.name.isupper() for p in edi_mock.PAYERS)
+
+
+def test_validator_status_and_cob_rules(stress):
+    out, truth = stress
+    files = list(_files(out, truth))
+    cob = next(b.decode() for _, f, b in files if f["kind"] == "837" and b"\nSVD*" in b and b[3:4] == b"*")
+    assert not validate(cob)
+    assert any("SVD02" in e for e in validate(_sub(cob, r"^(SVD\*\w+\*)([0-9.]+)", r"\g<1>99999")))
+    assert any("SBR02" in e for e in validate(_sub(cob, r"^(SBR\*P\*)(\d\d)(\*G\d+\*{6}\w+~\r?\n(?:CAS|AMT))", r"\g<1>\g<3>")))
+    rem = next(b.decode() for _, f, b in files if f["kind"] == "835" and b"\nCLP*" in b and b[3:4] == b"*"
+               and b"*4*" in b and b"\nPLB" not in b)
+    m = re.search(r"^CLP\*(\w+)\*4\*([0-9.]+)\*0\*", rem, re.M)
+    assert m
+    bad = rem.replace(m.group(0), f"CLP*{m.group(1)}*4*{m.group(2)}*5*", 1)
+    assert any("status 4" in e for e in validate(bad))
+
+
+def test_validator_and_parser_accept_delivery_noise(samples):
+    s837 = samples[0]
+    variants = {
+        "bom": "\ufeff" + s837,
+        "leading newline": "\r\n" + s837,
+        "nul padding": s837 + "\x00" * 64,
+        "space padding": s837 + " " * 80,
+        "wrapped at 80": "\n".join(s837.replace("\n", "")[i:i + 80] for i in range(0, len(s837.replace("\n", "")), 80)),
+        "two interchanges": s837 + s837.replace("000000", "000009"),
+    }
+    for name, text in variants.items():
+        assert not validate(text), (name, validate(text)[:2])
+        rows = parse_file(text, "F", "t", dict(s3_uri="x", s3_bucket="x", s3_key="x", size_bytes=1, sha256="x"), "r",
+                          datetime(2026, 1, 1))
+        assert rows["c837.claim"], name
+
+
+def test_generator_regressions_from_review(stress, tmp_path):
+    out, truth = stress
+    claims = truth["tenants"]["acme_labs"]["claims"].values()
+    # a payer is never secondary to itself
+    assert all(len(set(c["payers"])) == len(c["payers"]) for c in claims)
+    # a replacement claim's remit echoes frequency 7 (CLP09)
+    body = b"".join(b for _, f, b in _files(out, truth) if f["kind"] == "835" and f["expect"] == "parsed")
+    assert re.search(rb"CLP\*[^*~]+\*1\*[^~]*\*7~", body)
+    # secondary claims report a business-day primary adjudication date that has a primary 835
+    days = {f["day"] for _, f, _ in _files(out, truth) if f["kind"] == "835"}
+    for m in re.finditer(rb"DTP\*573\*D8\*(\d{8})", b"".join(b for _, f, b in _files(out, truth) if f["kind"] == "837")):
+        d = m.group(1).decode()
+        assert datetime.strptime(d, "%Y%m%d").weekday() < 5 and f"{d[:4]}-{d[4:6]}-{d[6:]}" in days
+    # duplicate denials always arrive after the claim's real adjudication
+    for c in claims:
+        for a in c["adjudications"].values():
+            dup = [e["date"] for e in a["events"] if e["duplicate_denial"]]
+            real = [e["date"] for e in a["events"] if not e["duplicate_denial"]]
+            assert not dup or (real and min(real) < min(dup))
+    # generator instances do not share state
+    g1, g2 = edi_mock.Generator(Scenario(days=5, volume_scale=.1)), edi_mock.Generator(Scenario(days=5, volume_scale=.1))
+    assert g1.plb_log is not g2.plb_log
+
+
+def test_default_benchmark_scenario_exercises_money_features(tmp_path):
+    """The benchmark's dataset must contain the cases its questions ask about."""
+    from bench.dataset import DEFAULT
+    t = generate(tmp_path, Scenario(**DEFAULT), ["acme_labs"])["tenants"]["acme_labs"]
+    evs = [e for c in t["claims"].values() for a in c["adjudications"].values() for e in a["events"]]
+    assert any(e["status"] == "22" and e["paid"] < 0 for e in evs), "no reversal of a paid claim"
+    assert {p["code"] for p in t["plb"]} >= {"WO", "L6"}, {p["code"] for p in t["plb"]}
+    assert any(c["voided"] for c in t["claims"].values())
+    assert any(a["seq"] == 1 and a["paid_current"] > 0 for c in t["claims"].values() for a in c["adjudications"].values())
