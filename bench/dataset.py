@@ -32,19 +32,20 @@ def dataset_id(scenario) -> str:
     return h.hexdigest()[:12]
 
 
-def snapshot(scenario=None, customer_user="ana@xifin.example", rebuild=False) -> Path:
+def snapshot(scenario=None, customer_user="ana@xifin.example", rebuild=False, cache: Path | None = None) -> Path:
     from ccsim.edi_mock import Scenario
     from ccsim.pipeline import ESCALATION, SEM_TABLES
     from ccsim.query import login, open_session
     from ccsim.world import build_world
     scenario = scenario or Scenario(**DEFAULT)
     did = dataset_id(scenario)
-    out = CACHE / did
+    cache = Path(cache or CACHE)
+    out = cache / did
     if (out / "meta.json").exists() and not rebuild:
         return out
     shutil.rmtree(out, ignore_errors=True)
     out.mkdir(parents=True)
-    w = build_world(CACHE / f"world-{did}", scenario)
+    w = build_world(cache / f"world-{did}", scenario)
     failed = [t.stopped_reason for t in w.tasks() if t.exit_code]
     if failed:
         raise RuntimeError(f"pipeline failed while building the dataset: {failed[:2]}")
@@ -52,13 +53,13 @@ def snapshot(scenario=None, customer_user="ana@xifin.example", rebuild=False) ->
     rels = [f"sem.{t}" for t in SEM_TABLES] + [f"lossless.{t.replace('.', '_')}" for t in ESCALATION]
     import pyarrow.parquet as pq
     for rel in rels:
-        pq.write_table(s.con.execute(f"SELECT * FROM {rel}").to_arrow_table(), out / f"{rel}.parquet")
+        pq.write_table(s.con.sql(f"SELECT * FROM {rel}").to_arrow_table(), out / f"{rel}.parquet")
     (out / "truth.json").write_text(json.dumps({"denial_carcs": w.truth["denial_carcs"], "customer": s.customer,
                                                 "tenant": w.truth["tenants"][s.customer]}, default=str))
     (out / "meta.json").write_text(json.dumps({"dataset_id": did, "customer": s.customer, "scenario": {
         k: str(v) for k, v in asdict(scenario).items()}, "gold_version": s.version, "relations": rels}, indent=1))
     w.aws.shutdown()
-    shutil.rmtree(CACHE / f"world-{did}", ignore_errors=True)
+    shutil.rmtree(cache / f"world-{did}", ignore_errors=True)
     return out
 
 
