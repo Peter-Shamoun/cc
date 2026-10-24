@@ -40,7 +40,8 @@ ESCALATION = {
     "c837.claim": "SELECT * FROM c837.claim",
     "c837.service_line": "SELECT * FROM c837.service_line",
     "c837.claim_code": "SELECT * FROM c837.claim_code",
-    "c837.hl": "SELECT * FROM c837.hl",
+    "c837.hl": ("SELECT * EXCLUDE (pat05_date_format, pat06_death_date, pat07_weight_unit, pat08_weight, pat09_pregnancy) "
+                "FROM c837.hl"),
     "r835.claim_payment": "SELECT * FROM r835.claim_payment",
     "r835.service_payment": "SELECT * FROM r835.service_payment",
     "r835.remark": "SELECT * FROM r835.remark",
@@ -66,10 +67,10 @@ def seed_ref(con: duckdb.DuckDBPyConnection):
     con.executemany("INSERT INTO ref.denial_carc VALUES (?, 'v3-placeholder', 'mock', DATE '2026-10-01', NULL)",
                     [[c] for c in edi_mock.DENIAL_CARCS])
     con.execute("INSERT INTO ref.tenant_setting VALUES ('status4_is_recorded_denial', 'true', 'default profile')")
-    for p in edi_mock.PAYERS:
-        for src in ("835_1000A", "837_2010BB"):
+    for p in edi_mock.PAYERS:                                 # the payer resolver's reviewed output
+        for src, name in (("837_2010BB", p.name), ("835_1000A", p.name_835 or p.name)):
             con.execute("INSERT INTO ref.payer_alias VALUES (?, ?, ?, ?, ?, ?, 'exact_id')",
-                        [src, p.payer_id, p.name, p.name.replace(" ", "_"), p.name.title(), p.payer_class])
+                        [src, p.payer_id, name, p.name.replace(" ", "_"), p.name.title(), p.payer_class])
     con.executemany("INSERT INTO ref.carc (code, description) VALUES (?, ?)", list(edi_mock.CARC_DESCRIPTIONS.items()))
     for code, cpt in edi_mock.CPTS.items():
         con.execute("INSERT INTO ref.procedure_code VALUES (?, 'CPT', ?, 'lab')", [code, cpt.description])
@@ -160,7 +161,7 @@ def parse_batch(env) -> dict:
             put(f"{c}/quarantine/{run_id}/{key.rsplit('/', 1)[-1]}", body)
             _insert(con, "edi.source_file", [dict(file_id=file_id, tenant_code=c, file_kind="UNKNOWN",
                                                   ingest_run_id=run_id, ingested_at=started, parse_status="REJECTED",
-                                                  parse_messages=f"{type(err).__name__}: {err}"[:500], **meta)])
+                                                  parse_messages=[f"{type(err).__name__}: {err}"[:500]], **meta)])
             continue
         if sha in known_sha:
             rows["edi.source_file"][0]["duplicate_of_file_id"] = known_sha[sha]
