@@ -7,7 +7,7 @@ Design work for CC, a conversational analytics agent over 837P claims and 835 re
 | Path | What it is |
 |---|---|
 | `claude/schema/` | Current data model (not loaded yet; the X12 parser isn't built): lossless EDI schema, `sem.*` semantic layer, semantic model YAML, agent tools and prompt, synthetic test. See its README. |
-| `docs/data-backend/` | Per-customer S3 layout and the per-request DuckDB read path |
+| `docs/data-backend/` | Per-customer S3 layout, the per-request DuckDB read path, and `canvas.html` (the canvas bundled into one page; rebuild with `python tools/canvas/build_canvas_page.py`) |
 | `docs/diagrams/duckdb-schema-access.excalidraw` | Sketch: semantic layer first, lossless schema only when needed |
 | `docs/plan/cc-build-week.html` | Build-week plan, Fri 10/23 - Thu 10/29 |
 | `diagrams/data-backend-canvas/` | Canonical data-backend architecture diagram (source of truth); `_blob/` holds its icons |
