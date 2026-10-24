@@ -1,0 +1,30 @@
+# STATUS: REFERENCE - prompt that produced the v0 schema research | source: chat "EDI 835/837 parquet schema" (2026-10-22)
+GOAL: Design and deliver a Parquet table schema (NOT a research report) for an agentic "analyst chatbot" that queries all claim and remittance data for one healthcare customer (Labcorp) from X12 EDI 837P (professional claims) and 835 (electronic remittance advice) files. The final output must be the schema itself: table list, columns with types, keys, relationships, partitioning, and a short, plain-language rationale for each major design decision, so the user can understand the schema and the "why" quickly. Research only to inform the design; keep any research findings brief and only where they justify a decision.
+
+CONTEXT (from the user):
+- Project is "ClaimClarity", a chat assistant at Xifin over Labcorp 835/837 data (previously explored Neo4j; DuckDB over Parquet is a likely query engine). Prior project discussions on best practices for agent analyst chatbots concluded that data schema and context are paramount.
+- The data is simple and inherently carries context: 835 and 837P labels are (semi) universal and generally mean the same thing everywhere (X12 segment/element names, CARC/RARC codes, CAS group codes, CLP status codes, etc.).
+- The agent must query efficiently and accurately. Prioritize simplicity and intuitiveness for the agent so it does not need to rely heavily on docs and does not send malformed queries (e.g., clear self-describing column names, consistent naming conventions, predictable join keys, avoiding ambiguous or overloaded columns, avoiding deeply nested types unless justified).
+- Follow best-practice standardization and atomic/normalized techniques (user suspects normalization at the right grain, e.g., file -> transaction/header -> claim -> service line -> adjustments, while considering whether some denormalized convenience views/tables help agents).
+- The schema should most likely be LOSSLESS relative to the full EDI data, unless there is a strong reason to disagree (if you disagree, explain). It should also carry some S3 provenance/lineage data (e.g., S3 bucket/key, file name, ingestion timestamp, ISA/GS/ST control numbers, raw segment references) so engineers can trace rows back to the source file.
+- Do NOT limit the schema per agent interaction; guardrails/hooks/blocks will be added later.
+- Multitenancy: this schema will be duplicated in different S3 buckets/folders per customer (one schema per customer), so design partitioning/paths with that in mind.
+
+RESEARCH TO DO (to inform the design):
+1. Best practices for designing database/table schemas for LLM text-to-SQL and agentic analytics (naming conventions, column descriptions/comments, star vs. normalized vs. wide tables, semantic layers, reducing join ambiguity, enums/code lookup tables, avoiding nested types, Parquet/DuckDB specifics, partitioning and file sizing).
+2. X12 835 (005010X221A1) and 837P (005010X222A1) structure: loops, segments, and elements; how to map them losslessly into relational tables (claims CLM, service lines SV1/LX, CLP/SVC in 835, CAS adjustments, NM1 entities, REF/DTP/AMT/QTY repeating segments, HL hierarchy, PLB provider-level adjustments, BPR/TRN payment info).
+3. Existing open-source or industry approaches to flattening 835/837 into relational/Parquet tables (e.g., CMS, Databricks/healthcare accelerators, open-source X12 parsers, tuva project, etc.) and lessons learned.
+4. How to link 837 claims to 835 remittances (patient control number CLM01 <-> CLP01, payer claim control number, line item control number REF*6R <-> 835 REF*6R, handling of reversals/corrections/multiple remits per claim).
+5. Handling repeating/generic segments losslessly (e.g., a generic long "segments" or "references/dates/amounts" table vs. typed columns) and the tradeoff for agent usability.
+6. Code lookup/reference tables (CARC, RARC, CAS group codes, claim status codes, place of service, frequency codes) to give agents context.
+
+DELIVERABLE FORMAT:
+- Start with a one-paragraph summary of the overall design approach.
+- An entity-relationship overview (text diagram is fine) showing tables and how they join.
+- For each table: name, grain (one row = ?), primary key, foreign keys, partition columns, and columns with type and a one-line description (including source X12 loop/segment/element reference).
+- Separate clearly: core lossless tables, provenance/lineage tables/columns, reference/code lookup tables, and any optional agent-friendly convenience views (and say whether those views should be physical or views).
+- Naming conventions and type conventions used.
+- S3 folder layout for multitenancy (per-customer prefix) and partitioning strategy.
+- A short "Key decisions and why" section (bulleted, plain language), including whether to be fully lossless and how raw segments are preserved.
+- A few example natural-language questions and the SQL an agent would write against the schema, to demonstrate intuitiveness.
+Keep it concise and practical; it is a design doc for a schema, not a literature review.

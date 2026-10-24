@@ -1,0 +1,200 @@
+<!-- STATUS: CURRENT (plan) - active plan Fri 10/23 - Thu 10/29; goes stale after the 10/29 ship date | source: chat "Build guide and project calendar" (2026-10-23) | live artifact https://claude.ai/code/artifact/5ed1ed5b-d18e-4ea7-9345-7112ed83b03e -->
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>ClaimClarity Build Week</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Hanken+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one column of day blocks, each a checklist; sticky summary bar with overall progress and blockers. */
+:root{
+  --bg:#f5f7f8; --surface:#ffffff; --fg:#17212b; --muted:#5d6b78; --line:#dde3e8;
+  --accent:#0d6e78; --accent-soft:#d8eef0; --added:#7a4fb8; --added-soft:#efe7fa;
+  --block:#b3402a; --block-soft:#fbe6e1; --done:#2f7d4a;
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --body:"Hanken Grotesk",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1519; --surface:#161f25; --fg:#e4eaee; --muted:#93a3b0; --line:#26323b;
+  --accent:#4cc2cd; --accent-soft:#163338; --added:#b99af0; --added-soft:#2a2140;
+  --block:#f08a72; --block-soft:#3a1f19; --done:#6fcf8f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1519; --surface:#161f25; --fg:#e4eaee; --muted:#93a3b0; --line:#26323b;
+  --accent:#4cc2cd; --accent-soft:#163338; --added:#b99af0; --added-soft:#2a2140;
+  --block:#f08a72; --block-soft:#3a1f19; --done:#6fcf8f; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.wrap{max-width:860px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 64px;display:grid;gap:28px}
+header h1{font-family:var(--display);font-size:clamp(28px,5vw,40px);line-height:1.1;margin:0;text-wrap:balance;letter-spacing:-.01em}
+header p{margin:8px 0 0;color:var(--muted);max-width:62ch}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 16px;display:grid;gap:8px}
+.bar-row{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;justify-content:space-between}
+.bar strong{font-family:var(--display);font-size:20px}
+.meta{font-family:var(--mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.track{height:8px;background:var(--line);border-radius:99px;overflow:hidden}
+.fill{height:100%;background:var(--accent);width:0;transition:width .3s}
+.legend{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:12.5px;color:var(--muted)}
+.chip{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:4px;white-space:nowrap}
+.chip.added{background:var(--added-soft);color:var(--added)}
+.chip.block{background:var(--block-soft);color:var(--block)}
+.chip.moved{background:var(--accent-soft);color:var(--accent)}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.filters button{font:500 13px var(--body);border:1px solid var(--line);background:transparent;color:var(--fg);padding:4px 10px;border-radius:99px;cursor:pointer}
+.filters button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.filters button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.callout{border-left:3px solid var(--block);background:var(--surface);padding:14px 16px;border-radius:0 8px 8px 0}
+.callout h2{font-family:var(--display);font-size:17px;margin:0 0 6px}
+.callout ul{margin:0;padding-left:18px;display:grid;gap:4px}
+.day{display:grid;gap:10px}
+.day-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;border-bottom:2px solid var(--fg);padding-bottom:6px}
+.day-head h2{font-family:var(--display);font-size:22px;margin:0}
+.day-head .theme{color:var(--muted);flex:1;min-width:0}
+.today .day-head{border-color:var(--accent)}
+.today .day-head h2::after{content:"Today";font:500 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;background:var(--accent);color:var(--bg);padding:2px 7px;border-radius:4px;margin-left:10px;vertical-align:middle}
+.off{opacity:.6}
+.slot{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:6px}
+ul.tasks{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.task{display:grid;grid-template-columns:22px 1fr;gap:10px;padding:8px 10px;border-radius:8px}
+.task:hover{background:var(--surface)}
+.task input{width:18px;height:18px;margin:2px 0 0;accent-color:var(--accent);cursor:pointer}
+.task label{cursor:pointer;min-width:0}
+.task .t{display:inline}
+.task .chips{display:inline-flex;gap:5px;margin-left:6px;vertical-align:1px}
+.task .why{display:block;color:var(--muted);font-size:13.5px;margin-top:2px}
+.task.done .t{text-decoration:line-through;color:var(--muted)}
+.task.done .why{display:none}
+footer{color:var(--muted);font-size:13px}
+@media (prefers-reduced-motion:reduce){.fill{transition:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>ClaimClarity Build Week</h1>
+    <p>Fri Oct 23 → Thu Oct 29. Thursday is the real deadline: Friday the 30th is off and the 31st is a Saturday. Items tagged <span class="chip added">added</span> are gaps I filled in; <span class="chip moved">moved</span> means I pulled your item earlier.</p>
+  </header>
+
+  <div class="bar" role="region" aria-label="Progress">
+    <div class="bar-row">
+      <strong id="pct">0%</strong>
+      <span class="meta" id="count">0 of 0 done</span>
+      <span class="meta" id="blk">0 blockers open</span>
+    </div>
+    <div class="track"><div class="fill" id="fill"></div></div>
+    <div class="bar-row">
+      <div class="filters" role="group" aria-label="Show">
+        <button id="f-all" aria-pressed="true" data-f="all">All</button>
+        <button id="f-open" aria-pressed="false" data-f="open">Open</button>
+        <button id="f-block" aria-pressed="false" data-f="block">Blockers</button>
+        <button id="f-added" aria-pressed="false" data-f="added">Added</button>
+      </div>
+      <button id="reset" class="meta" style="background:none;border:0;cursor:pointer;text-decoration:underline">Clear checks</button>
+    </div>
+  </div>
+
+  <section class="callout">
+    <h2>What could sink Mon–Tue hosting</h2>
+    <ul>
+      <li>Cognito approval, the DuckDB/SQLite catalog question, and the DEV PHI-bucket policy are still open. Each takes days, so they need to be in motion today.</li>
+      <li>DuckDB mode still calls Neo4j for payer search. Either host Neo4j or move payer search onto <code>ref.payer_alias</code> + <code>sem.payers</code> before Monday.</li>
+      <li>ADR-010 (EC2) and ADR-011 (Fargate) conflict. Terraform written before that call gets rewritten.</li>
+      <li>No baseline eval set exists, so "accuracy improved" and Wednesday's swarm test have nothing to compare against.</li>
+    </ul>
+  </section>
+
+  <div id="days"></div>
+
+  <footer>Checks are saved in this browser only.</footer>
+</div>
+
+<script>
+const PLAN=[
+ {id:"fri",date:"2026-10-23",name:"Fri Oct 23",theme:"Plan, parse, unblock",slots:[
+  {slot:"Now",tasks:[
+   ["fri-jw","Message Jaewon and book time today (or Monday morning at latest)","His answers decide what's locked vs open, so it shapes the schema freeze and terraform scope.",["moved","block"]],
+   ["fri-owen","Confirm Owen for Mon–Tue and book Monday's design review","Hosting in two days only works if his time is already on the calendar.",["added","block"]],
+   ["fri-gov","Chase governance: Cognito (CoE 10/19), DuckDB/SQLite catalog exception, DEV PHI-bucket policy","Approvals run on other people's clocks.",["added","block"]]]},
+  {slot:"Lunch · planning",tasks:[
+   ["fri-diag","Prepare AWS data diagram (overview + zoom-ins)","",[]],
+   ["fri-schema","Finalize silver (lossless) and gold (semantic_layer) schemas","",[]],
+   ["fri-ref","Load ref.denial_carc with the 23 reviewed CARCs; seed ref.tenant_setting","The test data uses placeholder CARCs, so every denial number is wrong until this is loaded.",["added"]]]},
+  {slot:"Afternoon",tasks:[
+   ["fri-phi","Confirm where you may run LabCorp files locally","Pulling PHI to a laptop may break policy; a dev box inside the PHI account may be required.",["added","block"]],
+   ["fri-parse","Port the Appeals parser; parse LCA S3 files into silver and gold","",[]],
+   ["fri-rt","Byte-level round-trip: re-emit one file from edi.segment and diff","Cheapest proof the lossless claim holds.",["added"]],
+   ["fri-dup","Re-run the full load; confirm the 8,294 duplicate keys are gone","This failure is what started the schema redesign.",["added"]],
+   ["fri-meet","Meet Jaewon: status, his pre-handoff todo, what stakeholders and Sharon liked or didn't, MVP vs improve","",[]],
+   ["fri-adr","Settle ADR-010 vs ADR-011","Decides EC2 vs Fargate for the read side.",["added","block"]],
+   ["fri-neo","Decide Neo4j: host it, or move payer search to ref.payer_alias","",["added","block"]],
+   ["fri-tf","Scope each AWS component; start terraform per role/service","",[]],
+   ["fri-local","Local clone of the architecture to validate logic","LocalStack for S3/EventBridge plus the parser container gets you most of the way.",[]]]}]},
+ {id:"sat",date:"2026-10-24",name:"Sat Oct 24",theme:"Research and hardening",slots:[{slot:"",tasks:[
+   ["sat-mt","Review multitenancy patterns with PHI boundaries","",[]],
+   ["sat-scale","Scale design: per-user/tenant throttling, queue for long queries, DuckDB memory and thread caps, query timeouts","",[]],
+   ["sat-eval","Build a golden eval set (30–50 questions with expected answers) and score the current agent","Start from verified_requests. This is the baseline for accuracy and for Wednesday.",["added"]],
+   ["sat-cost","Cost plan: prompt caching on system prompt + semantic model, Haiku for simple asks, per-turn token budget, cost logged per turn","",["added"]],
+   ["sat-safe","Safety plan: PHI-free logs, audit trail, cross-tenant read test that must fail, SQL guard on the escape hatch","",["added"]]]}]},
+ {id:"sun",date:"2026-10-25",name:"Sun Oct 25",theme:"Improvements",slots:[{slot:"",tasks:[
+   ["sun-jw","Apply Jaewon-approved changes to the agent architecture","",[]],
+   ["sun-sem","Wire the agent to query_metrics over sem.* with verified requests as examples","",[]],
+   ["sun-fe","Frontend: text, clarifying questions, markdown tables, charts, CSV download","Pick which ship Thursday; the rest go on the later list.",[]],
+   ["sun-kb","Knowledge base scope: EDI-wide docs only, admin-only write role","",[]],
+   ["sun-cut","Write the MVP cut line and freeze scope","Anything past the line moves to the post-launch list.",["added"]],
+   ["sun-eval2","Re-run the eval set on the improved agent","",["added"]]]}]},
+ {id:"mon",date:"2026-10-26",name:"Mon Oct 26",theme:"Review and provision",slots:[{slot:"",tasks:[
+   ["mon-prep","Prep for questions and pushback","",[]],
+   ["mon-rev","Design review of the full backend; iterate","",[]],
+   ["mon-auth","Pin down auth scope: Cognito + Entra, user-to-customer mapping","",[]],
+   ["mon-tf","Terraform apply with Owen: S3/KMS/IAM, EventBridge, Fargate parser","",[]]]}]},
+ {id:"tue",date:"2026-10-27",name:"Tue Oct 27",theme:"Hosted and testable by EOD",slots:[{slot:"",tasks:[
+   ["tue-host","Finish hosting: agent service, login, per-request scoped DuckDB creds","",[]],
+   ["tue-e2e","End-to-end run in dev on LabCorp data","",[]],
+   ["tue-obs","Observability: structured logs, cost per turn, error alarms","",["added"]]]}]},
+ {id:"wed",date:"2026-10-28",name:"Wed Oct 28",theme:"Test",slots:[{slot:"",tasks:[
+   ["wed-eval","Run the golden eval against the hosted build","",["added"]],
+   ["wed-swarm","Haiku swarm: concurrency load, prompt-injection attempts, cross-tenant probes","",[]],
+   ["wed-fix","Fix top failures and re-run","",[]]]}]},
+ {id:"thu",date:"2026-10-29",name:"Thu Oct 29",theme:"Ship",slots:[{slot:"",tasks:[
+   ["thu-dep","Formal deployment and sign-off","",[]],
+   ["thu-demo","Demo","",[]],
+   ["thu-doc","Confluence: architecture breakdown, runbook, updated ADRs, how to onboard a new customer","",[]],
+   ["thu-gaps","Publish known gaps: 277CA/999, COB detail, payer_alias coverage, heuristic line matching","",["added"]]]}]},
+ {id:"fri2",date:"2026-10-30",name:"Fri Oct 30",theme:"Off",off:true,slots:[]}
+];
+const KEY="cc-build-week";
+let done={};try{done=JSON.parse(localStorage.getItem(KEY)||"{}")}catch(e){done={}}
+let filter="all";
+const today=new Date();const todayStr=today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
+const chipText={added:"added",block:"blocker",moved:"moved"};
+function save(){try{localStorage.setItem(KEY,JSON.stringify(done))}catch(e){}}
+function render(){
+ const root=document.getElementById("days");root.innerHTML="";
+ let total=0,n=0,blk=0;
+ PLAN.forEach(d=>{
+  const sec=document.createElement("section");sec.className="day"+(d.date===todayStr?" today":"")+(d.off?" off":"");
+  let dt=0,dn=0;d.slots.forEach(s=>s.tasks.forEach(t=>{dt++;if(done[t[0]])dn++}));
+  sec.innerHTML=`<div class="day-head"><h2>${d.name}</h2><span class="theme">${d.theme}</span>${dt?`<span class="meta">${dn}/${dt}</span>`:""}</div>`;
+  d.slots.forEach(s=>{
+   const vis=s.tasks.filter(t=>filter==="all"||(filter==="open"&&!done[t[0]])||(filter==="block"&&t[3].includes("block"))||(filter==="added"&&t[3].includes("added")));
+   if(!vis.length)return;
+   if(s.slot){const h=document.createElement("div");h.className="slot";h.textContent=s.slot;sec.appendChild(h)}
+   const ul=document.createElement("ul");ul.className="tasks";
+   vis.forEach(([id,text,why,tags])=>{
+    const li=document.createElement("li");li.className="task"+(done[id]?" done":"");
+    li.innerHTML=`<input type="checkbox" id="${id}" ${done[id]?"checked":""}><label for="${id}"><span class="t">${text}</span><span class="chips">${tags.map(g=>`<span class="chip ${g}">${chipText[g]}</span>`).join("")}</span>${why?`<span class="why">${why}</span>`:""}</label>`;
+    li.querySelector("input").addEventListener("change",e=>{done[id]=e.target.checked;save();render()});
+    ul.appendChild(li)});
+   sec.appendChild(ul)});
+  root.appendChild(sec)});
+ PLAN.forEach(d=>d.slots.forEach(s=>s.tasks.forEach(t=>{total++;if(done[t[0]])n++;else if(t[3].includes("block"))blk++})));
+ const p=total?Math.round(n/total*100):0;
+ document.getElementById("pct").textContent=p+"%";
+ document.getElementById("count").textContent=`${n} of ${total} done`;
+ document.getElementById("blk").textContent=`${blk} blocker${blk===1?"":"s"} open`;
+ document.getElementById("fill").style.width=p+"%";
+}
+document.querySelectorAll(".filters button").forEach(b=>b.addEventListener("click",()=>{filter=b.dataset.f;document.querySelectorAll(".filters button").forEach(x=>x.setAttribute("aria-pressed",x===b));render()}));
+document.getElementById("reset").addEventListener("click",function(){if(this.dataset.armed){done={};save();render();this.textContent="Clear checks";delete this.dataset.armed}else{this.dataset.armed="1";this.textContent="Click again to clear"}});
+render();
+</script>
+
+</body></html>

@@ -1,0 +1,424 @@
+# STATUS: CURRENT (design) - metrics/dimensions/verified requests for the semantic layer | source: project knowledge file (added 2026-10-22)
+# =============================================================================
+# ClaimClarity semantic model — the ONLY thing the agent needs to read.
+# The compiler (04_agent_interface.py) turns {metrics, dimensions, filters}
+# into SQL over the `sem` views. The agent never picks a view or writes a join:
+# each metric declares which views can compute it, and the compiler picks the
+# first view (in `view_preference` order) that has every requested metric,
+# dimension and filter column.
+# =============================================================================
+version: 1
+min_group_size_default: 20        # applied to rate metrics when grouping (override per call)
+
+view_preference:                  # coarsest grain first
+  - sem.remit_claims
+  - sem.claims
+  - sem.payments
+  - sem.remit_lines
+  - sem.claim_lines
+  - sem.adjustments
+  - sem.remarks
+  - sem.provider_adjustments
+  - sem.diagnoses
+  - sem.payers
+
+views:
+  sem.remit_claims:
+    grain: one 835 claim adjudication event (CLP). Reversals and superseded events are rows too.
+    default_filter: "is_current_adjudication"        # metrics see the CURRENT state unless overridden
+    use_for: denial / payment / status questions at the claim level, by payer or time
+  sem.remit_lines:
+    grain: one 835 service line (SVC) with its claim's context
+    default_filter: "is_current_adjudication"
+    use_for: anything by procedure code / modifier on the remittance side
+  sem.claims:
+    grain: one 837P claim submission (CLM); is_latest_submission gives one row per claim_key
+    default_filter: "is_latest_submission"
+    use_for: billing volume, charges, remit coverage, lag from submission to payment
+  sem.claim_lines:
+    grain: one 837P service line, with matched primary 835 line outcome
+    default_filter: "is_latest_submission"
+    use_for: billed procedure mix, line-level remit coverage
+  sem.adjustments:
+    grain: one CAS group/reason/amount on an 835 (claim or line level)
+    default_filter: "is_current_adjudication"
+    use_for: CARC / group code analysis, why money was not paid
+  sem.remarks:
+    grain: one RARC on an 835 claim or line
+    default_filter: "is_current_adjudication"
+  sem.payments:
+    grain: one 835 payment (check / EFT / advice)
+  sem.provider_adjustments:
+    grain: one PLB reason/amount pair (recoupments, interest, offsets)
+  sem.diagnoses:
+    grain: one ICD-10 code on one 837P claim submission
+    default_filter: "is_latest_submission"
+  sem.payers:
+    grain: one canonical payer (lookup dimension)
+
+# -----------------------------------------------------------------------------
+# METRICS — name -> {description, unit, kind, per-view expression}
+# kind: count | sum | avg | ratio. Ratios reference other metrics.
+# -----------------------------------------------------------------------------
+metrics:
+  # ---- remittance: claim outcomes --------------------------------------------
+  remitted_claims:
+    description: Claims with a current 835 adjudication. One claim = one patient control number as adjudicated by one payer.
+    unit: claims
+    kind: count
+    views:
+      sem.remit_claims: "COUNT(DISTINCT claim_payer_key)"
+      sem.remit_lines:  "COUNT(DISTINCT claim_payer_key)"
+      sem.adjustments:  "COUNT(DISTINCT claim_key || '|' || payer_key)"
+  denied_claims:
+    description: Remitted claims that are denied (recorded denial CLP02=4, or denial signal v3).
+    unit: claims
+    kind: count
+    views:
+      sem.remit_claims: "COUNT(DISTINCT claim_payer_key) FILTER (WHERE is_denied)"
+      sem.remit_lines:  "COUNT(DISTINCT claim_payer_key) FILTER (WHERE claim_is_denied)"
+  denial_rate:
+    description: denied_claims / remitted_claims. When grouped by procedure, a claim counts toward every procedure on it.
+    unit: percent
+    kind: ratio
+    numerator: denied_claims
+    denominator: remitted_claims
+    min_group_size_on: remitted_claims
+  recorded_denial_claims:
+    description: Remitted claims with CLP02 = 4 (payer explicitly denied the claim).
+    unit: claims
+    kind: count
+    views:
+      sem.remit_claims: "COUNT(DISTINCT claim_payer_key) FILTER (WHERE is_denied_recorded)"
+  signal_denial_claims:
+    description: Remitted claims caught only by denial signal v3 ($0 paid + CO CAS with a reviewed denial CARC).
+    unit: claims
+    kind: count
+    views:
+      sem.remit_claims: "COUNT(DISTINCT claim_payer_key) FILTER (WHERE is_denied_signal_v3)"
+  paid_amount:
+    description: Dollars paid by payers (CLP04 at claim level; SVC03 at line level).
+    unit: usd
+    kind: sum
+    views:
+      sem.remit_claims: "SUM(paid_amount)"
+      sem.remit_lines:  "SUM(line_paid_amount)"
+      sem.claims:       "SUM(remit_paid_amount)"
+      sem.claim_lines:  "SUM(line_paid_amount)"
+  remitted_charge_amount:
+    description: Billed charges as reported on the 835 (CLP03 / SVC02).
+    unit: usd
+    kind: sum
+    views:
+      sem.remit_claims: "SUM(charge_amount)"
+      sem.remit_lines:  "SUM(line_charge_amount)"
+  payment_to_charge_ratio:
+    description: paid_amount / remitted_charge_amount.
+    unit: percent
+    kind: ratio
+    numerator: paid_amount
+    denominator: remitted_charge_amount
+  patient_responsibility_amount:
+    description: Patient responsibility (CLP05 / PR-group adjustments).
+    unit: usd
+    kind: sum
+    views:
+      sem.remit_claims: "SUM(patient_responsibility_amount)"
+      sem.remit_lines:  "SUM(line_pr_amount)"
+  contractual_adjustment_amount:
+    description: CO-group adjustments (provider write-off / contractual).
+    unit: usd
+    kind: sum
+    views:
+      sem.remit_claims: "SUM(co_amount)"
+      sem.remit_lines:  "SUM(line_co_amount)"
+  avg_paid_per_claim:
+    description: paid_amount / remitted_claims.
+    unit: usd
+    kind: ratio
+    numerator: paid_amount
+    denominator: remitted_claims
+  reversal_events:
+    description: Count of reversal (CLP02=22) events. Ignores the current-state filter.
+    unit: events
+    kind: count
+    override_default_filter: true
+    views:
+      sem.remit_claims: "COUNT(*) FILTER (WHERE is_reversal)"
+
+  # ---- remittance: lines -----------------------------------------------------
+  remitted_lines:
+    description: 835 service lines on current adjudications.
+    unit: lines
+    kind: count
+    views:
+      sem.remit_lines: "COUNT(*)"
+  denied_lines:
+    description: Lines paid $0 with a CO denial CARC, or lines on a denied claim.
+    unit: lines
+    kind: count
+    views:
+      sem.remit_lines: "COUNT(*) FILTER (WHERE line_is_denied)"
+  line_denial_rate:
+    description: denied_lines / remitted_lines.
+    unit: percent
+    kind: ratio
+    numerator: denied_lines
+    denominator: remitted_lines
+    min_group_size_on: remitted_lines
+  allowed_amount:
+    description: Payer allowed amount (835 AMT*B6, line level; NULL when the payer omits it).
+    unit: usd
+    kind: sum
+    views:
+      sem.remit_lines: "SUM(line_allowed_amount)"
+      sem.claim_lines: "SUM(line_allowed_amount)"
+  avg_paid_per_line:
+    description: paid_amount / remitted_lines.
+    unit: usd
+    kind: ratio
+    numerator: paid_amount
+    denominator: remitted_lines
+  payer_changed_procedure_lines:
+    description: Lines where the payer adjudicated a different procedure than submitted (SVC06 present).
+    unit: lines
+    kind: count
+    views:
+      sem.remit_lines: "COUNT(*) FILTER (WHERE procedure_changed_by_payer)"
+
+  # ---- submissions (837P) ----------------------------------------------------
+  submitted_claims:
+    description: Distinct claims submitted on 837P (latest submission per patient control number).
+    unit: claims
+    kind: count
+    views:
+      sem.claims:      "COUNT(DISTINCT claim_key)"
+      sem.claim_lines: "COUNT(DISTINCT claim_key)"
+      sem.diagnoses:   "COUNT(DISTINCT claim_key)"
+  billed_charge_amount:
+    description: Billed charges on the 837P (CLM02 / SV102).
+    unit: usd
+    kind: sum
+    views:
+      sem.claims:      "SUM(charge_amount)"
+      sem.claim_lines: "SUM(line_charge_amount)"
+  claims_with_remit:
+    description: Submitted claims that have at least one 835 event.
+    unit: claims
+    kind: count
+    views:
+      sem.claims: "COUNT(DISTINCT claim_key) FILTER (WHERE has_remit)"
+  remit_coverage_rate:
+    description: claims_with_remit / submitted_claims — how much of the 837 volume has an 835.
+    unit: percent
+    kind: ratio
+    numerator: claims_with_remit
+    denominator: submitted_claims
+  submitted_denied_claims:
+    description: Submitted claims whose primary current adjudication is denied.
+    unit: claims
+    kind: count
+    views:
+      sem.claims: "COUNT(DISTINCT claim_key) FILTER (WHERE is_denied)"
+  avg_days_to_first_remit:
+    description: Average days from 837 submission (BHT04) to the first 835 payment date.
+    unit: days
+    kind: avg
+    views:
+      sem.claims: "AVG(days_submission_to_first_remit)"
+  billed_lines:
+    description: 837P service lines.
+    unit: lines
+    kind: count
+    views:
+      sem.claim_lines: "COUNT(*)"
+  line_remit_coverage_rate:
+    description: Share of billed lines matched to an 835 line.
+    unit: percent
+    kind: avg
+    views:
+      sem.claim_lines: "AVG(CASE WHEN has_line_remit THEN 1.0 ELSE 0.0 END)"
+  resubmitted_claims:
+    description: Claims submitted more than once (replacements, corrections, duplicates).
+    unit: claims
+    kind: count
+    views:
+      sem.claims: "COUNT(DISTINCT claim_key) FILTER (WHERE submission_count > 1)"
+
+  # ---- adjustments & remarks -------------------------------------------------
+  adjustment_amount:
+    description: Sum of CAS adjustment dollars.
+    unit: usd
+    kind: sum
+    views:
+      sem.adjustments: "SUM(adjustment_amount)"
+  adjustment_count:
+    description: Number of CAS reason/amount pairs.
+    unit: adjustments
+    kind: count
+    views:
+      sem.adjustments: "COUNT(*)"
+  claims_with_adjustment:
+    description: Distinct remitted claims carrying the adjustment(s) in scope.
+    unit: claims
+    kind: count
+    views:
+      sem.adjustments: "COUNT(DISTINCT claim_key || '|' || payer_key)"
+  claims_with_remark:
+    description: Distinct remitted claims carrying the remark code(s) in scope.
+    unit: claims
+    kind: count
+    views:
+      sem.remarks: "COUNT(DISTINCT claim_key || '|' || payer_key)"
+  remark_count:
+    description: Number of remark code occurrences.
+    unit: remarks
+    kind: count
+    views:
+      sem.remarks: "COUNT(*)"
+
+  # ---- payments & PLB --------------------------------------------------------
+  payment_count:
+    description: 835 payments (checks / EFTs / advices).
+    unit: payments
+    kind: count
+    views:
+      sem.payments: "COUNT(*)"
+  total_payment_amount:
+    description: Total check/EFT dollars (BPR02).
+    unit: usd
+    kind: sum
+    views:
+      sem.payments: "SUM(total_payment_amount)"
+  unbalanced_payments:
+    description: Payments where BPR02 != sum(CLP04) - sum(PLB). Data-quality signal.
+    unit: payments
+    kind: count
+    views:
+      sem.payments: "COUNT(*) FILTER (WHERE NOT is_balanced)"
+  provider_adjustment_amount:
+    description: PLB dollars (positive = taken back / withheld).
+    unit: usd
+    kind: sum
+    views:
+      sem.provider_adjustments: "SUM(provider_adjustment_amount)"
+      sem.payments:             "SUM(provider_adjustment_amount)"
+
+# -----------------------------------------------------------------------------
+# DIMENSIONS — names are column names; the compiler checks which views have them.
+# searchable: lookup_values can fuzzy-match free text to real values.
+# -----------------------------------------------------------------------------
+dimensions:
+  payer_name:            {description: Canonical payer name (resolved across 837 and 835), searchable: true}
+  payer_key:             {description: Canonical payer id}
+  payer_class:           {description: Medicare / Medicaid / Commercial / MA / Blues / Other}
+  payer_sequence:        {description: primary / secondary / tertiary / unknown (from CLP02)}
+  claim_status:          {description: 835 claim status (CLP02 description), searchable: true}
+  claim_status_code:     {description: 835 CLP02 code}
+  adjudication_state:    {description: current / superseded / reversal}
+  is_denied:             {description: Claim denied (recorded or signal v3), type: boolean}
+  is_current_adjudication: {description: Latest non-reversed 835 event for the claim+payer, type: boolean}
+  is_reversal:           {description: CLP02 = 22, type: boolean}
+  is_latest_submission:  {description: Latest 837 submission for the claim key, type: boolean}
+  filing_indicator:      {description: Claim filing indicator (MB Medicare B, MC Medicaid, CI commercial, BL Blues, HM HMO, ...)}
+  frequency:             {description: 837 claim frequency (original / replacement / void)}
+  procedure_code:        {description: CPT/HCPCS as SUBMITTED (835 SVC06 else SVC01; 837 SV101-2), searchable: true}
+  adjudicated_procedure_code: {description: Procedure the payer adjudicated (835 SVC01)}
+  modifier_1:            {description: First procedure modifier}
+  procedure_changed_by_payer: {description: Payer adjudicated a different code than submitted, type: boolean}
+  revenue_code:          {description: Revenue code (rare on professional)}
+  place_of_service:      {description: Place of service code (81 = independent lab)}
+  principal_diagnosis_code: {description: ICD-10 principal diagnosis (no decimal), searchable: true}
+  diagnosis_code:        {description: Any ICD-10 code on the claim (sem.diagnoses), searchable: true}
+  billing_npi:           {description: Billing provider NPI}
+  billing_provider_name: {description: Billing provider name, searchable: true}
+  rendering_npi:         {description: Rendering provider NPI}
+  referring_npi:         {description: Referring/ordering provider NPI}
+  group_code:            {description: CAS group (CO / PR / OA / PI)}
+  carc_code:             {description: Claim Adjustment Reason Code, searchable: true}
+  carc_description:      {description: CARC description, searchable: true}
+  carc_category:         {description: Our CARC grouping (eligibility, auth, coding, medical necessity, timely filing, duplicate, ...)}
+  is_denial_carc:        {description: CARC is on the reviewed denial list, type: boolean}
+  adjustment_level:      {description: CLAIM or LINE}
+  remark_code:           {description: RARC, searchable: true}
+  remark_description:    {description: RARC description, searchable: true}
+  plb_reason_code:       {description: PLB reason (WO overpayment recovery, L6 interest, FB forward balance, ...)}
+  plb_reason_description: {description: PLB reason description}
+  payment_method:        {description: ACH / CHK / NON / ...}
+  check_or_eft_number:   {description: TRN02 trace number}
+  line_is_denied:        {description: Service line denied, type: boolean}
+  has_remit:             {description: 837 claim has any 835, type: boolean}
+  has_line_remit:        {description: 837 line matched to an 835 line, type: boolean}
+  claim_key:             {description: Patient control number (CLM01 = CLP01). Use only for drill-down, never for grouping.}
+
+time_dimensions:
+  payment_date:    {description: BPR16 effective date of the payment, grains: [day, week, month, quarter, year]}
+  payment_month:   {description: Month of payment date}
+  service_date_from: {description: First date of service on the claim, grains: [day, week, month, quarter, year]}
+  service_date:    {description: Line date of service (DTP*472 / DTM*472), grains: [day, week, month, quarter, year]}
+  service_month:   {description: Month of (first) date of service}
+  submission_date: {description: 837 BHT04 creation date, grains: [day, week, month, quarter, year]}
+  submission_month: {description: Month of 837 submission}
+
+# -----------------------------------------------------------------------------
+# GLOSSARY — maps user vocabulary to model vocabulary (put in the system prompt)
+# -----------------------------------------------------------------------------
+glossary:
+  "CPT / code / test / procedure": procedure_code
+  "denied / rejected by payer / zero-pay denial": is_denied (rejections at the clearinghouse/277CA are NOT in this data)
+  "remitted / adjudicated / processed / came back": has a current 835 adjudication
+  "collected / reimbursed / paid": paid_amount
+  "write-off / contractual": contractual_adjustment_amount (CO group)
+  "patient owes / copay / deductible / coinsurance": patient_responsibility_amount (PR group; CARC 1 deductible, 2 coinsurance, 3 copay)
+  "reason code / CARC / denial reason": carc_code + carc_description in sem.adjustments
+  "remark / RARC / N-code / M-code / MA-code": remark_code in sem.remarks
+  "recoupment / takeback / offset / interest": sem.provider_adjustments (PLB)
+  "lag / turnaround / days to pay": avg_days_to_first_remit
+  "volume / how many claims did they send": submitted_claims
+
+# -----------------------------------------------------------------------------
+# VERIFIED REQUESTS — question -> exact query_metrics call that is known-correct.
+# Retrieved by similarity and shown to the agent as few-shot examples.
+# -----------------------------------------------------------------------------
+verified_requests:
+  - question: Which CPT codes have the highest denial rate, among codes with at least 20 remitted claims?
+    call: {metrics: [denial_rate, denied_claims, remitted_claims], group_by: [procedure_code],
+           min_group_size: 20, order_by: [{field: denial_rate, direction: desc}], limit: 15}
+  - question: What is the overall denial rate by payer?
+    call: {metrics: [denial_rate, denied_claims, remitted_claims], group_by: [payer_name],
+           order_by: [{field: denied_claims, direction: desc}], limit: 25}
+  - question: How has the denial rate trended by month?
+    call: {metrics: [denial_rate, remitted_claims], group_by: [payment_month],
+           order_by: [{field: payment_month, direction: asc}]}
+  - question: What are the top denial reasons?
+    call: {metrics: [claims_with_adjustment, adjustment_amount], group_by: [carc_code, carc_description],
+           filters: [{field: group_code, op: "=", value: CO}, {field: is_denial_carc, op: "=", value: true}],
+           order_by: [{field: claims_with_adjustment, direction: desc}], limit: 15}
+  - question: Top denial reasons for CPT 87798 at a given payer
+    call: {metrics: [claims_with_adjustment], group_by: [carc_code, carc_description],
+           filters: [{field: procedure_code, op: "=", value: "87798"}, {field: payer_name, op: "=", value: "<resolved via lookup_values>"},
+                     {field: group_code, op: "=", value: CO}],
+           order_by: [{field: claims_with_adjustment, direction: desc}], limit: 10}
+  - question: How much did each payer pay last quarter, and what share of charges is that?
+    call: {metrics: [paid_amount, remitted_charge_amount, payment_to_charge_ratio], group_by: [payer_name],
+           time_range: {field: payment_date, preset: last_quarter},
+           order_by: [{field: paid_amount, direction: desc}]}
+  - question: What share of submitted claims never got a remit?
+    call: {metrics: [submitted_claims, claims_with_remit, remit_coverage_rate]}
+  - question: Average days from submission to payment by payer
+    call: {metrics: [avg_days_to_first_remit, submitted_claims], group_by: [payer_name], min_group_size: 20,
+           order_by: [{field: avg_days_to_first_remit, direction: desc}]}
+  - question: Which remark codes appear most on denied lines?
+    call: {metrics: [claims_with_remark, remark_count], group_by: [remark_code, remark_description],
+           order_by: [{field: claims_with_remark, direction: desc}], limit: 15}
+  - question: How much money was recouped through provider-level adjustments, by reason?
+    call: {metrics: [provider_adjustment_amount], group_by: [plb_reason_code, plb_reason_description],
+           order_by: [{field: provider_adjustment_amount, direction: desc}]}
+  - question: What procedures does this customer bill most?
+    call: {metrics: [billed_lines, submitted_claims, billed_charge_amount], group_by: [procedure_code],
+           order_by: [{field: billed_lines, direction: desc}], limit: 20}
+  - question: Line-level denial rate by procedure and modifier
+    call: {metrics: [line_denial_rate, denied_lines, remitted_lines], group_by: [procedure_code, modifier_1],
+           min_group_size: 20, order_by: [{field: line_denial_rate, direction: desc}], limit: 20}
+  - question: How many claims were reversed per month?
+    call: {metrics: [reversal_events], group_by: [payment_month], order_by: [{field: payment_month, direction: asc}]}

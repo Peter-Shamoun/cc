@@ -1,0 +1,23 @@
+// STATUS: CURRENT (design) - canonical data-backend architecture diagram (live canvas); source of truth for the backend design | source: chat "Data pipeline plan and diagram" (2026-10-23) | live artifact https://claude.ai/code/artifact/dc225769-cd93-4ddd-a752-c4a5967fa994
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "Main.dc.html": {"h": 1700, "title": "Overview · end to end", "w": 2460, "x": 0, "y": 0},
+    "Z00-Storage.dc.html": {"h": 880, "title": "00 · Storage & isolation", "w": 1600, "x": 0, "y": 2300},
+    "Z01-Trigger.dc.html": {"h": 1030, "title": "01 · Ingestion & parse", "w": 1900, "x": 1680, "y": 2300},
+    "Z02-Login.dc.html": {"h": 600, "title": "02 · Login & customer mapping", "w": 1720, "x": 0, "y": 3930},
+    "Z03-Query.dc.html": {"h": 800, "title": "03 · Query path", "w": 1900, "x": 1800, "y": 3930}
+  },
+  "createdOnFiles": {"at": "2026-10-23T16:00:00Z", "v": 1},
+  "designSystems": [],
+  "launch": {"view": "canvas"},
+  "notes": {
+    "ov": {"kind": "title1", "maxW": 2460, "text": "ClaimClarity data backend", "w": 240, "x": 0, "y": -300},
+    "rz": {"kind": "title1", "maxW": 3700, "text": "Read path · zoom-ins", "w": 240, "x": 0, "y": 3630},
+    "wz": {"kind": "title1", "maxW": 3580, "text": "Write path · zoom-ins", "w": 240, "x": 0, "y": 2000}
+  },
+  "order": ["Main.dc.html", "Z00-Storage.dc.html", "Z01-Trigger.dc.html", "Z02-Login.dc.html", "Z03-Query.dc.html"],
+  "pages": [],
+  "title": "ClaimClarity Data Backend"
+}

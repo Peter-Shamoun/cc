@@ -1,0 +1,279 @@
+<!-- STATUS: LEGACY - rejected file-shaped 9-table subset; replaced by claude/schema/* | source: chat "EDI 835/837 parquet schema" (2026-10-22) | FLAG: Turn 13: full rewrite of the schema page as the 9-table version (adds remit_adjustment and remit_batch_adjustment) -->
+<title>ClaimClarity Schema v1</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: reference manual — sticky table index on the left, sections + table cards on the right; one column on phones. */
+:root{
+  --bg:#f6f8f9; --surface:#ffffff; --sunk:#eef2f4; --fg:#16232b; --muted:#56656f; --line:#d6dee3;
+  --accent:#0d5e78;
+  --c-file:#6a7480; --c-837:#2457a6; --c-835:#1d7a4f; --c-adj:#a8640c;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"Instrument Sans", "Segoe UI", system-ui, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0f161b; --surface:#152028; --sunk:#1b2831; --fg:#e3eaee; --muted:#93a3ad; --line:#2a3943;
+  --accent:#5fb6d3; --c-file:#9aa4ae; --c-837:#7aa6ec; --c-835:#5fc493; --c-adj:#e3a457; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0f161b; --surface:#152028; --sunk:#1b2831; --fg:#e3eaee; --muted:#93a3ad; --line:#2a3943;
+  --accent:#5fb6d3; --c-file:#9aa4ae; --c-837:#7aa6ec; --c-835:#5fc493; --c-adj:#e3a457; color-scheme:dark }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:15px/1.6 var(--body);margin:0}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:32px 64px}
+h1,h2,h3{font-family:var(--display);line-height:1.15;text-wrap:balance;margin:0}
+h1{font-size:clamp(28px,4.5vw,42px);letter-spacing:-.01em}
+h2{font-size:24px}
+code,.mono{font-family:var(--mono);font-size:.86em}
+p{margin:0;max-width:72ch}
+.eyebrow{font:500 12px/1 var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+header.top{display:grid;gap:14px;padding-bottom:28px;border-bottom:1px solid var(--line);margin-bottom:28px}
+.lede{font-size:17px}
+.layout{display:grid;grid-template-columns:210px minmax(0,1fr);gap:40px;align-items:start}
+nav.idx{position:sticky;top:calc(env(safe-area-inset-top, 0px) + 16px);display:grid;gap:14px;font-size:13px}
+nav.idx .grp{display:grid;gap:2px}
+nav.idx .grp > span{font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:2px}
+nav.idx a{font-family:var(--mono);font-size:12.5px;text-decoration:none;color:var(--fg);padding:2px 6px;border-radius:4px}
+nav.idx a:hover{background:var(--sunk)}
+nav.idx a:focus-visible{outline:2px solid var(--accent)}
+main{display:grid;gap:48px;min-width:0}
+section{display:grid;gap:14px;min-width:0}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.diagram{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px;overflow-x:auto}
+.diagram pre{margin:0;font:13px/1.6 var(--mono);color:var(--fg)}
+.tree b{font-weight:500}
+.tree .f{color:var(--c-file)} .tree .a{color:var(--c-837)} .tree .b{color:var(--c-835)} .tree .k{color:var(--c-adj)} .tree .m{color:var(--muted)}
+.levels{overflow-x:auto}
+.conv{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px}
+.conv div{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;display:grid;gap:4px;font-size:14px}
+.conv code{color:var(--accent);font-weight:500}
+.tcard{background:var(--surface);border:1px solid var(--line);border-radius:8px;scroll-margin-top:16px;min-width:0}
+.tcard header{padding:14px 16px;display:grid;gap:8px;border-bottom:1px solid var(--line)}
+.tname{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:baseline}
+.tname h3{font-family:var(--mono);font-size:18px;font-weight:500}
+.badge{font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;padding:3px 8px;border-radius:4px;color:var(--c);border:1px solid var(--c)}
+.grain{font-size:14.5px}
+.why{font-size:13.5px;color:var(--muted)}
+.cols{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th{text-align:left;font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:8px 12px;background:var(--sunk);white-space:nowrap}
+td{padding:6px 12px;border-top:1px solid var(--line);vertical-align:top}
+td.c{font-family:var(--mono);font-size:12.5px;white-space:nowrap}
+td.t{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap}
+td.x{font-family:var(--mono);font-size:11.5px;color:var(--accent);white-space:nowrap}
+tr.sub td{background:var(--sunk);font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:5px 12px}
+.key{font:500 10px var(--mono);margin-left:6px;color:var(--accent)}
+.dec{display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px;padding:12px 0;border-top:1px solid var(--line)}
+.dec b{font-weight:600}
+pre.sql{margin:0;background:var(--sunk);border:1px solid var(--line);border-radius:6px;padding:12px 14px;overflow-x:auto;font:12.5px/1.55 var(--mono)}
+.q{display:grid;gap:8px}
+.q p{font-weight:600}
+ul.plain{margin:0;padding-left:20px;display:grid;gap:6px}
+@media (max-width:860px){
+  .layout{grid-template-columns:minmax(0,1fr)}
+  nav.idx{display:none}
+  .dec{grid-template-columns:minmax(0,1fr);gap:4px}
+}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div class="eyebrow">ClaimClarity · Labcorp · 837P + 835 · one copy per tenant</div>
+  <h1>ClaimClarity Schema v1</h1>
+  <p class="lede">Nine tables that follow the files' own shape: file, batch, claim, service line on each side, plus two adjustment tables on the 835 side. The 837 and 835 sides are built the same way, every join is a straight parent-to-child chain, and each claim and remit row points to its exact segments in the parsed file so nothing is lost.</p>
+</header>
+
+<div class="layout">
+<nav class="idx" aria-label="Contents">
+  <div class="grp"><span>Overview</span><a href="#shape">Shape</a><a href="#conventions">Conventions</a></div>
+  <div class="grp"><span>Tables</span><div id="navt" style="display:grid;gap:2px"></div></div>
+  <div class="grp"><span>Reference</span><a href="#decisions">Decisions</a><a href="#examples">Example SQL</a><a href="#s3">S3 layout</a></div>
+</nav>
+
+<main>
+<section id="shape">
+  <h2>The whole schema</h2>
+  <div class="diagram tree"><pre><b class="f">file</b>                                <span class="m">one per S3 object</span>
+ │
+ ├── <b class="a">claim_batch</b>                     <span class="m">837: one per payer in the file</span>
+ │    └── <b class="a">claim</b>                      <span class="m">one per CLM</span>
+ │         └── <b class="a">claim_service_line</b>     <span class="m">one per SV1</span>
+ │
+ └── <b class="b">remit_batch</b>                     <span class="m">835: one per check / EFT</span>
+      ├── <b class="k">remit_batch_adjustment</b>     <span class="m">one per PLB reason   (why the check ≠ sum of claims)</span>
+      └── <b class="b">remit</b>                      <span class="m">one per CLP          ── claim_id              → claim</span>
+           ├── <b class="k">remit_adjustment</b>       <span class="m">one per CAS reason   (why a claim or line was paid less)</span>
+           └── <b class="b">remit_service_line</b>     <span class="m">one per SVC          ── claim_service_line_id → claim_service_line</span></pre></div>
+  <div class="levels"><table>
+    <thead><tr><th>Level</th><th>837 side</th><th>835 side</th><th>Answers</th></tr></thead>
+    <tbody>
+      <tr><td>File</td><td class="c">file</td><td class="c">file</td><td>Did we receive and parse it?</td></tr>
+      <tr><td>Batch</td><td class="c">claim_batch</td><td class="c">remit_batch</td><td>What did Aetna pay on EFT 123? Does it tie out?</td></tr>
+      <tr><td>Claim</td><td class="c">claim</td><td class="c">remit</td><td>What happened to claim LC123?</td></tr>
+      <tr><td>Line</td><td class="c">claim_service_line</td><td class="c">remit_service_line</td><td>What do we get paid for 80053?</td></tr>
+      <tr><td>Reason</td><td>—</td><td class="c">remit_adjustment<br>remit_batch_adjustment</td><td>Why wasn't it paid? Why is the deposit short?</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="conventions">
+  <h2>Conventions</h2>
+  <div class="conv">
+    <div><code>&lt;table&gt;_id</code><span>Primary key, generated by the pipeline. The same name is used as the foreign key, so <span class="mono">JOIN … USING (remit_id)</span> works.</span></div>
+    <div><code>patient_control_number</code><span>CLM01 on the 837 and CLP01 on the 835. Same name on both sides.</span></div>
+    <div><code>_amount</code><span>DECIMAL(18,2), signed as sent. Reversals are negative, so <span class="mono">SUM(paid_amount)</span> nets them. Positive adjustment amounts mean less money paid.</span></div>
+    <div><code>copied columns</code><span>payer_name, payment_date and trace_number are copied down from the batch so most questions skip a join.</span></div>
+    <div><code>VARCHAR[]</code><span>Only for short repeats: diagnoses, modifiers, remark codes. Filter with <span class="mono">list_contains(col, 'X')</span>.</span></div>
+    <div><code>start_index / end_index</code><span>Where the row sits in the parsed file (<span class="mono">file.parsed_s3_uri</span>). Anything not in a column can be read from there.</span></div>
+  </div>
+</section>
+
+<div id="tables" style="display:grid;gap:22px"></div>
+
+<section id="decisions">
+  <h2>Decisions and why</h2>
+  <div id="dec"></div>
+</section>
+
+<section id="examples">
+  <h2>What the agent writes</h2>
+  <p>Most questions touch one or two tables.</p>
+  <div id="ex" style="display:grid;gap:22px"></div>
+</section>
+
+<section id="s3">
+  <h2>S3 layout per tenant</h2>
+  <div class="diagram"><pre>s3://xifin-claimclarity-&lt;env&gt;/tenants/labcorp/
+  landing/                       original 837 / 835 files (immutable)
+  parsed/                        parsed copies that start_index / end_index point into
+  warehouse/v1/
+    file/
+    claim_batch/  claim/  claim_service_line/            partitioned by submitted_month
+    remit_batch/  remit/  remit_service_line/
+    remit_adjustment/  remit_batch_adjustment/           partitioned by payment_month
+  catalog.duckdb                 COMMENT ON for every column; only sees this tenant's prefix</pre></div>
+  <p>Each customer gets the same tree under its own prefix, with access scoped to it. Child tables carry the parent's month column so one date filter prunes the whole join.</p>
+</section>
+</main>
+</div>
+</div>
+
+<script>
+const COL = {file:"--c-file", c837:"--c-837", c835:"--c-835", adj:"--c-adj"};
+const LBL = {file:"Source", c837:"837P", c835:"835", adj:"835 · reasons"};
+// rows: [name, type, x12, meaning, keyTag] | ["#", section label]
+const T = [
+{n:"file",k:"file",grain:"One row per file received in S3.",
+ why:"Idempotency and parse status. Engineers start here; the agent rarely needs it.",
+ cols:[["file_id","BIGINT","","","PK"],["s3_uri","VARCHAR","","original file; unique, doubles as idempotency key"],["parsed_s3_uri","VARCHAR","","parsed copy that start_index / end_index point into"],["file_type","VARCHAR","ST01","'837' or '835'"],["interchange_control_number","VARCHAR","ISA13",""],["uploaded_at","TIMESTAMP","","when it appeared in S3"],["parsed_at","TIMESTAMP","",""],["is_parsed","BOOLEAN","","true when parsing succeeded"],["error_message","VARCHAR","","null on success"]]},
+
+{n:"claim_batch",k:"c837",grain:"One row per payer within an 837 file.",
+ why:"Groups the claims in a file by destination payer, the same way your remit batches group payments.",
+ cols:[["claim_batch_id","BIGINT","","","PK"],["file_id","BIGINT","","→ file","FK"],["payer_name","VARCHAR","2010BB NM103",""],["payer_id","VARCHAR","2010BB NM109",""],["payer_secondary_id","VARCHAR","REF*2U",""],["submitted_date","DATE","BHT04","file creation date"],["claim_count","INTEGER","",""],["total_charge_amount","DECIMAL(18,2)","","sum of claim.charge_amount"],["submitted_month","VARCHAR","","partition, YYYY-MM"]]},
+
+{n:"claim",k:"c837",grain:"One row per claim (CLM01) in a batch. A resubmitted claim is a new row.",
+ why:"Provider, subscriber and patient details sit above the claim in the 837; they are copied onto it so the agent never walks that hierarchy.",
+ cols:[["claim_id","BIGINT","","","PK"],["claim_batch_id","BIGINT","","→ claim_batch","FK"],
+ ["#","Identity"],["patient_control_number","VARCHAR","CLM01","Labcorp's claim number; = remit.patient_control_number"],["claim_frequency_code","VARCHAR","CLM05-3","1 original, 7 replacement, 8 void"],["original_payer_claim_number","VARCHAR","REF*F8","payer ICN being replaced or voided"],
+ ["#","Money & dates"],["charge_amount","DECIMAL(18,2)","CLM02","total billed"],["submitted_date","DATE","BHT04",""],["service_start_date","DATE","DTP*472","earliest line"],["service_end_date","DATE","DTP*472","latest line"],
+ ["#","Payer"],["payer_name","VARCHAR","","copied from claim_batch"],["payer_responsibility_code","VARCHAR","SBR01","P primary, S secondary, T tertiary"],["claim_filing_indicator_code","VARCHAR","SBR09","MB Medicare, MC Medicaid, CI commercial…"],
+ ["#","Providers"],["billing_provider_npi","VARCHAR","2010AA NM109",""],["billing_provider_name","VARCHAR","2010AA NM103",""],["billing_provider_tax_id","VARCHAR","REF*EI",""],["rendering_provider_npi","VARCHAR","2310B NM109",""],["referring_provider_npi","VARCHAR","2310A NM109","ordering physician on most lab claims"],
+ ["#","Patient (PHI)"],["patient_member_id","VARCHAR","2010BA NM109",""],["patient_last_name","VARCHAR","NM103",""],["patient_first_name","VARCHAR","NM104",""],["patient_birth_date","DATE","DMG02",""],["patient_gender_code","VARCHAR","DMG03",""],
+ ["#","Clinical"],["place_of_service_code","VARCHAR","CLM05-1",""],["principal_diagnosis_code","VARCHAR","HI01","ICD-10, no decimal"],["diagnosis_codes","VARCHAR[]","HI","all diagnoses, in order"],["prior_authorization_number","VARCHAR","REF*G1",""],["clia_number","VARCHAR","REF*X4","lab CLIA certificate"],["service_line_count","INTEGER","",""],
+ ["#","Source"],["start_index","INTEGER","","start of this claim in the parsed file"],["end_index","INTEGER","","end of this claim"],["submitted_month","VARCHAR","","partition"]]},
+
+{n:"claim_service_line",k:"c837",grain:"One row per service line (LX / SV1) on a claim.",why:"",
+ cols:[["claim_service_line_id","BIGINT","","","PK"],["claim_id","BIGINT","","→ claim","FK"],["line_number","INTEGER","LX01",""],["procedure_code","VARCHAR","SV101-2","CPT / HCPCS"],["procedure_modifiers","VARCHAR[]","SV101-3..6",""],["charge_amount","DECIMAL(18,2)","SV102",""],["unit_count","DECIMAL(15,3)","SV104",""],["service_date","DATE","DTP*472",""],["diagnosis_codes","VARCHAR[]","SV107","pointers resolved to the actual codes"],["place_of_service_code","VARCHAR","SV105","null = same as claim"],["line_item_control_number","VARCHAR","REF*6R","comes back on the 835 when sent"],["ndc_code","VARCHAR","LIN03",""],["rendering_provider_npi","VARCHAR","2420A NM109","null = same as claim"],["ordering_provider_npi","VARCHAR","2420E NM109",""],["submitted_month","VARCHAR","","partition"]]},
+
+{n:"remit_batch",k:"c835",grain:"One row per check or EFT on an 835 (one BPR / TRN).",
+ why:"This is what hits the bank, so deposit reconciliation lives here.",
+ cols:[["remit_batch_id","BIGINT","","","PK"],["file_id","BIGINT","","→ file","FK"],["payer_name","VARCHAR","N1*PR N102",""],["payer_id","VARCHAR","N1*PR N104",""],["payer_secondary_id","VARCHAR","REF*2U",""],["payer_tax_id","VARCHAR","TRN03",""],["payee_name","VARCHAR","N1*PE N102",""],["payee_npi","VARCHAR","N1*PE N104",""],["trace_number","VARCHAR","TRN02","check or EFT number; matches the bank deposit"],["payment_date","DATE","BPR16",""],["payment_amount","DECIMAL(18,2)","BPR02","what was actually paid"],["payment_method_code","VARCHAR","BPR04","ACH, CHK, NON…"],["claim_paid_total","DECIMAL(18,2)","","sum of remit.paid_amount"],["batch_adjustment_total","DECIMAL(18,2)","","sum of remit_batch_adjustment.amount"],["is_balanced","BOOLEAN","","claim_paid_total − batch_adjustment_total = payment_amount"],["start_index","INTEGER","",""],["end_index","INTEGER","",""],["payment_month","VARCHAR","","partition"]]},
+
+{n:"remit",k:"c835",grain:"One row per claim payment (CLP) in a batch. A reversal and its correction are two rows.",
+ why:"claim_id is the matched 837 claim, filled at ingest. This replaces the candidate table.",
+ cols:[["remit_id","BIGINT","","","PK"],["remit_batch_id","BIGINT","","→ remit_batch","FK"],["claim_id","BIGINT","","→ matched claim; null if none found","FK"],["match_method","VARCHAR","","pcn_charge, pcn_only, or icn"],
+ ["#","Identity & status"],["patient_control_number","VARCHAR","CLP01","= claim.patient_control_number"],["payer_claim_number","VARCHAR","CLP07","payer ICN; used for appeals"],["status_code","VARCHAR","CLP02","1 primary, 2 secondary, 4 denied, 22 reversal…"],["is_reversal","BOOLEAN","CLP02 = 22",""],["claim_frequency_code","VARCHAR","CLP09",""],
+ ["#","Money"],["charge_amount","DECIMAL(18,2)","CLP03","negative on reversals"],["paid_amount","DECIMAL(18,2)","CLP04",""],["patient_responsibility_amount","DECIMAL(18,2)","CLP05",""],["interest_amount","DECIMAL(18,2)","AMT*I",""],
+ ["#","Context"],["payer_name","VARCHAR","","copied from remit_batch"],["payment_date","DATE","","copied from remit_batch"],["trace_number","VARCHAR","","copied from remit_batch"],["claim_filing_indicator_code","VARCHAR","CLP06",""],["payer_received_date","DATE","DTM*050",""],["patient_member_id","VARCHAR","NM1*QC NM109","PHI"],["patient_last_name","VARCHAR","NM1*QC NM103","PHI"],["rendering_provider_npi","VARCHAR","NM1*82 NM109",""],["crossover_payer_name","VARCHAR","NM1*TT","claim forwarded to this payer"],["remark_codes","VARCHAR[]","MOA","claim-level RARCs"],
+ ["#","Source"],["start_index","INTEGER","",""],["end_index","INTEGER","",""],["payment_month","VARCHAR","","partition"]]},
+
+{n:"remit_service_line",k:"c835",grain:"One row per service line payment (SVC) on a remit.",
+ why:"Keeps the code the payer paid and the code Labcorp billed, so recoding is visible.",
+ cols:[["remit_service_line_id","BIGINT","","","PK"],["remit_id","BIGINT","","→ remit","FK"],["claim_service_line_id","BIGINT","","→ matched claim_service_line; null if none","FK"],["procedure_code","VARCHAR","SVC01-2","as paid"],["procedure_modifiers","VARCHAR[]","SVC01-3..6",""],["billed_procedure_code","VARCHAR","SVC06-2","set only when the payer changed the code"],["charge_amount","DECIMAL(18,2)","SVC02",""],["allowed_amount","DECIMAL(18,2)","AMT*B6",""],["paid_amount","DECIMAL(18,2)","SVC03",""],["unit_count","DECIMAL(15,3)","SVC05",""],["service_date","DATE","DTM*472",""],["line_item_control_number","VARCHAR","REF*6R","= claim_service_line.line_item_control_number"],["remark_codes","VARCHAR[]","LQ*HE","line-level RARCs"],["payment_month","VARCHAR","","partition"]]},
+
+{n:"remit_adjustment",k:"adj",grain:"One row per CAS reason on a claim or service line.",
+ why:"Why a claim or line was paid less than billed. Claim-level and line-level reasons share one table so 'all adjustments on this claim' is one query: remit_id is always set, remit_service_line_id only for line-level rows.",
+ cols:[["remit_adjustment_id","BIGINT","","","PK"],["remit_id","BIGINT","","→ remit; always set","FK"],["remit_service_line_id","BIGINT","","→ remit_service_line; null for claim-level","FK"],["adjustment_level","VARCHAR","","'claim' or 'line'"],["group_code","VARCHAR","CAS01","CO contractual, PR patient, OA other, PI payer"],["reason_code","VARCHAR","CAS02/05/08…","CARC"],["reason_description","VARCHAR","","CARC text, filled at load"],["amount","DECIMAL(18,2)","CAS03/06/09…","positive = less money paid"],["quantity","DECIMAL(15,3)","CAS04/07/10…",""],["procedure_code","VARCHAR","","copied from the line, for line-level rows"],["payer_name","VARCHAR","","copied"],["payment_date","DATE","","copied"],["payment_month","VARCHAR","","partition"]]},
+
+{n:"remit_batch_adjustment",k:"adj",grain:"One row per PLB reason on a check or EFT.",
+ why:"Why the deposit differs from the sum of claim payments: recoupments, interest, forwarding balances. Different parent and code list from CAS, so a separate table.",
+ cols:[["remit_batch_adjustment_id","BIGINT","","","PK"],["remit_batch_id","BIGINT","","→ remit_batch","FK"],["reason_code","VARCHAR","PLB03-1","WO overpayment recovery, L6 interest, FB forwarding balance…"],["reason_description","VARCHAR","","filled at load"],["reference_id","VARCHAR","PLB03-2","often the claim being recouped"],["patient_control_number","VARCHAR","","parsed from reference_id when possible"],["amount","DECIMAL(18,2)","PLB04","positive = less money paid"],["fiscal_period_date","DATE","PLB02",""],["trace_number","VARCHAR","","copied"],["payment_month","VARCHAR","","partition"]]}
+];
+
+const DEC = [
+ ["Same shape on both sides","file → batch → claim → line on the 837 and on the 835. Once the agent learns one side it knows the other."],
+ ["Two adjustment tables","CAS explains a claim or line; PLB explains a check. They have different parents and different code lists, so mixing them would mislead the agent."],
+ ["Match stored on the remit","remit.claim_id and remit_service_line.claim_service_line_id are set at ingest: PCN + matching charge first, then PCN alone, then ICN for corrected claims. match_method records which."],
+ ["Reversals stay as rows","A reversal is a negative remit row, so SUM(paid_amount) for a claim gives what actually settled."],
+ ["Indexes for everything else","start_index / end_index keep the schema lossless. If a field not in a column gets asked for often, promote it."],
+ ["Descriptions loaded with the data","CARC and PLB reason text is written onto adjustment rows at load, so the agent doesn't need a lookup table to explain a denial."],
+ ["No audit columns","The Oracle AUD_USER / AUD_DT / AUD_REC_ID columns don't carry over to Parquet; file.parsed_at covers load time. Add them back if house rules require it."]
+];
+
+const EX = [
+ ["Top denial reasons by dollars for UnitedHealthcare last quarter (not patient responsibility).",
+`SELECT group_code, reason_code, reason_description, SUM(amount) AS dollars
+FROM remit_adjustment
+WHERE group_code <> 'PR'
+  AND payer_name ILIKE '%UNITED%'
+  AND payment_date BETWEEN DATE '2026-07-01' AND DATE '2026-09-30'
+GROUP BY ALL ORDER BY dollars DESC LIMIT 10;`],
+ ["What happened to claim LC12345678?",
+`SELECT c.submitted_date, c.charge_amount, r.payment_date, r.status_code,
+       r.paid_amount, r.patient_responsibility_amount, r.payer_claim_number
+FROM claim c LEFT JOIN remit r USING (claim_id)
+WHERE c.patient_control_number = 'LC12345678'
+ORDER BY c.submitted_date, r.payment_date;`],
+ ["Average allowed and paid for CPT 80053 by payer.",
+`SELECT r.payer_name, COUNT(*) AS lines,
+       AVG(l.allowed_amount) AS avg_allowed, AVG(l.paid_amount) AS avg_paid
+FROM remit_service_line l JOIN remit r USING (remit_id)
+WHERE l.procedure_code = '80053' AND NOT r.is_reversal
+GROUP BY ALL ORDER BY lines DESC;`],
+ ["Claims older than 45 days with no remittance.",
+`SELECT c.patient_control_number, c.payer_name, c.submitted_date, c.charge_amount
+FROM claim c
+WHERE NOT EXISTS (SELECT 1 FROM remit r WHERE r.claim_id = c.claim_id)
+  AND c.claim_frequency_code <> '8'
+  AND c.submitted_date < current_date - INTERVAL 45 DAY;`],
+ ["Why doesn't EFT 1234567890 match the deposit?",
+`SELECT payment_amount, claim_paid_total, batch_adjustment_total, is_balanced
+FROM remit_batch WHERE trace_number = '1234567890';
+
+SELECT reason_code, reason_description, reference_id, amount
+FROM remit_batch_adjustment WHERE trace_number = '1234567890';`],
+ ["(Engineer) Where is this remit in the source file?",
+`SELECT f.s3_uri, f.parsed_s3_uri, r.start_index, r.end_index
+FROM remit r
+JOIN remit_batch b USING (remit_batch_id)
+JOIN file f USING (file_id)
+WHERE r.remit_id = :id;`]
+];
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+document.getElementById("navt").innerHTML = T.map(t=>`<a href="#t-${t.n}"><span class="dot" style="background:var(${COL[t.k]})"></span>${t.n}</a>`).join("");
+document.getElementById("tables").innerHTML = T.map(t => `<article class="tcard" id="t-${t.n}">
+  <header>
+    <div class="tname"><h3>${t.n}</h3><span class="badge" style="--c:var(${COL[t.k]})">${LBL[t.k]}</span></div>
+    <p class="grain">${esc(t.grain)}</p>
+    ${t.why?`<p class="why">${esc(t.why)}</p>`:""}
+  </header>
+  <div class="cols"><table><thead><tr><th>Column</th><th>Type</th><th>X12</th><th>Meaning</th></tr></thead><tbody>
+  ${t.cols.map(c => c[0]==="#" ? `<tr class="sub"><td colspan="4">${esc(c[1])}</td></tr>`
+    : `<tr><td class="c">${esc(c[0])}${c[4]?`<span class="key">${c[4]}</span>`:""}</td><td class="t">${esc(c[1])}</td><td class="x">${esc(c[2])}</td><td>${esc(c[3])}</td></tr>`).join("")}
+  </tbody></table></div>
+</article>`).join("");
+document.getElementById("dec").innerHTML = DEC.map(d=>`<div class="dec"><b>${esc(d[0])}</b><p>${esc(d[1])}</p></div>`).join("");
+document.getElementById("ex").innerHTML = EX.map(e=>`<div class="q"><p>${esc(e[0])}</p><pre class="sql">${esc(e[1])}</pre></div>`).join("");
+</script>
