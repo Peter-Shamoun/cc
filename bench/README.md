@@ -25,11 +25,16 @@ python -m bench.eval calibrate                       # LLM-judge agreement on kn
 2. **Expected answer.** Each question has gold SQL, and most also have a `ledger` function. The ledger
    function computes the answer from the generator's own decisions (`truth.json`), with no parser or SQL
    involved.
-3. **Deterministic match** (`compare.py`), done first. The expected columns must map one-to-one onto
-   candidate columns, in any order and under any names (extra columns are fine). Rows must match as a
-   multiset, numbers within a per-question tolerance. Order is checked only for ranking questions, and
-   `topn` accepts any valid top-N when there are ties at the cut-off. Per question, a rate may be given as
-   a percentage and a credit may be given as a positive amount.
+3. **Deterministic match** (`compare.py`), done first:
+   - Columns match by value, not by name. Every numeric column the agent returns must correspond to an
+     expected column, so an answer that lists several alternative numbers fails. Extra label columns are fine.
+   - Measures must keep the expected column order, so two counts can't be swapped.
+   - Rows must match as a multiset within a per-question tolerance. Order is checked only for ranking
+     questions, and `topn` accepts any valid top-N when there are ties at the cut-off.
+   - Columns a question marks optional (e.g. a supporting count) may be left out. A rate may be given
+     as a percentage only in the columns the question declares, and consistently for the whole column.
+   - The matcher is deliberately strict about extra numbers. A helpful extra column is left for the judge
+     to accept.
 4. **LLM judge**, only when `--judge` is set and the matcher said no. This follows the OpenAI data-agent
    method. The judge sees the question, the glossary, both SQL queries and both results, and returns a
    verdict and an error type. `calibrate` measures how often it agrees with the known labels, and that
@@ -38,14 +43,20 @@ python -m bench.eval calibrate                       # LLM-judge agreement on kn
 
 ### Why the benchmark can be trusted (`selftest`)
 
-`selftest` runs three checks:
+`selftest` passes only if all of these hold:
 - every gold query equals its ledger answer
 - every `alt_sql` (a different-looking correct query) is accepted
-- every `wrong_sql` (a plausible mistake, e.g. "every $0 payment is a denial", "use 835 lines for CPT
-  rates", "filter `payer_sequence = 'primary'`") is rejected
+- the oracle agent scores 100%
+- in strict mode (the default), every `wrong_sql` is rejected
+- in strict mode, no gold answer is empty or all zeros (unless the question says zero is the expected answer)
 
-If a gold query and the ledger disagree, the problem is in the data layer, not in an agent. If a
-`wrong_sql` slips through, the question does not discriminate on this dataset.
+The `wrong_sql` queries are plausible mistakes, e.g. "every $0 payment is a denial", "use 835 lines for
+CPT rates", "filter `payer_sequence = 'primary'`".
+
+A gold-vs-ledger mismatch is a data-layer finding, not an agent error. A failure in strict mode means the
+dataset is too small or too uniform for that question to tell right from wrong. Agents never see the
+answer key: `truth.json` sits outside the directories their DuckDB session can read, and `lossless.*` is
+readable only on escalation questions.
 
 ### Reported numbers
 
