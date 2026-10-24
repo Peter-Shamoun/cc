@@ -77,3 +77,22 @@ and 30 ms; same-region S3 first-byte latency is around 10–30 ms). It records:
 - the same views computed live from silver, as one file per table per day vs compacted to one file per table
 
 Results go to `.ccsim/bench/perf-<days>d.{json,md}`.
+
+### Results: 100 days, scale 0.5 (4,447 claims, 72 daily batches, 1,800 silver files)
+
+| | HTTP requests |
+|---|---|
+| parser batch, day 1 → day 100 | 160 → 1,981 (gold is a full rebuild, so this grows linearly with history) |
+| agent query on gold | ~1 per query once the session's files are open |
+| the same views computed live from daily silver | 1,825 to load |
+| the same views from compacted silver | 53 to load |
+
+- The agent path doesn't suffer from the daily tree, because it only touches gold: 10 small files per version.
+- The cost lands on the parser. Each daily rebuild re-reads every silver file, so total work grows
+  quadratically with history.
+- Two fixes at scale: compact silver periodically (one file per table per month cut reads about 34×), or
+  build gold incrementally.
+- The local endpoint is a single Python process, so its wall-clock times are not S3 times; use the
+  request counts.
+- DuckDB's file cache is shared across connections in one process, so the "cold" query here is warm on
+  file metadata.
