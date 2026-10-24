@@ -3,7 +3,8 @@
 # Every question states its grain and definitions in plain words, so there is one right answer.
 #   gold_sql   reference query over sem.* (or lossless.* for escalation questions)
 #   ledger     function in bench/ledger.py computing the answer from the generator's ledger, independently
-#   compare    matcher options (bench/compare.py): order none|strict|topn, n, metric_col, tol, allow_percent, sign_insensitive
+#   compare    matcher options (bench/compare.py): order none|strict|topn, n, metric_col, tol, percent_cols,
+#              sign_cols, optional_cols (column indices into the gold result)
 #   wrong_sql  plausible mistakes; the self-test proves the matcher rejects each one (or flags it as not discriminating)
 #   alt_sql    different-looking correct answers; the self-test proves the matcher accepts them
 # Categories: volume, money, denials, lines, rework, cob, patient, payers, quality, escalation, safety.
@@ -22,7 +23,7 @@
 - id: q02_total_billed
   category: money
   difficulty: easy
-  question: What is the total amount we billed, counting each claim once at its latest submission?
+  question: What is the total amount we billed, counting each claim once at its latest submission? Include voided claims.
   ledger: total_billed
   compare: {tol: 0.01}
   gold_sql: SELECT round(sum(charge_amount), 2) AS billed FROM sem.claims WHERE is_latest_submission
@@ -52,7 +53,7 @@
   wrong_sql:
     - {label: groups by service month, sql: "SELECT service_month, sum(paid_amount) FROM sem.remit_claims WHERE is_current_adjudication GROUP BY 1"}
   alt_sql:
-    - SELECT strftime(payment_month, '%Y-%m-%d') AS m, sum(paid_amount) AS p, count(*) AS n FROM sem.remit_claims WHERE is_current_adjudication GROUP BY 1
+    - SELECT strftime(payment_month, '%Y-%m') AS month, 'paid' AS measure, sum(paid_amount) AS amount FROM sem.remit_claims WHERE is_current_adjudication GROUP BY 1 ORDER BY 1 DESC
 
 - id: q05_payments_count
   category: volume
@@ -66,7 +67,7 @@
   difficulty: medium
   question: How much prompt-pay interest have payers paid us through provider-level adjustments (PLB reason L6)? Give a positive dollar amount.
   ledger: interest_paid
-  compare: {tol: 0.01, sign_insensitive: true}
+  compare: {tol: 0.01}
   gold_sql: SELECT coalesce(round(-sum(provider_adjustment_amount), 2), 0) AS interest FROM sem.provider_adjustments WHERE plb_reason_code = 'L6'
 
 - id: q07_denial_rate
@@ -74,7 +75,7 @@
   difficulty: easy
   question: What is our overall denial rate? Count each claim once per payer, using its current adjudication.
   ledger: denial_rate
-  compare: {tol: 0.0005, allow_percent: true}
+  compare: {tol: 0.0005, percent_cols: [0]}
   gold_sql: SELECT round(avg(is_denied::INT), 4) AS denial_rate FROM sem.remit_claims WHERE is_current_adjudication
   wrong_sql:
     - {label: "treats every $0 payment as a denial", sql: "SELECT avg((paid_amount = 0)::INT) FROM sem.remit_claims WHERE is_current_adjudication"}
@@ -88,7 +89,7 @@
   difficulty: medium
   question: What is the denial rate for each payer? Count each claim once per payer, using its current adjudication.
   ledger: denial_rate_by_payer
-  compare: {tol: 0.0005, allow_percent: true}
+  compare: {tol: 0.0005, percent_cols: [1]}
   gold_sql: |
     SELECT payer_name, round(avg(is_denied::INT), 4) AS denial_rate FROM sem.remit_claims
     WHERE is_current_adjudication GROUP BY 1 ORDER BY 2 DESC
@@ -113,7 +114,7 @@
   difficulty: hard
   question: Which 5 denial reason codes (CARCs) appear on the most denied claims? Only count reviewed denial reasons under group CO, count each denied claim+payer once per code, and use current adjudications.
   ledger: top_denial_carcs
-  compare: {order: topn, n: 5, metric_col: 1}
+  compare: {order: topn, n: 5, metric_col: 1, optional_cols: [1]}
   gold_sql: |
     SELECT a.carc_code, count(DISTINCT a.remit_claim_id) AS denied_claims
     FROM sem.adjustments a JOIN sem.remit_claims r ON r.remit_claim_id = a.remit_claim_id
@@ -128,7 +129,7 @@
   difficulty: hard
   question: What is the denial rate by CPT code billed, among CPT codes on at least 20 claim+payer current adjudications? A claim counts toward every CPT billed on it.
   ledger: cpt_denial_rate_min20
-  compare: {tol: 0.0005, allow_percent: true}
+  compare: {tol: 0.0005, percent_cols: [1], optional_cols: [2]}
   gold_sql: |
     WITH lines AS (SELECT DISTINCT claim_key, procedure_code FROM sem.claim_lines WHERE is_latest_submission)
     SELECT l.procedure_code, round(avg(r.is_denied::INT), 4) AS denial_rate, count(*) AS adjudications
@@ -142,7 +143,7 @@
   difficulty: hard
   question: Which 5 ordering (referring) providers, by NPI, have the highest primary-payer denial rate, among providers with at least 15 claims adjudicated by the primary payer? Use current adjudications.
   ledger: referring_provider_denials
-  compare: {order: topn, n: 5, metric_col: 1, tol: 0.0005, allow_percent: true}
+  compare: {order: topn, n: 5, metric_col: 1, tol: 0.0005, percent_cols: [1], optional_cols: [2]}
   gold_sql: |
     WITH c AS (SELECT DISTINCT claim_key, referring_npi, payer_key FROM sem.claims WHERE payer_responsibility = 'P')
     SELECT c.referring_npi, round(avg(r.is_denied::INT), 4) AS denial_rate, count(*) AS claims
@@ -156,7 +157,7 @@
   difficulty: hard
   question: What is the primary-payer denial rate by principal diagnosis code, for diagnosis codes on at least 30 claims adjudicated by the primary payer? Use current adjudications.
   ledger: principal_dx_denials
-  compare: {tol: 0.0005, allow_percent: true}
+  compare: {tol: 0.0005, percent_cols: [1], optional_cols: [2]}
   gold_sql: |
     WITH c AS (SELECT DISTINCT claim_key, principal_diagnosis_code, payer_key FROM sem.claims WHERE payer_responsibility = 'P')
     SELECT c.principal_diagnosis_code, round(avg(r.is_denied::INT), 4) AS denial_rate, count(*) AS claims
@@ -276,7 +277,7 @@
 - id: q25_primary_deductible
   category: patient
   difficulty: hard
-  question: How much of that primary-payer patient responsibility is deductible (group PR, reason 1)?
+  question: What is the total deductible (adjustment group PR, reason code 1) assigned by primary payers on current adjudications?
   ledger: primary_deductible
   compare: {tol: 0.01}
   gold_sql: |
@@ -297,6 +298,7 @@
   difficulty: medium
   question: How many 835 payments do not balance (payment total different from claim payments minus provider-level adjustments)?
   ledger: unbalanced_payments
+  allow_trivial: true   # zero is the right answer on well-formed data
   gold_sql: SELECT count(*) AS unbalanced FROM sem.payments WHERE NOT is_balanced
 
 - id: q28_modifier_59

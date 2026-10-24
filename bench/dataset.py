@@ -25,7 +25,7 @@ def dataset_id(scenario) -> str:
     from ccsim import edi_mock
     h = hashlib.sha256()
     h.update(json.dumps({k: str(v) for k, v in asdict(scenario).items()}, sort_keys=True).encode())
-    h.update(edi_mock.GENERATOR_VERSION.encode())
+    h.update(edi_mock.GENERATOR_VERSION.encode() + b"layout-2")
     for f in ("ccsim/edi_mock.py", "ccsim/parser.py", "ccsim/pipeline.py", "claude/schema/01_lossless_edi_schema.sql",
               "claude/schema/02_semantic_layer_views.sql"):
         h.update((ROOT / f).read_bytes())
@@ -52,8 +52,10 @@ def snapshot(scenario=None, customer_user="ana@xifin.example", rebuild=False, ca
     s = open_session(w.aws, w.dep, login(w.aws, customer_user), escalate=True)
     rels = [f"sem.{t}" for t in SEM_TABLES] + [f"lossless.{t.replace('.', '_')}" for t in ESCALATION]
     import pyarrow.parquet as pq
-    for rel in rels:
-        pq.write_table(s.con.sql(f"SELECT * FROM {rel}").to_arrow_table(), out / f"{rel}.parquet")
+    for rel in rels:                       # data/<schema>/<rel>.parquet; truth.json and meta.json stay outside data/
+        d = out / "data" / rel.split(".")[0]
+        d.mkdir(parents=True, exist_ok=True)
+        pq.write_table(s.con.sql(f"SELECT * FROM {rel}").to_arrow_table(), d / f"{rel}.parquet")
     (out / "truth.json").write_text(json.dumps({"denial_carcs": w.truth["denial_carcs"], "customer": s.customer,
                                                 "tenant": w.truth["tenants"][s.customer]}, default=str))
     (out / "meta.json").write_text(json.dumps({"dataset_id": did, "customer": s.customer, "scenario": {
@@ -64,15 +66,17 @@ def snapshot(scenario=None, customer_user="ana@xifin.example", rebuild=False, ca
 
 
 def open_snapshot(path: Path, escalate: bool = False) -> duckdb.DuckDBPyConnection:
+    """Sandboxed connection: only data/sem/ (and data/lossless/ when escalating) is readable; the answer key
+    (truth.json) and meta.json sit outside every allowed directory."""
     meta = json.loads((path / "meta.json").read_text())
     con = duckdb.connect(config={"autoinstall_known_extensions": False, "autoload_known_extensions": False})
-    for schema in ("sem", "lossless") if escalate else ("sem",):
+    schemas = ("sem", "lossless") if escalate else ("sem",)
+    for schema in schemas:
         con.execute(f"CREATE SCHEMA {schema}")
     for rel in meta["relations"]:
-        if rel.startswith("lossless.") and not escalate:
-            continue
-        con.execute(f"CREATE VIEW {rel} AS SELECT * FROM read_parquet('{path / (rel + '.parquet')}')")
-    con.execute("SET allowed_directories = ?", [[str(path) + "/"]])
+        if rel.split(".")[0] in schemas:
+            con.execute(f"CREATE VIEW {rel} AS SELECT * FROM read_parquet('{path / 'data' / rel.split('.')[0] / (rel + '.parquet')}')")
+    con.execute("SET allowed_directories = ?", [[str(path / "data" / sch) + "/" for sch in schemas]])
     con.execute("SET enable_external_access = false")
     con.execute("SET lock_configuration = true")
     return con

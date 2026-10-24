@@ -44,28 +44,30 @@ class Answer:
 
 class Tools:
     def __init__(self, con, escalate: bool = False, row_limit: int = 1000):
-        self.con, self.escalate, self.row_limit = con, escalate, row_limit
+        self._con, self.escalate, self.row_limit = con, escalate, row_limit    # agents go through sql() only
         self.calls = []
 
     def describe(self) -> str:
         lines = []
-        for (schema, view) in self.con.execute("SELECT schema_name, view_name FROM duckdb_views() WHERE NOT internal "
+        for (schema, view) in self._con.execute("SELECT schema_name, view_name FROM duckdb_views() WHERE NOT internal "
                                                 "ORDER BY 1, 2").fetchall():
-            cols = self.con.execute(f"DESCRIBE {schema}.{view}").fetchall()
+            cols = self._con.execute(f"DESCRIBE {schema}.{view}").fetchall()
             lines.append(f"{schema}.{view}(" + ", ".join(f"{c[0]} {c[1]}" for c in cols) + ")")
         return "\n".join(lines) + "\n\n" + GLOSSARY
 
-    def sql(self, query: str):
+    def sql(self, query: str, _final: bool = False):
         t = time.perf_counter()
         try:
             safe = guard(query, self.row_limit, self.escalate)
-            cur = self.con.execute(safe)
+            cur = self._con.execute(safe)
             cols = [d[0] for d in cur.description]
             rows = cur.fetchall()
-            self.calls.append(dict(sql=query, ok=True, rows=len(rows), s=round(time.perf_counter() - t, 4)))
+            if not _final:
+                self.calls.append(dict(sql=query, ok=True, rows=len(rows), s=round(time.perf_counter() - t, 4)))
             return cols, rows
         except (GuardError, Exception) as e:                      # noqa: BLE001 - errors go back to the agent
-            self.calls.append(dict(sql=query, ok=False, error=str(e)[:300], s=round(time.perf_counter() - t, 4)))
+            if not _final:
+                self.calls.append(dict(sql=query, ok=False, error=str(e)[:300], s=round(time.perf_counter() - t, 4)))
             raise
 
 
@@ -141,7 +143,7 @@ class ClaudeSQLAgent:
                     return Answer(refused=True, text=b.input.get("reason", ""), usage=usage, trace=trace)
                 if b.name == "final_answer":
                     try:
-                        _, rows = tools.sql(b.input["sql"])
+                        _, rows = tools.sql(b.input["sql"], _final=True)   # re-run to score; not an agent call
                     except Exception as e:                        # noqa: BLE001
                         return Answer(sql=b.input["sql"], text=f"final SQL failed: {e}", usage=usage, trace=trace)
                     return Answer(sql=b.input["sql"], rows=rows, text=b.input.get("answer", ""), usage=usage, trace=trace)
@@ -152,10 +154,9 @@ class ClaudeSQLAgent:
                     content = f"ERROR: {str(e)[:500]}"
                 trace.append(b.input["sql"])
                 results.append({"type": "tool_result", "tool_use_id": b.id, "content": content})
-            if not results:
-                text = "".join(b.text for b in r.content if b.type == "text")
-                return Answer(text=text, refused="can't" in text.lower() or "cannot" in text.lower(), usage=usage,
-                              trace=trace)
+            if not results:                                       # prose without a tool call: no answer, not a
+                text = "".join(b.text for b in r.content if b.type == "text")   # refusal (only `refuse` counts)
+                return Answer(text=text, usage=usage, trace=trace)
             msgs.append({"role": "user", "content": results})
         return Answer(text="ran out of turns", usage=usage, trace=trace)
 
