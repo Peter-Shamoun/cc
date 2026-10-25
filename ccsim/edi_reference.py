@@ -373,7 +373,7 @@ def _load_dx() -> dict[str, list]:
 
 DX_DOMAINS = _load_dx()
 DX_BY_CODE = {dx.code: dx for v in DX_DOMAINS.values() for dx in v}
-DX_ZIPF = 1.6          # within a domain: the head codes carry most claims, a long tail carries the rest
+DX_ZIPF = 2.0          # within a domain: the head codes carry most claims, a long tail carries the rest
 
 
 @dataclass
@@ -446,7 +446,7 @@ _domains("82274 G0328", gi=1, anemia=.5)
 _domains("82310 82330 83970 84100", bone=2, ckd=2, electrolytes=1)
 _domains("84295 84132 82565 84520 83735 80069", ckd=3, electrolytes=2, htn=1, meds=1)
 _domains("80076 84460 84450 82977 84075 82247 82248 82040", liver=4, meds=1)
-_domains("86140 85652", rheum=3, infect=1, general=1)
+_domains("86140 85652", rheum=1.5, infect=1, general=2, cardio=.5)
 _domains("86038 86431 86235 86200 82085", rheum=5)
 _domains("86141 83880 84484", cardio=5)
 _domains("85379", thrombophilia=3, cardio=1)
@@ -534,7 +534,7 @@ _DOMAIN_CACHE: dict = {}
 CHRONIC = {"htn": (.01, .12, .38, .62), "lipid": (.01, .10, .35, .52), "dm": (.01, .05, .16, .26),
            "thyroid": (.01, .06, .10, .16), "ckd": (0, .01, .06, .22), "anemia": (.04, .06, .06, .12),
            "anticoag": (0, .003, .02, .10), "nutrition": (.08, .18, .22, .18), "psych": (.03, .12, .12, .08),
-           "cardio": (0, .005, .05, .18), "rheum": (0, .02, .06, .10), "liver": (0, .02, .04, .03),
+           "cardio": (0, .005, .05, .18), "rheum": (0, .01, .03, .06), "liver": (0, .02, .04, .03),
            "meds": (.02, .08, .16, .28)}
 CHRONIC_FEMALE_MULT = {"thyroid": 2.2, "anemia": 1.6, "rheum": 1.4}
 

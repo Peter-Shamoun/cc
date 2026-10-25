@@ -128,176 +128,6 @@ E11630,dm,94,,10,120,Type 2 diabetes mellitus with periodontal disease
 E11638,dm,95,,10,120,Type 2 diabetes mellitus with other oral complications
 E11641,dm,96,,10,120,Type 2 diabetes mellitus with hypoglycemia with coma
 E11A,dm,97,,10,120,Type 2 diabetes mellitus without complications in remission
-E1010,dm,98,,10,120,Type 1 diabetes mellitus with ketoacidosis without coma
-E1011,dm,99,,10,120,Type 1 diabetes mellitus with ketoacidosis with coma
-E1021,dm,100,,10,120,Type 1 diabetes mellitus with diabetic nephropathy
-E1022,dm,101,,10,120,Type 1 diabetes mellitus with diabetic chronic kidney disease
-E1029,dm,102,,10,120,Type 1 diabetes mellitus with other diabetic kidney complication
-E10311,dm,103,,10,120,Type 1 diabetes mellitus with unspecified diabetic retinopathy with macular edema
-E10319,dm,104,,10,120,Type 1 diabetes mellitus with unspecified diabetic retinopathy without macular edema
-E103211,dm,105,,10,120,"Type 1 diabetes mellitus with mild nonproliferative diabetic retinopathy with macular edema, right eye"
-E103212,dm,106,,10,120,"Type 1 diabetes mellitus with mild nonproliferative diabetic retinopathy with macular edema, left eye"
-E103213,dm,107,,10,120,"Type 1 diabetes mellitus with mild nonproliferative diabetic retinopathy with macular edema, bilateral"
-E103219,dm,108,,10,120,"Type 1 diabetes mellitus with mild nonproliferative diabetic retinopathy with macular edema, unspecified eye"
-E103291,dm,109,,10,120,"Type 1 diabetes mellitus with mild nonproliferative diabetic retinopathy without macular edema, right eye"
-E103292,dm,110,,10,120,"Type 1 diabetes mellitus with mild nonproliferative diabetic retinopathy without macular edema, left eye"
-E103293,dm,111,,10,120,"Type 1 diabetes mellitus with mild nonproliferative diabetic retinopathy without macular edema, bilateral"
-E103299,dm,112,,10,120,"Type 1 diabetes mellitus with mild nonproliferative diabetic retinopathy without macular edema, unspecified eye"
-E103311,dm,113,,10,120,"Type 1 diabetes mellitus with moderate nonproliferative diabetic retinopathy with macular edema, right eye"
-E103312,dm,114,,10,120,"Type 1 diabetes mellitus with moderate nonproliferative diabetic retinopathy with macular edema, left eye"
-E103313,dm,115,,10,120,"Type 1 diabetes mellitus with moderate nonproliferative diabetic retinopathy with macular edema, bilateral"
-E103319,dm,116,,10,120,"Type 1 diabetes mellitus with moderate nonproliferative diabetic retinopathy with macular edema, unspecified eye"
-E103391,dm,117,,10,120,"Type 1 diabetes mellitus with moderate nonproliferative diabetic retinopathy without macular edema, right eye"
-E103392,dm,118,,10,120,"Type 1 diabetes mellitus with moderate nonproliferative diabetic retinopathy without macular edema, left eye"
-E103393,dm,119,,10,120,"Type 1 diabetes mellitus with moderate nonproliferative diabetic retinopathy without macular edema, bilateral"
-E103399,dm,120,,10,120,"Type 1 diabetes mellitus with moderate nonproliferative diabetic retinopathy without macular edema, unspecified eye"
-E103411,dm,121,,10,120,"Type 1 diabetes mellitus with severe nonproliferative diabetic retinopathy with macular edema, right eye"
-E103412,dm,122,,10,120,"Type 1 diabetes mellitus with severe nonproliferative diabetic retinopathy with macular edema, left eye"
-E103413,dm,123,,10,120,"Type 1 diabetes mellitus with severe nonproliferative diabetic retinopathy with macular edema, bilateral"
-E103419,dm,124,,10,120,"Type 1 diabetes mellitus with severe nonproliferative diabetic retinopathy with macular edema, unspecified eye"
-E103491,dm,125,,10,120,"Type 1 diabetes mellitus with severe nonproliferative diabetic retinopathy without macular edema, right eye"
-E103492,dm,126,,10,120,"Type 1 diabetes mellitus with severe nonproliferative diabetic retinopathy without macular edema, left eye"
-E103493,dm,127,,10,120,"Type 1 diabetes mellitus with severe nonproliferative diabetic retinopathy without macular edema, bilateral"
-E103499,dm,128,,10,120,"Type 1 diabetes mellitus with severe nonproliferative diabetic retinopathy without macular edema, unspecified eye"
-E103511,dm,129,,10,120,"Type 1 diabetes mellitus with proliferative diabetic retinopathy with macular edema, right eye"
-E103512,dm,130,,10,120,"Type 1 diabetes mellitus with proliferative diabetic retinopathy with macular edema, left eye"
-E103513,dm,131,,10,120,"Type 1 diabetes mellitus with proliferative diabetic retinopathy with macular edema, bilateral"
-E103519,dm,132,,10,120,"Type 1 diabetes mellitus with proliferative diabetic retinopathy with macular edema, unspecified eye"
-E103521,dm,133,,10,120,"Type 1 diabetes mellitus with proliferative diabetic retinopathy with traction retinal detachment involving the macula, right eye"
-E103522,dm,134,,10,120,"Type 1 diabetes mellitus with proliferative diabetic retinopathy with traction retinal detachment involving the macula, left eye"
-E103523,dm,135,,10,120,"Type 1 diabetes mellitus with proliferative diabetic retinopathy with traction retinal detachment involving the macula, bilateral"
-E103529,dm,136,,10,120,"Type 1 diabetes mellitus with proliferative diabetic retinopathy with traction retinal detachment involving the macula, unspecified eye"
-E103531,dm,137,,10,120,"Type 1 diabetes mellitus with proliferative diabetic retinopathy with traction retinal detachment not involving the macula, right eye"
-E103532,dm,138,,10,120,"Type 1 diabetes mellitus with proliferative diabetic retinopathy with traction retinal detachment not involving the macula, left eye"
-E103533,dm,139,,10,120,"Type 1 diabetes mellitus with proliferative diabetic retinopathy with traction retinal detachment not involving the macula, bilateral"
-E103539,dm,140,,10,120,"Type 1 diabetes mellitus with proliferative diabetic retinopathy with traction retinal detachment not involving the macula, unspecified eye"
-E103541,dm,141,,10,120,"Type 1 diabetes mellitus with proliferative diabetic retinopathy with combined traction retinal detachment and rhegmatogenous retinal detachment, right eye"
-E103542,dm,142,,10,120,"Type 1 diabetes mellitus with proliferative diabetic retinopathy with combined traction retinal detachment and rhegmatogenous retinal detachment, left eye"
-E103543,dm,143,,10,120,"Type 1 diabetes mellitus with proliferative diabetic retinopathy with combined traction retinal detachment and rhegmatogenous retinal detachment, bilateral"
-E103549,dm,144,,10,120,"Type 1 diabetes mellitus with proliferative diabetic retinopathy with combined traction retinal detachment and rhegmatogenous retinal detachment, unspecified eye"
-E103551,dm,145,,10,120,"Type 1 diabetes mellitus with stable proliferative diabetic retinopathy, right eye"
-E103552,dm,146,,10,120,"Type 1 diabetes mellitus with stable proliferative diabetic retinopathy, left eye"
-E103553,dm,147,,10,120,"Type 1 diabetes mellitus with stable proliferative diabetic retinopathy, bilateral"
-E103559,dm,148,,10,120,"Type 1 diabetes mellitus with stable proliferative diabetic retinopathy, unspecified eye"
-E103591,dm,149,,10,120,"Type 1 diabetes mellitus with proliferative diabetic retinopathy without macular edema, right eye"
-E103592,dm,150,,10,120,"Type 1 diabetes mellitus with proliferative diabetic retinopathy without macular edema, left eye"
-E103593,dm,151,,10,120,"Type 1 diabetes mellitus with proliferative diabetic retinopathy without macular edema, bilateral"
-E103599,dm,152,,10,120,"Type 1 diabetes mellitus with proliferative diabetic retinopathy without macular edema, unspecified eye"
-E1036,dm,153,,10,120,Type 1 diabetes mellitus with diabetic cataract
-E1037X1,dm,154,,10,120,"Type 1 diabetes mellitus with diabetic macular edema, resolved following treatment, right eye"
-E1037X2,dm,155,,10,120,"Type 1 diabetes mellitus with diabetic macular edema, resolved following treatment, left eye"
-E1037X3,dm,156,,10,120,"Type 1 diabetes mellitus with diabetic macular edema, resolved following treatment, bilateral"
-E1037X9,dm,157,,10,120,"Type 1 diabetes mellitus with diabetic macular edema, resolved following treatment, unspecified eye"
-E1039,dm,158,,10,120,Type 1 diabetes mellitus with other diabetic ophthalmic complication
-E1040,dm,159,,10,120,"Type 1 diabetes mellitus with diabetic neuropathy, unspecified"
-E1041,dm,160,,10,120,Type 1 diabetes mellitus with diabetic mononeuropathy
-E1042,dm,161,,10,120,Type 1 diabetes mellitus with diabetic polyneuropathy
-E1043,dm,162,,10,120,Type 1 diabetes mellitus with diabetic autonomic (poly)neuropathy
-E1044,dm,163,,10,120,Type 1 diabetes mellitus with diabetic amyotrophy
-E1049,dm,164,,10,120,Type 1 diabetes mellitus with other diabetic neurological complication
-E1051,dm,165,,10,120,Type 1 diabetes mellitus with diabetic peripheral angiopathy without gangrene
-E1052,dm,166,,10,120,Type 1 diabetes mellitus with diabetic peripheral angiopathy with gangrene
-E1059,dm,167,,10,120,Type 1 diabetes mellitus with other circulatory complications
-E10610,dm,168,,10,120,Type 1 diabetes mellitus with diabetic neuropathic arthropathy
-E10618,dm,169,,10,120,Type 1 diabetes mellitus with other diabetic arthropathy
-E10620,dm,170,,10,120,Type 1 diabetes mellitus with diabetic dermatitis
-E10621,dm,171,,10,120,Type 1 diabetes mellitus with foot ulcer
-E10622,dm,172,,10,120,Type 1 diabetes mellitus with other skin ulcer
-E10628,dm,173,,10,120,Type 1 diabetes mellitus with other skin complications
-E10630,dm,174,,10,120,Type 1 diabetes mellitus with periodontal disease
-E10638,dm,175,,10,120,Type 1 diabetes mellitus with other oral complications
-E10641,dm,176,,10,120,Type 1 diabetes mellitus with hypoglycemia with coma
-E10649,dm,177,,10,120,Type 1 diabetes mellitus with hypoglycemia without coma
-E1069,dm,178,,10,120,Type 1 diabetes mellitus with other specified complication
-E108,dm,179,,10,120,Type 1 diabetes mellitus with unspecified complications
-E10A0,dm,180,,10,120,"Type 1 diabetes mellitus, presymptomatic, unspecified"
-E10A1,dm,181,,10,120,"Type 1 diabetes mellitus, presymptomatic, Stage 1"
-E10A2,dm,182,,10,120,"Type 1 diabetes mellitus, presymptomatic, Stage 2"
-E1300,dm,183,,10,120,Other specified diabetes mellitus with hyperosmolarity without nonketotic hyperglycemic-hyperosmolar coma (NKHHC)
-E1301,dm,184,,10,120,Other specified diabetes mellitus with hyperosmolarity with coma
-E1310,dm,185,,10,120,Other specified diabetes mellitus with ketoacidosis without coma
-E1311,dm,186,,10,120,Other specified diabetes mellitus with ketoacidosis with coma
-E1321,dm,187,,10,120,Other specified diabetes mellitus with diabetic nephropathy
-E1322,dm,188,,10,120,Other specified diabetes mellitus with diabetic chronic kidney disease
-E1329,dm,189,,10,120,Other specified diabetes mellitus with other diabetic kidney complication
-E13311,dm,190,,10,120,Other specified diabetes mellitus with unspecified diabetic retinopathy with macular edema
-E13319,dm,191,,10,120,Other specified diabetes mellitus with unspecified diabetic retinopathy without macular edema
-E133211,dm,192,,10,120,"Other specified diabetes mellitus with mild nonproliferative diabetic retinopathy with macular edema, right eye"
-E133212,dm,193,,10,120,"Other specified diabetes mellitus with mild nonproliferative diabetic retinopathy with macular edema, left eye"
-E133213,dm,194,,10,120,"Other specified diabetes mellitus with mild nonproliferative diabetic retinopathy with macular edema, bilateral"
-E133219,dm,195,,10,120,"Other specified diabetes mellitus with mild nonproliferative diabetic retinopathy with macular edema, unspecified eye"
-E133291,dm,196,,10,120,"Other specified diabetes mellitus with mild nonproliferative diabetic retinopathy without macular edema, right eye"
-E133292,dm,197,,10,120,"Other specified diabetes mellitus with mild nonproliferative diabetic retinopathy without macular edema, left eye"
-E133293,dm,198,,10,120,"Other specified diabetes mellitus with mild nonproliferative diabetic retinopathy without macular edema, bilateral"
-E133299,dm,199,,10,120,"Other specified diabetes mellitus with mild nonproliferative diabetic retinopathy without macular edema, unspecified eye"
-E133311,dm,200,,10,120,"Other specified diabetes mellitus with moderate nonproliferative diabetic retinopathy with macular edema, right eye"
-E133312,dm,201,,10,120,"Other specified diabetes mellitus with moderate nonproliferative diabetic retinopathy with macular edema, left eye"
-E133313,dm,202,,10,120,"Other specified diabetes mellitus with moderate nonproliferative diabetic retinopathy with macular edema, bilateral"
-E133319,dm,203,,10,120,"Other specified diabetes mellitus with moderate nonproliferative diabetic retinopathy with macular edema, unspecified eye"
-E133391,dm,204,,10,120,"Other specified diabetes mellitus with moderate nonproliferative diabetic retinopathy without macular edema, right eye"
-E133392,dm,205,,10,120,"Other specified diabetes mellitus with moderate nonproliferative diabetic retinopathy without macular edema, left eye"
-E133393,dm,206,,10,120,"Other specified diabetes mellitus with moderate nonproliferative diabetic retinopathy without macular edema, bilateral"
-E133399,dm,207,,10,120,"Other specified diabetes mellitus with moderate nonproliferative diabetic retinopathy without macular edema, unspecified eye"
-E133411,dm,208,,10,120,"Other specified diabetes mellitus with severe nonproliferative diabetic retinopathy with macular edema, right eye"
-E133412,dm,209,,10,120,"Other specified diabetes mellitus with severe nonproliferative diabetic retinopathy with macular edema, left eye"
-E133413,dm,210,,10,120,"Other specified diabetes mellitus with severe nonproliferative diabetic retinopathy with macular edema, bilateral"
-E133419,dm,211,,10,120,"Other specified diabetes mellitus with severe nonproliferative diabetic retinopathy with macular edema, unspecified eye"
-E133491,dm,212,,10,120,"Other specified diabetes mellitus with severe nonproliferative diabetic retinopathy without macular edema, right eye"
-E133492,dm,213,,10,120,"Other specified diabetes mellitus with severe nonproliferative diabetic retinopathy without macular edema, left eye"
-E133493,dm,214,,10,120,"Other specified diabetes mellitus with severe nonproliferative diabetic retinopathy without macular edema, bilateral"
-E133499,dm,215,,10,120,"Other specified diabetes mellitus with severe nonproliferative diabetic retinopathy without macular edema, unspecified eye"
-E133511,dm,216,,10,120,"Other specified diabetes mellitus with proliferative diabetic retinopathy with macular edema, right eye"
-E133512,dm,217,,10,120,"Other specified diabetes mellitus with proliferative diabetic retinopathy with macular edema, left eye"
-E133513,dm,218,,10,120,"Other specified diabetes mellitus with proliferative diabetic retinopathy with macular edema, bilateral"
-E133519,dm,219,,10,120,"Other specified diabetes mellitus with proliferative diabetic retinopathy with macular edema, unspecified eye"
-E133521,dm,220,,10,120,"Other specified diabetes mellitus with proliferative diabetic retinopathy with traction retinal detachment involving the macula, right eye"
-E133522,dm,221,,10,120,"Other specified diabetes mellitus with proliferative diabetic retinopathy with traction retinal detachment involving the macula, left eye"
-E133523,dm,222,,10,120,"Other specified diabetes mellitus with proliferative diabetic retinopathy with traction retinal detachment involving the macula, bilateral"
-E133529,dm,223,,10,120,"Other specified diabetes mellitus with proliferative diabetic retinopathy with traction retinal detachment involving the macula, unspecified eye"
-E133531,dm,224,,10,120,"Other specified diabetes mellitus with proliferative diabetic retinopathy with traction retinal detachment not involving the macula, right eye"
-E133532,dm,225,,10,120,"Other specified diabetes mellitus with proliferative diabetic retinopathy with traction retinal detachment not involving the macula, left eye"
-E133533,dm,226,,10,120,"Other specified diabetes mellitus with proliferative diabetic retinopathy with traction retinal detachment not involving the macula, bilateral"
-E133539,dm,227,,10,120,"Other specified diabetes mellitus with proliferative diabetic retinopathy with traction retinal detachment not involving the macula, unspecified eye"
-E133541,dm,228,,10,120,"Other specified diabetes mellitus with proliferative diabetic retinopathy with combined traction retinal detachment and rhegmatogenous retinal detachment, right eye"
-E133542,dm,229,,10,120,"Other specified diabetes mellitus with proliferative diabetic retinopathy with combined traction retinal detachment and rhegmatogenous retinal detachment, left eye"
-E133543,dm,230,,10,120,"Other specified diabetes mellitus with proliferative diabetic retinopathy with combined traction retinal detachment and rhegmatogenous retinal detachment, bilateral"
-E133549,dm,231,,10,120,"Other specified diabetes mellitus with proliferative diabetic retinopathy with combined traction retinal detachment and rhegmatogenous retinal detachment, unspecified eye"
-E133551,dm,232,,10,120,"Other specified diabetes mellitus with stable proliferative diabetic retinopathy, right eye"
-E133552,dm,233,,10,120,"Other specified diabetes mellitus with stable proliferative diabetic retinopathy, left eye"
-E133553,dm,234,,10,120,"Other specified diabetes mellitus with stable proliferative diabetic retinopathy, bilateral"
-E133559,dm,235,,10,120,"Other specified diabetes mellitus with stable proliferative diabetic retinopathy, unspecified eye"
-E133591,dm,236,,10,120,"Other specified diabetes mellitus with proliferative diabetic retinopathy without macular edema, right eye"
-E133592,dm,237,,10,120,"Other specified diabetes mellitus with proliferative diabetic retinopathy without macular edema, left eye"
-E133593,dm,238,,10,120,"Other specified diabetes mellitus with proliferative diabetic retinopathy without macular edema, bilateral"
-E133599,dm,239,,10,120,"Other specified diabetes mellitus with proliferative diabetic retinopathy without macular edema, unspecified eye"
-E1336,dm,240,,10,120,Other specified diabetes mellitus with diabetic cataract
-E1337X1,dm,241,,10,120,"Other specified diabetes mellitus with diabetic macular edema, resolved following treatment, right eye"
-E1337X2,dm,242,,10,120,"Other specified diabetes mellitus with diabetic macular edema, resolved following treatment, left eye"
-E1337X3,dm,243,,10,120,"Other specified diabetes mellitus with diabetic macular edema, resolved following treatment, bilateral"
-E1337X9,dm,244,,10,120,"Other specified diabetes mellitus with diabetic macular edema, resolved following treatment, unspecified eye"
-E1339,dm,245,,10,120,Other specified diabetes mellitus with other diabetic ophthalmic complication
-E1340,dm,246,,10,120,"Other specified diabetes mellitus with diabetic neuropathy, unspecified"
-E1341,dm,247,,10,120,Other specified diabetes mellitus with diabetic mononeuropathy
-E1342,dm,248,,10,120,Other specified diabetes mellitus with diabetic polyneuropathy
-E1343,dm,249,,10,120,Other specified diabetes mellitus with diabetic autonomic (poly)neuropathy
-E1344,dm,250,,10,120,Other specified diabetes mellitus with diabetic amyotrophy
-E1349,dm,251,,10,120,Other specified diabetes mellitus with other diabetic neurological complication
-E1351,dm,252,,10,120,Other specified diabetes mellitus with diabetic peripheral angiopathy without gangrene
-E1352,dm,253,,10,120,Other specified diabetes mellitus with diabetic peripheral angiopathy with gangrene
-E1359,dm,254,,10,120,Other specified diabetes mellitus with other circulatory complications
-E13610,dm,255,,10,120,Other specified diabetes mellitus with diabetic neuropathic arthropathy
-E13618,dm,256,,10,120,Other specified diabetes mellitus with other diabetic arthropathy
-E13620,dm,257,,10,120,Other specified diabetes mellitus with diabetic dermatitis
-E13621,dm,258,,10,120,Other specified diabetes mellitus with foot ulcer
-E13622,dm,259,,10,120,Other specified diabetes mellitus with other skin ulcer
-E13628,dm,260,,10,120,Other specified diabetes mellitus with other skin complications
-E13630,dm,261,,10,120,Other specified diabetes mellitus with periodontal disease
-E13638,dm,262,,10,120,Other specified diabetes mellitus with other oral complications
-E13641,dm,263,,10,120,Other specified diabetes mellitus with hypoglycemia with coma
-E13649,dm,264,,10,120,Other specified diabetes mellitus with hypoglycemia without coma
-E1365,dm,265,,10,120,Other specified diabetes mellitus with hyperglycemia
-E1369,dm,266,,10,120,Other specified diabetes mellitus with other specified complication
-E138,dm,267,,10,120,Other specified diabetes mellitus with unspecified complications
 E039,thyroid,0,,1,120,"Hypothyroidism, unspecified"
 E038,thyroid,1,,1,120,Other specified hypothyroidism
 E063,thyroid,2,,1,120,Autoimmune thyroiditis
@@ -662,265 +492,65 @@ K580,gi,35,,1,120,Irritable bowel syndrome with diarrhea
 K581,gi,36,,1,120,Irritable bowel syndrome with constipation
 K582,gi,37,,1,120,Mixed irritable bowel syndrome
 K588,gi,38,,1,120,Other irritable bowel syndrome
-K5000,gi,39,,1,120,Crohn's disease of small intestine without complications
-K50011,gi,40,,1,120,Crohn's disease of small intestine with rectal bleeding
-K50012,gi,41,,1,120,Crohn's disease of small intestine with intestinal obstruction
-K50013,gi,42,,1,120,Crohn's disease of small intestine with fistula
-K50014,gi,43,,1,120,Crohn's disease of small intestine with abscess
-K50018,gi,44,,1,120,Crohn's disease of small intestine with other complication
-K50019,gi,45,,1,120,Crohn's disease of small intestine with unspecified complications
-K5010,gi,46,,1,120,Crohn's disease of large intestine without complications
-K50111,gi,47,,1,120,Crohn's disease of large intestine with rectal bleeding
-K50112,gi,48,,1,120,Crohn's disease of large intestine with intestinal obstruction
-K50113,gi,49,,1,120,Crohn's disease of large intestine with fistula
-K50114,gi,50,,1,120,Crohn's disease of large intestine with abscess
-K50118,gi,51,,1,120,Crohn's disease of large intestine with other complication
-K50119,gi,52,,1,120,Crohn's disease of large intestine with unspecified complications
-K5080,gi,53,,1,120,Crohn's disease of both small and large intestine without complications
-K50811,gi,54,,1,120,Crohn's disease of both small and large intestine with rectal bleeding
-K50812,gi,55,,1,120,Crohn's disease of both small and large intestine with intestinal obstruction
-K50813,gi,56,,1,120,Crohn's disease of both small and large intestine with fistula
-K50814,gi,57,,1,120,Crohn's disease of both small and large intestine with abscess
-K50818,gi,58,,1,120,Crohn's disease of both small and large intestine with other complication
-K50819,gi,59,,1,120,Crohn's disease of both small and large intestine with unspecified complications
-K50911,gi,60,,1,120,"Crohn's disease, unspecified, with rectal bleeding"
-K50912,gi,61,,1,120,"Crohn's disease, unspecified, with intestinal obstruction"
-K50913,gi,62,,1,120,"Crohn's disease, unspecified, with fistula"
-K50914,gi,63,,1,120,"Crohn's disease, unspecified, with abscess"
-K50918,gi,64,,1,120,"Crohn's disease, unspecified, with other complication"
-K50919,gi,65,,1,120,"Crohn's disease, unspecified, with unspecified complications"
-K5100,gi,66,,1,120,Ulcerative (chronic) pancolitis without complications
-K51011,gi,67,,1,120,Ulcerative (chronic) pancolitis with rectal bleeding
-K51012,gi,68,,1,120,Ulcerative (chronic) pancolitis with intestinal obstruction
-K51013,gi,69,,1,120,Ulcerative (chronic) pancolitis with fistula
-K51014,gi,70,,1,120,Ulcerative (chronic) pancolitis with abscess
-K51018,gi,71,,1,120,Ulcerative (chronic) pancolitis with other complication
-K51019,gi,72,,1,120,Ulcerative (chronic) pancolitis with unspecified complications
-K5120,gi,73,,1,120,Ulcerative (chronic) proctitis without complications
-K51211,gi,74,,1,120,Ulcerative (chronic) proctitis with rectal bleeding
-K51212,gi,75,,1,120,Ulcerative (chronic) proctitis with intestinal obstruction
-K51213,gi,76,,1,120,Ulcerative (chronic) proctitis with fistula
-K51214,gi,77,,1,120,Ulcerative (chronic) proctitis with abscess
-K51218,gi,78,,1,120,Ulcerative (chronic) proctitis with other complication
-K51219,gi,79,,1,120,Ulcerative (chronic) proctitis with unspecified complications
-K5130,gi,80,,1,120,Ulcerative (chronic) rectosigmoiditis without complications
-K51311,gi,81,,1,120,Ulcerative (chronic) rectosigmoiditis with rectal bleeding
-K51312,gi,82,,1,120,Ulcerative (chronic) rectosigmoiditis with intestinal obstruction
-K51313,gi,83,,1,120,Ulcerative (chronic) rectosigmoiditis with fistula
-K51314,gi,84,,1,120,Ulcerative (chronic) rectosigmoiditis with abscess
-K51318,gi,85,,1,120,Ulcerative (chronic) rectosigmoiditis with other complication
-K51319,gi,86,,1,120,Ulcerative (chronic) rectosigmoiditis with unspecified complications
-K5140,gi,87,,1,120,Inflammatory polyps of colon without complications
-K51411,gi,88,,1,120,Inflammatory polyps of colon with rectal bleeding
-K51412,gi,89,,1,120,Inflammatory polyps of colon with intestinal obstruction
-K51413,gi,90,,1,120,Inflammatory polyps of colon with fistula
-K51414,gi,91,,1,120,Inflammatory polyps of colon with abscess
-K51418,gi,92,,1,120,Inflammatory polyps of colon with other complication
-K51419,gi,93,,1,120,Inflammatory polyps of colon with unspecified complications
-K5150,gi,94,,1,120,Left sided colitis without complications
-K51511,gi,95,,1,120,Left sided colitis with rectal bleeding
-K51512,gi,96,,1,120,Left sided colitis with intestinal obstruction
-K51513,gi,97,,1,120,Left sided colitis with fistula
-K51514,gi,98,,1,120,Left sided colitis with abscess
-K51518,gi,99,,1,120,Left sided colitis with other complication
-K51519,gi,100,,1,120,Left sided colitis with unspecified complications
-K5180,gi,101,,1,120,Other ulcerative colitis without complications
-K51811,gi,102,,1,120,Other ulcerative colitis with rectal bleeding
-K51812,gi,103,,1,120,Other ulcerative colitis with intestinal obstruction
-K51813,gi,104,,1,120,Other ulcerative colitis with fistula
-K51814,gi,105,,1,120,Other ulcerative colitis with abscess
-K51818,gi,106,,1,120,Other ulcerative colitis with other complication
-K51819,gi,107,,1,120,Other ulcerative colitis with unspecified complications
-K51911,gi,108,,1,120,"Ulcerative colitis, unspecified with rectal bleeding"
-K51912,gi,109,,1,120,"Ulcerative colitis, unspecified with intestinal obstruction"
-K51913,gi,110,,1,120,"Ulcerative colitis, unspecified with fistula"
-K51914,gi,111,,1,120,"Ulcerative colitis, unspecified with abscess"
-K51918,gi,112,,1,120,"Ulcerative colitis, unspecified with other complication"
-K51919,gi,113,,1,120,"Ulcerative colitis, unspecified with unspecified complications"
-K5700,gi,114,,1,120,Diverticulitis of small intestine with perforation and abscess without bleeding
-K5701,gi,115,,1,120,Diverticulitis of small intestine with perforation and abscess with bleeding
-K5710,gi,116,,1,120,Diverticulosis of small intestine without perforation or abscess without bleeding
-K5711,gi,117,,1,120,Diverticulosis of small intestine without perforation or abscess with bleeding
-K5712,gi,118,,1,120,Diverticulitis of small intestine without perforation or abscess without bleeding
-K5713,gi,119,,1,120,Diverticulitis of small intestine without perforation or abscess with bleeding
-K5720,gi,120,,1,120,Diverticulitis of large intestine with perforation and abscess without bleeding
-K5721,gi,121,,1,120,Diverticulitis of large intestine with perforation and abscess with bleeding
-K5731,gi,122,,1,120,Diverticulosis of large intestine without perforation or abscess with bleeding
-K5733,gi,123,,1,120,Diverticulitis of large intestine without perforation or abscess with bleeding
-K5740,gi,124,,1,120,Diverticulitis of both small and large intestine with perforation and abscess without bleeding
-K5741,gi,125,,1,120,Diverticulitis of both small and large intestine with perforation and abscess with bleeding
-K5750,gi,126,,1,120,Diverticulosis of both small and large intestine without perforation or abscess without bleeding
-K5751,gi,127,,1,120,Diverticulosis of both small and large intestine without perforation or abscess with bleeding
-K5752,gi,128,,1,120,Diverticulitis of both small and large intestine without perforation or abscess without bleeding
-K5753,gi,129,,1,120,Diverticulitis of both small and large intestine without perforation or abscess with bleeding
-K5780,gi,130,,1,120,"Diverticulitis of intestine, part unspecified, with perforation and abscess without bleeding"
-K5781,gi,131,,1,120,"Diverticulitis of intestine, part unspecified, with perforation and abscess with bleeding"
-K5791,gi,132,,1,120,"Diverticulosis of intestine, part unspecified, without perforation or abscess with bleeding"
-K5792,gi,133,,1,120,"Diverticulitis of intestine, part unspecified, without perforation or abscess without bleeding"
-K5793,gi,134,,1,120,"Diverticulitis of intestine, part unspecified, without perforation or abscess with bleeding"
-K8000,gi,135,,1,120,Calculus of gallbladder with acute cholecystitis without obstruction
-K8001,gi,136,,1,120,Calculus of gallbladder with acute cholecystitis with obstruction
-K8010,gi,137,,1,120,Calculus of gallbladder with chronic cholecystitis without obstruction
-K8011,gi,138,,1,120,Calculus of gallbladder with chronic cholecystitis with obstruction
-K8012,gi,139,,1,120,Calculus of gallbladder with acute and chronic cholecystitis without obstruction
-K8013,gi,140,,1,120,Calculus of gallbladder with acute and chronic cholecystitis with obstruction
-K8018,gi,141,,1,120,Calculus of gallbladder with other cholecystitis without obstruction
-K8019,gi,142,,1,120,Calculus of gallbladder with other cholecystitis with obstruction
-K8021,gi,143,,1,120,Calculus of gallbladder without cholecystitis with obstruction
-K8030,gi,144,,1,120,"Calculus of bile duct with cholangitis, unspecified, without obstruction"
-K8031,gi,145,,1,120,"Calculus of bile duct with cholangitis, unspecified, with obstruction"
-K8032,gi,146,,1,120,Calculus of bile duct with acute cholangitis without obstruction
-K8033,gi,147,,1,120,Calculus of bile duct with acute cholangitis with obstruction
-K8034,gi,148,,1,120,Calculus of bile duct with chronic cholangitis without obstruction
-K8035,gi,149,,1,120,Calculus of bile duct with chronic cholangitis with obstruction
-K8036,gi,150,,1,120,Calculus of bile duct with acute and chronic cholangitis without obstruction
-K8037,gi,151,,1,120,Calculus of bile duct with acute and chronic cholangitis with obstruction
-K8040,gi,152,,1,120,"Calculus of bile duct with cholecystitis, unspecified, without obstruction"
-K8041,gi,153,,1,120,"Calculus of bile duct with cholecystitis, unspecified, with obstruction"
-K8042,gi,154,,1,120,Calculus of bile duct with acute cholecystitis without obstruction
-K8043,gi,155,,1,120,Calculus of bile duct with acute cholecystitis with obstruction
-K8044,gi,156,,1,120,Calculus of bile duct with chronic cholecystitis without obstruction
-K8045,gi,157,,1,120,Calculus of bile duct with chronic cholecystitis with obstruction
-K8046,gi,158,,1,120,Calculus of bile duct with acute and chronic cholecystitis without obstruction
-K8047,gi,159,,1,120,Calculus of bile duct with acute and chronic cholecystitis with obstruction
-K8050,gi,160,,1,120,Calculus of bile duct without cholangitis or cholecystitis without obstruction
-K8051,gi,161,,1,120,Calculus of bile duct without cholangitis or cholecystitis with obstruction
-K8060,gi,162,,1,120,"Calculus of gallbladder and bile duct with cholecystitis, unspecified, without obstruction"
-K8061,gi,163,,1,120,"Calculus of gallbladder and bile duct with cholecystitis, unspecified, with obstruction"
-K8062,gi,164,,1,120,Calculus of gallbladder and bile duct with acute cholecystitis without obstruction
-K8063,gi,165,,1,120,Calculus of gallbladder and bile duct with acute cholecystitis with obstruction
-K8064,gi,166,,1,120,Calculus of gallbladder and bile duct with chronic cholecystitis without obstruction
-K8065,gi,167,,1,120,Calculus of gallbladder and bile duct with chronic cholecystitis with obstruction
-K8066,gi,168,,1,120,Calculus of gallbladder and bile duct with acute and chronic cholecystitis without obstruction
-K8067,gi,169,,1,120,Calculus of gallbladder and bile duct with acute and chronic cholecystitis with obstruction
-K8070,gi,170,,1,120,Calculus of gallbladder and bile duct without cholecystitis without obstruction
-K8071,gi,171,,1,120,Calculus of gallbladder and bile duct without cholecystitis with obstruction
-K8080,gi,172,,1,120,Other cholelithiasis without obstruction
-K8081,gi,173,,1,120,Other cholelithiasis with obstruction
-K8500,gi,174,,1,120,Idiopathic acute pancreatitis without necrosis or infection
-K8501,gi,175,,1,120,Idiopathic acute pancreatitis with uninfected necrosis
-K8502,gi,176,,1,120,Idiopathic acute pancreatitis with infected necrosis
-K8510,gi,177,,1,120,Biliary acute pancreatitis without necrosis or infection
-K8511,gi,178,,1,120,Biliary acute pancreatitis with uninfected necrosis
-K8512,gi,179,,1,120,Biliary acute pancreatitis with infected necrosis
-K8520,gi,180,,1,120,Alcohol induced acute pancreatitis without necrosis or infection
-K8521,gi,181,,1,120,Alcohol induced acute pancreatitis with uninfected necrosis
-K8522,gi,182,,1,120,Alcohol induced acute pancreatitis with infected necrosis
-K8530,gi,183,,1,120,Drug induced acute pancreatitis without necrosis or infection
-K8531,gi,184,,1,120,Drug induced acute pancreatitis with uninfected necrosis
-K8532,gi,185,,1,120,Drug induced acute pancreatitis with infected necrosis
-K8580,gi,186,,1,120,Other acute pancreatitis without necrosis or infection
-K8581,gi,187,,1,120,Other acute pancreatitis with uninfected necrosis
-K8582,gi,188,,1,120,Other acute pancreatitis with infected necrosis
-K860,gi,189,,1,120,Alcohol-induced chronic pancreatitis
-K861,gi,190,,1,120,Other chronic pancreatitis
-K862,gi,191,,1,120,Cyst of pancreas
-K863,gi,192,,1,120,Pseudocyst of pancreas
-K8681,gi,193,,1,120,Exocrine pancreatic insufficiency
-K8689,gi,194,,1,120,Other specified diseases of pancreas
-K869,gi,195,,1,120,"Disease of pancreas, unspecified"
-K920,gi,196,,1,120,Hematemesis
-K921,gi,197,,1,120,Melena
-K922,gi,198,,1,120,"Gastrointestinal hemorrhage, unspecified"
-K9281,gi,199,,1,120,Gastrointestinal mucositis (ulcerative)
-K9289,gi,200,,1,120,Other specified diseases of the digestive system
-K929,gi,201,,1,120,"Disease of digestive system, unspecified"
-K620,gi,202,,1,120,Anal polyp
-K621,gi,203,,1,120,Rectal polyp
-K622,gi,204,,1,120,Anal prolapse
-K623,gi,205,,1,120,Rectal prolapse
-K624,gi,206,,1,120,Stenosis of anus and rectum
-K625,gi,207,,1,120,Hemorrhage of anus and rectum
-K626,gi,208,,1,120,Ulcer of anus and rectum
-K627,gi,209,,1,120,Radiation proctitis
-K6281,gi,210,,1,120,Anal sphincter tear (healed) (nontraumatic) (old)
-K6282,gi,211,,1,120,Dysplasia of anus
-K6289,gi,212,,1,120,Other specified diseases of anus and rectum
-K629,gi,213,,1,120,"Disease of anus and rectum, unspecified"
-K630,gi,214,,1,120,Abscess of intestine
-K631,gi,215,,1,120,Perforation of intestine (nontraumatic)
-K632,gi,216,,1,120,Fistula of intestine
-K633,gi,217,,1,120,Ulcer of intestine
-K634,gi,218,,1,120,Enteroptosis
-K635,gi,219,,1,120,Polyp of colon
-K6381,gi,220,,1,120,Dieulafoy lesion of intestine
-K638211,gi,221,,1,120,"Small intestinal bacterial overgrowth, hydrogen-subtype"
-K638212,gi,222,,1,120,"Small intestinal bacterial overgrowth, hydrogen sulfide-subtype"
-K638219,gi,223,,1,120,"Small intestinal bacterial overgrowth, unspecified"
-K63822,gi,224,,1,120,Small intestinal fungal overgrowth
-K63829,gi,225,,1,120,"Intestinal methanogen overgrowth, unspecified"
-K6389,gi,226,,1,120,Other specified diseases of intestine
-K639,gi,227,,1,120,"Disease of intestine, unspecified"
-R100,gi,228,,1,120,Acute abdomen
-R1010,gi,229,,1,120,"Upper abdominal pain, unspecified"
-R1020,gi,230,,1,120,Pelvic and perineal pain unspecified side
-R1021,gi,231,,1,120,Pelvic and perineal pain right side
-R1022,gi,232,,1,120,Pelvic and perineal pain left side
-R1023,gi,233,,1,120,Pelvic and perineal pain bilateral
-R1024,gi,234,,1,120,Suprapubic pain
-R1033,gi,235,,1,120,Periumbilical pain
-R10811,gi,236,,1,120,Right upper quadrant abdominal tenderness
-R10812,gi,237,,1,120,Left upper quadrant abdominal tenderness
-R10813,gi,238,,1,120,Right lower quadrant abdominal tenderness
-R10814,gi,239,,1,120,Left lower quadrant abdominal tenderness
-R10815,gi,240,,1,120,Periumbilic abdominal tenderness
-R10816,gi,241,,1,120,Epigastric abdominal tenderness
-R10817,gi,242,,1,120,Generalized abdominal tenderness
-R10819,gi,243,,1,120,"Abdominal tenderness, unspecified site"
-R10821,gi,244,,1,120,Right upper quadrant rebound abdominal tenderness
-R10822,gi,245,,1,120,Left upper quadrant rebound abdominal tenderness
-R10823,gi,246,,1,120,Right lower quadrant rebound abdominal tenderness
-R10824,gi,247,,1,120,Left lower quadrant rebound abdominal tenderness
-R10825,gi,248,,1,120,Periumbilic rebound abdominal tenderness
-R10826,gi,249,,1,120,Epigastric rebound abdominal tenderness
-R10827,gi,250,,1,120,Generalized rebound abdominal tenderness
-R10829,gi,251,,1,120,"Rebound abdominal tenderness, unspecified site"
-R1083,gi,252,,1,120,Colic
-R1085,gi,253,,1,120,Abdominal pain of multiple sites
-R108A1,gi,254,,1,120,Right flank tenderness
-R108A2,gi,255,,1,120,Left flank tenderness
-R108A3,gi,256,,1,120,Suprapubic tenderness
-R108A9,gi,257,,1,120,"Flank tenderness, unspecified"
-R10A0,gi,258,,1,120,"Flank pain, unspecified side"
-R10A1,gi,259,,1,120,"Flank pain, right side"
-R10A2,gi,260,,1,120,"Flank pain, left side"
-R10A3,gi,261,,1,120,"Flank pain, bilateral"
-R1900,gi,262,,1,120,"Intra-abdominal and pelvic swelling, mass and lump, unspecified site"
-R1901,gi,263,,1,120,"Right upper quadrant abdominal swelling, mass and lump"
-R1902,gi,264,,1,120,"Left upper quadrant abdominal swelling, mass and lump"
-R1903,gi,265,,1,120,"Right lower quadrant abdominal swelling, mass and lump"
-R1904,gi,266,,1,120,"Left lower quadrant abdominal swelling, mass and lump"
-R1905,gi,267,,1,120,"Periumbilic swelling, mass or lump"
-R1906,gi,268,,1,120,"Epigastric swelling, mass or lump"
-R1907,gi,269,,1,120,"Generalized intra-abdominal and pelvic swelling, mass and lump"
-R1909,gi,270,,1,120,"Other intra-abdominal and pelvic swelling, mass and lump"
-R1911,gi,271,,1,120,Absent bowel sounds
-R1912,gi,272,,1,120,Hyperactive bowel sounds
-R1915,gi,273,,1,120,Other abnormal bowel sounds
-R192,gi,274,,1,120,Visible peristalsis
-R1930,gi,275,,1,120,"Abdominal rigidity, unspecified site"
-R1931,gi,276,,1,120,Right upper quadrant abdominal rigidity
-R1932,gi,277,,1,120,Left upper quadrant abdominal rigidity
-R1933,gi,278,,1,120,Right lower quadrant abdominal rigidity
-R1934,gi,279,,1,120,Left lower quadrant abdominal rigidity
-R1935,gi,280,,1,120,Periumbilic abdominal rigidity
-R1936,gi,281,,1,120,Epigastric abdominal rigidity
-R1937,gi,282,,1,120,Generalized abdominal rigidity
-R194,gi,283,,1,120,Change in bowel habit
-R195,gi,284,,1,120,Other fecal abnormalities
-R196,gi,285,,1,120,Halitosis
-R198,gi,286,,1,120,Other specified symptoms and signs involving the digestive system and abdomen
-K901,gi,287,,1,120,Tropical sprue
-K902,gi,288,,1,120,"Blind loop syndrome, not elsewhere classified"
-K903,gi,289,,1,120,Pancreatic steatorrhea
-K9049,gi,290,,1,120,"Malabsorption due to intolerance, not elsewhere classified"
-K9081,gi,291,,1,120,Whipple's disease
-K90821,gi,292,,1,120,Short bowel syndrome with colon in continuity
-K90822,gi,293,,1,120,Short bowel syndrome without colon in continuity
-K90829,gi,294,,1,120,"Short bowel syndrome, unspecified"
-K9083,gi,295,,1,120,Intestinal failure
-K9089,gi,296,,1,120,Other intestinal malabsorption
-K909,gi,297,,1,120,"Intestinal malabsorption, unspecified"
+R100,gi,39,,1,120,Acute abdomen
+R1010,gi,40,,1,120,"Upper abdominal pain, unspecified"
+R1020,gi,41,,1,120,Pelvic and perineal pain unspecified side
+R1021,gi,42,,1,120,Pelvic and perineal pain right side
+R1022,gi,43,,1,120,Pelvic and perineal pain left side
+R1023,gi,44,,1,120,Pelvic and perineal pain bilateral
+R1024,gi,45,,1,120,Suprapubic pain
+R1033,gi,46,,1,120,Periumbilical pain
+R10811,gi,47,,1,120,Right upper quadrant abdominal tenderness
+R10812,gi,48,,1,120,Left upper quadrant abdominal tenderness
+R10813,gi,49,,1,120,Right lower quadrant abdominal tenderness
+R10814,gi,50,,1,120,Left lower quadrant abdominal tenderness
+R10815,gi,51,,1,120,Periumbilic abdominal tenderness
+R10816,gi,52,,1,120,Epigastric abdominal tenderness
+R10817,gi,53,,1,120,Generalized abdominal tenderness
+R10819,gi,54,,1,120,"Abdominal tenderness, unspecified site"
+R10821,gi,55,,1,120,Right upper quadrant rebound abdominal tenderness
+R10822,gi,56,,1,120,Left upper quadrant rebound abdominal tenderness
+R10823,gi,57,,1,120,Right lower quadrant rebound abdominal tenderness
+R10824,gi,58,,1,120,Left lower quadrant rebound abdominal tenderness
+R10825,gi,59,,1,120,Periumbilic rebound abdominal tenderness
+R10826,gi,60,,1,120,Epigastric rebound abdominal tenderness
+R10827,gi,61,,1,120,Generalized rebound abdominal tenderness
+R10829,gi,62,,1,120,"Rebound abdominal tenderness, unspecified site"
+R1083,gi,63,,1,120,Colic
+R1085,gi,64,,1,120,Abdominal pain of multiple sites
+R108A1,gi,65,,1,120,Right flank tenderness
+R108A2,gi,66,,1,120,Left flank tenderness
+R108A3,gi,67,,1,120,Suprapubic tenderness
+R108A9,gi,68,,1,120,"Flank tenderness, unspecified"
+R10A0,gi,69,,1,120,"Flank pain, unspecified side"
+R10A1,gi,70,,1,120,"Flank pain, right side"
+R10A2,gi,71,,1,120,"Flank pain, left side"
+R10A3,gi,72,,1,120,"Flank pain, bilateral"
+R1900,gi,73,,1,120,"Intra-abdominal and pelvic swelling, mass and lump, unspecified site"
+R1901,gi,74,,1,120,"Right upper quadrant abdominal swelling, mass and lump"
+R1902,gi,75,,1,120,"Left upper quadrant abdominal swelling, mass and lump"
+R1903,gi,76,,1,120,"Right lower quadrant abdominal swelling, mass and lump"
+R1904,gi,77,,1,120,"Left lower quadrant abdominal swelling, mass and lump"
+R1905,gi,78,,1,120,"Periumbilic swelling, mass or lump"
+R1906,gi,79,,1,120,"Epigastric swelling, mass or lump"
+R1907,gi,80,,1,120,"Generalized intra-abdominal and pelvic swelling, mass and lump"
+R1909,gi,81,,1,120,"Other intra-abdominal and pelvic swelling, mass and lump"
+R1911,gi,82,,1,120,Absent bowel sounds
+R1912,gi,83,,1,120,Hyperactive bowel sounds
+R1915,gi,84,,1,120,Other abnormal bowel sounds
+R192,gi,85,,1,120,Visible peristalsis
+R1930,gi,86,,1,120,"Abdominal rigidity, unspecified site"
+R1931,gi,87,,1,120,Right upper quadrant abdominal rigidity
+R1932,gi,88,,1,120,Left upper quadrant abdominal rigidity
+R1933,gi,89,,1,120,Right lower quadrant abdominal rigidity
+R1934,gi,90,,1,120,Left lower quadrant abdominal rigidity
+R1935,gi,91,,1,120,Periumbilic abdominal rigidity
+R1936,gi,92,,1,120,Epigastric abdominal rigidity
+R1937,gi,93,,1,120,Generalized abdominal rigidity
+R194,gi,94,,1,120,Change in bowel habit
+R195,gi,95,,1,120,Other fecal abnormalities
+R196,gi,96,,1,120,Halitosis
+R198,gi,97,,1,120,Other specified symptoms and signs involving the digestive system and abdomen
 E559,nutrition,0,,0,120,"Vitamin D deficiency, unspecified"
 E669,nutrition,1,,0,120,"Obesity, unspecified"
 E6601,nutrition,2,,0,120,Morbid (severe) obesity due to excess calories
@@ -1630,60 +1260,6 @@ Z3A40,prenatal,69,F,15,50,40 weeks gestation of pregnancy
 Z3A41,prenatal,70,F,15,50,41 weeks gestation of pregnancy
 Z3A42,prenatal,71,F,15,50,42 weeks gestation of pregnancy
 Z3A49,prenatal,72,F,15,50,Greater than 42 weeks gestation of pregnancy
-O0900,prenatal,73,F,15,50,"Supervision of pregnancy with history of infertility, unspecified trimester"
-O0901,prenatal,74,F,15,50,"Supervision of pregnancy with history of infertility, first trimester"
-O0902,prenatal,75,F,15,50,"Supervision of pregnancy with history of infertility, second trimester"
-O0903,prenatal,76,F,15,50,"Supervision of pregnancy with history of infertility, third trimester"
-O0910,prenatal,77,F,15,50,"Supervision of pregnancy with history of ectopic pregnancy, unspecified trimester"
-O0911,prenatal,78,F,15,50,"Supervision of pregnancy with history of ectopic pregnancy, first trimester"
-O0912,prenatal,79,F,15,50,"Supervision of pregnancy with history of ectopic pregnancy, second trimester"
-O0913,prenatal,80,F,15,50,"Supervision of pregnancy with history of ectopic pregnancy, third trimester"
-O09211,prenatal,81,F,15,50,"Supervision of pregnancy with history of pre-term labor, first trimester"
-O09212,prenatal,82,F,15,50,"Supervision of pregnancy with history of pre-term labor, second trimester"
-O09213,prenatal,83,F,15,50,"Supervision of pregnancy with history of pre-term labor, third trimester"
-O09219,prenatal,84,F,15,50,"Supervision of pregnancy with history of pre-term labor, unspecified trimester"
-O09291,prenatal,85,F,15,50,"Supervision of pregnancy with other poor reproductive or obstetric history, first trimester"
-O09292,prenatal,86,F,15,50,"Supervision of pregnancy with other poor reproductive or obstetric history, second trimester"
-O09293,prenatal,87,F,15,50,"Supervision of pregnancy with other poor reproductive or obstetric history, third trimester"
-O09299,prenatal,88,F,15,50,"Supervision of pregnancy with other poor reproductive or obstetric history, unspecified trimester"
-O0930,prenatal,89,F,15,50,"Supervision of pregnancy with insufficient antenatal care, unspecified trimester"
-O0931,prenatal,90,F,15,50,"Supervision of pregnancy with insufficient antenatal care, first trimester"
-O0932,prenatal,91,F,15,50,"Supervision of pregnancy with insufficient antenatal care, second trimester"
-O0933,prenatal,92,F,15,50,"Supervision of pregnancy with insufficient antenatal care, third trimester"
-O0940,prenatal,93,F,15,50,"Supervision of pregnancy with grand multiparity, unspecified trimester"
-O0941,prenatal,94,F,15,50,"Supervision of pregnancy with grand multiparity, first trimester"
-O0942,prenatal,95,F,15,50,"Supervision of pregnancy with grand multiparity, second trimester"
-O0943,prenatal,96,F,15,50,"Supervision of pregnancy with grand multiparity, third trimester"
-O09519,prenatal,97,F,15,50,"Supervision of elderly primigravida, unspecified trimester"
-O09529,prenatal,98,F,15,50,"Supervision of elderly multigravida, unspecified trimester"
-O09611,prenatal,99,F,15,50,"Supervision of young primigravida, first trimester"
-O09612,prenatal,100,F,15,50,"Supervision of young primigravida, second trimester"
-O09613,prenatal,101,F,15,50,"Supervision of young primigravida, third trimester"
-O09619,prenatal,102,F,15,50,"Supervision of young primigravida, unspecified trimester"
-O09621,prenatal,103,F,15,50,"Supervision of young multigravida, first trimester"
-O09622,prenatal,104,F,15,50,"Supervision of young multigravida, second trimester"
-O09623,prenatal,105,F,15,50,"Supervision of young multigravida, third trimester"
-O09629,prenatal,106,F,15,50,"Supervision of young multigravida, unspecified trimester"
-O0970,prenatal,107,F,15,50,"Supervision of high risk pregnancy due to social problems, unspecified trimester"
-O0971,prenatal,108,F,15,50,"Supervision of high risk pregnancy due to social problems, first trimester"
-O0972,prenatal,109,F,15,50,"Supervision of high risk pregnancy due to social problems, second trimester"
-O0973,prenatal,110,F,15,50,"Supervision of high risk pregnancy due to social problems, third trimester"
-O09811,prenatal,111,F,15,50,"Supervision of pregnancy resulting from assisted reproductive technology, first trimester"
-O09812,prenatal,112,F,15,50,"Supervision of pregnancy resulting from assisted reproductive technology, second trimester"
-O09813,prenatal,113,F,15,50,"Supervision of pregnancy resulting from assisted reproductive technology, third trimester"
-O09819,prenatal,114,F,15,50,"Supervision of pregnancy resulting from assisted reproductive technology, unspecified trimester"
-O09821,prenatal,115,F,15,50,"Supervision of pregnancy with history of in utero procedure during previous pregnancy, first trimester"
-O09822,prenatal,116,F,15,50,"Supervision of pregnancy with history of in utero procedure during previous pregnancy, second trimester"
-O09823,prenatal,117,F,15,50,"Supervision of pregnancy with history of in utero procedure during previous pregnancy, third trimester"
-O09829,prenatal,118,F,15,50,"Supervision of pregnancy with history of in utero procedure during previous pregnancy, unspecified trimester"
-O09891,prenatal,119,F,15,50,"Supervision of other high risk pregnancies, first trimester"
-O09892,prenatal,120,F,15,50,"Supervision of other high risk pregnancies, second trimester"
-O09893,prenatal,121,F,15,50,"Supervision of other high risk pregnancies, third trimester"
-O09899,prenatal,122,F,15,50,"Supervision of other high risk pregnancies, unspecified trimester"
-O09A0,prenatal,123,F,15,50,"Supervision of pregnancy with history of molar pregnancy, unspecified trimester"
-O09A1,prenatal,124,F,15,50,"Supervision of pregnancy with history of molar pregnancy, first trimester"
-O09A2,prenatal,125,F,15,50,"Supervision of pregnancy with history of molar pregnancy, second trimester"
-O09A3,prenatal,126,F,15,50,"Supervision of pregnancy with history of molar pregnancy, third trimester"
 F329,psych,0,,12,120,"Major depressive disorder, single episode, unspecified"
 F32A,psych,1,,12,120,"Depression, unspecified"
 F331,psych,2,,12,120,"Major depressive disorder, recurrent, moderate"
@@ -1826,315 +1402,49 @@ F11981,drug,64,,14,90,"Opioid use, unspecified with opioid-induced sexual dysfun
 F11982,drug,65,,14,90,"Opioid use, unspecified with opioid-induced sleep disorder"
 F11988,drug,66,,14,90,"Opioid use, unspecified with other opioid-induced disorder"
 F1199,drug,67,,14,90,"Opioid use, unspecified with unspecified opioid-induced disorder"
-F1911,drug,68,,14,90,"Other psychoactive substance abuse, in remission"
-F19120,drug,69,,14,90,"Other psychoactive substance abuse with intoxication, uncomplicated"
-F19121,drug,70,,14,90,Other psychoactive substance abuse with intoxication delirium
-F19122,drug,71,,14,90,Other psychoactive substance abuse with intoxication with perceptual disturbances
-F19129,drug,72,,14,90,"Other psychoactive substance abuse with intoxication, unspecified"
-F19130,drug,73,,14,90,"Other psychoactive substance abuse with withdrawal, uncomplicated"
-F19131,drug,74,,14,90,Other psychoactive substance abuse with withdrawal delirium
-F19132,drug,75,,14,90,Other psychoactive substance abuse with withdrawal with perceptual disturbance
-F19139,drug,76,,14,90,"Other psychoactive substance abuse with withdrawal, unspecified"
-F1914,drug,77,,14,90,Other psychoactive substance abuse with psychoactive substance-induced mood disorder
-F19150,drug,78,,14,90,Other psychoactive substance abuse with psychoactive substance-induced psychotic disorder with delusions
-F19151,drug,79,,14,90,Other psychoactive substance abuse with psychoactive substance-induced psychotic disorder with hallucinations
-F19159,drug,80,,14,90,"Other psychoactive substance abuse with psychoactive substance-induced psychotic disorder, unspecified"
-F1916,drug,81,,14,90,Other psychoactive substance abuse with psychoactive substance-induced persisting amnestic disorder
-F1917,drug,82,,50,90,Other psychoactive substance abuse with psychoactive substance-induced persisting dementia
-F19180,drug,83,,14,90,Other psychoactive substance abuse with psychoactive substance-induced anxiety disorder
-F19181,drug,84,,14,90,Other psychoactive substance abuse with psychoactive substance-induced sexual dysfunction
-F19182,drug,85,,14,90,Other psychoactive substance abuse with psychoactive substance-induced sleep disorder
-F19188,drug,86,,14,90,Other psychoactive substance abuse with other psychoactive substance-induced disorder
-F1919,drug,87,,14,90,Other psychoactive substance abuse with unspecified psychoactive substance-induced disorder
-F1921,drug,88,,14,90,"Other psychoactive substance dependence, in remission"
-F19220,drug,89,,14,90,"Other psychoactive substance dependence with intoxication, uncomplicated"
-F19221,drug,90,,14,90,Other psychoactive substance dependence with intoxication delirium
-F19222,drug,91,,14,90,Other psychoactive substance dependence with intoxication with perceptual disturbance
-F19229,drug,92,,14,90,"Other psychoactive substance dependence with intoxication, unspecified"
-F19230,drug,93,,14,90,"Other psychoactive substance dependence with withdrawal, uncomplicated"
-F19231,drug,94,,14,90,Other psychoactive substance dependence with withdrawal delirium
-F19232,drug,95,,14,90,Other psychoactive substance dependence with withdrawal with perceptual disturbance
-F19239,drug,96,,14,90,"Other psychoactive substance dependence with withdrawal, unspecified"
-F1924,drug,97,,14,90,Other psychoactive substance dependence with psychoactive substance-induced mood disorder
-F19250,drug,98,,14,90,Other psychoactive substance dependence with psychoactive substance-induced psychotic disorder with delusions
-F19251,drug,99,,14,90,Other psychoactive substance dependence with psychoactive substance-induced psychotic disorder with hallucinations
-F19259,drug,100,,14,90,"Other psychoactive substance dependence with psychoactive substance-induced psychotic disorder, unspecified"
-F1926,drug,101,,14,90,Other psychoactive substance dependence with psychoactive substance-induced persisting amnestic disorder
-F1927,drug,102,,50,90,Other psychoactive substance dependence with psychoactive substance-induced persisting dementia
-F19280,drug,103,,14,90,Other psychoactive substance dependence with psychoactive substance-induced anxiety disorder
-F19281,drug,104,,14,90,Other psychoactive substance dependence with psychoactive substance-induced sexual dysfunction
-F19282,drug,105,,14,90,Other psychoactive substance dependence with psychoactive substance-induced sleep disorder
-F19288,drug,106,,14,90,Other psychoactive substance dependence with other psychoactive substance-induced disorder
-F1929,drug,107,,14,90,Other psychoactive substance dependence with unspecified psychoactive substance-induced disorder
-F1990,drug,108,,14,90,"Other psychoactive substance use, unspecified, uncomplicated"
-F1991,drug,109,,14,90,"Other psychoactive substance use, unspecified, in remission"
-F19920,drug,110,,14,90,"Other psychoactive substance use, unspecified with intoxication, uncomplicated"
-F19921,drug,111,,14,90,"Other psychoactive substance use, unspecified with intoxication with delirium"
-F19922,drug,112,,14,90,"Other psychoactive substance use, unspecified with intoxication with perceptual disturbance"
-F19929,drug,113,,14,90,"Other psychoactive substance use, unspecified with intoxication, unspecified"
-F19930,drug,114,,14,90,"Other psychoactive substance use, unspecified with withdrawal, uncomplicated"
-F19931,drug,115,,14,90,"Other psychoactive substance use, unspecified with withdrawal delirium"
-F19932,drug,116,,14,90,"Other psychoactive substance use, unspecified with withdrawal with perceptual disturbance"
-F19939,drug,117,,14,90,"Other psychoactive substance use, unspecified with withdrawal, unspecified"
-F1994,drug,118,,14,90,"Other psychoactive substance use, unspecified with psychoactive substance-induced mood disorder"
-F19950,drug,119,,14,90,"Other psychoactive substance use, unspecified with psychoactive substance-induced psychotic disorder with delusions"
-F19951,drug,120,,14,90,"Other psychoactive substance use, unspecified with psychoactive substance-induced psychotic disorder with hallucinations"
-F19959,drug,121,,14,90,"Other psychoactive substance use, unspecified with psychoactive substance-induced psychotic disorder, unspecified"
-F1996,drug,122,,14,90,"Other psychoactive substance use, unspecified with psychoactive substance-induced persisting amnestic disorder"
-F1997,drug,123,,50,90,"Other psychoactive substance use, unspecified with psychoactive substance-induced persisting dementia"
-F19980,drug,124,,14,90,"Other psychoactive substance use, unspecified with psychoactive substance-induced anxiety disorder"
-F19981,drug,125,,14,90,"Other psychoactive substance use, unspecified with psychoactive substance-induced sexual dysfunction"
-F19982,drug,126,,14,90,"Other psychoactive substance use, unspecified with psychoactive substance-induced sleep disorder"
-F19988,drug,127,,14,90,"Other psychoactive substance use, unspecified with other psychoactive substance-induced disorder"
-F1999,drug,128,,14,90,"Other psychoactive substance use, unspecified with unspecified psychoactive substance-induced disorder"
-F1211,drug,129,,14,90,"Cannabis abuse, in remission"
-F12120,drug,130,,14,90,"Cannabis abuse with intoxication, uncomplicated"
-F12121,drug,131,,14,90,Cannabis abuse with intoxication delirium
-F12122,drug,132,,14,90,Cannabis abuse with intoxication with perceptual disturbance
-F12129,drug,133,,14,90,"Cannabis abuse with intoxication, unspecified"
-F1213,drug,134,,14,90,Cannabis abuse with withdrawal
-F12150,drug,135,,14,90,Cannabis abuse with psychotic disorder with delusions
-F12151,drug,136,,14,90,Cannabis abuse with psychotic disorder with hallucinations
-F12159,drug,137,,14,90,"Cannabis abuse with psychotic disorder, unspecified"
-F12180,drug,138,,14,90,Cannabis abuse with cannabis-induced anxiety disorder
-F12188,drug,139,,14,90,Cannabis abuse with other cannabis-induced disorder
-F1219,drug,140,,14,90,Cannabis abuse with unspecified cannabis-induced disorder
-F1221,drug,141,,14,90,"Cannabis dependence, in remission"
-F12220,drug,142,,14,90,"Cannabis dependence with intoxication, uncomplicated"
-F12221,drug,143,,14,90,Cannabis dependence with intoxication delirium
-F12222,drug,144,,14,90,Cannabis dependence with intoxication with perceptual disturbance
-F12229,drug,145,,14,90,"Cannabis dependence with intoxication, unspecified"
-F1223,drug,146,,14,90,Cannabis dependence with withdrawal
-F12250,drug,147,,14,90,Cannabis dependence with psychotic disorder with delusions
-F12251,drug,148,,14,90,Cannabis dependence with psychotic disorder with hallucinations
-F12259,drug,149,,14,90,"Cannabis dependence with psychotic disorder, unspecified"
-F12280,drug,150,,14,90,Cannabis dependence with cannabis-induced anxiety disorder
-F12288,drug,151,,14,90,Cannabis dependence with other cannabis-induced disorder
-F1229,drug,152,,14,90,Cannabis dependence with unspecified cannabis-induced disorder
-F1291,drug,153,,14,90,"Cannabis use, unspecified, in remission"
-F12920,drug,154,,14,90,"Cannabis use, unspecified with intoxication, uncomplicated"
-F12921,drug,155,,14,90,"Cannabis use, unspecified with intoxication delirium"
-F12922,drug,156,,14,90,"Cannabis use, unspecified with intoxication with perceptual disturbance"
-F12929,drug,157,,14,90,"Cannabis use, unspecified with intoxication, unspecified"
-F1293,drug,158,,14,90,"Cannabis use, unspecified with withdrawal"
-F12950,drug,159,,14,90,"Cannabis use, unspecified with psychotic disorder with delusions"
-F12951,drug,160,,14,90,"Cannabis use, unspecified with psychotic disorder with hallucinations"
-F12959,drug,161,,14,90,"Cannabis use, unspecified with psychotic disorder, unspecified"
-F12980,drug,162,,14,90,"Cannabis use, unspecified with anxiety disorder"
-F12988,drug,163,,14,90,"Cannabis use, unspecified with other cannabis-induced disorder"
-F1299,drug,164,,14,90,"Cannabis use, unspecified with unspecified cannabis-induced disorder"
-F1411,drug,165,,14,90,"Cocaine abuse, in remission"
-F14120,drug,166,,14,90,"Cocaine abuse with intoxication, uncomplicated"
-F14121,drug,167,,14,90,Cocaine abuse with intoxication with delirium
-F14122,drug,168,,14,90,Cocaine abuse with intoxication with perceptual disturbance
-F14129,drug,169,,14,90,"Cocaine abuse with intoxication, unspecified"
-F1413,drug,170,,14,90,"Cocaine abuse, unspecified with withdrawal"
-F1414,drug,171,,14,90,Cocaine abuse with cocaine-induced mood disorder
-F14150,drug,172,,14,90,Cocaine abuse with cocaine-induced psychotic disorder with delusions
-F14151,drug,173,,14,90,Cocaine abuse with cocaine-induced psychotic disorder with hallucinations
-F14159,drug,174,,14,90,"Cocaine abuse with cocaine-induced psychotic disorder, unspecified"
-F14180,drug,175,,14,90,Cocaine abuse with cocaine-induced anxiety disorder
-F14181,drug,176,,14,90,Cocaine abuse with cocaine-induced sexual dysfunction
-F14182,drug,177,,14,90,Cocaine abuse with cocaine-induced sleep disorder
-F14188,drug,178,,14,90,Cocaine abuse with other cocaine-induced disorder
-F1419,drug,179,,14,90,Cocaine abuse with unspecified cocaine-induced disorder
-F1421,drug,180,,14,90,"Cocaine dependence, in remission"
-F14220,drug,181,,14,90,"Cocaine dependence with intoxication, uncomplicated"
-F14221,drug,182,,14,90,Cocaine dependence with intoxication delirium
-F14222,drug,183,,14,90,Cocaine dependence with intoxication with perceptual disturbance
-F14229,drug,184,,14,90,"Cocaine dependence with intoxication, unspecified"
-F1423,drug,185,,14,90,Cocaine dependence with withdrawal
-F1424,drug,186,,14,90,Cocaine dependence with cocaine-induced mood disorder
-F14250,drug,187,,14,90,Cocaine dependence with cocaine-induced psychotic disorder with delusions
-F14251,drug,188,,14,90,Cocaine dependence with cocaine-induced psychotic disorder with hallucinations
-F14259,drug,189,,14,90,"Cocaine dependence with cocaine-induced psychotic disorder, unspecified"
-F14280,drug,190,,14,90,Cocaine dependence with cocaine-induced anxiety disorder
-F14281,drug,191,,14,90,Cocaine dependence with cocaine-induced sexual dysfunction
-F14282,drug,192,,14,90,Cocaine dependence with cocaine-induced sleep disorder
-F14288,drug,193,,14,90,Cocaine dependence with other cocaine-induced disorder
-F1429,drug,194,,14,90,Cocaine dependence with unspecified cocaine-induced disorder
-F1490,drug,195,,14,90,"Cocaine use, unspecified, uncomplicated"
-F1491,drug,196,,14,90,"Cocaine use, unspecified, in remission"
-F14920,drug,197,,14,90,"Cocaine use, unspecified with intoxication, uncomplicated"
-F14921,drug,198,,14,90,"Cocaine use, unspecified with intoxication delirium"
-F14922,drug,199,,14,90,"Cocaine use, unspecified with intoxication with perceptual disturbance"
-F14929,drug,200,,14,90,"Cocaine use, unspecified with intoxication, unspecified"
-F1493,drug,201,,14,90,"Cocaine use, unspecified with withdrawal"
-F1494,drug,202,,14,90,"Cocaine use, unspecified with cocaine-induced mood disorder"
-F14950,drug,203,,14,90,"Cocaine use, unspecified with cocaine-induced psychotic disorder with delusions"
-F14951,drug,204,,14,90,"Cocaine use, unspecified with cocaine-induced psychotic disorder with hallucinations"
-F14959,drug,205,,14,90,"Cocaine use, unspecified with cocaine-induced psychotic disorder, unspecified"
-F14980,drug,206,,14,90,"Cocaine use, unspecified with cocaine-induced anxiety disorder"
-F14981,drug,207,,14,90,"Cocaine use, unspecified with cocaine-induced sexual dysfunction"
-F14982,drug,208,,14,90,"Cocaine use, unspecified with cocaine-induced sleep disorder"
-F14988,drug,209,,14,90,"Cocaine use, unspecified with other cocaine-induced disorder"
-F1499,drug,210,,14,90,"Cocaine use, unspecified with unspecified cocaine-induced disorder"
-F1511,drug,211,,14,90,"Other stimulant abuse, in remission"
-F15120,drug,212,,14,90,"Other stimulant abuse with intoxication, uncomplicated"
-F15121,drug,213,,14,90,Other stimulant abuse with intoxication delirium
-F15122,drug,214,,14,90,Other stimulant abuse with intoxication with perceptual disturbance
-F15129,drug,215,,14,90,"Other stimulant abuse with intoxication, unspecified"
-F1513,drug,216,,14,90,Other stimulant abuse with withdrawal
-F1514,drug,217,,14,90,Other stimulant abuse with stimulant-induced mood disorder
-F15150,drug,218,,14,90,Other stimulant abuse with stimulant-induced psychotic disorder with delusions
-F15151,drug,219,,14,90,Other stimulant abuse with stimulant-induced psychotic disorder with hallucinations
-F15159,drug,220,,14,90,"Other stimulant abuse with stimulant-induced psychotic disorder, unspecified"
-F15180,drug,221,,14,90,Other stimulant abuse with stimulant-induced anxiety disorder
-F15181,drug,222,,14,90,Other stimulant abuse with stimulant-induced sexual dysfunction
-F15182,drug,223,,14,90,Other stimulant abuse with stimulant-induced sleep disorder
-F15188,drug,224,,14,90,Other stimulant abuse with other stimulant-induced disorder
-F1519,drug,225,,14,90,Other stimulant abuse with unspecified stimulant-induced disorder
-F1521,drug,226,,14,90,"Other stimulant dependence, in remission"
-F15220,drug,227,,14,90,"Other stimulant dependence with intoxication, uncomplicated"
-F15221,drug,228,,14,90,Other stimulant dependence with intoxication delirium
-F15222,drug,229,,14,90,Other stimulant dependence with intoxication with perceptual disturbance
-F15229,drug,230,,14,90,"Other stimulant dependence with intoxication, unspecified"
-F1523,drug,231,,14,90,Other stimulant dependence with withdrawal
-F1524,drug,232,,14,90,Other stimulant dependence with stimulant-induced mood disorder
-F15250,drug,233,,14,90,Other stimulant dependence with stimulant-induced psychotic disorder with delusions
-F15251,drug,234,,14,90,Other stimulant dependence with stimulant-induced psychotic disorder with hallucinations
-F15259,drug,235,,14,90,"Other stimulant dependence with stimulant-induced psychotic disorder, unspecified"
-F15280,drug,236,,14,90,Other stimulant dependence with stimulant-induced anxiety disorder
-F15281,drug,237,,14,90,Other stimulant dependence with stimulant-induced sexual dysfunction
-F15282,drug,238,,14,90,Other stimulant dependence with stimulant-induced sleep disorder
-F15288,drug,239,,14,90,Other stimulant dependence with other stimulant-induced disorder
-F1529,drug,240,,14,90,Other stimulant dependence with unspecified stimulant-induced disorder
-F1590,drug,241,,14,90,"Other stimulant use, unspecified, uncomplicated"
-F1591,drug,242,,14,90,"Other stimulant use, unspecified, in remission"
-F15920,drug,243,,14,90,"Other stimulant use, unspecified with intoxication, uncomplicated"
-F15921,drug,244,,14,90,"Other stimulant use, unspecified with intoxication delirium"
-F15922,drug,245,,14,90,"Other stimulant use, unspecified with intoxication with perceptual disturbance"
-F15929,drug,246,,14,90,"Other stimulant use, unspecified with intoxication, unspecified"
-F1593,drug,247,,14,90,"Other stimulant use, unspecified with withdrawal"
-F1594,drug,248,,14,90,"Other stimulant use, unspecified with stimulant-induced mood disorder"
-F15950,drug,249,,14,90,"Other stimulant use, unspecified with stimulant-induced psychotic disorder with delusions"
-F15951,drug,250,,14,90,"Other stimulant use, unspecified with stimulant-induced psychotic disorder with hallucinations"
-F15959,drug,251,,14,90,"Other stimulant use, unspecified with stimulant-induced psychotic disorder, unspecified"
-F15980,drug,252,,14,90,"Other stimulant use, unspecified with stimulant-induced anxiety disorder"
-F15981,drug,253,,14,90,"Other stimulant use, unspecified with stimulant-induced sexual dysfunction"
-F15982,drug,254,,14,90,"Other stimulant use, unspecified with stimulant-induced sleep disorder"
-F15988,drug,255,,14,90,"Other stimulant use, unspecified with other stimulant-induced disorder"
-F1599,drug,256,,14,90,"Other stimulant use, unspecified with unspecified stimulant-induced disorder"
-F1310,drug,257,,14,90,"Sedative, hypnotic or anxiolytic abuse, uncomplicated"
-F1311,drug,258,,14,90,"Sedative, hypnotic or anxiolytic abuse, in remission"
-F13120,drug,259,,14,90,"Sedative, hypnotic or anxiolytic abuse with intoxication, uncomplicated"
-F13121,drug,260,,14,90,"Sedative, hypnotic or anxiolytic abuse with intoxication delirium"
-F13129,drug,261,,14,90,"Sedative, hypnotic or anxiolytic abuse with intoxication, unspecified"
-F13130,drug,262,,14,90,"Sedative, hypnotic or anxiolytic abuse with withdrawal, uncomplicated"
-F13131,drug,263,,14,90,"Sedative, hypnotic or anxiolytic abuse with withdrawal delirium"
-F13132,drug,264,,14,90,"Sedative, hypnotic or anxiolytic abuse with withdrawal with perceptual disturbance"
-F13139,drug,265,,14,90,"Sedative, hypnotic or anxiolytic abuse with withdrawal, unspecified"
-F1314,drug,266,,14,90,"Sedative, hypnotic or anxiolytic abuse with sedative, hypnotic or anxiolytic-induced mood disorder"
-F13150,drug,267,,14,90,"Sedative, hypnotic or anxiolytic abuse with sedative, hypnotic or anxiolytic-induced psychotic disorder with delusions"
-F13151,drug,268,,14,90,"Sedative, hypnotic or anxiolytic abuse with sedative, hypnotic or anxiolytic-induced psychotic disorder with hallucinations"
-F13159,drug,269,,14,90,"Sedative, hypnotic or anxiolytic abuse with sedative, hypnotic or anxiolytic-induced psychotic disorder, unspecified"
-F13180,drug,270,,14,90,"Sedative, hypnotic or anxiolytic abuse with sedative, hypnotic or anxiolytic-induced anxiety disorder"
-F13181,drug,271,,14,90,"Sedative, hypnotic or anxiolytic abuse with sedative, hypnotic or anxiolytic-induced sexual dysfunction"
-F13182,drug,272,,14,90,"Sedative, hypnotic or anxiolytic abuse with sedative, hypnotic or anxiolytic-induced sleep disorder"
-F13188,drug,273,,14,90,"Sedative, hypnotic or anxiolytic abuse with other sedative, hypnotic or anxiolytic-induced disorder"
-F1319,drug,274,,14,90,"Sedative, hypnotic or anxiolytic abuse with unspecified sedative, hypnotic or anxiolytic-induced disorder"
-F1321,drug,275,,14,90,"Sedative, hypnotic or anxiolytic dependence, in remission"
-F13220,drug,276,,14,90,"Sedative, hypnotic or anxiolytic dependence with intoxication, uncomplicated"
-F13221,drug,277,,14,90,"Sedative, hypnotic or anxiolytic dependence with intoxication delirium"
-F13229,drug,278,,14,90,"Sedative, hypnotic or anxiolytic dependence with intoxication, unspecified"
-F13230,drug,279,,14,90,"Sedative, hypnotic or anxiolytic dependence with withdrawal, uncomplicated"
-F13231,drug,280,,14,90,"Sedative, hypnotic or anxiolytic dependence with withdrawal delirium"
-F13232,drug,281,,14,90,"Sedative, hypnotic or anxiolytic dependence with withdrawal with perceptual disturbance"
-F13239,drug,282,,14,90,"Sedative, hypnotic or anxiolytic dependence with withdrawal, unspecified"
-F1324,drug,283,,14,90,"Sedative, hypnotic or anxiolytic dependence with sedative, hypnotic or anxiolytic-induced mood disorder"
-F13250,drug,284,,14,90,"Sedative, hypnotic or anxiolytic dependence with sedative, hypnotic or anxiolytic-induced psychotic disorder with delusions"
-F13251,drug,285,,14,90,"Sedative, hypnotic or anxiolytic dependence with sedative, hypnotic or anxiolytic-induced psychotic disorder with hallucinations"
-F13259,drug,286,,14,90,"Sedative, hypnotic or anxiolytic dependence with sedative, hypnotic or anxiolytic-induced psychotic disorder, unspecified"
-F1326,drug,287,,14,90,"Sedative, hypnotic or anxiolytic dependence with sedative, hypnotic or anxiolytic-induced persisting amnestic disorder"
-F1327,drug,288,,50,90,"Sedative, hypnotic or anxiolytic dependence with sedative, hypnotic or anxiolytic-induced persisting dementia"
-F13280,drug,289,,14,90,"Sedative, hypnotic or anxiolytic dependence with sedative, hypnotic or anxiolytic-induced anxiety disorder"
-F13281,drug,290,,14,90,"Sedative, hypnotic or anxiolytic dependence with sedative, hypnotic or anxiolytic-induced sexual dysfunction"
-F13282,drug,291,,14,90,"Sedative, hypnotic or anxiolytic dependence with sedative, hypnotic or anxiolytic-induced sleep disorder"
-F13288,drug,292,,14,90,"Sedative, hypnotic or anxiolytic dependence with other sedative, hypnotic or anxiolytic-induced disorder"
-F1329,drug,293,,14,90,"Sedative, hypnotic or anxiolytic dependence with unspecified sedative, hypnotic or anxiolytic-induced disorder"
-F1390,drug,294,,14,90,"Sedative, hypnotic, or anxiolytic use, unspecified, uncomplicated"
-F1391,drug,295,,14,90,"Sedative, hypnotic or anxiolytic use, unspecified, in remission"
-F13920,drug,296,,14,90,"Sedative, hypnotic or anxiolytic use, unspecified with intoxication, uncomplicated"
-F13921,drug,297,,14,90,"Sedative, hypnotic or anxiolytic use, unspecified with intoxication delirium"
-F13929,drug,298,,14,90,"Sedative, hypnotic or anxiolytic use, unspecified with intoxication, unspecified"
-F13930,drug,299,,14,90,"Sedative, hypnotic or anxiolytic use, unspecified with withdrawal, uncomplicated"
-F13931,drug,300,,14,90,"Sedative, hypnotic or anxiolytic use, unspecified with withdrawal delirium"
-F13932,drug,301,,14,90,"Sedative, hypnotic or anxiolytic use, unspecified with withdrawal with perceptual disturbances"
-F13939,drug,302,,14,90,"Sedative, hypnotic or anxiolytic use, unspecified with withdrawal, unspecified"
-F1394,drug,303,,14,90,"Sedative, hypnotic or anxiolytic use, unspecified with sedative, hypnotic or anxiolytic-induced mood disorder"
-F13950,drug,304,,14,90,"Sedative, hypnotic or anxiolytic use, unspecified with sedative, hypnotic or anxiolytic-induced psychotic disorder with delusions"
-F13951,drug,305,,14,90,"Sedative, hypnotic or anxiolytic use, unspecified with sedative, hypnotic or anxiolytic-induced psychotic disorder with hallucinations"
-F13959,drug,306,,14,90,"Sedative, hypnotic or anxiolytic use, unspecified with sedative, hypnotic or anxiolytic-induced psychotic disorder, unspecified"
-F1396,drug,307,,14,90,"Sedative, hypnotic or anxiolytic use, unspecified with sedative, hypnotic or anxiolytic-induced persisting amnestic disorder"
-F1397,drug,308,,50,90,"Sedative, hypnotic or anxiolytic use, unspecified with sedative, hypnotic or anxiolytic-induced persisting dementia"
-F13980,drug,309,,14,90,"Sedative, hypnotic or anxiolytic use, unspecified with sedative, hypnotic or anxiolytic-induced anxiety disorder"
-F13981,drug,310,,14,90,"Sedative, hypnotic or anxiolytic use, unspecified with sedative, hypnotic or anxiolytic-induced sexual dysfunction"
-F13982,drug,311,,14,90,"Sedative, hypnotic or anxiolytic use, unspecified with sedative, hypnotic or anxiolytic-induced sleep disorder"
-F13988,drug,312,,14,90,"Sedative, hypnotic or anxiolytic use, unspecified with other sedative, hypnotic or anxiolytic-induced disorder"
-F1399,drug,313,,14,90,"Sedative, hypnotic or anxiolytic use, unspecified with unspecified sedative, hypnotic or anxiolytic-induced disorder"
-F1011,drug,314,,14,90,"Alcohol abuse, in remission"
-F10120,drug,315,,14,90,"Alcohol abuse with intoxication, uncomplicated"
-F10121,drug,316,,14,90,Alcohol abuse with intoxication delirium
-F10129,drug,317,,14,90,"Alcohol abuse with intoxication, unspecified"
-F10130,drug,318,,14,90,"Alcohol abuse with withdrawal, uncomplicated"
-F10131,drug,319,,14,90,Alcohol abuse with withdrawal delirium
-F10132,drug,320,,14,90,Alcohol abuse with withdrawal with perceptual disturbance
-F10139,drug,321,,14,90,"Alcohol abuse with withdrawal, unspecified"
-F1014,drug,322,,14,90,Alcohol abuse with alcohol-induced mood disorder
-F10150,drug,323,,14,90,Alcohol abuse with alcohol-induced psychotic disorder with delusions
-F10151,drug,324,,14,90,Alcohol abuse with alcohol-induced psychotic disorder with hallucinations
-F10159,drug,325,,14,90,"Alcohol abuse with alcohol-induced psychotic disorder, unspecified"
-F10180,drug,326,,14,90,Alcohol abuse with alcohol-induced anxiety disorder
-F10181,drug,327,,14,90,Alcohol abuse with alcohol-induced sexual dysfunction
-F10182,drug,328,,14,90,Alcohol abuse with alcohol-induced sleep disorder
-F10188,drug,329,,14,90,Alcohol abuse with other alcohol-induced disorder
-F1019,drug,330,,14,90,Alcohol abuse with unspecified alcohol-induced disorder
-F1021,drug,331,,14,90,"Alcohol dependence, in remission"
-F10220,drug,332,,14,90,"Alcohol dependence with intoxication, uncomplicated"
-F10221,drug,333,,14,90,Alcohol dependence with intoxication delirium
-F10229,drug,334,,14,90,"Alcohol dependence with intoxication, unspecified"
-F10230,drug,335,,14,90,"Alcohol dependence with withdrawal, uncomplicated"
-F10231,drug,336,,14,90,Alcohol dependence with withdrawal delirium
-F10232,drug,337,,14,90,Alcohol dependence with withdrawal with perceptual disturbance
-F10239,drug,338,,14,90,"Alcohol dependence with withdrawal, unspecified"
-F1024,drug,339,,14,90,Alcohol dependence with alcohol-induced mood disorder
-F10250,drug,340,,14,90,Alcohol dependence with alcohol-induced psychotic disorder with delusions
-F10251,drug,341,,14,90,Alcohol dependence with alcohol-induced psychotic disorder with hallucinations
-F10259,drug,342,,14,90,"Alcohol dependence with alcohol-induced psychotic disorder, unspecified"
-F1026,drug,343,,14,90,Alcohol dependence with alcohol-induced persisting amnestic disorder
-F1027,drug,344,,50,90,Alcohol dependence with alcohol-induced persisting dementia
-F10280,drug,345,,14,90,Alcohol dependence with alcohol-induced anxiety disorder
-F10281,drug,346,,14,90,Alcohol dependence with alcohol-induced sexual dysfunction
-F10282,drug,347,,14,90,Alcohol dependence with alcohol-induced sleep disorder
-F10288,drug,348,,14,90,Alcohol dependence with other alcohol-induced disorder
-F1029,drug,349,,14,90,Alcohol dependence with unspecified alcohol-induced disorder
-F1090,drug,350,,14,90,"Alcohol use, unspecified, uncomplicated"
-F1091,drug,351,,14,90,"Alcohol use, unspecified, in remission"
-F10920,drug,352,,14,90,"Alcohol use, unspecified with intoxication, uncomplicated"
-F10921,drug,353,,14,90,"Alcohol use, unspecified with intoxication delirium"
-F10929,drug,354,,14,90,"Alcohol use, unspecified with intoxication, unspecified"
-F10930,drug,355,,14,90,"Alcohol use, unspecified with withdrawal, uncomplicated"
-F10931,drug,356,,14,90,"Alcohol use, unspecified with withdrawal delirium"
-F10932,drug,357,,14,90,"Alcohol use, unspecified with withdrawal with perceptual disturbance"
-F10939,drug,358,,14,90,"Alcohol use, unspecified with withdrawal, unspecified"
-F1094,drug,359,,14,90,"Alcohol use, unspecified with alcohol-induced mood disorder"
-F10950,drug,360,,14,90,"Alcohol use, unspecified with alcohol-induced psychotic disorder with delusions"
-F10951,drug,361,,14,90,"Alcohol use, unspecified with alcohol-induced psychotic disorder with hallucinations"
-F10959,drug,362,,14,90,"Alcohol use, unspecified with alcohol-induced psychotic disorder, unspecified"
-F1096,drug,363,,14,90,"Alcohol use, unspecified with alcohol-induced persisting amnestic disorder"
-F1097,drug,364,,50,90,"Alcohol use, unspecified with alcohol-induced persisting dementia"
-F10980,drug,365,,14,90,"Alcohol use, unspecified with alcohol-induced anxiety disorder"
-F10981,drug,366,,14,90,"Alcohol use, unspecified with alcohol-induced sexual dysfunction"
-F10982,drug,367,,14,90,"Alcohol use, unspecified with alcohol-induced sleep disorder"
-F10988,drug,368,,14,90,"Alcohol use, unspecified with other alcohol-induced disorder"
-F1099,drug,369,,14,90,"Alcohol use, unspecified with unspecified alcohol-induced disorder"
-M069,rheum,0,,10,120,"Rheumatoid arthritis, unspecified"
-M329,rheum,1,,10,120,"Systemic lupus erythematosus, unspecified"
-M109,rheum,2,,10,120,"Gout, unspecified"
-E790,rheum,3,,10,120,Hyperuricemia without signs of inflammatory arthritis and tophaceous disease
-M1990,rheum,4,,10,120,"Unspecified osteoarthritis, unspecified site"
-M170,rheum,5,,10,120,Bilateral primary osteoarthritis of knee
-M179,rheum,6,,10,120,"Osteoarthritis of knee, unspecified"
+F1211,drug,68,,14,90,"Cannabis abuse, in remission"
+F12120,drug,69,,14,90,"Cannabis abuse with intoxication, uncomplicated"
+F12121,drug,70,,14,90,Cannabis abuse with intoxication delirium
+F12122,drug,71,,14,90,Cannabis abuse with intoxication with perceptual disturbance
+F12129,drug,72,,14,90,"Cannabis abuse with intoxication, unspecified"
+F1213,drug,73,,14,90,Cannabis abuse with withdrawal
+F12150,drug,74,,14,90,Cannabis abuse with psychotic disorder with delusions
+F12151,drug,75,,14,90,Cannabis abuse with psychotic disorder with hallucinations
+F12159,drug,76,,14,90,"Cannabis abuse with psychotic disorder, unspecified"
+F12180,drug,77,,14,90,Cannabis abuse with cannabis-induced anxiety disorder
+F12188,drug,78,,14,90,Cannabis abuse with other cannabis-induced disorder
+F1219,drug,79,,14,90,Cannabis abuse with unspecified cannabis-induced disorder
+F1221,drug,80,,14,90,"Cannabis dependence, in remission"
+F12220,drug,81,,14,90,"Cannabis dependence with intoxication, uncomplicated"
+F12221,drug,82,,14,90,Cannabis dependence with intoxication delirium
+F12222,drug,83,,14,90,Cannabis dependence with intoxication with perceptual disturbance
+F12229,drug,84,,14,90,"Cannabis dependence with intoxication, unspecified"
+F1223,drug,85,,14,90,Cannabis dependence with withdrawal
+F12250,drug,86,,14,90,Cannabis dependence with psychotic disorder with delusions
+F12251,drug,87,,14,90,Cannabis dependence with psychotic disorder with hallucinations
+F12259,drug,88,,14,90,"Cannabis dependence with psychotic disorder, unspecified"
+F12280,drug,89,,14,90,Cannabis dependence with cannabis-induced anxiety disorder
+F12288,drug,90,,14,90,Cannabis dependence with other cannabis-induced disorder
+F1229,drug,91,,14,90,Cannabis dependence with unspecified cannabis-induced disorder
+F1291,drug,92,,14,90,"Cannabis use, unspecified, in remission"
+F12920,drug,93,,14,90,"Cannabis use, unspecified with intoxication, uncomplicated"
+F12921,drug,94,,14,90,"Cannabis use, unspecified with intoxication delirium"
+F12922,drug,95,,14,90,"Cannabis use, unspecified with intoxication with perceptual disturbance"
+F12929,drug,96,,14,90,"Cannabis use, unspecified with intoxication, unspecified"
+F1293,drug,97,,14,90,"Cannabis use, unspecified with withdrawal"
+F12950,drug,98,,14,90,"Cannabis use, unspecified with psychotic disorder with delusions"
+F12951,drug,99,,14,90,"Cannabis use, unspecified with psychotic disorder with hallucinations"
+F12959,drug,100,,14,90,"Cannabis use, unspecified with psychotic disorder, unspecified"
+F12980,drug,101,,14,90,"Cannabis use, unspecified with anxiety disorder"
+F12988,drug,102,,14,90,"Cannabis use, unspecified with other cannabis-induced disorder"
+F1299,drug,103,,14,90,"Cannabis use, unspecified with unspecified cannabis-induced disorder"
+M1990,rheum,0,,10,120,"Unspecified osteoarthritis, unspecified site"
+M170,rheum,1,,10,120,Bilateral primary osteoarthritis of knee
+M179,rheum,2,,10,120,"Osteoarthritis of knee, unspecified"
+M109,rheum,3,,10,120,"Gout, unspecified"
+E790,rheum,4,,10,120,Hyperuricemia without signs of inflammatory arthritis and tophaceous disease
+M069,rheum,5,,10,120,"Rheumatoid arthritis, unspecified"
+M329,rheum,6,,10,120,"Systemic lupus erythematosus, unspecified"
 M3500,rheum,7,,10,120,"Sjogren syndrome, unspecified"
 M353,rheum,8,,10,120,Polymyalgia rheumatica
 M459,rheum,9,,10,120,Ankylosing spondylitis of unspecified sites in spine
@@ -2461,66 +1771,6 @@ C185,cancer,75,,18,120,Malignant neoplasm of splenic flexure
 C186,cancer,76,,18,120,Malignant neoplasm of descending colon
 C187,cancer,77,,18,120,Malignant neoplasm of sigmoid colon
 C188,cancer,78,,18,120,Malignant neoplasm of overlapping sites of colon
-C3400,cancer,79,,18,120,Malignant neoplasm of unspecified main bronchus
-C3401,cancer,80,,18,120,Malignant neoplasm of right main bronchus
-C3402,cancer,81,,18,120,Malignant neoplasm of left main bronchus
-C3410,cancer,82,,18,120,"Malignant neoplasm of upper lobe, unspecified bronchus or lung"
-C3411,cancer,83,,18,120,"Malignant neoplasm of upper lobe, right bronchus or lung"
-C3412,cancer,84,,18,120,"Malignant neoplasm of upper lobe, left bronchus or lung"
-C342,cancer,85,,18,120,"Malignant neoplasm of middle lobe, bronchus or lung"
-C3430,cancer,86,,18,120,"Malignant neoplasm of lower lobe, unspecified bronchus or lung"
-C3431,cancer,87,,18,120,"Malignant neoplasm of lower lobe, right bronchus or lung"
-C3432,cancer,88,,18,120,"Malignant neoplasm of lower lobe, left bronchus or lung"
-C3480,cancer,89,,18,120,Malignant neoplasm of overlapping sites of unspecified bronchus and lung
-C3481,cancer,90,,18,120,Malignant neoplasm of overlapping sites of right bronchus and lung
-C3482,cancer,91,,18,120,Malignant neoplasm of overlapping sites of left bronchus and lung
-C3491,cancer,92,,18,120,Malignant neoplasm of unspecified part of right bronchus or lung
-C3492,cancer,93,,18,120,Malignant neoplasm of unspecified part of left bronchus or lung
-C561,cancer,94,F,18,120,Malignant neoplasm of right ovary
-C562,cancer,95,F,18,120,Malignant neoplasm of left ovary
-C563,cancer,96,F,18,120,Malignant neoplasm of bilateral ovaries
-C641,cancer,97,,18,120,"Malignant neoplasm of right kidney, except renal pelvis"
-C642,cancer,98,,18,120,"Malignant neoplasm of left kidney, except renal pelvis"
-C670,cancer,99,,18,120,Malignant neoplasm of trigone of bladder
-C671,cancer,100,,18,120,Malignant neoplasm of dome of bladder
-C672,cancer,101,,18,120,Malignant neoplasm of lateral wall of bladder
-C673,cancer,102,,18,120,Malignant neoplasm of anterior wall of bladder
-C674,cancer,103,,18,120,Malignant neoplasm of posterior wall of bladder
-C675,cancer,104,,18,120,Malignant neoplasm of bladder neck
-C676,cancer,105,,18,120,Malignant neoplasm of ureteric orifice
-C677,cancer,106,,18,120,Malignant neoplasm of urachus
-C678,cancer,107,,18,120,Malignant neoplasm of overlapping sites of bladder
-C430,cancer,108,,18,120,Malignant melanoma of lip
-C4310,cancer,109,,18,120,"Malignant melanoma of unspecified eyelid, including canthus"
-C43111,cancer,110,,18,120,"Malignant melanoma of right upper eyelid, including canthus"
-C43112,cancer,111,,18,120,"Malignant melanoma of right lower eyelid, including canthus"
-C43121,cancer,112,,18,120,"Malignant melanoma of left upper eyelid, including canthus"
-C43122,cancer,113,,18,120,"Malignant melanoma of left lower eyelid, including canthus"
-C4320,cancer,114,,18,120,Malignant melanoma of unspecified ear and external auricular canal
-C4321,cancer,115,,18,120,Malignant melanoma of right ear and external auricular canal
-C4322,cancer,116,,18,120,Malignant melanoma of left ear and external auricular canal
-C4330,cancer,117,,18,120,Malignant melanoma of unspecified part of face
-C4331,cancer,118,,18,120,Malignant melanoma of nose
-C4339,cancer,119,,18,120,Malignant melanoma of other parts of face
-C434,cancer,120,,18,120,Malignant melanoma of scalp and neck
-C4351,cancer,121,,18,120,Malignant melanoma of anal skin
-C4352,cancer,122,,18,120,Malignant melanoma of skin of breast
-C4359,cancer,123,,18,120,Malignant melanoma of other part of trunk
-C4360,cancer,124,,18,120,"Malignant melanoma of unspecified upper limb, including shoulder"
-C4361,cancer,125,,18,120,"Malignant melanoma of right upper limb, including shoulder"
-C4362,cancer,126,,18,120,"Malignant melanoma of left upper limb, including shoulder"
-C4370,cancer,127,,18,120,"Malignant melanoma of unspecified lower limb, including hip"
-C4371,cancer,128,,18,120,"Malignant melanoma of right lower limb, including hip"
-C4372,cancer,129,,18,120,"Malignant melanoma of left lower limb, including hip"
-C438,cancer,130,,18,120,Malignant melanoma of overlapping sites of skin
-C160,cancer,131,,18,120,Malignant neoplasm of cardia
-C161,cancer,132,,18,120,Malignant neoplasm of fundus of stomach
-C162,cancer,133,,18,120,Malignant neoplasm of body of stomach
-C163,cancer,134,,18,120,Malignant neoplasm of pyloric antrum
-C164,cancer,135,,18,120,Malignant neoplasm of pylorus
-C165,cancer,136,,18,120,"Malignant neoplasm of lesser curvature of stomach, unspecified"
-C166,cancer,137,,18,120,"Malignant neoplasm of greater curvature of stomach, unspecified"
-C168,cancer,138,,18,120,Malignant neoplasm of overlapping sites of stomach
 I2510,pgx,0,,18,120,Atherosclerotic heart disease of native coronary artery without angina pectoris
 Z955,pgx,1,,18,120,Presence of coronary angioplasty implant and graft
 Z7902,pgx,2,,18,120,Long term (current) use of antithrombotics/antiplatelets
@@ -3125,83 +2375,6 @@ Z79621,transplant,8,,18,120,Long term (current) use of calcineurin inhibitor
 Z79622,transplant,9,,18,120,Long term (current) use of Janus kinase inhibitor
 Z79623,transplant,10,,18,120,Long term (current) use of mammalian target of rapamycin (mTOR) inhibitor
 Z79620,transplant,11,,18,120,Long term (current) use of immunosuppressive biologic
-T8600,transplant,12,,18,120,Unspecified complication of bone marrow transplant
-T8601,transplant,13,,18,120,Bone marrow transplant rejection
-T8602,transplant,14,,18,120,Bone marrow transplant failure
-T8603,transplant,15,,18,120,Bone marrow transplant infection
-T8609,transplant,16,,18,120,Other complications of bone marrow transplant
-T8610,transplant,17,,18,120,Unspecified complication of kidney transplant
-T8611,transplant,18,,18,120,Kidney transplant rejection
-T8612,transplant,19,,18,120,Kidney transplant failure
-T8613,transplant,20,,18,120,Kidney transplant infection
-T8619,transplant,21,,18,120,Other complication of kidney transplant
-T8620,transplant,22,,18,120,Unspecified complication of heart transplant
-T8621,transplant,23,,18,120,Heart transplant rejection
-T8622,transplant,24,,18,120,Heart transplant failure
-T8623,transplant,25,,18,120,Heart transplant infection
-T86290,transplant,26,,18,120,Cardiac allograft vasculopathy
-T86298,transplant,27,,18,120,Other complications of heart transplant
-T8630,transplant,28,,18,120,Unspecified complication of heart-lung transplant
-T8631,transplant,29,,18,120,Heart-lung transplant rejection
-T8632,transplant,30,,18,120,Heart-lung transplant failure
-T8633,transplant,31,,18,120,Heart-lung transplant infection
-T8639,transplant,32,,18,120,Other complications of heart-lung transplant
-T8640,transplant,33,,18,120,Unspecified complication of liver transplant
-T8641,transplant,34,,18,120,Liver transplant rejection
-T8642,transplant,35,,18,120,Liver transplant failure
-T8643,transplant,36,,18,120,Liver transplant infection
-T8649,transplant,37,,18,120,Other complications of liver transplant
-T865,transplant,38,,18,120,Complications of stem cell transplant
-T86810,transplant,39,,18,120,Lung transplant rejection
-T86811,transplant,40,,18,120,Lung transplant failure
-T86812,transplant,41,,18,120,Lung transplant infection
-T86818,transplant,42,,18,120,Other complications of lung transplant
-T86819,transplant,43,,18,120,Unspecified complication of lung transplant
-T86820,transplant,44,,18,120,Skin graft (allograft) rejection
-T86821,transplant,45,,18,120,Skin graft (allograft) (autograft) failure
-T86822,transplant,46,,18,120,Skin graft (allograft) (autograft) infection
-T86828,transplant,47,,18,120,Other complications of skin graft (allograft) (autograft)
-T86829,transplant,48,,18,120,Unspecified complication of skin graft (allograft) (autograft)
-T86830,transplant,49,,18,120,Bone graft rejection
-T86831,transplant,50,,18,120,Bone graft failure
-T86832,transplant,51,,18,120,Bone graft infection
-T86838,transplant,52,,18,120,Other complications of bone graft
-T86839,transplant,53,,18,120,Unspecified complication of bone graft
-T868401,transplant,54,,18,120,"Corneal transplant rejection, right eye"
-T868402,transplant,55,,18,120,"Corneal transplant rejection, left eye"
-T868403,transplant,56,,18,120,"Corneal transplant rejection, bilateral"
-T868409,transplant,57,,18,120,"Corneal transplant rejection, unspecified eye"
-T868411,transplant,58,,18,120,"Corneal transplant failure, right eye"
-T868412,transplant,59,,18,120,"Corneal transplant failure, left eye"
-T868413,transplant,60,,18,120,"Corneal transplant failure, bilateral"
-T868419,transplant,61,,18,120,"Corneal transplant failure, unspecified eye"
-T868421,transplant,62,,18,120,"Corneal transplant infection, right eye"
-T868422,transplant,63,,18,120,"Corneal transplant infection, left eye"
-T868423,transplant,64,,18,120,"Corneal transplant infection, bilateral"
-T868429,transplant,65,,18,120,"Corneal transplant infection, unspecified eye"
-T868481,transplant,66,,18,120,"Other complications of corneal transplant, right eye"
-T868482,transplant,67,,18,120,"Other complications of corneal transplant, left eye"
-T868483,transplant,68,,18,120,"Other complications of corneal transplant, bilateral"
-T868489,transplant,69,,18,120,"Other complications of corneal transplant, unspecified eye"
-T868491,transplant,70,,18,120,"Unspecified complication of corneal transplant, right eye"
-T868492,transplant,71,,18,120,"Unspecified complication of corneal transplant, left eye"
-T868493,transplant,72,,18,120,"Unspecified complication of corneal transplant, bilateral"
-T868499,transplant,73,,18,120,"Unspecified complication of corneal transplant, unspecified eye"
-T86850,transplant,74,,18,120,Intestine transplant rejection
-T86851,transplant,75,,18,120,Intestine transplant failure
-T86852,transplant,76,,18,120,Intestine transplant infection
-T86858,transplant,77,,18,120,Other complications of intestine transplant
-T86859,transplant,78,,18,120,Unspecified complication of intestine transplant
-T86890,transplant,79,,18,120,Other transplanted tissue rejection
-T86891,transplant,80,,18,120,Other transplanted tissue failure
-T86892,transplant,81,,18,120,Other transplanted tissue infection
-T86898,transplant,82,,18,120,Other complications of other transplanted tissue
-T86899,transplant,83,,18,120,Unspecified complication of other transplanted tissue
-T8690,transplant,84,,18,120,Unspecified complication of unspecified transplanted organ and tissue
-T8691,transplant,85,,18,120,Unspecified transplanted organ and tissue rejection
-T8692,transplant,86,,18,120,Unspecified transplanted organ and tissue failure
-T8693,transplant,87,,18,120,Unspecified transplanted organ and tissue infection
-T8699,transplant,88,,18,120,Other complications of unspecified transplanted organ and tissue
 Z79899,meds,0,,0,120,Other long term (current) drug therapy
 Z5181,meds,1,,0,120,Encounter for therapeutic drug level monitoring
 Z7901,meds,2,,0,120,Long term (current) use of anticoagulants
