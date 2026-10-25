@@ -67,7 +67,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.032,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_b853266803",
@@ -113,7 +113,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.011,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -143,7 +143,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.007,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_a5888f64a4",
@@ -195,7 +195,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_7d45c279a7",
@@ -219,7 +219,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.007,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q15_partial_line_denials",
@@ -232,7 +232,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.005,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q25_primary_deductible",
@@ -245,7 +245,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_8663c777cd",
@@ -267,7 +267,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_share_of_line_payments__87798",
@@ -280,7 +280,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.003,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q11_cpt_denial_rate",
@@ -302,7 +302,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_a123bba47f",
@@ -333,7 +333,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.007,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_9108c7aacb",
@@ -378,7 +378,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_856b95a70c",
@@ -430,7 +430,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.007,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_1b7e02d0b0",
@@ -445,7 +445,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.009,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_921f1bf366",
@@ -461,7 +461,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": false
   },
   {
    "qid": "q14_zero_paid_not_denied",
@@ -474,7 +474,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.002,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_dca9da6d52",
@@ -491,7 +491,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q19_reversed_no_correction",
@@ -504,7 +504,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.003,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_share_of_line_payments__80307",
@@ -517,7 +517,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.003,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_d383370345",
@@ -569,7 +569,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.007,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0482",
@@ -582,7 +582,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.003,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_0d43f7d4b6",
@@ -597,7 +597,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.014,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_923951a050",
@@ -611,7 +611,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_7423e6eb91",
@@ -631,7 +631,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_never_remitted_submitted_in_month__2026-07-01",
@@ -644,7 +644,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.004,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_ab202d4b23",
@@ -849,7 +849,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.009,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0480",
@@ -862,7 +862,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.003,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_d671e0b995",
@@ -928,7 +928,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.005,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_share_of_line_payments__81479",
@@ -941,7 +941,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.003,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q12_referring_provider_denials",
@@ -950,11 +950,11 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null
+   "pass": true
   }
  ],
- "accuracy": null,
+ "accuracy": "29/30",
  "n": 30,
  "mean_sql_execs": 2.033,
- "notes": "BM25 few-shot used the 3 most similar non-dev questions, excluding heldout_hard_1 and the same parametric family. CTE grain checks ran before the final execution. The similar rework example inner-joins frequency 1 to frequency 7; that join was empty, so the submitted cycle-time query left-joins and keeps the 10 frequency-7 claims. repair=0, so no later rewrite. Shared explore probes are not included in sql_execs."
+ "notes": "BM25 few-shot used the 3 most similar non-dev questions, excluding heldout_hard_1 and the same parametric family. CTE grain checks ran before the final execution. The similar rework example inner-joins frequency 1 to frequency 7; that join was empty, so the submitted cycle-time query left-joins and keeps the 10 frequency-7 claims. repair=0, so no later rewrite. Shared explore probes are not included in sql_execs. Scored after the answer commit with bench.compare.match. The only miss is a_921f1bf366: with no frequency-8 claims, the current-paid total was coalesced to 0.00 and the checker wanted null."
 }

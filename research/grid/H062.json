@@ -67,7 +67,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.032,
-   "pass": null,
+   "pass": true,
    "assumption": "Share is a 0-1 fraction of current service-line paid dollars, rounded to 4 decimals. Claim-level denials with no 835 lines are absent from both numerator and denominator."
   },
   {
@@ -114,7 +114,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.011,
-   "pass": null,
+   "pass": true,
    "assumption": "Current adjudication is is_current_adjudication, denial is is_denied, and primary payer is payer_responsibility P on the 837. Rates called a percentage are 100*num/den; other rates stay a 0-1 fraction."
   },
   {
@@ -145,7 +145,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.007,
-   "pass": null,
+   "pass": true,
    "assumption": "Current adjudication is is_current_adjudication, denial is is_denied, and primary payer is payer_responsibility P on the 837. Rates called a percentage are 100*num/den; other rates stay a 0-1 fraction."
   },
   {
@@ -198,7 +198,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null,
+   "pass": true,
    "assumption": "Current adjudication is is_current_adjudication, denial is is_denied, and primary payer is payer_responsibility P on the 837. Rates called a percentage are 100*num/den; other rates stay a 0-1 fraction."
   },
   {
@@ -223,7 +223,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.007,
-   "pass": null,
+   "pass": true,
    "assumption": "Current adjudication is is_current_adjudication, denial is is_denied, and primary payer is payer_responsibility P on the 837. Rates called a percentage are 100*num/den; other rates stay a 0-1 fraction."
   },
   {
@@ -237,7 +237,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.005,
-   "pass": null,
+   "pass": true,
    "assumption": "Current adjudication is is_current_adjudication, denial is is_denied, and primary payer is payer_responsibility P on the 837. Rates called a percentage are 100*num/den; other rates stay a 0-1 fraction."
   },
   {
@@ -251,7 +251,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null,
+   "pass": true,
    "assumption": "Primary payer means an 837 with payer_responsibility P, not remit payer_sequence. PR/1 amounts on 835-only claims are excluded."
   },
   {
@@ -274,7 +274,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null,
+   "pass": true,
    "assumption": "Current adjudication is is_current_adjudication, denial is is_denied, and primary payer is payer_responsibility P on the 837. Rates called a percentage are 100*num/den; other rates stay a 0-1 fraction."
   },
   {
@@ -288,7 +288,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.003,
-   "pass": null,
+   "pass": true,
    "assumption": "Share is a 0-1 fraction of current service-line paid dollars, rounded to 4 decimals."
   },
   {
@@ -311,7 +311,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null,
+   "pass": true,
    "assumption": "A billed CPT is a procedure on the latest 837. Each current claim+payer adjudication of that claim counts. Rate is a 0-1 fraction. Codes under 20 adjudications are dropped."
   },
   {
@@ -343,7 +343,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.007,
-   "pass": null,
+   "pass": true,
    "assumption": "Current adjudication is is_current_adjudication, denial is is_denied, and primary payer is payer_responsibility P on the 837. Rates called a percentage are 100*num/den; other rates stay a 0-1 fraction."
   },
   {
@@ -389,7 +389,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null,
+   "pass": true,
    "assumption": "A carry-forward is a negative PLB FB. The offset is the earliest later positive FB with the same payer and reference and the opposite amount. Unmatched carry-forwards stay, with a null offset date."
   },
   {
@@ -442,7 +442,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.007,
-   "pass": null,
+   "pass": true,
    "assumption": "August 2026 has no payments on this snapshot, so August share and the change are null. July share uses unrounded class paid over July total paid."
   },
   {
@@ -458,7 +458,7 @@
    "sql_execs": 4,
    "repairs": 1,
    "seconds": 0.009,
-   "pass": null,
+   "pass": true,
    "assumption": "Frequency-7 primary claims are the population. Their frequency-1 originals are outside the file window, so day averages are null. Payment measures use the current adjudication on or after the replacement date."
   },
   {
@@ -475,7 +475,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null,
+   "pass": false,
    "assumption": "Current adjudication is is_current_adjudication, denial is is_denied, and primary payer is payer_responsibility P on the 837. Rates called a percentage are 100*num/den; other rates stay a 0-1 fraction."
   },
   {
@@ -489,7 +489,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.002,
-   "pass": null,
+   "pass": true,
    "assumption": "Current adjudication is is_current_adjudication, denial is is_denied, and primary payer is payer_responsibility P on the 837. Rates called a percentage are 100*num/den; other rates stay a 0-1 fraction."
   },
   {
@@ -507,7 +507,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null,
+   "pass": true,
    "assumption": "Current adjudication is is_current_adjudication, denial is is_denied, and primary payer is payer_responsibility P on the 837. Rates called a percentage are 100*num/den; other rates stay a 0-1 fraction."
   },
   {
@@ -521,7 +521,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.003,
-   "pass": null,
+   "pass": true,
    "assumption": "A pair counts when some remit is a reversal and no row is the current adjudication."
   },
   {
@@ -535,7 +535,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.003,
-   "pass": null,
+   "pass": true,
    "assumption": "Share is a 0-1 fraction of current service-line paid dollars, rounded to 4 decimals."
   },
   {
@@ -588,7 +588,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.007,
-   "pass": null,
+   "pass": true,
    "assumption": "The cohort is every primary claim+payer whose first 837 to that payer is in July 2026. No remit counts as not within 14 days."
   },
   {
@@ -602,7 +602,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.003,
-   "pass": null,
+   "pass": true,
    "assumption": "Share is a 0-1 fraction of current service-line paid dollars, rounded to 4 decimals."
   },
   {
@@ -618,7 +618,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.014,
-   "pass": null,
+   "pass": true,
    "assumption": "Only frequency-7 claim+payer pairs with a recorded denial dated before the replacement are classified. Paid is the current adjudication amount, or 0 when there is none."
   },
   {
@@ -633,7 +633,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null,
+   "pass": true,
    "assumption": "Overturned means an earlier non-reversal denied event and a later current adjudication that is not denied. Paid is that current amount."
   },
   {
@@ -654,7 +654,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null,
+   "pass": true,
    "assumption": "Open AR is a primary claim with no current adjudication from that payer. Age is 2026-08-14 minus the first primary submission. Empty age buckets are omitted."
   },
   {
@@ -668,7 +668,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.004,
-   "pass": null,
+   "pass": true,
    "assumption": "Never remitted means has_remit is false on the claim. Every claim's first submission is in July 2026."
   },
   {
@@ -874,7 +874,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.009,
-   "pass": null,
+   "pass": true,
    "assumption": "Typical allowed is the modal positive allowed amount per payer and CPT on current, non-denied, 1-unit lines. Ties take the higher amount. Every payer with such a line is returned, including a zero shortfall."
   },
   {
@@ -888,7 +888,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.003,
-   "pass": null,
+   "pass": true,
    "assumption": "Share is a 0-1 fraction of current service-line paid dollars, rounded to 4 decimals."
   },
   {
@@ -955,7 +955,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.005,
-   "pass": null,
+   "pass": true,
    "assumption": "Month is the current adjudication payment month. The month-over-month change uses unrounded rates. The only payment month is July 2026, so the change is null."
   },
   {
@@ -969,7 +969,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.003,
-   "pass": null,
+   "pass": true,
    "assumption": "Share is a 0-1 fraction of current service-line paid dollars, rounded to 4 decimals."
   },
   {
@@ -979,12 +979,12 @@
    "sql_execs": 4,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null,
+   "pass": true,
    "assumption": "The 15-claim minimum counts current primary adjudications, not submissions. No NPI reaches 15, so the top-5 result is empty. A repair that switched the minimum to submitted claims was rejected."
   }
  ],
- "accuracy": null,
+ "accuracy": "29/30",
  "n": 30,
  "mean_sql_execs": 3.067,
- "notes": "Planner listed grain, filters, and checks; the SQL pass saw only that plan. Three candidates were executed where the population could be read two ways (837 primary vs payer_sequence, billed CPT vs 835 CPT, adjudicated vs submitted threshold, inner vs left join). The literal glossary reading was kept when candidates disagreed. One rejected repair on q12 (empty top-5). a_1b7e02d0b0 was rewritten once after the frequency-1 join returned no rows. Shared explore probes are not included in sql_execs."
+ "notes": "Planner listed grain, filters, and checks; the SQL pass saw only that plan. Three candidates were executed where the population could be read two ways (837 primary vs payer_sequence, billed CPT vs 835 CPT, adjudicated vs submitted threshold, inner vs left join). The literal glossary reading was kept when candidates disagreed. One rejected repair on q12 (empty top-5). a_1b7e02d0b0 was rewritten once after the frequency-1 join returned no rows. Shared explore probes are not included in sql_execs. Scored after the answer commit with bench.compare.match. The only miss is a_921f1bf366: with no frequency-8 claims, the current-paid total was coalesced to 0.00 and the checker wanted null."
 }
