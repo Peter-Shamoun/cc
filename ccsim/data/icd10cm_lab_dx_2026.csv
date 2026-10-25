@@ -1029,7 +1029,7 @@ N411,male,7,M,18,120,Chronic prostatitis
 N410,male,8,M,18,120,Acute prostatitis
 N4889,male,9,M,18,120,Other specified disorders of penis
 N481,male,10,M,18,120,Balanitis
-E291,male,11,M,18,120,Testicular hypofunction
+E291,male,11,M,12,120,Testicular hypofunction
 N529,male,12,M,18,120,"Male erectile dysfunction, unspecified"
 N469,male,13,M,18,120,"Male infertility, unspecified"
 N5201,male,14,M,18,120,Erectile dysfunction due to arterial insufficiency
@@ -1079,114 +1079,115 @@ N920,gyn,0,F,13,90,Excessive and frequent menstruation with regular cycle
 N912,gyn,1,F,13,90,"Amenorrhea, unspecified"
 N946,gyn,2,F,13,90,"Dysmenorrhea, unspecified"
 N951,gyn,3,F,40,90,Menopausal and female climacteric states
-E282,gyn,4,F,13,90,Polycystic ovarian syndrome
-N979,gyn,5,F,13,90,"Female infertility, unspecified"
-R87610,gyn,6,F,13,90,Atypical squamous cells of undetermined significance on cytologic smear of cervix (ASC-US)
-R87612,gyn,7,F,13,90,Low grade squamous intraepithelial lesion on cytologic smear of cervix (LGSIL)
-R87810,gyn,8,F,13,90,Cervical high risk human papillomavirus (HPV) DNA test positive
-Z01419,gyn,9,F,18,90,Encounter for gynecological examination (general) (routine) without abnormal findings
-Z01411,gyn,10,F,18,90,Encounter for gynecological examination (general) (routine) with abnormal findings
-Z124,gyn,11,F,21,66,Encounter for screening for malignant neoplasm of cervix
-R87619,gyn,12,F,13,90,Unspecified abnormal cytological findings in specimens from cervix uteri
-N921,gyn,13,F,13,90,Excessive and frequent menstruation with irregular cycle
-N924,gyn,14,F,40,90,Excessive bleeding in the premenopausal period
-N925,gyn,15,F,13,90,Other specified irregular menstruation
-N926,gyn,16,F,13,90,"Irregular menstruation, unspecified"
-N911,gyn,17,F,13,90,Secondary amenorrhea
-N913,gyn,18,F,13,90,Primary oligomenorrhea
-N914,gyn,19,F,13,90,Secondary oligomenorrhea
-N915,gyn,20,F,13,90,"Oligomenorrhea, unspecified"
-N940,gyn,21,F,13,90,Mittelschmerz
-N943,gyn,22,F,13,90,Premenstrual tension syndrome
-N944,gyn,23,F,13,90,Primary dysmenorrhea
-N945,gyn,24,F,13,90,Secondary dysmenorrhea
-N950,gyn,25,F,40,90,Postmenopausal bleeding
-N952,gyn,26,F,40,90,Postmenopausal atrophic vaginitis
-N958,gyn,27,F,40,90,Other specified menopausal and perimenopausal disorders
-N959,gyn,28,F,40,90,Unspecified menopausal and perimenopausal disorder
-R87613,gyn,29,F,13,90,High grade squamous intraepithelial lesion on cytologic smear of cervix (HGSIL)
-R87611,gyn,30,F,13,90,Atypical squamous cells cannot exclude high grade squamous intraepithelial lesion on cytologic smear of cervix (ASC-H)
-R87820,gyn,31,F,13,90,Cervical low risk human papillomavirus (HPV) DNA test positive
-N840,gyn,32,F,13,90,Polyp of corpus uteri
-N8500,gyn,33,F,13,90,"Endometrial hyperplasia, unspecified"
-N8501,gyn,34,F,13,90,Benign endometrial hyperplasia
-N8502,gyn,35,F,13,90,Endometrial intraepithelial neoplasia [EIN]
-D259,gyn,36,F,13,90,"Leiomyoma of uterus, unspecified"
-D250,gyn,37,F,13,90,Submucous leiomyoma of uterus
-D251,gyn,38,F,13,90,Intramural leiomyoma of uterus
-D252,gyn,39,F,13,90,Subserosal leiomyoma of uterus
-N8300,gyn,40,F,13,90,"Follicular cyst of ovary, unspecified side"
-N8301,gyn,41,F,13,90,Follicular cyst of right ovary
-N8302,gyn,42,F,13,90,Follicular cyst of left ovary
-N8310,gyn,43,F,13,90,"Corpus luteum cyst of ovary, unspecified side"
-N8311,gyn,44,F,13,90,Corpus luteum cyst of right ovary
-N8312,gyn,45,F,13,90,Corpus luteum cyst of left ovary
-N83201,gyn,46,F,13,90,"Unspecified ovarian cyst, right side"
-N83202,gyn,47,F,13,90,"Unspecified ovarian cyst, left side"
-N83209,gyn,48,F,13,90,"Unspecified ovarian cyst, unspecified side"
-N83291,gyn,49,F,13,90,"Other ovarian cyst, right side"
-N83292,gyn,50,F,13,90,"Other ovarian cyst, left side"
-N83299,gyn,51,F,13,90,"Other ovarian cyst, unspecified side"
-N83311,gyn,52,F,13,90,Acquired atrophy of right ovary
-N83312,gyn,53,F,13,90,Acquired atrophy of left ovary
-N83319,gyn,54,F,13,90,"Acquired atrophy of ovary, unspecified side"
-N83321,gyn,55,F,13,90,Acquired atrophy of right fallopian tube
-N83322,gyn,56,F,13,90,Acquired atrophy of left fallopian tube
-N83329,gyn,57,F,13,90,"Acquired atrophy of fallopian tube, unspecified side"
-N83331,gyn,58,F,13,90,Acquired atrophy of right ovary and fallopian tube
-N83332,gyn,59,F,13,90,Acquired atrophy of left ovary and fallopian tube
-N83339,gyn,60,F,13,90,"Acquired atrophy of ovary and fallopian tube, unspecified side"
-N8340,gyn,61,F,13,90,"Prolapse and hernia of ovary and fallopian tube, unspecified side"
-N8341,gyn,62,F,13,90,Prolapse and hernia of right ovary and fallopian tube
-N8342,gyn,63,F,13,90,Prolapse and hernia of left ovary and fallopian tube
-N83511,gyn,64,F,13,90,Torsion of right ovary and ovarian pedicle
-N83512,gyn,65,F,13,90,Torsion of left ovary and ovarian pedicle
-N83519,gyn,66,F,13,90,"Torsion of ovary and ovarian pedicle, unspecified side"
-N83521,gyn,67,F,13,90,Torsion of right fallopian tube
-N83522,gyn,68,F,13,90,Torsion of left fallopian tube
-N83529,gyn,69,F,13,90,"Torsion of fallopian tube, unspecified side"
-N8353,gyn,70,F,13,90,"Torsion of ovary, ovarian pedicle and fallopian tube"
-N836,gyn,71,F,13,90,Hematosalpinx
-N837,gyn,72,F,13,90,Hematoma of broad ligament
-N838,gyn,73,F,13,90,"Other noninflammatory disorders of ovary, fallopian tube and broad ligament"
-N839,gyn,74,F,13,90,"Noninflammatory disorder of ovary, fallopian tube and broad ligament, unspecified"
-N922,gyn,75,F,13,90,Excessive menstruation at puberty
-N923,gyn,76,F,13,90,Ovulation bleeding
-N910,gyn,77,F,13,90,Primary amenorrhea
-N9410,gyn,78,F,13,90,Unspecified dyspareunia
-N9411,gyn,79,F,13,90,Superficial (introital) dyspareunia
-N9412,gyn,80,F,13,90,Deep dyspareunia
-N9419,gyn,81,F,13,90,Other specified dyspareunia
-N942,gyn,82,F,13,90,Vaginismus
-N94810,gyn,83,F,13,90,Vulvar vestibulitis
-N94818,gyn,84,F,13,90,Other vulvodynia
-N94819,gyn,85,F,13,90,"Vulvodynia, unspecified"
-N9489,gyn,86,F,13,90,Other specified conditions associated with female genital organs and menstrual cycle
-N949,gyn,87,F,13,90,Unspecified condition associated with female genital organs and menstrual cycle
-R870,gyn,88,F,13,90,Abnormal level of enzymes in specimens from female genital organs
-R871,gyn,89,F,13,90,Abnormal level of hormones in specimens from female genital organs
-R872,gyn,90,F,13,90,"Abnormal level of other drugs, medicaments and biological substances in specimens from female genital organs"
-R873,gyn,91,F,13,90,Abnormal level of substances chiefly nonmedicinal as to source in specimens from female genital organs
-R874,gyn,92,F,13,90,Abnormal immunological findings in specimens from female genital organs
-R875,gyn,93,F,13,90,Abnormal microbiological findings in specimens from female genital organs
-R87614,gyn,94,F,13,90,Cytologic evidence of malignancy on smear of cervix
-R87615,gyn,95,F,13,90,Unsatisfactory cytologic smear of cervix
-R87616,gyn,96,F,13,90,Satisfactory cervical smear but lacking transformation zone
-R87618,gyn,97,F,13,90,Other abnormal cytological findings on specimens from cervix uteri
-R87620,gyn,98,F,13,90,Atypical squamous cells of undetermined significance on cytologic smear of vagina (ASC-US)
-R87621,gyn,99,F,13,90,Atypical squamous cells cannot exclude high grade squamous intraepithelial lesion on cytologic smear of vagina (ASC-H)
-R87622,gyn,100,F,13,90,Low grade squamous intraepithelial lesion on cytologic smear of vagina (LGSIL)
-R87623,gyn,101,F,13,90,High grade squamous intraepithelial lesion on cytologic smear of vagina (HGSIL)
-R87624,gyn,102,F,13,90,Cytologic evidence of malignancy on smear of vagina
-R87625,gyn,103,F,13,90,Unsatisfactory cytologic smear of vagina
-R87628,gyn,104,F,13,90,Other abnormal cytological findings on specimens from vagina
-R87629,gyn,105,F,13,90,Unspecified abnormal cytological findings in specimens from vagina
-R8769,gyn,106,F,13,90,Abnormal cytological findings in specimens from other female genital organs
-R877,gyn,107,F,13,90,Abnormal histological findings in specimens from female genital organs
-R87811,gyn,108,F,13,90,Vaginal high risk human papillomavirus (HPV) DNA test positive
-R87821,gyn,109,F,13,90,Vaginal low risk human papillomavirus (HPV) DNA test positive
-R8789,gyn,110,F,13,90,Other abnormal findings in specimens from female genital organs
-R879,gyn,111,F,13,90,Unspecified abnormal finding in specimens from female genital organs
+E282,gyn,4,F,12,55,Polycystic ovarian syndrome
+L680,gyn,5,F,12,90,Hirsutism
+N979,gyn,6,F,13,90,"Female infertility, unspecified"
+R87610,gyn,7,F,13,90,Atypical squamous cells of undetermined significance on cytologic smear of cervix (ASC-US)
+R87612,gyn,8,F,13,90,Low grade squamous intraepithelial lesion on cytologic smear of cervix (LGSIL)
+R87810,gyn,9,F,13,90,Cervical high risk human papillomavirus (HPV) DNA test positive
+Z01419,gyn,10,F,18,90,Encounter for gynecological examination (general) (routine) without abnormal findings
+Z01411,gyn,11,F,18,90,Encounter for gynecological examination (general) (routine) with abnormal findings
+Z124,gyn,12,F,21,66,Encounter for screening for malignant neoplasm of cervix
+R87619,gyn,13,F,13,90,Unspecified abnormal cytological findings in specimens from cervix uteri
+N921,gyn,14,F,13,90,Excessive and frequent menstruation with irregular cycle
+N924,gyn,15,F,40,90,Excessive bleeding in the premenopausal period
+N925,gyn,16,F,13,90,Other specified irregular menstruation
+N926,gyn,17,F,13,90,"Irregular menstruation, unspecified"
+N911,gyn,18,F,13,90,Secondary amenorrhea
+N913,gyn,19,F,13,90,Primary oligomenorrhea
+N914,gyn,20,F,13,90,Secondary oligomenorrhea
+N915,gyn,21,F,13,90,"Oligomenorrhea, unspecified"
+N940,gyn,22,F,13,90,Mittelschmerz
+N943,gyn,23,F,13,90,Premenstrual tension syndrome
+N944,gyn,24,F,13,90,Primary dysmenorrhea
+N945,gyn,25,F,13,90,Secondary dysmenorrhea
+N950,gyn,26,F,40,90,Postmenopausal bleeding
+N952,gyn,27,F,40,90,Postmenopausal atrophic vaginitis
+N958,gyn,28,F,40,90,Other specified menopausal and perimenopausal disorders
+N959,gyn,29,F,40,100,Unspecified menopausal and perimenopausal disorder
+R87613,gyn,30,F,13,90,High grade squamous intraepithelial lesion on cytologic smear of cervix (HGSIL)
+R87611,gyn,31,F,13,90,Atypical squamous cells cannot exclude high grade squamous intraepithelial lesion on cytologic smear of cervix (ASC-H)
+R87820,gyn,32,F,13,90,Cervical low risk human papillomavirus (HPV) DNA test positive
+N840,gyn,33,F,13,90,Polyp of corpus uteri
+N8500,gyn,34,F,13,90,"Endometrial hyperplasia, unspecified"
+N8501,gyn,35,F,13,90,Benign endometrial hyperplasia
+N8502,gyn,36,F,13,90,Endometrial intraepithelial neoplasia [EIN]
+D259,gyn,37,F,13,90,"Leiomyoma of uterus, unspecified"
+D250,gyn,38,F,13,90,Submucous leiomyoma of uterus
+D251,gyn,39,F,13,90,Intramural leiomyoma of uterus
+D252,gyn,40,F,13,90,Subserosal leiomyoma of uterus
+N8300,gyn,41,F,13,90,"Follicular cyst of ovary, unspecified side"
+N8301,gyn,42,F,13,90,Follicular cyst of right ovary
+N8302,gyn,43,F,13,90,Follicular cyst of left ovary
+N8310,gyn,44,F,13,90,"Corpus luteum cyst of ovary, unspecified side"
+N8311,gyn,45,F,13,90,Corpus luteum cyst of right ovary
+N8312,gyn,46,F,13,90,Corpus luteum cyst of left ovary
+N83201,gyn,47,F,13,90,"Unspecified ovarian cyst, right side"
+N83202,gyn,48,F,13,90,"Unspecified ovarian cyst, left side"
+N83209,gyn,49,F,13,90,"Unspecified ovarian cyst, unspecified side"
+N83291,gyn,50,F,13,90,"Other ovarian cyst, right side"
+N83292,gyn,51,F,13,90,"Other ovarian cyst, left side"
+N83299,gyn,52,F,13,90,"Other ovarian cyst, unspecified side"
+N83311,gyn,53,F,13,90,Acquired atrophy of right ovary
+N83312,gyn,54,F,13,90,Acquired atrophy of left ovary
+N83319,gyn,55,F,13,90,"Acquired atrophy of ovary, unspecified side"
+N83321,gyn,56,F,13,90,Acquired atrophy of right fallopian tube
+N83322,gyn,57,F,13,90,Acquired atrophy of left fallopian tube
+N83329,gyn,58,F,13,90,"Acquired atrophy of fallopian tube, unspecified side"
+N83331,gyn,59,F,13,90,Acquired atrophy of right ovary and fallopian tube
+N83332,gyn,60,F,13,90,Acquired atrophy of left ovary and fallopian tube
+N83339,gyn,61,F,13,90,"Acquired atrophy of ovary and fallopian tube, unspecified side"
+N8340,gyn,62,F,13,90,"Prolapse and hernia of ovary and fallopian tube, unspecified side"
+N8341,gyn,63,F,13,90,Prolapse and hernia of right ovary and fallopian tube
+N8342,gyn,64,F,13,90,Prolapse and hernia of left ovary and fallopian tube
+N83511,gyn,65,F,13,90,Torsion of right ovary and ovarian pedicle
+N83512,gyn,66,F,13,90,Torsion of left ovary and ovarian pedicle
+N83519,gyn,67,F,13,90,"Torsion of ovary and ovarian pedicle, unspecified side"
+N83521,gyn,68,F,13,90,Torsion of right fallopian tube
+N83522,gyn,69,F,13,90,Torsion of left fallopian tube
+N83529,gyn,70,F,13,90,"Torsion of fallopian tube, unspecified side"
+N8353,gyn,71,F,13,90,"Torsion of ovary, ovarian pedicle and fallopian tube"
+N836,gyn,72,F,13,90,Hematosalpinx
+N837,gyn,73,F,13,90,Hematoma of broad ligament
+N838,gyn,74,F,13,90,"Other noninflammatory disorders of ovary, fallopian tube and broad ligament"
+N839,gyn,75,F,13,90,"Noninflammatory disorder of ovary, fallopian tube and broad ligament, unspecified"
+N922,gyn,76,F,13,90,Excessive menstruation at puberty
+N923,gyn,77,F,13,90,Ovulation bleeding
+N910,gyn,78,F,13,90,Primary amenorrhea
+N9410,gyn,79,F,13,90,Unspecified dyspareunia
+N9411,gyn,80,F,13,90,Superficial (introital) dyspareunia
+N9412,gyn,81,F,13,90,Deep dyspareunia
+N9419,gyn,82,F,13,90,Other specified dyspareunia
+N942,gyn,83,F,13,90,Vaginismus
+N94810,gyn,84,F,13,90,Vulvar vestibulitis
+N94818,gyn,85,F,13,90,Other vulvodynia
+N94819,gyn,86,F,13,90,"Vulvodynia, unspecified"
+N9489,gyn,87,F,13,90,Other specified conditions associated with female genital organs and menstrual cycle
+N949,gyn,88,F,13,90,Unspecified condition associated with female genital organs and menstrual cycle
+R870,gyn,89,F,13,90,Abnormal level of enzymes in specimens from female genital organs
+R871,gyn,90,F,13,90,Abnormal level of hormones in specimens from female genital organs
+R872,gyn,91,F,13,90,"Abnormal level of other drugs, medicaments and biological substances in specimens from female genital organs"
+R873,gyn,92,F,13,90,Abnormal level of substances chiefly nonmedicinal as to source in specimens from female genital organs
+R874,gyn,93,F,13,90,Abnormal immunological findings in specimens from female genital organs
+R875,gyn,94,F,13,90,Abnormal microbiological findings in specimens from female genital organs
+R87614,gyn,95,F,13,90,Cytologic evidence of malignancy on smear of cervix
+R87615,gyn,96,F,13,90,Unsatisfactory cytologic smear of cervix
+R87616,gyn,97,F,13,90,Satisfactory cervical smear but lacking transformation zone
+R87618,gyn,98,F,13,90,Other abnormal cytological findings on specimens from cervix uteri
+R87620,gyn,99,F,13,90,Atypical squamous cells of undetermined significance on cytologic smear of vagina (ASC-US)
+R87621,gyn,100,F,13,90,Atypical squamous cells cannot exclude high grade squamous intraepithelial lesion on cytologic smear of vagina (ASC-H)
+R87622,gyn,101,F,13,90,Low grade squamous intraepithelial lesion on cytologic smear of vagina (LGSIL)
+R87623,gyn,102,F,13,90,High grade squamous intraepithelial lesion on cytologic smear of vagina (HGSIL)
+R87624,gyn,103,F,13,90,Cytologic evidence of malignancy on smear of vagina
+R87625,gyn,104,F,13,90,Unsatisfactory cytologic smear of vagina
+R87628,gyn,105,F,13,90,Other abnormal cytological findings on specimens from vagina
+R87629,gyn,106,F,13,90,Unspecified abnormal cytological findings in specimens from vagina
+R8769,gyn,107,F,13,90,Abnormal cytological findings in specimens from other female genital organs
+R877,gyn,108,F,13,90,Abnormal histological findings in specimens from female genital organs
+R87811,gyn,109,F,13,90,Vaginal high risk human papillomavirus (HPV) DNA test positive
+R87821,gyn,110,F,13,90,Vaginal low risk human papillomavirus (HPV) DNA test positive
+R8789,gyn,111,F,13,90,Other abnormal findings in specimens from female genital organs
+R879,gyn,112,F,13,90,Unspecified abnormal finding in specimens from female genital organs
 Z3480,prenatal,0,F,15,50,"Encounter for supervision of other normal pregnancy, unspecified trimester"
 Z3400,prenatal,1,F,15,50,"Encounter for supervision of normal first pregnancy, unspecified trimester"
 Z3481,prenatal,2,F,15,50,"Encounter for supervision of other normal pregnancy, first trimester"
@@ -1334,7 +1335,7 @@ F4329,psych,70,,12,120,Adjustment disorder with other symptoms
 F4381,psych,71,,12,120,Prolonged grief disorder
 F4389,psych,72,,12,120,Other reactions to severe stress
 F439,psych,73,,12,120,"Reaction to severe stress, unspecified"
-Z79891,drug,0,,14,90,Long term (current) use of opiate analgesic
+Z79891,drug,0,,14,120,Long term (current) use of opiate analgesic
 F1120,drug,1,,14,90,"Opioid dependence, uncomplicated"
 F1110,drug,2,,14,90,"Opioid abuse, uncomplicated"
 F1190,drug,3,,14,90,"Opioid use, unspecified, uncomplicated"
@@ -1781,7 +1782,7 @@ F411,pgx,6,,18,120,Generalized anxiety disorder
 G8929,pgx,7,,18,120,Other chronic pain
 F339,pgx,8,,18,120,"Major depressive disorder, recurrent, unspecified"
 F332,pgx,9,,18,120,"Major depressive disorder, recurrent severe without psychotic features"
-Z79891,pgx,10,,18,120,Long term (current) use of opiate analgesic
+Z79891,pgx,10,,14,120,Long term (current) use of opiate analgesic
 F419,pgx,11,,18,120,"Anxiety disorder, unspecified"
 Z7901,pgx,12,,18,120,Long term (current) use of anticoagulants
 I214,pgx,13,,18,120,Non-ST elevation (NSTEMI) myocardial infarction
@@ -2161,63 +2162,78 @@ J112,resp,77,,0,120,Influenza due to unidentified influenza virus with gastroint
 J1181,resp,78,,0,120,Influenza due to unidentified influenza virus with encephalopathy
 J1182,resp,79,,0,120,Influenza due to unidentified influenza virus with myocarditis
 J1183,resp,80,,0,120,Influenza due to unidentified influenza virus with otitis media
-A6920,infect,0,,0,120,"Lyme disease, unspecified"
-B2799,infect,1,,0,120,"Infectious mononucleosis, unspecified with other complication"
-Z111,infect,2,,0,120,Encounter for screening for respiratory tuberculosis
-Z117,infect,3,,0,120,Encounter for testing for latent tuberculosis infection
-R7611,infect,4,,0,120,Nonspecific reaction to tuberculin skin test without active tuberculosis
-Z201,infect,5,,0,120,Contact with and (suspected) exposure to tuberculosis
-A419,infect,6,,0,120,"Sepsis, unspecified organism"
-A499,infect,7,,0,120,"Bacterial infection, unspecified"
-B9689,infect,8,,0,120,Other specified bacterial agents as the cause of diseases classified elsewhere
-B9620,infect,9,,0,120,Unspecified Escherichia coli [E. coli] as the cause of diseases classified elsewhere
-Z2239,infect,10,,0,120,Carrier of other specified bacterial diseases
-Z22321,infect,11,,0,120,Carrier or suspected carrier of Methicillin susceptible Staphylococcus aureus
-Z22322,infect,12,,0,120,Carrier or suspected carrier of Methicillin resistant Staphylococcus aureus
-B370,infect,13,,0,120,Candidal stomatitis
-B379,infect,14,,0,120,"Candidiasis, unspecified"
-B372,infect,15,,0,120,Candidiasis of skin and nail
-L0390,infect,16,,0,120,"Cellulitis, unspecified"
-L0291,infect,17,,0,120,"Cutaneous abscess, unspecified"
-B354,infect,18,,0,120,Tinea corporis
-B351,infect,19,,0,120,Tinea unguium
-B3731,infect,20,F,0,120,Acute candidiasis of vulva and vagina
-B3732,infect,21,F,0,120,Chronic candidiasis of vulva and vagina
-B3781,infect,22,,0,120,Candidal esophagitis
-B3782,infect,23,,0,120,Candidal enteritis
-B3783,infect,24,,0,120,Candidal cheilitis
-B3784,infect,25,,0,120,Candidal otitis externa
-B3789,infect,26,,0,120,Other sites of candidiasis
-A4901,infect,27,,0,120,"Methicillin susceptible Staphylococcus aureus infection, unspecified site"
-A4902,infect,28,,0,120,"Methicillin resistant Staphylococcus aureus infection, unspecified site"
-A491,infect,29,,0,120,"Streptococcal infection, unspecified site"
-A492,infect,30,,0,120,"Hemophilus influenzae infection, unspecified site"
-A493,infect,31,,0,120,"Mycoplasma infection, unspecified site"
-A498,infect,32,,0,120,Other bacterial infections of unspecified site
-B950,infect,33,,0,120,"Streptococcus, group A, as the cause of diseases classified elsewhere"
-B951,infect,34,,0,120,"Streptococcus, group B, as the cause of diseases classified elsewhere"
-B952,infect,35,,0,120,Enterococcus as the cause of diseases classified elsewhere
-B953,infect,36,,0,120,Streptococcus pneumoniae as the cause of diseases classified elsewhere
-B954,infect,37,,0,120,Other streptococcus as the cause of diseases classified elsewhere
-B955,infect,38,,0,120,Unspecified streptococcus as the cause of diseases classified elsewhere
-B9561,infect,39,,0,120,Methicillin susceptible Staphylococcus aureus infection as the cause of diseases classified elsewhere
-B9562,infect,40,,0,120,Methicillin resistant Staphylococcus aureus infection as the cause of diseases classified elsewhere
-B957,infect,41,,0,120,Other staphylococcus as the cause of diseases classified elsewhere
-B958,infect,42,,0,120,Unspecified staphylococcus as the cause of diseases classified elsewhere
-B960,infect,43,,0,120,Mycoplasma pneumoniae [M. pneumoniae] as the cause of diseases classified elsewhere
-B961,infect,44,,0,120,Klebsiella pneumoniae [K. pneumoniae] as the cause of diseases classified elsewhere
-B9621,infect,45,,0,120,Shiga toxin-producing Escherichia coli [E. coli] [STEC] O157 as the cause of diseases classified elsewhere
-B9622,infect,46,,0,120,Other specified Shiga toxin-producing Escherichia coli [E. coli] [STEC] as the cause of diseases classified elsewhere
-B9623,infect,47,,0,120,Unspecified Shiga toxin-producing Escherichia coli [E. coli] [STEC] as the cause of diseases classified elsewhere
-B9629,infect,48,,0,120,Other Escherichia coli [E. coli] as the cause of diseases classified elsewhere
-B963,infect,49,,0,120,Hemophilus influenzae [H. influenzae] as the cause of diseases classified elsewhere
-B964,infect,50,,0,120,Proteus (mirabilis) (morganii) as the cause of diseases classified elsewhere
-B965,infect,51,,0,120,Pseudomonas (aeruginosa) (mallei) (pseudomallei) as the cause of diseases classified elsewhere
-B966,infect,52,,0,120,Bacteroides fragilis [B. fragilis] as the cause of diseases classified elsewhere
-B967,infect,53,,0,120,Clostridium perfringens [C. perfringens] as the cause of diseases classified elsewhere
-B9681,infect,54,,0,120,Helicobacter pylori [H. pylori] as the cause of diseases classified elsewhere
-B9682,infect,55,,0,120,Vibrio vulnificus as the cause of diseases classified elsewhere
-B9683,infect,56,,0,120,Acinetobacter baumannii as the cause of diseases classified elsewhere
+Z0184,infect,0,,0,120,Encounter for antibody response examination
+B349,infect,1,,0,120,"Viral infection, unspecified"
+R509,infect,2,,0,120,"Fever, unspecified"
+B2799,infect,3,,0,120,"Infectious mononucleosis, unspecified with other complication"
+Z1159,infect,4,,0,120,Encounter for screening for other viral diseases
+A499,infect,5,,0,120,"Bacterial infection, unspecified"
+L0390,infect,6,,0,120,"Cellulitis, unspecified"
+Z111,infect,7,,0,120,Encounter for screening for respiratory tuberculosis
+Z117,infect,8,,0,120,Encounter for testing for latent tuberculosis infection
+R7611,infect,9,,0,120,Nonspecific reaction to tuberculin skin test without active tuberculosis
+Z201,infect,10,,0,120,Contact with and (suspected) exposure to tuberculosis
+A419,infect,11,,0,120,"Sepsis, unspecified organism"
+B9689,infect,12,,0,120,Other specified bacterial agents as the cause of diseases classified elsewhere
+B9620,infect,13,,0,120,Unspecified Escherichia coli [E. coli] as the cause of diseases classified elsewhere
+L0291,infect,14,,0,120,"Cutaneous abscess, unspecified"
+B370,infect,15,,0,120,Candidal stomatitis
+B379,infect,16,,0,120,"Candidiasis, unspecified"
+B372,infect,17,,0,120,Candidiasis of skin and nail
+Z2239,infect,18,,0,120,Carrier of other specified bacterial diseases
+Z22321,infect,19,,0,120,Carrier or suspected carrier of Methicillin susceptible Staphylococcus aureus
+Z22322,infect,20,,0,120,Carrier or suspected carrier of Methicillin resistant Staphylococcus aureus
+B354,infect,21,,0,120,Tinea corporis
+B351,infect,22,,0,120,Tinea unguium
+A6920,infect,23,,0,120,"Lyme disease, unspecified"
+B3731,infect,24,F,0,120,Acute candidiasis of vulva and vagina
+B3732,infect,25,F,0,120,Chronic candidiasis of vulva and vagina
+B3781,infect,26,,0,120,Candidal esophagitis
+B3782,infect,27,,0,120,Candidal enteritis
+B3783,infect,28,,0,120,Candidal cheilitis
+B3784,infect,29,,0,120,Candidal otitis externa
+B3789,infect,30,,0,120,Other sites of candidiasis
+A4901,infect,31,,0,120,"Methicillin susceptible Staphylococcus aureus infection, unspecified site"
+A4902,infect,32,,0,120,"Methicillin resistant Staphylococcus aureus infection, unspecified site"
+A491,infect,33,,0,120,"Streptococcal infection, unspecified site"
+A492,infect,34,,0,120,"Hemophilus influenzae infection, unspecified site"
+A493,infect,35,,0,120,"Mycoplasma infection, unspecified site"
+A498,infect,36,,0,120,Other bacterial infections of unspecified site
+B950,infect,37,,0,120,"Streptococcus, group A, as the cause of diseases classified elsewhere"
+B951,infect,38,,0,120,"Streptococcus, group B, as the cause of diseases classified elsewhere"
+B952,infect,39,,0,120,Enterococcus as the cause of diseases classified elsewhere
+B953,infect,40,,0,120,Streptococcus pneumoniae as the cause of diseases classified elsewhere
+B954,infect,41,,0,120,Other streptococcus as the cause of diseases classified elsewhere
+B955,infect,42,,0,120,Unspecified streptococcus as the cause of diseases classified elsewhere
+B9561,infect,43,,0,120,Methicillin susceptible Staphylococcus aureus infection as the cause of diseases classified elsewhere
+B9562,infect,44,,0,120,Methicillin resistant Staphylococcus aureus infection as the cause of diseases classified elsewhere
+B957,infect,45,,0,120,Other staphylococcus as the cause of diseases classified elsewhere
+B958,infect,46,,0,120,Unspecified staphylococcus as the cause of diseases classified elsewhere
+B960,infect,47,,0,120,Mycoplasma pneumoniae [M. pneumoniae] as the cause of diseases classified elsewhere
+B961,infect,48,,0,120,Klebsiella pneumoniae [K. pneumoniae] as the cause of diseases classified elsewhere
+B9621,infect,49,,0,120,Shiga toxin-producing Escherichia coli [E. coli] [STEC] O157 as the cause of diseases classified elsewhere
+B9622,infect,50,,0,120,Other specified Shiga toxin-producing Escherichia coli [E. coli] [STEC] as the cause of diseases classified elsewhere
+B9623,infect,51,,0,120,Unspecified Shiga toxin-producing Escherichia coli [E. coli] [STEC] as the cause of diseases classified elsewhere
+B9629,infect,52,,0,120,Other Escherichia coli [E. coli] as the cause of diseases classified elsewhere
+B963,infect,53,,0,120,Hemophilus influenzae [H. influenzae] as the cause of diseases classified elsewhere
+B964,infect,54,,0,120,Proteus (mirabilis) (morganii) as the cause of diseases classified elsewhere
+B965,infect,55,,0,120,Pseudomonas (aeruginosa) (mallei) (pseudomallei) as the cause of diseases classified elsewhere
+B966,infect,56,,0,120,Bacteroides fragilis [B. fragilis] as the cause of diseases classified elsewhere
+B967,infect,57,,0,120,Clostridium perfringens [C. perfringens] as the cause of diseases classified elsewhere
+B9681,infect,58,,0,120,Helicobacter pylori [H. pylori] as the cause of diseases classified elsewhere
+B9682,infect,59,,0,120,Vibrio vulnificus as the cause of diseases classified elsewhere
+B9683,infect,60,,0,120,Acinetobacter baumannii as the cause of diseases classified elsewhere
+M109,gout,0,,18,120,"Gout, unspecified"
+E790,gout,1,,18,120,Hyperuricemia without signs of inflammatory arthritis and tophaceous disease
+M1A9XX0,gout,2,,18,120,"Chronic gout, unspecified, without tophus (tophi)"
+M1A9XX1,gout,3,,18,120,"Chronic gout, unspecified, with tophus (tophi)"
+N200,gout,4,,18,120,Calculus of kidney
+M10071,gout,5,,18,120,"Idiopathic gout, right ankle and foot"
+M10072,gout,6,,18,120,"Idiopathic gout, left ankle and foot"
+M10079,gout,7,,18,120,"Idiopathic gout, unspecified ankle and foot"
+M1000,gout,8,,18,120,"Idiopathic gout, unspecified site"
+M10041,gout,9,,18,120,"Idiopathic gout, right hand"
+M10042,gout,10,,18,120,"Idiopathic gout, left hand"
 R197,gi_infect,0,,0,120,"Diarrhea, unspecified"
 A084,gi_infect,1,,0,120,"Viral intestinal infection, unspecified"
 A0472,gi_infect,2,,0,120,"Enterocolitis due to Clostridium difficile, not specified as recurrent"
@@ -2332,37 +2348,36 @@ Z8262,bone,6,,40,120,Family history of osteoporosis
 Z8739,bone,7,,40,120,Personal history of other diseases of the musculoskeletal system and connective tissue
 M816,bone,8,,40,120,Localized osteoporosis [Lequesne]
 M818,bone,9,,40,120,Other osteoporosis without current pathological fracture
-L680,endocrine,0,,12,120,Hirsutism
-E221,endocrine,1,,12,120,Hyperprolactinemia
-E2740,endocrine,2,,12,120,Unspecified adrenocortical insufficiency
-E230,endocrine,3,,12,120,Hypopituitarism
-E271,endocrine,4,,12,120,Primary adrenocortical insufficiency
-E249,endocrine,5,,12,120,"Cushing's syndrome, unspecified"
-E222,endocrine,6,,12,120,Syndrome of inappropriate secretion of antidiuretic hormone
-E236,endocrine,7,,12,120,Other disorders of pituitary gland
-E240,endocrine,8,,12,120,Pituitary-dependent Cushing's disease
-E243,endocrine,9,,12,120,Ectopic ACTH syndrome
-E248,endocrine,10,,12,120,Other Cushing's syndrome
-E272,endocrine,11,,12,120,Addisonian crisis
-E2749,endocrine,12,,12,120,Other adrenocortical insufficiency
-E278,endocrine,13,,12,120,Other specified disorders of adrenal gland
-E229,endocrine,14,,12,120,"Hyperfunction of pituitary gland, unspecified"
-E232,endocrine,15,,12,120,Diabetes insipidus
-E237,endocrine,16,,12,120,"Disorder of pituitary gland, unspecified"
-E259,endocrine,17,,12,120,"Adrenogenital disorder, unspecified"
-E301,endocrine,18,,12,120,Precocious puberty
-E309,endocrine,19,,12,120,"Disorder of puberty, unspecified"
-E220,endocrine,20,,12,120,Acromegaly and pituitary gigantism
-E228,endocrine,21,,12,120,Other hyperfunction of pituitary gland
-E231,endocrine,22,,12,120,Drug-induced hypopituitarism
-E233,endocrine,23,,12,120,"Hypothalamic dysfunction, not elsewhere classified"
-E241,endocrine,24,,12,120,Nelson's syndrome
-E242,endocrine,25,,12,120,Drug-induced Cushing's syndrome
-E244,endocrine,26,,12,120,Alcohol-induced pseudo-Cushing's syndrome
-E270,endocrine,27,,12,120,Other adrenocortical overactivity
-E273,endocrine,28,,12,120,Drug-induced adrenocortical insufficiency
-E275,endocrine,29,,12,120,Adrenomedullary hyperfunction
-E279,endocrine,30,,12,120,"Disorder of adrenal gland, unspecified"
+E221,endocrine,0,,12,120,Hyperprolactinemia
+E2740,endocrine,1,,12,120,Unspecified adrenocortical insufficiency
+E230,endocrine,2,,12,120,Hypopituitarism
+E271,endocrine,3,,12,120,Primary adrenocortical insufficiency
+E249,endocrine,4,,12,120,"Cushing's syndrome, unspecified"
+E222,endocrine,5,,12,120,Syndrome of inappropriate secretion of antidiuretic hormone
+E236,endocrine,6,,12,120,Other disorders of pituitary gland
+E240,endocrine,7,,12,120,Pituitary-dependent Cushing's disease
+E243,endocrine,8,,12,120,Ectopic ACTH syndrome
+E248,endocrine,9,,12,120,Other Cushing's syndrome
+E272,endocrine,10,,12,120,Addisonian crisis
+E2749,endocrine,11,,12,120,Other adrenocortical insufficiency
+E278,endocrine,12,,12,120,Other specified disorders of adrenal gland
+E229,endocrine,13,,12,120,"Hyperfunction of pituitary gland, unspecified"
+E232,endocrine,14,,12,120,Diabetes insipidus
+E237,endocrine,15,,12,120,"Disorder of pituitary gland, unspecified"
+E259,endocrine,16,,12,120,"Adrenogenital disorder, unspecified"
+E301,endocrine,17,,12,120,Precocious puberty
+E309,endocrine,18,,12,120,"Disorder of puberty, unspecified"
+E220,endocrine,19,,12,120,Acromegaly and pituitary gigantism
+E228,endocrine,20,,12,120,Other hyperfunction of pituitary gland
+E231,endocrine,21,,12,120,Drug-induced hypopituitarism
+E233,endocrine,22,,12,120,"Hypothalamic dysfunction, not elsewhere classified"
+E241,endocrine,23,,12,120,Nelson's syndrome
+E242,endocrine,24,,12,120,Drug-induced Cushing's syndrome
+E244,endocrine,25,,12,120,Alcohol-induced pseudo-Cushing's syndrome
+E270,endocrine,26,,12,120,Other adrenocortical overactivity
+E273,endocrine,27,,12,120,Drug-induced adrenocortical insufficiency
+E275,endocrine,28,,12,120,Adrenomedullary hyperfunction
+E279,endocrine,29,,12,120,"Disorder of adrenal gland, unspecified"
 Z940,transplant,0,,18,120,Kidney transplant status
 Z941,transplant,1,,18,120,Heart transplant status
 Z942,transplant,2,,18,120,Lung transplant status
@@ -2377,29 +2392,28 @@ Z79623,transplant,10,,18,120,Long term (current) use of mammalian target of rapa
 Z79620,transplant,11,,18,120,Long term (current) use of immunosuppressive biologic
 Z79899,meds,0,,0,120,Other long term (current) drug therapy
 Z5181,meds,1,,0,120,Encounter for therapeutic drug level monitoring
-Z7901,meds,2,,0,120,Long term (current) use of anticoagulants
-Z7902,meds,3,,0,120,Long term (current) use of antithrombotics/antiplatelets
-Z7982,meds,4,,0,120,Long term (current) use of aspirin
-Z7952,meds,5,,0,120,Long term (current) use of systemic steroids
-Z7951,meds,6,,0,120,Long term (current) use of inhaled steroids
-Z79891,meds,7,,0,120,Long term (current) use of opiate analgesic
-Z791,meds,8,,0,120,Long term (current) use of non-steroidal anti-inflammatories (NSAID)
-Z792,meds,9,,0,120,Long term (current) use of antibiotics
-Z793,meds,10,,0,120,Long term (current) use of hormonal contraceptives
-Z7983,meds,11,,0,120,Long term (current) use of bisphosphonates
-Z79810,meds,12,,0,120,Long term (current) use of selective estrogen receptor modulators (SERMs)
-Z79811,meds,13,,0,120,Long term (current) use of aromatase inhibitors
-Z79818,meds,14,,0,120,Long term (current) use of other agents affecting estrogen receptors and estrogen levels
-Z79890,meds,15,,0,120,Hormone replacement therapy
-Z79631,meds,16,,0,120,Long term (current) use of antimetabolite agent
-Z79630,meds,17,,0,120,Long term (current) use of alkylating agent
-Z79633,meds,18,,0,120,Long term (current) use of mitotic inhibitor
-Z79634,meds,19,,0,120,Long term (current) use of topoisomerase inhibitor
-Z79620,meds,20,,0,120,Long term (current) use of immunosuppressive biologic
-Z79624,meds,21,,0,120,Long term (current) use of inhibitors of nucleotide synthesis
-Z7985,meds,22,,0,120,Long-term (current) use of injectable non-insulin antidiabetic drugs
-Z7984,meds,23,,0,120,Long term (current) use of oral hypoglycemic drugs
-Z794,meds,24,,0,120,Long term (current) use of insulin
+Z7902,meds,2,,0,120,Long term (current) use of antithrombotics/antiplatelets
+Z7982,meds,3,,0,120,Long term (current) use of aspirin
+Z7952,meds,4,,0,120,Long term (current) use of systemic steroids
+Z7951,meds,5,,0,120,Long term (current) use of inhaled steroids
+Z79891,meds,6,,14,120,Long term (current) use of opiate analgesic
+Z791,meds,7,,0,120,Long term (current) use of non-steroidal anti-inflammatories (NSAID)
+Z792,meds,8,,0,120,Long term (current) use of antibiotics
+Z793,meds,9,F,12,55,Long term (current) use of hormonal contraceptives
+Z7983,meds,10,,0,120,Long term (current) use of bisphosphonates
+Z79810,meds,11,,0,120,Long term (current) use of selective estrogen receptor modulators (SERMs)
+Z79811,meds,12,,0,120,Long term (current) use of aromatase inhibitors
+Z79818,meds,13,,0,120,Long term (current) use of other agents affecting estrogen receptors and estrogen levels
+Z79890,meds,14,F,40,120,Hormone replacement therapy
+Z79631,meds,15,,0,120,Long term (current) use of antimetabolite agent
+Z79630,meds,16,,0,120,Long term (current) use of alkylating agent
+Z79633,meds,17,,0,120,Long term (current) use of mitotic inhibitor
+Z79634,meds,18,,0,120,Long term (current) use of topoisomerase inhibitor
+Z79620,meds,19,,0,120,Long term (current) use of immunosuppressive biologic
+Z79624,meds,20,,0,120,Long term (current) use of inhibitors of nucleotide synthesis
+Z7985,meds,21,,0,120,Long-term (current) use of injectable non-insulin antidiabetic drugs
+Z7984,meds,22,,0,120,Long term (current) use of oral hypoglycemic drugs
+Z794,meds,23,,0,120,Long term (current) use of insulin
 Z01812,preop,0,,0,120,Encounter for preprocedural laboratory examination
 Z01818,preop,1,,0,120,Encounter for other preprocedural examination
 Z01810,preop,2,,0,120,Encounter for preprocedural cardiovascular examination
@@ -2443,7 +2457,7 @@ N468,infertility,5,M,18,50,Other male infertility
 Z3141,infertility,6,,18,50,Encounter for fertility testing
 Z3189,infertility,7,,18,50,Encounter for other procreative management
 Z319,infertility,8,,18,50,"Encounter for procreative management, unspecified"
-E282,infertility,9,F,18,50,Polycystic ovarian syndrome
+E282,infertility,9,F,12,55,Polycystic ovarian syndrome
 N911,infertility,10,,18,50,Secondary amenorrhea
 N913,infertility,11,,18,50,Primary oligomenorrhea
 Z0000,screening,0,,18,120,Encounter for general adult medical examination without abnormal findings
