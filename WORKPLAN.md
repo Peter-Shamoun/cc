@@ -39,9 +39,18 @@ Never decide the work is done; when an item finishes, pick the next highest-valu
   procedural steps +5 Haiku; others ~0. Haiku+pitfalls ~= Sonnet. Matcher false-reject fixed during scoring.
 - [done] generator 3.1 merged (audit-1 fixes); audit 2 = 7/10 (research/edi_realism_audit_2.md); realism
   engineer on audit-2 findings (target >= 8.5)
-- [done] lake optimization merged (incremental gold, manifests, quarter folds): KNOWN RED - 2 tests in
-  tests/test_lake.py fail on generator-3.1 data (manifest lists a missing gold file); lake architect fixing;
-  independent lake review running
+- [done] lake optimization merged (incremental gold, manifests, quarter folds) + review fixes (unique keys,
+  manifest check, month-close crash rebuild, fenced lock, reader retention, per-relation reader scope); 227 green
+- [done] PHI: default-deny allowlist of REF qualifiers in lossless.edi_reference
+- CURRENT FOCUS (owner, 2026-10-25): data groundwork, then STOP before the agent analyzer
+  - [running] realism round 2 (audit-2 findings, target >= 8.5), then re-audit
+  - [running] parser loop: speed/memory with byte-identical Parquet (oracle), then edi.segment slimmed to
+    bronze byte offsets (raw_text/elements dropped; lossless proven against bronze)
+  - [running] silver: open-month small-file compaction, claim-key index, re-measure
+  - [running] design check: DuckLake / Iceberg / current, measured + security fit -> lake-design-check.md
+  - [next] scale runs 2 customers x 1 year, 1 customer x 3 years through the merged pipeline
+- PARKED until after the groundwork (owner): authoring round 3 ingest (13 verifiers failed on the limit),
+  SOTA research refresh, screen 2 / gradient search, then React front end
 - [running] held-out validation (heldout_hard_1, 27 questions, 4 configs x Haiku/Sonnet x 2 repeats)
 - [next] harder question set (Sonnet at ceiling): Opus authors multi-step questions; then screen 2 =
   coordinate ascent around the winner (glossary content variants, examples/semantic layer on hard questions,
