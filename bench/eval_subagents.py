@@ -32,7 +32,7 @@ def prepare(run_label: str, configs: dict, models: list[str], repeats: int, only
     if run_dir.exists():
         raise FileExistsError(f"{run_dir} exists; choose a new run label")
     entries = []
-    for case in load_cases(only):
+    for case in load_cases(only, snapshot_path=snap):
         for config_name, technique_config in configs.items():
             for model in models:
                 for repeat in range(repeats):
@@ -50,7 +50,7 @@ def prepare(run_label: str, configs: dict, models: list[str], repeats: int, only
 def score(run_label: str) -> dict:
     run_dir = SESSIONS_ROOT / run_label
     manifest = json.loads((run_dir / "manifest.json").read_text())
-    cases = {c["id"]: c for c in load_cases()}
+    cases = {c["id"]: c for c in load_cases(snapshot_path=Path(manifest["snapshot"]))}
     gold_cache = {}
     rows = []
     for e in manifest["entries"]:
