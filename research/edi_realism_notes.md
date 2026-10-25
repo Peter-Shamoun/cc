@@ -1,0 +1,239 @@
+# EDI realism notes: what a reference lab's 837P/835 traffic looks like
+
+Companion to `research/edi_realism_calibration.yaml`, which holds every number with a source and a confidence level. This file gives the reasoning, says where the evidence is strong or weak, and ends with the 15 largest gaps between `ccsim/edi_mock.py` v2.0 and real traffic, in priority order.
+
+Researched 2026-10-25. Primary data pulled and computed directly:
+- **CMS CY2026 CLFS** file (26CLABQ4, 2,243 codes)
+- **CMS Medicare Physician & Other Practitioners by Geography and Service, CY2024**, all national rows (13,463 HCPCS x place-of-service rows; services, bene-days, average submitted charge, average allowed)
+- **Quest FY2025 10-K** (payer mix by volume and revenue, requisitions, DSO)
+- **XiFin 2026 Payor Denial Impact Report** (PDF text tables)
+- **CMS 835 companion guides**
+- **UHC PLB guide**
+
+Everything else comes from payer and MAC pages, X12 RFIs, KFF, and Optum.
+
+---
+
+## 1. Volume and the 5 MB/day target
+
+**Bytes per claim (computed).** I built segment lists for a realistic lab claim. Field widths are typical: a 14-character PCN, 40-character addresses, a CLIA `REF*X4`, a clearinghouse `REF*D9`, `REF*6R` on every line, and no line breaks. Bytes grow linearly with the number of lines:
+
+- **837P claim:** about **398 + 80 x lines** bytes. A dependent (2000C) adds 142 B; COB (2320/2330B plus `SVD`/`CAS`/`DTP` per line) adds about 300 B + 52 B per line.
+- **835 CLP:** about **213 + 109 x lines** bytes (Medicare). Commercial is about 10% more because of PR `CAS`, `LQ` and `AMT*AU`.
+- **Current generator:** 467 B per 837 claim and 403 B per CLP, because it averages about 2.1 lines per claim.
+
+**Lines per claim.** In Medicare 2024 there are 318M CLFS-code lines (distinct beneficiary, day and code) against 40.3M venipuncture days. That is **7.9 codes per blood-draw day**. Claims with no draw (urine, swab) and younger commercial patients pull the mean down. A blended mean of about **4.9 lines** (spread 3.5–6.5) is defensible. Units are almost always 1. The exceptions are **87798 (mean 10.3 units per line)** and 87150 (8.4), which is exactly where Medicare's MUE edit (CO-151/N362) fires.
+
+**Mapping 5 MB to volume.** All-in, one claim costs about 835 B of 837 plus 1.10 CLPs x about 770 B of 835, roughly **1.68 KB**:
+
+| What "5 MB/day" counts | Claims per business day |
+|---|---|
+| 837 and 835 together (bytes split about 50/50) | ~3,000 (2,700–3,300) |
+| 837 only | ~6,000 |
+| 7-day calendar average | multiply either figure by 1.4 |
+
+**Sanity check against Quest.** Quest processed about 244M requisitions in 2025. About 60% are insurance-billed (insurers 43% + government 17%); 37% are client-billed and never become an 837. So 3,000 claims per day is about 5,000 requisitions per day, roughly 1/190 of Quest: a mid-size or large regional reference lab. Quest's net revenue per requisition is about **$44**, which is a useful check on mean paid per claim.
+
+**835 shape.** I found no public measurement of 835 file counts or sizes, so this is derived (confidence: low):
+- The MAC issues one 835 per payee NPI per business day. For this tenant that is about 600 CLPs and about 420 KB, the largest file of the day.
+- State Medicaid runs a weekly checkwrite (NC, NV and OH are weekly; AL is biweekly; NC skips the last cycle of June and December).
+- Commercial payers range from daily to twice a week, and small payers from weekly to monthly.
+- With about 300 payer IDs a month and a Zipf-shaped tail, expect **30–60 835 files a day**: median about 6 claims (about 5 KB), p90 about 120 claims.
+- There is no ERA or EFT on weekends or federal holidays. Under CORE 370, the 835 may arrive no more than 3 days before the EFT.
+
+**Patient reuse.** Medicare patients who are tested have **2.7 blood-draw days per year**. The generator's patient pool (0.35 x claims) gives about 2.9 claims per patient within 30 days. In reality a 30-day window holds about 1.1–1.3 claims per distinct patient.
+
+## 2. Payer mix and identifiers
+
+Quest by volume: government is 28% of insurance-billed claims. That covers traditional Medicare and Medicaid FFS; MA and Medicaid MCOs are counted under "healthcare insurers".
+- MA is now 54% of eligible beneficiaries (KFF 2025), so MA volume is about the same as Medicare FFS volume.
+- 78% of Medicaid enrollees are in MCOs.
+
+Recommended share of insurance-billed claims:
+
+| Payer type | Share |
+|---|---|
+| Medicare FFS (MAC) | ~20% |
+| Medicare Advantage | ~16% |
+| Medicaid MCO | ~11% |
+| Medicaid FFS | ~3% |
+| BCBS plans | ~20% |
+| National commercial (UHC, Aetna, Cigna, Humana) | ~21% |
+| Regional plans and TPAs | ~7% |
+| Tricare and other | ~2% |
+
+The generator has **no Medicare FFS payer at all**, and that is the single most visible gap.
+
+Identifier conventions:
+- **Medicare.** Payer IDs are the MAC's 5-digit contract number for the jurisdiction where the lab sits. A lab in Burlington, NC bills Palmetto JM; the "11502" pattern is right, but verify the exact numbers.
+- **National commercial.** UHC 87726, Aetna 60054, Cigna 62308 and Humana 61101 are fairly universal across clearinghouses. Blues and Medicaid MCO IDs vary by clearinghouse.
+- **835 payer identity.**
+  - `N1*PR` carries the payer's processing name, which often differs from the 837 name ("MEDICARE PART B" on the 837 becomes "PALMETTO GBA" on the 835).
+  - `TRN03` is usually "1" + the payer's EIN.
+  - `REF*2U` is optional.
+  - The 835's `ISA06` is the clearinghouse's ID, not the payer's.
+  - The generator models only the name difference (`name_835`). It puts the payer ID in `ISA06` and `TRN03`, which real feeds rarely do.
+
+## 3. CPT mix, charges, and allowed amounts
+
+**Volume.** The Medicare 2024 line shares are dominated by **36415 (12.7%)**, then 80053 (8.6%), 85025 (8.2%), 80061 (5.5%), 83036 (4.6%) and 84443 (4.4%). After those come urinalysis (81001/81003), urine creatinine and microalbumin, free T4, BMP, B12, ferritin, iron, PSA, PT and culture work-ups (87086, 87088, 87077, 87186).
+
+**Dollars.** The top codes by allowed dollars are **87798 (6.1%)**, 36415, 81528, 80053, 84443, 80061, 85025, 82306, 83036, G0483 and 80307. Genetic tests are 5% of Part B lab tests but 43% of Part B lab dollars (OIG 2024).
+
+**Charges (chargemaster proxy).** Average submitted charges run **4–11x the CLFS rate for routine chemistry and hematology** (80053: $61 vs $10.56), about 2.5x for NAATs, about 2.6x for definitive drug testing, and 1.2–2.5x for molecular. Venipuncture is $21.81 vs $9.34.
+
+**Allowed amounts.** These should be computed from the **CLFS**, not as a share of charge:
+- **Medicare FFS:** 1.0x CLFS, then minus 2% sequestration (CO-253) on every paid line.
+- **MA:** about 1.0x.
+- **Medicaid:** capped at CLFS by SSA 1903(i)(7); typically 0.6–0.9x.
+- **Contracted commercial:** about 0.8–2.0x, typical about 1.15x. PAMA built the CLFS from the median of private-payer rates, so contracted commercial rates cluster near it. Evidence here is weak: Avalere's 2013 CBC figure of $20.26 vs $11.02 predates PAMA.
+- **Out-of-network commercial:** a percentage of billed charges.
+
+The generator's 80053 allowed amount is about $35, three times the CLFS rate.
+
+**Code hygiene.**
+- **0240U** is not on the CY2026 CLFS.
+- **81479** has no national rate (the MAC prices it) and needs a description in `SV101-7` or `NTE`.
+- XiFin reports that payers now treat **87801** as a bundling ceiling for STI NAATs billed together.
+
+## 4. Denials
+
+**Rates (XiFin, the only lab-specific source at scale).**
+
+| Year (DOS) | All lab segments | Clinical | Molecular | Pathology |
+|---|---|---|---|---|
+| 2021 | n/a | 13.6% | 27.2% | 19.8% |
+| 2023 | 9.9% | n/a | n/a | n/a |
+| 2024 | 8.0% | 6.5% (with hospital outreach) | 32.9% | n/a |
+| 2025 | 11.2% | n/a | n/a | n/a |
+
+Across industries for comparison: Optum's hospital index puts all claims at 12% in 2023, and KFF puts ACA in-network denials at 19%. In 2021, contracted payers denied 21.2% of claims and non-contracted payers 32.7%, a ratio of about 1.5. XiFin's payer-group charts are images, so the multipliers by payer class in the YAML (Medicare FFS 0.6x, MA 1.3x, Medicaid MCO 1.5x) are estimates, marked low confidence.
+
+**Reasons: the biggest correction.** For 2025 clinical lab denials, XiFin reports:
+- **59.4% "procedure not paid separately"** (bundling: CARC 97/234/236, plus NCCI)
+- **15.2% duplicates** (CARC 18)
+- 6.6% non-covered (96/204)
+- 3.5% prior authorization (197)
+- 3.2% modifier (4)
+- 2.1% COB (22)
+- 1.8% experimental (55)
+- 0.5% HSA
+- 0.4% wrong payer (109)
+
+Molecular is led by prior authorization (27.6%), then duplicates (16.3%), experimental (14.5%) and bundling (14.2%). Pathology is led by duplicates (35.5%), then bundling (23%) and COB (15%).
+
+The generator is weighted toward 50, 197 and 16 and almost never emits 97, 18, 151 or 236. A dashboard built on its output would rank denial causes in nearly the reverse of the real order.
+
+**Medicare-specific edits worth modeling:**
+
+| Edit | Group / CARC | RARCs |
+|---|---|---|
+| MUE units | CO-151 (whole line denied) | N362 |
+| NCCI procedure-to-procedure | CO-236 | n/a |
+| PECOS ordering-provider edit | CO-183 or CO-16 | N574, N264, N265, N575, MA13 |
+| CLIA certificate scope | CO-B7 | N95 / MA120 |
+| LCD/NCD medical necessity | CO-50 (PR-50 when modifier GA) | N386 / N115 |
+
+Two further Medicare facts:
+- Medicare Part B reports adjustments **only at line level**; claim-level `CAS` does not apply to Part B carriers.
+- MACs periodically run **mass adjustments**: a wave of reversals and corrections after an erroneous edit, as with Noridian's B7 incidents in 2024 and 2025.
+
+**Partial vs full denials.** Most lab "denied claims" are paid claims with one or two lines denied (bundled venipuncture, MUE, medical necessity on one code). I estimate about 60% of denied claims are partial (low confidence). The generator has 6% partial versus about 8% full.
+
+**Rework.**
+- Corrected claims are 2–5% of 837 volume.
+- Medicare often wants a *new* claim rather than a frequency-7 replacement for PECOS and CO-16 fixes.
+- 2025 appeal success, first attempt (clinical): additional information 36%, medical necessity 10%.
+- Appeals return about 0.35% of insurance payments for clinical labs but 9.3% for molecular.
+
+## 5. Timing, interest, PLB, reversals
+
+**Days from receipt to payment.**
+- **Medicare:** an electronic clean claim cannot be paid before **day 14** (a 13-day floor). Interest is owed after day 30, at 4.125% for 2026H1 and 4.75% for 2026H2, and is not paid on full denials. It is reported as CLP-level `AMT*I` and summed in `PLB L6`.
+- **Medicaid FFS:** follows the weekly checkwrite.
+- **Commercial and MA:** no good public lab number. Hospital data (Crowe, Florida Hospital Association) shows long tails. The YAML uses a typical 12–16 days with a 5% tail beyond 60 days (low confidence).
+- **Reference point:** Quest's DSO is 48 days.
+
+**PLB semantics (UHC guide).**
+- **WO:** a positive amount recoups an earlier overpayment. When a reversal and its correction land in *different* 835s, the reversal's 835 carries a negative WO and the correction's 835 a positive WO.
+- **72:** a refund check, offset by WO.
+- **FB:** negative when a balance moves forward to a later 835, positive when it comes back; the reference is the originating `TRN02`.
+- **J1, IR, CS:** J1 is a suppressed payment, IR is IRS withholding, and CS (mostly FEP/Blues) is an adjustment overpayment.
+
+The generator always emits a correction in the same 835 as its reversal, and uses its own WO references.
+
+**Reversals.** I estimate `CLP02=22` at about 1–2% of CLPs (low confidence). The generator's combined rate (1.5% + 2.5% + 0.4% of claims) is probably about 2–3x too high.
+
+## 6. Patient responsibility and COB
+
+- **Medicare Part B CLFS tests have no deductible and no coinsurance** (Quest 10-K). So Medicare-primary lab claims produce almost no PR and almost no Medigap or Medicaid secondary payments. The exception is pathology (PFS), which carries the deductible plus 20%.
+- **Medicare crossovers** happen through COBA. The lab does not send a secondary 837. The Medicare 835 shows `CLP02=19`, an `NM1*TT` crossover carrier and an `MOA` with MA18 (or N89 when the claim crosses to more than one payer).
+- **Commercial (KFF 2025 EHBS):** 88% of covered workers have a deductible, averaging **$1,886**; 34% have deductibles of $2,000 or more. The generator's PPO deductible of $500 is far too low.
+- **How much PR shows up:** XiFin reports **30% of lab claims carried patient responsibility in 2025** (26% in 2023), while patient payments fell to 9%. PR should spike in January–March as deductibles reset.
+- **COB billed through an 837:** probably only 2–8% of claims. The generator's 12% secondary coverage, with a secondary 837 for every claim that has PR, overstates it, especially since it never applies the Medicare zero-PR rule.
+
+## 7. X12 conventions (837P and 835)
+
+**837P.**
+- **Delimiters:** `*`, then `:` (about 75%) or `>` as the component separator, `^` for repetition, `~` as terminator. Most clearinghouse traffic has no line breaks.
+- **Envelope:** usually `ZZ` qualifiers. `GS01=HC`, version 005010X222A1, `BHT*0019*00*...*CH`.
+- **Size limits:** at most 5,000 `CLM` per ST (a TR3 recommendation that companion guides repeat), usually 1–10 files per day.
+- **Billing provider:** `PRV*BI*PXC*291U00000X`, a 9-digit ZIP, `REF*EI`.
+- **CLM05:** `81:B:1`, about 92% POS 81.
+- **CLIA:** `REF*X4` is **required** at claim level. Anthem rejects claims without it. A line-level `REF*X4` is allowed when lines are performed by different CLIA sites (X12 RFI 1742).
+- **Prior auth:** `REF*G1` on molecular claims.
+- **Original claim:** `REF*F8` on frequency 7/8.
+- **Notes:** `NTE` for unlisted-code descriptions.
+- **Ordering provider:** 2310A `NM1*DN` with `NM102=1` (an organization fails the PECOS edit), or a line-level 2420E `NM1*DK`.
+- **Line pointers:** up to 4 diagnosis pointers in `SV107`.
+- **Lab modifiers:** 91, 90, QW, 59/XU, GA/GZ/GY, 26/TC.
+
+**835.**
+- **Medicare:** `CLP06=MB`; only CO, OA and PR groups (never PI); no `NM1*IL`; the patient is identified by MBI; `MOA` carries claim remarks (MA01, MA18, N89); `LX*000000`/`000001` style; CO-253 on every paid line; LCD/NCD reference on medical-necessity denials.
+- **Commercial:** `SVC06` when a code is recoded (panel unbundling, 87801), `SVC07` when units are cut, `AMT*B6`, `REF*6R` echoed only when it was sent, `LQ*HE`, line splitting and bundling.
+
+## 8. Quirks the parser must survive
+
+The generator covers: delimiter variants, truncation, non-X12 files, a damaged IEA, byte-identical redelivery, multiple STs per file, a missing `REF*6R`, and 835 names that differ from the 837.
+
+It is missing:
+- **Envelope and file problems:** 80-character wrapped lines, several ISAs in one file, a BOM or leading whitespace, trailing NULs or Ctrl-Z, mixed line endings, ISA IDs not padded to 15 characters, `SE01` counts off by one, `ISA13` control numbers reused across days.
+- **835 content changes:** payers altering `CLP01` (uppercased, truncated to 17 or 20 characters, special characters stripped), and an ICN reused on an adjustment.
+- **835 structure:** SVCs with no `DTM*472`, one CARC under two groups on one line, PLB segments with several adjustment pairs and composite references.
+- **Identity drift:** member IDs with alpha prefixes, payer names that change mid-month, and occasional payer-side unbalanced 835s.
+
+---
+
+## 9. The 15 most important gaps, prioritized
+
+Ranked by how much each one distorts metrics a user would see (denial rates, top CARCs, payer and CPT rankings, dollars), then by effort.
+
+1. **No traditional Medicare.** Add a MAC payer (CLFS-based, 14-day floor, daily 835, `CLP06=MB`, line-level CAS only, CO-253 2% sequestration on every paid line, `MOA` remarks, no PR on CLFS codes) at about 20% of claims. Also add MA ≈ Medicare FFS volume, and split Medicaid into MCO and FFS.
+2. **Allowed amounts are about 3x too high.** Replace `charge x fee_ratio` with `CLFS_2026[code] x payer multiplier` (Medicare 1.0, MA about 1.0, Medicaid at most 1.0 and typically 0.8, commercial about 1.15). Keep the chargemaster at 4–11x CLFS for routine tests, from the Medicare average-submitted-charge column.
+3. **The denial-reason mix is inverted.** Clinical denials should be about 59% bundling (CO-97/234/236), 15% duplicates (18), 7% non-covered, 3.5% prior auth, 3% modifier (4), 2% COB (22). Molecular is led by prior auth (28%) and experimental (55, 15%). Add the Medicare edits CO-151/N362, CO-183/N574, CO-B7, CO-50/N386.
+4. **Too few lines per claim and the wrong CPT mix.** The mean is about 2.1 lines; it should be about 4.9. Put 36415 on about 75% of blood claims. Add urinalysis, urine chemistry, free T4, B12, ferritin, iron, PSA, PT, and culture reflexes (87088/87077/87186). 87798 needs about 10 units. Replace 0240U with 87637/0241U. Use order profiles (YAML `cpt_mix.order_profiles`).
+5. **Volume is about 25x too low for 5 MB/day.** It needs about 3,000 claims per business day per tenant (or about 6,000 if 5 MB means 837 only). Split 837s into several files per day with at most 5,000 CLM per ST.
+6. **Most denials should be partial.** About 60% of denied claims should be paid claims with one or two denied lines. Today `p_partial_line_denial` is 0.06 while full-claim denials are about 8%.
+7. **835 cadence and file population.** Real traffic has 30–60 files a day: one large Medicare file, weekly Medicaid checkwrite files, commercial files daily to twice weekly, and a long tail of tiny files. Add federal holidays (no ERA or EFT), state fiscal-year skips, and BPR16 at least as late as `DTM*405`, within 3 days. Today there is one 835 per payer per day whenever events exist.
+8. **Payer long tail and identifiers.** Grow from 6 payers to about 150–600 payer IDs per month, Zipf-distributed. 835 `TRN03` should be "1" + EIN, `ISA06` should be the clearinghouse, `REF*2U` optional, and the 837 and 835 names should differ about 60% of the time. Currently the 835 uses the payer ID as sender and as `TRN03`.
+9. **Patient responsibility is unrealistic.** Use deductibles averaging $1,886 (34% at $2,000 or more), about 30% of claims with any PR, a January–March spike, $0 for preventive screening, and $0 for Medicare CLFS tests. Today the PPO deductible is $500, HDHP $2,500, and patients repeat too often (2.9 claims per 30 days vs about 1.15).
+10. **COB and crossover.** Medicare crossovers should be COBA-style (`CLP02=19` + `NM1*TT` + MA18, no secondary 837). Secondary 837s should drop to about 4% of claims, almost all with a commercial primary. Today 12% of patients have secondary coverage and an 837 goes to every one with PR.
+11. **CLIA and lab-specific 837 segments.** Add `REF*X4` (required; its absence should produce a front-end rejection), `REF*G1` when prior auth was obtained, `REF*D9`, `NTE` for 81479, `SV107` pointers to the relevant diagnosis, the lab modifiers (91, 90, QW, 59/XU, GA/GZ/GY, 26/TC), 2420E ordering or 2310C facility on some claims, and a 9-digit billing ZIP.
+12. **Reversal and correction behavior.** Cut the rates (`CLP02=22` about 1–2% of CLPs). In about 30% of cases, split the reversal and its correction across 835s with offsetting PLB WO (negative, then positive). Add occasional MAC mass-adjustment waves over a whole edit and date range. Use realistic WO references (DOS + patient account, or FCN + MBI) and PLB 72, J1, CS and IR.
+13. **Seasonality and calendar.** Respiratory panels should run about 3x in December–February, with routine volume dipping in summer and around holidays. Add holiday volume dips and the post-holiday catch-up, plus Monday catch-up of Saturday DOS (today only Monday 1.3 / Friday 0.9 plus noise). DOS-to-submission lag should be longer for molecular (about 14 days).
+14. **835 line fidelity.** Add `SVC07` (original units) with unit reductions, line splits and bundles (payer folds lines and denies the rest with CO-97 at $0), `SVC06` on 87801 ceiling recodes, `LQ` on only about 40% of adjusted lines, `REF*6R` echoed only when sent, `AMT*AU`/`REF*1L`/`DTM*050` at payer-specific rates, and Medicare REF LCD/NCD references.
+15. **Parser-hardening quirks.** Add 80-character wrapping, several ISAs per file, a BOM, NUL or Ctrl-Z padding, mixed line endings, short ISA IDs, `SE01` off by one, `ISA13` reuse, payer-altered `CLP01` (truncated or uppercased), member-ID prefixes, mid-month payer renames, and rare unbalanced payer 835s. Lower the current corrupt-file rate (3%) and duplicate-835 rate (4%) to about 1–2% each so they stay edge cases.
+
+## Confidence summary
+
+- **High:** CLFS rates; Medicare volumes, units, charges and allowed amounts; Quest payer mix and requisitions; the Medicare payment floor, interest, sequestration and MUE/PECOS/B7 codes; CLIA `REF*X4`; the 5,000-CLM limit; Medicare 835 conventions; the Medicaid cap at CLFS; KFF deductibles.
+- **Medium:** XiFin denial rates and reason mixes (vendor data, but large); PLB semantics (UHC and BCBSTX, generalized to other payers); payer-ID conventions.
+- **Low (tunable defaults, no public measurement):**
+  - denial multipliers by payer class
+  - the partial vs full denial split
+  - commercial days to pay
+  - 835 file counts and sizes per day
+  - reversal and corrected-claim rates
+  - weekday and seasonal indices
+  - commercial line shares
+  - quirk rates
