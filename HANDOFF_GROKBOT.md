@@ -1,8 +1,8 @@
 # HANDOFF_GROKBOT.md: Grok Bot session, Oct 25 2026, 3:26 to about 4:55 PM PT
 
-**For Claude Code.** While your usage was out, Peter had Grok Bot act as main dev on this repo. This file lists what landed, what is still in flight, what was deliberately left alone, and what to do next on the agent analyzer. Last refreshed: **4:35 PM PT, Oct 25 2026**.
+**For Claude Code.** While your usage was out, Peter had Grok Bot act as main dev on this repo. This file lists what landed, what is still in flight, what was deliberately left alone, and what to do next on the agent analyzer. Last refreshed: **4:45 PM PT, Oct 25 2026** (final). Grok Bot stopped handing out new work at 4:40 PM PT; no cloud agent is still running on this repo.
 
-Short version: 93 PRs opened against `claude/trusting-heisenberg-8xvazk` (90 merged, 3 open at refresh time). Peter asked for PRs to be **auto-merged**, so a script merged every cleanly mergeable PR into the working branch once a minute until 5 PM PT. Nothing was reviewed by hand. Treat every merged PR as unreviewed, and review it before you build on it.
+Short version: 94 PRs opened against `claude/trusting-heisenberg-8xvazk` (92 merged, 2 open and conflicting: [#31](https://github.com/Peter-Shamoun/cc/pull/31) and [#50](https://github.com/Peter-Shamoun/cc/pull/50)). Peter asked for PRs to be **auto-merged**, so a script merged every cleanly mergeable PR into the working branch once a minute until 5 PM PT. Nothing was reviewed by hand. Treat every merged PR as unreviewed, and review it before you build on it.
 
 ## Ground rules that were held
 
@@ -22,7 +22,7 @@ Path audit at refresh time: these merged PRs touch guarded paths. Review them fi
 
 - **Research refresh** (`research/sota_refresh_2.md`). Recommendations: don't ship the screen-1 pitfalls text, because Haiku's +16 didn't replicate on held-out (−1.9) while Sonnet's +7.4 did. Treat every glossary change as a trained artifact with TRAIN/VAL/TEST splits. Agent v1 is one model in a short tool loop over `sem.*`. Screen 2 is paired one-factor-at-a-time on a VAL of about 120 harder questions, for both Haiku and Sonnet.
 - **Analyzer v1** (`analyzer/`, `docs/agent/README.md`). Harness-agnostic analyst over `ccsim.query`, with these tools: describe, sample, profile, dictionary, glossary lookup, and guarded `run_sql`. It also has an audited `request_escalation` and PHI redaction on output. Loop: understand → link → draft → execute → repair (max 2) → verify → answer or refuse. Config flags map to the screen factors, plus `candidates` (execution vote) and `cascade=haiku_then_sonnet`. `python -m bench.eval_subagents prepare RUN --agent analyzer` adapts it to the bench.
-- **Glossary train/val/test pipeline + power analysis + screen-2 infrastructure**: [#54](https://github.com/Peter-Shamoun/cc/pull/54) open, **conflicting** (auto-merge skips it).
+- **Glossary train/val/test pipeline + power analysis + screen-2 infrastructure**: [#54](https://github.com/Peter-Shamoun/cc/pull/54) merged at 4:37 PM PT after its conflict was resolved by hand (`glossary splits, learner, screen 2`).
 - **Security / HIPAA stress test**: [#34](https://github.com/Peter-Shamoun/cc/pull/34) merged.
 - **Chat transcript storage, two competing designs**: [#50](https://github.com/Peter-Shamoun/cc/pull/50) open, **conflicting** (auto-merge skips it).
 - **`grokbot-r1` validation questions**: [#19](https://github.com/Peter-Shamoun/cc/pull/19) merged. 50 hard everyday-analyst questions in `bench/questions_grokbot_r1.json` (intended split `validation`, snapshot `e21410ce6805`, 50/50 sound on the self-check). They are deliberately **not** wired into `load_cases`, so the grid's `grokbot-r1` exclusion was a no-op and no grid cell saw them. That makes them clean held-out material for screen 2, once a split manager ingests them.
@@ -38,7 +38,7 @@ Path audit at refresh time: these merged PRs touch guarded paths. Review them fi
 | [#37](https://github.com/Peter-Shamoun/cc/pull/37) | api: FastAPI SSE bridge between the analyzer and the web chat | merged | `PYTHONPATH=. pytest api/tests -q`: 22 passed |
 | [#50](https://github.com/Peter-Shamoun/cc/pull/50) | Chat transcripts: ephemeral default and persisted design behind a mode switch | open, **conflicting** (auto-merge skips it) | 244 passed |
 | [#52](https://github.com/Peter-Shamoun/cc/pull/52) | web: CC chat frontend v0 | merged | 18 vitest tests passed |
-| [#54](https://github.com/Peter-Shamoun/cc/pull/54) | Seal glossary learning into train, validation, and test | open, **conflicting** (auto-merge skips it) | n/a (see PR body) |
+| [#54](https://github.com/Peter-Shamoun/cc/pull/54) | Seal glossary learning into train, validation, and test | merged (conflict resolved by hand, 4:37 PM PT) | n/a (see PR body) |
 | [#78](https://github.com/Peter-Shamoun/cc/pull/78) | web v1: Streamdown, live api/ round-trip, edit-and-branch, mobile drawer, search/rename, virtualized tables | merged | 23/23 pass |
 | [#84](https://github.com/Peter-Shamoun/cc/pull/84) | web v1.1: thumbs-down feedback panel, Ctrl/Cmd+K search, Ctrl/Cmd+Shift+O new chat | merged | n/a (see PR body) |
 | [#87](https://github.com/Peter-Shamoun/cc/pull/87) | web v1.2: pin follow-up question to top while the answer streams (ChatGPT/Claude scroll behavior) | merged | n/a (see PR body) |
@@ -395,7 +395,6 @@ Grid PRs:
 
 **Open PRs that conflict with the working branch (the auto-merger skips these; resolve by hand):**
 
-- [#54](https://github.com/Peter-Shamoun/cc/pull/54) Seal glossary learning into train, validation, and test
 - [#50](https://github.com/Peter-Shamoun/cc/pull/50) Chat transcripts: ephemeral default and persisted design behind a mode switch
 - [#31](https://github.com/Peter-Shamoun/cc/pull/31) Multi-candidate SQL with execution-based selection
 
@@ -406,6 +405,12 @@ Conflict log from the auto-merge script (PRs that conflicted at some point; chec
 16:10:39 conflict #54 Seal glossary learning into train, validation, and test
 16:10:46 conflict #50 Chat transcripts: ephemeral default and persisted design behind a mode switch
 ```
+
+### Grid cells that never ran
+
+- C030 to C099 (70 v1 cells): abandoned because the v1 dev set was at ceiling; superseded by the H-series.
+- All 100 H cells (H000 to H099) have result files, but 2 were rejected by the aggregator's schema/design checks and 20 cells are contamination-flagged and excluded from the clean fit (see `research/grid/SUMMARY.md`).
+- The other 284 of the full 384-combination design were never scheduled. The merged design is in `research/grid/design.json` (and `research/grid/combos.json`).
 
 ## Deliberately left alone
 
