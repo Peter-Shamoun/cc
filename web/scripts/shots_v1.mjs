@@ -108,6 +108,12 @@ pg = await page(live, { theme: 'dark' });
 await ask(pg, 'What is the denial rate by payer?');
 await shot(pg, '15_live_dark');
 
+// 8. Follow-up pinned to the top (live)
+pg = await page(live);
+await ask(pg, 'What is the denial rate by payer?');
+await ask(pg, 'Show the monthly trend of paid amount');
+await shot(pg, '17_live_followup_pinned_top');
+
 await browser.close();
 const apiCalls = network.filter((n) => n.includes('/api/'));
 fs.writeFileSync(`${out}/v1_run.json`, JSON.stringify({ csvHead, apiCalls: [...new Set(apiCalls)], consoleLines }, null, 2));

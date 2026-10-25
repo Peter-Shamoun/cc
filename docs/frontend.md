@@ -40,6 +40,7 @@ node scripts/shots_v1.mjs http://127.0.0.1:5174/ http://127.0.0.1:5175/ /workspa
 - **Search and rename**: "Search chats" filters thread titles client-side (titles never leave the page); the pencil or a double-click renames inline (`TranscriptStore.renameConversation`).
 - **Table virtualization**: tables over 200 rows render a TanStack Virtual window (spacer rows keep native `<table>` semantics, sticky header, sorting and filtering still work on all rows).
 - Tests: 23 (was 18), adding the HTTP adapter contract, Streamdown repair, virtualization, store rename/replace and an edit-and-branch + feedback + search + shortcut flow.
+- v1.2: a follow-up question is pinned to the top of the viewport and its answer streams in below (ChatGPT/Claude behavior) instead of the view chasing the bottom; the newest answer reserves most of a viewport for this. "Jump to latest" releases the pin.
 - v1.1: thumbs-down "Tell us more" panel (reason chips + optional detail, kept in component state only until a PHI-safe feedback endpoint exists), Ctrl/⌘+K search chats, Ctrl/⌘+Shift+O new chat, single-series charts follow the palette (Paper = clay accent), usage line hidden for zero-query turns, inline favicon.
 
 ## Stack
