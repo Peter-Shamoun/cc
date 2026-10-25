@@ -157,6 +157,23 @@ def _sql_error_hint(message: str) -> str:
     return ""
 
 
+def glossary_text(setting: str) -> str:
+    """The glossary block for a technique setting. ``version:<id>`` is a file under bench/glossaries/."""
+    if setting == "none":
+        return ""
+    if setting == "basic":
+        return GLOSSARY
+    if setting == "pitfalls":
+        return GLOSSARY + "\n" + PITFALLS
+    if isinstance(setting, str) and setting.startswith("version:"):
+        from bench.glossary_versions import render_version
+        try:
+            return render_version(setting.split(":", 1)[1])
+        except FileNotFoundError as exc:
+            raise CliError(str(exc)) from None
+    raise CliError(f"unknown glossary setting {setting!r}")
+
+
 def command_context(session: Session) -> str:
     parts = []
     for schema, view in session.con.execute("SELECT schema_name, view_name FROM duckdb_views() WHERE NOT internal "
@@ -164,12 +181,9 @@ def command_context(session: Session) -> str:
         cols = session.con.execute(f"DESCRIBE {schema}.{view}").fetchall()
         parts.append(f"{schema}.{view}(" + ", ".join(f"{c[0]} {c[1]}" for c in cols) + ")")
     text = "\n".join(parts)
-    if session.config["glossary"] not in ("none", "basic", "pitfalls"):
-        raise CliError(f"unknown glossary setting {session.config['glossary']!r}")
-    if session.config["glossary"] != "none":
-        text += "\n\n" + GLOSSARY
-    if session.config["glossary"] == "pitfalls":
-        text += "\n" + PITFALLS
+    extra = glossary_text(session.config["glossary"])
+    if extra:
+        text += "\n\n" + extra
     if session.config["data_dictionary"]:
         _, api = session.semantic_api()
         text += "\n\n" + api.describe_semantic_layer()
