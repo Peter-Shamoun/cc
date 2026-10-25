@@ -38,18 +38,20 @@ CELL_FILE_RE = re.compile(r"(?:^|/)research/grid/([CH]\d{3})\.json$")
 HERE = Path(__file__).resolve().parent
 
 # Phrases cell agents use when they admit seeing something the protocol forbids.
-CONTAM_PATTERNS = [
-    (r"reference sql", "reference SQL"),
-    (r"gold (sql|answer|result)", "gold SQL/answers"),
-    (r"answer key", "answer key"),
-    (r"question_families\.py|sql templates?|templates? (were|was) visible", "family SQL templates"),
-    (r"pitfalls? glossary", "pitfalls glossary"),
-    (r"screening_results|heldout_results|failure analys", "screen/held-out failure analyses"),
-    (r"other (grid )?cells?'? results", "other cells' results"),
-    (r"contaminat", "self-reported contamination"),
-    (r"\bvisible\b|\bopened\b|\bsaw\b|\bpeeked?\b", "saw restricted material"),
+CONTAM_PATTERNS = [  # (regex, label, severity) - "soft" leaks are reported but not excluded
+    (r"(saw|seen|had seen|saw only)\b[^.;]{0,40}\bh\d{3}|seen their per-question|saw [^.;]{0,30}pass/fail", "saw earlier cells' pass/fail (same executor)", "soft"),
+    (r"reference sql", "reference SQL", "hard"),
+    (r"gold[- ](sql|answer|result|quer)", "gold SQL/answers", "hard"),
+    (r"answer key", "answer key", "hard"),
+    (r"question_families\.py|sql templates?|family templates|templates? (were|was) visible", "family SQL templates", "hard"),
+    (r"pitfalls? (glossary|block)", "pitfalls glossary", "hard"),
+    (r"screening_results|heldout_results|failure analys", "screen/held-out failure analyses", "hard"),
+    (r"other (grid )?cells?'? results", "other cells' results", "hard"),
+    (r"contaminat", "self-reported contamination", "hard"),
+    (r"\b(visible|peeked?)\b|\bsaw (gold|glossary|family|some harness|the gold|templates)|\bread gold|\bwere seen\b", "saw restricted material", "hard"),
 ]
 SCORING = re.compile(r"scor|compare\.match|checker|judge|re-?executed")
+FEWSHOT_CTX = re.compile(r"neighbo|few-?shot|bm25|idf|exemplar|retriev|jaccard|similar|as examples|non-dev|outside (the )?dev")
 ADMISSION = re.compile(r"\b(seen|saw|visible|opened|read|peek|looked)\b")
 NEGATION = re.compile(r"\b(no|not|never|without|didn'?t|did not)\b[^.;]{0,60}$")
 
@@ -139,21 +141,30 @@ def _text(d):
     return "\n".join(parts)
 
 
-def contamination(d, series):
+def contamination(d, series, hits=None):
+    hits = [] if hits is None else hits
     reasons = []
     text = _text(d)
     low = text.lower()
-    for pat, label in CONTAM_PATTERNS:
+    for pat, label, sev in CONTAM_PATTERNS:
         for m in re.finditer(pat, low):
             before = low[max(0, m.start() - 80):m.start()]
             sentence_start = max(before.rfind(". "), before.rfind(";"))
+            if re.match(r"[^.;]{0,6}\b(not|never) (opened|read|seen)", low[m.end():m.end() + 25]):
+                continue  # "question_families.py not opened"
             if NEGATION.search(before[sentence_start + 1:]):
                 continue  # "did not read the answer key" is not an admission
             end = min([i for i in (low.find(". ", m.end()), low.find(";", m.end())) if i >= 0] or [len(low)])
             sentence = low[max(0, m.start() - 80) + sentence_start + 1:end]
             if SCORING.search(sentence) and not ADMISSION.search(sentence):
                 continue  # "scored against gold SQL" describes the checker, not a leak
-            reasons.append(label)
+            if (sev == "hard" and FEWSHOT_CTX.search(sentence)
+                    and not re.search(r"answer key|earlier|while locating|before (the )?(dev|answers)|templates? (was|were) visible", sentence)):
+                continue  # few-shot neighbours' reference SQL is part of the fewshot=1 config
+            if sev == "hard" and re.search(r"\bsoft\b|pass/fail", sentence) and "gold" not in sentence.split("never")[0]:
+                continue
+            hits.append(sentence.strip()[:160])
+            reasons.append(label if sev == "hard" else "soft: " + label)
             break
     ds = dev_set_of(d, series)
     if series == "H" and ds != "DEV_HARD_v1":
@@ -209,17 +220,21 @@ def normalise(cid, d, design):
         if diff:
             errs.append(f"config disagrees with design on {diff}")
     rows_in = d.get("results") or d.get("questions") or []
-    rows = []
+    rows, dropped = [], 0
+    if rows_in and all(r.get("pass") is None for r in rows_in):
+        return None, [f"unscored: {len(rows_in)} answers written but every pass is null (scoring not done yet)"], []
     for i, r in enumerate(rows_in):
         qid = r.get("qid") or r.get("question_id")
         p = _b(r.get("pass"))
         if not qid or p is None:
-            warns.append(f"row {i} missing qid/pass; dropped")
+            dropped += 1
             continue
         ex = r.get("sql_execs", r.get("sql_executions"))
         rows.append({"qid": str(qid), "pass": int(p),
                      "sql_execs": float(ex) if isinstance(ex, (int, float)) else math.nan,
                      "repairs": r.get("repairs")})
+    if dropped:
+        warns.append(f"{dropped} rows missing qid/pass were dropped")
     if not rows:
         errs.append("no scored results")
     if len({r["qid"] for r in rows}) != len(rows):
@@ -242,12 +257,13 @@ def normalise(cid, d, design):
     series = cid[0]
     execs = [r["sql_execs"] for r in rows if not math.isnan(r["sql_execs"])]
     mse = d.get("mean_sql_execs", d.get("mean_sql_calls"))
+    hits = []
     cell = {
         "cell": cid, "series": series, "config": config, "rows": rows,
         "n": len(rows), "k": sum(r["pass"] for r in rows),
         "mean_sql_execs": float(np.mean(execs)) if execs else (float(mse) if mse is not None else math.nan),
         "model": d.get("model", "?"), "dev_set": dev_set_of(d, series), "dataset_id": dataset_of(d),
-        "contamination": contamination(d, series), "partial": len(rows) < 20,
+        "contamination": contamination(d, series, hits), "contamination_evidence": hits, "partial": len(rows) < 20,
     }
     return cell, errs, warns
 
@@ -500,7 +516,8 @@ def write_summary(path, ctx):
               f"{len(cs)} cells, {sum(c['k'] for c in cs)}/{sum(c['n'] for c in cs)} question-passes "
               f"({100 * sum(c['k'] for c in cs) / max(1, sum(c['n'] for c in cs)):.1f}%).")
     w(f"- Sources: {', '.join(sorted(ctx['sources']))}.")
-    w(f"- Contamination-flagged cells: {len(ctx['flagged'])} ({', '.join(ctx['flagged']) or 'none'}).")
+    w(f"- Contamination-flagged cells (excluded from the clean fit): {len(ctx['flagged'])} ({', '.join(ctx['flagged']) or 'none'}).")
+    w(f"- Soft-flagged only (same executor saw earlier cells' pass/fail; kept in the clean fit): {len(ctx.get('soft', []))} ({', '.join(ctx.get('soft', [])) or 'none'}).")
     w("")
     w("## Headline")
     w("")
@@ -561,7 +578,8 @@ def write_summary(path, ctx):
     w("|---|---|---|---|---|---|---|---|")
     for c in sorted(ctx["cells"], key=lambda c: c["cell"]):
         w(f"| {c['cell']} | {c['source']} | {c['dev_set']} | {c['dataset_id']} | {c['model']} | {c['k']}/{c['n']}"
-          f"{' (partial)' if c['partial'] else ''} | {num(c['mean_sql_execs'], 1)} | {'; '.join(c['contamination'])} |")
+          f"{' (partial)' if c['partial'] else ''} | {num(c['mean_sql_execs'], 1)} | "
+          f"{'; '.join(c['contamination'] + c.get('contamination_soft', []))} |")
     if ctx["invalid"]:
         w("")
         w("Rejected:")
@@ -601,6 +619,19 @@ def headline(ctx):
                 f"{e['term']} {pp(e['est'])} pp [{pp(e['lo'])}, {pp(e['hi'])}]" for e in best) + ".")
         if best:
             hs.append("CIs excluding zero: " + (", ".join(f"{e['term']} ({pp(e['est'])} pp)" for e in sig) or "none yet") + ".")
+        lsig = [l for l in H.get("logit", []) if l["lo"] > 0 or l["hi"] < 0]
+        if lsig:
+            hs.append("Ridge-logit check (naive SEs, not cluster-robust, so optimistic) has CIs excluding zero for: "
+                      + ", ".join(f"{l['term']} ({l['logodds']:+.2f} log-odds)" for l in lsig) + ".")
+        if H.get("interactions"):
+            r = H["interactions"][0]
+            hs.append(f"Strongest 2-way interaction: {r['terms']} {pp(r['est'])} pp [{pp(r['lo'])}, {pp(r['hi'])}] "
+                      f"(one of ~30 screened, so treat as a lead, not a finding).")
+        hc = [c for c in ctx["cells"] if c["series"] == "H" and c["dev_set"] != "v1_fallback"]
+        if hc:
+            accs = [c["k"] / c["n"] for c in hc]
+            hs.append(f"H-series cell accuracy: mean {100 * np.mean(accs):.1f}%, range {100 * min(accs):.0f}-{100 * max(accs):.0f}% "
+                      f"across {len(hc)} cells; between-cell spread is small relative to per-question difficulty.")
         al = [e["term"] for e in H["effects"] if not e["identified"]]
         if al:
             hs.append(f"Not yet identifiable (aliased with too few cells): {', '.join(al)}.")
@@ -663,7 +694,13 @@ def main(argv=None):
             cells.append(chosen)
             sources.add("working branch" if chosen["source"] == "branch" else "open PRs")
 
+    for c in cells:
+        c["contamination_soft"] = [r for r in c["contamination"] if r.startswith("soft: ")]
+        c["contamination"] = [r for r in c["contamination"] if not r.startswith("soft: ")]
+        if c["contamination_soft"] and c["contamination"] == ["self-reported contamination"]:
+            c["contamination"] = []  # the self-report is about the soft carry-over
     flagged = [c["cell"] for c in cells if c["contamination"]]
+    soft = [c["cell"] for c in cells if c["contamination_soft"] and not c["contamination"]]
     H = [c for c in cells if c["series"] == "H" and c["dev_set"] != "v1_fallback"]
     Hfb = [c for c in cells if c["series"] == "H" and c["dev_set"] == "v1_fallback"]
     C = [c for c in cells if c["series"] == "C"] + Hfb
@@ -693,7 +730,7 @@ def main(argv=None):
     from datetime import datetime
     ctx = {"generated": a.generated or datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z"),
            "n_found": len(raw), "n_valid": len(cells), "invalid": invalid, "warnings": warnings,
-           "cells": cells, "sources": sources or {"none"}, "flagged": flagged, "fits": fits,
+           "cells": cells, "sources": sources or {"none"}, "flagged": flagged, "soft": soft, "fits": fits,
            "ranking": ranking, "caveats": caveats}
     ctx["headline"] = headline(ctx)
     write_summary(out_dir / "SUMMARY.md", ctx)
