@@ -264,13 +264,13 @@ def test_default_benchmark_scenario_exercises_money_features(tmp_path):
 def test_every_parsed_value_survives_into_the_lossless_tables(stress):
     """Parser rows -> the batch's constrained staging tables (as the Fargate task stages them): no field dropped."""
     from ccsim.parser import TABLES
-    from ccsim.pipeline import SilverBatch
+    from ccsim.silver_staging import RawFile, SilverBatch
     out, truth = stress
     tc, f, body = next((tc, f, b) for tc, f, b in _files(out, truth) if f["kind"] == "837" and b"\nSVD*" in b)
     meta = dict(s3_uri="x", s3_bucket="x", s3_key="x", size_bytes=1, sha256="x")
     rows = parse_file(body, "F1", tc, meta, "r1", datetime(2026, 1, 1))
-    batch = SilverBatch("r1", datetime(2026, 1, 1), triggered_by="t", notes=None)
-    assert batch.add_raw_file(body, "F1", tc, meta, duplicate_of_file_id=None)
+    batch = SilverBatch("r1", datetime(2026, 1, 1), triggered_by="t", notes=None, parser_version="test")
+    assert [ok for _, ok in batch.add_raw_files([RawFile("x", body, "F1", meta)], tc, {})] == [True]
     con = batch.finish()
     for t in TABLES:
         if t == "edi.segment":                          # tuples; elements are split at insert
