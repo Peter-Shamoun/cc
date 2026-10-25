@@ -1,0 +1,222 @@
+{
+ "cell": "C007",
+ "config": {
+  "generation": "direct_sql",
+  "fewshot": 1,
+  "explore": 1,
+  "candidates3": 1,
+  "verifier": 0,
+  "repair": 0,
+  "assumptions": 1,
+  "multiagent": 0
+ },
+ "model": "Grok 4.7",
+ "dev_ids": [
+  "f_payer_denial_rate__humana-medicare-advantage",
+  "f_cpt_denied_lines__83036",
+  "f_payer_avg_paid_per_paid_claim__medicare-part-b-north-carolina",
+  "a_f786e11aec",
+  "f_payer_denial_rate__unitedhealthcare-community-plan-nc",
+  "f_payer_monthly_denial_rate__unitedhealthcare",
+  "f_payer_denial_rate__unitedhealthcare-medicare-advantage",
+  "f_cpt_share_of_line_payments__g0483",
+  "a_fca405b635",
+  "f_payer_paid_in_month__cigna_2026-08-01",
+  "f_payer_patient_responsibility__aetna",
+  "a_b853266803",
+  "q10_top_denial_carcs",
+  "f_payer_class_denial_rate__medicaid_mco",
+  "a_a5888f64a4",
+  "a_436f690741",
+  "a_d29f83c935",
+  "f_payer_class_denial_rate__other",
+  "f_cpt_denied_lines__85652",
+  "q07_denial_rate"
+ ],
+ "results": [
+  {
+   "qid": "f_payer_denial_rate__humana-medicare-advantage",
+   "answer": "0.0330. Assumption: denial rate is the share of current adjudications (one row per claim+payer) with is_denied, for canonical payer_name 'Humana Medicare Advantage', reported as a 0-1 fraction rounded to 4 decimals.",
+   "final_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Humana Medicare Advantage'",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.04,
+   "pass": true
+  },
+  {
+   "qid": "f_cpt_denied_lines__83036",
+   "answer": "14. Assumption: a denied service line is sem.remit_lines.line_is_denied on a current adjudication, procedure code as billed (not the payer-recoded code).",
+   "final_sql": "SELECT count(*) FROM sem.remit_lines WHERE is_current_adjudication AND line_is_denied AND procedure_code = '83036'",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.024,
+   "pass": true
+  },
+  {
+   "qid": "f_payer_avg_paid_per_paid_claim__medicare-part-b-north-carolina",
+   "answer": "$105.74. Assumption: average of paid_amount over current adjudications with paid_amount > 0 for canonical payer_name 'Medicare Part B North Carolina', rounded to 2 decimals. $0 adjudications are excluded.",
+   "final_sql": "SELECT round(avg(paid_amount), 2) FROM sem.remit_claims WHERE is_current_adjudication AND paid_amount > 0 AND payer_name = 'Medicare Part B North Carolina'",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.007,
+   "pass": true
+  },
+  {
+   "qid": "a_f786e11aec",
+   "answer": "Primary-payer class, including voided claims. blues: claims 411, avg lag 11.16 days, median 4.00, submitted >90 days after service 7; commercial: claims 710, avg lag 7.02 days, median 4.00, submitted >90 days after service 1; medicaid: claims 55, avg lag 11.45 days, median 4.00, submitted >90 days after service 1; medicaid_mco: claims 241, avg lag 10.78 days, median 4.00, submitted >90 days after service 5; medicare: claims 509, avg lag 4.97 days, median 3.00, submitted >90 days after service 0; medicare_advantage: claims 363, avg lag 7.10 days, median 4.00, submitted >90 days after service 1; other: claims 47, avg lag 5.15 days, median 3.00, submitted >90 days after service 0. Assumption: population is claims with a primary 837 (payer_responsibility P); secondary-only claims are out. Lag is earliest submission to any payer minus date of service (service date does not vary across a claim's submissions). Payer class is the primary payer's class. Average rounded to 2 decimals; median is the continuous median rounded to 2 decimals; the >90 count is strict.",
+   "final_sql": "WITH base AS (\n  SELECT claim_key, min(submission_date) AS first_submission, min(service_date_from) AS service_date\n  FROM sem.claims GROUP BY 1\n), primary_class AS (\n  SELECT claim_key, min(payer_class) AS payer_class\n  FROM sem.claims WHERE payer_responsibility = 'P' GROUP BY 1\n)\nSELECT pc.payer_class, count(*) AS claims,\n       round(avg(date_diff('day', b.service_date, b.first_submission)), 2) AS avg_lag_days,\n       round(median(date_diff('day', b.service_date, b.first_submission)), 2) AS median_lag_days,\n       count(*) FILTER (WHERE date_diff('day', b.service_date, b.first_submission) > 90) AS claims_over_90\nFROM base b JOIN primary_class pc USING (claim_key)\nGROUP BY 1 ORDER BY 1",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.024,
+   "pass": true
+  },
+  {
+   "qid": "f_payer_denial_rate__unitedhealthcare-community-plan-nc",
+   "answer": "0.0290. Assumption: same denial-rate definition as other payer rates, canonical payer_name 'Unitedhealthcare Community Plan Nc' (title-case stored name), 0-1 fraction rounded to 4 decimals.",
+   "final_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Unitedhealthcare Community Plan Nc'",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.01,
+   "pass": true
+  },
+  {
+   "qid": "f_payer_monthly_denial_rate__unitedhealthcare",
+   "answer": "Unitedhealthcare denial rate by payment month (current adjudications): 2026-07-01: 0.0368; 2026-08-01: 0.0492. Assumption: month is the 835 payment month, payer_name 'Unitedhealthcare' only (not the Community Plan or Medicare Advantage affiliates), rate is a 0-1 fraction rounded to 4 decimals.",
+   "final_sql": "SELECT payment_month, round(avg(is_denied::INT), 4) AS denial_rate FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Unitedhealthcare' GROUP BY 1 ORDER BY 1",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.011,
+   "pass": true
+  },
+  {
+   "qid": "f_payer_denial_rate__unitedhealthcare-medicare-advantage",
+   "answer": "0.0403. Assumption: current adjudications for canonical payer_name 'Unitedhealthcare Medicare Advantage', one claim per payer, 0-1 fraction rounded to 4 decimals.",
+   "final_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Unitedhealthcare Medicare Advantage'",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.015,
+   "pass": true
+  },
+  {
+   "qid": "f_cpt_share_of_line_payments__g0483",
+   "answer": "0.0455. Assumption: fraction of summed line paid dollars on current 835 service lines whose billed procedure code is G0483, rounded to 4 decimals. Claim-level denials with no 835 lines are absent from this grain.",
+   "final_sql": "SELECT round(sum(line_paid_amount) FILTER (WHERE procedure_code = 'G0483') / sum(line_paid_amount), 4) FROM sem.remit_lines WHERE is_current_adjudication",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.011,
+   "pass": true
+  },
+  {
+   "qid": "a_fca405b635",
+   "answer": "Corrected replacement submissions (frequency 7) by submission month: 2026-07-01: 45 claims, billed $30,709.95; 2026-08-01: 16 claims, billed $7,039.61. Assumption: each frequency-7 837 submission is one replacement (no claim had two); month is that submission's month; charge is the 837 claim charge rounded to 2 decimals. Not limited to the latest submission.",
+   "final_sql": "SELECT submission_month, count(*) AS replacement_claims, round(sum(charge_amount), 2) AS billed FROM sem.claims WHERE frequency_code = '7' GROUP BY 1 ORDER BY 1",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.01,
+   "pass": true
+  },
+  {
+   "qid": "f_payer_paid_in_month__cigna_2026-08-01",
+   "answer": "$4,243.89. Assumption: sum of paid_amount on current adjudications for canonical payer_name 'Cigna' whose payment date falls in August 2026, rounded to 2 decimals.",
+   "final_sql": "SELECT coalesce(round(sum(paid_amount), 2), 0) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Cigna' AND payment_month = DATE '2026-08-01'",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.008,
+   "pass": true
+  },
+  {
+   "qid": "f_payer_patient_responsibility__aetna",
+   "answer": "$2,570.75. Assumption: sum of patient_responsibility_amount on current adjudications for canonical payer_name 'Aetna'. Null responsibility is treated as not assigned (SQL SUM skips nulls, same total as treating them as $0). Rounded to 2 decimals. Includes every claim+payer adjudication, not only primary.",
+   "final_sql": "SELECT coalesce(round(sum(patient_responsibility_amount), 2), 0) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Aetna'",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.009,
+   "pass": true
+  },
+  {
+   "qid": "a_b853266803",
+   "answer": "Days to pay by primary payer class: blues: paid claims 188, median 18.0 days, 90th percentile 22.0 days; commercial: paid claims 313, median 16.0 days, 90th percentile 24.0 days; medicaid: paid claims 24, median 22.0 days, 90th percentile 29.4 days; medicaid_mco: paid claims 87, median 27.0 days, 90th percentile 31.4 days; medicare: paid claims 289, median 17.0 days, 90th percentile 20.0 days; medicare_advantage: paid claims 184, median 21.0 days, 90th percentile 26.0 days; other: paid claims 16, median 23.5 days, 90th percentile 31.0 days. Assumption: keep current adjudications from the primary payer (837 payer_responsibility P) with paid_amount > 0. Days = that payment date minus the first 837 submission date to the same payer. Median and 90th percentile are continuous/linear, rounded to 1 decimal. Payer class is the primary payer's class.",
+   "final_sql": "WITH prim AS (\n  SELECT claim_key, payer_key, min(payer_class) AS payer_class, min(submission_date) AS first_submission\n  FROM sem.claims WHERE payer_responsibility = 'P' GROUP BY 1, 2\n), paid AS (\n  SELECT claim_key, payer_key, payment_date\n  FROM sem.remit_claims\n  WHERE is_current_adjudication AND paid_amount > 0\n)\nSELECT p.payer_class, count(*) AS paid_claims,\n       round(quantile_cont(date_diff('day', p.first_submission, r.payment_date), 0.5), 1) AS median_days,\n       round(quantile_cont(date_diff('day', p.first_submission, r.payment_date), 0.9), 1) AS p90_days\nFROM prim p JOIN paid r USING (claim_key, payer_key)\nGROUP BY 1 ORDER BY 1",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.021,
+   "pass": true
+  },
+  {
+   "qid": "q10_top_denial_carcs",
+   "answer": "Top 5 CO reviewed-denial CARCs by denied claim+payer count: 197 (12 denied claim+payers); 16 (11 denied claim+payers); 18 (9 denied claim+payers); 55 (9 denied claim+payers); 96 (8 denied claim+payers). Assumption: current adjudications that are denied; adjustments in group CO with is_denial_carc; each denied claim+payer counted once per CARC; rank by that count, ties broken by CARC code ascending.",
+   "final_sql": "SELECT a.carc_code, count(DISTINCT a.remit_claim_id) AS denied_claim_payers\nFROM sem.adjustments a\nJOIN sem.remit_claims r ON r.remit_claim_id = a.remit_claim_id\nWHERE r.is_current_adjudication AND r.is_denied AND a.group_code = 'CO' AND a.is_denial_carc\nGROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 5",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.016,
+   "pass": true
+  },
+  {
+   "qid": "f_payer_class_denial_rate__medicaid_mco",
+   "answer": "0.0512. Assumption: payer_class 'medicaid_mco' on current adjudications, one claim per payer, 0-1 fraction rounded to 4 decimals.",
+   "final_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_class = 'medicaid_mco'",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.008,
+   "pass": true
+  },
+  {
+   "qid": "a_a5888f64a4",
+   "answer": "First-pass resolution by payer class: blues: remitted pairs 406, first-pass 370, rate 91.13%; commercial: remitted pairs 680, first-pass 628, rate 92.35%; medicaid: remitted pairs 81, first-pass 78, rate 96.30%; medicaid_mco: remitted pairs 255, first-pass 239, rate 93.73%; medicare: remitted pairs 536, first-pass 515, rate 96.08%; medicare_advantage: remitted pairs 378, first-pass 353, rate 93.39%; other: remitted pairs 57, first-pass 54, rate 94.74%. Assumption: a claim+payer pair is in the population if it has any 835 claim payment. First pass means exactly one such event, that event is the current adjudication, and it is not a denial. Rate is first-pass pairs / remitted pairs as a percentage rounded to 2 decimals.",
+   "final_sql": "WITH pairs AS (\n  SELECT payer_class, claim_key, payer_key, count(*) AS events,\n         bool_or(is_current_adjudication) AS has_current,\n         bool_or(is_denied) AS any_denied\n  FROM sem.remit_claims GROUP BY 1, 2, 3\n)\nSELECT payer_class, count(*) AS remitted_pairs,\n       count(*) FILTER (WHERE events = 1 AND has_current AND NOT any_denied) AS first_pass_pairs,\n       round(100.0 * count(*) FILTER (WHERE events = 1 AND has_current AND NOT any_denied) / count(*), 2) AS first_pass_rate_pct\nFROM pairs GROUP BY 1 ORDER BY 1",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.016,
+   "pass": true
+  },
+  {
+   "qid": "a_436f690741",
+   "answer": "25 CO denial CARCs on denied current adjudications, ordered by pair count then CARC: 197: 12 pairs, $21,021.14; 16: 11 pairs, $11,343.78; 18: 9 pairs, $3,134.29; 55: 9 pairs, $15,966.55; 96: 8 pairs, $10,123.32; 183: 7 pairs, $4,516.19; 29: 6 pairs, $2,347.44; 97: 5 pairs, $364.03; 204: 4 pairs, $1,261.40; 22: 4 pairs, $2,400.27; 252: 4 pairs, $843.32; 15: 3 pairs, $9,079.64; 27: 3 pairs, $1,072.19; 50: 3 pairs, $9,079.64; B7: 3 pairs, $1,323.78; 198: 2 pairs, $1,238.57; 236: 2 pairs, $41.96; 24: 2 pairs, $479.73; 109: 1 pairs, $234.32; 119: 1 pairs, $515.01; 234: 1 pairs, $20.98; 242: 1 pairs, $234.32; 288: 1 pairs, $515.01; 4: 1 pairs, $6,872.90; B15: 1 pairs, $234.32. Assumption: claim and line adjustments, group CO, reviewed denial CARCs only (is_denial_carc); each denied claim+payer counted once per code; dollars are the sum of those adjustment amounts rounded to 2 decimals.",
+   "final_sql": "SELECT a.carc_code,\n       count(DISTINCT a.claim_key || '|' || a.payer_key) AS denied_claim_payers,\n       round(sum(a.adjustment_amount), 2) AS co_amount\nFROM sem.adjustments a\nJOIN sem.remit_claims r ON r.remit_claim_id = a.remit_claim_id\nWHERE r.is_current_adjudication AND r.is_denied AND a.group_code = 'CO' AND a.is_denial_carc\nGROUP BY 1 ORDER BY 2 DESC, 1",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.025,
+   "pass": true
+  },
+  {
+   "qid": "a_d29f83c935",
+   "answer": "327 billed procedure codes. Each row is procedure, top principal diagnosis, claims with that pair, claims with the procedure, and the pair's share in percent. First (procedure order): 36415 / Z0000, 178 of 1152 claims (15.5%). Last: G0483 / Z79891, 35 of 52 (67.3%). Assumption: one row per claim at its latest 837 submission, voids included; a claim counts once per CPT; the top diagnosis is the mode with ties broken by the lowest diagnosis code; share is rounded to 1 decimal percent.",
+   "final_sql": "WITH lines AS (\n  SELECT DISTINCT c.claim_key, cl.procedure_code, c.principal_diagnosis_code\n  FROM sem.claim_lines cl\n  JOIN sem.claims c ON c.claim_id = cl.claim_id\n  WHERE c.is_latest_submission\n),\npair AS (\n  SELECT procedure_code, principal_diagnosis_code, count(*) AS n FROM lines GROUP BY 1, 2\n),\ntot AS (\n  SELECT procedure_code, count(*) AS total_claims FROM lines GROUP BY 1\n),\nranked AS (\n  SELECT procedure_code, principal_diagnosis_code, n,\n         row_number() OVER (PARTITION BY procedure_code ORDER BY n DESC, principal_diagnosis_code ASC) AS rn\n  FROM pair\n)\nSELECT r.procedure_code, r.principal_diagnosis_code, r.n AS claims_with_top_dx, t.total_claims,\n       round(100.0 * r.n / t.total_claims, 1) AS top_dx_share_pct\nFROM ranked r JOIN tot t USING (procedure_code)\nWHERE r.rn = 1\nORDER BY 1",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.03,
+   "pass": true
+  },
+  {
+   "qid": "f_payer_class_denial_rate__other",
+   "answer": "0.0175. Assumption: payer_class 'other' on current adjudications, one claim per payer, 0-1 fraction rounded to 4 decimals.",
+   "final_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_class = 'other'",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.007,
+   "pass": true
+  },
+  {
+   "qid": "f_cpt_denied_lines__85652",
+   "answer": "10. Assumption: same line-denial definition as CPT 83036: line_is_denied on current adjudications for billed procedure 85652.",
+   "final_sql": "SELECT count(*) FROM sem.remit_lines WHERE is_current_adjudication AND line_is_denied AND procedure_code = '85652'",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.014,
+   "pass": true
+  },
+  {
+   "qid": "q07_denial_rate",
+   "answer": "0.0453. Assumption: denied current adjudications divided by all current adjudications, one row per claim+payer, 0-1 fraction rounded to 4 decimals. $0 paid alone is not a denial.",
+   "final_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.007,
+   "pass": true
+  }
+ ],
+ "accuracy": "20/20",
+ "n": 20,
+ "mean_sql_execs": 3.0,
+ "notes": "Dataset is the benchmark default snapshot (generator 3.3, days=45, volume_scale=0.6, seed=2026, p_corrupt_file=0.1), id e21410ce6805, queried with a non-escalated sem.* reader. Dev set: all benchmark questions except heldout_hard_1 (27) and grokbot-r1 (none tagged), sorted by sha256(question_id), first 20. Few-shot: BM25 (k1=1.5, b=0.75) over question text, k=3, drawn only from questions outside this dev set and outside the held-out 27, dropping the same parametric family. Explore: 22 shared probes (view counts, payer-name dictionary, null rates, frequency, DOS stability, join cardinality of primary 837 to current 835) before the candidates. Those 22 are not included in per-question sql_execs. Each question then ran 3 direct-SQL candidates once; the result with majority agreement was kept. repair=0, so the one candidate that errored (a_d29f83c935, ambiguous claim_key) was not rewritten. verifier=0, multiagent=0. Scored after the answer commit with bench.compare.match: 20/20, no scored failures. Contamination: while locating the harness, the family gold-SQL templates in bench/question_families.py and the gold SQL for q07_denial_rate and a_436f690741 (file headers) were seen before answers were committed. Those answers were still taken from agreeing candidates written from the question text, glossary, schema, exploration, and other-family few-shot."
+}
