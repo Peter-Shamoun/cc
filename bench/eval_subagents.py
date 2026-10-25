@@ -38,7 +38,7 @@ def prepare(run_label: str, configs: dict, models: list[str], repeats: int, only
     cases = load_cases(snapshot_path=snap)
     if only:
         wanted = set(only.split(","))
-        cases = [c for c in cases if wanted & {c["id"], c["category"], c["difficulty"], c.get("family")}]
+        cases = [c for c in cases if wanted & {c["id"], c["category"], c["difficulty"], c.get("family"), c.get("question_set")}]
     for case in cases:
         for config_name, technique_config in configs.items():
             for model in models:

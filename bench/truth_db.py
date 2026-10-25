@@ -10,7 +10,7 @@ the rows come straight from the generator's own decisions. Tables (all in schema
     submissions(pcn, submission_date, payer_id, payer_sequence, frequency)
     adjudications(pcn, payer_id, payer, payer_class, payer_sequence, remitted_current, denied, denied_recorded,
                   denied_signal_v3, paid_current, status_current, ever_reversed, claim_level_only, has_duplicate_denial)
-    events(pcn, payer_id, event_number, event_date, status, icn, paid, patient_responsibility, charge,
+    events(pcn, payer_id, event_number, dos, event_date, status, icn, paid, patient_responsibility, charge,
            claim_level_only, trn, duplicate_denial, is_current)
     event_adjustments(pcn, payer_id, event_number, group_code, carc, amount)
     event_lines(pcn, payer_id, event_number, line_number, cpt, adjudicated_cpt, paid, allowed, denied, co_carcs,
@@ -114,7 +114,8 @@ def build_truth_db(generator_out_dir: Path, tenant: str, db_path: Path) -> Path:
                 list(range(len(a["events"])))
             current_index = real_events[-1] if real_events and a["remitted_current"] else None
             for n, e in enumerate(a["events"]):
-                sinks["events"].add(pcn=pcn, payer_id=payer_id, event_number=n + 1, event_date=e["date"], status=e["status"],
+                sinks["events"].add(pcn=pcn, payer_id=payer_id, event_number=n + 1, dos=c["dos"], event_date=e["date"],
+                                    status=e["status"],
                                     icn=e.get("icn"), paid=e["paid"], patient_responsibility=e.get("pr"),
                                     charge=e.get("charge"), claim_level_only=e.get("claim_level_only"), trn=e.get("trn"),
                                     duplicate_denial=bool(e.get("duplicate_denial")), is_current=n == current_index)
