@@ -89,3 +89,5 @@ If agent SQL ever pointed at `customer_a/`, IAM would deny it: role B's credenti
 - How file supersession (`duplicate_of_file_id`, `superseded_by_file_id`) works when Parquet is append-only: either rewrite `edi.source_file` each batch, or add a separate log table.
 - Chat transcripts and an app-level audit log, and retention periods (audit logs about 6 years, transcripts 30–90 days). These need compliance sign-off.
 - 277 files arrive later. A possible later move to Iceberg / S3 Tables.
+  [`lake-design-check.md`](lake-design-check.md) measured DuckLake and Iceberg against the current lake on 120 days
+  of one customer and recommends keeping the current design, with the conditions that would change that.

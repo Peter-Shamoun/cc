@@ -1,0 +1,113 @@
+{
+ "ducklake": {
+  "silver_catalog_phi_stats": [
+   [
+    "name_last_or_org",
+    "AARP MEDICARE SUPPLEMENT",
+    "ZIMMERMAN"
+   ],
+   [
+    "name_first",
+    "AALIYAH",
+    "ZOEY"
+   ],
+   [
+    "id_value",
+    "100067634",
+    "ZZC925814223"
+   ],
+   [
+    "addr_line1",
+    "1 BRIARWOOD DR",
+    "PO BOX 981106"
+   ],
+   [
+    "dmg_birth_date",
+    "1931-07-10",
+    "2025-06-25"
+   ]
+  ],
+  "default_inlining_tables": [
+   "ducklake_inlined_data_1_1",
+   "ducklake_inlined_data_tables"
+  ],
+  "default_inlining_rows": 9,
+  "reader_attach_gold_catalog": "allowed: 12329",
+  "reader_get_silver_catalog": "denied (AccessDenied: An error occurred (AccessDenied) when calling the GetObject operation: Access Denied)",
+  "reader_read_silver_file": "denied (HTTPException: HTTP Error: HTTP GET error reading 's3://cc-prod/acme_labs/parquet/ducklake/edi/entity/received_mont)",
+  "gold_catalog_tables": [
+   "lossless.c837_claim",
+   "lossless.c837_claim_code",
+   "lossless.c837_hl",
+   "lossless.c837_service_line",
+   "lossless.edi_adjustment",
+   "lossless.edi_amount",
+   "lossless.edi_date_time",
+   "lossless.edi_entity",
+   "lossless.edi_reference",
+   "lossless.edi_source_file",
+   "lossless.r835_claim_payment",
+   "lossless.r835_payment",
+   "lossless.r835_provider_adjustment",
+   "lossless.r835_remark",
+   "lossless.r835_service_payment",
+   "meta.state",
+   "sem.adjustments",
+   "sem.claim_lines",
+   "sem.claims",
+   "sem.diagnoses",
+   "sem.payers",
+   "sem.payments",
+   "sem.provider_adjustments",
+   "sem.remarks",
+   "sem.remit_claims",
+   "sem.remit_lines"
+  ],
+  "write_without_customer_key": "denied (HTTPException: HTTP Error: HTTP PUT error uploading to 's3://cc-prod/acme_labs/semantic_layer/ducklake/probe.parque)"
+ },
+ "iceberg": {
+  "silver_manifest_phi_bounds": {
+   "name_last_or_org": [
+    "AARP MEDICARE SU",
+    "ZUNIGA"
+   ],
+   "name_first": [
+    "AALIYAH",
+    "ZOEY"
+   ],
+   "dmg_birth_date": [
+    "1931-07-13",
+    "2025-06-23"
+   ],
+   "addr_line1": [
+    "1 CHAPEL LN",
+    "PO BOX 981106"
+   ],
+   "id_value": [
+    "1003332990",
+    "ZZC713829034"
+   ]
+  },
+  "silver_metadata_location": "s3://cc-prod/acme_labs/parquet/iceberg/edi.entity/metadata/00004-1bd3a102-38bb-4dfd-92b6-385b3056024e.metadata.json",
+  "stock_pyiceberg_write": "denied (OSError: When completing multiple part upload for key 'acme_labs/semantic_layer/iceberg/probe/metadata/00000-11ac9780-6)",
+  "reader_scan_gold": "allowed: 12329",
+  "reader_scan_silver": "denied (HTTPException: HTTP Error: HTTP GET error reading 's3://cc-prod/acme_labs/parquet/iceberg/edi.entity/metadata/00004)"
+ },
+ "crypto_shred": {
+  "ducklake gold catalog file": "denied (ClientError: An error occurred (KMS.DisabledException) when calling the GetObject operation: arn:aws:kms:us-west-2:11112222)",
+  "silver data file": "denied (ClientError: An error occurred (KMS.DisabledException) when calling the GetObject operation: arn:aws:kms:us-west-2:11112222)",
+  "iceberg metadata.json": "denied (ClientError: An error occurred (KMS.DisabledException) when calling the GetObject operation: arn:aws:kms:us-west-2:11112222)"
+ },
+ "raw_objects_before_after": [
+  0,
+  0
+ ],
+ "prefixes_written": [
+  "parquet/_ducklake",
+  "parquet/ducklake",
+  "parquet/iceberg",
+  "semantic_layer/_ducklake",
+  "semantic_layer/ducklake",
+  "semantic_layer/iceberg"
+ ]
+}
