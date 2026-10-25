@@ -40,7 +40,7 @@ s.con.execute("SELECT payer_name, avg(is_denied::INT) FROM sem.remit_claims WHER
 | `infra.py` | The account as Terraform would build it: roles, ABAC bucket policy, key policies, lifecycle, the EventBridge rule and task definitions. |
 | `pipeline.py` | The Fargate parser. Bronze → staging → silver, quarantining bad files. Loads are idempotent. Gold is rebuilt from silver, CURRENT is flipped with a compare-and-set, and old versions are cleaned up. |
 | `query.py` | The per-request session: Cognito token → STS → DuckDB scoped to this customer's current gold version. |
-| `edi_mock.py`, `x12_validate.py`, `parser.py` | Mock EDI and its ledger; an independent validator; the X12 → lossless-schema parser. The generator streams day by day with flat memory; volume is set in real units (`Scenario.target_mb_per_day`); the ledger is `truth.json` (index) + `truth/<customer>/claims.jsonl`, read back with `edi_mock.load_truth`. |
+| `edi_mock.py`, `x12_validate.py`, `parser.py` | Mock EDI and its ledger; an independent validator; the X12 → lossless-schema parser. The generator is calibrated to `research/edi_realism_calibration.yaml` (Medicare MAC + MA + Medicaid + Blues + national + a long payer tail, CLFS-based allowed amounts, XiFin denial mix, payer remittance cycles, holidays, seasonality; the CY2026 CLFS ships in `data/clfs_2026q4.csv`; `tests/test_edi_calibration.py` checks the distributions). It streams day by day with flat memory; volume is set in real units (`Scenario.target_mb_per_day`); the ledger is `truth.json` (index) + `truth/<customer>/claims.jsonl`, read back with `edi_mock.load_truth`. |
 
 ## Security model, and the test that checks each piece
 
@@ -71,9 +71,12 @@ s.con.execute("SELECT payer_name, avg(is_denied::INT) FROM sem.remit_claims WHER
 6. **Open (semantic layer): `payer_sequence` comes from CLP02, so it is `unknown` for denials and
    reversals.** Filtering `payer_sequence = 'primary'` silently drops denied claims (benchmark q12 tests
    this trap).
-7. **Open (semantic layer): an exact-duplicate denial (CO-18 on an accidental resend) becomes the
-   "current" adjudication** and flips a paid claim to denied. Only `Scenario.stress()` generates it; the
-   ledger keeps the business answer, so the self-test shows the disagreement on stress data.
+7. **Open (semantic layer): an exact-duplicate denial (CO/OA-18 on an accidental resend) that arrives after
+   the payment becomes the "current" adjudication** and flips a paid claim to denied (CO-18, or status 4).
+   The calibrated generator sends resends on ~1.5% of claims (duplicates are 15% of lab denials), half
+   before and half after the original pays. The ledger follows the business rule as written (latest event
+   per claim+payer is current), so gold and ledger agree; `has_duplicate_denial` marks the claims where the
+   rule probably gives the wrong business answer. Decide whether the view should skip CARC-18 events.
 8. **Open (DuckDB): inside its allowed directory, a session can run `COPY ... TO 's3://…'` and
    `CREATE SECRET`.** Only the read-only IAM role and the SQL guard (`bench/guard.py`) stop these, so keep
    both.
