@@ -74,7 +74,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      492,
@@ -132,7 +132,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      492,
@@ -174,7 +174,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      492,
@@ -238,7 +238,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      492,
@@ -274,7 +274,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      492,
@@ -299,7 +299,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      492,
@@ -324,7 +324,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      492,
@@ -358,7 +358,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      492,
@@ -383,7 +383,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      492,
@@ -417,7 +417,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": false,
    "explore": [
     [
      492,
@@ -460,7 +460,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      492,
@@ -517,7 +517,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      492,
@@ -581,7 +581,7 @@
    "sql_execs": 4,
    "repairs": 1,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      "2026-07-01",
@@ -611,7 +611,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      10,
@@ -639,7 +639,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": false,
    "explore": [
     [
      "7",
@@ -668,7 +668,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      492,
@@ -697,7 +697,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      492,
@@ -722,7 +722,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      492,
@@ -747,7 +747,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      492,
@@ -811,7 +811,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      492,
@@ -836,7 +836,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      492,
@@ -863,7 +863,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      492,
@@ -889,7 +889,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      492,
@@ -921,7 +921,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      492,
@@ -946,7 +946,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      441,
@@ -1163,7 +1163,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      492,
@@ -1188,7 +1188,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      492,
@@ -1266,7 +1266,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      492,
@@ -1291,7 +1291,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      492,
@@ -1312,7 +1312,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "explore": [
     [
      4
@@ -1325,7 +1325,7 @@
    ]
   }
  ],
- "accuracy": null,
+ "accuracy": "28/30",
  "n": 30,
  "mean_sql_execs": 3.033,
  "notes": "CTE grain check plus one explore probe per question before the final SELECT. August payer-mix alias AT failed to parse and was repaired once. Corrected-claim day averages stay null because no frequency-1 original is in the extract; the claim count keeps those frequency-7 claims."
