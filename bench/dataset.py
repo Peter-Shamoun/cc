@@ -59,6 +59,8 @@ def snapshot(scenario=None, customer_user="ana@xifin.example", rebuild=False, ca
         pq.write_table(s.con.sql(f"SELECT * FROM {rel}").to_arrow_table(), d / f"{rel}.parquet")
     from ccsim.edi_mock import write_truth  # truth.json + truth/<customer>/claims.jsonl
     write_truth(out, dict(w.truth, customer=s.customer, tenants={s.customer: w.truth["tenants"][s.customer]}))
+    from bench.truth_db import build_truth_db                         # answer keys at scale: SQL over the ledger
+    build_truth_db(out, s.customer, out / "ledger.duckdb")
     (out / "meta.json").write_text(json.dumps({"dataset_id": did, "customer": s.customer, "scenario": {
         k: str(v) for k, v in asdict(scenario).items()}, "gold_version": s.version, "relations": rels}, indent=1))
     w.aws.shutdown()
