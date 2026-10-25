@@ -1,0 +1,50 @@
+# Screen-2 arm for the typed metric compiler.
+# Contrast this with the held-out base (free SQL over sem.*, metrics off, basic glossary, goal style,
+# effort low). Do not start from the screen-1 winner. One factor: the typed spec and its compiler.
+#
+# The harness (bench/eval_subagents.py) rejects unknown technique keys today. Wire this arm by
+# pointing the subagent at analyst.variants.typed_metric_compiler.prompts (PARSER_TOOLS,
+# parser_system) and running TypedCompilerAgent, or by adding the flags below to the CLI.
+# Pre-register: accept only if the paired question-level bootstrap interval lies entirely above 0,
+# per model. Report coverage (share of questions the typed lane compiles) next to accuracy,
+# accuracy on the covered subset, accuracy on the complement, and wrong-but-executed on each.
+
+arm: typed_metric_compiler
+base: sql_only
+factor: T08_typed_spec_date_basis
+contrast_with:
+  interface: sql_only
+  glossary: basic
+  context_style: goal
+  effort: low
+  enable_metrics: false
+  enable_sql: true
+  enable_lookup: false
+  enable_examples: false
+
+flags:
+  interface: typed_spec_then_sql          # typed_only disables the fallback; typed_spec_then_sql gates it
+  date_basis_required: true               # payment | service | submission | cohort_* | payer_received | file_received | none
+  cohort_compiler: true                   # first-submission / first-service population, then a catalog metric
+  payer_received_basis: true              # overlay DTM*050; column is on sem.remit_claims, not in the yaml catalog
+  file_received: cannot_express           # raw received_date is not a public sem.* column; never guess payment_date
+  min_group_size_when_unspecified: 0      # do not apply the catalog's silent floor of 20
+  project_requested_only: true            # drop ratio components so the matcher does not see extra numbers
+  phi_lexical: true                       # refuse names, DOB, member ids, writes, other customers before SQL
+  block_identifier_groupby: true          # claim_key, check number, payer ICN cannot be group_by
+  block_identifier_projection: true       # fallback SQL may not project those columns
+  repair_catalog_errors: 1                # one retry when the spec names an unknown metric or dimension
+  fallback: guarded_sem_sql               # only after CannotExpress; abstain is the typed_only setting
+  on_ambiguous_basis: abstain             # compiler does not default a missing date basis
+  default_limit: 500
+
+ablations:
+  - id: typed_only
+    change: {interface: typed_only, fallback: abstain}
+    question: "What does the lane score when it must abstain instead of writing SQL?"
+  - id: no_cohort
+    change: {cohort_compiler: false}
+    question: "How much of the covered set is the cohort extension rather than the base compiler?"
+  - id: catalog_min_group
+    change: {min_group_size_when_unspecified: 20}
+    question: "Does the catalog's default floor of 20 drop groups the question did not exclude?"
