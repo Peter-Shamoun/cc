@@ -471,6 +471,7 @@ def build_gold(env, s3, con, B: str, c: str, kms: str, run_id: str, silver: Silv
             if "schema" not in relations.setdefault(rel, {}):
                 relations[rel]["schema"] = [writer.write(rel, f"SELECT * FROM {_source_sql(rel)} LIMIT 0", "schema")]
         out["written"], out["written_mb"] = writer.count, round(writer.bytes / 1e6, 1)
+        out["written_mb_by_kind"] = {k: round(v / 1e6, 1) for k, v in writer.bytes_by_kind.items()}
     # Retention: what this version stops listing (and the base's manifest) is retired now; a retired file is
     # deleted only once it has been retired longer than a reader session can live, so a session that opened any
     # recent version keeps working.
@@ -513,6 +514,7 @@ class _GoldWriter:
 
     def __init__(self, con, store: Store, run_id: str, tmp: Path):
         self.con, self.store, self.run_id, self.tmp, self.count, self.bytes = con, store, run_id, tmp, 0, 0
+        self.bytes_by_kind = {}             # settled quarters / open claim cohorts / everything else, for the report
 
     def write(self, relation: str, sql: str, partition: str) -> str:
         p = self.tmp / "gold.parquet"
@@ -523,6 +525,8 @@ class _GoldWriter:
         self.store.put(key, body)
         self.count += 1
         self.bytes += len(body)
+        kind = "settled" if "-Q" in partition else "claims_open" if relation in GOLD_SORT else "other"
+        self.bytes_by_kind[kind] = self.bytes_by_kind.get(kind, 0) + len(body)
         return key
 
 
