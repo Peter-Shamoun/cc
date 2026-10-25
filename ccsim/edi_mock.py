@@ -1635,13 +1635,15 @@ def _finalize_claim(led: dict) -> dict:
 
     Mirrors the business rule of the semantic layer, not its SQL: the latest event per (claim, payer) is current
     unless it is a reversal; denied = recorded (status 4) or signal v3 ($0 paid, not a reversal, CO with a reviewed
-    CARC). A duplicate denial (CO/OA-18 on an accidental resend) that arrives after the real adjudication is the
-    latest event, so it is current, as the rule says; `has_duplicate_denial` flags those claims.
+    CARC). A duplicate-claim denial (CARC 18 on an accidental resend) never replaces another adjudication: payers
+    deny the resend and the original adjudication stands. It is current only when nothing else was received.
+    `has_duplicate_denial` flags those claims.
     """
     led = {k: v for k, v in led.items() if k != "_claim"}
     for pid, a in led["adjudications"].items():
         evs = a["events"]
-        cur = evs[-1] if evs else None
+        real = [e for e in evs if not e["duplicate_denial"]] or evs
+        cur = real[-1] if real else None
         remitted = cur is not None and cur["status"] != "22"
         recorded = remitted and cur["status"] == "4"
         signal = remitted and cur["paid"] == 0 and any(k in DENIAL_CARCS for k in cur["co_carcs"])

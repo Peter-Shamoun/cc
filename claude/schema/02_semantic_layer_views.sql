@@ -90,6 +90,7 @@ SELECT
     SUM(amount)                                         AS total_adjustment_amount,
     bool_or(group_code = 'CO' AND reason_code IN (SELECT reason_code FROM ref.denial_carc))
                                                         AS has_co_denial_carc,
+    bool_or(reason_code = '18')                         AS has_duplicate_claim_carc,
     list_sort(list_distinct(list(group_code || '-' || reason_code))) AS adjustment_codes
 FROM all_cas
 GROUP BY claim_payment_uid;
@@ -152,9 +153,16 @@ ev AS (
         (NOT COALESCE(cs.is_reversal, false)
             AND COALESCE(cp.clp04_total_paid, 0) = 0
             AND COALESCE(cc.has_co_denial_carc, false))          AS is_denied_signal_v3,
+        -- A duplicate-claim denial (CARC 18, $0) of an accidental resend never replaces another adjudication.
+        (NOT COALESCE(cs.is_reversal, false)
+            AND COALESCE(cp.clp04_total_paid, 0) = 0
+            AND COALESCE(cc.has_duplicate_claim_carc, false))    AS is_duplicate_claim_denial,
         ROW_NUMBER() OVER (
             PARTITION BY cp.clp01_patient_control_number, py.payer_key
-            ORDER BY p.bpr16_effective_date DESC NULLS LAST,
+            ORDER BY (NOT COALESCE(cs.is_reversal, false)
+                        AND COALESCE(cp.clp04_total_paid, 0) = 0
+                        AND COALESCE(cc.has_duplicate_claim_carc, false)) ASC,
+                     p.bpr16_effective_date DESC NULLS LAST,
                      sf.received_at DESC NULLS LAST,
                      cp.file_id DESC,
                      cp.seg_ord DESC)                             AS event_rank_desc,
@@ -253,7 +261,7 @@ SELECT
     claim_key || '|' || payer_key AS claim_payer_key,
     payer_key, payer_name, payer_class,
     payer_sequence, claim_status_code, claim_status,
-    adjudication_state, is_current_adjudication, is_reversal,
+    adjudication_state, is_current_adjudication, is_reversal, is_duplicate_claim_denial,
     is_denied, is_denied_recorded, is_denied_signal_v3,
     payer_claim_control_number, filing_indicator, frequency_code,
     charge_amount, paid_amount, patient_responsibility_amount,

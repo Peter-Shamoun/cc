@@ -110,7 +110,7 @@ def test_line_denials_match_ledger(world):
     want = Counter()
     for _, a in adjudications(world):
         if a["remitted_current"]:
-            cur = a["events"][-1]                                # current = latest event (business rule)
+            cur = ([e for e in a["events"] if not e["duplicate_denial"]] or a["events"])[-1]   # business rule
             for ln in cur["lines"]:
                 want[(ln["adjudicated_cpt"], ln["denied"])] += 1
     got = Counter({(cpt, bool(d)): n for cpt, d, n in q(

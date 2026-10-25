@@ -144,7 +144,7 @@ def test_every_scenario_occurs_under_stress(stress):
         "dependent patient": any(c["dependent"] for c in claims),
         "claim-level denial": any(a["claim_level_only"] for a in ads),
         "partial line denial": any(a["remitted_current"] and a["paid_current"] > 0 and
-                                   any(ln["denied"] for ln in a["events"][-1]["lines"])
+                                   any(ln["denied"] for ln in _current_event(a)["lines"])
                                    for a in ads),
         "timely filing": any("29" in e["carcs"] for e in evs),
         "duplicate submission": any(a["has_duplicate_denial"] for a in ads),
@@ -158,13 +158,18 @@ def test_every_scenario_occurs_under_stress(stress):
     assert all(seen.values()), [k for k, v in seen.items() if not v]
 
 
+def _current_event(a):
+    """The latest event that is not a duplicate-claim denial (bench/ledger.py _cur_event)."""
+    return ([e for e in a["events"] if not e["duplicate_denial"]] or a["events"])[-1]
+
+
 def test_denials_follow_the_drivers(tmp_path):
     """Signals the agent should be able to find: risky providers (claim denials for missing information / PECOS),
     screening dx on medical-necessity tests (mostly line-level CO-50/11/167 on an otherwise paid claim)."""
     t = generate(tmp_path, Scenario(days=60, volume_scale=1, seed=11), ["acme_labs"])
 
     def rate(pred, any_line=False):
-        xs = [a["denied"] or (any_line and any(ln["denied"] for ln in a["events"][-1]["lines"]))
+        xs = [a["denied"] or (any_line and any(ln["denied"] for ln in _current_event(a)["lines"]))
               for c in t["tenants"]["acme_labs"]["claims"].values() if pred(c)
               for a in c["adjudications"].values() if a["remitted_current"] and a["seq"] == 0]
         return sum(xs) / len(xs)
@@ -226,16 +231,17 @@ def test_generator_regressions_from_review(stress, tmp_path):
     for m in re.finditer(rb"DTP\*573\*D8\*(\d{8})", b"".join(b for _, f, b in _files(out, truth) if f["kind"] == "837")):
         d = m.group(1).decode()
         assert datetime.strptime(d, "%Y%m%d").weekday() < 5 and d in paid_on
-    # duplicate resends: denied before the original pays (the real adjudication stays current) or after it
-    # (the duplicate denial is then the latest event, so it is current, as the business rule says)
+    # duplicate resends: denied before or after the original pays; either way the original adjudication stays current
     orders = Counter()
     for c in claims:
         for a in c["adjudications"].values():
             if a["has_duplicate_denial"]:
                 last = a["events"][-1]
                 orders["after" if last["duplicate_denial"] else "before"] += 1
-                if last["duplicate_denial"]:
-                    assert a["denied"] == (last["status"] == "4" or "18" in last["co_carcs"])
+                original = _current_event(a)
+                only_duplicates = all(e["duplicate_denial"] for e in a["events"])   # original not paid yet
+                assert original["duplicate_denial"] == only_duplicates and a["paid_current"] == (
+                    original["paid"] if a["remitted_current"] else 0.0)
     assert orders["before"] and orders["after"], orders
     # generator instances do not share state
     g1, g2 = edi_mock.Generator(Scenario(days=5, volume_scale=.1)), edi_mock.Generator(Scenario(days=5, volume_scale=.1))

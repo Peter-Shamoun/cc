@@ -19,7 +19,8 @@ GLOSSARY = """Business definitions (CC semantic layer):
   marks the latest one for each claim_key across all payers.
 - adjudication event: one 835 claim payment (CLP) in sem.remit_claims. A claim can have several per payer
   (original, reversal, correction). The current adjudication for a claim+payer is the latest non-reversal event:
-  is_current_adjudication. A claim+payer whose latest event is a reversal has no current adjudication.
+  is_current_adjudication. A claim+payer whose latest event is a reversal has no current adjudication. A duplicate-
+  claim denial of an accidental resend (is_duplicate_claim_denial, CARC 18) does not replace the original adjudication.
 - denied (is_denied): recorded denial (claim status 4, is_denied_recorded) OR signal v3 (is_denied_signal_v3:
   $0 paid, not a reversal, and a CO adjustment with a reviewed denial CARC). $0 paid alone is not a denial.
 - denial rate: denied current adjudications / current adjudications, counting each claim once per payer.

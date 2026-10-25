@@ -30,9 +30,10 @@ def _current(T, seq=None):
 
 
 def _cur_event(a):
-    """The current adjudication: the latest event per claim+payer (the business rule has no exception for a
-    duplicate denial that arrives after the payment)."""
-    return a["events"][-1]
+    """The current adjudication: the latest event per claim+payer that is not a duplicate-claim denial (a CARC-18
+    denial of an accidental resend does not undo the original adjudication), unless only duplicates exist."""
+    real = [e for e in a["events"] if not e.get("duplicate_denial")]
+    return (real or a["events"])[-1]
 
 
 def _rate(pairs, key, min_n=1, r=4):

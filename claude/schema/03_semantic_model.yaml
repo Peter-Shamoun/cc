@@ -318,6 +318,7 @@ dimensions:
   is_denied:             {description: Claim denied (recorded or signal v3), type: boolean}
   is_current_adjudication: {description: Latest non-reversed 835 event for the claim+payer, type: boolean}
   is_reversal:           {description: CLP02 = 22, type: boolean}
+  is_duplicate_claim_denial: {description: "$0 denial of an accidental resend (CARC 18); never the current adjudication while another event exists", type: boolean}
   is_latest_submission:  {description: Latest 837 submission for the claim key, type: boolean}
   filing_indicator:      {description: Claim filing indicator (MB Medicare B, MC Medicaid, CI commercial, BL Blues, HM HMO, ...)}
   frequency:             {description: 837 claim frequency (original / replacement / void)}
