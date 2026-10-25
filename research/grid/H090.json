@@ -59,7 +59,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0046,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_b853266803",
@@ -105,7 +106,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0055,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -135,7 +137,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0052,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_a5888f64a4",
@@ -187,7 +190,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.004,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7d45c279a7",
@@ -211,7 +215,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0069,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q15_partial_line_denials",
@@ -224,7 +229,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0017,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q25_primary_deductible",
@@ -237,7 +243,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0064,
-   "pass": null
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_8663c777cd",
@@ -259,7 +266,8 @@
    "sql_execs": 2,
    "repairs": 1,
    "seconds": 0.0059,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__87798",
@@ -272,7 +280,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0024,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q11_cpt_denial_rate",
@@ -300,7 +309,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0058,
-   "pass": null
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_a123bba47f",
@@ -331,7 +341,8 @@
    "sql_execs": 2,
    "repairs": 1,
    "seconds": 0.0053,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_9108c7aacb",
@@ -376,7 +387,8 @@
    "sql_execs": 3,
    "repairs": 2,
    "seconds": 0.0037,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_856b95a70c",
@@ -428,7 +440,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0037,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_1b7e02d0b0",
@@ -445,7 +458,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0061,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_921f1bf366",
@@ -461,7 +475,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0066,
-   "pass": null
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "q14_zero_paid_not_denied",
@@ -474,7 +489,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0018,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_dca9da6d52",
@@ -491,7 +507,8 @@
    "sql_execs": 2,
    "repairs": 1,
    "seconds": 0.0061,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q19_reversed_no_correction",
@@ -504,7 +521,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0028,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__80307",
@@ -517,7 +535,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0028,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d383370345",
@@ -569,7 +588,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0086,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0482",
@@ -582,7 +602,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.002,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_0d43f7d4b6",
@@ -597,7 +618,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0116,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_923951a050",
@@ -611,7 +633,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0042,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7423e6eb91",
@@ -631,7 +654,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0055,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_never_remitted_submitted_in_month__2026-07-01",
@@ -644,7 +668,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0052,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_ab202d4b23",
@@ -849,7 +874,8 @@
    "sql_execs": 2,
    "repairs": 1,
    "seconds": 0.008,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0480",
@@ -862,7 +888,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.002,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d671e0b995",
@@ -928,7 +955,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0053,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__81479",
@@ -941,7 +969,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0021,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q12_referring_provider_denials",
@@ -950,12 +979,13 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0053,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   }
  ],
- "accuracy": null,
+ "accuracy": "27/30",
  "n": 30,
  "mean_sql_execs": 1.2,
- "notes": "Planner pass wrote a per-question plan (population, keys claim_key+payer_key, date basis); separate writer pass wrote direct SQL; one fresh critic pass reviewed semantics (no revisions adopted: flagged negative days for 'other' class, empty q12 result, August rows absent because the 20-day snapshot ends 2026-07-22). Repairs only on execution errors (5 questions). Pre-run schema read: sem.* column list plus 4 enum counts (payer_sequence, frequency_code, claim_status_code, latest-submission keys) as data dictionary. Answers committed before scoring.",
- "n_pass": null
+ "notes": "Planner pass wrote a per-question plan (population, keys claim_key+payer_key, date basis); separate writer pass wrote direct SQL; one fresh critic pass reviewed semantics (no revisions adopted: flagged negative days for 'other' class, empty q12 result, August rows absent because the 20-day snapshot ends 2026-07-22). Repairs only on execution errors (5 questions). Pre-run schema read: sem.* column list plus 4 enum counts (payer_sequence, frequency_code, claim_status_code, latest-submission keys) as data dictionary. Answers committed before scoring. Scored with bench.compare.match after answers were committed. Failures: 3.",
+ "n_pass": 27
 }
