@@ -1,0 +1,71 @@
+# Screen 2: coordinate ascent around the screen-1 winner.
+# Score every factor on validation. Learn glossary text on train. Draw examples from train.
+# The test split is not a factor here; bench.splits refuses to run it without --unseal-test.
+# Repeats stay at 2. research/screen2_power.md: a third repeat barely shrinks the paired SD,
+# and 80% power for a 10-point Haiku effect needs far more questions than repeats can buy.
+name: screen2_coordinate_ascent
+method: coordinate_ascent
+models: [haiku, sonnet]
+repeats: 2
+seed: 20261025
+learner_gate:
+  effect_min: 0.05
+  ci_low_min: 0.0
+  policy: any
+  combine: either
+  scored_on: validation
+  failures_read_from: train
+baseline_config:
+  # research/heldout_configs_1.json screen1_winner, with the glossary pinned to a version file.
+  glossary: version:v001_screen1_pitfalls
+  data_dictionary: true
+  data_profile: true
+  context_style: procedural
+  effort: low
+  enable_sql: true
+  enable_metrics: false
+  enable_examples: false
+  enable_lookup: false
+  sql_error_hints: false
+  result_checks: false
+  cascade: haiku
+  multi_candidate: 1
+factors:
+  - id: glossary_version
+    split: validation
+    learn_split: train
+    technique_key: glossary
+    levels:
+      - version:v000_basic
+      - version:v001_screen1_pitfalls
+    notes: New versions are proposed from train failures and accepted here. Do not score a version on the questions it was written from.
+  - id: semantic_layer
+    split: validation
+    technique_key: enable_metrics
+    levels: [false, true]
+    notes: Typed metrics (enable_metrics) against the SQL lane. Screen 1 found no main effect on the easier set; this is the hard-question check.
+  - id: examples
+    split: validation
+    technique_key: enable_examples
+    example_library_split: train
+    levels: [false, true]
+    notes: The example library is train questions only. A validation or test question must not be shown as a solved example.
+  - id: multi_candidate
+    split: validation
+    orchestrator: true
+    selection: majority
+    levels: [1, 3]
+    notes: Score with bench.screen2.score_multi_candidate rule majority. upper_bound_any is not a score.
+  - id: cascade
+    split: validation
+    orchestrator: true
+    levels: [haiku, sonnet, haiku_then_sonnet]
+    notes: >
+      haiku_then_sonnet keeps Haiku's answer when Haiku submitted one, and otherwise uses Sonnet
+      (bench.screen2.cascade_correct). Prepare both models; do not treat pass@2 as the cascade.
+  - id: repeats
+    split: validation
+    levels: [1, 2]
+    notes: >
+      Measurement factor, not a technique. Power says 2 repeats is enough to see pass^2; 5 or 8 repeats
+      do not replace questions. The level is the repeat count for that stage.

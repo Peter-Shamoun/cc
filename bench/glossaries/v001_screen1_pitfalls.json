@@ -1,0 +1,222 @@
+{
+ "version_id": "v001_screen1_pitfalls",
+ "parent_id": "v000_basic",
+ "sections": [
+  {
+   "section": "basic",
+   "entries": [
+    {
+     "entry_id": "basic-01",
+     "section": "basic",
+     "kind": "header",
+     "text": "Business definitions (CC semantic layer):",
+     "provenance": {
+      "origin": "hand_written",
+      "source": "bench/agents.py GLOSSARY",
+      "train_question_ids": [],
+      "note": "Written before the train/validation/test protocol."
+     }
+    },
+    {
+     "entry_id": "basic-02",
+     "section": "basic",
+     "kind": "bullet",
+     "text": "- claim: one patient control number (claim_key). sem.claims has one row per 837 submission; is_latest_submission\n  marks the latest one for each claim_key across all payers.",
+     "provenance": {
+      "origin": "hand_written",
+      "source": "bench/agents.py GLOSSARY",
+      "train_question_ids": [],
+      "note": "Written before the train/validation/test protocol."
+     }
+    },
+    {
+     "entry_id": "basic-03",
+     "section": "basic",
+     "kind": "bullet",
+     "text": "- adjudication event: one 835 claim payment (CLP) in sem.remit_claims. A claim can have several per payer\n  (original, reversal, correction). The current adjudication for a claim+payer is the latest non-reversal event:\n  is_current_adjudication. A claim+payer whose latest event is a reversal has no current adjudication. A duplicate-\n  claim denial of an accidental resend (is_duplicate_claim_denial, CARC 18) does not replace the original adjudication.",
+     "provenance": {
+      "origin": "hand_written",
+      "source": "bench/agents.py GLOSSARY",
+      "train_question_ids": [],
+      "note": "Written before the train/validation/test protocol."
+     }
+    },
+    {
+     "entry_id": "basic-04",
+     "section": "basic",
+     "kind": "bullet",
+     "text": "- denied (is_denied): recorded denial (claim status 4, is_denied_recorded) OR signal v3 (is_denied_signal_v3:\n  $0 paid, not a reversal, and a CO adjustment with a reviewed denial CARC). $0 paid alone is not a denial.",
+     "provenance": {
+      "origin": "hand_written",
+      "source": "bench/agents.py GLOSSARY",
+      "train_question_ids": [],
+      "note": "Written before the train/validation/test protocol."
+     }
+    },
+    {
+     "entry_id": "basic-05",
+     "section": "basic",
+     "kind": "bullet",
+     "text": "- denial rate: denied current adjudications / current adjudications, counting each claim once per payer.",
+     "provenance": {
+      "origin": "hand_written",
+      "source": "bench/agents.py GLOSSARY",
+      "train_question_ids": [],
+      "note": "Written before the train/validation/test protocol."
+     }
+    },
+    {
+     "entry_id": "basic-06",
+     "section": "basic",
+     "kind": "bullet",
+     "text": "- primary payer: the payer billed with payer_responsibility = 'P' on sem.claims. payer_sequence on sem.remit_claims\n  comes from the claim status code and is 'unknown' for denials and reversals; do not use it to find primary payers.",
+     "provenance": {
+      "origin": "hand_written",
+      "source": "bench/agents.py GLOSSARY",
+      "train_question_ids": [],
+      "note": "Written before the train/validation/test protocol."
+     }
+    },
+    {
+     "entry_id": "basic-07",
+     "section": "basic",
+     "kind": "bullet",
+     "text": "- 835 lines (sem.remit_lines) are missing when a payer denies a whole claim at claim level; billed lines are in\n  sem.claim_lines.",
+     "provenance": {
+      "origin": "hand_written",
+      "source": "bench/agents.py GLOSSARY",
+      "train_question_ids": [],
+      "note": "Written before the train/validation/test protocol."
+     }
+    },
+    {
+     "entry_id": "basic-08",
+     "section": "basic",
+     "kind": "bullet",
+     "text": "- The data starts with the lab's first delivered file. Claims billed before that appear only through their 835s\n  (sem.remit_claims rows with no sem.claims rows), and some claims show only a later secondary or corrected\n  submission; \"first submission\" and \"billed lines\" refer to what is in the data.",
+     "provenance": {
+      "origin": "hand_written",
+      "source": "bench/agents.py GLOSSARY",
+      "train_question_ids": [],
+      "note": "Written before the train/validation/test protocol."
+     }
+    },
+    {
+     "entry_id": "basic-09",
+     "section": "basic",
+     "kind": "bullet",
+     "text": "- Never return patient names, member ids, birth dates or addresses (they are not in these views) and never\n  answer about another customer: the session can only see the logged-in customer's data. Data is read-only.",
+     "provenance": {
+      "origin": "hand_written",
+      "source": "bench/agents.py GLOSSARY",
+      "train_question_ids": [],
+      "note": "Written before the train/validation/test protocol."
+     }
+    }
+   ]
+  },
+  {
+   "section": "pitfalls",
+   "entries": [
+    {
+     "entry_id": "pitfalls-01",
+     "section": "pitfalls",
+     "kind": "header",
+     "text": "Invariants and common traps:",
+     "provenance": {
+      "origin": "hand_written",
+      "source": "bench/agent_cli.py PITFALLS",
+      "train_question_ids": [],
+      "note": "Written in the same session as the screen-1 questions, before heldout_hard_1. The +16 Haiku point estimate did not replicate on that held-out set."
+     }
+    },
+    {
+     "entry_id": "pitfalls-02",
+     "section": "pitfalls",
+     "kind": "bullet",
+     "text": "- sem.claims and sem.claim_lines have one row per 837 submission: resubmissions and claims sent on to a secondary\n  payer are extra rows. is_latest_submission keeps exactly one row per claim_key, but that row may be the secondary\n  payer's submission; for primary-payer questions filter payer_responsibility = 'P' and count DISTINCT claim_key.",
+     "provenance": {
+      "origin": "hand_written",
+      "source": "bench/agent_cli.py PITFALLS",
+      "train_question_ids": [],
+      "note": "Written in the same session as the screen-1 questions, before heldout_hard_1. The +16 Haiku point estimate did not replicate on that held-out set."
+     }
+    },
+    {
+     "entry_id": "pitfalls-03",
+     "section": "pitfalls",
+     "kind": "bullet",
+     "text": "- Money paid, patient responsibility and denials come from current adjudications only (is_current_adjudication);\n  summing every 835 event double-counts reversals and superseded payments.",
+     "provenance": {
+      "origin": "hand_written",
+      "source": "bench/agent_cli.py PITFALLS",
+      "train_question_ids": [],
+      "note": "Written in the same session as the screen-1 questions, before heldout_hard_1. The +16 Haiku point estimate did not replicate on that held-out set."
+     }
+    },
+    {
+     "entry_id": "pitfalls-04",
+     "section": "pitfalls",
+     "kind": "bullet",
+     "text": "- Re-delivered 835 files are already de-duplicated in the sem views; do not de-duplicate again.",
+     "provenance": {
+      "origin": "hand_written",
+      "source": "bench/agent_cli.py PITFALLS",
+      "train_question_ids": [],
+      "note": "Written in the same session as the screen-1 questions, before heldout_hard_1. The +16 Haiku point estimate did not replicate on that held-out set."
+     }
+    },
+    {
+     "entry_id": "pitfalls-05",
+     "section": "pitfalls",
+     "kind": "bullet",
+     "text": "- sem.remit_lines has no rows for claims denied at claim level; billed codes and units are in sem.claim_lines.\n  Joining remit_lines to remit_claims repeats claim amounts once per line: aggregate lines first.",
+     "provenance": {
+      "origin": "hand_written",
+      "source": "bench/agent_cli.py PITFALLS",
+      "train_question_ids": [],
+      "note": "Written in the same session as the screen-1 questions, before heldout_hard_1. The +16 Haiku point estimate did not replicate on that held-out set."
+     }
+    },
+    {
+     "entry_id": "pitfalls-06",
+     "section": "pitfalls",
+     "kind": "bullet",
+     "text": "- Time basis matters: payment_date/payment_month (835), service_date/service_month (date of service) and\n  submission_date (837) give different answers; use the one the question names.",
+     "provenance": {
+      "origin": "hand_written",
+      "source": "bench/agent_cli.py PITFALLS",
+      "train_question_ids": [],
+      "note": "Written in the same session as the screen-1 questions, before heldout_hard_1. The +16 Haiku point estimate did not replicate on that held-out set."
+     }
+    },
+    {
+     "entry_id": "pitfalls-07",
+     "section": "pitfalls",
+     "kind": "bullet",
+     "text": "- Rates: use 100.0 * x / y for percentages (integer division truncates); round only at the end, as asked.",
+     "provenance": {
+      "origin": "hand_written",
+      "source": "bench/agent_cli.py PITFALLS",
+      "train_question_ids": [],
+      "note": "Written in the same session as the screen-1 questions, before heldout_hard_1. The +16 Haiku point estimate did not replicate on that held-out set."
+     }
+    },
+    {
+     "entry_id": "pitfalls-08",
+     "section": "pitfalls",
+     "kind": "bullet",
+     "text": "- Ranked questions: ORDER BY the measure (and the stated tie-break) and LIMIT to the number asked for.",
+     "provenance": {
+      "origin": "hand_written",
+      "source": "bench/agent_cli.py PITFALLS",
+      "train_question_ids": [],
+      "note": "Written in the same session as the screen-1 questions, before heldout_hard_1. The +16 Haiku point estimate did not replicate on that held-out set."
+     }
+    }
+   ]
+  }
+ ],
+ "note": "Screen-1 pitfalls glossary: basic definitions plus the invariants and traps block.",
+ "content_hash": "6847ab56cdcd05e59fdd3a32bbc8599ac6c53e321029890ee1539ca8a4484e54"
+}

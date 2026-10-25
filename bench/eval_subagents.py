@@ -1,7 +1,9 @@
 """Batch evaluation of technique configurations with real Haiku / Sonnet subagents.
 
     python -m bench.eval_subagents prepare RUN --configs configs.json --models haiku,sonnet --repeats 3 [--only cat]
+            [--split train|validation|test] [--unseal-test]
         -> .ccsim/agent_sessions/RUN/manifest.json  (one entry per session: path, model, prompt)
+        --split test is refused unless --unseal-test is set (the test split is sealed).
     (the orchestrator runs one subagent per manifest entry, with the entry's model and prompt)
     python -m bench.eval_subagents score RUN
         -> .ccsim/agent_sessions/RUN/results.json + results.md (accuracy by config x model, pass^k, calls, errors)
@@ -31,13 +33,18 @@ from bench.eval import load_cases  # noqa: E402
 
 
 def prepare(run_label: str, configs: dict, models: list[str], repeats: int, only: str | None = None,
-            snapshot_path: Path | None = None) -> Path:
+            snapshot_path: Path | None = None, question_split: str | None = None, unseal_test: bool = False) -> Path:
     snap = Path(snapshot_path) if snapshot_path else snapshot()
     run_dir = SESSIONS_ROOT / run_label
     if run_dir.exists():
         raise FileExistsError(f"{run_dir} exists; choose a new run label")
     entries = []
     cases = load_cases(snapshot_path=snap)
+    if question_split:
+        from bench.splits import select_cases
+        cases = select_cases(cases, question_split, unseal_test=unseal_test)
+        if not cases:
+            raise ValueError(f"no questions in split {question_split!r}")
     if only:
         wanted = set(only.split(","))
         cases = [c for c in cases if wanted & {c["id"], c["category"], c["difficulty"], c.get("family"), c.get("question_set")}]
@@ -158,9 +165,12 @@ def main():
     ap.add_argument("--repeats", type=int, default=1)
     ap.add_argument("--only")
     ap.add_argument("--snapshot")
+    ap.add_argument("--split", help="train, validation, or test; test is sealed without --unseal-test")
+    ap.add_argument("--unseal-test", action="store_true")
     a = ap.parse_args()
     if a.cmd == "prepare":
-        print(prepare(a.run, json.loads(Path(a.configs).read_text()), a.models.split(","), a.repeats, a.only, a.snapshot))
+        print(prepare(a.run, json.loads(Path(a.configs).read_text()), a.models.split(","), a.repeats, a.only,
+                      a.snapshot, a.split, a.unseal_test))
     elif a.cmd == "contrast":
         print(json.dumps(contrast(a.run, a.baseline), indent=1))
     elif a.cmd == "effects":
