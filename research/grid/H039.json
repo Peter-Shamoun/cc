@@ -55,7 +55,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_b853266803",
@@ -64,7 +65,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -73,7 +75,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_a5888f64a4",
@@ -82,7 +85,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7d45c279a7",
@@ -91,7 +95,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q15_partial_line_denials",
@@ -100,7 +105,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q25_primary_deductible",
@@ -109,7 +115,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_8663c777cd",
@@ -118,7 +125,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__87798",
@@ -127,7 +135,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q11_cpt_denial_rate",
@@ -136,7 +145,8 @@
    "sql_execs": 4,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": false,
+   "why": "expected 3 rows, got 28"
   },
   {
    "qid": "a_a123bba47f",
@@ -145,7 +155,8 @@
    "sql_execs": 4,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_9108c7aacb",
@@ -154,7 +165,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_856b95a70c",
@@ -163,7 +175,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_1b7e02d0b0",
@@ -172,7 +185,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_921f1bf366",
@@ -181,7 +195,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "q14_zero_paid_not_denied",
@@ -190,7 +205,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_dca9da6d52",
@@ -199,7 +215,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q19_reversed_no_correction",
@@ -208,7 +225,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__80307",
@@ -217,7 +235,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d383370345",
@@ -226,7 +245,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0482",
@@ -235,7 +255,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_0d43f7d4b6",
@@ -244,7 +265,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_923951a050",
@@ -253,7 +275,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7423e6eb91",
@@ -262,7 +285,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_never_remitted_submitted_in_month__2026-07-01",
@@ -271,7 +295,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_ab202d4b23",
@@ -280,7 +305,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0480",
@@ -289,7 +315,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d671e0b995",
@@ -298,7 +325,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__81479",
@@ -307,7 +335,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q12_referring_provider_denials",
@@ -316,11 +345,12 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   }
  ],
- "accuracy": null,
- "accuracy_frac": null,
+ "accuracy": "25/30",
+ "accuracy_frac": 0.8333,
  "n": 30,
  "mean_sql_execs": 1.23,
  "notes": "Answers committed before scoring. CONTAMINATION CAVEAT: same executor ran H037 and H038 first on the same 30 questions and had seen their per-question pass/fail (checker reasons only; no gold, reference SQL or answer keys read), so this cell is not independent. Drafts reuse the executor's earlier SQL. explore=1: probes for q9 (claim_lines grain), q10, q29 (max claims per referring NPI is 4, so the empty result is legitimate). candidates3=1: 3 candidates executed for q9 and q10. q10: all 3 agreed. q9: candidates disagreed; picked by a population-coverage sanity check: most current adjudications belong to claims billed before the data starts, so billed CPT comes from 835 line procedure codes, with claim_lines as fallback for claim-level denials. Knowledge that q9 failed in H037/H038 may have biased this pick. repair=1: empty/degenerate results (q29, q13, q14, q12) were checked with probes and judged legitimate (no NPI >=15 claims, no frequency-1 originals for corrected claims, no voids, no August payments), so no repairs were applied. verifier: same-executor critic, no further changes. Final SQL for every question executed once more before submission. Seconds not tracked."
