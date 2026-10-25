@@ -49,8 +49,8 @@ ESCALATION = {
     "c837.claim": "SELECT * FROM c837.claim",
     "c837.service_line": "SELECT * FROM c837.service_line",
     "c837.claim_code": "SELECT * FROM c837.claim_code",
-    "c837.hl": ("SELECT * EXCLUDE (pat05_date_format, pat06_death_date, pat07_weight_unit, pat08_weight, pat09_pregnancy) "
-                "FROM c837.hl"),
+    "c837.hl": ("SELECT * EXCLUDE (pat05_date_format, pat06_death_date, pat07_weight_unit, pat08_weight, "
+                "pat09_pregnancy, sbr03_group_number, sbr04_group_name) FROM c837.hl"),
     "r835.claim_payment": "SELECT * FROM r835.claim_payment",
     "r835.service_payment": "SELECT * FROM r835.service_payment",
     "r835.remark": "SELECT * FROM r835.remark",
@@ -65,7 +65,8 @@ ESCALATION = {
     "r835.payment": ("SELECT * EXCLUDE (bpr07_sender_dfi_id, bpr09_sender_account, bpr13_receiver_dfi_id, "
                      "bpr15_receiver_account) FROM r835.payment"),
     "edi.entity": ("SELECT * EXCLUDE (name_last_or_org, name_first, name_middle, name_prefix, name_suffix, id_value, "
-                   "addr_line1, addr_line2, city, postal_code, dmg_birth_date, dmg_gender), "
+                   "addr_line1, addr_line2, city, postal_code, dmg_birth_date, dmg_gender, "
+                   "n2_additional_name, nm110, nm111, nm112, location_id), "
                    f"CASE WHEN entity_id_code IN {PERSON_ENTITY_CODES} THEN NULL ELSE name_last_or_org END AS org_name, "
                    f"CASE WHEN entity_id_code IN {PERSON_ENTITY_CODES} THEN NULL ELSE id_value END AS org_id "
                    "FROM edi.entity"),

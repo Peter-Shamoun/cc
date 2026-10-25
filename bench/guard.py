@@ -14,7 +14,13 @@ BANNED_FUNCTIONS = {
     "delta_scan", "parquet_metadata", "parquet_schema", "parquet_file_metadata", "parquet_kv_metadata",
     "duckdb_secrets", "which_secret", "duckdb_settings", "current_setting", "getenv", "duckdb_extensions",
     "duckdb_databases", "pragma_database_list", "load_extension", "install_extension",
+    "shell", "system", "st_read", "eval",
 }
+# Scalar calls are not table functions, so a new reader named read_xlsx('file') would otherwise pass.
+# UNNEST / EXPLODE do not match these prefixes and stay available for list columns.
+BANNED_PREFIXES = ("read_", "parquet_", "sqlite_", "postgres_", "mysql_", "delta_", "iceberg_", "http_")
+MAX_SQL_CHARS = 32_768
+MAX_ROW_LIMIT = 10_000
 
 
 class GuardError(ValueError):
@@ -41,7 +47,33 @@ def _visible_ctes(node) -> set[str]:
     return names
 
 
+def _function_names(fn) -> set[str]:
+    names = set()
+    if isinstance(fn, exp.Anonymous) and fn.name:
+        names.add(fn.name.lower())
+    sql_name = (fn.sql_name() or "").lower()
+    if sql_name and sql_name != "anonymous":
+        names.add(sql_name)
+    return names
+
+
+def _banned_function(names: set[str]) -> str | None:
+    hit = names & BANNED_FUNCTIONS
+    if hit:
+        return hit.pop()
+    for name in names:
+        if name.startswith(BANNED_PREFIXES):
+            return name
+    return None
+
+
 def guard(sql: str, row_limit: int = 1000, escalate: bool = False) -> str:
+    if not isinstance(sql, str):
+        raise GuardError("SQL must be a string")
+    if len(sql) > MAX_SQL_CHARS:
+        raise GuardError(f"query exceeds {MAX_SQL_CHARS} characters")
+    if isinstance(row_limit, bool) or not isinstance(row_limit, int) or not 1 <= row_limit <= MAX_ROW_LIMIT:
+        raise GuardError("row limit must be an integer from 1 to 10000")
     allowed = ESCALATION_SCHEMAS if escalate else ALLOWED_SCHEMAS
     try:
         stmts = [s for s in sqlglot.parse(sql, read="duckdb") if s is not None]
@@ -55,6 +87,13 @@ def guard(sql: str, row_limit: int = 1000, escalate: bool = False) -> str:
     for node in tree.walk():
         if type(node).__name__ in FORBIDDEN_NODES:
             raise GuardError(f"{type(node).__name__} is not allowed")
+        # sqlglot accepts a bare SELECT (no projection). Wrapping it still yields SELECT with an empty list.
+        if isinstance(node, exp.Select) and not node.expressions:
+            raise GuardError("SELECT must project at least one expression")
+    for with_clause in tree.find_all(exp.With):
+        if with_clause.args.get("recursive"):
+            # The outer LIMIT does not stop a recursive CTE: count(*) returns one row after the CTE materializes.
+            raise GuardError("recursive queries are not allowed")
     for cte in tree.find_all(exp.CTE):
         if not _IDENT.fullmatch(cte.alias_or_name or ""):
             raise GuardError(f"CTE name {cte.alias_or_name!r} must be a plain identifier")
@@ -72,7 +111,7 @@ def guard(sql: str, row_limit: int = 1000, escalate: bool = False) -> str:
         if schema not in allowed:
             raise GuardError(f"relation {t.sql()} is not allowed; use {', '.join(sorted(s + '.*' for s in allowed))}")
     for fn in tree.find_all(exp.Func):
-        names = {fn.name.lower() if isinstance(fn, exp.Anonymous) else "", fn.sql_name().lower()}
-        if names & BANNED_FUNCTIONS:
-            raise GuardError(f"function {(names & BANNED_FUNCTIONS).pop()}() is not allowed")
-    return f"SELECT * FROM ({tree.sql(dialect='duckdb')}) AS agent_query LIMIT {int(row_limit)}"
+        banned = _banned_function(_function_names(fn))
+        if banned:
+            raise GuardError(f"function {banned}() is not allowed")
+    return f"SELECT * FROM ({tree.sql(dialect='duckdb')}) AS agent_query LIMIT {row_limit}"
