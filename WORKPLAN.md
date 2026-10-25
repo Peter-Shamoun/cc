@@ -42,6 +42,9 @@ Never decide the work is done; when an item finishes, pick the next highest-valu
 - [done] lake optimization merged (incremental gold, manifests, quarter folds) + review fixes (unique keys,
   manifest check, month-close crash rebuild, fenced lock, reader retention, per-relation reader scope); 227 green
 - [done] PHI: default-deny allowlist of REF qualifiers in lossless.edi_reference
+- [done] Chat transcripts: Design A (ephemeral, default) and Design B (persisted) in
+  docs/data-backend/chat-transcripts.md, simulator store in ccsim/transcripts.py (`CC_TRANSCRIPT_MODE`).
+  Compliance still signs retention and the designated-record-set question before persistence is turned on.
 - OWNER 2026-10-25 late: too much usage on realism; close prerequisites with final verdicts, then move to the
   agent analyzer. Generator FROZEN at 3.3 (audit 4 = final verdict, findings = known limitations, no more fix
   rounds); parser + silver agents wrapping up (no new experiments); scale runs are CPU-only, run in background

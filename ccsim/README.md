@@ -40,6 +40,7 @@ s.con.execute("SELECT payer_name, avg(is_denied::INT) FROM sem.remit_claims WHER
 | `infra.py` | The account as Terraform would build it: roles, ABAC bucket policy, key policies, lifecycle, the EventBridge rule and task definitions. |
 | `pipeline.py`, `lake.py` | The Fargate parser. Under a per-customer S3 lock: bronze → silver parts (edi.source_file last, as the commit record), quarantining bad files. Loads are idempotent. Gold is maintained incrementally: only the claims a batch touches are recomputed and only their partitions rewritten (`GOLD_MODE=full` rebuilds everything). A new gold version is a manifest; CURRENT moves to it with a compare-and-set. Closed months are compacted. Layout and measurements: `docs/data-backend/lake-optimization.md`. |
 | `query.py` | The per-request session: Cognito token → STS → CURRENT → manifest → DuckDB views over exactly the files of that version, scoped to this customer's gold prefix. |
+| `transcripts.py` | Chat store. `mode="ephemeral"` (Design A, the default) keeps message text in process memory only. `mode="persisted"` (Design B) writes it under `{customer}/transcripts/` with that customer's transcript KMS key. Both modes write non-content metadata and a query audit. Design: `docs/data-backend/chat-transcripts.md`. |
 | `edi_mock.py`, `x12_validate.py`, `parser.py` | Mock EDI and its ledger; an independent validator; the X12 → lossless-schema parser. Patients, places and diagnoses come from `edi_reference.py` (Census/SSA name frequencies, real city/ZIP pairs and area codes per lab state, FY2026 billable ICD-10-CM codes in clinical domains so each line points at a fitting diagnosis, NCCI panel components a claim scrubber strips). A 90-day hidden burn-in (`Scenario.burn_in_days`) makes day 1 steady state: the window's 835s also answer, recoup and rework claims billed before it, and the ledger keeps only what the window delivered. The generator is calibrated to `research/edi_realism_calibration.yaml` (Medicare MAC + MA + Medicaid + Blues + national + a long payer tail, CLFS-based allowed amounts, XiFin denial mix, payer remittance cycles, holidays, seasonality; the CY2026 CLFS ships in `data/clfs_2026q4.csv`; `tests/test_edi_calibration.py` checks the distributions). Each lab is its own market around those typical values (`tenant_market`: payer mix with the state's Medicaid managed-care share, order-profile and test-menu weights; a tail of regional plans and TPAs from the lab's state and its neighbours; COB in NAIC order). It streams day by day with flat memory; volume is set in real units (`Scenario.target_mb_per_day`); the ledger is `truth.json` (index) + `truth/<customer>/claims.jsonl`, read back with `edi_mock.load_truth`. |
 
 ## Security model, and the test that checks each piece
@@ -56,6 +57,10 @@ s.con.execute("SELECT payer_name, avg(is_denied::INT) FROM sem.remit_claims WHER
 | Readers never see a half-built or older gold | CURRENT is flipped by a conditional write, and only forward. | `test_current_never_moves_backwards` |
 | Incremental gold equals a full rebuild | Same view SQL over each touched claim's full silver history; a batch that crashed after its silver commit is caught up by the next one. | `test_incremental_gold_equals_full_rebuild` |
 | One batch per customer at a time | S3 lease lock (`If-None-Match` create, `If-Match` takeover after expiry). | `test_batch_lock_is_exclusive_and_expires` |
+| Design A stores no message text | The transcript store's default mode writes metadata and the query audit only. A disk scan after a chat finds none of the message. | `test_ephemeral_mode_leaves_no_content_on_disk` |
+| Design B chats are per user and per customer | Transcript role, ABAC prefix, and a transcript KMS key that is not the lake key. | `test_persisted_transcripts_are_isolated_across_customers_and_users` |
+| A user delete removes chats; disabling the transcript key shreds copies | All versions under that user's prefix go. A stolen wrapped data key dies only when the transcript CMK is disabled. Audit and the lake key stay. | `test_user_deletion_and_customer_key_crypto_shred` |
+| The reader, eval, support, and API roles cannot read transcript content | Eval can read a redacted export for one customer. Break-glass can read content only with a ticket. | `test_roles_without_access_are_denied` |
 
 ## What the simulation found (fix before or while porting)
 
@@ -85,6 +90,10 @@ s.con.execute("SELECT payer_name, avg(is_denied::INT) FROM sem.remit_claims WHER
 9. **Open (ECS): task-role credentials outlive the task.** AWS does not revoke them at stop; they expire
    on their own schedule, up to about 6 h. The PHI boundary is the destroyed container, not the
    credentials.
+10. **Fixed: `AssumeRole` now requires the trust policy to allow the call.** A caller's identity policy
+    that grants `sts:AssumeRole` no longer skips the trust conditions (external id, session tags). Web
+    identity assume was already trust-only. Same-account S3 is unchanged: an identity allow still does
+    not need a bucket-policy allow.
 
 ## Check in real AWS before relying on these
 

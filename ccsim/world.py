@@ -20,6 +20,8 @@ def add_user(aws: LocalAWS, upn: str, customer: str | None, groups=("claimclarit
     attrs = {"email": u.upn, "sub": f"sub-{u.oid[:8]}"}
     if customer:
         attrs["custom:customer"] = customer
+    if "claimclarity-customer-admins" in groups:
+        attrs["custom:transcript_admin"] = "true"
     aws.cognito.users[name] = CognitoUser(name, attrs)
     return name
 

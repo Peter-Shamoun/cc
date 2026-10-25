@@ -19,4 +19,11 @@ s3://claimclarity-prod/customer_b/
 │       ├── sem.remit_lines/...
 │       └── ...                            # the 10 sem.* tables
 ├── staging/<run_id>/
-└── quarantine/
+├── quarantine/
+├── transcripts/                           # see chat-transcripts.md. Design A writes meta/ only.
+│   ├── users/<user_sub>/meta/<session_id>.json
+│   ├── users/<user_sub>/content/<session_id>/<turn_id>.bin   # Design B, envelope-encrypted
+│   ├── users/<user_sub>/dek.bin
+│   ├── exports/<export_id>.json           # redacted; eval role only
+│   └── admin/salts/<export_id>.bin
+└── audit/queries/YYYY-MM-DD/<request_id>.json   # both designs; no message text; 6-year lock

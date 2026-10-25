@@ -160,11 +160,22 @@ class CognitoUserPool:
         if not customer:                                          # pre-authentication trigger
             raise AuthError("PreAuthentication failed: user is not mapped to a customer", code="UserNotMapped")
         now = int(self.clock())
+        principal_tags = {"customer": [customer], "user": [u.attributes["sub"]]}
+        transitive = ["customer", "user"]
+        # Customer admins carry an extra session tag. Reader and transcript-user trusts ignore it; the
+        # transcript-admin trust requires it, so a normal user token cannot assume that role.
+        if u.attributes.get("custom:transcript_admin") == "true":
+            principal_tags["transcript_admin"] = ["true"]
+            transitive.append("transcript_admin")
+            claims_admin = "true"
+        else:
+            claims_admin = None
         claims = {"iss": self.issuer.url, "aud": self.client_id, "token_use": "id", "sub": u.attributes["sub"],
                   "cognito:username": u.username, "email": u.attributes["email"], "custom:customer": customer,
                   "auth_time": now, "iat": now, "exp": now + self.id_ttl,
-                  "https://aws.amazon.com/tags": {"principal_tags": {"customer": [customer], "user": [u.attributes["sub"]]},
-                                                  "transitive_tag_keys": ["customer", "user"]}}
+                  "https://aws.amazon.com/tags": {"principal_tags": principal_tags, "transitive_tag_keys": transitive}}
+        if claims_admin:
+            claims["custom:transcript_admin"] = claims_admin
         rt = secrets.token_urlsafe(32)
         self.refresh[rt] = (u.username, now + self.refresh_ttl)
         u.refresh_tokens.add(rt)

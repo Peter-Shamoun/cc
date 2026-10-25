@@ -568,6 +568,22 @@ class S3:
         for b in self.buckets.values():
             for rule in b.lifecycle:
                 pre = rule.get("Prefix", "")
+                if rule.get("ExpirationDays"):
+                    # Current-version expiry, the way S3 does it on a versioned bucket: a delete marker, not an
+                    # immediate byte wipe. NoncurrentDays on the same rule then drops the bytes once they age out.
+                    # Object-lock retention and legal hold win, so audit objects are not expired this way.
+                    days = rule["ExpirationDays"]
+                    current = self.db.execute(
+                        "SELECT key, last_modified, retain_until, legal_hold FROM objects WHERE bucket=? "
+                        "AND is_latest=1 AND delete_marker=0 AND substr(key,1,?)=?",
+                        (b.name, len(pre), pre)).fetchall()
+                    for key, modified, retain, hold in current:
+                        if hold or (retain and retain > now) or modified is None:
+                            continue
+                        if now - modified >= days * 86400:
+                            self._store_version(b, key, dict(version_id=self._new_version_id(b), delete_marker=1,
+                                                             size=0, etag="", last_modified=now))
+                            removed += 1
                 if "NoncurrentDays" in rule:
                     rows = self.db.execute(
                         "SELECT o.seq, o.blob, o.key, (SELECT min(n.last_modified) FROM objects n WHERE n.bucket=o.bucket "
