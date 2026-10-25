@@ -1,0 +1,59 @@
+{
+ "ids": [
+  "f_cpt_share_of_line_payments__g0483",
+  "a_b853266803",
+  "q10_top_denial_carcs",
+  "a_a5888f64a4",
+  "a_7d45c279a7",
+  "q15_partial_line_denials",
+  "q25_primary_deductible",
+  "a_8663c777cd",
+  "f_cpt_share_of_line_payments__87798",
+  "q11_cpt_denial_rate",
+  "a_a123bba47f",
+  "a_9108c7aacb",
+  "a_856b95a70c",
+  "a_1b7e02d0b0",
+  "a_921f1bf366",
+  "q14_zero_paid_not_denied",
+  "a_dca9da6d52",
+  "q19_reversed_no_correction",
+  "f_cpt_share_of_line_payments__80307",
+  "a_d383370345",
+  "f_cpt_share_of_line_payments__g0482",
+  "a_0d43f7d4b6",
+  "a_923951a050",
+  "a_7423e6eb91",
+  "f_never_remitted_submitted_in_month__2026-07-01",
+  "a_ab202d4b23",
+  "f_cpt_share_of_line_payments__g0480",
+  "a_d671e0b995",
+  "f_cpt_share_of_line_payments__81479",
+  "q12_referring_provider_denials"
+ ],
+ "dataset": {
+  "generator": "3.3",
+  "dataset_id": "98e61f03e594",
+  "snapshot_dir": ".ccsim/bench/98e61f03e594",
+  "customer": "acme_labs",
+  "scenario": {
+   "start": "2026-07-01",
+   "days": 20,
+   "seed": 5,
+   "volume_scale": 0.3,
+   "p_corrupt_file": 0.01
+  },
+  "build": "bench.dataset.snapshot(Scenario(days=20, volume_scale=0.3, seed=5))",
+  "why_this_snapshot": "Largest frozen generator-3.3 snapshot already built and readable. The 45-day bench default (days=45, volume_scale=0.6, seed=2026, p_corrupt_file=0.1) was not on disk."
+ },
+ "selection_rule": "Pool: load_cases on snapshot 98e61f03e594 (hand-written + generated families + authored), minus the 27 heldout_hard_1 questions, minus anything tagged grokbot-r1, minus any split labelled validation or test. 128 loaded, 27 held out, 0 grokbot-r1, 0 split labels, pool 101. Screen-1 (research/screening_results_1.md, research/screening_questions.json) has config-level Haiku/Sonnet accuracy only and no per-question pass/fail, so the pass-rate ranking could not be computed. Fallback: rank by difficulty (hard, then medium, then easy) and break ties by sha256(question_id) hex. Take 30. The pool has 42 hard questions, so all 30 selected are hard.",
+ "source_files": [
+  "bench/questions.yaml",
+  "bench/authored_questions.json",
+  "bench/question_families.py",
+  ".ccsim/bench/98e61f03e594/generated_questions.json",
+  "research/screening_results_1.md",
+  "research/screening_questions.json"
+ ],
+ "n": 30
+}
