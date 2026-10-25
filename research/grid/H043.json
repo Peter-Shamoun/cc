@@ -58,7 +58,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0247,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_b853266803",
@@ -104,7 +104,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0182,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -134,7 +134,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0133,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_a5888f64a4",
@@ -186,7 +186,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0143,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_7d45c279a7",
@@ -210,7 +210,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0187,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q15_partial_line_denials",
@@ -223,7 +223,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0055,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q25_primary_deductible",
@@ -236,7 +236,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0137,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_8663c777cd",
@@ -258,7 +258,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0207,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_share_of_line_payments__87798",
@@ -271,7 +271,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.007,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q11_cpt_denial_rate",
@@ -293,7 +293,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0178,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_a123bba47f",
@@ -324,7 +324,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0276,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_9108c7aacb",
@@ -369,7 +369,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.017,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_856b95a70c",
@@ -421,7 +421,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0217,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_1b7e02d0b0",
@@ -438,7 +438,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0269,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_921f1bf366",
@@ -454,7 +454,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0214,
-   "pass": null
+   "pass": false
   },
   {
    "qid": "q14_zero_paid_not_denied",
@@ -467,7 +467,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0062,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_dca9da6d52",
@@ -484,7 +484,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0182,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q19_reversed_no_correction",
@@ -497,7 +497,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0082,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_share_of_line_payments__80307",
@@ -510,7 +510,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0069,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_d383370345",
@@ -562,7 +562,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0248,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0482",
@@ -575,7 +575,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0064,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_0d43f7d4b6",
@@ -590,7 +590,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0349,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_923951a050",
@@ -604,7 +604,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0223,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_7423e6eb91",
@@ -624,7 +624,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0221,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_never_remitted_submitted_in_month__2026-07-01",
@@ -637,7 +637,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0131,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_ab202d4b23",
@@ -907,7 +907,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0258,
-   "pass": null
+   "pass": false
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0480",
@@ -920,7 +920,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0067,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_d671e0b995",
@@ -986,7 +986,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0145,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_share_of_line_payments__81479",
@@ -999,7 +999,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0067,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q12_referring_provider_denials",
@@ -1008,11 +1008,11 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0198,
-   "pass": null
+   "pass": true
   }
  ],
- "accuracy": null,
+ "accuracy": "28/30",
  "n": 30,
  "mean_sql_execs": 3.0,
- "notes": "Same few-shot pool and three-candidate agreement as H042. repair=0, so the agreed candidate's first execution stands. Verifier (fresh pass over semantics, population, units, invariants) kept that SQL: empty referring-NPI top-5 matches the >=15 threshold (no NPI reaches it), August shares stay null because the snapshot has no August payment month, frequency-8 voids are absent, and frequency-7 cycle time keeps claims whose frequency-1 original is not in the extract. No verifier revision."
+ "notes": "Same few-shot pool and three-candidate agreement as H042. repair=0, so the agreed candidate's first execution stands. Verifier (fresh pass over semantics, population, units, invariants) kept that SQL: empty referring-NPI top-5 matches the >=15 threshold (no NPI reaches it), August shares stay null because the snapshot has no August payment month, frequency-8 voids are absent, and frequency-7 cycle time keeps claims whose frequency-1 original is not in the extract. No verifier revision. Scored 28/30 with bench.compare.match after the answer commit."
 }
