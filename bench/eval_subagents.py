@@ -5,6 +5,9 @@
     (the orchestrator runs one subagent per manifest entry, with the entry's model and prompt)
     python -m bench.eval_subagents score RUN
         -> .ccsim/agent_sessions/RUN/results.json + results.md (accuracy by config x model, pass^k, calls, errors)
+    python -m bench.eval_subagents effects RUN --design research/screening_design.json
+        -> main effect of each two-level factor per model: accuracy at high minus low, with a question-level
+           bootstrap 95% interval (questions are resampled, so the interval reflects question-set variance)
 
 configs.json: {"<config name>": {<technique settings for bench/agent_cli.py>}, ...}
 """
@@ -89,9 +92,39 @@ def score(run_label: str) -> dict:
     return out
 
 
+def effects(run_label: str, design_path: Path, resamples: int = 2000) -> dict:
+    import random
+    design = json.loads(Path(design_path).read_text())
+    factor_names = list(design["factors"])
+    level_of = {r["config"]: r for r in design["runs"]}
+    rows = json.loads((SESSIONS_ROOT / run_label / "results.json").read_text())["results"]
+    out = {}
+    for model in sorted({r["model"] for r in rows}):
+        # per question: mean correctness at each level of each factor (balanced design: each level has 8 configs)
+        by_question = defaultdict(lambda: defaultdict(list))
+        for r in rows:
+            if r["model"] == model and r["config"] in level_of:
+                for f in factor_names:
+                    by_question[r["question_id"]][(f, level_of[r["config"]][f])].append(r["correct"])
+        questions = sorted(by_question)
+        def effect(qs, f):
+            diffs = [statistics.mean(by_question[q][(f, 1)]) - statistics.mean(by_question[q][(f, 0)]) for q in qs
+                     if by_question[q][(f, 1)] and by_question[q][(f, 0)]]
+            return statistics.mean(diffs) if diffs else None
+        rng = random.Random(0)
+        out[model] = {}
+        for f in factor_names:
+            boot = sorted(e for e in (effect([rng.choice(questions) for _ in questions], f) for _ in range(resamples))
+                          if e is not None)
+            out[model][f] = dict(effect=round(effect(questions, f), 4), ci95=[round(boot[int(.025 * len(boot))], 4),
+                                                                            round(boot[int(.975 * len(boot)) - 1], 4)])
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("cmd", choices=["prepare", "score"])
+    ap.add_argument("cmd", choices=["prepare", "score", "effects"])
+    ap.add_argument("--design")
     ap.add_argument("run")
     ap.add_argument("--configs")
     ap.add_argument("--models", default="haiku,sonnet")
@@ -101,6 +134,8 @@ def main():
     a = ap.parse_args()
     if a.cmd == "prepare":
         print(prepare(a.run, json.loads(Path(a.configs).read_text()), a.models.split(","), a.repeats, a.only, a.snapshot))
+    elif a.cmd == "effects":
+        print(json.dumps(effects(a.run, Path(a.design)), indent=1))
     else:
         out = score(a.run)
         print((SESSIONS_ROOT / a.run / "results.md").read_text())

@@ -116,3 +116,16 @@ def test_procedural_briefing(snap):
     case = CASES["q01_claims_submitted"]
     assert "Work in these steps" in build_prompt(create_session(snap, case, {"context_style": "procedural"}, "t", "pytest"))
     assert "Work in these steps" not in build_prompt(create_session(snap, case, {}, "t", "pytest"))
+
+
+def test_screening_effects_recover_a_planted_main_effect(tmp_path, monkeypatch):
+    import bench.eval_subagents as ES
+    design = json.loads((ROOT / "research/screening_design.json").read_text())
+    monkeypatch.setattr(ES, "SESSIONS_ROOT", tmp_path)
+    (tmp_path / "r").mkdir()
+    rows = [dict(model="haiku", config=run["config"], question_id=f"q{i}", correct=bool(run["A_semantic_layer"]))
+            for run in design["runs"] for i in range(5)]
+    (tmp_path / "r" / "results.json").write_text(json.dumps({"results": rows}))
+    effects = ES.effects("r", ROOT / "research/screening_design.json", resamples=50)["haiku"]
+    assert effects["A_semantic_layer"]["effect"] == 1
+    assert all(e["effect"] == 0 for f, e in effects.items() if f != "A_semantic_layer")   # orthogonal design
