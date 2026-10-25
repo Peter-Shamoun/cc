@@ -51,7 +51,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0051,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_denied_lines__83036",
@@ -70,7 +70,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0143,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_avg_paid_per_paid_claim__medicare-part-b-north-carolina",
@@ -89,7 +89,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0043,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_f786e11aec",
@@ -158,7 +158,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0155,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_denial_rate__unitedhealthcare-community-plan-nc",
@@ -177,7 +177,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0052,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_monthly_denial_rate__unitedhealthcare",
@@ -202,7 +202,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0071,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_denial_rate__unitedhealthcare-medicare-advantage",
@@ -221,7 +221,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0047,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0483",
@@ -240,7 +240,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.007,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_fca405b635",
@@ -268,7 +268,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0064,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_paid_in_month__cigna_2026-08-01",
@@ -287,7 +287,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0056,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_patient_responsibility__aetna",
@@ -306,7 +306,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0039,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_b853266803",
@@ -367,7 +367,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0207,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -404,7 +404,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0093,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_class_denial_rate__medicaid_mco",
@@ -423,7 +423,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0046,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_a5888f64a4",
@@ -484,7 +484,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0079,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_436f690741",
@@ -627,7 +627,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0154,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_d29f83c935",
@@ -2936,7 +2936,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0198,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_class_denial_rate__other",
@@ -2955,7 +2955,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0044,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_denied_lines__85652",
@@ -2974,7 +2974,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0045,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q07_denial_rate",
@@ -2993,11 +2993,11 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0043,
-   "pass": null
+   "pass": true
   }
  ],
- "accuracy": null,
+ "accuracy": "20/20",
  "n": 20,
  "mean_sql_execs": 2.15,
- "notes": "Dataset snapshot e21410ce6805 from generator 3.3 and the benchmark default scenario (days=45, volume_scale=0.6, seed=2026, p_corrupt_file=0.1), read through a non-escalated sem.* session. Dev set is the first 20 question ids by sha256 after dropping question_set heldout_hard_1 (27) and any grokbot-r1 tag (none found). Planner and verifier ran in separate contexts; the verifier accepted every query, so there was no revised execution. repair=0. Per-question sql_execs counts that question's intermediate checks plus its final statement. Nine shared exploratory probes (payer names, classes, null rates, uniqueness) are not repeated inside each sql_execs. Accuracy is filled after the committed answers are scored."
+ "notes": "Dataset snapshot e21410ce6805 from generator 3.3 and the benchmark default scenario (days=45, volume_scale=0.6, seed=2026, p_corrupt_file=0.1), read through a non-escalated sem.* session. Dev set is the first 20 question ids by sha256 after dropping question_set heldout_hard_1 (27) and any grokbot-r1 tag (none found). Planner and verifier ran in separate contexts; the verifier accepted every query, so there was no revised execution. repair=0. Per-question sql_execs counts that question's intermediate checks plus its final statement. Nine shared exploratory probes (payer names, classes, null rates, uniqueness) are not repeated inside each sql_execs. Scored with bench.compare.match against gold SQL on snapshot e21410ce6805 after the answers were committed. Passed 20 of 20."
 }
