@@ -61,7 +61,7 @@ def _is_numeric_col(rows, j) -> bool:
 def _eq(g, c, tol, factor) -> bool:
     gn, cn = _num(g), _num(c)
     if gn is not None and cn is not None and not isinstance(g, str):     # expected text never compares as a number
-        return abs(gn - cn * factor) <= tol + 1e-12
+        return abs(gn - cn * factor) <= tol + 1e-9 * max(1.0, abs(gn))   # float sums can land on the boundary
     if g is None or c is None:
         return g is None and c is None
     return _text(g) == _text(c)

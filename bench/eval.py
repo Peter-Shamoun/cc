@@ -49,7 +49,7 @@ def load_cases(only: str | None = None, snapshot_path: Path | None = None) -> li
     ids = [c["id"] for c in cases]
     assert len(ids) == len(set(ids)), "duplicate question ids"
     if only:
-        cases = [c for c in cases if only in (c["id"], c["category"], c["difficulty"], c.get("family"),
+        cases = [c for c in cases if only in (c["id"], c["category"], c["difficulty"], c.get("family"), c.get("question_set"),
                                               "generated" if c.get("family") else
                                               "authored" if c["id"].startswith("a_") else "handwritten")]
     return cases
