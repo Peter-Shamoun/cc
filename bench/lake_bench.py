@@ -195,8 +195,52 @@ def export_gold(aws, dep, customer: str, dest: Path):
             p.write_bytes(s3.get_object(Bucket=BUCKET, Key=key)["Body"].read())
 
 
+def claim_lookup_probe(aws, c: str) -> dict:
+    """The per-batch claim-key lookup (which older silver files hold the touched claims), measured alone: as the
+    pipeline does it (claim key + file_id columns of every live c837.claim / r835.claim_payment file), and against
+    a claim-key -> file index (one file sorted by claim key) built from the same rows."""
+    from ccsim.lake import Store, silver_state
+    from ccsim.pipeline import _scan
+    creds = parser_session(aws, c)
+    st = Store(aws.boto3_client("s3", creds), BUCKET, c, aws.kms.resolve(f"alias/cc/{c}").arn)
+    silver = silver_state(st)
+    newest = max(silver.committed_runs)
+    cols = {"c837.claim": "clm01_patient_control_number", "r835.claim_payment": "clp01_patient_control_number"}
+    con = duckdb.connect(config={"autoinstall_known_extensions": False, "autoload_known_extensions": False})
+    con.execute("LOAD httpfs")
+    con.execute(aws.duckdb_secret_sql(creds, f"s3://{BUCKET}/{c}/"))
+    con.execute("CREATE TABLE k AS " + " UNION ".join(
+        f"SELECT {col} AS claim_key FROM {_scan(st, silver.parts_of(t, [newest]))}" for t, col in cols.items()
+        if silver.parts_of(t, [newest])))
+    ep = aws.endpoint
+
+    def measure(sql_by_table: dict) -> dict:
+        c0, cpu0 = ep.counters(), time.process_time()
+        hits = sum(len(con.execute(sql).fetchall()) for sql in sql_by_table.values())
+        d = diff(ep.counters(), c0)
+        return dict(requests=d["requests"], mb=round(d["bytes_out"] / 1e6, 2), cpu_s=round(time.process_time() - cpu0, 2),
+                    hits=hits)
+    files = {t: [k for k in silver.files(t) if k not in set(silver.parts_of(t, [newest]))] for t in cols}
+    scan = measure({t: f"SELECT DISTINCT file_id, filename FROM {_scan(st, files[t], ', filename=true')} "
+                       f"WHERE {col} IN (SELECT claim_key FROM k)" for t, col in cols.items()})
+    index_key = f"{c}/parquet/_claim_index/received_month=0000-00/compacted-run_0.parquet"
+    with tempfile.TemporaryDirectory(dir=ROOT / ".ccsim") as tmp:
+        p = Path(tmp) / "index.parquet"
+        con.execute("COPY (" + " UNION ALL ".join(f"SELECT {col} AS claim_key, file_id FROM {_scan(st, files[t])}"
+                                                  for t, col in cols.items()) +
+                    f") TO '{p}' (FORMAT parquet, COMPRESSION zstd)")
+        con.execute(f"COPY (SELECT * FROM '{p}' ORDER BY claim_key) TO '{p}.sorted' (FORMAT parquet, COMPRESSION zstd)")
+        st.put(index_key, Path(f"{p}.sorted").read_bytes())
+        index_mb = round(Path(f"{p}.sorted").stat().st_size / 1e6, 2)
+    index = measure({"index": f"SELECT DISTINCT file_id FROM {_scan(st, [index_key])} WHERE claim_key IN (SELECT claim_key FROM k)"})
+    st.delete([index_key])
+    return dict(touched_keys=con.execute("SELECT count(*) FROM k").fetchone()[0], lookup_files=sum(map(len, files.values())),
+                scan=scan, index=dict(index, index_mb=index_mb))
+
+
 def checkpoint(aws, dep, customers: list[str], n_batches: int, queries: bool) -> dict:
-    out = dict(batches=n_batches, inventory={c: inventory(aws, c) for c in customers})
+    out = dict(batches=n_batches, inventory={c: inventory(aws, c) for c in customers},
+               claim_lookup={c: claim_lookup_probe(aws, c) for c in customers})
     if queries:
         upn = next(u for u, c in DEFAULT_USERS.items() if c == customers[0])
         out["queries"] = run_queries(aws, dep, upn)
@@ -223,16 +267,18 @@ def stream(root: Path, customers: list[str], scenario: edi_mock.Scenario, pipeli
         sftp_drop(aws, dep, dd.tenant, dd.path, day)
         shutil.rmtree(dd.path)
         _reset_peak_rss()
-        c0, t0 = ep.counters(), time.perf_counter()
+        c0, t0, cpu0, thread0 = ep.counters(), time.perf_counter(), time.process_time(), time.thread_time()
         n_tasks = len(aws.ecs.tasks)
         aws.events.drain()
         d = diff(ep.counters(), c0)
+        cpu_s, thread_cpu_s = round(time.process_time() - cpu0, 2), round(time.thread_time() - thread0, 2)
         tasks = aws.ecs.tasks[n_tasks:]
         if not tasks or any(t.exit_code for t in tasks):
             raise RuntimeError(f"parser task failed on {dd.tenant} {day}: "
                                f"{[t.result for t in tasks if t.exit_code] or 'no task'}")
         r = tasks[-1].result
         batches.append(dict(customer=dd.tenant, day=day, raw_bytes=dd.bytes, s=round(time.perf_counter() - t0, 2),
+                            cpu_s=cpu_s, task_thread_cpu_s=thread_cpu_s,
                             peak_rss_mb=_peak_rss_mb(), requests=d["requests"], bytes_read=d["bytes_out"],
                             bytes_written=d["bytes_in"], ops={k[3:]: v for k, v in d.items() if k.startswith("op_")},
                             s3_model_s=s3_model_s(d["requests"], d["bytes_out"] + d["bytes_in"]),
@@ -291,6 +337,9 @@ def _pick(batches, n=6):
 def render_checkpoint(cp: dict) -> str:
     mb = lambda x: f"{x / 1e6:,.1f}"
     lines = [f"## After {cp['batches']} business days", ""]
+    for c, probe in cp.get("claim_lookup", {}).items():
+        lines += [f"Claim lookup {c}: {probe['touched_keys']:,} keys over {probe['lookup_files']} files: scan {probe['scan']}, "
+                  f"index {probe['index']}", ""]
     for c, inv in cp["inventory"].items():
         lines += [f"Inventory {c}: " + ", ".join(f"{layer} {v['files']:,} files / {mb(v['bytes'])} MB"
                                                 for layer, v in sorted(inv.items())), ""]

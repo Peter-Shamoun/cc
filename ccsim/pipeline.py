@@ -109,6 +109,8 @@ def _insert(con, table: str, rows: list[dict]):
 # Pipeline configuration (task-definition environment):
 #   GOLD_MODE=incremental (default)  recompute only the claims the new batch touched, rewrite only their partitions
 #   GOLD_MODE=full                   rebuild all of gold from all of silver every batch (what a rules change does)
+#   SILVER_OPEN_MONTH_MAX_PARTS=n    compact an open-month silver partition gold reads once it has n daily parts
+SILVER_OPEN_MONTH_MAX_PARTS = 4
 PARQUET = "FORMAT parquet, COMPRESSION zstd"         # silver: default row groups keep lookups by file_id selective
 GOLD_PARQUET = PARQUET + ", ROW_GROUP_SIZE 1048576"   # gold: fewer, larger row groups = fewer range requests per query
 GOLD_LAYOUT = "cohort-tiered-4"
@@ -273,7 +275,8 @@ def _parse_batch_locked(env, store: Store, lock: BatchLock) -> dict:
         stats.update(gold_full=gold["full"], gold=gold)
         t0 = time.perf_counter()
         lock.renew()
-        compact_silver(gold_con, store, silver, before_month=gold["last_month"])
+        compact_silver(gold_con, store, silver, before_month=gold["last_month"],
+                       open_month_max_parts=int(e.get("SILVER_OPEN_MONTH_MAX_PARTS", SILVER_OPEN_MONTH_MAX_PARTS)))
         stats["compact_s"] = round(time.perf_counter() - t0, 2)
     return dict(stats, status="ok")
 
@@ -292,14 +295,22 @@ def write_silver(con, store: Store, run_id: str, month: str, lock: BatchLock):
                 store.put(f"{store.root}parquet/{t}/received_month={month}/part-{run_id}.parquet", p.read_bytes())
 
 
-def compact_silver(con, store: Store, silver: Silver, before_month: str):
-    """Merge every closed month (< before_month) that still has daily parts into one file per table, sorted by
-    source file and segment order (so a lookup by file_id reads few row groups), then delete what it covers."""
+def compact_silver(con, store: Store, silver: Silver, before_month: str, open_month_max_parts: int):
+    """Merge a partition's files into one compacted file, sorted by source file and segment order (so a lookup by
+    file_id reads few row groups), then delete what it covers:
+      - every closed month (< before_month) that still has more than its compacted file, every table;
+      - in the open month, a table gold reads (VIEW_INPUTS) once it has open_month_max_parts daily parts beside its
+        compacted base: the batch's lookups then open at most that many small files per table, not one per day.
+    Runs after gold has included every committed run, so no part a pending build needs is ever compacted away. A
+    crash between the new file and the deletes leaves a state silver_state already resolves (the newest compacted
+    file wins; the parts it covers and the older compacted file are garbage)."""
     with tempfile.TemporaryDirectory() as tmp:
         covered = []
         for t, by_month in silver.live.items():
             for m, keys in by_month.items():
-                if m >= before_month or (len(keys) == 1 and "/compacted-" in keys[0]):
+                parts = [k for k in keys if k.rsplit("/", 1)[1].startswith("part-")]
+                closed = m < before_month and (len(keys) > 1 or parts)
+                if not closed and not (t in VIEW_INPUTS and len(parts) >= open_month_max_parts):
                     continue
                 through = max(k.rsplit("/", 1)[1].removesuffix(".parquet").split("-", 1)[1] for k in keys)
                 cols = {r[0] for r in con.execute(f"DESCRIBE SELECT * FROM {_scan(store, keys[:1])}").fetchall()}
@@ -371,23 +382,29 @@ def _load_closure(con, store: Store, silver: Silver, pending_runs: list[str]) ->
     con.execute("CREATE TEMP TABLE touched_claim AS SELECT clm01_patient_control_number AS claim_key FROM c837.claim "
                 "UNION SELECT clp01_patient_control_number FROM r835.claim_payment")
     touched_files, months = set(), set()
+    lookup_files = closure_files = 0
+    t0 = time.process_time()
     for t, col in (("c837.claim", "clm01_patient_control_number"), ("r835.claim_payment", "clp01_patient_control_number")):
         older = [k for k in silver.files(t) if k not in pending_parts]
+        lookup_files += len(older)
         if older:
             for fid, fname in con.execute(f"SELECT DISTINCT file_id, filename FROM {_scan(store, older, ', filename=true')} "
                                           f"WHERE {col} IN (SELECT claim_key FROM touched_claim)").fetchall():
                 touched_files.add(fid)
                 months.add(fname.split("received_month=", 1)[1][:7])
+    lookup_cpu_s = time.process_time() - t0
     if touched_files:
         if not all(re.fullmatch(r"[0-9a-f]{16}", f) for f in touched_files):
             raise ValueError("unexpected file_id format")
         in_files = ", ".join(f"'{f}'" for f in sorted(touched_files))   # a literal list prunes row groups
         for t, closure_filter in CLOSURE:
             older = [k for k in silver.files(t, months) if k not in pending_parts]
+            closure_files += len(older)
             if older:
                 con.execute(f"INSERT INTO {t} BY NAME SELECT {_view_columns(con, t)} FROM "
                             f"{_scan(store, older, ', union_by_name=true')} WHERE file_id IN ({in_files}) AND ({closure_filter})")
-    return dict(touched_files=len(touched_files), touched_months=sorted(months))
+    return dict(touched_files=len(touched_files), touched_months=sorted(months), lookup_files=lookup_files,
+                lookup_cpu_s=round(lookup_cpu_s, 2), closure_files=closure_files, pending_files=len(pending_parts))
 
 
 def _view_columns(con, table: str) -> str:
