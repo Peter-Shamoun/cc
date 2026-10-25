@@ -59,6 +59,7 @@ Never decide the work is done; when an item finishes, pick the next highest-valu
 - PARKED until after the groundwork (owner): authoring round 3 ingest (13 verifiers failed on the limit),
   SOTA research refresh, screen 2 / gradient search, then React front end
 - [running] held-out validation (heldout_hard_1, 27 questions, 4 configs x Haiku/Sonnet x 2 repeats)
+- [done, branch cursor/analyzer-v1-9e95] analyzer v1 (`analyzer/`, `docs/agent/README.md`): tool layer over ccsim.query (guard + audited escalation), repair/verify loop, screen-factor flags, candidate vote, Haiku-then-Sonnet cascade, scripted LLM, `eval_subagents --agent analyzer`. Generator stays 3.3; no paid API calls.
 - [next] harder question set (Sonnet at ceiling): Opus authors multi-step questions; then screen 2 =
   coordinate ascent around the winner (glossary content variants, examples/semantic layer on hard questions,
   model cascade Haiku->Sonnet, multi-candidate) with repeats for pass^k
