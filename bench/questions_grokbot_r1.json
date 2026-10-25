@@ -1,0 +1,1462 @@
+{
+ "round": "grokbot-r1",
+ "intended_split": "validation",
+ "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+ "generator_version": "3.3",
+ "dataset_id": "e21410ce6805",
+ "dataset_scenario": {
+  "days": 45,
+  "volume_scale": 0.6,
+  "seed": 2026,
+  "p_corrupt_file": 0.1,
+  "start": "2026-07-01"
+ },
+ "self_check": {
+  "checker": "bench.compare.match with the same rules as bench/eval.py selftest",
+  "passed": 50,
+  "dropped": 0,
+  "drop_reasons": [],
+  "tie_boundaries": [
+   {
+    "id": "g1_und_short_by_cpt",
+    "n": 8,
+    "cutoff": 1185.24,
+    "next": 1006.22,
+    "tied": false
+   },
+   {
+    "id": "g1_dx_top_denied_charge",
+    "n": 3,
+    "cutoff": 6872.9,
+    "next": 6872.9,
+    "tied": true
+   },
+   {
+    "id": "g1_ptr_pr_rate",
+    "n": 8,
+    "cutoff": 3.19,
+    "next": 3.19,
+    "tied": true
+   }
+  ],
+  "llm_judge": "not run; the deterministic matcher is the self-check"
+ },
+ "questions": [
+  {
+   "id": "g1_den_zero_pay_month",
+   "category": "denials",
+   "difficulty": "hard",
+   "question": "For each payer class and 835 payment month, among current adjudications only (one row per claim and payer), how many paid exactly $0 but are not denials? $0 paid alone is not a denial: a denial is a recorded denial (claim status 4) or the signal rule ($0 paid, not a reversal, with a CO adjustment whose CARC is on the reviewed denial list). Return payer class, payment month, current adjudications, zero-pay non-denials, denials, and zero-pay non-denials as a percent of current adjudications rounded to 1 decimal. Order by payer class, then month.",
+   "gold_sql": "select payer_class, payment_month, count(*) current_adjudications, count(*) filter (where paid_amount = 0 and not is_denied) zero_pay_not_denied, count(*) filter (where is_denied) denied, round(100.0 * count(*) filter (where paid_amount = 0 and not is_denied) / count(*), 1) zero_pay_not_denied_pct from sem.remit_claims where is_current_adjudication group by 1, 2 order by 1, 2",
+   "answer_key_sql": "select a.payer_class, date_trunc('month', e.event_date::date)::date payment_month, count(*) current_adjudications, count(*) filter (where e.paid = 0 and not a.denied) zero_pay_not_denied, count(*) filter (where a.denied) denied, round(100.0 * count(*) filter (where e.paid = 0 and not a.denied) / count(*), 1) zero_pay_not_denied_pct from ledger.events e join ledger.adjudications a using (pcn, payer_id) where e.is_current group by 1, 2 order by 1, 2",
+   "alt_sql": [
+    "select payer_class, strftime(payment_month, '%Y-%m') payment_month, count(*) current_adjudications, sum(case when paid_amount = 0 and not is_denied then 1 else 0 end) zero_pay_not_denied, sum(case when is_denied then 1 else 0 end) denied, round(100.0 * sum(case when paid_amount = 0 and not is_denied then 1 else 0 end) / count(*), 1) pct from sem.remit_claims where is_current_adjudication group by 1, 2",
+    "SELECT 'ok' AS note, * FROM (select payer_class, payment_month, count(*) current_adjudications, count(*) filter (where paid_amount = 0 and not is_denied) zero_pay_not_denied, count(*) filter (where is_denied) denied, round(100.0 * count(*) filter (where paid_amount = 0 and not is_denied) / count(*), 1) zero_pay_not_denied_pct from sem.remit_claims where is_current_adjudication group by 1, 2 order by 1, 2) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "treats every $0 payment as the zero-pay non-denial count",
+     "sql": "select payer_class, payment_month, count(*), count(*) filter (where paid_amount = 0), count(*) filter (where is_denied), round(100.0 * count(*) filter (where paid_amount = 0) / count(*), 1) from sem.remit_claims where is_current_adjudication group by 1, 2"
+    },
+    {
+     "label": "uses every 835 event, not the current adjudication",
+     "sql": "select payer_class, payment_month, count(*), count(*) filter (where paid_amount = 0 and not is_denied), count(*) filter (where is_denied), round(100.0 * count(*) filter (where paid_amount = 0 and not is_denied) / count(*), 1) from sem.remit_claims group by 1, 2"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Grain is the current adjudication (claim+payer). Time basis is the payment date month. Zero-pay non-denials are paid 0 and is_denied is false.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_den_signal_by_month",
+   "category": "denials",
+   "difficulty": "hard",
+   "question": "Split denials on current adjudications by payment month into recorded denials (claim status 4) and signal-only denials (the $0-paid CO denial-CARC rule, and not also claim status 4). Return the payment month, recorded denials, signal-only denials, all denials, and signal-only denials as a percent of all denials that month, rounded to 1 decimal. Order by month.",
+   "gold_sql": "select payment_month, count(*) filter (where is_denied_recorded) recorded_denials, count(*) filter (where is_denied_signal_v3 and not is_denied_recorded) signal_only_denials, count(*) filter (where is_denied) denied, round(100.0 * count(*) filter (where is_denied_signal_v3 and not is_denied_recorded) / nullif(count(*) filter (where is_denied), 0), 1) signal_only_pct_of_denials from sem.remit_claims where is_current_adjudication group by 1 order by 1",
+   "answer_key_sql": "select date_trunc('month', e.event_date::date)::date payment_month, count(*) filter (where a.denied_recorded) recorded_denials, count(*) filter (where a.denied_signal_v3 and not a.denied_recorded) signal_only_denials, count(*) filter (where a.denied) denied, round(100.0 * count(*) filter (where a.denied_signal_v3 and not a.denied_recorded) / nullif(count(*) filter (where a.denied), 0), 1) signal_only_pct_of_denials from ledger.events e join ledger.adjudications a using (pcn, payer_id) where e.is_current group by 1 order by 1",
+   "alt_sql": [
+    "select payment_month, sum(is_denied_recorded::int), sum((is_denied_signal_v3 and not is_denied_recorded)::int), sum(is_denied::int), round(100.0 * sum((is_denied_signal_v3 and not is_denied_recorded)::int) / nullif(sum(is_denied::int), 0), 1) from sem.remit_claims where is_current_adjudication group by 1",
+    "SELECT 'ok' AS note, * FROM (select payment_month, count(*) filter (where is_denied_recorded) recorded_denials, count(*) filter (where is_denied_signal_v3 and not is_denied_recorded) signal_only_denials, count(*) filter (where is_denied) denied, round(100.0 * count(*) filter (where is_denied_signal_v3 and not is_denied_recorded) / nullif(count(*) filter (where is_denied), 0), 1) signal_only_pct_of_denials from sem.remit_claims where is_current_adjudication group by 1 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "counts signal denials without removing the ones that are also status 4",
+     "sql": "select payment_month, count(*) filter (where is_denied_recorded), count(*) filter (where is_denied_signal_v3), count(*) filter (where is_denied), round(100.0 * count(*) filter (where is_denied_signal_v3) / nullif(count(*) filter (where is_denied), 0), 1) from sem.remit_claims where is_current_adjudication group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Grain is the current adjudication. Signal-only means is_denied_signal_v3 and not is_denied_recorded.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_den_charge_gap",
+   "category": "denials",
+   "difficulty": "hard",
+   "question": "On current adjudications, how does the average 835 claim charge of denied adjudications compare with the average charge of adjudications that are not denied? By payer class, return denied count, average denied charge, not-denied count, average not-denied charge, and the difference (denied average minus not-denied average). Round the averages and the difference to 2 decimals, computing the difference from the unrounded averages. Order by payer class.",
+   "gold_sql": "select payer_class, count(*) filter (where is_denied) denied, round(avg(charge_amount) filter (where is_denied), 2) avg_denied_charge, count(*) filter (where not is_denied) not_denied, round(avg(charge_amount) filter (where not is_denied), 2) avg_not_denied_charge, round(avg(charge_amount) filter (where is_denied) - avg(charge_amount) filter (where not is_denied), 2) avg_charge_gap from sem.remit_claims where is_current_adjudication group by 1 order by 1",
+   "answer_key_sql": "select a.payer_class, count(*) filter (where a.denied) denied, round(avg(e.charge) filter (where a.denied), 2) avg_denied_charge, count(*) filter (where not a.denied) not_denied, round(avg(e.charge) filter (where not a.denied), 2) avg_not_denied_charge, round(avg(e.charge) filter (where a.denied) - avg(e.charge) filter (where not a.denied), 2) avg_charge_gap from ledger.events e join ledger.adjudications a using (pcn, payer_id) where e.is_current group by 1 order by 1",
+   "alt_sql": [
+    "select payer_class, sum(is_denied::int), round(sum(charge_amount) filter (where is_denied) / nullif(sum(is_denied::int), 0), 2), sum((not is_denied)::int), round(sum(charge_amount) filter (where not is_denied) / nullif(sum((not is_denied)::int), 0), 2), round(sum(charge_amount) filter (where is_denied) / nullif(sum(is_denied::int), 0) - sum(charge_amount) filter (where not is_denied) / nullif(sum((not is_denied)::int), 0), 2) from sem.remit_claims where is_current_adjudication group by 1",
+    "SELECT 'ok' AS note, * FROM (select payer_class, count(*) filter (where is_denied) denied, round(avg(charge_amount) filter (where is_denied), 2) avg_denied_charge, count(*) filter (where not is_denied) not_denied, round(avg(charge_amount) filter (where not is_denied), 2) avg_not_denied_charge, round(avg(charge_amount) filter (where is_denied) - avg(charge_amount) filter (where not is_denied), 2) avg_charge_gap from sem.remit_claims where is_current_adjudication group by 1 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "uses $0 paid as the denial split",
+     "sql": "select payer_class, count(*) filter (where paid_amount = 0), round(avg(charge_amount) filter (where paid_amount = 0), 2), count(*) filter (where paid_amount <> 0), round(avg(charge_amount) filter (where paid_amount <> 0), 2), round(avg(charge_amount) filter (where paid_amount = 0) - avg(charge_amount) filter (where paid_amount <> 0), 2) from sem.remit_claims where is_current_adjudication group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Grain is the current adjudication. Charge is the 835 claim charge. Denied follows is_denied.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_den_pr_split",
+   "category": "denials",
+   "difficulty": "hard",
+   "question": "On current adjudications, how much patient responsibility (CLP05) sits on denials versus on adjudications that are not denials? By payer class, return patient-responsibility dollars on denials, patient-responsibility dollars on non-denials, the number of denied adjudications with patient responsibility greater than zero, and the number of non-denied adjudications with patient responsibility greater than zero. Treat a missing patient responsibility as $0. Round dollars to 2 decimals. Order by payer class.",
+   "gold_sql": "select payer_class, round(coalesce(sum(patient_responsibility_amount) filter (where is_denied), 0), 2) pr_on_denials, round(coalesce(sum(patient_responsibility_amount) filter (where not is_denied), 0), 2) pr_on_non_denials, count(*) filter (where is_denied and coalesce(patient_responsibility_amount, 0) > 0) denied_with_pr, count(*) filter (where not is_denied and coalesce(patient_responsibility_amount, 0) > 0) non_denied_with_pr from sem.remit_claims where is_current_adjudication group by 1 order by 1",
+   "answer_key_sql": "select a.payer_class, round(coalesce(sum(e.patient_responsibility) filter (where a.denied), 0), 2) pr_on_denials, round(coalesce(sum(e.patient_responsibility) filter (where not a.denied), 0), 2) pr_on_non_denials, count(*) filter (where a.denied and coalesce(e.patient_responsibility, 0) > 0) denied_with_pr, count(*) filter (where not a.denied and coalesce(e.patient_responsibility, 0) > 0) non_denied_with_pr from ledger.events e join ledger.adjudications a using (pcn, payer_id) where e.is_current group by 1 order by 1",
+   "alt_sql": [
+    "select payer_class, coalesce(round(sum(case when is_denied then patient_responsibility_amount else 0 end), 2), 0), coalesce(round(sum(case when not is_denied then patient_responsibility_amount else 0 end), 2), 0), count(*) filter (where is_denied and coalesce(patient_responsibility_amount, 0) > 0), count(*) filter (where not is_denied and coalesce(patient_responsibility_amount, 0) > 0) from sem.remit_claims where is_current_adjudication group by 1",
+    "SELECT 'ok' AS note, * FROM (select payer_class, round(coalesce(sum(patient_responsibility_amount) filter (where is_denied), 0), 2) pr_on_denials, round(coalesce(sum(patient_responsibility_amount) filter (where not is_denied), 0), 2) pr_on_non_denials, count(*) filter (where is_denied and coalesce(patient_responsibility_amount, 0) > 0) denied_with_pr, count(*) filter (where not is_denied and coalesce(patient_responsibility_amount, 0) > 0) non_denied_with_pr from sem.remit_claims where is_current_adjudication group by 1 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "sums patient responsibility without splitting denials from the rest",
+     "sql": "select payer_class, round(coalesce(sum(patient_responsibility_amount), 0), 2), round(coalesce(sum(patient_responsibility_amount), 0), 2), count(*) filter (where coalesce(patient_responsibility_amount, 0) > 0), count(*) filter (where coalesce(patient_responsibility_amount, 0) > 0) from sem.remit_claims where is_current_adjudication group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Grain is the current adjudication. Patient responsibility is CLP05, missing treated as 0.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_den_charge_by_service_month",
+   "category": "denials",
+   "difficulty": "hard",
+   "question": "Of the 835 claim charges on current adjudications, what share sits on denials in each service month? Service month is the month of the service-from date on the 835 claim payment. Return service month, total charge, denied charge, and denied charge as a percent of total charge rounded to 1 decimal. Order by service month. Include every service month that has a current adjudication, including claims whose 837 is not in the data.",
+   "gold_sql": "select service_month, round(sum(charge_amount), 2) charge, round(coalesce(sum(charge_amount) filter (where is_denied), 0), 2) denied_charge, round(100.0 * coalesce(sum(charge_amount) filter (where is_denied), 0) / nullif(sum(charge_amount), 0), 1) denied_charge_pct from sem.remit_claims where is_current_adjudication group by 1 order by 1",
+   "answer_key_sql": "select date_trunc('month', e.dos::date)::date service_month, round(sum(e.charge), 2) charge, round(coalesce(sum(e.charge) filter (where a.denied), 0), 2) denied_charge, round(100.0 * coalesce(sum(e.charge) filter (where a.denied), 0) / nullif(sum(e.charge), 0), 1) denied_charge_pct from ledger.events e join ledger.adjudications a using (pcn, payer_id) where e.is_current group by 1 order by 1",
+   "alt_sql": [
+    "select service_month, sum(charge_amount), sum(case when is_denied then charge_amount else 0 end), round(100.0 * sum(case when is_denied then charge_amount else 0 end) / sum(charge_amount), 1) from sem.remit_claims where is_current_adjudication group by 1",
+    "SELECT 'ok' AS note, * FROM (select service_month, round(sum(charge_amount), 2) charge, round(coalesce(sum(charge_amount) filter (where is_denied), 0), 2) denied_charge, round(100.0 * coalesce(sum(charge_amount) filter (where is_denied), 0) / nullif(sum(charge_amount), 0), 1) denied_charge_pct from sem.remit_claims where is_current_adjudication group by 1 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "groups by payment month instead of service month",
+     "sql": "select payment_month, round(sum(charge_amount), 2), round(coalesce(sum(charge_amount) filter (where is_denied), 0), 2), round(100.0 * coalesce(sum(charge_amount) filter (where is_denied), 0) / nullif(sum(charge_amount), 0), 1) from sem.remit_claims where is_current_adjudication group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Grain is the current adjudication. Time basis is the 835 service-from month, not the payment month.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_den_quartile",
+   "category": "denials",
+   "difficulty": "hard",
+   "question": "Among claims that have an 837 to a primary payer (payer_responsibility = 'P') and a current adjudication from that same payer, does the primary denial rate rise with billed charge? Use the charge on the latest primary 837 submission. Split the claims into four charge groups at the 25th, 50th and 75th percentiles of that charge (continuous percentile): group 1 is charge at or below the 25th percentile, group 2 above the 25th through the 50th, group 3 above the 50th through the 75th, group 4 above the 75th. Claims billed before the data window, which appear only as 835s, are excluded. Return the group, claims, denied claims, the denial rate as a fraction rounded to 4 decimals, the minimum charge and the maximum charge (2 decimals). Order by group.",
+   "gold_sql": "with prim as ( select claim_key, payer_key, charge_amount from ( select claim_key, payer_key, charge_amount, row_number() over (partition by claim_key order by submission_date desc, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1), pop as ( select prim.charge_amount, r.is_denied from prim join sem.remit_claims r on r.claim_key = prim.claim_key and r.payer_key = prim.payer_key and r.is_current_adjudication), cuts as ( select quantile_cont(charge_amount, 0.25) q1, quantile_cont(charge_amount, 0.5) q2, quantile_cont(charge_amount, 0.75) q3 from pop) select case when charge_amount <= q1 then 1 when charge_amount <= q2 then 2 when charge_amount <= q3 then 3 else 4 end charge_group, count(*) claims, count(*) filter (where is_denied) denied, round(avg(is_denied::int), 4) denial_rate, round(min(charge_amount), 2) min_charge, round(max(charge_amount), 2) max_charge from pop, cuts group by 1 order by 1",
+   "answer_key_sql": "with prim as ( select pcn, payer_id, charge from ( select c.pcn, s.payer_id, c.charge, row_number() over (partition by c.pcn order by s.submission_date desc, s.payer_id) rn from ledger.claims c join ledger.submissions s on s.pcn = c.pcn and s.payer_sequence = 0 ) t where rn = 1), pop as ( select prim.charge charge_amount, a.denied is_denied from prim join ledger.events e on e.pcn = prim.pcn and e.payer_id = prim.payer_id and e.is_current join ledger.adjudications a on a.pcn = prim.pcn and a.payer_id = prim.payer_id), cuts as ( select quantile_cont(charge_amount, 0.25) q1, quantile_cont(charge_amount, 0.5) q2, quantile_cont(charge_amount, 0.75) q3 from pop) select case when charge_amount <= q1 then 1 when charge_amount <= q2 then 2 when charge_amount <= q3 then 3 else 4 end charge_group, count(*) claims, count(*) filter (where is_denied) denied, round(avg(is_denied::int), 4) denial_rate, round(min(charge_amount), 2) min_charge, round(max(charge_amount), 2) max_charge from pop, cuts group by 1 order by 1",
+   "alt_sql": [
+    "with prim as ( select claim_key, payer_key, charge_amount from ( select claim_key, payer_key, charge_amount, row_number() over (partition by claim_key order by submission_date desc, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1), pop as ( select prim.charge_amount, r.is_denied from prim join sem.remit_claims r on r.claim_key = prim.claim_key and r.payer_key = prim.payer_key and r.is_current_adjudication), cuts as ( select quantile_cont(charge_amount, 0.25) q1, quantile_cont(charge_amount, 0.5) q2, quantile_cont(charge_amount, 0.75) q3 from pop) select case when charge_amount <= q1 then 1 when charge_amount <= q2 then 2 when charge_amount <= q3 then 3 else 4 end charge_group, count(*) claims, count(*) filter (where is_denied) denied, round(100.0 * avg(is_denied::int), 2) denial_rate_pct, round(min(charge_amount), 2) min_charge, round(max(charge_amount), 2) max_charge from pop, cuts group by 1 order by 1",
+    "SELECT 'ok' AS note, * FROM (with prim as ( select claim_key, payer_key, charge_amount from ( select claim_key, payer_key, charge_amount, row_number() over (partition by claim_key order by submission_date desc, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1), pop as ( select prim.charge_amount, r.is_denied from prim join sem.remit_claims r on r.claim_key = prim.claim_key and r.payer_key = prim.payer_key and r.is_current_adjudication), cuts as ( select quantile_cont(charge_amount, 0.25) q1, quantile_cont(charge_amount, 0.5) q2, quantile_cont(charge_amount, 0.75) q3 from pop) select case when charge_amount <= q1 then 1 when charge_amount <= q2 then 2 when charge_amount <= q3 then 3 else 4 end charge_group, count(*) claims, count(*) filter (where is_denied) denied, round(avg(is_denied::int), 4) denial_rate, round(min(charge_amount), 2) min_charge, round(max(charge_amount), 2) max_charge from pop, cuts group by 1 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "builds the percentiles from every primary submission, including claims with no current adjudication, and treats those as not denied",
+     "sql": "with prim as ( select claim_key, payer_key, charge_amount from ( select claim_key, payer_key, charge_amount, row_number() over (partition by claim_key order by submission_date desc, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1), pop as ( select prim.charge_amount, coalesce(r.is_denied, false) is_denied from prim left join sem.remit_claims r on r.claim_key = prim.claim_key and r.payer_key = prim.payer_key and r.is_current_adjudication), cuts as ( select quantile_cont(charge_amount, 0.25) q1, quantile_cont(charge_amount, 0.5) q2, quantile_cont(charge_amount, 0.75) q3 from pop) select case when charge_amount <= q1 then 1 when charge_amount <= q2 then 2 when charge_amount <= q3 then 3 else 4 end, count(*), count(*) filter (where is_denied), round(avg(is_denied::int), 4), round(min(charge_amount), 2), round(max(charge_amount), 2) from pop, cuts group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01,
+    "percent_cols": [
+     3
+    ]
+   },
+   "interpretation": "Population is primary 837 claims that also have a current adjudication from that primary payer. Quartile cuts are inclusive on the lower side. The rate column is a fraction; a percentage rendering of the same rate is accepted.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_den_carc29",
+   "category": "denials",
+   "difficulty": "hard",
+   "question": "Among denied current adjudications, how many carry timely-filing CARC 29 on a contractual-obligation (CO) adjustment (claim or line level)? Count each denied claim once per payer. By payer class return the number of denied current adjudications and how many of them have at least one CO-29 adjustment. Order by payer class.",
+   "gold_sql": "select r.payer_class, count(distinct r.claim_payer_key) denied_pairs, count(distinct case when a.carc_code = '29' then r.claim_payer_key end) timely_filing_pairs from sem.remit_claims r left join sem.adjustments a on a.remit_claim_id = r.remit_claim_id and a.is_current_adjudication and a.group_code = 'CO' and a.carc_code = '29' where r.is_current_adjudication and r.is_denied group by 1 order by 1",
+   "answer_key_sql": "select a.payer_class, count(distinct a.pcn || '|' || a.payer_id) denied_pairs, count(distinct case when x.carc = '29' then a.pcn || '|' || a.payer_id end) timely_filing_pairs from ledger.adjudications a join ledger.events e on e.pcn = a.pcn and e.payer_id = a.payer_id and e.is_current left join ledger.event_adjustments x on x.pcn = e.pcn and x.payer_id = e.payer_id and x.event_number = e.event_number and x.group_code = 'CO' and x.carc = '29' where a.denied group by 1 order by 1",
+   "alt_sql": [
+    "select r.payer_class, count(distinct r.claim_key || '|' || r.payer_key), count(distinct case when a.carc_code = '29' then r.claim_key || '|' || r.payer_key end) from sem.remit_claims r left join sem.adjustments a on a.remit_claim_id = r.remit_claim_id and a.group_code = 'CO' and a.carc_code = '29' and a.is_current_adjudication where r.is_current_adjudication and r.is_denied group by 1",
+    "SELECT 'ok' AS note, * FROM (select r.payer_class, count(distinct r.claim_payer_key) denied_pairs, count(distinct case when a.carc_code = '29' then r.claim_payer_key end) timely_filing_pairs from sem.remit_claims r left join sem.adjustments a on a.remit_claim_id = r.remit_claim_id and a.is_current_adjudication and a.group_code = 'CO' and a.carc_code = '29' where r.is_current_adjudication and r.is_denied group by 1 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "counts CARC 29 on every current adjudication, denied or not, and drops the denied count",
+     "sql": "select r.payer_class, count(distinct r.claim_payer_key), count(distinct case when a.carc_code = '29' then r.claim_payer_key end) from sem.remit_claims r left join sem.adjustments a on a.remit_claim_id = r.remit_claim_id and a.is_current_adjudication and a.group_code = 'CO' and a.carc_code = '29' where r.is_current_adjudication group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Population is denied current adjudications. CARC 29 counts only CO-group adjustments on that adjudication. Distinct claim+payer.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_mix_share_by_month",
+   "category": "payer_mix_payment_timing",
+   "difficulty": "hard",
+   "question": "Within each 835 payment month, what is each payer class's share of current adjudications and its share of paid dollars? Use current adjudications only (one per claim and payer, primary and secondary both included). Return payment month, payer class, current adjudications, paid dollars, the class's percent of that month's adjudications, and the class's percent of that month's paid dollars. Round dollars to 2 decimals and percents to 1 decimal. Order by month, then payer class.",
+   "gold_sql": "with m as ( select payment_month, payer_class, count(*) n, sum(paid_amount) paid from sem.remit_claims where is_current_adjudication group by 1, 2) select payment_month, payer_class, n current_adjudications, round(paid, 2) paid, round(100.0 * n / sum(n) over (partition by payment_month), 1) adjudication_share_pct, round(100.0 * paid / sum(paid) over (partition by payment_month), 1) paid_share_pct from m order by 1, 2",
+   "answer_key_sql": "with m as ( select date_trunc('month', e.event_date::date)::date payment_month, a.payer_class, count(*) n, sum(e.paid) paid from ledger.events e join ledger.adjudications a using (pcn, payer_id) where e.is_current group by 1, 2) select payment_month, payer_class, n, round(paid, 2), round(100.0 * n / sum(n) over (partition by payment_month), 1), round(100.0 * paid / sum(paid) over (partition by payment_month), 1) from m order by 1, 2",
+   "alt_sql": [
+    "with m as ( select payment_month, payer_class, count(*) n, sum(paid_amount) paid from sem.remit_claims where is_current_adjudication group by 1, 2) select strftime(payment_month, '%Y-%m'), payer_class, n, paid, round(100.0 * n / sum(n) over (partition by payment_month), 1), round(100.0 * paid / sum(paid) over (partition by payment_month), 1) from m",
+    "SELECT 'ok' AS note, * FROM (with m as ( select payment_month, payer_class, count(*) n, sum(paid_amount) paid from sem.remit_claims where is_current_adjudication group by 1, 2) select payment_month, payer_class, n current_adjudications, round(paid, 2) paid, round(100.0 * n / sum(n) over (partition by payment_month), 1) adjudication_share_pct, round(100.0 * paid / sum(paid) over (partition by payment_month), 1) paid_share_pct from m order by 1, 2) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "computes each class's share of all months combined, repeating that share on every month row",
+     "sql": "with m as ( select payment_month, payer_class, count(*) n, sum(paid_amount) paid from sem.remit_claims where is_current_adjudication group by 1, 2) select payment_month, payer_class, n, round(paid, 2), round(100.0 * n / sum(n) over (), 1), round(100.0 * paid / sum(paid) over (), 1) from m"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Grain is the current adjudication. Shares are within the payment month, not across the whole window.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_time_dos_buckets",
+   "category": "payer_mix_payment_timing",
+   "difficulty": "hard",
+   "question": "How old are the services we are getting paid for? For current adjudications with paid amount greater than zero and a service-from date, bucket the days from service-from to the payment date as 0-14, 15-30, 31-45 and 46 or more. By payer class and bucket, return the number of paid adjudications and the paid dollars (2 decimals). This includes 835s for claims billed before the data window. Order by payer class, then bucket.",
+   "gold_sql": "select payer_class, case when payment_date - service_date_from <= 14 then '0-14' when payment_date - service_date_from <= 30 then '15-30' when payment_date - service_date_from <= 45 then '31-45' else '46+' end age_bucket, count(*) paid_adjudications, round(sum(paid_amount), 2) paid from sem.remit_claims where is_current_adjudication and paid_amount > 0 and service_date_from is not null group by 1, 2 order by 1, 2",
+   "answer_key_sql": "select a.payer_class, case when e.event_date::date - e.dos::date <= 14 then '0-14' when e.event_date::date - e.dos::date <= 30 then '15-30' when e.event_date::date - e.dos::date <= 45 then '31-45' else '46+' end age_bucket, count(*) paid_adjudications, round(sum(e.paid), 2) paid from ledger.events e join ledger.adjudications a using (pcn, payer_id) where e.is_current and e.paid > 0 and e.dos is not null group by 1, 2 order by 1, 2",
+   "alt_sql": [
+    "select payer_class, case when payment_date - service_date_from <= 14 then '0-14' when payment_date - service_date_from <= 30 then '15-30' when payment_date - service_date_from <= 45 then '31-45' else '46+' end, count(*), sum(paid_amount) from sem.remit_claims where is_current_adjudication and paid_amount > 0 and service_date_from is not null group by 1, 2",
+    "SELECT 'ok' AS note, * FROM (select payer_class, case when payment_date - service_date_from <= 14 then '0-14' when payment_date - service_date_from <= 30 then '15-30' when payment_date - service_date_from <= 45 then '31-45' else '46+' end age_bucket, count(*) paid_adjudications, round(sum(paid_amount), 2) paid from sem.remit_claims where is_current_adjudication and paid_amount > 0 and service_date_from is not null group by 1, 2 order by 1, 2) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "includes adjudications that paid $0",
+     "sql": "select payer_class, case when payment_date - service_date_from <= 14 then '0-14' when payment_date - service_date_from <= 30 then '15-30' when payment_date - service_date_from <= 45 then '31-45' else '46+' end, count(*), round(sum(paid_amount), 2) from sem.remit_claims where is_current_adjudication and service_date_from is not null group by 1, 2"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Grain is a paid current adjudication. Age is payment date minus the 835 service-from date.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_time_primary_21day",
+   "category": "payer_mix_payment_timing",
+   "difficulty": "hard",
+   "question": "Which primary payers pay within 21 days of our first bill? Take each claim's primary payer (payer_responsibility = 'P' on the 837) and its first 837 submission date to that payer. Keep claims that have a current adjudication from that payer. A claim counts as paid within 21 days only when that adjudication paid more than zero and the payment date is no more than 21 days after the first submission. For payers with at least 25 such current adjudications, return the payer name, the number of current adjudications, how many were paid within 21 days, and that share as a percent rounded to 1 decimal. Order by the percent descending, then payer name.",
+   "gold_sql": "with p as ( select claim_key, payer_key, payer_name, min(submission_date) first_sub from sem.claims where payer_responsibility = 'P' group by all), d as ( select p.payer_name, (r.paid_amount > 0 and r.payment_date - p.first_sub <= 21) within_21 from p join sem.remit_claims r on r.claim_key = p.claim_key and r.payer_key = p.payer_key and r.is_current_adjudication) select payer_name, count(*) current_primary, count(*) filter (where within_21) paid_within_21, round(100.0 * avg(within_21::int), 1) pct_paid_within_21 from d group by 1 having count(*) >= 25 order by pct_paid_within_21 desc, payer_name",
+   "answer_key_sql": "with p as ( select s.pcn, s.payer_id, min(s.submission_date::date) first_sub from ledger.submissions s where s.payer_sequence = 0 group by all), d as ( select array_to_string(list_transform(string_split(lower(py.payer), ' '), lambda x: upper(x[1]) || x[2:]), ' ') payer_name, (e.paid > 0 and e.event_date::date - p.first_sub <= 21) within_21 from p join ledger.events e on e.pcn = p.pcn and e.payer_id = p.payer_id and e.is_current join ledger.payers py on py.payer_id = p.payer_id) select payer_name, count(*) current_primary, count(*) filter (where within_21) paid_within_21, round(100.0 * avg(within_21::int), 1) pct_paid_within_21 from d group by 1 having count(*) >= 25 order by pct_paid_within_21 desc, payer_name",
+   "alt_sql": [
+    "with p as ( select claim_key, payer_key, payer_name, min(submission_date) first_sub from sem.claims where payer_responsibility = 'P' group by all), d as ( select p.payer_name, (r.paid_amount > 0 and r.payment_date - p.first_sub <= 21) within_21 from p join sem.remit_claims r on r.claim_key = p.claim_key and r.payer_key = p.payer_key and r.is_current_adjudication) select payer_name, count(*), sum(within_21::int), round(100.0 * avg(within_21::int), 1) from d group by 1 having count(*) >= 25",
+    "SELECT 'ok' AS note, * FROM (with p as ( select claim_key, payer_key, payer_name, min(submission_date) first_sub from sem.claims where payer_responsibility = 'P' group by all), d as ( select p.payer_name, (r.paid_amount > 0 and r.payment_date - p.first_sub <= 21) within_21 from p join sem.remit_claims r on r.claim_key = p.claim_key and r.payer_key = p.payer_key and r.is_current_adjudication) select payer_name, count(*) current_primary, count(*) filter (where within_21) paid_within_21, round(100.0 * avg(within_21::int), 1) pct_paid_within_21 from d group by 1 having count(*) >= 25 order by pct_paid_within_21 desc, payer_name) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "uses 30 days and keeps payers with at least 25 adjudications",
+     "sql": "with p as ( select claim_key, payer_key, payer_name, min(submission_date) first_sub from sem.claims where payer_responsibility = 'P' group by all), d as ( select p.payer_name, (r.paid_amount > 0 and r.payment_date - p.first_sub <= 30) within_21 from p join sem.remit_claims r on r.claim_key = p.claim_key and r.payer_key = p.payer_key and r.is_current_adjudication) select payer_name, count(*), count(*) filter (where within_21), round(100.0 * avg(within_21::int), 1) from d group by 1 having count(*) >= 25"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Population is claims with a primary 837 and a current adjudication from that payer. Every payer with at least 25 such adjudications is returned.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_time_primary_buckets",
+   "category": "payer_mix_payment_timing",
+   "difficulty": "hard",
+   "question": "For claims whose primary payer (payer_responsibility = 'P') has a current adjudication with paid amount greater than zero, bucket the days from the first 837 submission to that payer until that payment date: 0-7, 8-14, 15-30, and 31 or more. By payer class and bucket, return paid claims and paid dollars (2 decimals). Claims with no primary 837 in the data are excluded. Order by payer class, then bucket.",
+   "gold_sql": "with p as ( select claim_key, payer_key, payer_class, min(submission_date) first_sub from sem.claims where payer_responsibility = 'P' group by all) select p.payer_class, case when r.payment_date - p.first_sub <= 7 then '0-7' when r.payment_date - p.first_sub <= 14 then '8-14' when r.payment_date - p.first_sub <= 30 then '15-30' else '31+' end age_bucket, count(*) paid_claims, round(sum(r.paid_amount), 2) paid from p join sem.remit_claims r on r.claim_key = p.claim_key and r.payer_key = p.payer_key where r.is_current_adjudication and r.paid_amount > 0 group by 1, 2 order by 1, 2",
+   "answer_key_sql": "with p as ( select s.pcn, s.payer_id, py.payer_class, min(s.submission_date::date) first_sub from ledger.submissions s join ledger.payers py using (payer_id) where s.payer_sequence = 0 group by all) select p.payer_class, case when e.event_date::date - p.first_sub <= 7 then '0-7' when e.event_date::date - p.first_sub <= 14 then '8-14' when e.event_date::date - p.first_sub <= 30 then '15-30' else '31+' end age_bucket, count(*) paid_claims, round(sum(e.paid), 2) paid from p join ledger.events e on e.pcn = p.pcn and e.payer_id = p.payer_id and e.is_current where e.paid > 0 group by 1, 2 order by 1, 2",
+   "alt_sql": [
+    "with p as ( select claim_key, payer_key, payer_class, min(submission_date) first_sub from sem.claims where payer_responsibility = 'P' group by all) select p.payer_class, case when r.payment_date - p.first_sub <= 7 then '0-7' when r.payment_date - p.first_sub <= 14 then '8-14' when r.payment_date - p.first_sub <= 30 then '15-30' else '31+' end, count(*), sum(r.paid_amount) from p join sem.remit_claims r using (claim_key, payer_key) where r.is_current_adjudication and r.paid_amount > 0 group by 1, 2",
+    "SELECT 'ok' AS note, * FROM (with p as ( select claim_key, payer_key, payer_class, min(submission_date) first_sub from sem.claims where payer_responsibility = 'P' group by all) select p.payer_class, case when r.payment_date - p.first_sub <= 7 then '0-7' when r.payment_date - p.first_sub <= 14 then '8-14' when r.payment_date - p.first_sub <= 30 then '15-30' else '31+' end age_bucket, count(*) paid_claims, round(sum(r.paid_amount), 2) paid from p join sem.remit_claims r on r.claim_key = p.claim_key and r.payer_key = p.payer_key where r.is_current_adjudication and r.paid_amount > 0 group by 1, 2 order by 1, 2) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "measures days from the service date on the 835 instead of the first primary submission",
+     "sql": "select payer_class, case when payment_date - service_date_from <= 7 then '0-7' when payment_date - service_date_from <= 14 then '8-14' when payment_date - service_date_from <= 30 then '15-30' else '31+' end, count(*), round(sum(paid_amount), 2) from sem.remit_claims where is_current_adjudication and paid_amount > 0 group by 1, 2"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Grain is a paid current adjudication of the primary payer. Clock starts at the first primary 837 submission in the data.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_mix_secondary",
+   "category": "payer_mix_payment_timing",
+   "difficulty": "hard",
+   "question": "What does secondary billing look like by the secondary payer's class? A secondary bill is an 837 with payer_responsibility = 'S'. One row per claim and secondary payer, using the earliest such submission. Return, by secondary payer class: claims billed, how many have a current adjudication from that secondary payer, paid dollars on those current adjudications (0 when none, 2 decimals), and the median days from that earliest secondary submission to the current payment date among adjudications with paid amount greater than zero (1 decimal; null when the class has none). Order by payer class.",
+   "gold_sql": "with s as ( select claim_key, payer_key, payer_class, submission_date from ( select claim_key, payer_key, payer_class, submission_date, row_number() over (partition by claim_key, payer_key order by submission_date, claim_id) rn from sem.claims where payer_responsibility = 'S') t where rn = 1) select s.payer_class, count(*) billed_claims, count(r.remit_claim_id) with_current_adjudication, round(coalesce(sum(r.paid_amount), 0), 2) current_paid, round(median(r.payment_date - s.submission_date) filter (where r.paid_amount > 0), 1) median_days_to_pay from s left join sem.remit_claims r on r.claim_key = s.claim_key and r.payer_key = s.payer_key and r.is_current_adjudication group by 1 order by 1",
+   "answer_key_sql": "with s as ( select pcn, payer_id, payer_class, submission_date from ( select s.pcn, s.payer_id, py.payer_class, s.submission_date::date submission_date, row_number() over (partition by s.pcn, s.payer_id order by s.submission_date, s.payer_id) rn from ledger.submissions s join ledger.payers py using (payer_id) where s.payer_sequence = 1) t where rn = 1) select s.payer_class, count(*) billed_claims, count(e.pcn) with_current_adjudication, round(coalesce(sum(e.paid), 0), 2) current_paid, round(median(e.event_date::date - s.submission_date) filter (where e.paid > 0), 1) median_days_to_pay from s left join ledger.events e on e.pcn = s.pcn and e.payer_id = s.payer_id and e.is_current group by 1 order by 1",
+   "alt_sql": [
+    "with s as ( select claim_key, payer_key, payer_class, min(submission_date) submission_date from sem.claims where payer_responsibility = 'S' group by all) select s.payer_class, count(*), count(r.remit_claim_id), coalesce(round(sum(r.paid_amount), 2), 0), round(median(r.payment_date - s.submission_date) filter (where r.paid_amount > 0), 1) from s left join sem.remit_claims r on r.claim_key = s.claim_key and r.payer_key = s.payer_key and r.is_current_adjudication group by 1",
+    "SELECT 'ok' AS note, * FROM (with s as ( select claim_key, payer_key, payer_class, submission_date from ( select claim_key, payer_key, payer_class, submission_date, row_number() over (partition by claim_key, payer_key order by submission_date, claim_id) rn from sem.claims where payer_responsibility = 'S') t where rn = 1) select s.payer_class, count(*) billed_claims, count(r.remit_claim_id) with_current_adjudication, round(coalesce(sum(r.paid_amount), 0), 2) current_paid, round(median(r.payment_date - s.submission_date) filter (where r.paid_amount > 0), 1) median_days_to_pay from s left join sem.remit_claims r on r.claim_key = s.claim_key and r.payer_key = s.payer_key and r.is_current_adjudication group by 1 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "uses primary submissions instead of secondary",
+     "sql": "with s as ( select claim_key, payer_key, payer_class, min(submission_date) submission_date from sem.claims where payer_responsibility = 'P' group by all) select s.payer_class, count(*), count(r.remit_claim_id), round(coalesce(sum(r.paid_amount), 0), 2), round(median(r.payment_date - s.submission_date) filter (where r.paid_amount > 0), 1) from s left join sem.remit_claims r on r.claim_key = s.claim_key and r.payer_key = s.payer_key and r.is_current_adjudication group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Grain is claim plus secondary payer. Median days is only over current adjudications with paid > 0.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_mix_reversal_history",
+   "category": "payer_mix_payment_timing",
+   "difficulty": "hard",
+   "question": "How much of our current paid dollars belongs to claim-and-payer pairs that also had a reversal (claim status 22) at some point? By payer class, using current adjudications, return the number of current adjudications, how many of those pairs also have a reversal event, total paid dollars, and paid dollars on the pairs that have a reversal (0 when none). Round dollars to 2 decimals. Order by payer class.",
+   "gold_sql": "with rev as ( select distinct claim_key, payer_key from sem.remit_claims where is_reversal) select r.payer_class, count(*) current_adjudications, count(*) filter (where rev.claim_key is not null) pairs_with_a_reversal, round(sum(r.paid_amount), 2) paid, round(coalesce(sum(r.paid_amount) filter (where rev.claim_key is not null), 0), 2) paid_on_reversed_pairs from sem.remit_claims r left join rev using (claim_key, payer_key) where r.is_current_adjudication group by 1 order by 1",
+   "answer_key_sql": "with rev as ( select distinct pcn, payer_id from ledger.events where status = '22') select a.payer_class, count(*) current_adjudications, count(*) filter (where rev.pcn is not null) pairs_with_a_reversal, round(sum(e.paid), 2) paid, round(coalesce(sum(e.paid) filter (where rev.pcn is not null), 0), 2) paid_on_reversed_pairs from ledger.events e join ledger.adjudications a using (pcn, payer_id) left join rev using (pcn, payer_id) where e.is_current group by 1 order by 1",
+   "alt_sql": [
+    "with rev as (select distinct claim_key, payer_key from sem.remit_claims where is_reversal) select r.payer_class, count(*), sum(case when rev.claim_key is not null then 1 else 0 end), sum(r.paid_amount), coalesce(sum(case when rev.claim_key is not null then r.paid_amount else 0 end), 0) from sem.remit_claims r left join rev using (claim_key, payer_key) where r.is_current_adjudication group by 1",
+    "SELECT 'ok' AS note, * FROM (with rev as ( select distinct claim_key, payer_key from sem.remit_claims where is_reversal) select r.payer_class, count(*) current_adjudications, count(*) filter (where rev.claim_key is not null) pairs_with_a_reversal, round(sum(r.paid_amount), 2) paid, round(coalesce(sum(r.paid_amount) filter (where rev.claim_key is not null), 0), 2) paid_on_reversed_pairs from sem.remit_claims r left join rev using (claim_key, payer_key) where r.is_current_adjudication group by 1 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "counts the reversal events themselves instead of current adjudications that have one in their history",
+     "sql": "select payer_class, count(*), count(*), round(sum(paid_amount), 2), round(sum(paid_amount), 2) from sem.remit_claims where is_reversal group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "A pair has reversal history when any 835 event for that claim and payer is a reversal (status 22). Dollars are from the current adjudication.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_ar_open_30",
+   "category": "ar_aging",
+   "difficulty": "hard",
+   "question": "Open primary AR, aged in 30-day buckets as of the latest 835 payment date in the data (the maximum payment_date on sem.payments). A claim is open when its latest 837 submission is not a void (frequency 8) and its primary payer (payer_responsibility = 'P') has no current adjudication, either because nothing came back or because the latest event was a reversal. Age is that as-of date minus the first 837 submission date to the primary payer. Buckets are 0-30, 31-60, 61-90 and 91 or more. By payer class and bucket, return open claims and billed charge from the claim's latest submission (2 decimals). Order by payer class, then bucket.",
+   "gold_sql": "with cutoff as (select max(payment_date) as_of from sem.payments), p as ( select claim_key, payer_key, payer_class, min(submission_date) first_sub from sem.claims where payer_responsibility = 'P' group by all), l as ( select claim_key, frequency_code, charge_amount from sem.claims where is_latest_submission), o as ( select p.payer_class, l.charge_amount, (select as_of from cutoff) - p.first_sub as age_days from p join l using (claim_key) where l.frequency_code <> '8' and not exists ( select 1 from sem.remit_claims r where r.claim_key = p.claim_key and r.payer_key = p.payer_key and r.is_current_adjudication)) select payer_class, case when age_days <= 30 then '0-30' when age_days <= 60 then '31-60' when age_days <= 90 then '61-90' else '91+' end age_bucket, count(*) open_claims, round(sum(charge_amount), 2) open_charge from o group by 1, 2 order by 1, 2",
+   "answer_key_sql": "with cutoff as (select max(event_date::date) as_of from ledger.events), p as ( select pcn, payer_id, min(submission_date::date) first_sub from ledger.submissions where payer_sequence = 0 group by all), o as ( select py.payer_class, c.charge, (select as_of from cutoff) - p.first_sub as age_days from p join ledger.claims c using (pcn) join ledger.payers py using (payer_id) where not c.voided and not exists ( select 1 from ledger.events e where e.pcn = p.pcn and e.payer_id = p.payer_id and e.is_current)) select payer_class, case when age_days <= 30 then '0-30' when age_days <= 60 then '31-60' when age_days <= 90 then '61-90' else '91+' end age_bucket, count(*) open_claims, round(sum(charge), 2) open_charge from o group by 1, 2 order by 1, 2",
+   "alt_sql": [
+    "with cutoff as (select max(payment_date) as_of from sem.payments), p as ( select claim_key, payer_key, payer_class, min(submission_date) first_sub from sem.claims where payer_responsibility = 'P' group by all), l as (select claim_key, frequency_code, charge_amount from sem.claims where is_latest_submission), o as ( select p.payer_class, l.charge_amount, (select as_of from cutoff) - p.first_sub age_days from p join l using (claim_key) where l.frequency_code <> '8' and not exists (select 1 from sem.remit_claims r where r.claim_key = p.claim_key and r.payer_key = p.payer_key and r.is_current_adjudication)) select payer_class, case when age_days <= 30 then '0-30' when age_days <= 60 then '31-60' when age_days <= 90 then '61-90' else '91+' end, count(*), sum(charge_amount) from o group by 1, 2",
+    "SELECT 'ok' AS note, * FROM (with cutoff as (select max(payment_date) as_of from sem.payments), p as ( select claim_key, payer_key, payer_class, min(submission_date) first_sub from sem.claims where payer_responsibility = 'P' group by all), l as ( select claim_key, frequency_code, charge_amount from sem.claims where is_latest_submission), o as ( select p.payer_class, l.charge_amount, (select as_of from cutoff) - p.first_sub as age_days from p join l using (claim_key) where l.frequency_code <> '8' and not exists ( select 1 from sem.remit_claims r where r.claim_key = p.claim_key and r.payer_key = p.payer_key and r.is_current_adjudication)) select payer_class, case when age_days <= 30 then '0-30' when age_days <= 60 then '31-60' when age_days <= 90 then '61-90' else '91+' end age_bucket, count(*) open_claims, round(sum(charge_amount), 2) open_charge from o group by 1, 2 order by 1, 2) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "ages the same open claims as of 2026-07-31 instead of the latest payment date",
+     "sql": "with p as ( select claim_key, payer_key, payer_class, min(submission_date) first_sub from sem.claims where payer_responsibility = 'P' group by all), l as (select claim_key, frequency_code, charge_amount from sem.claims where is_latest_submission), o as ( select p.payer_class, l.charge_amount, date '2026-07-31' - p.first_sub age_days from p join l using (claim_key) where l.frequency_code <> '8' and not exists (select 1 from sem.remit_claims r where r.claim_key = p.claim_key and r.payer_key = p.payer_key and r.is_current_adjudication)) select payer_class, case when age_days <= 30 then '0-30' when age_days <= 60 then '31-60' when age_days <= 90 then '61-90' else '91+' end, count(*), round(sum(charge_amount), 2) from o group by 1, 2"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Open means no current adjudication from the primary payer, and the latest submission is not a void. Charge is the latest submission charge. As-of date is max payment_date.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_ar_weighted_age",
+   "category": "ar_aging",
+   "difficulty": "hard",
+   "question": "For the same open primary AR (latest submission is not a void, primary payer has no current adjudication), what is the dollar-weighted average age in days as of the latest 835 payment date? Age is that date minus the first primary submission date, and the weight is the latest submission's billed charge. By payer class return open claims, open charge (2 decimals) and the weighted average age (2 decimals). Order by payer class.",
+   "gold_sql": "with cutoff as (select max(payment_date) as_of from sem.payments), p as ( select claim_key, payer_key, payer_class, min(submission_date) first_sub from sem.claims where payer_responsibility = 'P' group by all), l as (select claim_key, frequency_code, charge_amount from sem.claims where is_latest_submission), o as ( select p.payer_class, l.charge_amount, (select as_of from cutoff) - p.first_sub as age_days from p join l using (claim_key) where l.frequency_code <> '8' and not exists (select 1 from sem.remit_claims r where r.claim_key = p.claim_key and r.payer_key = p.payer_key and r.is_current_adjudication)) select payer_class, count(*) open_claims, round(sum(charge_amount), 2) open_charge, round(sum(charge_amount * age_days) / nullif(sum(charge_amount), 0), 2) weighted_avg_age_days from o group by 1 order by 1",
+   "answer_key_sql": "with cutoff as (select max(event_date::date) as_of from ledger.events), p as ( select pcn, payer_id, min(submission_date::date) first_sub from ledger.submissions where payer_sequence = 0 group by all), o as ( select py.payer_class, c.charge, (select as_of from cutoff) - p.first_sub as age_days from p join ledger.claims c using (pcn) join ledger.payers py using (payer_id) where not c.voided and not exists (select 1 from ledger.events e where e.pcn = p.pcn and e.payer_id = p.payer_id and e.is_current)) select payer_class, count(*) open_claims, round(sum(charge), 2) open_charge, round(sum(charge * age_days) / nullif(sum(charge), 0), 2) weighted_avg_age_days from o group by 1 order by 1",
+   "alt_sql": [
+    "with cutoff as (select max(payment_date) as_of from sem.payments), p as ( select claim_key, payer_key, payer_class, min(submission_date) first_sub from sem.claims where payer_responsibility = 'P' group by all), l as (select claim_key, frequency_code, charge_amount from sem.claims where is_latest_submission), o as ( select p.payer_class, l.charge_amount, (select as_of from cutoff) - p.first_sub age_days from p join l using (claim_key) where l.frequency_code <> '8' and not exists (select 1 from sem.remit_claims r where r.claim_key = p.claim_key and r.payer_key = p.payer_key and r.is_current_adjudication)) select payer_class, count(*), sum(charge_amount), sum(charge_amount * age_days) / sum(charge_amount) from o group by 1",
+    "SELECT 'ok' AS note, * FROM (with cutoff as (select max(payment_date) as_of from sem.payments), p as ( select claim_key, payer_key, payer_class, min(submission_date) first_sub from sem.claims where payer_responsibility = 'P' group by all), l as (select claim_key, frequency_code, charge_amount from sem.claims where is_latest_submission), o as ( select p.payer_class, l.charge_amount, (select as_of from cutoff) - p.first_sub as age_days from p join l using (claim_key) where l.frequency_code <> '8' and not exists (select 1 from sem.remit_claims r where r.claim_key = p.claim_key and r.payer_key = p.payer_key and r.is_current_adjudication)) select payer_class, count(*) open_claims, round(sum(charge_amount), 2) open_charge, round(sum(charge_amount * age_days) / nullif(sum(charge_amount), 0), 2) weighted_avg_age_days from o group by 1 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "simple average of age, not charge-weighted",
+     "sql": "with cutoff as (select max(payment_date) as_of from sem.payments), p as ( select claim_key, payer_key, payer_class, min(submission_date) first_sub from sem.claims where payer_responsibility = 'P' group by all), l as (select claim_key, frequency_code, charge_amount from sem.claims where is_latest_submission), o as ( select p.payer_class, l.charge_amount, (select as_of from cutoff) - p.first_sub age_days from p join l using (claim_key) where l.frequency_code <> '8' and not exists (select 1 from sem.remit_claims r where r.claim_key = p.claim_key and r.payer_key = p.payer_key and r.is_current_adjudication)) select payer_class, count(*), round(sum(charge_amount), 2), round(avg(age_days), 2) from o group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Same open-primary population as the 30-day bucket report. Weighted age = sum(charge * age) / sum(charge).",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_ar_open_by_dos",
+   "category": "ar_aging",
+   "difficulty": "hard",
+   "question": "Age the same open primary AR from the date of service instead of the submission date. Open claims are those whose latest 837 is not a void and whose primary payer has no current adjudication. Age, as of the latest 835 payment date, is that date minus the service-from date on the latest submission. Buckets are 0-30, 31-60, 61-90 and 91 or more days. By payer class and bucket return open claims and latest-submission charge (2 decimals). Order by payer class, then bucket.",
+   "gold_sql": "with cutoff as (select max(payment_date) as_of from sem.payments), p as ( select claim_key, payer_key, payer_class from ( select claim_key, payer_key, payer_class, row_number() over (partition by claim_key order by submission_date desc, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1), l as ( select claim_key, frequency_code, charge_amount, service_date_from from sem.claims where is_latest_submission), o as ( select p.payer_class, l.charge_amount, (select as_of from cutoff) - l.service_date_from as age_days from p join l using (claim_key) where l.frequency_code <> '8' and l.service_date_from is not null and not exists (select 1 from sem.remit_claims r where r.claim_key = p.claim_key and r.payer_key = p.payer_key and r.is_current_adjudication)) select payer_class, case when age_days <= 30 then '0-30' when age_days <= 60 then '31-60' when age_days <= 90 then '61-90' else '91+' end age_bucket, count(*) open_claims, round(sum(charge_amount), 2) open_charge from o group by 1, 2 order by 1, 2",
+   "answer_key_sql": "with cutoff as (select max(event_date::date) as_of from ledger.events), p as ( select pcn, payer_id from ledger.submissions where payer_sequence = 0 group by 1, 2), o as ( select py.payer_class, c.charge, (select as_of from cutoff) - c.dos::date as age_days from p join ledger.claims c using (pcn) join ledger.payers py using (payer_id) where not c.voided and c.dos is not null and not exists (select 1 from ledger.events e where e.pcn = p.pcn and e.payer_id = p.payer_id and e.is_current)) select payer_class, case when age_days <= 30 then '0-30' when age_days <= 60 then '31-60' when age_days <= 90 then '61-90' else '91+' end age_bucket, count(*) open_claims, round(sum(charge), 2) open_charge from o group by 1, 2 order by 1, 2",
+   "alt_sql": [
+    "with cutoff as (select max(payment_date) as_of from sem.payments), p as ( select claim_key, payer_key, payer_class from ( select claim_key, payer_key, payer_class, row_number() over (partition by claim_key order by submission_date desc, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1), l as ( select claim_key, frequency_code, charge_amount, service_date_from from sem.claims where is_latest_submission), o as ( select p.payer_class, l.charge_amount, (select as_of from cutoff) - l.service_date_from age_days from p join l using (claim_key) where l.frequency_code <> '8' and l.service_date_from is not null and not exists (select 1 from sem.remit_claims r where r.claim_key = p.claim_key and r.payer_key = p.payer_key and r.is_current_adjudication)) select payer_class, case when age_days <= 30 then '0-30' when age_days <= 60 then '31-60' when age_days <= 90 then '61-90' else '91+' end, count(*), sum(charge_amount) from o group by 1, 2",
+    "SELECT 'ok' AS note, * FROM (with cutoff as (select max(payment_date) as_of from sem.payments), p as ( select claim_key, payer_key, payer_class from ( select claim_key, payer_key, payer_class, row_number() over (partition by claim_key order by submission_date desc, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1), l as ( select claim_key, frequency_code, charge_amount, service_date_from from sem.claims where is_latest_submission), o as ( select p.payer_class, l.charge_amount, (select as_of from cutoff) - l.service_date_from as age_days from p join l using (claim_key) where l.frequency_code <> '8' and l.service_date_from is not null and not exists (select 1 from sem.remit_claims r where r.claim_key = p.claim_key and r.payer_key = p.payer_key and r.is_current_adjudication)) select payer_class, case when age_days <= 30 then '0-30' when age_days <= 60 then '31-60' when age_days <= 90 then '61-90' else '91+' end age_bucket, count(*) open_claims, round(sum(charge_amount), 2) open_charge from o group by 1, 2 order by 1, 2) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "ages from the first primary submission date instead of the date of service",
+     "sql": "with cutoff as (select max(payment_date) as_of from sem.payments), p as ( select claim_key, payer_key, payer_class, min(submission_date) first_sub from sem.claims where payer_responsibility = 'P' group by all), l as (select claim_key, frequency_code, charge_amount from sem.claims where is_latest_submission), o as ( select p.payer_class, l.charge_amount, (select as_of from cutoff) - p.first_sub age_days from p join l using (claim_key) where l.frequency_code <> '8' and not exists (select 1 from sem.remit_claims r where r.claim_key = p.claim_key and r.payer_key = p.payer_key and r.is_current_adjudication)) select payer_class, case when age_days <= 30 then '0-30' when age_days <= 60 then '31-60' when age_days <= 90 then '61-90' else '91+' end, count(*), round(sum(charge_amount), 2) from o group by 1, 2"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Same open definition. The clock is the latest submission's service-from date. Payer class is the primary payer's class.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_ar_zero_pay_lag",
+   "category": "ar_aging",
+   "difficulty": "hard",
+   "question": "Some primary adjudications close at $0 without being denials. For current adjudications from the primary payer (payer_responsibility = 'P') with paid amount exactly 0 and is_denied false, bucket the days from the first primary 837 submission to the payment date as 0-14, 15-30 and 31 or more. By payer class and bucket return the number of claims and the 835 claim charge (2 decimals). Order by payer class, then bucket.",
+   "gold_sql": "with p as ( select claim_key, payer_key, payer_class, min(submission_date) first_sub from sem.claims where payer_responsibility = 'P' group by all) select p.payer_class, case when r.payment_date - p.first_sub <= 14 then '0-14' when r.payment_date - p.first_sub <= 30 then '15-30' else '31+' end age_bucket, count(*) claims, round(sum(r.charge_amount), 2) charge from p join sem.remit_claims r on r.claim_key = p.claim_key and r.payer_key = p.payer_key where r.is_current_adjudication and r.paid_amount = 0 and not r.is_denied group by 1, 2 order by 1, 2",
+   "answer_key_sql": "with p as ( select s.pcn, s.payer_id, py.payer_class, min(s.submission_date::date) first_sub from ledger.submissions s join ledger.payers py using (payer_id) where s.payer_sequence = 0 group by all) select p.payer_class, case when e.event_date::date - p.first_sub <= 14 then '0-14' when e.event_date::date - p.first_sub <= 30 then '15-30' else '31+' end age_bucket, count(*) claims, round(sum(e.charge), 2) charge from p join ledger.events e on e.pcn = p.pcn and e.payer_id = p.payer_id and e.is_current join ledger.adjudications a on a.pcn = p.pcn and a.payer_id = p.payer_id where e.paid = 0 and not a.denied group by 1, 2 order by 1, 2",
+   "alt_sql": [
+    "with p as ( select claim_key, payer_key, payer_class, min(submission_date) first_sub from sem.claims where payer_responsibility = 'P' group by all) select p.payer_class, case when r.payment_date - p.first_sub <= 14 then '0-14' when r.payment_date - p.first_sub <= 30 then '15-30' else '31+' end, count(*), sum(r.charge_amount) from p join sem.remit_claims r using (claim_key, payer_key) where r.is_current_adjudication and r.paid_amount = 0 and not r.is_denied group by 1, 2",
+    "SELECT 'ok' AS note, * FROM (with p as ( select claim_key, payer_key, payer_class, min(submission_date) first_sub from sem.claims where payer_responsibility = 'P' group by all) select p.payer_class, case when r.payment_date - p.first_sub <= 14 then '0-14' when r.payment_date - p.first_sub <= 30 then '15-30' else '31+' end age_bucket, count(*) claims, round(sum(r.charge_amount), 2) charge from p join sem.remit_claims r on r.claim_key = p.claim_key and r.payer_key = p.payer_key where r.is_current_adjudication and r.paid_amount = 0 and not r.is_denied group by 1, 2 order by 1, 2) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "includes denials in the $0 population",
+     "sql": "with p as ( select claim_key, payer_key, payer_class, min(submission_date) first_sub from sem.claims where payer_responsibility = 'P' group by all) select p.payer_class, case when r.payment_date - p.first_sub <= 14 then '0-14' when r.payment_date - p.first_sub <= 30 then '15-30' else '31+' end, count(*), round(sum(r.charge_amount), 2) from p join sem.remit_claims r using (claim_key, payer_key) where r.is_current_adjudication and r.paid_amount = 0 group by 1, 2"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Primary current adjudications with paid 0 and not denied. Age is payment date minus first primary submission.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_ar_reversal_open",
+   "category": "ar_aging",
+   "difficulty": "hard",
+   "question": "Which reversals left the claim unpaid? For claim-and-payer pairs that have a reversal event (claim status 22) and no current adjudication, by payer class return the number of pairs and the sum of paid amounts on the reversal events (2 decimals, signed as the 835 sent them). Order by payer class.",
+   "gold_sql": "with rev as ( select payer_class, claim_key, payer_key, sum(paid_amount) reversal_paid from sem.remit_claims where is_reversal group by 1, 2, 3) select rev.payer_class, count(*) pairs_reversed_with_no_current, round(sum(rev.reversal_paid), 2) reversal_paid from rev where not exists ( select 1 from sem.remit_claims c where c.claim_key = rev.claim_key and c.payer_key = rev.payer_key and c.is_current_adjudication) group by 1 order by 1",
+   "answer_key_sql": "with rev as ( select payer_id, pcn, sum(paid) reversal_paid from ledger.events where status = '22' group by 1, 2) select py.payer_class, count(*) pairs_reversed_with_no_current, round(sum(rev.reversal_paid), 2) reversal_paid from rev join ledger.payers py using (payer_id) where not exists ( select 1 from ledger.events e where e.pcn = rev.pcn and e.payer_id = rev.payer_id and e.is_current) group by 1 order by 1",
+   "alt_sql": [
+    "with rev as ( select payer_class, claim_key, payer_key, sum(paid_amount) reversal_paid from sem.remit_claims where is_reversal group by 1, 2, 3) select payer_class, count(*), sum(reversal_paid) from rev where not exists ( select 1 from sem.remit_claims c where c.claim_key = rev.claim_key and c.payer_key = rev.payer_key and c.is_current_adjudication) group by 1",
+    "SELECT 'ok' AS note, * FROM (with rev as ( select payer_class, claim_key, payer_key, sum(paid_amount) reversal_paid from sem.remit_claims where is_reversal group by 1, 2, 3) select rev.payer_class, count(*) pairs_reversed_with_no_current, round(sum(rev.reversal_paid), 2) reversal_paid from rev where not exists ( select 1 from sem.remit_claims c where c.claim_key = rev.claim_key and c.payer_key = rev.payer_key and c.is_current_adjudication) group by 1 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "includes pairs that were reversed and then corrected, which do have a current adjudication",
+     "sql": "select payer_class, count(*), round(sum(paid_amount), 2) from sem.remit_claims where is_reversal group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Population is claim+payer pairs whose reversal was not followed by a current adjudication. Paid amount is the sum of the reversal events.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_ar_pr_age",
+   "category": "ar_aging",
+   "difficulty": "hard",
+   "question": "Patient responsibility assigned on a current adjudication is still open from the lab's point of view (patient payments are not in this data). As of the latest 835 payment date, bucket that balance by how many days have passed since the adjudication's payment date: 0-14 and 15 or more. By payer class and bucket, return the number of current adjudications with patient responsibility greater than zero and the patient-responsibility dollars (CLP05, 2 decimals). Order by payer class, then bucket.",
+   "gold_sql": "with cutoff as (select max(payment_date) as_of from sem.payments) select payer_class, case when (select as_of from cutoff) - payment_date <= 14 then '0-14' else '15+' end age_bucket, count(*) adjudications, round(sum(patient_responsibility_amount), 2) patient_responsibility from sem.remit_claims where is_current_adjudication and coalesce(patient_responsibility_amount, 0) > 0 group by 1, 2 order by 1, 2",
+   "answer_key_sql": "with cutoff as (select max(event_date::date) as_of from ledger.events) select a.payer_class, case when (select as_of from cutoff) - e.event_date::date <= 14 then '0-14' else '15+' end age_bucket, count(*) adjudications, round(sum(e.patient_responsibility), 2) patient_responsibility from ledger.events e join ledger.adjudications a using (pcn, payer_id) where e.is_current and coalesce(e.patient_responsibility, 0) > 0 group by 1, 2 order by 1, 2",
+   "alt_sql": [
+    "with cutoff as (select max(payment_date) as_of from sem.payments) select payer_class, case when (select as_of from cutoff) - payment_date <= 14 then '0-14' else '15+' end, count(*), sum(patient_responsibility_amount) from sem.remit_claims where is_current_adjudication and patient_responsibility_amount > 0 group by 1, 2",
+    "SELECT 'ok' AS note, * FROM (with cutoff as (select max(payment_date) as_of from sem.payments) select payer_class, case when (select as_of from cutoff) - payment_date <= 14 then '0-14' else '15+' end age_bucket, count(*) adjudications, round(sum(patient_responsibility_amount), 2) patient_responsibility from sem.remit_claims where is_current_adjudication and coalesce(patient_responsibility_amount, 0) > 0 group by 1, 2 order by 1, 2) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "buckets by days since the service date instead of the payment date",
+     "sql": "with cutoff as (select max(payment_date) as_of from sem.payments) select payer_class, case when (select as_of from cutoff) - service_date_from <= 14 then '0-14' else '15+' end, count(*), round(sum(patient_responsibility_amount), 2) from sem.remit_claims where is_current_adjudication and coalesce(patient_responsibility_amount, 0) > 0 group by 1, 2"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Current adjudications with CLP05 > 0. Age is the latest payment date in the data minus this adjudication's payment date.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_und_short_by_class",
+   "category": "underpayment",
+   "difficulty": "hard",
+   "question": "Where did payers pay less than the fee-schedule allowance they reported? On 835 service lines of current adjudications that are not denied at line level and have a positive allowed amount (AMT*B6), a line is short when line paid is below that allowance. The shortfall (allowed minus paid) includes dollars the payer shifted to the patient; do not subtract patient responsibility. By payer class return lines in this population, lines paid below allowed, total allowed, total paid, the shortfall (0 when none), and the shortfall as a percent of allowed, all dollars to 2 decimals and the percent to 1 decimal. Order by payer class.",
+   "gold_sql": "select payer_class, count(*) lines, count(*) filter (where line_paid_amount < line_allowed_amount) short_lines, round(sum(line_allowed_amount), 2) allowed, round(sum(line_paid_amount), 2) paid, round(coalesce(sum(line_allowed_amount - line_paid_amount) filter (where line_paid_amount < line_allowed_amount), 0), 2) shortfall, round(100.0 * coalesce(sum(line_allowed_amount - line_paid_amount) filter (where line_paid_amount < line_allowed_amount), 0) / nullif(sum(line_allowed_amount), 0), 1) shortfall_pct from sem.remit_lines where is_current_adjudication and not line_is_denied and line_allowed_amount > 0 group by 1 order by 1",
+   "answer_key_sql": "select py.payer_class, count(*) lines, count(*) filter (where el.paid < el.allowed) short_lines, round(sum(el.allowed), 2) allowed, round(sum(el.paid), 2) paid, round(coalesce(sum(el.allowed - el.paid) filter (where el.paid < el.allowed), 0), 2) shortfall, round(100.0 * coalesce(sum(el.allowed - el.paid) filter (where el.paid < el.allowed), 0) / nullif(sum(el.allowed), 0), 1) shortfall_pct from ledger.event_lines el join ledger.events e using (pcn, payer_id, event_number) join ledger.payers py using (payer_id) where e.is_current and not el.denied and el.allowed > 0 group by 1 order by 1",
+   "alt_sql": [
+    "select payer_class, count(*), sum(case when line_paid_amount < line_allowed_amount then 1 else 0 end), sum(line_allowed_amount), sum(line_paid_amount), coalesce(sum(case when line_paid_amount < line_allowed_amount then line_allowed_amount - line_paid_amount else 0 end), 0), round(100.0 * coalesce(sum(case when line_paid_amount < line_allowed_amount then line_allowed_amount - line_paid_amount else 0 end), 0) / sum(line_allowed_amount), 1) from sem.remit_lines where is_current_adjudication and not line_is_denied and line_allowed_amount > 0 group by 1",
+    "SELECT 'ok' AS note, * FROM (select payer_class, count(*) lines, count(*) filter (where line_paid_amount < line_allowed_amount) short_lines, round(sum(line_allowed_amount), 2) allowed, round(sum(line_paid_amount), 2) paid, round(coalesce(sum(line_allowed_amount - line_paid_amount) filter (where line_paid_amount < line_allowed_amount), 0), 2) shortfall, round(100.0 * coalesce(sum(line_allowed_amount - line_paid_amount) filter (where line_paid_amount < line_allowed_amount), 0) / nullif(sum(line_allowed_amount), 0), 1) shortfall_pct from sem.remit_lines where is_current_adjudication and not line_is_denied and line_allowed_amount > 0 group by 1 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "includes line-level denials in the population",
+     "sql": "select payer_class, count(*), count(*) filter (where line_paid_amount < line_allowed_amount), round(sum(line_allowed_amount), 2), round(sum(line_paid_amount), 2), round(coalesce(sum(line_allowed_amount - line_paid_amount) filter (where line_paid_amount < line_allowed_amount), 0), 2), round(100.0 * coalesce(sum(line_allowed_amount - line_paid_amount) filter (where line_paid_amount < line_allowed_amount), 0) / nullif(sum(line_allowed_amount), 0), 1) from sem.remit_lines where is_current_adjudication and line_allowed_amount > 0 group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Allowed amount is the 835 AMT*B6 fee-schedule allowance. Population excludes line denials and lines with no positive allowance. Shortfall is allowed minus paid.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_und_short_by_cpt",
+   "category": "underpayment",
+   "difficulty": "hard",
+   "question": "Which billed CPT codes account for the most dollars paid below the fee-schedule allowance? Use 835 service lines on current adjudications that are not denied at line level, have a positive allowed amount, and were paid below that allowance. Shortfall is allowed minus paid. Return every such procedure code with the number of short lines and the shortfall in dollars (2 decimals), ordered by shortfall descending and procedure code ascending. The top 8 are the answer; ties at the cutoff are acceptable.",
+   "gold_sql": "select procedure_code, count(*) short_lines, round(sum(line_allowed_amount - line_paid_amount), 2) shortfall from sem.remit_lines where is_current_adjudication and not line_is_denied and line_allowed_amount > 0 and line_paid_amount < line_allowed_amount group by 1 order by shortfall desc, procedure_code",
+   "answer_key_sql": "select el.cpt procedure_code, count(*) short_lines, round(sum(el.allowed - el.paid), 2) shortfall from ledger.event_lines el join ledger.events e using (pcn, payer_id, event_number) where e.is_current and not el.denied and el.allowed > 0 and el.paid < el.allowed group by 1 order by shortfall desc, procedure_code",
+   "alt_sql": [
+    "select procedure_code, count(*) short_lines, sum(line_allowed_amount - line_paid_amount) shortfall from sem.remit_lines where is_current_adjudication and not line_is_denied and line_allowed_amount > 0 and line_paid_amount < line_allowed_amount group by 1 order by shortfall desc, procedure_code desc limit 8",
+    "SELECT * FROM (select procedure_code, count(*) short_lines, round(sum(line_allowed_amount - line_paid_amount), 2) shortfall from sem.remit_lines where is_current_adjudication and not line_is_denied and line_allowed_amount > 0 and line_paid_amount < line_allowed_amount group by 1 order by shortfall desc, procedure_code) q LIMIT 8"
+   ],
+   "wrong_sql": [
+    {
+     "label": "ranks by short line count instead of shortfall dollars",
+     "sql": "select procedure_code, count(*) short_lines, round(sum(line_allowed_amount - line_paid_amount), 2) shortfall from sem.remit_lines where is_current_adjudication and not line_is_denied and line_allowed_amount > 0 and line_paid_amount < line_allowed_amount group by 1 order by short_lines desc, procedure_code limit 8"
+    }
+   ],
+   "compare": {
+    "tol": 0.01,
+    "order": "topn",
+    "n": 8,
+    "metric_col": 2
+   },
+   "interpretation": "Line grain, current adjudications, billed procedure code. Ranking metric is the shortfall. Top 8, ties at the cutoff allowed.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_und_over_allowed",
+   "category": "underpayment",
+   "difficulty": "hard",
+   "question": "Did any current-adjudication service line that is not denied get paid more than the fee-schedule allowance the payer reported? For lines with a positive allowed amount, by payer class return the line count, how many were paid above the allowance, and the excess dollars (paid minus allowed, only where paid is above allowed, otherwise 0). Round dollars to 2 decimals. Order by payer class.",
+   "gold_sql": "select payer_class, count(*) lines, count(*) filter (where line_paid_amount > line_allowed_amount) paid_above_allowed, round(coalesce(sum(line_paid_amount - line_allowed_amount) filter (where line_paid_amount > line_allowed_amount), 0), 2) excess from sem.remit_lines where is_current_adjudication and not line_is_denied and line_allowed_amount > 0 group by 1 order by 1",
+   "answer_key_sql": "select py.payer_class, count(*) lines, count(*) filter (where el.paid > el.allowed) paid_above_allowed, round(coalesce(sum(el.paid - el.allowed) filter (where el.paid > el.allowed), 0), 2) excess from ledger.event_lines el join ledger.events e using (pcn, payer_id, event_number) join ledger.payers py using (payer_id) where e.is_current and not el.denied and el.allowed > 0 group by 1 order by 1",
+   "alt_sql": [
+    "select payer_class, count(*), sum((line_paid_amount > line_allowed_amount)::int), coalesce(sum(case when line_paid_amount > line_allowed_amount then line_paid_amount - line_allowed_amount else 0 end), 0) from sem.remit_lines where is_current_adjudication and not line_is_denied and line_allowed_amount > 0 group by 1",
+    "SELECT 'ok' AS note, * FROM (select payer_class, count(*) lines, count(*) filter (where line_paid_amount > line_allowed_amount) paid_above_allowed, round(coalesce(sum(line_paid_amount - line_allowed_amount) filter (where line_paid_amount > line_allowed_amount), 0), 2) excess from sem.remit_lines where is_current_adjudication and not line_is_denied and line_allowed_amount > 0 group by 1 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "reports lines paid below the allowance as if they were paid above it",
+     "sql": "select payer_class, count(*), count(*) filter (where line_paid_amount < line_allowed_amount), round(coalesce(sum(line_allowed_amount - line_paid_amount) filter (where line_paid_amount < line_allowed_amount), 0), 2) from sem.remit_lines where is_current_adjudication and not line_is_denied and line_allowed_amount > 0 group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Control total for payment above AMT*B6. Population is non-denied current lines with a positive allowance.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_und_allowed_missing",
+   "category": "underpayment",
+   "difficulty": "hard",
+   "question": "How often is the fee-schedule allowance missing? Among 835 service lines on current adjudications that are not denied at line level, by payer class return the line count, how many have no positive allowed amount (null or zero), and that share as a percent rounded to 1 decimal. Order by payer class.",
+   "gold_sql": "select payer_class, count(*) lines, count(*) filter (where line_allowed_amount is null or line_allowed_amount = 0) missing_allowed, round(100.0 * count(*) filter (where line_allowed_amount is null or line_allowed_amount = 0) / count(*), 1) missing_allowed_pct from sem.remit_lines where is_current_adjudication and not line_is_denied group by 1 order by 1",
+   "answer_key_sql": "select py.payer_class, count(*) lines, count(*) filter (where el.allowed is null or el.allowed = 0) missing_allowed, round(100.0 * count(*) filter (where el.allowed is null or el.allowed = 0) / count(*), 1) missing_allowed_pct from ledger.event_lines el join ledger.events e using (pcn, payer_id, event_number) join ledger.payers py using (payer_id) where e.is_current and not el.denied group by 1 order by 1",
+   "alt_sql": [
+    "select payer_class, count(*), sum((line_allowed_amount is null or line_allowed_amount = 0)::int), round(100.0 * avg((line_allowed_amount is null or line_allowed_amount = 0)::int), 1) from sem.remit_lines where is_current_adjudication and not line_is_denied group by 1",
+    "SELECT 'ok' AS note, * FROM (select payer_class, count(*) lines, count(*) filter (where line_allowed_amount is null or line_allowed_amount = 0) missing_allowed, round(100.0 * count(*) filter (where line_allowed_amount is null or line_allowed_amount = 0) / count(*), 1) missing_allowed_pct from sem.remit_lines where is_current_adjudication and not line_is_denied group by 1 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "uses every current line, including line-level denials",
+     "sql": "select payer_class, count(*), count(*) filter (where line_allowed_amount is null), round(100.0 * count(*) filter (where line_allowed_amount is null) / count(*), 1) from sem.remit_lines where is_current_adjudication group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Non-denied lines on current adjudications. A missing allowance is a null or zero allowed amount. The generator's ledger stores an omitted allowance as zero; the semantic layer stores it as null.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_und_allowed_to_charge",
+   "category": "underpayment",
+   "difficulty": "hard",
+   "question": "How deep is the fee-schedule allowance relative to what we billed? For 835 service lines on current adjudications that are not denied at line level and have both a positive allowed amount and a positive line charge, by payer class return the line count, total line charge, total allowed, and allowed as a percent of charge rounded to 1 decimal. Order by payer class.",
+   "gold_sql": "select payer_class, count(*) lines, round(sum(line_charge_amount), 2) line_charge, round(sum(line_allowed_amount), 2) allowed, round(100.0 * sum(line_allowed_amount) / sum(line_charge_amount), 1) allowed_pct_of_charge from sem.remit_lines where is_current_adjudication and not line_is_denied and line_allowed_amount > 0 and line_charge_amount > 0 group by 1 order by 1",
+   "answer_key_sql": "select py.payer_class, count(*) lines, round(sum(el.charge), 2) line_charge, round(sum(el.allowed), 2) allowed, round(100.0 * sum(el.allowed) / sum(el.charge), 1) allowed_pct_of_charge from ledger.event_lines el join ledger.events e using (pcn, payer_id, event_number) join ledger.payers py using (payer_id) where e.is_current and not el.denied and el.allowed > 0 and el.charge > 0 group by 1 order by 1",
+   "alt_sql": [
+    "select payer_class, count(*), sum(line_charge_amount), sum(line_allowed_amount), round(100.0 * sum(line_allowed_amount) / sum(line_charge_amount), 1) from sem.remit_lines where is_current_adjudication and not line_is_denied and line_allowed_amount > 0 and line_charge_amount > 0 group by 1",
+    "SELECT 'ok' AS note, * FROM (select payer_class, count(*) lines, round(sum(line_charge_amount), 2) line_charge, round(sum(line_allowed_amount), 2) allowed, round(100.0 * sum(line_allowed_amount) / sum(line_charge_amount), 1) allowed_pct_of_charge from sem.remit_lines where is_current_adjudication and not line_is_denied and line_allowed_amount > 0 and line_charge_amount > 0 group by 1 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "uses paid instead of allowed in the ratio",
+     "sql": "select payer_class, count(*), round(sum(line_charge_amount), 2), round(sum(line_paid_amount), 2), round(100.0 * sum(line_paid_amount) / sum(line_charge_amount), 1) from sem.remit_lines where is_current_adjudication and not line_is_denied and line_allowed_amount > 0 and line_charge_amount > 0 group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Allowance yield: AMT*B6 divided by the 835 line charge, on non-denied current lines that report both.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_und_short_by_month",
+   "category": "underpayment",
+   "difficulty": "hard",
+   "question": "Is the gap between the fee-schedule allowance and what was paid changing by payment month? Same line population as the payer-class shortfall: current adjudications, not denied at line level, positive allowed amount. A line is short when paid is below allowed. By payment month return lines, short lines, total allowed, total paid and the shortfall (allowed minus paid where paid is below allowed, otherwise that line contributes 0). Round dollars to 2 decimals. Order by month.",
+   "gold_sql": "select payment_month, count(*) lines, count(*) filter (where line_paid_amount < line_allowed_amount) short_lines, round(sum(line_allowed_amount), 2) allowed, round(sum(line_paid_amount), 2) paid, round(coalesce(sum(line_allowed_amount - line_paid_amount) filter (where line_paid_amount < line_allowed_amount), 0), 2) shortfall from sem.remit_lines where is_current_adjudication and not line_is_denied and line_allowed_amount > 0 group by 1 order by 1",
+   "answer_key_sql": "select date_trunc('month', e.event_date::date)::date payment_month, count(*) lines, count(*) filter (where el.paid < el.allowed) short_lines, round(sum(el.allowed), 2) allowed, round(sum(el.paid), 2) paid, round(coalesce(sum(el.allowed - el.paid) filter (where el.paid < el.allowed), 0), 2) shortfall from ledger.event_lines el join ledger.events e using (pcn, payer_id, event_number) where e.is_current and not el.denied and el.allowed > 0 group by 1 order by 1",
+   "alt_sql": [
+    "select payment_month, count(*), sum((line_paid_amount < line_allowed_amount)::int), sum(line_allowed_amount), sum(line_paid_amount), coalesce(sum(case when line_paid_amount < line_allowed_amount then line_allowed_amount - line_paid_amount else 0 end), 0) from sem.remit_lines where is_current_adjudication and not line_is_denied and line_allowed_amount > 0 group by 1",
+    "SELECT 'ok' AS note, * FROM (select payment_month, count(*) lines, count(*) filter (where line_paid_amount < line_allowed_amount) short_lines, round(sum(line_allowed_amount), 2) allowed, round(sum(line_paid_amount), 2) paid, round(coalesce(sum(line_allowed_amount - line_paid_amount) filter (where line_paid_amount < line_allowed_amount), 0), 2) shortfall from sem.remit_lines where is_current_adjudication and not line_is_denied and line_allowed_amount > 0 group by 1 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "groups by service month instead of payment month",
+     "sql": "select service_month, count(*), count(*) filter (where line_paid_amount < line_allowed_amount), round(sum(line_allowed_amount), 2), round(sum(line_paid_amount), 2), round(coalesce(sum(line_allowed_amount - line_paid_amount) filter (where line_paid_amount < line_allowed_amount), 0), 2) from sem.remit_lines where is_current_adjudication and not line_is_denied and line_allowed_amount > 0 group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Payment month of the current adjudication. Shortfall definition matches the payer-class allowance gap.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_dx_chapter",
+   "category": "cpt_dx",
+   "difficulty": "hard",
+   "question": "Does the primary-payer denial rate differ by ICD-10 chapter? Use claims with an 837 to the primary payer (payer_responsibility = 'P') and a current adjudication from that payer. The principal diagnosis is the one on the latest primary submission. The chapter is the first character of that code. Keep chapters with at least 40 such claims. Return the chapter, claims, denied claims and the denial rate as a percent rounded to 1 decimal. Order by chapter. Claims that appear only as 835s are excluded.",
+   "gold_sql": "with prim as ( select claim_key, payer_key, principal_diagnosis_code dx from ( select claim_key, payer_key, principal_diagnosis_code, row_number() over (partition by claim_key order by submission_date desc, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1), pop as ( select left(dx, 1) chapter, r.is_denied from prim join sem.remit_claims r on r.claim_key = prim.claim_key and r.payer_key = prim.payer_key and r.is_current_adjudication) select chapter, count(*) claims, count(*) filter (where is_denied) denied, round(100.0 * avg(is_denied::int), 1) denial_rate_pct from pop group by 1 having count(*) >= 40 order by 1",
+   "answer_key_sql": "with prim as ( select pcn, payer_id, principal_dx dx from ( select c.pcn, s.payer_id, c.principal_dx, row_number() over (partition by c.pcn order by s.submission_date desc, s.payer_id) rn from ledger.claims c join ledger.submissions s on s.pcn = c.pcn and s.payer_sequence = 0 ) t where rn = 1), pop as ( select left(dx, 1) chapter, a.denied is_denied from prim join ledger.events e on e.pcn = prim.pcn and e.payer_id = prim.payer_id and e.is_current join ledger.adjudications a on a.pcn = prim.pcn and a.payer_id = prim.payer_id) select chapter, count(*) claims, count(*) filter (where is_denied) denied, round(100.0 * avg(is_denied::int), 1) denial_rate_pct from pop group by 1 having count(*) >= 40 order by 1",
+   "alt_sql": [
+    "with prim as ( select claim_key, payer_key, principal_diagnosis_code dx from ( select claim_key, payer_key, principal_diagnosis_code, row_number() over (partition by claim_key order by submission_date desc, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1), pop as ( select substring(dx, 1, 1) chapter, r.is_denied from prim join sem.remit_claims r on r.claim_key = prim.claim_key and r.payer_key = prim.payer_key and r.is_current_adjudication) select chapter, count(*), sum(is_denied::int), round(100.0 * avg(is_denied::int), 1) from pop group by 1 having count(*) >= 40",
+    "SELECT 'ok' AS note, * FROM (with prim as ( select claim_key, payer_key, principal_diagnosis_code dx from ( select claim_key, payer_key, principal_diagnosis_code, row_number() over (partition by claim_key order by submission_date desc, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1), pop as ( select left(dx, 1) chapter, r.is_denied from prim join sem.remit_claims r on r.claim_key = prim.claim_key and r.payer_key = prim.payer_key and r.is_current_adjudication) select chapter, count(*) claims, count(*) filter (where is_denied) denied, round(100.0 * avg(is_denied::int), 1) denial_rate_pct from pop group by 1 having count(*) >= 40 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "keeps every chapter, including those with fewer than 40 claims",
+     "sql": "with prim as ( select claim_key, payer_key, principal_diagnosis_code dx from ( select claim_key, payer_key, principal_diagnosis_code, row_number() over (partition by claim_key order by submission_date desc, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1), pop as ( select left(dx, 1) chapter, r.is_denied from prim join sem.remit_claims r on r.claim_key = prim.claim_key and r.payer_key = prim.payer_key and r.is_current_adjudication) select chapter, count(*), count(*) filter (where is_denied), round(100.0 * avg(is_denied::int), 1) from pop group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Primary current adjudications of claims with an 837. Chapter is the first character of the principal diagnosis on the latest primary submission.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_dx_count_bucket",
+   "category": "cpt_dx",
+   "difficulty": "hard",
+   "question": "Are claims with more diagnosis codes denied more often by the primary payer? Count diagnosis codes on the latest primary 837 submission (payer_responsibility = 'P') and bucket them as 1, 2, and 3 or more. Keep claims that have a current adjudication from that primary payer. Return the bucket, claims, denied claims and the denial rate as a percent rounded to 1 decimal. Order by bucket.",
+   "gold_sql": "with prim as ( select claim_id, claim_key, payer_key from ( select claim_id, claim_key, payer_key, row_number() over (partition by claim_key order by submission_date desc, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1), dx as (select claim_id, count(*) n from sem.diagnoses group by 1), pop as ( select case when coalesce(dx.n, 0) <= 1 then '1' when dx.n = 2 then '2' else '3+' end dx_bucket, r.is_denied from prim left join dx using (claim_id) join sem.remit_claims r on r.claim_key = prim.claim_key and r.payer_key = prim.payer_key and r.is_current_adjudication) select dx_bucket, count(*) claims, count(*) filter (where is_denied) denied, round(100.0 * avg(is_denied::int), 1) denial_rate_pct from pop group by 1 order by 1",
+   "answer_key_sql": "with prim as ( select pcn, payer_id from ( select c.pcn, s.payer_id, row_number() over (partition by c.pcn order by s.submission_date desc, s.payer_id) rn from ledger.claims c join ledger.submissions s on s.pcn = c.pcn and s.payer_sequence = 0 ) t where rn = 1), dx as (select pcn, count(*) n from ledger.claim_diagnoses group by 1), pop as ( select case when coalesce(dx.n, 0) <= 1 then '1' when dx.n = 2 then '2' else '3+' end dx_bucket, a.denied is_denied from prim left join dx using (pcn) join ledger.events e on e.pcn = prim.pcn and e.payer_id = prim.payer_id and e.is_current join ledger.adjudications a on a.pcn = prim.pcn and a.payer_id = prim.payer_id) select dx_bucket, count(*) claims, count(*) filter (where is_denied) denied, round(100.0 * avg(is_denied::int), 1) denial_rate_pct from pop group by 1 order by 1",
+   "alt_sql": [
+    "with prim as ( select claim_id, claim_key, payer_key from ( select claim_id, claim_key, payer_key, row_number() over (partition by claim_key order by submission_date desc, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1), dx as (select claim_id, count(*) n from sem.diagnoses group by 1), pop as ( select case when coalesce(dx.n, 0) <= 1 then '1' when dx.n = 2 then '2' else '3+' end b, r.is_denied from prim left join dx using (claim_id) join sem.remit_claims r on r.claim_key = prim.claim_key and r.payer_key = prim.payer_key and r.is_current_adjudication) select b, count(*), sum(is_denied::int), round(100.0 * avg(is_denied::int), 1) from pop group by 1",
+    "SELECT 'ok' AS note, * FROM (with prim as ( select claim_id, claim_key, payer_key from ( select claim_id, claim_key, payer_key, row_number() over (partition by claim_key order by submission_date desc, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1), dx as (select claim_id, count(*) n from sem.diagnoses group by 1), pop as ( select case when coalesce(dx.n, 0) <= 1 then '1' when dx.n = 2 then '2' else '3+' end dx_bucket, r.is_denied from prim left join dx using (claim_id) join sem.remit_claims r on r.claim_key = prim.claim_key and r.payer_key = prim.payer_key and r.is_current_adjudication) select dx_bucket, count(*) claims, count(*) filter (where is_denied) denied, round(100.0 * avg(is_denied::int), 1) denial_rate_pct from pop group by 1 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "counts diagnoses on the latest submission of any payer, not the latest primary submission",
+     "sql": "with dx as ( select claim_key, count(*) n from sem.diagnoses where is_latest_submission group by 1), pop as ( select case when coalesce(dx.n, 0) <= 1 then '1' when dx.n = 2 then '2' else '3+' end b, r.is_denied from sem.remit_claims r join sem.claims c on c.claim_key = r.claim_key and c.payer_responsibility = 'P' and c.is_latest_submission left join dx on dx.claim_key = r.claim_key where r.is_current_adjudication and r.payer_key = c.payer_key) select b, count(*), count(*) filter (where is_denied), round(100.0 * avg(is_denied::int), 1) from pop group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Diagnosis count is on the latest primary 837. Denial is the current adjudication from that primary payer.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_cpt_recoded",
+   "category": "cpt_dx",
+   "difficulty": "hard",
+   "question": "How often does the payer adjudicate a different procedure than the one we billed, and does that change what we are paid? On 835 service lines of current adjudications, by payer class return the line count, how many lines the payer recoded (a submitted procedure is present and differs from the adjudicated procedure), that share as a percent rounded to 2 decimals, the average paid amount on recoded lines and the average paid amount on lines that were not recoded (2 decimals; null when a class has no lines in that group). Order by payer class.",
+   "gold_sql": "select payer_class, count(*) lines, count(*) filter (where procedure_changed_by_payer) recoded_lines, round(100.0 * avg(procedure_changed_by_payer::int), 2) recoded_pct, round(avg(line_paid_amount) filter (where procedure_changed_by_payer), 2) avg_paid_recoded, round(avg(line_paid_amount) filter (where not procedure_changed_by_payer), 2) avg_paid_not_recoded from sem.remit_lines where is_current_adjudication group by 1 order by 1",
+   "answer_key_sql": "select py.payer_class, count(*) lines, count(*) filter (where el.adjudicated_cpt is not null and el.adjudicated_cpt <> el.cpt) recoded_lines, round(100.0 * avg((el.adjudicated_cpt is not null and el.adjudicated_cpt <> el.cpt)::int), 2) recoded_pct, round(avg(el.paid) filter (where el.adjudicated_cpt is not null and el.adjudicated_cpt <> el.cpt), 2) avg_paid_recoded, round(avg(el.paid) filter (where not (el.adjudicated_cpt is not null and el.adjudicated_cpt <> el.cpt)), 2) avg_paid_not_recoded from ledger.event_lines el join ledger.events e using (pcn, payer_id, event_number) join ledger.payers py using (payer_id) where e.is_current group by 1 order by 1",
+   "alt_sql": [
+    "select payer_class, count(*), sum(procedure_changed_by_payer::int), round(100.0 * avg(procedure_changed_by_payer::int), 2), round(sum(line_paid_amount) filter (where procedure_changed_by_payer) / nullif(sum(procedure_changed_by_payer::int), 0), 2), round(sum(line_paid_amount) filter (where not procedure_changed_by_payer) / nullif(count(*) - sum(procedure_changed_by_payer::int), 0), 2) from sem.remit_lines where is_current_adjudication group by 1",
+    "SELECT 'ok' AS note, * FROM (select payer_class, count(*) lines, count(*) filter (where procedure_changed_by_payer) recoded_lines, round(100.0 * avg(procedure_changed_by_payer::int), 2) recoded_pct, round(avg(line_paid_amount) filter (where procedure_changed_by_payer), 2) avg_paid_recoded, round(avg(line_paid_amount) filter (where not procedure_changed_by_payer), 2) avg_paid_not_recoded from sem.remit_lines where is_current_adjudication group by 1 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "restricts to lines that are not denied, which drops recodes that were denied",
+     "sql": "select payer_class, count(*), count(*) filter (where procedure_changed_by_payer), round(100.0 * avg(procedure_changed_by_payer::int), 2), round(avg(line_paid_amount) filter (where procedure_changed_by_payer), 2), round(avg(line_paid_amount) filter (where not procedure_changed_by_payer), 2) from sem.remit_lines where is_current_adjudication and not line_is_denied group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Line grain on current adjudications, all payers. Recoded means the payer adjudicated a different procedure than submitted.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_cpt_family_class",
+   "category": "cpt_dx",
+   "difficulty": "hard",
+   "question": "How do test families pay and deny, by payer class? On 835 service lines of current adjudications, group the billed procedure into chemistry (CPT starting with 80), molecular (CPT starting with 81, or a PLA code ending in U), microbiology (CPT starting with 87), other lab (any other CPT starting with 8) and other. Return payer class, test family, line count, line charge, line paid (dollars to 2 decimals) and the line denial rate as a percent rounded to 1 decimal. Order by payer class, then test family.",
+   "gold_sql": "select payer_class, case when procedure_code like '80%' then 'chemistry' when procedure_code like '81%' or right(procedure_code, 1) = 'U' then 'molecular' when procedure_code like '87%' then 'microbiology' when procedure_code like '8%' then 'other_lab' else 'other' end test_family, count(*) lines, round(sum(line_charge_amount), 2) line_charge, round(sum(line_paid_amount), 2) line_paid, round(100.0 * avg(line_is_denied::int), 1) line_denial_rate_pct from sem.remit_lines where is_current_adjudication group by 1, 2 order by 1, 2",
+   "answer_key_sql": "select py.payer_class, case when el.cpt like '80%' then 'chemistry' when el.cpt like '81%' or right(el.cpt, 1) = 'U' then 'molecular' when el.cpt like '87%' then 'microbiology' when el.cpt like '8%' then 'other_lab' else 'other' end test_family, count(*) lines, round(sum(el.charge), 2) line_charge, round(sum(el.paid), 2) line_paid, round(100.0 * avg(el.denied::int), 1) line_denial_rate_pct from ledger.event_lines el join ledger.events e using (pcn, payer_id, event_number) join ledger.payers py using (payer_id) where e.is_current group by 1, 2 order by 1, 2",
+   "alt_sql": [
+    "select payer_class, case when procedure_code like '80%' then 'chemistry' when procedure_code like '81%' or right(procedure_code, 1) = 'U' then 'molecular' when procedure_code like '87%' then 'microbiology' when procedure_code like '8%' then 'other_lab' else 'other' end, count(*), sum(line_charge_amount), sum(line_paid_amount), round(100.0 * avg(line_is_denied::int), 1) from sem.remit_lines where is_current_adjudication group by 1, 2",
+    "SELECT 'ok' AS note, * FROM (select payer_class, case when procedure_code like '80%' then 'chemistry' when procedure_code like '81%' or right(procedure_code, 1) = 'U' then 'molecular' when procedure_code like '87%' then 'microbiology' when procedure_code like '8%' then 'other_lab' else 'other' end test_family, count(*) lines, round(sum(line_charge_amount), 2) line_charge, round(sum(line_paid_amount), 2) line_paid, round(100.0 * avg(line_is_denied::int), 1) line_denial_rate_pct from sem.remit_lines where is_current_adjudication group by 1, 2 order by 1, 2) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "collapses chemistry, microbiology and other lab into one non-molecular bucket",
+     "sql": "select payer_class, case when procedure_code like '81%' or right(procedure_code, 1) = 'U' then 'molecular' else 'other' end, count(*), round(sum(line_charge_amount), 2), round(sum(line_paid_amount), 2), round(100.0 * avg(line_is_denied::int), 1) from sem.remit_lines where is_current_adjudication group by 1, 2"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Billed procedure on current-adjudication 835 lines. Family rules are applied in the order chemistry, molecular, microbiology, other lab, other.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_dx_top_denied_charge",
+   "category": "cpt_dx",
+   "difficulty": "hard",
+   "question": "Which principal diagnoses carry the most billed charge on primary-payer denials? Use claims with a primary 837 and a denied current adjudication from that primary payer. The diagnosis is the principal diagnosis on the latest primary submission, and the charge is the 835 claim charge on that adjudication. Return every such diagnosis with the number of denied claims and the denied charge (2 decimals), ordered by denied charge descending and diagnosis code ascending. The top 3 are the answer; ties at the cutoff are acceptable.",
+   "gold_sql": "with prim as ( select claim_key, payer_key, principal_diagnosis_code dx from ( select claim_key, payer_key, principal_diagnosis_code, row_number() over (partition by claim_key order by submission_date desc, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1) select prim.dx diagnosis_code, count(*) denied_claims, round(sum(r.charge_amount), 2) denied_charge from prim join sem.remit_claims r on r.claim_key = prim.claim_key and r.payer_key = prim.payer_key and r.is_current_adjudication and r.is_denied group by 1 order by denied_charge desc, diagnosis_code",
+   "answer_key_sql": "with prim as ( select pcn, payer_id, principal_dx dx from ( select c.pcn, s.payer_id, c.principal_dx, row_number() over (partition by c.pcn order by s.submission_date desc, s.payer_id) rn from ledger.claims c join ledger.submissions s on s.pcn = c.pcn and s.payer_sequence = 0 ) t where rn = 1) select prim.dx diagnosis_code, count(*) denied_claims, round(sum(e.charge), 2) denied_charge from prim join ledger.events e on e.pcn = prim.pcn and e.payer_id = prim.payer_id and e.is_current join ledger.adjudications a on a.pcn = prim.pcn and a.payer_id = prim.payer_id and a.denied group by 1 order by denied_charge desc, diagnosis_code",
+   "alt_sql": [
+    "with prim as ( select claim_key, payer_key, principal_diagnosis_code dx from ( select claim_key, payer_key, principal_diagnosis_code, row_number() over (partition by claim_key order by submission_date desc, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1) select prim.dx, count(*), sum(r.charge_amount) from prim join sem.remit_claims r on r.claim_key = prim.claim_key and r.payer_key = prim.payer_key and r.is_current_adjudication and r.is_denied group by 1 order by 3 desc, 1 desc limit 3",
+    "SELECT * FROM (with prim as ( select claim_key, payer_key, principal_diagnosis_code dx from ( select claim_key, payer_key, principal_diagnosis_code, row_number() over (partition by claim_key order by submission_date desc, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1) select prim.dx diagnosis_code, count(*) denied_claims, round(sum(r.charge_amount), 2) denied_charge from prim join sem.remit_claims r on r.claim_key = prim.claim_key and r.payer_key = prim.payer_key and r.is_current_adjudication and r.is_denied group by 1 order by denied_charge desc, diagnosis_code) q LIMIT 3"
+   ],
+   "wrong_sql": [
+    {
+     "label": "ranks by denied claim count instead of denied charge",
+     "sql": "with prim as ( select claim_key, payer_key, principal_diagnosis_code dx from ( select claim_key, payer_key, principal_diagnosis_code, row_number() over (partition by claim_key order by submission_date desc, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1) select prim.dx, count(*) denied_claims, round(sum(r.charge_amount), 2) denied_charge from prim join sem.remit_claims r on r.claim_key = prim.claim_key and r.payer_key = prim.payer_key and r.is_current_adjudication and r.is_denied group by 1 order by denied_claims desc, prim.dx limit 3"
+    }
+   ],
+   "compare": {
+    "tol": 0.01,
+    "order": "topn",
+    "n": 3,
+    "metric_col": 2
+   },
+   "interpretation": "Denied current adjudications of the primary payer, charge from the 835. Top 3 by denied charge. Several diagnoses tie on charge, so another diagnosis at the cutoff is a correct answer.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_cpt_partial_family",
+   "category": "cpt_dx",
+   "difficulty": "hard",
+   "question": "Where do line-level denials happen inside claims the payer did not deny overall? Use 835 service lines on current adjudications whose claim is not denied. Group the billed procedure as chemistry (CPT 80), molecular (CPT 81 or a PLA code ending in U), microbiology (CPT 87), other lab (other CPT 8) and other. Return the test family, line count, denied lines, the line denial rate as a percent rounded to 1 decimal, and the charge on the denied lines (2 decimals). Order by test family.",
+   "gold_sql": "select case when procedure_code like '80%' then 'chemistry' when procedure_code like '81%' or right(procedure_code, 1) = 'U' then 'molecular' when procedure_code like '87%' then 'microbiology' when procedure_code like '8%' then 'other_lab' else 'other' end test_family, count(*) lines, count(*) filter (where l.line_is_denied) denied_lines, round(100.0 * avg(l.line_is_denied::int), 1) line_denial_rate_pct, round(coalesce(sum(l.line_charge_amount) filter (where l.line_is_denied), 0), 2) denied_line_charge from sem.remit_lines l join sem.remit_claims r using (remit_claim_id) where l.is_current_adjudication and not r.is_denied group by 1 order by 1",
+   "answer_key_sql": "select case when el.cpt like '80%' then 'chemistry' when el.cpt like '81%' or right(el.cpt, 1) = 'U' then 'molecular' when el.cpt like '87%' then 'microbiology' when el.cpt like '8%' then 'other_lab' else 'other' end test_family, count(*) lines, count(*) filter (where el.denied) denied_lines, round(100.0 * avg(el.denied::int), 1) line_denial_rate_pct, round(coalesce(sum(el.charge) filter (where el.denied), 0), 2) denied_line_charge from ledger.event_lines el join ledger.events e using (pcn, payer_id, event_number) join ledger.adjudications a using (pcn, payer_id) where e.is_current and not a.denied group by 1 order by 1",
+   "alt_sql": [
+    "select case when procedure_code like '80%' then 'chemistry' when procedure_code like '81%' or right(procedure_code, 1) = 'U' then 'molecular' when procedure_code like '87%' then 'microbiology' when procedure_code like '8%' then 'other_lab' else 'other' end, count(*), sum(l.line_is_denied::int), round(100.0 * avg(l.line_is_denied::int), 1), coalesce(sum(case when l.line_is_denied then l.line_charge_amount else 0 end), 0) from sem.remit_lines l join sem.remit_claims r using (remit_claim_id) where l.is_current_adjudication and not r.is_denied group by 1",
+    "SELECT 'ok' AS note, * FROM (select case when procedure_code like '80%' then 'chemistry' when procedure_code like '81%' or right(procedure_code, 1) = 'U' then 'molecular' when procedure_code like '87%' then 'microbiology' when procedure_code like '8%' then 'other_lab' else 'other' end test_family, count(*) lines, count(*) filter (where l.line_is_denied) denied_lines, round(100.0 * avg(l.line_is_denied::int), 1) line_denial_rate_pct, round(coalesce(sum(l.line_charge_amount) filter (where l.line_is_denied), 0), 2) denied_line_charge from sem.remit_lines l join sem.remit_claims r using (remit_claim_id) where l.is_current_adjudication and not r.is_denied group by 1 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "uses lines on denied claims instead of lines on claims that were not denied",
+     "sql": "select case when procedure_code like '80%' then 'chemistry' when procedure_code like '81%' or right(procedure_code, 1) = 'U' then 'molecular' when procedure_code like '87%' then 'microbiology' when procedure_code like '8%' then 'other_lab' else 'other' end, count(*), count(*) filter (where l.line_is_denied), round(100.0 * avg(l.line_is_denied::int), 1), round(coalesce(sum(l.line_charge_amount) filter (where l.line_is_denied), 0), 2) from sem.remit_lines l join sem.remit_claims r using (remit_claim_id) where l.is_current_adjudication and r.is_denied group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Partial denials: line denied while the current claim adjudication is not denied. Family is the billed procedure.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_rec_line_coverage",
+   "category": "remit_reconciliation",
+   "difficulty": "hard",
+   "question": "How many current adjudications came back without service-line detail? Claim-level denials often have no 835 lines. By payer class, split current adjudications into those with at least one 835 service line and those with none. Return payer class, adjudications with lines, paid dollars on those, adjudications with no lines, and paid dollars on those (2 decimals). Order by payer class.",
+   "gold_sql": "with ln as ( select remit_claim_id, sum(line_paid_amount) line_paid, count(*) n from sem.remit_lines group by 1) select r.payer_class, count(*) filter (where ln.n is not null) with_lines, round(coalesce(sum(r.paid_amount) filter (where ln.n is not null), 0), 2) paid_with_lines, count(*) filter (where ln.n is null) no_lines, round(coalesce(sum(r.paid_amount) filter (where ln.n is null), 0), 2) paid_no_lines from sem.remit_claims r left join ln using (remit_claim_id) where r.is_current_adjudication group by 1 order by 1",
+   "answer_key_sql": "with ln as ( select pcn, payer_id, event_number, count(*) n, sum(paid) line_paid from ledger.event_lines group by all) select a.payer_class, count(*) filter (where ln.n is not null) with_lines, round(coalesce(sum(e.paid) filter (where ln.n is not null), 0), 2) paid_with_lines, count(*) filter (where ln.n is null) no_lines, round(coalesce(sum(e.paid) filter (where ln.n is null), 0), 2) paid_no_lines from ledger.events e join ledger.adjudications a using (pcn, payer_id) left join ln using (pcn, payer_id, event_number) where e.is_current group by 1 order by 1",
+   "alt_sql": [
+    "with ln as (select remit_claim_id, count(*) n from sem.remit_lines group by 1) select r.payer_class, sum(case when ln.n is not null then 1 else 0 end), coalesce(sum(case when ln.n is not null then r.paid_amount else 0 end), 0), sum(case when ln.n is null then 1 else 0 end), coalesce(sum(case when ln.n is null then r.paid_amount else 0 end), 0) from sem.remit_claims r left join ln using (remit_claim_id) where r.is_current_adjudication group by 1",
+    "SELECT 'ok' AS note, * FROM (with ln as ( select remit_claim_id, sum(line_paid_amount) line_paid, count(*) n from sem.remit_lines group by 1) select r.payer_class, count(*) filter (where ln.n is not null) with_lines, round(coalesce(sum(r.paid_amount) filter (where ln.n is not null), 0), 2) paid_with_lines, count(*) filter (where ln.n is null) no_lines, round(coalesce(sum(r.paid_amount) filter (where ln.n is null), 0), 2) paid_no_lines from sem.remit_claims r left join ln using (remit_claim_id) where r.is_current_adjudication group by 1 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "counts every 835 event, not just the current adjudication",
+     "sql": "with ln as (select remit_claim_id, count(*) n from sem.remit_lines group by 1) select r.payer_class, count(*) filter (where ln.n is not null), round(coalesce(sum(r.paid_amount) filter (where ln.n is not null), 0), 2), count(*) filter (where ln.n is null), round(coalesce(sum(r.paid_amount) filter (where ln.n is null), 0), 2) from sem.remit_claims r left join ln using (remit_claim_id) group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Current adjudications. No lines means the 835 claim payment has no SVC lines. Paid dollars are the claim paid amount.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_rec_composition",
+   "category": "remit_reconciliation",
+   "difficulty": "hard",
+   "question": "How does an 835 claim payment split the billed charge? On current adjudications, by payer class, return total 835 charge, paid amount, patient responsibility (CLP05), contractual-obligation adjustments (CO, claim and line levels together), other-adjustment (OA) and payer-initiated (PI) adjustments. Also return paid as a percent of charge, rounded to 1 decimal. Treat missing patient responsibility as 0. Round dollars to 2 decimals. Order by payer class.",
+   "gold_sql": "select payer_class, round(sum(charge_amount), 2) charge, round(sum(paid_amount), 2) paid, round(sum(coalesce(patient_responsibility_amount, 0)), 2) patient_responsibility, round(sum(co_amount), 2) co_amount, round(sum(oa_amount), 2) oa_amount, round(sum(pi_amount), 2) pi_amount, round(100.0 * sum(paid_amount) / nullif(sum(charge_amount), 0), 1) paid_pct_of_charge from sem.remit_claims where is_current_adjudication group by 1 order by 1",
+   "answer_key_sql": "with adj as ( select pcn, payer_id, event_number, sum(amount) filter (where group_code = 'CO') co, sum(amount) filter (where group_code = 'OA') oa, sum(amount) filter (where group_code = 'PI') pi from ledger.event_adjustments group by 1, 2, 3) select a.payer_class, round(sum(e.charge), 2) charge, round(sum(e.paid), 2) paid, round(sum(coalesce(e.patient_responsibility, 0)), 2) patient_responsibility, round(sum(coalesce(adj.co, 0)), 2) co_amount, round(sum(coalesce(adj.oa, 0)), 2) oa_amount, round(sum(coalesce(adj.pi, 0)), 2) pi_amount, round(100.0 * sum(e.paid) / nullif(sum(e.charge), 0), 1) paid_pct_of_charge from ledger.events e join ledger.adjudications a using (pcn, payer_id) left join adj using (pcn, payer_id, event_number) where e.is_current group by 1 order by 1",
+   "alt_sql": [
+    "select payer_class, sum(charge_amount), sum(paid_amount), sum(coalesce(patient_responsibility_amount, 0)), sum(co_amount), sum(oa_amount), sum(pi_amount), round(100.0 * sum(paid_amount) / sum(charge_amount), 1) from sem.remit_claims where is_current_adjudication group by 1",
+    "SELECT 'ok' AS note, * FROM (select payer_class, round(sum(charge_amount), 2) charge, round(sum(paid_amount), 2) paid, round(sum(coalesce(patient_responsibility_amount, 0)), 2) patient_responsibility, round(sum(co_amount), 2) co_amount, round(sum(oa_amount), 2) oa_amount, round(sum(pi_amount), 2) pi_amount, round(100.0 * sum(paid_amount) / nullif(sum(charge_amount), 0), 1) paid_pct_of_charge from sem.remit_claims where is_current_adjudication group by 1 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "restricts the split to denied current adjudications",
+     "sql": "select payer_class, round(sum(charge_amount), 2), round(sum(paid_amount), 2), round(sum(coalesce(patient_responsibility_amount, 0)), 2), round(sum(co_amount), 2), round(sum(oa_amount), 2), round(sum(pi_amount), 2), round(100.0 * sum(paid_amount) / nullif(sum(charge_amount), 0), 1) from sem.remit_claims where is_current_adjudication and is_denied group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Current adjudications. CO, OA and PI are the summed CAS amounts at claim and line level. Patient responsibility is CLP05, not the PR CAS total.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_rec_bpr_month",
+   "category": "remit_reconciliation",
+   "difficulty": "hard",
+   "question": "Reconcile check totals to claim payments by month. One row per 835 payment (a re-delivered file counts once). By payment month return the number of payments, the payment total (BPR), the sum of claim paid amounts on those payments, provider-level adjustment dollars (PLB, signed as sent), and PLB as a percent of claim paid amounts rounded to 2 decimals. Round dollars to 2 decimals. Order by month.",
+   "gold_sql": "select payment_month, count(*) payments, round(sum(total_payment_amount), 2) bpr_amount, round(sum(claims_paid_amount), 2) claims_paid, round(sum(provider_adjustment_amount), 2) provider_adjustments, round(100.0 * sum(provider_adjustment_amount) / nullif(sum(claims_paid_amount), 0), 2) plb_pct_of_claims_paid from sem.payments group by 1 order by 1",
+   "answer_key_sql": "with e as ( select trn, min(event_date::date) pay_date, sum(paid) claims_paid from ledger.events group by trn), pl as (select trn, sum(amount) plb from ledger.plb group by 1), pay as ( select date_trunc('month', e.pay_date)::date payment_month, e.claims_paid, coalesce(pl.plb, 0) plb, e.claims_paid - coalesce(pl.plb, 0) bpr from e left join pl using (trn)) select payment_month, count(*) payments, round(sum(bpr), 2) bpr_amount, round(sum(claims_paid), 2) claims_paid, round(sum(plb), 2) provider_adjustments, round(100.0 * sum(plb) / nullif(sum(claims_paid), 0), 2) plb_pct_of_claims_paid from pay group by 1 order by 1",
+   "alt_sql": [
+    "select payment_month, count(*), sum(total_payment_amount), sum(claims_paid_amount), sum(provider_adjustment_amount), round(100.0 * sum(provider_adjustment_amount) / sum(claims_paid_amount), 2) from sem.payments group by 1",
+    "SELECT 'ok' AS note, * FROM (select payment_month, count(*) payments, round(sum(total_payment_amount), 2) bpr_amount, round(sum(claims_paid_amount), 2) claims_paid, round(sum(provider_adjustment_amount), 2) provider_adjustments, round(100.0 * sum(provider_adjustment_amount) / nullif(sum(claims_paid_amount), 0), 2) plb_pct_of_claims_paid from sem.payments group by 1 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "groups payments by the calendar month of a single claim's service date \u2014 uses payer class instead of month",
+     "sql": "select payer_class, count(*), round(sum(total_payment_amount), 2), round(sum(claims_paid_amount), 2), round(sum(provider_adjustment_amount), 2), round(100.0 * sum(provider_adjustment_amount) / nullif(sum(claims_paid_amount), 0), 2) from sem.payments group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Grain is one 835 payment. BPR should equal claim paid amounts minus PLB. Re-delivered files are already collapsed in sem.payments.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_rec_plb_class_reason",
+   "category": "remit_reconciliation",
+   "difficulty": "hard",
+   "question": "Break provider-level adjustments down by payer class and PLB reason code. One row per PLB amount on a payment that is not a re-delivery. Return payer class, reason code, the number of adjustments, and the net amount signed as sent (2 decimals). Order by payer class, then reason code.",
+   "gold_sql": "select py.payer_class, pa.plb_reason_code, count(*) adjustments, round(sum(pa.provider_adjustment_amount), 2) net_amount from sem.provider_adjustments pa join sem.payments py on py.payment_id = pa.payment_id group by 1, 2 order by 1, 2",
+   "answer_key_sql": "select py.payer_class, pl.code plb_reason_code, count(*) adjustments, round(sum(pl.amount), 2) net_amount from ledger.plb pl join ledger.payers py using (payer_id) group by 1, 2 order by 1, 2",
+   "alt_sql": [
+    "select py.payer_class, pa.plb_reason_code, count(*), sum(pa.provider_adjustment_amount) from sem.provider_adjustments pa join sem.payments py on py.payment_id = pa.payment_id group by 1, 2",
+    "SELECT 'ok' AS note, * FROM (select py.payer_class, pa.plb_reason_code, count(*) adjustments, round(sum(pa.provider_adjustment_amount), 2) net_amount from sem.provider_adjustments pa join sem.payments py on py.payment_id = pa.payment_id group by 1, 2 order by 1, 2) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "rolls every reason code together and returns one row per payer class",
+     "sql": "select py.payer_class, 'ALL', count(*), round(sum(pa.provider_adjustment_amount), 2) from sem.provider_adjustments pa join sem.payments py on py.payment_id = pa.payment_id group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "PLB grain, joined to the payment for payer class. Net amount keeps the sign on the 835.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_rec_reversal_pairs",
+   "category": "remit_reconciliation",
+   "difficulty": "hard",
+   "question": "For claim-and-payer pairs that have at least one reversal, how much did the reversal move and what is left on the current adjudication? By payer class return the number of pairs with a reversal, the sum of paid amounts on the reversal events (signed, 2 decimals), how many of those pairs have no current adjudication, and the paid amount on the current adjudications of the pairs that still have one (0 when none, 2 decimals). Order by payer class.",
+   "gold_sql": "with rev as ( select payer_class, claim_key, payer_key, sum(paid_amount) reversal_paid from sem.remit_claims where is_reversal group by 1, 2, 3) select rev.payer_class, count(*) pairs_with_reversal, round(sum(rev.reversal_paid), 2) reversal_paid, count(*) filter (where c.remit_claim_id is null) no_current, round(coalesce(sum(c.paid_amount), 0), 2) current_paid from rev left join sem.remit_claims c on c.claim_key = rev.claim_key and c.payer_key = rev.payer_key and c.is_current_adjudication group by 1 order by 1",
+   "answer_key_sql": "with rev as ( select payer_id, pcn, sum(paid) reversal_paid from ledger.events where status = '22' group by 1, 2) select py.payer_class, count(*) pairs_with_reversal, round(sum(rev.reversal_paid), 2) reversal_paid, count(*) filter (where e.pcn is null) no_current, round(coalesce(sum(e.paid), 0), 2) current_paid from rev join ledger.payers py using (payer_id) left join ledger.events e on e.pcn = rev.pcn and e.payer_id = rev.payer_id and e.is_current group by 1 order by 1",
+   "alt_sql": [
+    "with rev as ( select payer_class, claim_key, payer_key, sum(paid_amount) reversal_paid from sem.remit_claims where is_reversal group by 1, 2, 3) select rev.payer_class, count(*), sum(rev.reversal_paid), sum(case when c.remit_claim_id is null then 1 else 0 end), coalesce(sum(c.paid_amount), 0) from rev left join sem.remit_claims c on c.claim_key = rev.claim_key and c.payer_key = rev.payer_key and c.is_current_adjudication group by 1",
+    "SELECT 'ok' AS note, * FROM (with rev as ( select payer_class, claim_key, payer_key, sum(paid_amount) reversal_paid from sem.remit_claims where is_reversal group by 1, 2, 3) select rev.payer_class, count(*) pairs_with_reversal, round(sum(rev.reversal_paid), 2) reversal_paid, count(*) filter (where c.remit_claim_id is null) no_current, round(coalesce(sum(c.paid_amount), 0), 2) current_paid from rev left join sem.remit_claims c on c.claim_key = rev.claim_key and c.payer_key = rev.payer_key and c.is_current_adjudication group by 1 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "sums paid amount on the current adjudication of every pair, not just pairs that were reversed",
+     "sql": "select payer_class, count(*), round(sum(paid_amount), 2), 0, round(sum(paid_amount), 2) from sem.remit_claims where is_current_adjudication group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "A reversal is claim status 22. Current paid is null when the latest event is a reversal and is reported as 0 in the total.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_rec_payments_with_reversal",
+   "category": "remit_reconciliation",
+   "difficulty": "hard",
+   "question": "How many 835 payments contain a reversal? One row per payment, re-deliveries counted once. By payer class return the number of payments, how many have at least one reversal claim, that share as a percent rounded to 1 decimal, and claim paid dollars (2 decimals). Order by payer class.",
+   "gold_sql": "select payer_class, count(*) payments, count(*) filter (where reversal_count > 0) payments_with_reversal, round(100.0 * count(*) filter (where reversal_count > 0) / count(*), 1) pct_with_reversal, round(sum(claims_paid_amount), 2) claims_paid from sem.payments group by 1 order by 1",
+   "answer_key_sql": "with e as ( select trn, payer_id, sum(paid) claims_paid, count(*) filter (where status = '22') reversals from ledger.events group by 1, 2) select py.payer_class, count(*) payments, count(*) filter (where reversals > 0) payments_with_reversal, round(100.0 * count(*) filter (where reversals > 0) / count(*), 1) pct_with_reversal, round(sum(claims_paid), 2) claims_paid from e join ledger.payers py using (payer_id) group by 1 order by 1",
+   "alt_sql": [
+    "select payer_class, count(*), sum((reversal_count > 0)::int), round(100.0 * avg((reversal_count > 0)::int), 1), sum(claims_paid_amount) from sem.payments group by 1",
+    "SELECT 'ok' AS note, * FROM (select payer_class, count(*) payments, count(*) filter (where reversal_count > 0) payments_with_reversal, round(100.0 * count(*) filter (where reversal_count > 0) / count(*), 1) pct_with_reversal, round(sum(claims_paid_amount), 2) claims_paid from sem.payments group by 1 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "counts reversal claims instead of payments that contain one",
+     "sql": "select payer_class, count(*), sum(reversal_count), round(100.0 * sum(reversal_count) / count(*), 1), round(sum(claims_paid_amount), 2) from sem.payments group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Payment grain. A payment has a reversal when its reversal_count, from claim status 22 on that payment, is at least 1.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_ptr_denial_yield",
+   "category": "payer_trends",
+   "difficulty": "hard",
+   "question": "For payers with at least 10 current adjudications in July 2026 and at least 10 in August 2026, how did the denial rate and the paid-to-charge ratio move? Count each claim once per payer. July and August are the payment-date months. Return the payer name, July adjudications, July denial rate percent, July paid-to-charge percent, and the same three figures for August, then the August-minus-July change in denial rate and in paid-to-charge, in percentage points. Round percents and changes to 1 decimal, computing changes from the unrounded rates. Order by the denial-rate change descending, then payer name.",
+   "gold_sql": "with m as ( select payer_name, payment_month, count(*) n, avg(is_denied::int) dr, sum(paid_amount) / nullif(sum(charge_amount), 0) yld from sem.remit_claims where is_current_adjudication group by 1, 2) select j.payer_name, j.n july_adjudications, round(100 * j.dr, 1) july_denial_pct, round(100 * j.yld, 1) july_yield_pct, a.n august_adjudications, round(100 * a.dr, 1) august_denial_pct, round(100 * a.yld, 1) august_yield_pct, round(100 * (a.dr - j.dr), 1) denial_change_pp, round(100 * (a.yld - j.yld), 1) yield_change_pp from m j join m a on a.payer_name = j.payer_name where j.payment_month = date '2026-07-01' and a.payment_month = date '2026-08-01' and j.n >= 10 and a.n >= 10 order by 100 * (a.dr - j.dr) desc, j.payer_name",
+   "answer_key_sql": "with m as ( select array_to_string(list_transform(string_split(lower(a.payer), ' '), lambda x: upper(x[1]) || x[2:]), ' ') payer_name, date_trunc('month', e.event_date::date)::date payment_month, count(*) n, avg(a.denied::int) dr, sum(e.paid) / nullif(sum(e.charge), 0) yld from ledger.events e join ledger.adjudications a using (pcn, payer_id) where e.is_current group by 1, 2) select j.payer_name, j.n, round(100 * j.dr, 1), round(100 * j.yld, 1), a.n, round(100 * a.dr, 1), round(100 * a.yld, 1), round(100 * (a.dr - j.dr), 1), round(100 * (a.yld - j.yld), 1) from m j join m a on a.payer_name = j.payer_name where j.payment_month = date '2026-07-01' and a.payment_month = date '2026-08-01' and j.n >= 10 and a.n >= 10 order by 100 * (a.dr - j.dr) desc, j.payer_name",
+   "alt_sql": [
+    "with m as ( select payer_name, payment_month, count(*) n, sum(is_denied::int)::double / count(*) dr, sum(paid_amount) / sum(charge_amount) yld from sem.remit_claims where is_current_adjudication group by 1, 2) select j.payer_name, j.n, round(100 * j.dr, 1), round(100 * j.yld, 1), a.n, round(100 * a.dr, 1), round(100 * a.yld, 1), round(100 * (a.dr - j.dr), 1), round(100 * (a.yld - j.yld), 1) from m j join m a on a.payer_name = j.payer_name where j.payment_month = date '2026-07-01' and a.payment_month = date '2026-08-01' and j.n >= 10 and a.n >= 10",
+    "SELECT 'ok' AS note, * FROM (with m as ( select payer_name, payment_month, count(*) n, avg(is_denied::int) dr, sum(paid_amount) / nullif(sum(charge_amount), 0) yld from sem.remit_claims where is_current_adjudication group by 1, 2) select j.payer_name, j.n july_adjudications, round(100 * j.dr, 1) july_denial_pct, round(100 * j.yld, 1) july_yield_pct, a.n august_adjudications, round(100 * a.dr, 1) august_denial_pct, round(100 * a.yld, 1) august_yield_pct, round(100 * (a.dr - j.dr), 1) denial_change_pp, round(100 * (a.yld - j.yld), 1) yield_change_pp from m j join m a on a.payer_name = j.payer_name where j.payment_month = date '2026-07-01' and a.payment_month = date '2026-08-01' and j.n >= 10 and a.n >= 10 order by 100 * (a.dr - j.dr) desc, j.payer_name) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "lowers the volume floor to 1 adjudication in each month, so small payers enter",
+     "sql": "with m as ( select payer_name, payment_month, count(*) n, avg(is_denied::int) dr, sum(paid_amount) / nullif(sum(charge_amount), 0) yld from sem.remit_claims where is_current_adjudication group by 1, 2) select j.payer_name, j.n, round(100 * j.dr, 1), round(100 * j.yld, 1), a.n, round(100 * a.dr, 1), round(100 * a.yld, 1), round(100 * (a.dr - j.dr), 1), round(100 * (a.yld - j.yld), 1) from m j join m a on a.payer_name = j.payer_name where j.payment_month = date '2026-07-01' and a.payment_month = date '2026-08-01'"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Payers need 10 current adjudications in each of July and August 2026. Changes are August minus July, from unrounded rates.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_ptr_dos_lag",
+   "category": "payer_trends",
+   "difficulty": "hard",
+   "question": "Which payers are paying on older dates of service? For current adjudications with paid amount greater than zero, days to pay is the payment date minus the service-from date. Keep payers with at least 30 such adjudications. Return the payer name, paid adjudications, median days (1 decimal) and the 90th percentile of days (continuous percentile, 1 decimal). Order by median days descending, then payer name.",
+   "gold_sql": "select payer_name, count(*) paid_adjudications, round(median(payment_date - service_date_from), 1) median_days, round(quantile_cont(payment_date - service_date_from, 0.9), 1) p90_days from sem.remit_claims where is_current_adjudication and paid_amount > 0 and service_date_from is not null group by 1 having count(*) >= 30 order by median_days desc, payer_name",
+   "answer_key_sql": "select array_to_string(list_transform(string_split(lower(a.payer), ' '), lambda x: upper(x[1]) || x[2:]), ' ') payer_name, count(*) paid_adjudications, round(median(e.event_date::date - e.dos::date), 1) median_days, round(quantile_cont(e.event_date::date - e.dos::date, 0.9), 1) p90_days from ledger.events e join ledger.adjudications a using (pcn, payer_id) where e.is_current and e.paid > 0 and e.dos is not null group by 1 having count(*) >= 30 order by median_days desc, payer_name",
+   "alt_sql": [
+    "select payer_name, count(*), median(payment_date - service_date_from), quantile_cont(payment_date - service_date_from, 0.9) from sem.remit_claims where is_current_adjudication and paid_amount > 0 and service_date_from is not null group by 1 having count(*) >= 30",
+    "SELECT 'ok' AS note, * FROM (select payer_name, count(*) paid_adjudications, round(median(payment_date - service_date_from), 1) median_days, round(quantile_cont(payment_date - service_date_from, 0.9), 1) p90_days from sem.remit_claims where is_current_adjudication and paid_amount > 0 and service_date_from is not null group by 1 having count(*) >= 30 order by median_days desc, payer_name) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "uses a floor of 10 paid adjudications instead of 30",
+     "sql": "select payer_name, count(*), round(median(payment_date - service_date_from), 1), round(quantile_cont(payment_date - service_date_from, 0.9), 1) from sem.remit_claims where is_current_adjudication and paid_amount > 0 and service_date_from is not null group by 1 having count(*) >= 10"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Paid current adjudications. Days are payment date minus 835 service-from. Payers with fewer than 30 are excluded.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_ptr_signal_share",
+   "category": "payer_trends",
+   "difficulty": "hard",
+   "question": "Which payers' denials are mostly the signal rule rather than a claim status 4? Among current adjudications, keep payers with at least 4 denials. Return the payer name, denials, how many are signal-only (signal rule and not claim status 4), and signal-only as a percent of that payer's denials rounded to 1 decimal. Order by that percent descending, then payer name.",
+   "gold_sql": "select payer_name, count(*) filter (where is_denied) denials, count(*) filter (where is_denied_signal_v3 and not is_denied_recorded) signal_only, round(100.0 * count(*) filter (where is_denied_signal_v3 and not is_denied_recorded) / nullif(count(*) filter (where is_denied), 0), 1) signal_only_pct from sem.remit_claims where is_current_adjudication group by 1 having count(*) filter (where is_denied) >= 4 order by signal_only_pct desc, payer_name",
+   "answer_key_sql": "select array_to_string(list_transform(string_split(lower(a.payer), ' '), lambda x: upper(x[1]) || x[2:]), ' ') payer_name, count(*) filter (where a.denied) denials, count(*) filter (where a.denied_signal_v3 and not a.denied_recorded) signal_only, round(100.0 * count(*) filter (where a.denied_signal_v3 and not a.denied_recorded) / nullif(count(*) filter (where a.denied), 0), 1) signal_only_pct from ledger.events e join ledger.adjudications a using (pcn, payer_id) where e.is_current group by 1 having count(*) filter (where a.denied) >= 4 order by signal_only_pct desc, payer_name",
+   "alt_sql": [
+    "select payer_name, sum(is_denied::int), sum((is_denied_signal_v3 and not is_denied_recorded)::int), round(100.0 * sum((is_denied_signal_v3 and not is_denied_recorded)::int) / nullif(sum(is_denied::int), 0), 1) from sem.remit_claims where is_current_adjudication group by 1 having sum(is_denied::int) >= 4",
+    "SELECT 'ok' AS note, * FROM (select payer_name, count(*) filter (where is_denied) denials, count(*) filter (where is_denied_signal_v3 and not is_denied_recorded) signal_only, round(100.0 * count(*) filter (where is_denied_signal_v3 and not is_denied_recorded) / nullif(count(*) filter (where is_denied), 0), 1) signal_only_pct from sem.remit_claims where is_current_adjudication group by 1 having count(*) filter (where is_denied) >= 4 order by signal_only_pct desc, payer_name) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "uses a floor of 1 denial, so every payer with a single denial is included",
+     "sql": "select payer_name, count(*) filter (where is_denied), count(*) filter (where is_denied_signal_v3 and not is_denied_recorded), round(100.0 * count(*) filter (where is_denied_signal_v3 and not is_denied_recorded) / count(*) filter (where is_denied), 1) from sem.remit_claims where is_current_adjudication group by 1 having count(*) filter (where is_denied) >= 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Current adjudications. Signal-only is the denial signal without a recorded status-4 denial. Floor is 4 denials.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_ptr_hhi",
+   "category": "payer_trends",
+   "difficulty": "hard",
+   "question": "How concentrated are paid dollars across payers in each payment month? Using current adjudications, compute each payer's share of that month's paid dollars and the Herfindahl-Hirschman index, the sum of the squared shares. Return the payment month, the number of payers with a current adjudication that month, total paid (2 decimals) and the index rounded to 4 decimals. Order by month.",
+   "gold_sql": "with p as ( select payment_month, payer_key, sum(paid_amount) paid from sem.remit_claims where is_current_adjudication group by 1, 2), m as (select payment_month, sum(paid) total, count(*) payers from p group by 1) select p.payment_month, m.payers, round(m.total, 2) paid, round(sum(power(p.paid / m.total, 2)), 4) hhi from p join m using (payment_month) group by p.payment_month, m.payers, m.total order by 1",
+   "answer_key_sql": "with p as ( select date_trunc('month', e.event_date::date)::date payment_month, e.payer_id, sum(e.paid) paid from ledger.events e where e.is_current group by 1, 2), m as (select payment_month, sum(paid) total, count(*) payers from p group by 1) select p.payment_month, m.payers, round(m.total, 2) paid, round(sum(power(p.paid / m.total, 2)), 4) hhi from p join m using (payment_month) group by p.payment_month, m.payers, m.total order by 1",
+   "alt_sql": [
+    "with p as ( select payment_month, payer_key, sum(paid_amount) paid from sem.remit_claims where is_current_adjudication group by 1, 2), m as (select payment_month, sum(paid) total, count(*) payers from p group by 1) select p.payment_month, m.payers, m.total, sum(power(p.paid / m.total, 2)) from p join m using (payment_month) group by p.payment_month, m.payers, m.total",
+    "SELECT 'ok' AS note, * FROM (with p as ( select payment_month, payer_key, sum(paid_amount) paid from sem.remit_claims where is_current_adjudication group by 1, 2), m as (select payment_month, sum(paid) total, count(*) payers from p group by 1) select p.payment_month, m.payers, round(m.total, 2) paid, round(sum(power(p.paid / m.total, 2)), 4) hhi from p join m using (payment_month) group by p.payment_month, m.payers, m.total order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "computes the index on adjudication counts instead of paid dollars",
+     "sql": "with p as ( select payment_month, payer_key, count(*)::double n from sem.remit_claims where is_current_adjudication group by 1, 2), m as (select payment_month, sum(n) total, count(*) payers from p group by 1) select p.payment_month, m.payers, round(m.total, 2), round(sum(power(p.n / m.total, 2)), 4) from p join m using (payment_month) group by p.payment_month, m.payers, m.total"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "HHI of payer shares of paid dollars on current adjudications, within each payment month. A single payer would score 1.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_ptr_pr_rate",
+   "category": "payer_trends",
+   "difficulty": "hard",
+   "question": "Which payers shift the most of the allowed claim onto the patient? On current adjudications, for payers with at least 20 adjudications and a positive total charge, patient-responsibility rate is CLP05 divided by the 835 charge (missing CLP05 counts as 0). Return every such payer with adjudications, patient-responsibility dollars, charge and the rate as a percent rounded to 2 decimals, ordered by the rate descending and payer name ascending. The top 8 are the answer; ties at the cutoff are acceptable.",
+   "gold_sql": "select payer_name, count(*) adjudications, round(sum(coalesce(patient_responsibility_amount, 0)), 2) patient_responsibility, round(sum(charge_amount), 2) charge, round(100.0 * sum(coalesce(patient_responsibility_amount, 0)) / sum(charge_amount), 2) pr_rate_pct from sem.remit_claims where is_current_adjudication group by 1 having count(*) >= 20 and sum(charge_amount) > 0 order by pr_rate_pct desc, payer_name",
+   "answer_key_sql": "select array_to_string(list_transform(string_split(lower(a.payer), ' '), lambda x: upper(x[1]) || x[2:]), ' ') payer_name, count(*) adjudications, round(sum(coalesce(e.patient_responsibility, 0)), 2) patient_responsibility, round(sum(e.charge), 2) charge, round(100.0 * sum(coalesce(e.patient_responsibility, 0)) / sum(e.charge), 2) pr_rate_pct from ledger.events e join ledger.adjudications a using (pcn, payer_id) where e.is_current group by 1 having count(*) >= 20 and sum(e.charge) > 0 order by pr_rate_pct desc, payer_name",
+   "alt_sql": [
+    "select payer_name, count(*), sum(coalesce(patient_responsibility_amount, 0)), sum(charge_amount), round(100.0 * sum(coalesce(patient_responsibility_amount, 0)) / sum(charge_amount), 2) pr_rate_pct from sem.remit_claims where is_current_adjudication group by 1 having count(*) >= 20 and sum(charge_amount) > 0 order by pr_rate_pct desc, payer_name desc limit 8",
+    "SELECT * FROM (select payer_name, count(*) adjudications, round(sum(coalesce(patient_responsibility_amount, 0)), 2) patient_responsibility, round(sum(charge_amount), 2) charge, round(100.0 * sum(coalesce(patient_responsibility_amount, 0)) / sum(charge_amount), 2) pr_rate_pct from sem.remit_claims where is_current_adjudication group by 1 having count(*) >= 20 and sum(charge_amount) > 0 order by pr_rate_pct desc, payer_name) q LIMIT 8"
+   ],
+   "wrong_sql": [
+    {
+     "label": "ranks by patient-responsibility dollars instead of the rate",
+     "sql": "select payer_name, count(*) adjudications, round(sum(coalesce(patient_responsibility_amount, 0)), 2) patient_responsibility, round(sum(charge_amount), 2) charge, round(100.0 * sum(coalesce(patient_responsibility_amount, 0)) / sum(charge_amount), 2) pr_rate_pct from sem.remit_claims where is_current_adjudication group by 1 having count(*) >= 20 and sum(charge_amount) > 0 order by pr_rate_pct asc, payer_name limit 8"
+    }
+   ],
+   "compare": {
+    "tol": 0.01,
+    "order": "topn",
+    "n": 8,
+    "metric_col": 4
+   },
+   "interpretation": "Current adjudications, payers with at least 20. Rate is patient responsibility over 835 charge. Top 8; ties at the cutoff allowed.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_ptr_co_rate",
+   "category": "payer_trends",
+   "difficulty": "hard",
+   "question": "How did each payer's contractual write-off rate move from July 2026 to August 2026? On current adjudications, CO rate is contractual-obligation dollars (claim and line CAS together) divided by the 835 charge. Keep payers with at least 8 current adjudications in each month. Return the payer name, July and August adjudication counts, July and August CO rates as percents rounded to 1 decimal, and the August-minus-July change in percentage points computed from the unrounded rates and then rounded to 1 decimal. Order by the change descending, then payer name.",
+   "gold_sql": "with m as ( select payer_name, payment_month, count(*) n, sum(co_amount) / nullif(sum(charge_amount), 0) rate from sem.remit_claims where is_current_adjudication group by 1, 2) select j.payer_name, j.n july_adjudications, round(100 * j.rate, 1) july_co_pct, a.n august_adjudications, round(100 * a.rate, 1) august_co_pct, round(100 * (a.rate - j.rate), 1) co_change_pp from m j join m a on a.payer_name = j.payer_name where j.payment_month = date '2026-07-01' and a.payment_month = date '2026-08-01' and j.n >= 8 and a.n >= 8 order by 100 * (a.rate - j.rate) desc, j.payer_name",
+   "answer_key_sql": "with adj as ( select pcn, payer_id, event_number, sum(amount) filter (where group_code = 'CO') co from ledger.event_adjustments group by 1, 2, 3), m as ( select array_to_string(list_transform(string_split(lower(a.payer), ' '), lambda x: upper(x[1]) || x[2:]), ' ') payer_name, date_trunc('month', e.event_date::date)::date payment_month, count(*) n, sum(coalesce(adj.co, 0)) / nullif(sum(e.charge), 0) rate from ledger.events e join ledger.adjudications a using (pcn, payer_id) left join adj using (pcn, payer_id, event_number) where e.is_current group by 1, 2) select j.payer_name, j.n, round(100 * j.rate, 1), a.n, round(100 * a.rate, 1), round(100 * (a.rate - j.rate), 1) from m j join m a on a.payer_name = j.payer_name where j.payment_month = date '2026-07-01' and a.payment_month = date '2026-08-01' and j.n >= 8 and a.n >= 8 order by 100 * (a.rate - j.rate) desc, j.payer_name",
+   "alt_sql": [
+    "with m as ( select payer_name, payment_month, count(*) n, sum(co_amount) / sum(charge_amount) rate from sem.remit_claims where is_current_adjudication group by 1, 2) select j.payer_name, j.n, round(100 * j.rate, 1), a.n, round(100 * a.rate, 1), round(100 * (a.rate - j.rate), 1) from m j join m a on a.payer_name = j.payer_name where j.payment_month = date '2026-07-01' and a.payment_month = date '2026-08-01' and j.n >= 8 and a.n >= 8",
+    "SELECT 'ok' AS note, * FROM (with m as ( select payer_name, payment_month, count(*) n, sum(co_amount) / nullif(sum(charge_amount), 0) rate from sem.remit_claims where is_current_adjudication group by 1, 2) select j.payer_name, j.n july_adjudications, round(100 * j.rate, 1) july_co_pct, a.n august_adjudications, round(100 * a.rate, 1) august_co_pct, round(100 * (a.rate - j.rate), 1) co_change_pp from m j join m a on a.payer_name = j.payer_name where j.payment_month = date '2026-07-01' and a.payment_month = date '2026-08-01' and j.n >= 8 and a.n >= 8 order by 100 * (a.rate - j.rate) desc, j.payer_name) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "compares service month instead of payment month",
+     "sql": "with m as ( select payer_name, service_month, count(*) n, sum(co_amount) / nullif(sum(charge_amount), 0) rate from sem.remit_claims where is_current_adjudication group by 1, 2) select j.payer_name, j.n, round(100 * j.rate, 1), a.n, round(100 * a.rate, 1), round(100 * (a.rate - j.rate), 1) from m j join m a on a.payer_name = j.payer_name where j.service_month = date '2026-07-01' and a.service_month = date '2026-08-01' and j.n >= 8 and a.n >= 8"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "CO rate is CO adjustments over 835 charge on current adjudications. Floor is 8 adjudications in each payment month. Change is August minus July.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_mom_line_denial",
+   "category": "month_over_month",
+   "difficulty": "hard",
+   "question": "How did the service-line denial rate move by 835 payment month? Use lines on current adjudications. Return the payment month, line count, denied lines, the denial rate as a percent rounded to 2 decimals, and the change in percentage points from the prior payment month (null for the first month). Compute the change from the unrounded rates, then round it to 2 decimals. Order by month.",
+   "gold_sql": "with m as ( select payment_month, count(*) lines, count(*) filter (where line_is_denied) denied, avg(line_is_denied::int) rate from sem.remit_lines where is_current_adjudication group by 1) select payment_month, lines, denied, round(100 * rate, 2) line_denial_rate_pct, round(100 * (rate - lag(rate) over (order by payment_month)), 2) change_pp from m order by 1",
+   "answer_key_sql": "with m as ( select date_trunc('month', e.event_date::date)::date payment_month, count(*) lines, count(*) filter (where el.denied) denied, avg(el.denied::int) rate from ledger.event_lines el join ledger.events e using (pcn, payer_id, event_number) where e.is_current group by 1) select payment_month, lines, denied, round(100 * rate, 2) line_denial_rate_pct, round(100 * (rate - lag(rate) over (order by payment_month)), 2) change_pp from m order by 1",
+   "alt_sql": [
+    "with m as ( select payment_month, count(*) lines, sum(line_is_denied::int) denied, avg(line_is_denied::int) rate from sem.remit_lines where is_current_adjudication group by 1) select payment_month, lines, denied, round(100 * rate, 2), round(100 * (rate - lag(rate) over (order by payment_month)), 2) from m",
+    "SELECT 'ok' AS note, * FROM (with m as ( select payment_month, count(*) lines, count(*) filter (where line_is_denied) denied, avg(line_is_denied::int) rate from sem.remit_lines where is_current_adjudication group by 1) select payment_month, lines, denied, round(100 * rate, 2) line_denial_rate_pct, round(100 * (rate - lag(rate) over (order by payment_month)), 2) change_pp from m order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "uses the claim denial rate instead of the service-line denial rate",
+     "sql": "with m as ( select payment_month, count(*) lines, count(*) filter (where is_denied) denied, avg(is_denied::int) rate from sem.remit_claims where is_current_adjudication group by 1) select payment_month, lines, denied, round(100 * rate, 2), round(100 * (rate - lag(rate) over (order by payment_month)), 2) from m"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Line grain, current adjudications. Change is this month's unrounded rate minus the prior payment month's, in percentage points.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_mom_pr",
+   "category": "month_over_month",
+   "difficulty": "hard",
+   "question": "How did patient responsibility move by payment month? On current adjudications, by payment month return adjudications, patient-responsibility dollars (CLP05, missing as 0, 2 decimals), charge, patient responsibility as a percent of charge rounded to 2 decimals, and the change in that percent from the prior month in percentage points (null for the first month, computed from the unrounded ratios, then rounded to 2 decimals). Order by month.",
+   "gold_sql": "with m as ( select payment_month, count(*) n, sum(coalesce(patient_responsibility_amount, 0)) pr, sum(charge_amount) charge from sem.remit_claims where is_current_adjudication group by 1) select payment_month, n adjudications, round(pr, 2) patient_responsibility, round(charge, 2) charge, round(100 * pr / charge, 2) pr_pct_of_charge, round(100 * (pr / charge - lag(pr / charge) over (order by payment_month)), 2) change_pp from m order by 1",
+   "answer_key_sql": "with m as ( select date_trunc('month', e.event_date::date)::date payment_month, count(*) n, sum(coalesce(e.patient_responsibility, 0)) pr, sum(e.charge) charge from ledger.events e where e.is_current group by 1) select payment_month, n, round(pr, 2), round(charge, 2), round(100 * pr / charge, 2), round(100 * (pr / charge - lag(pr / charge) over (order by payment_month)), 2) from m order by 1",
+   "alt_sql": [
+    "with m as ( select payment_month, count(*) n, sum(coalesce(patient_responsibility_amount, 0)) pr, sum(charge_amount) charge from sem.remit_claims where is_current_adjudication group by 1) select payment_month, n, pr, charge, 100 * pr / charge, 100 * (pr / charge - lag(pr / charge) over (order by payment_month)) from m",
+    "SELECT 'ok' AS note, * FROM (with m as ( select payment_month, count(*) n, sum(coalesce(patient_responsibility_amount, 0)) pr, sum(charge_amount) charge from sem.remit_claims where is_current_adjudication group by 1) select payment_month, n adjudications, round(pr, 2) patient_responsibility, round(charge, 2) charge, round(100 * pr / charge, 2) pr_pct_of_charge, round(100 * (pr / charge - lag(pr / charge) over (order by payment_month)), 2) change_pp from m order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "uses CO dollars in place of patient responsibility",
+     "sql": "with m as ( select payment_month, count(*) n, sum(co_amount) pr, sum(charge_amount) charge from sem.remit_claims where is_current_adjudication group by 1) select payment_month, n, round(pr, 2), round(charge, 2), round(100 * pr / charge, 2), round(100 * (pr / charge - lag(pr / charge) over (order by payment_month)), 2) from m"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Current adjudications. Patient responsibility is CLP05. The change is in percentage points of charge.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_mom_avg_charge",
+   "category": "month_over_month",
+   "difficulty": "hard",
+   "question": "Is the average 835 charge per current adjudication changing by payment month? Return the payment month, current adjudications, total charge (2 decimals), average charge (2 decimals) and the change in average charge from the prior month (null for the first month, from the unrounded averages, then rounded to 2 decimals). Order by month.",
+   "gold_sql": "with m as ( select payment_month, count(*) n, sum(charge_amount) charge, avg(charge_amount) avg_charge from sem.remit_claims where is_current_adjudication group by 1) select payment_month, n adjudications, round(charge, 2) charge, round(avg_charge, 2) avg_charge, round(avg_charge - lag(avg_charge) over (order by payment_month), 2) avg_charge_change from m order by 1",
+   "answer_key_sql": "with m as ( select date_trunc('month', event_date::date)::date payment_month, count(*) n, sum(charge) charge, avg(charge) avg_charge from ledger.events where is_current group by 1) select payment_month, n, round(charge, 2), round(avg_charge, 2), round(avg_charge - lag(avg_charge) over (order by payment_month), 2) from m order by 1",
+   "alt_sql": [
+    "with m as ( select payment_month, count(*) n, sum(charge_amount) charge, avg(charge_amount) avg_charge from sem.remit_claims where is_current_adjudication group by 1) select payment_month, n, charge, avg_charge, avg_charge - lag(avg_charge) over (order by payment_month) from m",
+    "SELECT 'ok' AS note, * FROM (with m as ( select payment_month, count(*) n, sum(charge_amount) charge, avg(charge_amount) avg_charge from sem.remit_claims where is_current_adjudication group by 1) select payment_month, n adjudications, round(charge, 2) charge, round(avg_charge, 2) avg_charge, round(avg_charge - lag(avg_charge) over (order by payment_month), 2) avg_charge_change from m order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "averages the paid amount instead of the charge",
+     "sql": "with m as ( select payment_month, count(*) n, sum(paid_amount) charge, avg(paid_amount) avg_charge from sem.remit_claims where is_current_adjudication group by 1) select payment_month, n, round(charge, 2), round(avg_charge, 2), round(avg_charge - lag(avg_charge) over (order by payment_month), 2) from m"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Current adjudications. Average is the mean 835 claim charge. Change is this month minus the prior payment month.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_mom_primary_volume",
+   "category": "month_over_month",
+   "difficulty": "hard",
+   "question": "How did primary billing volume move by the month we first billed the primary payer? One row per claim, primary payer is payer_responsibility = 'P', and the month is the month of the earliest 837 to that payer. The billed charge is the charge on that earliest primary submission. Return the month, claims, billed charge (2 decimals) and the percent change in claim count from the prior month (null for the first month, 1 decimal). Order by month.",
+   "gold_sql": "with s as ( select submission_month, charge_amount from ( select submission_month, charge_amount, row_number() over (partition by claim_key order by submission_date, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1), m as (select submission_month, count(*) claims, sum(charge_amount) billed from s group by 1) select submission_month, claims, round(billed, 2) billed, round(100.0 * (claims - lag(claims) over (order by submission_month)) / lag(claims) over (order by submission_month), 1) claims_change_pct from m order by 1",
+   "answer_key_sql": "with s as ( select date_trunc('month', submission_date::date)::date submission_month, charge from ( select s.pcn, s.submission_date, c.charge, row_number() over (partition by s.pcn order by s.submission_date, s.payer_id) rn from ledger.submissions s join ledger.claims c on c.pcn = s.pcn where s.payer_sequence = 0) t where rn = 1), m as (select submission_month, count(*) claims, sum(charge) billed from s group by 1) select submission_month, claims, round(billed, 2), round(100.0 * (claims - lag(claims) over (order by submission_month)) / lag(claims) over (order by submission_month), 1) from m order by 1",
+   "alt_sql": [
+    "with s as ( select date_trunc('month', submission_date)::date submission_month, charge_amount from ( select submission_date, charge_amount, row_number() over (partition by claim_key order by submission_date, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1), m as (select submission_month, count(*) claims, sum(charge_amount) billed from s group by 1) select submission_month, claims, round(billed, 2) billed, round(100.0 * (claims - lag(claims) over (order by submission_month)) / lag(claims) over (order by submission_month), 1) claims_change_pct from m",
+    "SELECT 'ok' AS note, * FROM (with s as ( select submission_month, charge_amount from ( select submission_month, charge_amount, row_number() over (partition by claim_key order by submission_date, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1), m as (select submission_month, count(*) claims, sum(charge_amount) billed from s group by 1) select submission_month, claims, round(billed, 2) billed, round(100.0 * (claims - lag(claims) over (order by submission_month)) / lag(claims) over (order by submission_month), 1) claims_change_pct from m order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "counts every primary submission, so a corrected claim is counted again in the later month",
+     "sql": "select submission_month, count(*) claims, round(sum(charge_amount), 2), round(100.0 * (count(*) - lag(count(*)) over (order by submission_month)) / lag(count(*)) over (order by submission_month), 1) from sem.claims where payer_responsibility = 'P' group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "One row per claim at its first primary 837. Percent change is in the claim count, not the dollars.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_mom_yield_service",
+   "category": "month_over_month",
+   "difficulty": "hard",
+   "question": "For primary-payer claims, how does collection on the date of service compare across service months that have at least 80 claims? One row per claim: the latest primary 837 (payer_responsibility = 'P'), service month from that submission's service-from date, charge from that submission. Paid is the current adjudication from that primary payer, or 0 when there is none (including voids' latest submissions only when that latest primary row is not a void; drop frequency 8). Keep service months with at least 80 claims. Return the service month, claims, billed charge, paid dollars and paid as a percent of billed (1 decimal). Order by month.",
+   "gold_sql": "with c as ( select claim_key, payer_key, service_month, charge_amount from ( select claim_key, payer_key, service_month, charge_amount, frequency_code, row_number() over (partition by claim_key order by submission_date desc, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1 and frequency_code <> '8') select c.service_month, count(*) claims, round(sum(c.charge_amount), 2) billed, round(sum(coalesce(r.paid_amount, 0)), 2) paid, round(100.0 * sum(coalesce(r.paid_amount, 0)) / nullif(sum(c.charge_amount), 0), 1) yield_pct from c left join sem.remit_claims r on r.claim_key = c.claim_key and r.payer_key = c.payer_key and r.is_current_adjudication group by 1 having count(*) >= 80 order by 1",
+   "answer_key_sql": "with c as ( select pcn, payer_id, service_month, charge from ( select c.pcn, s.payer_id, date_trunc('month', c.dos::date)::date service_month, c.charge, c.voided, row_number() over (partition by c.pcn order by s.submission_date desc, s.payer_id) rn from ledger.claims c join ledger.submissions s on s.pcn = c.pcn and s.payer_sequence = 0 ) t where rn = 1 and not voided) select c.service_month, count(*) claims, round(sum(c.charge), 2) billed, round(sum(coalesce(e.paid, 0)), 2) paid, round(100.0 * sum(coalesce(e.paid, 0)) / nullif(sum(c.charge), 0), 1) yield_pct from c left join ledger.events e on e.pcn = c.pcn and e.payer_id = c.payer_id and e.is_current group by 1 having count(*) >= 80 order by 1",
+   "alt_sql": [
+    "with c as ( select claim_key, payer_key, service_month, charge_amount from ( select claim_key, payer_key, service_month, charge_amount, frequency_code, row_number() over (partition by claim_key order by submission_date desc, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1 and frequency_code <> '8') select c.service_month, count(*), sum(c.charge_amount), sum(coalesce(r.paid_amount, 0)), round(100.0 * sum(coalesce(r.paid_amount, 0)) / sum(c.charge_amount), 1) from c left join sem.remit_claims r on r.claim_key = c.claim_key and r.payer_key = c.payer_key and r.is_current_adjudication group by 1 having count(*) >= 80",
+    "SELECT 'ok' AS note, * FROM (with c as ( select claim_key, payer_key, service_month, charge_amount from ( select claim_key, payer_key, service_month, charge_amount, frequency_code, row_number() over (partition by claim_key order by submission_date desc, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1 and frequency_code <> '8') select c.service_month, count(*) claims, round(sum(c.charge_amount), 2) billed, round(sum(coalesce(r.paid_amount, 0)), 2) paid, round(100.0 * sum(coalesce(r.paid_amount, 0)) / nullif(sum(c.charge_amount), 0), 1) yield_pct from c left join sem.remit_claims r on r.claim_key = c.claim_key and r.payer_key = c.payer_key and r.is_current_adjudication group by 1 having count(*) >= 80 order by 1) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "drops the 80-claim floor and returns every service month",
+     "sql": "with c as ( select claim_key, payer_key, service_month, charge_amount from ( select claim_key, payer_key, service_month, charge_amount, frequency_code, row_number() over (partition by claim_key order by submission_date desc, claim_id) rn from sem.claims where payer_responsibility = 'P') t where rn = 1 and frequency_code <> '8') select c.service_month, count(*), round(sum(c.charge_amount), 2), round(sum(coalesce(r.paid_amount, 0)), 2), round(100.0 * sum(coalesce(r.paid_amount, 0)) / nullif(sum(c.charge_amount), 0), 1) from c left join sem.remit_claims r on r.claim_key = c.claim_key and r.payer_key = c.payer_key and r.is_current_adjudication group by 1"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Latest non-void primary submission. Paid comes from that payer's current adjudication, else 0. Service months under 80 claims are omitted.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_mom_co_by_class",
+   "category": "month_over_month",
+   "difficulty": "hard",
+   "question": "How did the contractual write-off rate move by payer class and payment month? On current adjudications, CO rate is CO adjustment dollars divided by the 835 charge. Return payer class, payment month, adjudications, CO dollars, charge (2 decimals), the CO rate as a percent rounded to 2 decimals, and the change in percentage points from that class's prior payment month (null for its first month, from the unrounded rates, then rounded to 2 decimals). Order by payer class, then month.",
+   "gold_sql": "with m as ( select payer_class, payment_month, count(*) n, sum(co_amount) co, sum(charge_amount) charge from sem.remit_claims where is_current_adjudication group by 1, 2) select payer_class, payment_month, n adjudications, round(co, 2) co_amount, round(charge, 2) charge, round(100 * co / charge, 2) co_pct, round(100 * (co / charge - lag(co / charge) over (partition by payer_class order by payment_month)), 2) change_pp from m order by 1, 2",
+   "answer_key_sql": "with adj as ( select pcn, payer_id, event_number, sum(amount) filter (where group_code = 'CO') co from ledger.event_adjustments group by 1, 2, 3), m as ( select a.payer_class, date_trunc('month', e.event_date::date)::date payment_month, count(*) n, sum(coalesce(adj.co, 0)) co, sum(e.charge) charge from ledger.events e join ledger.adjudications a using (pcn, payer_id) left join adj using (pcn, payer_id, event_number) where e.is_current group by 1, 2) select payer_class, payment_month, n, round(co, 2), round(charge, 2), round(100 * co / charge, 2), round(100 * (co / charge - lag(co / charge) over (partition by payer_class order by payment_month)), 2) from m order by 1, 2",
+   "alt_sql": [
+    "with m as ( select payer_class, payment_month, count(*) n, sum(co_amount) co, sum(charge_amount) charge from sem.remit_claims where is_current_adjudication group by 1, 2) select payer_class, payment_month, n, co, charge, 100 * co / charge, 100 * (co / charge - lag(co / charge) over (partition by payer_class order by payment_month)) from m",
+    "SELECT 'ok' AS note, * FROM (with m as ( select payer_class, payment_month, count(*) n, sum(co_amount) co, sum(charge_amount) charge from sem.remit_claims where is_current_adjudication group by 1, 2) select payer_class, payment_month, n adjudications, round(co, 2) co_amount, round(charge, 2) charge, round(100 * co / charge, 2) co_pct, round(100 * (co / charge - lag(co / charge) over (partition by payer_class order by payment_month)), 2) change_pp from m order by 1, 2) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "computes the change across payer classes in alphabetical order instead of within each class",
+     "sql": "with m as ( select payer_class, payment_month, count(*) n, sum(co_amount) co, sum(charge_amount) charge from sem.remit_claims where is_current_adjudication group by 1, 2) select payer_class, payment_month, n, round(co, 2), round(charge, 2), round(100 * co / charge, 2), round(100 * (co / charge - lag(co / charge) over (order by payer_class, payment_month)), 2) from m"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Current adjudications. The prior month is the previous payment month of the same payer class.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  },
+  {
+   "id": "g1_mom_family_share",
+   "category": "month_over_month",
+   "difficulty": "hard",
+   "question": "How did the mix of paid line dollars across test families move by payment month? On 835 service lines of current adjudications, families are chemistry (CPT 80), molecular (CPT 81 or PLA ending in U), microbiology (CPT 87), other lab (other CPT 8) and other. Return payment month, test family, line paid dollars (2 decimals) and that family's share of the month's line paid dollars as a percent rounded to 1 decimal. Order by month, then family.",
+   "gold_sql": "with m as ( select payment_month, case when procedure_code like '80%' then 'chemistry' when procedure_code like '81%' or right(procedure_code, 1) = 'U' then 'molecular' when procedure_code like '87%' then 'microbiology' when procedure_code like '8%' then 'other_lab' else 'other' end test_family, sum(line_paid_amount) paid from sem.remit_lines where is_current_adjudication group by 1, 2) select payment_month, test_family, round(paid, 2) line_paid, round(100.0 * paid / sum(paid) over (partition by payment_month), 1) share_pct from m order by 1, 2",
+   "answer_key_sql": "with m as ( select date_trunc('month', e.event_date::date)::date payment_month, case when el.cpt like '80%' then 'chemistry' when el.cpt like '81%' or right(el.cpt, 1) = 'U' then 'molecular' when el.cpt like '87%' then 'microbiology' when el.cpt like '8%' then 'other_lab' else 'other' end test_family, sum(el.paid) paid from ledger.event_lines el join ledger.events e using (pcn, payer_id, event_number) where e.is_current group by 1, 2) select payment_month, test_family, round(paid, 2) line_paid, round(100.0 * paid / sum(paid) over (partition by payment_month), 1) share_pct from m order by 1, 2",
+   "alt_sql": [
+    "with m as ( select payment_month, case when procedure_code like '80%' then 'chemistry' when procedure_code like '81%' or right(procedure_code, 1) = 'U' then 'molecular' when procedure_code like '87%' then 'microbiology' when procedure_code like '8%' then 'other_lab' else 'other' end test_family, sum(line_paid_amount) paid from sem.remit_lines where is_current_adjudication group by 1, 2) select strftime(payment_month, '%Y-%m'), test_family, paid, round(100.0 * paid / sum(paid) over (partition by payment_month), 1) from m",
+    "SELECT 'ok' AS note, * FROM (with m as ( select payment_month, case when procedure_code like '80%' then 'chemistry' when procedure_code like '81%' or right(procedure_code, 1) = 'U' then 'molecular' when procedure_code like '87%' then 'microbiology' when procedure_code like '8%' then 'other_lab' else 'other' end test_family, sum(line_paid_amount) paid from sem.remit_lines where is_current_adjudication group by 1, 2) select payment_month, test_family, round(paid, 2) line_paid, round(100.0 * paid / sum(paid) over (partition by payment_month), 1) share_pct from m order by 1, 2) q"
+   ],
+   "wrong_sql": [
+    {
+     "label": "share of line charge instead of line paid",
+     "sql": "with m as ( select payment_month, case when procedure_code like '80%' then 'chemistry' when procedure_code like '81%' or right(procedure_code, 1) = 'U' then 'molecular' when procedure_code like '87%' then 'microbiology' when procedure_code like '8%' then 'other_lab' else 'other' end test_family, sum(line_charge_amount) paid from sem.remit_lines where is_current_adjudication group by 1, 2) select payment_month, test_family, round(paid, 2), round(100.0 * paid / sum(paid) over (partition by payment_month), 1) from m"
+    }
+   ],
+   "compare": {
+    "tol": 0.01
+   },
+   "interpretation": "Current-adjudication 835 lines. Share is within the payment month. Family rules match the test-family question.",
+   "round": "grokbot-r1",
+   "intended_split": "validation",
+   "provenance": "Authored from the basic glossary in bench/agents.py (GLOSSARY) and the data dictionary (sem.* views in claude/schema/02_semantic_layer_views.sql and metric definitions in claude/schema/03_semantic_model.yaml) only. The pitfalls glossary and per-question failure analyses were not used.",
+   "source": "grokbot-r1 validation set",
+   "dataset_id": "e21410ce6805",
+   "generator_version": "3.3"
+  }
+ ]
+}
