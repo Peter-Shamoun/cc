@@ -42,6 +42,10 @@ def test_matcher_accepts_equivalent_answers():
     assert match([(-5.0,)], [(5.0,)], {"sign_cols": [0]})[0]
     g = [("a", 10)] + [(f"p{i}", 5) for i in range(13)]
     assert match(g, [("a", 10)] + [(f"p{i}", 5) for i in range(8, 12)], {"order": "topn", "n": 5})[0]
+    # a rate with its optional count in another order, plus an extra supporting count (found in screen 1)
+    spec = {"percent_cols": [1], "optional_cols": [2], "tol": 0.0005}
+    assert match([("Z13220", 0.0465, 86)], [("Z13220", 86, 4, 4.65)], spec)[0]
+    assert match([("a", 0.5, 10)], [("a", 10, 0.5)])[0]
 
 
 @pytest.mark.parametrize("gold,cand,spec", [
@@ -55,6 +59,8 @@ def test_matcher_accepts_equivalent_answers():
     ([("A", 1)], [("A", 1), ("A", 1)], {}),
     ([("x", 10), ("y", 8), ("z", 8), ("w", 5)], [("x", 10), ("w", 5)], {"order": "topn", "n": 2}),
     ([("a", 10)] + [(f"p{i}", 5) for i in range(13)], [(f"p{i}", 5) for i in range(5)], {"order": "topn", "n": 5}),
+    ([("a", 10)], [("a", 10, 7)], {}),                                           # extra count beside a count answer
+    ([("x", 0.0465, 86)], [("x", 85, 4, 0.0465)], {"optional_cols": [2]}),       # the optional count given, but wrong
 ])
 def test_matcher_rejects(gold, cand, spec):
     assert not match(gold, cand, spec)[0]

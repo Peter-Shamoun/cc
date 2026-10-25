@@ -4,10 +4,12 @@ A candidate result is correct when it states the expected answer and nothing tha
 
 - Columns are matched by value, not name (agents name columns freely). Every numeric column the candidate
   returns must map to an expected column, so a result that lists several alternative numbers fails, with one
-  exception: whole-number supporting counts beside fractional measures (rates, averages, amounts). Extra text
+  exception: whole-number supporting counts when every required measure is fractional (a rate, an average, an
+  amount); the question's optional counts may be among the measures. Extra text
   columns (labels, names next to ids) are allowed. Expected columns are required unless the question marks
   them `optional_cols` (e.g. a supporting count).
-- Measures keep the expected column order, so two counts cannot be swapped.
+- Measures of the same kind (whole-number counts, or fractional rates/averages/amounts) keep the expected column
+  order, so two counts cannot be swapped; a count and a rate may come in either order.
 - Rows must match as a multiset within `tol`. `order: strict` also checks order. `order: topn` (with `n` and
   `metric_col`) accepts any valid top-N when there are ties at the cut-off.
 - `percent_cols` and `sign_cols` allow, per listed column and for the whole column at once, a rate given as a
@@ -82,15 +84,15 @@ def _is_whole_number_col(rows, j) -> bool:
     return bool(vals) and all(v is not None and float(v).is_integer() for v in vals)
 
 
-def _supporting_counts_allowed(gold, cand, gcols, g_num, unexplained, spec) -> bool:
-    """Extra numeric columns are tolerated only as supporting counts next to fractional measures (a rate, an
-    average, an amount): every extra column holds whole numbers and every expected measure is fractional. An extra
-    rate beside a rate, or an extra count beside a count, could be an alternative answer, so it fails."""
+def _supporting_counts_allowed(gold, cand, required_cols, g_num, unexplained, spec) -> bool:
+    """Extra numeric columns are tolerated only as supporting counts next to fractional answers (a rate, an average,
+    an amount): every extra column holds whole numbers and every required measure is fractional. An extra rate
+    beside a rate, or an extra count when the answer itself is a count, could be an alternative answer, so it fails."""
     if spec.get("strict_extra_columns"):
         return False
-    measures = [g for g in gcols if g in g_num]
-    return bool(measures) and all(_is_whole_number_col(cand, j) for j in unexplained) and \
-        not any(_is_whole_number_col(gold, g) for g in measures)
+    required_measures = [g for g in required_cols if g in g_num]
+    return bool(required_measures) and all(_is_whole_number_col(cand, j) for j in unexplained) and \
+        not any(_is_whole_number_col(gold, g) for g in required_measures)
 
 
 def _mappings(gold, cand, spec):
@@ -99,6 +101,7 @@ def _mappings(gold, cand, spec):
     req = set(spec.get("required_cols", range(k))) - set(spec.get("optional_cols", []))
     opt = [j for j in range(k) if j not in req]
     g_num = {j for j in range(k) if _is_numeric_col(gold, j)}
+    g_whole = {j for j in g_num if _is_whole_number_col(gold, j)}
     c_num = {j for j in range(m) if _is_numeric_col(cand, j)}
     c_numstr = {j for j in range(m) if j not in c_num and all(_num(r[j]) is not None for r in cand if r[j] is not None)}
     pct, sgn = set(spec.get("percent_cols", [])), set(spec.get("sign_cols", []))
@@ -111,12 +114,13 @@ def _mappings(gold, cand, spec):
                 unexplained = c_num - set(ccols)
                 unused_optional_measures = [g for g in opt if g in g_num and g not in gcols]
                 if unexplained and (unused_optional_measures or   # a count the question defines must be the right one
-                                    not _supporting_counts_allowed(gold, cand, gcols, g_num, unexplained, spec)):
+                                    not _supporting_counts_allowed(gold, cand, req, g_num, unexplained, spec)):
                     continue                                      # extra numbers could be alternative answers
                 if any((g in g_num) != (c in c_num or (g in g_num and c in c_numstr)) for g, c in zip(gcols, ccols)):
                     continue
-                nums = [c for g, c in zip(gcols, ccols) if g in g_num]
-                if nums != sorted(nums):                          # measures keep the expected order
+                counts = [c for g, c in zip(gcols, ccols) if g in g_whole]
+                fractions = [c for g, c in zip(gcols, ccols) if g in g_num and g not in g_whole]
+                if counts != sorted(counts) or fractions != sorted(fractions):   # same-kind measures keep their order
                     continue
                 opts = []
                 for g in gcols:
