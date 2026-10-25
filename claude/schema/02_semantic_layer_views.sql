@@ -588,8 +588,8 @@ WITH s AS (
     SELECT payer_key, payer_name, payer_class, payer_name_as_sent, payer_id_as_sent, '835' FROM sem_int.payer_835
 )
 SELECT payer_key,
-       any_value(payer_name)  AS payer_name,
-       any_value(payer_class) AS payer_class,
+       min(payer_name)        AS payer_name,           -- deterministic (any_value is not), and mergeable
+       min(payer_class)       AS payer_class,
        list_sort(list_distinct(list(payer_name_as_sent) FILTER (WHERE payer_name_as_sent IS NOT NULL))) AS names_as_sent,
        list_sort(list_distinct(list(payer_id_as_sent)   FILTER (WHERE payer_id_as_sent IS NOT NULL)))   AS ids_as_sent,
        COUNT(*) FILTER (WHERE side = '837') AS claim_submissions,

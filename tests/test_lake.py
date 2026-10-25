@@ -11,7 +11,7 @@ from ccsim.aws.ecs import TaskEnv
 from ccsim.aws.sts import service_principal
 from ccsim.edi_mock import Scenario
 from ccsim.infra import BUCKET, names, role_arn
-from ccsim.lake import Store, acquire_lock, read_current, read_manifest, release_lock, silver_state
+from ccsim.lake import BatchLock, LockLost, Store, check_manifest, read_current, read_manifest, silver_state
 from ccsim.query import login, open_session
 from ccsim.world import build_world
 
@@ -112,13 +112,21 @@ def test_uncommitted_silver_parts_are_garbage(world):
     st.delete([junk])
 
 
-def test_batch_lock_is_exclusive_and_expires(world):
+def test_batch_lock_is_exclusive_expires_and_fences_the_overrunning_holder(world):
     st = store(world)
     clock = world.aws.clock
-    key = acquire_lock(st, "first", clock)
+    first = BatchLock(st, "first", clock).acquire()
     with pytest.raises(TimeoutError):
-        acquire_lock(st, "second", clock, wait_seconds=0)
-    clock.advance(3 * 3600)                                       # the holder crashed: its lease runs out
-    st = store(world)                                             # (and so did its credentials)
-    assert acquire_lock(st, "second", clock, wait_seconds=0) == key
-    release_lock(st, key)
+        BatchLock(st, "second", clock).acquire(wait_seconds=0)
+    clock.advance(3 * 3600)                                       # first overran its lease (or crashed)
+    st = store(world)                                             # (and its credentials expired)
+    first.store = st
+    second = BatchLock(st, "second", clock).acquire(wait_seconds=0)
+    with pytest.raises(LockLost):                                 # first must not commit or publish any more
+        first.renew()
+    first.release()                                               # ...nor release second's lock
+    second.renew()
+    with pytest.raises(TimeoutError):
+        BatchLock(st, "third", clock).acquire(wait_seconds=0)
+    second.release()
+    BatchLock(st, "third", clock).acquire(wait_seconds=0).release()
