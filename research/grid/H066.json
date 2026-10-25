@@ -65,7 +65,8 @@
    "repairs": 0,
    "seconds": 0.002,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_b853266803",
@@ -120,7 +121,8 @@
    "repairs": 0,
    "seconds": 0.007,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -157,7 +159,8 @@
    "repairs": 0,
    "seconds": 0.005,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_a5888f64a4",
@@ -218,7 +221,8 @@
    "repairs": 0,
    "seconds": 0.005,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7d45c279a7",
@@ -252,7 +256,8 @@
    "repairs": 0,
    "seconds": 0.007,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q15_partial_line_denials",
@@ -271,7 +276,8 @@
    "repairs": 0,
    "seconds": 0.002,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q25_primary_deductible",
@@ -290,7 +296,8 @@
    "repairs": 0,
    "seconds": 0.004,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_8663c777cd",
@@ -321,7 +328,8 @@
    "repairs": 0,
    "seconds": 0.006,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__87798",
@@ -340,7 +348,8 @@
    "repairs": 0,
    "seconds": 0.003,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q11_cpt_denial_rate",
@@ -527,7 +536,8 @@
    "repairs": 0,
    "seconds": 0.007,
    "note": "explore showed most current adjudications lack 837 lines; CPTs taken from 837+835 lines",
-   "pass": null
+   "pass": false,
+   "why": "expected 3 rows, got 28"
   },
   {
    "qid": "a_a123bba47f",
@@ -568,7 +578,8 @@
    "repairs": 0,
    "seconds": 0.009,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_9108c7aacb",
@@ -623,7 +634,8 @@
    "repairs": 1,
    "seconds": 0.012,
    "note": "repaired binder error",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_856b95a70c",
@@ -684,7 +696,8 @@
    "repairs": 0,
    "seconds": 0.006,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_1b7e02d0b0",
@@ -711,7 +724,8 @@
    "repairs": 0,
    "seconds": 0.009,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_921f1bf366",
@@ -736,7 +750,8 @@
    "repairs": 0,
    "seconds": 0.01,
    "note": "",
-   "pass": null
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "q14_zero_paid_not_denied",
@@ -755,7 +770,8 @@
    "repairs": 0,
    "seconds": 0.003,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_dca9da6d52",
@@ -782,7 +798,8 @@
    "repairs": 0,
    "seconds": 0.007,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q19_reversed_no_correction",
@@ -801,7 +818,8 @@
    "repairs": 0,
    "seconds": 0.003,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__80307",
@@ -820,7 +838,8 @@
    "repairs": 0,
    "seconds": 0.003,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d383370345",
@@ -881,7 +900,8 @@
    "repairs": 0,
    "seconds": 0.011,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0482",
@@ -900,7 +920,8 @@
    "repairs": 0,
    "seconds": 0.003,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_0d43f7d4b6",
@@ -923,7 +944,8 @@
    "repairs": 0,
    "seconds": 0.015,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_923951a050",
@@ -944,7 +966,8 @@
    "repairs": 0,
    "seconds": 0.006,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7423e6eb91",
@@ -972,7 +995,8 @@
    "repairs": 0,
    "seconds": 0.009,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_never_remitted_submitted_in_month__2026-07-01",
@@ -991,7 +1015,8 @@
    "repairs": 0,
    "seconds": 0.005,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_ab202d4b23",
@@ -1204,7 +1229,8 @@
    "repairs": 0,
    "seconds": 0.009,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0480",
@@ -1223,7 +1249,8 @@
    "repairs": 0,
    "seconds": 0.003,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d671e0b995",
@@ -1300,7 +1327,8 @@
    "repairs": 0,
    "seconds": 0.005,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__81479",
@@ -1319,7 +1347,8 @@
    "repairs": 0,
    "seconds": 0.003,
    "note": "",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q12_referring_provider_denials",
@@ -1337,11 +1366,13 @@
    "repairs": 1,
    "seconds": 0.006,
    "note": "empty result -> repair re-check (claims per NPI max 18 raw / <15 adjudicated); empty stands",
-   "pass": null
+   "pass": true,
+   "why": "ok"
   }
  ],
- "accuracy": null,
+ "accuracy": "28/30",
  "n": 30,
  "mean_sql_execs": 2.07,
- "notes": "Answers committed before scoring (pass=null until scored). Single executor l0 ran all 5 cells sequentially with one shared draft pool; cells differ only where factor logic changes the selected SQL. Disclosure: executor glanced at H001's aggregate accuracy line (no answers/SQL) before writing answers."
+ "notes": "Answers committed before scoring (pass=null until scored). Single executor l0 ran all 5 cells sequentially with one shared draft pool; cells differ only where factor logic changes the selected SQL. Disclosure: executor glanced at H001's aggregate accuracy line (no answers/SQL) before writing answers. Scored with bench.compare.match against gold_sql after the answer commit. Failures: 2 (q11_cpt_denial_rate, a_921f1bf366).",
+ "n_pass": 28
 }
