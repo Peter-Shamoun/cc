@@ -51,7 +51,7 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.027,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_f786e11aec",
@@ -120,7 +120,7 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.026,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0483",
@@ -139,7 +139,7 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_fca405b635",
@@ -162,7 +162,7 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.009,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_b853266803",
@@ -217,7 +217,7 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.029,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -254,7 +254,7 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.018,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_class_denial_rate__medicaid_mco",
@@ -273,7 +273,7 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.007,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_a5888f64a4",
@@ -334,7 +334,7 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.014,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_436f690741",
@@ -412,7 +412,7 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.017,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_d29f83c935",
@@ -1748,7 +1748,7 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.028,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q07_denial_rate",
@@ -1767,7 +1767,7 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.007,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_7d45c279a7",
@@ -1801,7 +1801,7 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.026,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_f3c42ce766",
@@ -1916,7 +1916,7 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.011,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q15_partial_line_denials",
@@ -1935,7 +1935,7 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.007,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q25_primary_deductible",
@@ -1954,7 +1954,7 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.018,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_26d4c3f4ca",
@@ -2039,7 +2039,7 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.012,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q18_voided",
@@ -2058,7 +2058,7 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.005,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_denied_lines__36415",
@@ -2077,7 +2077,7 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_8663c777cd",
@@ -2108,7 +2108,7 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.015,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_9a40343e18",
@@ -2177,11 +2177,11 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.02,
-   "pass": null
+   "pass": true
   }
  ],
- "accuracy": null,
+ "accuracy": "20/20",
  "n": 20,
  "mean_sql_execs": 8.0,
- "notes": "Generator 3.3 smallest benchmark snapshot Scenario(days=20, volume_scale=0.3, seed=5), dataset 98e61f03e594, non-escalated sem.* reader. Dev set: all benchmark questions except heldout_hard_1 (27) and grokbot-r1 (none), sorted by sha256(question_id), first 20. Few-shot: BM25 top 3 from outside the dev set, excluding the same parametric family and the held-out 27. Explore: 25 shared profile queries (distinct values, ranges, nulls, join cardinalities) run once before SQL; counted as 5 probes per question. Three structural SQL candidates per question, all executed, all 20 agreed 3/3, no repairs. Planner and SQL writer were separate subagents; the writer saw only the metric spec. Pass left null until scoring."
+ "notes": "Generator 3.3 smallest benchmark snapshot Scenario(days=20, volume_scale=0.3, seed=5), dataset 98e61f03e594, non-escalated sem.* reader. Dev set: all benchmark questions except heldout_hard_1 (27) and grokbot-r1 (none), sorted by sha256(question_id), first 20. Few-shot: BM25 top 3 from outside the dev set, excluding the same parametric family and the held-out 27. Explore: 25 shared profile queries (distinct values, ranges, nulls, join cardinalities) run once before SQL; counted as 5 probes per question. Three structural SQL candidates per question, all executed, all 20 agreed 3/3, no repairs. Planner and SQL writer were separate subagents; the writer saw only the metric spec. Scored with bench.compare.match against gold SQL on the same snapshot: 20/20. SQL was not revised after scoring."
 }
