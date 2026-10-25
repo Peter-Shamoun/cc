@@ -355,8 +355,8 @@ PROFILES_FOR_CHILDREN = {"routine_blood": .7, "routine_urine": 1.0, "respiratory
 # Mean long-tail add-on codes on a blood draw, by payer class (calibrated to lines/claim: Medicare 6.0, MA 5.5,
 # commercial 4.3, Medicaid 4.0; spec volume.lines_per_claim.by_payer_class). Drawn before the claim scrubber strips
 # NCCI panel components, so slightly above the billed means.
-TAIL_LINES_BY_CLASS = {"medicare": 7.0, "medicare_advantage": 6.2, "commercial": 4.4, "blues": 4.4, "other": 4.4,
-                       "medicaid": 4.6, "medicaid_mco": 4.6}
+TAIL_LINES_BY_CLASS = {"medicare": 6.5, "medicare_advantage": 5.8, "commercial": 4.0, "blues": 4.0, "other": 4.0,
+                       "medicaid": 4.3, "medicaid_mco": 4.3}
 DEEP_TAIL_SHARE = .08                   # share of long-tail add-ons drawn from the rare-code tail
 P_VENIPUNCTURE_BILLED = .75             # notes s.9 #4: the lab drew the specimen (patient service center)
 
