@@ -64,7 +64,9 @@
    "sql_execs": 6,
    "repairs": 0,
    "seconds": 0.0186,
-   "trace": "explore: 3 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: share = CPT line paid / all current line paid, as a fraction 0-1 (billed procedure_code), 4 dp"
+   "trace": "explore: 3 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: share = CPT line paid / all current line paid, as a fraction 0-1 (billed procedure_code), 4 dp",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_b853266803",
@@ -118,7 +120,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0219,
-   "trace": "explore: 4 probes; candidates: A=6r, B=errr, C=6r; agree=2; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending"
+   "trace": "explore: 4 probes; candidates: A=6r, B=errr, C=6r; agree=2; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -154,7 +158,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0197,
-   "trace": "explore: 4 probes; candidates: A=5r, B=5r, C=5r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending"
+   "trace": "explore: 4 probes; candidates: A=5r, B=5r, C=5r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_a5888f64a4",
@@ -214,7 +220,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0262,
-   "trace": "explore: 4 probes; candidates: A=7r, B=7r, C=7r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending"
+   "trace": "explore: 4 probes; candidates: A=7r, B=7r, C=7r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7d45c279a7",
@@ -247,7 +255,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0245,
-   "trace": "explore: 4 probes; candidates: A=2r, B=2r, C=2r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending"
+   "trace": "explore: 4 probes; candidates: A=2r, B=2r, C=2r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q15_partial_line_denials",
@@ -265,7 +275,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0159,
-   "trace": "explore: 4 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending"
+   "trace": "explore: 4 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q25_primary_deductible",
@@ -283,7 +295,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0175,
-   "trace": "explore: 4 probes; candidates: A=1r, B=1r, C=1r; agree=2; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending"
+   "trace": "explore: 4 probes; candidates: A=1r, B=1r, C=1r; agree=2; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending",
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_8663c777cd",
@@ -294,7 +308,9 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.0093,
-   "trace": "explore: 5 probes; candidates: A=errr, B=errr, C=errr; agree=0; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending"
+   "trace": "explore: 5 probes; candidates: A=errr, B=errr, C=errr; agree=0; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending",
+   "pass": false,
+   "why": "final SQL fails: Parser Error: syntax error at or near \"month\"\n\nLINE 3: SELECT strftime(m,'%Y-%m') month, sum(n) total_claims, sum(n) FIL"
   },
   {
    "qid": "f_cpt_share_of_line_payments__87798",
@@ -312,7 +328,9 @@
    "sql_execs": 6,
    "repairs": 0,
    "seconds": 0.0113,
-   "trace": "explore: 3 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: share = CPT line paid / all current line paid, as a fraction 0-1 (billed procedure_code), 4 dp"
+   "trace": "explore: 3 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: share = CPT line paid / all current line paid, as a fraction 0-1 (billed procedure_code), 4 dp",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q11_cpt_denial_rate",
@@ -348,7 +366,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0219,
-   "trace": "explore: 4 probes; candidates: A=3r, B=3r, C=28r; agree=2; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending"
+   "trace": "explore: 4 probes; candidates: A=3r, B=3r, C=28r; agree=2; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending",
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_a123bba47f",
@@ -388,7 +408,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0221,
-   "trace": "explore: 4 probes; candidates: A=3r, B=3r, C=3r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending"
+   "trace": "explore: 4 probes; candidates: A=3r, B=3r, C=3r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_9108c7aacb",
@@ -399,7 +421,9 @@
    "sql_execs": 4,
    "repairs": 0,
    "seconds": 0.0023,
-   "trace": "explore: 1 probes; candidates: A=errr, B=errr, C=errr; agree=0; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending"
+   "trace": "explore: 1 probes; candidates: A=errr, B=errr, C=errr; agree=0; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending",
+   "pass": false,
+   "why": "final SQL fails: Parser Error: syntax error at or near \"days\"\n\nLINE 1: ....payment_date) offset_date, min(o.payment_date)-f.payment_date "
   },
   {
    "qid": "a_856b95a70c",
@@ -459,7 +483,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0201,
-   "trace": "explore: 4 probes; candidates: A=7r, B=errr, C=7r; agree=1; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending"
+   "trace": "explore: 4 probes; candidates: A=7r, B=errr, C=7r; agree=1; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_1b7e02d0b0",
@@ -485,7 +511,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.029,
-   "trace": "explore: 4 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending"
+   "trace": "explore: 4 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_921f1bf366",
@@ -509,7 +537,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0244,
-   "trace": "explore: 4 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending"
+   "trace": "explore: 4 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending",
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "q14_zero_paid_not_denied",
@@ -527,7 +557,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.015,
-   "trace": "explore: 4 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending"
+   "trace": "explore: 4 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_dca9da6d52",
@@ -553,7 +585,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0142,
-   "trace": "explore: 4 probes; candidates: A=errr, B=errr, C=1r; agree=1; pick=C; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending"
+   "trace": "explore: 4 probes; candidates: A=errr, B=errr, C=1r; agree=1; pick=C; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q19_reversed_no_correction",
@@ -571,7 +605,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0169,
-   "trace": "explore: 4 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending"
+   "trace": "explore: 4 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__80307",
@@ -589,7 +625,9 @@
    "sql_execs": 6,
    "repairs": 0,
    "seconds": 0.0107,
-   "trace": "explore: 3 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: share = CPT line paid / all current line paid, as a fraction 0-1 (billed procedure_code), 4 dp"
+   "trace": "explore: 3 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: share = CPT line paid / all current line paid, as a fraction 0-1 (billed procedure_code), 4 dp",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d383370345",
@@ -649,7 +687,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0308,
-   "trace": "explore: 4 probes; candidates: A=7r, B=7r, C=7r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending"
+   "trace": "explore: 4 probes; candidates: A=7r, B=7r, C=7r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0482",
@@ -667,7 +707,9 @@
    "sql_execs": 6,
    "repairs": 0,
    "seconds": 0.0116,
-   "trace": "explore: 3 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: share = CPT line paid / all current line paid, as a fraction 0-1 (billed procedure_code), 4 dp"
+   "trace": "explore: 3 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: share = CPT line paid / all current line paid, as a fraction 0-1 (billed procedure_code), 4 dp",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_0d43f7d4b6",
@@ -689,7 +731,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.027,
-   "trace": "explore: 4 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending"
+   "trace": "explore: 4 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_923951a050",
@@ -709,7 +753,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0176,
-   "trace": "explore: 4 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending"
+   "trace": "explore: 4 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7423e6eb91",
@@ -736,7 +782,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0313,
-   "trace": "explore: 4 probes; candidates: A=2r, B=2r, C=2r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending"
+   "trace": "explore: 4 probes; candidates: A=2r, B=2r, C=2r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_never_remitted_submitted_in_month__2026-07-01",
@@ -754,7 +802,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0199,
-   "trace": "explore: 4 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending"
+   "trace": "explore: 4 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_ab202d4b23",
@@ -966,7 +1016,9 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.0284,
-   "trace": "explore: 5 probes; candidates: A=39r, B=39r, C=39r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending"
+   "trace": "explore: 5 probes; candidates: A=39r, B=39r, C=39r; agree=3; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0480",
@@ -984,7 +1036,9 @@
    "sql_execs": 6,
    "repairs": 0,
    "seconds": 0.0124,
-   "trace": "explore: 3 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: share = CPT line paid / all current line paid, as a fraction 0-1 (billed procedure_code), 4 dp"
+   "trace": "explore: 3 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: share = CPT line paid / all current line paid, as a fraction 0-1 (billed procedure_code), 4 dp",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d671e0b995",
@@ -995,7 +1049,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0093,
-   "trace": "explore: 4 probes; candidates: A=errr, B=errr, C=errr; agree=0; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending"
+   "trace": "explore: 4 probes; candidates: A=errr, B=errr, C=errr; agree=0; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending",
+   "pass": false,
+   "why": "final SQL fails: Parser Error: syntax error at or near \"month\"\n\nLINE 1: ... m AS (SELECT payer_class, strftime(payment_date,'%Y-%m') mont"
   },
   {
    "qid": "f_cpt_share_of_line_payments__81479",
@@ -1013,7 +1069,9 @@
    "sql_execs": 6,
    "repairs": 0,
    "seconds": 0.0114,
-   "trace": "explore: 3 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: share = CPT line paid / all current line paid, as a fraction 0-1 (billed procedure_code), 4 dp"
+   "trace": "explore: 3 probes; candidates: A=1r, B=1r, C=1r; agree=3; pick=A; assumptions: share = CPT line paid / all current line paid, as a fraction 0-1 (billed procedure_code), 4 dp",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q12_referring_provider_denials",
@@ -1030,9 +1088,22 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.0363,
-   "trace": "explore: 5 probes; candidates: A=0r, B=0r, C=0r; agree=0; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending"
+   "trace": "explore: 5 probes; candidates: A=0r, B=0r, C=0r; agree=0; pick=A; assumptions: current adjudication = is_current_adjudication (one per claim+payer); denial = remit_claims.is_denied; primary = claims.payer_responsibility 'P' matched on claim_key+payer_key; first submission = min 837 submission_date per claim+payer; dates as calendar-day differences; percentages on 0-100 scale; ties by stated key ascending",
+   "pass": true,
+   "why": "ok"
   }
  ],
  "n": 30,
- "mean_sql_execs": 6.8
+ "mean_sql_execs": 6.8,
+ "accuracy": "24/30",
+ "n_pass": 24,
+ "failures": [
+  "q25_primary_deductible",
+  "a_8663c777cd",
+  "q11_cpt_denial_rate",
+  "a_9108c7aacb",
+  "a_921f1bf366",
+  "a_d671e0b995"
+ ],
+ "notes": "Scored with bench.compare.match (deterministic, gold SQL on snapshot) after answers were committed. Failures: 6."
 }
