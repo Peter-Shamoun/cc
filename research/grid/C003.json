@@ -50,7 +50,7 @@
       "sql_execs": 1,
       "repairs": 0,
       "seconds": 0.029,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_cpt_denied_lines__83036",
@@ -68,7 +68,7 @@
       "sql_execs": 1,
       "repairs": 0,
       "seconds": 0.003,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_payer_avg_paid_per_paid_claim__medicare-part-b-north-carolina",
@@ -86,7 +86,7 @@
       "sql_execs": 1,
       "repairs": 0,
       "seconds": 0.003,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_f786e11aec",
@@ -154,7 +154,7 @@
       "sql_execs": 1,
       "repairs": 0,
       "seconds": 0.013,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_payer_denial_rate__unitedhealthcare-community-plan-nc",
@@ -172,7 +172,7 @@
       "sql_execs": 1,
       "repairs": 0,
       "seconds": 0.004,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_payer_monthly_denial_rate__unitedhealthcare",
@@ -196,7 +196,7 @@
       "sql_execs": 1,
       "repairs": 0,
       "seconds": 0.007,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_payer_denial_rate__unitedhealthcare-medicare-advantage",
@@ -214,7 +214,7 @@
       "sql_execs": 1,
       "repairs": 0,
       "seconds": 0.004,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_cpt_share_of_line_payments__g0483",
@@ -232,7 +232,7 @@
       "sql_execs": 1,
       "repairs": 0,
       "seconds": 0.005,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_fca405b635",
@@ -259,7 +259,7 @@
       "sql_execs": 1,
       "repairs": 0,
       "seconds": 0.005,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_payer_paid_in_month__cigna_2026-08-01",
@@ -277,7 +277,7 @@
       "sql_execs": 1,
       "repairs": 0,
       "seconds": 0.003,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_payer_patient_responsibility__aetna",
@@ -295,7 +295,7 @@
       "sql_execs": 1,
       "repairs": 0,
       "seconds": 0.003,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_b853266803",
@@ -355,7 +355,7 @@
       "sql_execs": 1,
       "repairs": 0,
       "seconds": 0.009,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q10_top_denial_carcs",
@@ -391,7 +391,7 @@
       "sql_execs": 1,
       "repairs": 0,
       "seconds": 0.008,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_payer_class_denial_rate__medicaid_mco",
@@ -409,7 +409,7 @@
       "sql_execs": 1,
       "repairs": 0,
       "seconds": 0.003,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_a5888f64a4",
@@ -469,7 +469,7 @@
       "sql_execs": 1,
       "repairs": 0,
       "seconds": 0.006,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_436f690741",
@@ -611,7 +611,7 @@
       "sql_execs": 1,
       "repairs": 0,
       "seconds": 0.009,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_d29f83c935",
@@ -2919,7 +2919,7 @@
       "sql_execs": 1,
       "repairs": 0,
       "seconds": 0.018,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_payer_class_denial_rate__other",
@@ -2937,7 +2937,7 @@
       "sql_execs": 1,
       "repairs": 0,
       "seconds": 0.003,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_cpt_denied_lines__85652",
@@ -2955,7 +2955,7 @@
       "sql_execs": 1,
       "repairs": 0,
       "seconds": 0.003,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q07_denial_rate",
@@ -2973,11 +2973,11 @@
       "sql_execs": 1,
       "repairs": 0,
       "seconds": 0.003,
-      "pass": null
+      "pass": true
     }
   ],
-  "accuracy": null,
+  "accuracy": "20/20",
   "n": 20,
   "mean_sql_execs": 1.0,
-  "notes": "Direct SQL over sem.* on the frozen generator 3.3 benchmark snapshot (.ccsim/bench/e21410ce6805; dataset.snapshot() default: days=45, volume_scale=0.6, seed=2026, p_corrupt_file=0.1), opened with open_snapshot(escalate=False). No few-shot examples, no pre-SQL exploration, no candidate set, no verifier, no stated assumptions. Each question's first execution returned a non-empty result and was kept (repairs=0). Dev set: handwritten + generated + authored questions, excluding question_set heldout_hard_1 (27) and any grokbot-r1 tag (none in this tree), ordered by sha256(question_id) hex, first 20. pass/accuracy filled after this answer commit, using bench.compare.match."
+  "notes": "Direct SQL over sem.* on the frozen generator 3.3 benchmark snapshot (.ccsim/bench/e21410ce6805; dataset.snapshot() default: days=45, volume_scale=0.6, seed=2026, p_corrupt_file=0.1), opened with open_snapshot(escalate=False). No few-shot examples, no pre-SQL exploration, no candidate set, no verifier, no stated assumptions. Each question's first execution returned a non-empty result and was kept (repairs=0). Dev set: handwritten + generated + authored questions, excluding question_set heldout_hard_1 (27) and any grokbot-r1 tag (none in this tree), ordered by sha256(question_id) hex, first 20. Scored after the answer commit with bench.compare.match against gold SQL on the same snapshot: 20/20."
 }
