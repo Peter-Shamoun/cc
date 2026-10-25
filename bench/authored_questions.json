@@ -689,7 +689,7 @@
   "difficulty": "easy",
   "question": "Unit cuts: on current adjudications, list every 835 line where the payer paid fewer units than were billed. Show the billed CPT, payer class, units billed, units paid, units cut, line allowed amount and line paid amount. Sort by units billed descending, then payer class.",
   "gold_sql": "select procedure_code, payer_class, units_billed::int units_billed, units_paid::int units_paid, (units_billed-units_paid)::int units_cut, line_allowed_amount::double allowed, line_paid_amount::double paid from sem.remit_lines where is_current_adjudication and units_paid<units_billed order by units_billed desc, payer_class",
-  "answer_key_sql": "select l.cpt procedure_code, p.payer_class, cl.units units_billed, l.units_paid, cl.units-l.units_paid units_cut, l.allowed, l.paid from ledger.event_lines l join ledger.events e using(pcn,payer_id,event_number) join ledger.claim_lines cl using(pcn,line_number) join ledger.payers p using(payer_id) where e.is_current and l.units_paid<cl.units order by cl.units desc, 2",
+  "answer_key_sql": "select l.cpt procedure_code, p.payer_class, l.units units_billed, l.units_paid, l.units-l.units_paid units_cut, l.allowed, l.paid from ledger.event_lines l join ledger.events e using(pcn,payer_id,event_number) join ledger.payers p using(payer_id) where e.is_current and l.units_paid<l.units order by l.units desc, 2",
   "compare": {
    "tol": 0.01
   },
