@@ -202,8 +202,9 @@ class Deployment:
 
 
 def provision(aws: LocalAWS, customers: list[str], parser_entrypoint, tenant_id: str = "xifin.example",
-              app_group: str = "claimclarity-users") -> Deployment:
-    """Resources in dependency order (IAM, KMS and S3 reject policies that name principals that do not exist)."""
+              app_group: str = "claimclarity-users", pipeline_env: dict | None = None) -> Deployment:
+    """Resources in dependency order (IAM, KMS and S3 reject policies that name principals that do not exist).
+    pipeline_env: extra parser task-definition environment (pipeline configuration, see ccsim/pipeline.py)."""
     from .aws.s3 import set_bucket_policy
     provider_arn = aws.create_identity(tenant_id, [app_group])
     sso = {"Version": V, "Statement": [{"Effect": "Allow", "Principal": {"Service": "ec2.amazonaws.com"},
@@ -244,7 +245,8 @@ def provision(aws: LocalAWS, customers: list[str], parser_entrypoint, tenant_id:
     aws.iam.put_role_policy("cc-events-run-parser", "run", events_role_policy(customers))
     for c in customers:
         td = aws.ecs.register_task_definition(f"cc-parser-{c}", role_arn(names(c)["parser"]), parser_entrypoint,
-                                              environment={"CUSTOMER": c, "BUCKET": BUCKET, "KMS_KEY_ARN": keys[c].arn})
+                                              environment={"CUSTOMER": c, "BUCKET": BUCKET, "KMS_KEY_ARN": keys[c].arn,
+                                                           **(pipeline_env or {})})
         rule = aws.events.put_rule(f"cc-raw-success-{c}", success_pattern(c))
 
         def invoke(evt, session, family=td.family):

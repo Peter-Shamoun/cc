@@ -35,6 +35,7 @@ from .iam import ACCOUNT, REGION, Principal, decide
 from .kms import seal, unseal
 
 VIA_S3 = f"s3.{REGION}.amazonaws.com"
+PLAIN_CACHE_MAX_BYTES = 1 << 30                    # decrypted-object cache bound (multi-GB lakes must not OOM)
 
 
 @dataclass
@@ -104,6 +105,7 @@ class S3:
         self.db.execute("CREATE INDEX IF NOT EXISTS ix_key ON objects(bucket, key, seq)")
         self.request_count = 0
         self._plain_cache: dict[str, bytes] = {}                 # blob id -> plaintext (blobs are immutable)
+        self._plain_cache_bytes = 0
         self._cols = [d[0] for d in self.db.execute("SELECT * FROM objects LIMIT 0").description]
 
     # -- control plane ------------------------------------------------------------------------------
@@ -335,8 +337,9 @@ class S3:
         body = unseal(data_key, (self.root / "s3data" / row["blob"]).read_bytes())
         with self._lock:                                          # small LRU: parquet readers issue many ranged GETs
             self._plain_cache[row["blob"]] = body
-            while len(self._plain_cache) > 256:
-                self._plain_cache.pop(next(iter(self._plain_cache)))
+            self._plain_cache_bytes += len(body)
+            while len(self._plain_cache) > 256 or self._plain_cache_bytes > PLAIN_CACHE_MAX_BYTES:
+                self._plain_cache_bytes -= len(self._plain_cache.pop(next(iter(self._plain_cache))))
         return body
 
     def _head(self, rc, Bucket, Key, VersionId, op, IfMatch=None, IfNoneMatch=None):
