@@ -1,0 +1,6 @@
+# api/ runtime on top of the repo's pyproject dependencies
+fastapi>=0.110
+uvicorn>=0.29
+# tests
+httpx>=0.27
+pytest>=8
