@@ -101,7 +101,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0596,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_fca405b635",
@@ -123,7 +123,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0099,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_b853266803",
@@ -159,7 +159,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0185,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q10_top_denial_carcs",
@@ -195,7 +195,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0142,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_a5888f64a4",
@@ -255,7 +255,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0127,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_436f690741",
@@ -302,7 +302,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0152,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_d29f83c935",
@@ -1462,7 +1462,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0257,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q07_denial_rate",
@@ -1484,7 +1484,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.008,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_7d45c279a7",
@@ -1552,7 +1552,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0159,
-      "pass": null
+      "pass": false
     },
     {
       "qid": "a_f3c42ce766",
@@ -1654,7 +1654,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0124,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q15_partial_line_denials",
@@ -1672,7 +1672,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0069,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q25_primary_deductible",
@@ -1690,7 +1690,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0161,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_26d4c3f4ca",
@@ -1774,7 +1774,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0128,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q18_voided",
@@ -1792,7 +1792,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0069,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_8663c777cd",
@@ -1822,7 +1822,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0141,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_9a40343e18",
@@ -1890,7 +1890,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0173,
-      "pass": null
+      "pass": false
     },
     {
       "qid": "q03_total_paid",
@@ -1910,7 +1910,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0079,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q11_cpt_denial_rate",
@@ -2030,7 +2030,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0161,
-      "pass": null
+      "pass": false
     },
     {
       "qid": "a_a123bba47f",
@@ -2056,7 +2056,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0217,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_9108c7aacb",
@@ -2082,11 +2082,11 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0136,
-      "pass": null
+      "pass": true
     }
   ],
-  "accuracy": null,
+  "accuracy": "17/20",
   "n": 20,
   "mean_sql_execs": 5.0,
-  "notes": "Planner pass fixed population, grain, filters, and tie-breaks; the writer pass emitted three diverse statements and saw only that plan. Explored 40 shared probes (distinct values, ranges, nulls, join cardinalities) before the candidates. Each question then executed 3 statements and kept the agreed one (A on every tie). repair is off, so the first agreed execution stands. mean_sql_execs = (3*20 + 40) / 20 = 5. Per-question sql_execs counts only that question's candidate executions. seconds are SQL wall time. Snapshot Scenario(days=15, volume_scale=0.2, seed=3), generator 3.3, non-escalated reader via the A01 SnapshotQueryExecutor. Dev set: questions.yaml + authored questions, drop question_set heldout_hard_1 (27) and grokbot-r1 (none), sort by sha256(id), first 20. pass is filled only after this file is committed."
+  "notes": "Planner pass fixed population, grain, filters, and tie-breaks; the writer pass emitted three diverse statements and saw only that plan. Explored 40 shared probes (distinct values, ranges, nulls, join cardinalities) before the candidates. Each question then executed 3 statements and kept the agreed one (A on every tie). repair is off, so the first agreed execution stands. mean_sql_execs = (3*20 + 40) / 20 = 5. Per-question sql_execs counts only that question's candidate executions. seconds are SQL wall time. Snapshot Scenario(days=15, volume_scale=0.2, seed=3), generator 3.3, non-escalated reader via the A01 SnapshotQueryExecutor. Dev set: questions.yaml + authored questions, drop question_set heldout_hard_1 (27) and grokbot-r1 (none), sort by sha256(id), first 20. Scored with bench.compare after the answer commit: 17/20. Misses: a_7d45c279a7 (zero-filled payer classes; key is empty), a_9a40343e18 (percents use all claims, key uses the primary-claim base), q11_cpt_denial_rate (835 CPTs; key population is empty on this extract)."
 }

@@ -101,7 +101,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0115,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_fca405b635",
@@ -123,7 +123,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0083,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_b853266803",
@@ -159,7 +159,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0159,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q10_top_denial_carcs",
@@ -195,7 +195,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.013,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_a5888f64a4",
@@ -255,7 +255,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0109,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_436f690741",
@@ -302,7 +302,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0137,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_d29f83c935",
@@ -1462,7 +1462,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0214,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q07_denial_rate",
@@ -1484,7 +1484,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0074,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_7d45c279a7",
@@ -1552,7 +1552,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0135,
-      "pass": null
+      "pass": false
     },
     {
       "qid": "a_f3c42ce766",
@@ -1654,7 +1654,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0109,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q15_partial_line_denials",
@@ -1672,7 +1672,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0059,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q25_primary_deductible",
@@ -1690,7 +1690,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0148,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_26d4c3f4ca",
@@ -1774,7 +1774,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.011,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q18_voided",
@@ -1792,7 +1792,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0054,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_8663c777cd",
@@ -1822,7 +1822,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0126,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_9a40343e18",
@@ -1890,7 +1890,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0146,
-      "pass": null
+      "pass": false
     },
     {
       "qid": "q03_total_paid",
@@ -1910,7 +1910,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0063,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q11_cpt_denial_rate",
@@ -2030,7 +2030,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0137,
-      "pass": null
+      "pass": false
     },
     {
       "qid": "a_a123bba47f",
@@ -2056,7 +2056,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0181,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_9108c7aacb",
@@ -2082,11 +2082,11 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0196,
-      "pass": null
+      "pass": true
     }
   ],
-  "accuracy": null,
+  "accuracy": "17/20",
   "n": 20,
   "mean_sql_execs": 3.0,
-  "notes": "Direct SQL, three diverse candidates, agreement pick (A when it ties). No few-shot and no exploration. Repair budget was 2; no chosen statement errored or came back empty, so repairs stayed 0. A fresh critic then checked population, units, and invariants (percent vs ratio, empty, rate above 1 when a ratio was asked). It accepted all 20 and did not emit a revised statement. pass is filled only after this file is committed."
+  "notes": "Direct SQL, three diverse candidates, agreement pick (A when it ties). No few-shot and no exploration. Repair budget was 2; no chosen statement errored or came back empty, so repairs stayed 0. A fresh critic then checked population, units, and invariants (percent vs ratio, empty, rate above 1 when a ratio was asked). It accepted all 20 and did not emit a revised statement. Scored with bench.compare after the answer commit: 17/20. Misses: a_7d45c279a7 (zero-filled payer classes; key is empty), a_9a40343e18 (percents use all claims, key uses the primary-claim base), q11_cpt_denial_rate (835 CPTs; key population is empty on this extract)."
 }
