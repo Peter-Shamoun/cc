@@ -323,3 +323,5 @@ tail of WO recoupments means a 45-day benchmark window sees few recoupments of i
 
 Measured at 5 MB/day for 30 days from 2026-07-01: lines/claim 5.13; denial rate 10.4%, 70% line-level; allowed/CLFS
 unchanged; ~1,560 distinct diagnoses; 2,990 claims per business day; 32 835 files a day from day 1.
+One year at 5 MB/business day plus the burn-in: 1,330 MB raw, 3,088 claims per business day, 622 s CPU, peak RSS
+978 MB.
