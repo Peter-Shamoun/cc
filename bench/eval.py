@@ -32,20 +32,26 @@ from bench.dataset import CACHE, load_truth, open_snapshot, snapshot  # noqa: E4
 from bench.ledger import answer as ledger_answer  # noqa: E402
 
 CASES = Path(__file__).with_name("questions.yaml")
+AUTHORED = Path(__file__).with_name("authored_questions.json")
 
 
 def load_cases(only: str | None = None, snapshot_path: Path | None = None) -> list[dict]:
     """Hand-written questions (questions.yaml) plus, when a snapshot is given, the questions generated for that
-    dataset from bench/question_families.py (stored in the snapshot as generated_questions.json)."""
+    dataset from bench/question_families.py (stored in the snapshot as generated_questions.json) and the
+    Opus-authored questions (bench/authored_questions.json, verified against the snapshot's answer key)."""
     cases = yaml.safe_load(CASES.read_text())
-    generated = Path(snapshot_path) / "generated_questions.json" if snapshot_path else None
-    if generated and generated.exists():
-        cases += json.loads(generated.read_text())
+    if snapshot_path:
+        generated = Path(snapshot_path) / "generated_questions.json"
+        if generated.exists():
+            cases += json.loads(generated.read_text())
+        if AUTHORED.exists() and (Path(snapshot_path) / "answer_key.duckdb").exists():
+            cases += json.loads(AUTHORED.read_text())
     ids = [c["id"] for c in cases]
     assert len(ids) == len(set(ids)), "duplicate question ids"
     if only:
         cases = [c for c in cases if only in (c["id"], c["category"], c["difficulty"], c.get("family"),
-                                              "generated" if c.get("family") else "handwritten")]
+                                              "generated" if c.get("family") else
+                                              "authored" if c["id"].startswith("a_") else "handwritten")]
     return cases
 
 
