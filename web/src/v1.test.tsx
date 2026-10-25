@@ -86,5 +86,11 @@ describe('Edit and branch', () => {
     fireEvent.click(screen.getByRole('button', { name: /Search chats/ }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Search chats' }), { target: { value: 'zzz' } });
     expect(screen.getByText(/No chats match/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+    // Ctrl+K reopens search, Ctrl+Shift+O starts a new chat
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    expect(screen.getByRole('textbox', { name: 'Search chats' })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'O', ctrlKey: true, shiftKey: true });
+    await waitFor(() => expect(screen.getByText('What should we look into?')).toBeInTheDocument());
   });
 });
