@@ -95,8 +95,8 @@ def _insert(con, table: str, rows: list[dict]):
 #   GOLD_MODE=incremental (default)  recompute only the claims the new batch touched, rewrite only their partitions
 #   GOLD_MODE=full                   rebuild all of gold from all of silver every batch (what a rules change does)
 PARQUET = "FORMAT parquet, COMPRESSION zstd"
-GOLD_LAYOUT = "cohort-tiered-1"
-OPEN_MONTHS = 3          # newest months kept as their own gold partition; older months fold into one file per year
+GOLD_LAYOUT = "cohort-tiered-2"
+OPEN_MONTHS = 3          # newest months kept as their own gold partition; older months fold into one file per quarter
 CLAIM_RELATIONS = [f"sem.{t}" for t in ("remit_claims", "remit_lines", "claims", "claim_lines", "adjustments", "remarks",
                                         "diagnoses")]                    # partitioned by claim cohort, copy-on-write
 SMALL_RELATIONS = ["sem.payments", "sem.provider_adjustments", "sem.payers"]   # one file each, rewritten per batch
@@ -479,16 +479,17 @@ def _source_sql(relation: str) -> str:
 
 
 def tier(month: str, last_month: str) -> str:
-    """Gold partition of a month ('YYYY-MM'): its own while it is one of the OPEN_MONTHS newest, else its year.
-    Recent cohorts still change daily and stay small to rewrite; settled ones collapse into few large files."""
+    """Gold partition of a month ('YYYY-MM'): its own while it is one of the OPEN_MONTHS newest, else its quarter
+    ('YYYY-Qn'). Recent cohorts change daily and stay small to rewrite; settled ones collapse into fewer files, and
+    a late event for a settled claim rewrites one quarter, not a year."""
     age = (int(last_month[:4]) * 12 + int(last_month[5:7])) - (int(month[:4]) * 12 + int(month[5:7]))
-    return month if age < OPEN_MONTHS else month[:4]
+    return month if age < OPEN_MONTHS else f"{month[:4]}-Q{(int(month[5:7]) - 1) // 3 + 1}"
 
 
 def _tier_sql(month_sql: str, last_month: str) -> str:
-    age = (f"({int(last_month[:4]) * 12 + int(last_month[5:7])} - (CAST(left({month_sql}, 4) AS INT) * 12 "
-           f"+ CAST(right({month_sql}, 2) AS INT)))")
-    return f"CASE WHEN {age} < {OPEN_MONTHS} THEN {month_sql} ELSE left({month_sql}, 4) END"
+    m = f"CAST(right({month_sql}, 2) AS INT)"
+    age = f"({int(last_month[:4]) * 12 + int(last_month[5:7])} - (CAST(left({month_sql}, 4) AS INT) * 12 + {m}))"
+    return f"CASE WHEN {age} < {OPEN_MONTHS} THEN {month_sql} ELSE left({month_sql}, 4) || '-Q' || (({m} - 1) // 3 + 1) END"
 
 
 def _cohorts(con):
@@ -544,14 +545,14 @@ def _gold_full(con, writer: _GoldWriter, last_month: str) -> dict:
 
 def _retier(writer: _GoldWriter, relations: dict, last_month: str) -> list:
     """A month closed: every partition except the new current month becomes one file, and months that left the
-    OPEN_MONTHS window fold into their year's file. Rows are copied, not recomputed. Returns the retired files."""
+    OPEN_MONTHS window fold into their quarter's file. Rows are copied, not recomputed. Returns the retired files."""
     retired = []
     for rel in CLAIM_RELATIONS + list(APPEND_RELATIONS):
         groups = {}
         for part, keys in relations[rel].items():
             if part != "empty":
                 prefix, period = part.split("=", 1)
-                target = f"{prefix}={tier(period, last_month) if len(period) == 7 else period}"
+                target = f"{prefix}={period if '-Q' in period else tier(period, last_month)}"
                 groups.setdefault(target, []).append((part, keys))
         for target, entries in groups.items():
             keys = [k for _, ks in entries for k in ks]

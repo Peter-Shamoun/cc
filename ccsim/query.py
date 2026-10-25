@@ -48,9 +48,9 @@ def open_session(aws, dep: Deployment, id_token: str, escalate: bool = False, re
     version = s3.get_object(Bucket=BUCKET, Key=f"{customer}/semantic_layer/CURRENT")["Body"].read().decode()
     manifest = json.loads(s3.get_object(Bucket=BUCKET, Key=f"{customer}/semantic_layer/{version}/manifest.json")["Body"].read())
     gold = f"s3://{BUCKET}/{customer}/semantic_layer/"
-    # oldest partition first: a year file is large, so binding the view reads only its footer (DuckDB fetches a
+    # oldest partition first: a settled quarter's file is large, so binding the view reads only its footer (DuckDB fetches a
     # first file under 2 MB whole, at every session open)
-    files = lambda rel: [f"s3://{BUCKET}/{k}" for part in sorted(manifest["relations"][rel])
+    files = lambda rel: [f"s3://{BUCKET}/{k}" for part in sorted(manifest["relations"][rel], key=lambda p: ("-Q" not in p, p))
                          for k in manifest["relations"][rel][part]]
     con = duckdb.connect(config={"autoinstall_known_extensions": False, "autoload_known_extensions": False})
     con.execute("LOAD httpfs")
