@@ -373,7 +373,7 @@ def _load_dx() -> dict[str, list]:
 
 DX_DOMAINS = _load_dx()
 DX_BY_CODE = {dx.code: dx for v in DX_DOMAINS.values() for dx in v}
-DX_ZIPF = 1.15          # within a domain: the head codes carry most claims, a long tail carries the rest
+DX_ZIPF = 1.6          # within a domain: the head codes carry most claims, a long tail carries the rest
 
 
 @dataclass
@@ -577,9 +577,15 @@ DOMAIN_CODES = {d: frozenset(dx.code for dx in v) for d, v in DX_DOMAINS.items()
 def dx_fits_cpt(code: str, cpt: str) -> bool:
     """The diagnosis justifies the test: it is in one of the test's clinical domains, or it is a screening code
     that covers the test (a general exam covers any routine test)."""
-    if code in GENERAL_EXAM_CODES or code in SCREENING_BY_CPT.get(cpt, ()):
-        return True
-    return any(code in DOMAIN_CODES.get(d, ()) for d in cpt_domains(cpt))
+    key = (code, cpt)
+    fits = _DX_FITS_CACHE.get(key)
+    if fits is None:
+        fits = _DX_FITS_CACHE[key] = (code in GENERAL_EXAM_CODES or code in SCREENING_BY_CPT.get(cpt, ()) or
+                                      any(code in DOMAIN_CODES.get(d, ()) for d in cpt_domains(cpt)))
+    return fits
+
+
+_DX_FITS_CACHE: dict = {}
 
 
 def pick_dx_for_cpt(r, cpt: str, sex: str, age: float) -> str:
