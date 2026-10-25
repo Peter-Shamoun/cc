@@ -37,6 +37,17 @@ function Shell() {
     return () => mq.removeEventListener('change', on);
   }, []);
   const [sidebar, setSidebar] = useState(() => window.innerWidth >= 768);
+  // ChatGPT-style shortcuts: Ctrl/⌘+K search chats, Ctrl/⌘+Shift+O new chat.
+  const [searchSignal, setSearchSignal] = useState(0);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && !e.shiftKey && e.key.toLowerCase() === 'k') { e.preventDefault(); setSidebar(true); setSearchSignal((n) => n + 1); }
+      if (mod && e.shiftKey && e.key.toLowerCase() === 'o') { e.preventDefault(); chat.newChat(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [chat.newChat]);
   /** On phones the sidebar is a drawer: picking anything closes it. */
   const closeDrawer = () => { if (mobile) setSidebar(false); };
   const [artifact, setArtifact] = useState<Artifact | null>(null);
@@ -63,7 +74,7 @@ function Shell() {
       <div className="flex h-full overflow-hidden">
         {sidebar && mobile && <div className="fixed inset-0 z-30 bg-black/40" aria-hidden onClick={() => setSidebar(false)} data-testid="drawer-scrim" />}
         {sidebar && (
-          <Sidebar threads={chat.threads} activeId={chat.convId} drawer={mobile} onSelect={(id) => { chat.open(id); closeDrawer(); }} onNew={() => { chat.newChat(); closeDrawer(); }} onDelete={chat.remove} onRename={chat.rename} onCollapse={() => setSidebar(false)} storeMode={store.mode} />
+          <Sidebar threads={chat.threads} activeId={chat.convId} drawer={mobile} onSelect={(id) => { chat.open(id); closeDrawer(); }} onNew={() => { chat.newChat(); closeDrawer(); }} onDelete={chat.remove} onRename={chat.rename} onCollapse={() => setSidebar(false)} storeMode={store.mode} searchSignal={searchSignal} />
         )}
         <main className="relative flex min-w-0 flex-1 flex-col font-sans md:min-w-[400px]">
           <header className="flex h-[52px] shrink-0 items-center justify-between px-2">

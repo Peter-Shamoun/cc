@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MessageSquarePlus, PanelLeft, Pencil, Search, Trash2, ShieldCheck, X } from 'lucide-react';
 import clsx from 'clsx';
 import { IconButton } from './ui';
@@ -10,9 +10,10 @@ function bucket(iso: string) {
   return d < 1 ? 'Today' : d < 2 ? 'Yesterday' : d < 7 ? 'Previous 7 days' : 'Older';
 }
 
-export function Sidebar({ threads, activeId, onSelect, onNew, onDelete, onCollapse, onRename, storeMode, drawer }: { storeMode: string; drawer?: boolean; onRename: (id: string, title: string) => void; threads: Item[]; activeId?: string | null; onSelect: (id: string) => void; onNew: () => void; onDelete: (id: string) => void; onCollapse: () => void }) {
+export function Sidebar({ threads, activeId, onSelect, onNew, onDelete, onCollapse, onRename, storeMode, drawer, searchSignal = 0 }: { storeMode: string; drawer?: boolean; searchSignal?: number; onRename: (id: string, title: string) => void; threads: Item[]; activeId?: string | null; onSelect: (id: string) => void; onNew: () => void; onDelete: (id: string) => void; onCollapse: () => void }) {
   const [query, setQuery] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
+  useEffect(() => { if (searchSignal) setQuery(''); }, [searchSignal]);
   const q = query?.trim().toLowerCase() ?? '';
   const groups = new Map<string, Item[]>();
   // Title search, client-side over the in-memory thread list (titles never leave the page).
