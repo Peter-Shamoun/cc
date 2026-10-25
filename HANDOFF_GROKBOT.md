@@ -1,8 +1,8 @@
 # HANDOFF_GROKBOT.md: Grok Bot session, Oct 25 2026, 3:26 to about 4:55 PM PT
 
-**For Claude Code.** While your usage was out, Peter had Grok Bot act as main dev on this repo. This file lists what landed, what is still in flight, what was deliberately left alone, and what to do next on the agent analyzer. Last refreshed: **4:22 PM PT, Oct 25 2026**.
+**For Claude Code.** While your usage was out, Peter had Grok Bot act as main dev on this repo. This file lists what landed, what is still in flight, what was deliberately left alone, and what to do next on the agent analyzer. Last refreshed: **4:33 PM PT, Oct 25 2026**.
 
-Short version: 85 PRs opened against `claude/trusting-heisenberg-8xvazk` (81 merged, 4 open at refresh time). Peter asked for PRs to be **auto-merged**, so a script merged every cleanly mergeable PR into the working branch once a minute until 5 PM PT. Nothing was reviewed by hand. Treat every merged PR as unreviewed, and review it before you build on it.
+Short version: 91 PRs opened against `claude/trusting-heisenberg-8xvazk` (87 merged, 4 open at refresh time). Peter asked for PRs to be **auto-merged**, so a script merged every cleanly mergeable PR into the working branch once a minute until 5 PM PT. Nothing was reviewed by hand. Treat every merged PR as unreviewed, and review it before you build on it.
 
 ## Ground rules that were held
 
@@ -37,10 +37,11 @@ Path audit at refresh time: these merged PRs touch guarded paths. Review them fi
 | [#34](https://github.com/Peter-Shamoun/cc/pull/34) | Stress-test agent SQL: guard, PHI, and audit | merged | `pytest -q tests/`: 386 passed |
 | [#37](https://github.com/Peter-Shamoun/cc/pull/37) | api: FastAPI SSE bridge between the analyzer and the web chat | merged | `PYTHONPATH=. pytest api/tests -q`: 22 passed |
 | [#50](https://github.com/Peter-Shamoun/cc/pull/50) | Chat transcripts: ephemeral default and persisted design behind a mode switch | open, **conflicting** (auto-merge skips it) | 244 passed |
-| [#52](https://github.com/Peter-Shamoun/cc/pull/52) | web: ClaimClarity chat frontend v0 | merged | 18 vitest tests passed (scripted) |
+| [#52](https://github.com/Peter-Shamoun/cc/pull/52) | web: ClaimClarity chat frontend v0 | merged | 18 vitest tests passed |
 | [#54](https://github.com/Peter-Shamoun/cc/pull/54) | Seal glossary learning into train, validation, and test | open, **conflicting** (auto-merge skips it) | n/a (see PR body) |
 | [#78](https://github.com/Peter-Shamoun/cc/pull/78) | web v1: Streamdown, live api/ round-trip, edit-and-branch, mobile drawer, search/rename, virtualized tables | merged | 23/23 pass |
 | [#84](https://github.com/Peter-Shamoun/cc/pull/84) | web v1.1: thumbs-down feedback panel, Ctrl/Cmd+K search, Ctrl/Cmd+Shift+O new chat | merged | n/a (see PR body) |
+| [#87](https://github.com/Peter-Shamoun/cc/pull/87) | web v1.2: pin follow-up question to top while the answer streams (ChatGPT/Claude scroll behavior) | merged | n/a (see PR body) |
 
 ### Agent-analyzer approaches A01 to A10
 
@@ -83,88 +84,87 @@ Peter wanted a factorial search over analyzer parameters, where "off" counts as 
 - **Protocol**: [`research/grid/GRID_PROTOCOL.md`](research/grid/GRID_PROTOCOL.md). One cloud agent per cell, acting as the analyst itself on frozen-3.3 data through a non-escalated `sem.*` reader. The no-contamination rule bars the pitfalls glossary, reference SQL and other cells until the answers are committed, and scoring uses `bench.compare.match`.
 - **Ceiling finding**: the v1 dev set (the first 20 non-held-out questions by sha256) hit **ceiling**. 22 of the 27 v1 cells on the branch scored 20/20, including all-off direct SQL and all-on, so v1 can't separate the factors. The remaining v1 cells (C030 to C099) were abandoned, and the grid moved to **DEV_HARD_v1** under [`research/grid/GRID_PROTOCOL_V2_ADDENDUM.md`](research/grid/GRID_PROTOCOL_V2_ADDENDUM.md), as the H-series (H000+), with the same design order.
 - **DEV_HARD_v1** is on the branch (`research/grid/DEV_HARD_v1.json`). Screen 1 publishes only config-level accuracy, so the builder fell back to `difficulty == hard`, taking the first 30 of 42 by sha256. That is **not** a measured-hardness set. The dataset is the 20-day bench-test snapshot `98e61f03e594`, because the 45-day world wasn't on disk.
-- H-series cells on the branch at refresh time: 95. **DEV_HARD_v1 is also near ceiling for this model** (see the raw marginals below, at about 90% pooled, with several 30/30 cells). Factor differences are a point or two, which is within noise at n=30 per cell. A tag-based "hard" set isn't hard enough for a strong model.
+- H-series cells on the branch at refresh time: 100. **DEV_HARD_v1 is also near ceiling for this model** (see the raw marginals below, at about 90% pooled, with several 30/30 cells). Factor differences are a point or two, which is within noise at n=30 per cell. A tag-based "hard" set isn't hard enough for a strong model.
 - **DEV_HARD_v2 proposal** ([#82](https://github.com/Peter-Shamoun/cc/pull/82) merged): `research/grid/DEV_HARD_v2_PROPOSAL.md`. It moves to the 45-day bench default world (`cbb77dba2ad6`, rebuilt locally and not committed because it contains the answer key), where data traps actually occur. For example, August payments go from 0 to 122. `research/grid/INDEPENDENCE_NOTES.md` gives **weight 0** to the explicit-reuse cells (H018–20, H022–24, H026–28, H030–32, H034–36, H038–40, H066–69) in the primary analysis.
 
-**Grid headlines**, quoted from [`research/grid/SUMMARY.md`](research/grid/SUMMARY.md) Generated by `research/grid/aggregate.py` at 2026-10-25 16:20 PDT. Re-run it to refresh; do not hand-edit. Read the file for the ranking and per-cell tables.
+**Grid headlines**, quoted from [`research/grid/SUMMARY.md`](research/grid/SUMMARY.md) Generated by `research/grid/aggregate.py` at 2026-10-25 16:22 PDT. Re-run it to refresh; do not hand-edit. Read the file for the ranking and per-cell tables.
 
 ### Status
 
-- Cells found: **122** (117 valid, 5 rejected by schema/design checks).
-- H-series (DEV_HARD_v1, protocol v2 - the series that matters): 90 cells, 2428/2700 question-passes (89.9%).
+- Cells found: **124** (122 valid, 2 rejected by schema/design checks).
+- H-series (DEV_HARD_v1, protocol v2 - the series that matters): 95 cells, 2567/2850 question-passes (90.1%).
 - C-series (v1 dev set - at ceiling): 27 cells, 529/540 question-passes (98.0%).
 - Sources: working branch.
-- Contamination-flagged cells: 44 (C000, C003, C006, C007, C008, C010, C011, C021, C022, C024, C025, C026, H000, H001, H004, H008, H015, H016, H018, H022, H026, H027, H028, H029, H030, H038, H039, H040, H047, H050, H051, H052, H056, H057, H058, H059, H060, H061, H062, H063, H064, H072, H075, H078).
+- Contamination-flagged cells (excluded from the clean fit): 20 (C000, C006, C007, C010, C011, H000, H001, H050, H051, H052, H056, H057, H058, H059, H060, H061, H062, H063, H064, H091).
+- Soft-flagged only (same executor saw earlier cells' pass/fail; kept in the clean fit): 9 (H018, H026, H027, H028, H030, H031, H038, H039, H040).
 
 ### Headline
 
-- Largest H-series effects: candidates3 +1.9 pp [-1.9, +5.6]; repair +1.8 pp [-1.8, +5.5]; gen:decompose_cte -1.5 pp [-6.5, +3.4].
+- Largest H-series effects: repair +2.0 pp [-1.6, +5.5]; candidates3 +2.0 pp [-1.6, +5.6]; gen:decompose_cte -1.3 pp [-6.0, +3.4].
 - CIs excluding zero: none yet.
-- Best predicted combination: 020 (metric_spec, flags 0110100) at 92.7% with ~2.8 SQL execs/question.
+- Ridge-logit check (naive SEs, not cluster-robust, so optimistic) has CIs excluding zero for: gen:metric_spec (+0.39 log-odds), candidates3 (+0.54 log-odds), repair (+0.57 log-odds), assumptions (+0.32 log-odds).
+- Strongest 2-way interaction: fewshot x assumptions +10.1 pp [+2.7, +17.5] (one of ~30 screened, so treat as a lead, not a finding).
+- H-series cell accuracy: mean 90.1%, range 70-100% across 95 cells; between-cell spread is small relative to per-question difficulty.
+- Best predicted combination: 067 (metric_spec, flags 0010111) at 92.8% with ~2.4 SQL execs/question.
 
 ### Main effects: H-series (primary)
 
-Linear probability model, pass ~ generation (ref = direct_sql) + 7 flags + question fixed effects; cluster-robust SEs by cell, t(89) CIs. 90 cells, 30 questions, 7 questions dropped as constant across cells (all-pass/all-fail carry no information under question FE), 2070 informative observations.
+Linear probability model, pass ~ generation (ref = direct_sql) + 7 flags + question fixed effects; cluster-robust SEs by cell, t(94) CIs. 95 cells, 30 questions, 7 questions dropped as constant across cells (all-pass/all-fail carry no information under question FE), 2185 informative observations.
 
 | term | effect (pp) | 95% CI (pp) | identified | ridge-logit log-odds [95% CI] |
 |---|---|---|---|---|
-| gen:metric_spec | +0.9 | [-2.9, +4.7] | yes | +0.42 [+0.06, +0.78] |
-| gen:decompose_cte | -1.5 | [-6.5, +3.4] | yes | +0.14 [-0.21, +0.49] |
-| fewshot | -0.5 | [-4.2, +3.3] | yes | +0.11 [-0.19, +0.41] |
-| explore | +0.3 | [-3.2, +3.8] | yes | +0.27 [-0.04, +0.57] |
-| candidates3 | +1.9 | [-1.9, +5.6] | yes | +0.52 [+0.23, +0.82] |
-| verifier | -1.4 | [-5.3, +2.5] | yes | -0.00 [-0.31, +0.30] |
-| repair | +1.8 | [-1.8, +5.5] | yes | +0.55 [+0.26, +0.84] |
-| assumptions | +0.2 | [-3.8, +4.1] | yes | +0.30 [+0.01, +0.60] |
-| multiagent | -0.1 | [-3.9, +3.7] | yes | +0.15 [-0.16, +0.46] |
+| gen:metric_spec | +0.8 | [-2.8, +4.4] | yes | +0.39 [+0.03, +0.74] |
+| gen:decompose_cte | -1.3 | [-6.0, +3.4] | yes | +0.14 [-0.21, +0.48] |
+| fewshot | -0.5 | [-4.1, +3.2] | yes | +0.12 [-0.18, +0.42] |
+| explore | +0.1 | [-3.2, +3.4] | yes | +0.23 [-0.07, +0.53] |
+| candidates3 | +2.0 | [-1.6, +5.6] | yes | +0.54 [+0.25, +0.83] |
+| verifier | -1.1 | [-4.8, +2.6] | yes | +0.02 [-0.28, +0.32] |
+| repair | +2.0 | [-1.6, +5.5] | yes | +0.57 [+0.29, +0.86] |
+| assumptions | +0.4 | [-3.4, +4.2] | yes | +0.32 [+0.03, +0.62] |
+| multiagent | +0.1 | [-3.5, +3.7] | yes | +0.20 [-0.10, +0.50] |
 
 Top two-way interactions (each added alone to the main-effects model):
 
 | interaction | est (pp) | 95% CI (pp) | t | cells with both on |
 |---|---|---|---|---|
-| fewshot x assumptions | +10.1 | [+2.3, +17.9] | +2.56 | 24 |
-| fewshot x verifier | +6.2 | [-1.8, +14.2] | +1.53 | 20 |
-| repair x assumptions | +5.9 | [-2.1, +13.9] | +1.47 | 22 |
-| explore x assumptions | -5.2 | [-12.5, +2.1] | -1.42 | 25 |
-| verifier x multiagent | +4.0 | [-3.8, +11.8] | +1.02 | 16 |
+| fewshot x assumptions | +10.1 | [+2.7, +17.5] | +2.71 | 26 |
+| explore x assumptions | -5.6 | [-12.6, +1.4] | -1.57 | 26 |
+| fewshot x verifier | +5.5 | [-1.9, +12.9] | +1.46 | 21 |
+| repair x assumptions | +5.4 | [-2.0, +12.8] | +1.44 | 24 |
+| verifier x multiagent | +3.6 | [-3.7, +11.0] | +0.98 | 18 |
 
 ### Main effects: H-series, contamination-flagged cells excluded
 
-Linear probability model, pass ~ generation (ref = direct_sql) + 7 flags + question fixed effects; cluster-robust SEs by cell, t(57) CIs. 58 cells, 30 questions, 9 questions dropped as constant across cells (all-pass/all-fail carry no information under question FE), 1218 informative observations.
+Linear probability model, pass ~ generation (ref = direct_sql) + 7 flags + question fixed effects; cluster-robust SEs by cell, t(79) CIs. 80 cells, 30 questions, 9 questions dropped as constant across cells (all-pass/all-fail carry no information under question FE), 1680 informative observations.
 
 | term | effect (pp) | 95% CI (pp) | identified | ridge-logit log-odds [95% CI] |
 |---|---|---|---|---|
-| gen:metric_spec | +1.8 | [-4.1, +7.7] | yes | +0.47 [+0.04, +0.91] |
-| gen:decompose_cte | -3.5 | [-10.8, +3.8] | yes | -0.10 [-0.57, +0.37] |
-| fewshot | -1.6 | [-7.7, +4.5] | yes | -0.12 [-0.50, +0.26] |
-| explore | -1.9 | [-6.9, +3.0] | yes | +0.10 [-0.27, +0.46] |
-| candidates3 | +2.4 | [-3.7, +8.4] | yes | +0.62 [+0.26, +0.98] |
-| verifier | -0.4 | [-6.6, +5.9] | yes | +0.17 [-0.20, +0.53] |
-| repair | +1.8 | [-3.5, +7.0] | yes | +0.59 [+0.25, +0.93] |
-| assumptions | -0.8 | [-7.0, +5.3] | yes | +0.21 [-0.14, +0.56] |
-| multiagent | -0.9 | [-6.5, +4.7] | yes | +0.16 [-0.24, +0.55] |
-
-Top two-way interactions (each added alone to the main-effects model):
-
-| interaction | est (pp) | 95% CI (pp) | t | cells with both on |
-|---|---|---|---|---|
+| gen:metric_spec | +2.1 | [-2.3, +6.6] | yes | +0.51 [+0.12, +0.90] |
+| gen:decompose_cte | -1.6 | [-7.6, +4.4] | yes | +0.08 [-0.29, +0.46] |
+| fewshot | -0.9 | [-5.4, +3.7] | yes | -0.01 [-0.33, +0.32] |
+| explore | -0.9 | [-4.9, +3.1] | yes | +0.09 [-0.24, +0.42] |
+| candidates3 | +2.2 | [-2.7, +7.1] | yes | +0.56 [+0.25, +0.88] |
+| verifier | -1.1 | [-5.9, +3.8] | yes | +0.07 [-0.24, +0.39] |
+| repair | +2.4 | [-2.1, +6.9] | yes | +0.63 [+0.32, +0.93] |
+| assumptions | +0.9 | [-3.9, +5.6] | yes | +0.36 [+0.05, +0.67] |
+| multiagent | -0.7 | [-5.3, +3.9] | yes | +0.15 [-0.18, +0.49] |
 
 #### Quick raw marginals (computed by this handoff from the cell JSONs)
 
-Raw pooled pass rate on DEV_HARD_v1 across **86 cells**: 89.8% (86 cells). These are unadjusted marginals (the design is unbalanced, so factors are confounded). Use SUMMARY.md's regression for effects.
+Raw pooled pass rate on DEV_HARD_v1 across **94 cells**: 89.7% (94 cells). These are unadjusted marginals (the design is unbalanced, so factors are confounded). Use SUMMARY.md's regression for effects.
 
 | Factor | Level / on | Off |
 |---|---|---|
-| generation = direct_sql | 90.0% (30 cells) | |
-| generation = metric_spec | 90.7% (29 cells) | |
-| generation = decompose_cte | 88.5% (27 cells) | |
-| fewshot | 89.5% (43 cells) | 90.1% (43 cells) |
-| explore | 89.6% (44 cells) | 89.9% (42 cells) |
-| candidates3 | 90.6% (41 cells) | 89.0% (45 cells) |
-| verifier | 88.9% (33 cells) | 90.3% (53 cells) |
-| repair | 90.3% (45 cells) | 89.2% (41 cells) |
-| assumptions | 89.8% (41 cells) | 89.7% (45 cells) |
-| multiagent | 89.6% (35 cells) | 89.9% (51 cells) |
+| generation = direct_sql | 89.7% (34 cells) | |
+| generation = metric_spec | 90.5% (31 cells) | |
+| generation = decompose_cte | 88.9% (29 cells) | |
+| fewshot | 89.6% (45 cells) | 89.8% (49 cells) |
+| explore | 89.8% (46 cells) | 89.7% (48 cells) |
+| candidates3 | 90.3% (47 cells) | 89.1% (47 cells) |
+| verifier | 89.3% (37 cells) | 90.0% (57 cells) |
+| repair | 90.3% (50 cells) | 89.0% (44 cells) |
+| assumptions | 90.1% (44 cells) | 89.4% (50 cells) |
+| multiagent | 89.3% (41 cells) | 90.0% (53 cells) |
 
 Top cells by raw score: H001 (direct_sql `1111111`) 30/30, H021 (decompose_cte `0110001`) 30/30, H022 (decompose_cte `1000110`) 30/30, H023 (direct_sql `0011100`) 30/30, H024 (metric_spec `1010010`) 30/30.
 
@@ -243,6 +243,9 @@ Cell results on the branch:
 | H041 | direct_sql | `0001100` | DEV_HARD_v1 | 28/30 | 30 | 1.233 | Grok 4.7 | reused A02 builder |
 | H042 | direct_sql | `1010100` | DEV_HARD_v1 | 28/30 | 30 | 3.0 | Grok 4.7 | reused A02 builder |
 | H043 | direct_sql | `1011000` | DEV_HARD_v1 | 28/30 | 30 | 3.0 | Grok 4.7 | reused A02 builder |
+| H044 | direct_sql | `0010101` | DEV_HARD_v1 | 25/30 | 30 | 3.0667 | Grok 4.7 | sequential, same agent as C007 |
+| H045 | direct_sql | `0010001` | DEV_HARD_v1 | 25/30 | 30 | 3.0 | Grok 4.7 | sequential, same agent as C007 |
+| H046 | metric_spec | `0010001` | DEV_HARD_v1 | 25/30 | 30 | 3.0 | Grok 4.7 | sequential, same agent as C007 |
 | H047 | decompose_cte | `1101111` | DEV_HARD_v1 | 27/30 | 30 | 2.3 | grok-4.7 | reused A06 builder |
 | H048 | direct_sql | `0101110` | DEV_HARD_v1 | 25/30 | 30 | 1.2 | grok-4.7 | reused A06 builder |
 | H049 | metric_spec | `1101111` | DEV_HARD_v1 | 27/30 | 30 | 1.3 | grok-4.7 | reused A06 builder |
@@ -286,9 +289,11 @@ Cell results on the branch:
 | H087 | metric_spec | `0000100` | DEV_HARD_v1 | 27/30 | 30 | 1.17 | Grok Bot (l4 local executor) | local Grok Bot executor l4 |
 | H088 | direct_sql | `0000110` | DEV_HARD_v1 | 27/30 | 30 | 1.17 | Grok Bot (l4 local executor) | local Grok Bot executor l4 |
 | H089 | direct_sql | `0000001` | DEV_HARD_v1 | 26/30 | 30 | 1.0 | Grok Bot (l4 local executor) | local Grok Bot executor l4 |
-| H090 | direct_sql | `0001101` | DEV_HARD_v1 | None | 30 | 1.2 | Grok Bot (local executor) | local Grok Bot executor l5 |
-| H091 | decompose_cte | `1001111` | DEV_HARD_v1 | None | 30 | 2.0 | Grok Bot (local executor) | local Grok Bot executor l5 |
-| H092 | direct_sql | `1010011` | DEV_HARD_v1 | None | 30 | 3.0 | Grok Bot (local executor) | local Grok Bot executor l5 |
+| H090 | direct_sql | `0001101` | DEV_HARD_v1 | 27/30 | 30 | 1.2 | Grok Bot (local executor) | local Grok Bot executor l5 |
+| H091 | decompose_cte | `1001111` | DEV_HARD_v1 | 28/30 | 30 | 2.0 | Grok Bot (local executor) | local Grok Bot executor l5 |
+| H092 | direct_sql | `1010011` | DEV_HARD_v1 | 28/30 | 30 | 3.0 | Grok Bot (local executor) | local Grok Bot executor l5 |
+| H093 | decompose_cte | `0111100` | DEV_HARD_v1 | 28/30 | 30 | 3.1 | Grok Bot (local executor) | local Grok Bot executor l5 |
+| H094 | metric_spec | `0111110` | DEV_HARD_v1 | 28/30 | 30 | 3.0 | Grok Bot (local executor) | local Grok Bot executor l5 |
 | H095 | decompose_cte | `1010000` | DEV_HARD_v1 | 24/30 | 30 | 3.0 | Grok Bot (local executor) | local Grok Bot executor l6 |
 | H096 | metric_spec | `1111000` | DEV_HARD_v1 | 23/30 | 30 | 6.83 | Grok Bot (local executor) | local Grok Bot executor l6 |
 | H097 | decompose_cte | `1010110` | DEV_HARD_v1 | 27/30 | 30 | 3.17 | Grok Bot (local executor) | local Grok Bot executor l6 |
@@ -356,10 +361,14 @@ Grid PRs:
 | [#81](https://github.com/Peter-Shamoun/cc/pull/81) | Grid cells H041–H043 on DEV_HARD_v1 | merged | accuracy 28/30 (bench.compare.match) |
 | [#82](https://github.com/Peter-Shamoun/cc/pull/82) | grid: DEV_HARD_v2 proposal (45-day default snapshot cbb77dba2ad6) + independence notes | merged | n/a (see PR body) |
 | [#83](https://github.com/Peter-Shamoun/cc/pull/83) | Grid SUMMARY refresh (1620) | merged | n/a (see PR body) |
+| [#86](https://github.com/Peter-Shamoun/cc/pull/86) | grid l5: H093-H094 answers + scoring for H090-H094 | merged | n/a (see PR body) |
+| [#89](https://github.com/Peter-Shamoun/cc/pull/89) | Grid aggregation v2: contamination tiers + SUMMARY refresh | merged | n/a (see PR body) |
+| [#90](https://github.com/Peter-Shamoun/cc/pull/90) | GRID H044–H046 on DEV_HARD_v1 | merged | n/a (see PR body) |
+| [#91](https://github.com/Peter-Shamoun/cc/pull/91) | Grid cells C018, C019, and C020 | open (auto-merge pending) | accuracy 20/20 (bench.compare.match) |
 
 ### Product surface
 
-- **React chat frontend in `web/`** (Vite + React + TypeScript, built by local Grok Bot workers): present on the branch. PRs: [#52](https://github.com/Peter-Shamoun/cc/pull/52) merged, [#78](https://github.com/Peter-Shamoun/cc/pull/78) merged, [#84](https://github.com/Peter-Shamoun/cc/pull/84) merged. Spec: `docs/frontend-spec.md`. Architecture, the contract, the PHI rules and the to-do list: `docs/frontend.md`. It looks and behaves like ChatGPT (layout, pill composer, density) and has a Claude-style resizable artifact panel. It was built clean-room from observation, with no ChatGPT, Claude or vercel/chatbot code copied. Streamdown (Vercel, Apache-2.0) renders the markdown, and its notice is in `web/THIRD_PARTY_NOTICES.md`. It isn't a vercel/chatbot fork, and `docs/frontend.md` says what a full fork would take.
+- **React chat frontend in `web/`** (Vite + React + TypeScript, built by local Grok Bot workers): present on the branch. PRs: [#52](https://github.com/Peter-Shamoun/cc/pull/52) merged, [#78](https://github.com/Peter-Shamoun/cc/pull/78) merged, [#84](https://github.com/Peter-Shamoun/cc/pull/84) merged, [#87](https://github.com/Peter-Shamoun/cc/pull/87) merged. Spec: `docs/frontend-spec.md`. Architecture, the contract, the PHI rules and the to-do list: `docs/frontend.md`. It looks and behaves like ChatGPT (layout, pill composer, density) and has a Claude-style resizable artifact panel. It was built clean-room from observation, with no ChatGPT, Claude or vercel/chatbot code copied. Streamdown (Vercel, Apache-2.0) renders the markdown, and its notice is in `web/THIRD_PARTY_NOTICES.md`. It isn't a vercel/chatbot fork, and `docs/frontend.md` says what a full fork would take.
   - **Typed contract** (`web/src/lib/contract.ts`): a `Part` union and a `StreamEvent` union with a pure reducer. Parts: GFM markdown, sortable and virtualized tables (copy as TSV, download CSV, PHI masking), CSV file chips, images with a lightbox, Vega-Lite charts, Shiki code, a collapsed SQL disclosure, callouts (assumptions, caveats, PHI), "Thought for N s", tool-call rows and artifact cards.
   - **Themes:** Neutral (ChatGPT-like) and Paper (Claude-like), each in light and dark. It also has edit-and-branch, a mobile drawer, and chat search and rename.
   - **Run and test:** `cd web && npm install && npm test && npm run build`. #78 reports 23 vitest tests passing. A mock adapter runs offline, and `VITE_ANALYST_BASE` points it at `api/`.
