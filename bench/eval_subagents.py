@@ -1,9 +1,10 @@
 """Batch evaluation of technique configurations with real Haiku / Sonnet subagents.
 
     python -m bench.eval_subagents prepare RUN --configs configs.json --models haiku,sonnet --repeats 3 [--only cat]
-        [--agent cli|analyzer]
+        [--agent cli|analyzer] [--split train|validation|test] [--unseal-test]
         -> .ccsim/agent_sessions/RUN/manifest.json  (one entry per session: path, model, prompt)
         --agent analyzer writes the analyzer's briefing plus its tool spec (analyzer.harness). Default stays the CLI.
+        --split test is refused unless --unseal-test is set (the test split is sealed).
     (the orchestrator runs one subagent per manifest entry, with the entry's model and prompt)
     python -m bench.eval_subagents score RUN
         -> .ccsim/agent_sessions/RUN/results.json + results.md (accuracy by config x model, pass^k, calls, errors)
@@ -33,7 +34,8 @@ from bench.eval import load_cases  # noqa: E402
 
 
 def prepare(run_label: str, configs: dict, models: list[str], repeats: int, only: str | None = None,
-            snapshot_path: Path | None = None, agent: str = "cli") -> Path:
+            snapshot_path: Path | None = None, agent: str = "cli", question_split: str | None = None,
+            unseal_test: bool = False) -> Path:
     if agent not in {"cli", "analyzer"}:
         raise ValueError(f"unknown agent {agent!r}; expected cli or analyzer")
     snap = Path(snapshot_path) if snapshot_path else snapshot()
@@ -42,6 +44,11 @@ def prepare(run_label: str, configs: dict, models: list[str], repeats: int, only
         raise FileExistsError(f"{run_dir} exists; choose a new run label")
     entries = []
     cases = load_cases(snapshot_path=snap)
+    if question_split:
+        from bench.splits import select_cases
+        cases = select_cases(cases, question_split, unseal_test=unseal_test)
+        if not cases:
+            raise ValueError(f"no questions in split {question_split!r}")
     if only:
         wanted = set(only.split(","))
         cases = [c for c in cases if wanted & {c["id"], c["category"], c["difficulty"], c.get("family"), c.get("question_set")}]
@@ -171,10 +178,12 @@ def main():
     ap.add_argument("--snapshot")
     ap.add_argument("--agent", choices=["cli", "analyzer"], default="cli",
                     help="cli: bench.agent_cli briefing. analyzer: analyzer prompt and tool spec")
+    ap.add_argument("--split", help="train, validation, or test; test is sealed without --unseal-test")
+    ap.add_argument("--unseal-test", action="store_true")
     a = ap.parse_args()
     if a.cmd == "prepare":
         print(prepare(a.run, json.loads(Path(a.configs).read_text()), a.models.split(","), a.repeats, a.only,
-                      a.snapshot, a.agent))
+                      a.snapshot, a.agent, a.split, a.unseal_test))
     elif a.cmd == "contrast":
         print(json.dumps(contrast(a.run, a.baseline), indent=1))
     elif a.cmd == "effects":
