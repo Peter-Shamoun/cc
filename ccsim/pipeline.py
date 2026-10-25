@@ -28,10 +28,9 @@ from . import edi_mock
 from .infra import SESSION_SECONDS
 from .lake import (COMMIT_TABLE, BatchLock, Silver, Store, check_manifest, gold_key, manifest_files, manifest_key, publish,
                    read_current, read_manifest, run_month, silver_state)
-from .parser import TABLES, ParseError, parse_file
+from .parser import DDL_LOSSLESS, SEGMENT_FIELDS, TABLES, ParseError, TableRows, parse_file
 
 ROOT = Path(__file__).resolve().parent.parent
-DDL_LOSSLESS = (ROOT / "claude/schema/01_lossless_edi_schema.sql").read_text()
 DDL_SEMANTIC = (ROOT / "claude/schema/02_semantic_layer_views.sql").read_text()
 SEM_TABLES = ["remit_claims", "remit_lines", "claims", "claim_lines", "adjustments", "remarks", "payments",
               "provider_adjustments", "diagnoses", "payers"]
@@ -95,13 +94,23 @@ def seed_ref(con: duckdb.DuckDBPyConnection):
 
 
 def _insert(con, table: str, rows: list[dict]):
+    """Insert row dicts that all have the same keys in the same order (the parser's TableRows rows do)."""
     if not rows:
         return
-    # Columns are the union of every row's keys: pa.Table.from_pylist infers them from the first row only and
-    # would silently drop fields the first row lacks (an HL-20 has no SBR, a submitter NM1 has no address).
-    keys = list(dict.fromkeys(k for r in rows for k in r))
-    con.register("_rows", pa.table({k: [r.get(k) for r in rows] for k in keys}))
+    columns = map(list, zip(*map(dict.values, rows), strict=True))   # strict: a row with other keys fails here
+    con.register("_rows", pa.table(dict(zip(rows[0], columns, strict=True))))   # lists: pyarrow reads tuples 10x slower
     con.execute(f"INSERT INTO {table} BY NAME SELECT * FROM _rows")
+    con.unregister("_rows")
+
+
+def _insert_segments(con, rows: list[tuple]):
+    """edi.segment rows (parser.SEGMENT_FIELDS tuples); elements is split from raw_text here, in DuckDB."""
+    if not rows:
+        return
+    con.register("_rows", pa.table(dict(zip(SEGMENT_FIELDS, map(list, zip(*rows, strict=True)), strict=True))))
+    con.execute("INSERT INTO edi.segment BY NAME SELECT * EXCLUDE (element_separator, elements_json), "
+                "CASE WHEN elements_json IS NULL THEN string_split(raw_text, element_separator)[2:] "
+                "ELSE elements_json::VARCHAR[] END AS elements FROM _rows")
     con.unregister("_rows")
 
 
@@ -261,15 +270,57 @@ def _parse_batch_locked(env, store: Store, lock: BatchLock) -> dict:
     return dict(stats, status="ok")
 
 
-class SilverBatch:
+def _staging_ddl() -> tuple[str, list[tuple[str, str, str, str]]]:
+    """The lossless DDL for a batch's staging tables: its types and NOT NULLs, without keys. Returns it and the
+    foreign keys as (table, column, parent table, parent column).
+
+    SilverBatch inserts a file's rows while the file is still being parsed, before its edi.source_file row exists,
+    so it checks the foreign keys once per batch instead (SilverBatch.finish). Primary keys are unique by
+    construction (<file_id>:<seg_ord>, tests/test_parser_speed.py checks it) and maintaining their indexes was half
+    the insert cost. Neither changes the Parquet written: its schema comes from the column types and the data."""
+    con = duckdb.connect()
+    con.execute(DDL_LOSSLESS)
+    keys = [(f"{schema}.{table}", columns[0], f"{schema}.{parent}", parent_columns[0])
+            for schema, table, columns, parent, parent_columns in con.execute(
+                "SELECT schema_name, table_name, constraint_column_names, referenced_table, referenced_column_names "
+                "FROM duckdb_constraints() WHERE constraint_type = 'FOREIGN KEY'").fetchall()]
+    n_primary_keys = con.execute("SELECT count(*) FROM duckdb_constraints() "
+                                 "WHERE constraint_type = 'PRIMARY KEY'").fetchone()[0]
+    ddl, n_references = re.subn(r"\s+REFERENCES\s+[\w.]+\(\w+\)", "", DDL_LOSSLESS)
+    ddl, n_table_keys = re.subn(r",([ \t]*--[^\n]*)?\n\s*PRIMARY KEY\s*\([^)]*\)", r"\1", ddl)
+    ddl, n_column_keys = re.subn(r"\s+PRIMARY KEY\b", "", ddl)
+    assert n_references == len(keys) and n_table_keys + n_column_keys == n_primary_keys, (keys, n_primary_keys)
+    con = duckdb.connect()
+    con.execute(ddl)
+    assert not con.execute("SELECT count(*) FROM duckdb_constraints() WHERE constraint_type IN "
+                           "('PRIMARY KEY', 'FOREIGN KEY', 'UNIQUE')").fetchone()[0]
+    return ddl, keys
+
+
+STAGING_DDL, STAGING_FOREIGN_KEYS = _staging_ddl()
+
+
+class SilverBatch(TableRows):
     """One batch's silver rows, staged in DuckDB under the lossless DDL (its types and NOT NULLs) for write_silver.
-    A raw file that fails to parse is recorded as a REJECTED edi.source_file row instead; the caller quarantines it."""
+    A raw file that fails to parse is recorded as a REJECTED edi.source_file row instead; the caller quarantines it.
+
+    Rows are flushed into DuckDB whenever FLUSH_SEGMENTS segments are buffered, also in the middle of a file (the
+    parser's latest row of each table stays buffered, it may still change), so Python memory does not grow with the
+    batch or the file. A file rejected after a flush has its flushed rows deleted again."""
+
+    FLUSH_SEGMENTS = 50_000
+    STAGING_MEMORY_LIMIT = "256MB"
 
     def __init__(self, run_id: str, started: datetime, triggered_by: str, notes: str | None):
+        super().__init__()
         self.run_id, self.started = run_id, started
-        self.con = duckdb.connect()
-        self.con.execute(DDL_LOSSLESS)
-        self.rows = {t: [] for t in TABLES}
+        # One thread: more only spends CPU at this size. Above the memory limit the staged tables spill to disk,
+        # so memory stays flat with the size of the batch and of its files.
+        self.spill_dir = tempfile.TemporaryDirectory(prefix="silver-staging-")    # removed with the batch
+        self.con = duckdb.connect(config={"threads": 1, "memory_limit": self.STAGING_MEMORY_LIMIT,
+                                          "temp_directory": self.spill_dir.name})
+        self.con.execute(STAGING_DDL)
+        self.flushed_during_file = False
         _insert(self.con, "edi.ingest_run", [dict(ingest_run_id=run_id, started_at=started, status="SUCCEEDED",
                                                   parser_name="ccsim.parser", parser_version=PARSER_VERSION,
                                                   schema_version="1", triggered_by=triggered_by, notes=notes)])
@@ -277,26 +328,44 @@ class SilverBatch:
     def add_raw_file(self, body: bytes, file_id: str, customer: str, meta: dict,
                      duplicate_of_file_id: str | None) -> bool:
         """Parse one raw object into the batch. Returns False (and records the rejection) if it is not loadable."""
+        self.flushed_during_file = False
+        source = meta if duplicate_of_file_id is None else dict(meta, duplicate_of_file_id=duplicate_of_file_id)
         try:
-            text = body[3:].decode("ascii") if body.startswith(b"\xef\xbb\xbf") else body.decode("ascii")   # UTF-8 BOM
-            rows = parse_file(text, file_id, customer, meta, self.run_id, self.started)
+            parse_file(body, file_id, customer, source, self.run_id, self.started, sink=self)
         except (ParseError, UnicodeDecodeError, IndexError, ValueError, KeyError, TypeError) as err:
-            self.rows["edi.source_file"].append(dict(file_id=file_id, tenant_code=customer, file_kind="UNKNOWN",
-                                                     ingest_run_id=self.run_id, ingested_at=self.started,
-                                                     parse_status="REJECTED",
-                                                     parse_messages=[f"{type(err).__name__}: {err}"[:500]], **meta))
+            self._discard_file(file_id)
+            self.add["edi.source_file"](file_id=file_id, tenant_code=customer, file_kind="UNKNOWN",
+                                        ingest_run_id=self.run_id, ingested_at=self.started, parse_status="REJECTED",
+                                        parse_messages=[f"{type(err).__name__}: {err}"[:500]], **meta)
             return False
-        if duplicate_of_file_id is not None:
-            rows["edi.source_file"][0]["duplicate_of_file_id"] = duplicate_of_file_id
-        for t in TABLES:
-            self.rows[t] += rows.get(t, [])
         return True
 
+    def after_chunk(self):
+        if len(self.rows["edi.segment"]) >= self.FLUSH_SEGMENTS:
+            self._flush(keep_latest_rows=True)
+            self.flushed_during_file = True
+
+    def _flush(self, keep_latest_rows: bool):
+        for t, rows in self.rows.items():
+            n = len(rows) - 1 if keep_latest_rows and t != "edi.segment" else len(rows)
+            if n > 0:
+                (_insert_segments(self.con, rows[:n]) if t == "edi.segment" else _insert(self.con, t, rows[:n]))
+                del rows[:n]                                      # in place: the parser's adders append to it
+
+    def _discard_file(self, file_id: str):
+        for t, rows in self.rows.items():
+            rows[:] = [r for r in rows if (r[0] if t == "edi.segment" else r["file_id"]) != file_id]
+            if self.flushed_during_file:
+                self.con.execute(f"DELETE FROM {t} WHERE file_id = ?", [file_id])
+
     def finish(self) -> duckdb.DuckDBPyConnection:
-        """Insert the staged rows; returns the connection holding the batch's tables."""
-        for t in TABLES:                              # one insert per table: ~40% less than one per file and table
-            _insert(self.con, t, self.rows[t])
-        self.rows = None
+        """Insert the rows still buffered; returns the connection holding the batch's tables."""
+        self._flush(keep_latest_rows=False)
+        for table, column, parent, parent_column in STAGING_FOREIGN_KEYS:
+            orphans = self.con.execute(f"SELECT count(*) FROM {table} WHERE {column} NOT IN "
+                                       f"(SELECT {parent_column} FROM {parent})").fetchone()[0]
+            if orphans:
+                raise RuntimeError(f"{orphans} rows of {table} reference no {parent}.{parent_column}")
         return self.con
 
 
