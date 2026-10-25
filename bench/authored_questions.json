@@ -53,5 +53,463 @@
   },
   "source": "opus-authored, verified by independent answer key",
   "interpretation": "Grain is claim+payer. A prior denial is a superseded (non-current, non-reversal) adjudication meeting the denial definition (status 4 or $0 paid with a CO denial CARC); overturned means the current adjudication is not denied. Expected: 19 pairs, $70.40 paid (all commercial)."
+ },
+ {
+  "id": "a_f786e11aec",
+  "category": "ar_aging",
+  "difficulty": "medium",
+  "question": "For each claim, how many days passed between its date of service and its first 837 submission (earliest submission to any payer)? Group claims by the payer class of the claim's primary payer (payer_responsibility = 'P') and show, per payer class: number of claims, average lag in days (rounded to 2 decimals), median lag in days, and the number of claims first submitted more than 90 days after the date of service. Include voided claims. Order by payer class.",
+  "gold_sql": "with f as (select claim_key, min(submission_date) - min(service_date_from) as lag_days from sem.claims group by 1), p as (select distinct claim_key, payer_class from sem.claims where payer_responsibility = 'P') select p.payer_class, count(*) as claims, round(avg(lag_days), 2) as avg_lag_days, median(lag_days) as median_lag_days, count(*) filter (where lag_days > 90) as claims_over_90_days from f join p using (claim_key) group by 1 order by 1",
+  "answer_key_sql": "with pc as (select distinct payer_id, payer_class from ledger.adjudications), f as (select c.pcn, c.submitted::date - c.dos::date as lag_days, pc.payer_class from ledger.claims c join ledger.submissions s on s.pcn = c.pcn and s.payer_sequence = 0 and s.frequency = '1' join pc using (payer_id)) select payer_class, count(*) as claims, round(avg(lag_days), 2) as avg_lag_days, median(lag_days) as median_lag_days, count(*) filter (where lag_days > 90) as claims_over_90_days from f group by 1 order by 1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain: claim (claim_key), each with exactly one primary payer. Lag = earliest submission date across all of the claim's 837s minus its date of service. Result: commercial 1839 / 5.61 / 3 / 19; medicaid 214 / 4.62 / 3 / 1; medicare_advantage 362 / 6.72 / 3 / 5."
+ },
+ {
+  "id": "a_b853266803",
+  "category": "ar_aging",
+  "difficulty": "hard",
+  "question": "Days-to-pay by payer class: for each claim's primary payer (payer_responsibility = 'P'), take the current adjudication from that payer and keep only the ones with paid amount > 0. Days to pay = that adjudication's payment date minus the claim's first 837 submission date to that same payer. Per payer class, show the number of paid claims, the median days to pay, and the 90th percentile days to pay (continuous/linear-interpolated percentile), rounding both to 1 decimal. Order by payer class.",
+  "gold_sql": "with p as (select claim_key, payer_key, payer_class, min(submission_date) as first_submission_date from sem.claims where payer_responsibility = 'P' group by all), d as (select p.payer_class, r.payment_date - p.first_submission_date as days_to_pay from sem.remit_claims r join p using (claim_key, payer_key) where r.is_current_adjudication and r.paid_amount > 0) select payer_class, count(*) as paid_claims, round(median(days_to_pay), 1) as median_days_to_pay, round(quantile_cont(days_to_pay, 0.9), 1) as p90_days_to_pay from d group by 1 order by 1",
+  "answer_key_sql": "with pc as (select distinct payer_id, payer_class from ledger.adjudications), p as (select pcn, payer_id, min(submission_date::date) as first_submission_date from ledger.submissions where payer_sequence = 0 group by all), d as (select pc.payer_class, e.event_date::date - p.first_submission_date as days_to_pay from ledger.events e join p using (pcn, payer_id) join pc using (payer_id) where e.is_current and e.paid > 0) select payer_class, count(*) as paid_claims, round(median(days_to_pay), 1) as median_days_to_pay, round(quantile_cont(days_to_pay, 0.9), 1) as p90_days_to_pay from d group by 1 order by 1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain: claim + primary payer, current adjudications only, paid > 0. Time basis: payment date of the current adjudication vs first submission to that payer (original, not the replacement). Result: commercial 262 / 11.0 / 15.0; medicaid 29 / 28.0 / 36.2; medicare_advantage 106 / 24.0 / 33.0."
+ },
+ {
+  "id": "a_7423e6eb91",
+  "category": "ar_aging",
+  "difficulty": "hard",
+  "question": "Open primary AR aging as of 2026-08-14: which non-voided claims (latest submission is not a void, frequency 8) still have no current adjudication from their primary payer (payer_responsibility = 'P'), either because no 835 was ever received or because the latest event was a reversal? Age each claim as 2026-08-14 minus its first 837 submission date to the primary payer, then bucket into '0-14', '15-29' and '30+' days. Per bucket, show the number of claims and the total billed charge from each claim's latest submission. Order buckets youngest first.",
+  "gold_sql": "with p as (select claim_key, payer_key, min(submission_date) as first_submission_date from sem.claims where payer_responsibility = 'P' group by all), l as (select claim_key, charge_amount, frequency_code from sem.claims where is_latest_submission), o as (select p.claim_key, l.charge_amount, date '2026-08-14' - p.first_submission_date as age_days from p join l using (claim_key) where l.frequency_code <> '8' and not exists (select 1 from sem.remit_claims r where r.claim_key = p.claim_key and r.payer_key = p.payer_key and r.is_current_adjudication)) select case when age_days <= 14 then '0-14' when age_days <= 29 then '15-29' else '30+' end as age_bucket, count(*) as open_claims, sum(charge_amount) as billed_charge from o group by 1 order by min(age_days)",
+  "answer_key_sql": "with p as (select pcn, payer_id, min(submission_date::date) as first_submission_date from ledger.submissions where payer_sequence = 0 group by all), o as (select p.pcn, c.charge, date '2026-08-14' - p.first_submission_date as age_days from p join ledger.claims c using (pcn) where not c.voided and not exists (select 1 from ledger.events e where e.pcn = p.pcn and e.payer_id = p.payer_id and e.is_current)) select case when age_days <= 14 then '0-14' when age_days <= 29 then '15-29' else '30+' end as age_bucket, count(*) as open_claims, round(sum(charge), 2) as billed_charge from o group by 1 order by min(age_days)",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain: claim (one primary payer each). Population: not voided, no current adjudication from the primary payer. Time basis: first submission date to the primary payer, as of 2026-08-14. Result: 0-14: 714 claims / 231709.00; 15-29: 273 / 83247.00; 30+: 62 / 19621.00."
+ },
+ {
+  "id": "a_d383370345",
+  "category": "ar_aging",
+  "difficulty": "hard",
+  "question": "Payment velocity for the July 2026 submission cohort: take claims whose first 837 submission to their primary payer (payer_responsibility = 'P') falls between 2026-07-01 and 2026-07-31. For each, find the earliest 835 claim payment from that primary payer (any adjudication event). Per primary payer class, show the number of cohort claims, how many got that first remit within 14 days of the first submission (payment date minus submission date <= 14), and that share as a percentage rounded to 1 decimal. Claims with no remit count as not remitted. Order by payer class.",
+  "gold_sql": "with p as (select claim_key, payer_key, payer_class, min(submission_date) as first_submission_date from sem.claims where payer_responsibility = 'P' group by all), r as (select claim_key, payer_key, min(payment_date) as first_remit_date from sem.remit_claims group by all), c as (select p.payer_class, r.first_remit_date - p.first_submission_date as lag_days from p left join r using (claim_key, payer_key) where p.first_submission_date between date '2026-07-01' and date '2026-07-31') select payer_class, count(*) as cohort_claims, count(*) filter (where lag_days <= 14) as remitted_within_14_days, round(100.0 * count(*) filter (where lag_days <= 14) / count(*), 1) as pct_remitted_within_14_days from c group by 1 order by 1",
+  "answer_key_sql": "with pc as (select distinct payer_id, payer_class from ledger.adjudications), p as (select pcn, payer_id, min(submission_date::date) as first_submission_date from ledger.submissions where payer_sequence = 0 group by all), r as (select pcn, payer_id, min(event_date::date) as first_remit_date from ledger.events group by all), c as (select pc.payer_class, r.first_remit_date - p.first_submission_date as lag_days from p join pc using (payer_id) left join r using (pcn, payer_id) where p.first_submission_date between date '2026-07-01' and date '2026-07-31') select payer_class, count(*) as cohort_claims, count(*) filter (where lag_days <= 14) as remitted_within_14_days, round(100.0 * count(*) filter (where lag_days <= 14) / count(*), 1) as pct_remitted_within_14_days from c group by 1 order by 1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain: claim + primary payer; cohort by first submission month (July 2026); first remit = earliest 835 event of any kind. Result: commercial 1241 / 703 / 56.6; medicaid 142 / 0 / 0.0; medicare_advantage 258 / 7 / 2.7."
+ },
+ {
+  "id": "a_1b7e02d0b0",
+  "category": "ar_aging",
+  "difficulty": "hard",
+  "question": "Rework cycle time for corrected claims: for claims that were resubmitted to their primary payer (payer_responsibility = 'P') as a corrected replacement (frequency 7), show in one row: the number of such claims; the average days from the original submission (frequency 1) to the first replacement submission, rounded to 2 decimals; how many of them have a current adjudication from the primary payer with a payment date on or after the replacement submission date; for those, the average days from the original submission to that payment date (rounded to 2 decimals); and the total paid on those adjudications.",
+  "gold_sql": "with s as (select claim_key, payer_key, min(submission_date) filter (where frequency_code = '1') as original_submission_date, min(submission_date) filter (where frequency_code = '7') as replacement_submission_date from sem.claims where payer_responsibility = 'P' group by all having replacement_submission_date is not null), j as (select s.*, r.payment_date, r.paid_amount from s left join sem.remit_claims r on r.claim_key = s.claim_key and r.payer_key = s.payer_key and r.is_current_adjudication) select count(*) as corrected_claims, round(avg(replacement_submission_date - original_submission_date), 2) as avg_days_to_correction, count(payment_date) filter (where payment_date >= replacement_submission_date) as adjudicated_after_correction, round(avg(payment_date - original_submission_date) filter (where payment_date >= replacement_submission_date), 2) as avg_days_original_to_final_payment, sum(paid_amount) filter (where payment_date >= replacement_submission_date) as paid_after_correction from j",
+  "answer_key_sql": "with s as (select pcn, payer_id, min(submission_date::date) filter (where frequency = '1') as original_submission_date, min(submission_date::date) filter (where frequency = '7') as replacement_submission_date from ledger.submissions where payer_sequence = 0 group by all having replacement_submission_date is not null), j as (select s.*, e.event_date::date as payment_date, e.paid from s left join ledger.events e on e.pcn = s.pcn and e.payer_id = s.payer_id and e.is_current) select count(*) as corrected_claims, round(avg(replacement_submission_date - original_submission_date), 2) as avg_days_to_correction, count(payment_date) filter (where payment_date >= replacement_submission_date) as adjudicated_after_correction, round(avg(payment_date - original_submission_date) filter (where payment_date >= replacement_submission_date), 2) as avg_days_original_to_final_payment, round(sum(paid) filter (where payment_date >= replacement_submission_date), 2) as paid_after_correction from j",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain: claim + primary payer with a frequency-7 replacement (each such claim has exactly one). Current adjudication only, payment date on or after replacement submission. Result: 46 / 21.11 / 12 / 28.17 / 56.17."
+ },
+ {
+  "id": "a_dccab5ccfe",
+  "category": "contract_variance",
+  "difficulty": "easy",
+  "question": "For each payer class, what are the total billed charges, total paid and the payment-to-charge ratio (paid / billed, as a percentage rounded to 2 decimals) across current adjudications? Count each claim once per payer (claim+payer grain, primary and secondary payers both included), using the charge amount reported on the 835 claim payment.",
+  "gold_sql": "SELECT payer_class, SUM(charge_amount) AS billed, SUM(paid_amount) AS paid, ROUND(100.0*SUM(paid_amount)/SUM(charge_amount),2) AS payment_to_charge_pct FROM sem.remit_claims WHERE is_current_adjudication GROUP BY 1 ORDER BY 1",
+  "answer_key_sql": "SELECT a.payer_class, ROUND(SUM(e.charge),2) AS billed, ROUND(SUM(e.paid),2) AS paid, ROUND(100.0*SUM(e.paid)/SUM(e.charge),2) AS payment_to_charge_pct FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current GROUP BY 1 ORDER BY 1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain = current adjudication (one per claim+payer). Billed = CLP charge on the current 835 claim payment; paid = CLP paid. Ratio = 100*paid/billed rounded to 2 decimals. All payer sequences included; reversed-without-correction pairs excluded since they have no current adjudication. Result: commercial 375571.00 / 55019.64 / 14.65; medicaid 19551.00 / 2547.98 / 13.03; medicare_advantage 53549.00 / 12303.22 / 22.98."
+ },
+ {
+  "id": "a_837ce03435",
+  "category": "contract_variance",
+  "difficulty": "medium",
+  "question": "By payer and payment month, what is the total billed charge on current adjudications, the total CO-45 contractual adjustment on those adjudications, and CO-45 as a percentage of billed charges (rounded to 2 decimals)? Use the claim+payer current adjudication grain, the 835 claim charge amount, and the 835 payment date's month. Order by payer name, then month.",
+  "gold_sql": "WITH rc AS (SELECT remit_claim_id, payer_name, payment_month, charge_amount FROM sem.remit_claims WHERE is_current_adjudication), co AS (SELECT remit_claim_id, SUM(adjustment_amount) AS co45 FROM sem.adjustments WHERE group_code='CO' AND carc_code='45' AND is_current_adjudication GROUP BY 1) SELECT rc.payer_name, rc.payment_month, SUM(rc.charge_amount) AS billed, COALESCE(SUM(co.co45),0) AS co45_amount, ROUND(100.0*COALESCE(SUM(co.co45),0)/SUM(rc.charge_amount),2) AS co45_pct_of_billed FROM rc LEFT JOIN co USING (remit_claim_id) GROUP BY 1,2 ORDER BY 1,2",
+  "answer_key_sql": "WITH e AS (SELECT e.*, a.payer FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current), co AS (SELECT pcn, payer_id, event_number, SUM(amount) AS co45 FROM ledger.event_adjustments WHERE group_code='CO' AND carc='45' GROUP BY ALL) SELECT array_to_string(list_transform(string_split(lower(payer),' '), lambda x: upper(x[1])||x[2:]),' ') AS payer_name, date_trunc('month', event_date::DATE)::DATE AS payment_month, SUM(charge) AS billed, ROUND(COALESCE(SUM(co45),0),2) AS co45_amount, ROUND(100.0*COALESCE(SUM(co45),0)/SUM(charge),2) AS co45_pct_of_billed FROM e LEFT JOIN co USING (pcn, payer_id, event_number) GROUP BY 1,2 ORDER BY 1,2",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain = payer x payment month over current adjudications. CO-45 summed over all claim- and line-level CO/45 adjustments on the current adjudication. Billed = CLP charge. 12 rows (6 payers x Jul/Aug 2026), e.g. Acme Health Plan 2026-07: 77219.00 billed, 27148.99 CO-45, 35.16%; Tailspin Medicaid 2026-08: 14930.00, 7362.09, 49.31%."
+ },
+ {
+  "id": "a_477b034f58",
+  "category": "contract_variance",
+  "difficulty": "hard",
+  "question": "At the 835 service-line level, how did the payment-to-charge ratio for each billed CPT code change between July 2026 and August 2026 payment months? Use current adjudications only (all payers, denied lines included, claims denied only at claim level have no lines and are excluded), group by the CPT code as billed (not the payer's adjudicated code), and compute ratio = line paid / line charge as a percentage. Return CPT, July ratio, August ratio and the change in percentage points (August minus July, computed from unrounded ratios), all rounded to 2 decimals, for CPTs with lines in both months, ordered by change ascending then CPT.",
+  "gold_sql": "WITH m AS (SELECT procedure_code AS cpt, SUM(line_charge_amount) FILTER (WHERE payment_month='2026-07-01') AS charge_jul, SUM(line_paid_amount) FILTER (WHERE payment_month='2026-07-01') AS paid_jul, SUM(line_charge_amount) FILTER (WHERE payment_month='2026-08-01') AS charge_aug, SUM(line_paid_amount) FILTER (WHERE payment_month='2026-08-01') AS paid_aug FROM sem.remit_lines WHERE is_current_adjudication GROUP BY 1) SELECT cpt, ROUND(100.0*paid_jul/charge_jul,2) AS jul_ratio_pct, ROUND(100.0*paid_aug/charge_aug,2) AS aug_ratio_pct, ROUND(100.0*paid_aug/charge_aug-100.0*paid_jul/charge_jul,2) AS change_pp FROM m WHERE charge_jul>0 AND charge_aug>0 ORDER BY change_pp, cpt",
+  "answer_key_sql": "WITH x AS (SELECT l.cpt, date_trunc('month', e.event_date::DATE)::DATE AS mo, c.charge, l.paid FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) JOIN ledger.claim_lines c ON c.pcn=l.pcn AND c.line_number=l.line_number WHERE e.is_current), m AS (SELECT cpt, SUM(charge) FILTER (WHERE mo='2026-07-01') AS charge_jul, SUM(paid) FILTER (WHERE mo='2026-07-01') AS paid_jul, SUM(charge) FILTER (WHERE mo='2026-08-01') AS charge_aug, SUM(paid) FILTER (WHERE mo='2026-08-01') AS paid_aug FROM x GROUP BY 1) SELECT cpt, ROUND(100.0*paid_jul/charge_jul,2) AS jul_ratio_pct, ROUND(100.0*paid_aug/charge_aug,2) AS aug_ratio_pct, ROUND(100.0*paid_aug/charge_aug-100.0*paid_jul/charge_jul,2) AS change_pp FROM m WHERE charge_jul>0 AND charge_aug>0 ORDER BY change_pp, cpt",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain = billed CPT over 835 service lines on current adjudications, split by payment month (835 payment date). Ratio = sum(line paid)/sum(line charge)*100. 15 CPTs; largest drop 82306 (18.75 -> 15.41, -3.34 pp), largest gain 87086 (9.32 -> 15.11, +5.79 pp)."
+ },
+ {
+  "id": "a_a23ce7f1de",
+  "category": "contract_variance",
+  "difficulty": "hard",
+  "question": "For each billed CPT code, what is the allowed amount per unit paid by primary payers in each payer class (commercial, Medicare Advantage, Medicaid), and what are the Medicare Advantage and Medicaid rates as a percentage of the commercial rate? Use 835 service lines on current adjudications where the payer was billed as primary on the 837 (payer responsibility P), excluding denied lines and lines with no positive allowed amount. Rate = total allowed / total units paid within the class (rounded to 2 decimals); percentages of commercial rounded to 1 decimal and computed from unrounded rates. Group by the CPT as billed, ordered by CPT.",
+  "gold_sql": "WITH p AS (SELECT DISTINCT claim_key, payer_key FROM sem.claims WHERE payer_responsibility='P'), l AS (SELECT r.* FROM sem.remit_lines r JOIN p USING (claim_key, payer_key) WHERE r.is_current_adjudication AND NOT r.line_is_denied AND r.line_allowed_amount>0), m AS (SELECT procedure_code AS cpt, SUM(line_allowed_amount) FILTER (WHERE payer_class='commercial')/SUM(units_paid) FILTER (WHERE payer_class='commercial') AS com, SUM(line_allowed_amount) FILTER (WHERE payer_class='medicare_advantage')/SUM(units_paid) FILTER (WHERE payer_class='medicare_advantage') AS ma, SUM(line_allowed_amount) FILTER (WHERE payer_class='medicaid')/SUM(units_paid) FILTER (WHERE payer_class='medicaid') AS mcd FROM l GROUP BY 1) SELECT cpt, ROUND(com,2) AS commercial_allowed_per_unit, ROUND(ma,2) AS medicare_advantage_allowed_per_unit, ROUND(mcd,2) AS medicaid_allowed_per_unit, ROUND(100*ma/com,1) AS medicare_advantage_pct_of_commercial, ROUND(100*mcd/com,1) AS medicaid_pct_of_commercial FROM m ORDER BY cpt",
+  "answer_key_sql": "WITH p AS (SELECT DISTINCT pcn, payer_id FROM ledger.submissions WHERE payer_sequence=0), x AS (SELECT l.cpt, a.payer_class, l.allowed, c.units FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) JOIN p USING (pcn, payer_id) JOIN ledger.adjudications a USING (pcn, payer_id) JOIN ledger.claim_lines c ON c.pcn=l.pcn AND c.line_number=l.line_number WHERE e.is_current AND NOT l.denied AND l.allowed>0), m AS (SELECT cpt, SUM(allowed) FILTER (WHERE payer_class='commercial')/SUM(units) FILTER (WHERE payer_class='commercial') AS com, SUM(allowed) FILTER (WHERE payer_class='medicare_advantage')/SUM(units) FILTER (WHERE payer_class='medicare_advantage') AS ma, SUM(allowed) FILTER (WHERE payer_class='medicaid')/SUM(units) FILTER (WHERE payer_class='medicaid') AS mcd FROM x GROUP BY 1) SELECT cpt, ROUND(com,2) AS commercial_allowed_per_unit, ROUND(ma,2) AS medicare_advantage_allowed_per_unit, ROUND(mcd,2) AS medicaid_allowed_per_unit, ROUND(100*ma/com,1) AS medicare_advantage_pct_of_commercial, ROUND(100*mcd/com,1) AS medicaid_pct_of_commercial FROM m ORDER BY cpt",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain = billed CPT. Population = current-adjudication 835 lines from payers billed as primary (837 payer responsibility P / ledger payer_sequence 0), not denied, allowed > 0. Unit-weighted allowed rate per class; ratios vs commercial. 15 CPTs, e.g. 81479: commercial 1200.82, MA 894.59, Medicaid 598.96, 74.5% and 49.9%; 85025: 20.32, 12.31, 7.79, 60.6%, 38.3%."
+ },
+ {
+  "id": "a_ab202d4b23",
+  "category": "contract_variance",
+  "difficulty": "hard",
+  "question": "For every payer, how many service lines were allowed below that payer's typical allowed amount for the CPT, and what is the total shortfall? Use 835 service lines on current adjudications (primary and secondary), not denied, with exactly 1 unit paid and a positive allowed amount. A payer's typical allowed for a billed CPT is the most frequent allowed amount among those lines (ties broken by the higher amount). Shortfall = sum of (typical allowed - line allowed) over lines below typical, rounded to 2 decimals (0 when none). Return payer, underpaid line count and shortfall, ordered by shortfall descending then payer name.",
+  "gold_sql": "WITH l AS (SELECT payer_name, procedure_code AS cpt, line_allowed_amount AS allowed FROM sem.remit_lines WHERE is_current_adjudication AND NOT line_is_denied AND units_paid=1 AND line_allowed_amount>0), freq AS (SELECT payer_name, cpt, allowed, COUNT(*) AS n FROM l GROUP BY ALL), typical AS (SELECT payer_name, cpt, allowed AS typical_allowed FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY payer_name, cpt ORDER BY n DESC, allowed DESC) AS rn FROM freq) WHERE rn=1) SELECT payer_name, COUNT(*) FILTER (WHERE allowed<typical_allowed) AS underpaid_lines, COALESCE(SUM(typical_allowed-allowed) FILTER (WHERE allowed<typical_allowed),0) AS shortfall FROM l JOIN typical USING (payer_name, cpt) GROUP BY 1 ORDER BY shortfall DESC, payer_name",
+  "answer_key_sql": "WITH l AS (SELECT array_to_string(list_transform(string_split(lower(a.payer),' '), lambda x: upper(x[1])||x[2:]),' ') AS payer_name, el.cpt, ROUND(el.allowed,2) AS allowed FROM ledger.event_lines el JOIN ledger.events e USING (pcn, payer_id, event_number) JOIN ledger.adjudications a USING (pcn, payer_id) JOIN ledger.claim_lines c ON c.pcn=el.pcn AND c.line_number=el.line_number WHERE e.is_current AND NOT el.denied AND c.units=1 AND el.allowed>0), freq AS (SELECT payer_name, cpt, allowed, COUNT(*) AS n FROM l GROUP BY ALL), typical AS (SELECT payer_name, cpt, allowed AS typical_allowed FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY payer_name, cpt ORDER BY n DESC, allowed DESC) AS rn FROM freq) WHERE rn=1) SELECT payer_name, COUNT(*) FILTER (WHERE allowed<typical_allowed) AS underpaid_lines, ROUND(COALESCE(SUM(typical_allowed-allowed) FILTER (WHERE allowed<typical_allowed),0),2) AS shortfall FROM l JOIN typical USING (payer_name, cpt) GROUP BY 1 ORDER BY shortfall DESC, payer_name",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain = payer. Typical allowed = modal allowed per payer+billed CPT over current, non-denied, single-unit 835 lines with allowed > 0 (tie goes to the higher amount). Result: Woodgrove Benefits 16 lines / 73.92; Acme Health Plan 5 / 21.78; Contoso Mutual, Fabrikam Medicare Advantage, Northwind Health, Tailspin Medicaid 0 / 0.00. In this data the below-typical lines are all secondary (COB) adjudications."
+ },
+ {
+  "id": "a_d671e0b995",
+  "category": "denial_trends",
+  "difficulty": "hard",
+  "question": "For each payer class and payment month, what is the denial rate of current adjudications (each claim counted once per payer, month taken from the current adjudication's payment date), and how many percentage points did it change from the previous month for that class? Return payer class, month (YYYY-MM), current adjudications, denied, denial rate % rounded to 2 decimals, and the month-over-month change in percentage points rounded to 2 decimals (computed from unrounded rates; null for the first month). Order by payer class, then month.",
+  "gold_sql": "with m as (select payer_class, payment_month, count(*) n, sum(is_denied::int) d from sem.remit_claims where is_current_adjudication group by 1,2) select payer_class, strftime(payment_month,'%Y-%m') pay_month, n, d, round(100.0*d/n,2) rate, round(100.0*d/n - lag(100.0*d/n) over (partition by payer_class order by payment_month),2) chg from m order by 1,2",
+  "answer_key_sql": "with c as (select a.payer_class, date_trunc('month',e.event_date::date) m, a.denied from ledger.events e join ledger.adjudications a using(pcn,payer_id) where e.is_current), m as (select payer_class, m, count(*) n, sum(denied::int) d from c group by 1,2) select payer_class, strftime(m,'%Y-%m'), n, d, round(100.0*d/n,2), round(100.0*d/n - lag(100.0*d/n) over (partition by payer_class order by m),2) from m order by 1,2",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain claim+payer current adjudication; time basis = payment date of the current adjudication; LAG over months within payer class. Commercial rose +6.31 pts Jul->Aug; Medicaid -7.95; MA -3.60."
+ },
+ {
+  "id": "a_5059b5e0e6",
+  "category": "denial_trends",
+  "difficulty": "medium",
+  "question": "Do claims billed with modifiers get denied more often by the primary payer? Using each claim's current adjudication from its primary payer (the payer billed with payer responsibility P), and classifying a claim as 'with modifier' if any billed line on its latest submission carries at least one procedure modifier (else 'no modifier'), return group, number of claims, denied claims, and denial rate % rounded to 2 decimals. Order by group.",
+  "gold_sql": "with p as (select distinct claim_key, payer_key from sem.claims where payer_responsibility='P'), m as (select claim_key, bool_or(coalesce(modifier_1,modifier_2,modifier_3,modifier_4) is not null) has_mod from sem.claim_lines where is_latest_submission group by 1), r as (select r.claim_key, r.is_denied from sem.remit_claims r join p using(claim_key,payer_key) where r.is_current_adjudication) select case when has_mod then 'with modifier' else 'no modifier' end grp, count(*) n, sum(is_denied::int) d, round(100.0*avg(is_denied::int),2) rate from r join m using(claim_key) group by 1 order by 1",
+  "answer_key_sql": "with m as (select pcn, bool_or(len(modifiers)>0) has_mod from ledger.claim_lines group by 1) select case when has_mod then 'with modifier' else 'no modifier' end, count(*), sum(denied::int), round(100.0*avg(denied::int),2) from ledger.adjudications a join m using(pcn) where a.remitted_current and a.payer_sequence=0 group by 1 order by 1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain claim (primary payer current adjudication). Expected: no modifier 1273/303/23.80; with modifier 92/30/32.61."
+ },
+ {
+  "id": "a_a123bba47f",
+  "category": "denial_trends",
+  "difficulty": "hard",
+  "question": "How does the primary-payer denial rate vary with the number of billed service lines? Bucket claims by line count on their latest submission (1, 2, 3+), and using each claim's current adjudication from its primary payer (payer responsibility P), return bucket, claims, denied claims, denial rate % rounded to 2 decimals, and total billed charge (latest submission claim charge) of the denied claims. Order by bucket.",
+  "gold_sql": "with p as (select distinct claim_key, payer_key from sem.claims where payer_responsibility='P'), l as (select claim_key, line_count, charge_amount from sem.claims where is_latest_submission), r as (select r.claim_key, r.is_denied from sem.remit_claims r join p using(claim_key,payer_key) where r.is_current_adjudication) select case when line_count>=3 then '3+' else line_count::varchar end bucket, count(*) n, sum(is_denied::int) d, round(100.0*avg(is_denied::int),2) rate, sum(case when is_denied then charge_amount else 0 end) denied_charge from r join l using(claim_key) group by 1 order by 1",
+  "answer_key_sql": "select case when n_lines>=3 then '3+' else n_lines::varchar end b, count(*), sum(denied::int), round(100.0*avg(denied::int),2), round(sum(case when denied then c.charge else 0 end),2) from ledger.adjudications a join ledger.claims c using(pcn) where a.remitted_current and a.payer_sequence=0 group by 1 order by 1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain claim, primary payer current adjudication; charge from the latest 837 submission. Single-line claims deny most (27.07%, $114,654 denied charge)."
+ },
+ {
+  "id": "a_a5888f64a4",
+  "category": "denial_trends",
+  "difficulty": "hard",
+  "question": "What is our first-pass resolution rate by payer class? Among all claim+payer pairs that have received at least one 835 claim payment, count a pair as resolved on first pass when it has exactly one 835 claim payment event ever (no reversals or re-adjudications) and that event is its current adjudication and not a denial. Return payer class, claim+payer pairs remitted, first-pass resolved pairs, and the rate % rounded to 2 decimals. Order by payer class.",
+  "gold_sql": "with p as (select claim_key, payer_key, any_value(payer_class) payer_class, count(*) n_events, bool_or(is_current_adjudication and not is_denied) ok from sem.remit_claims group by 1,2) select payer_class, count(*) pairs, sum((n_events=1 and ok)::int) fpr, round(100.0*sum((n_events=1 and ok)::int)/count(*),2) rate from p group by 1 order by 1",
+  "answer_key_sql": "with e as (select pcn,payer_id,count(*) n from ledger.events group by 1,2) select a.payer_class, count(*), sum((n=1 and a.remitted_current and not a.denied)::int), round(100.0*sum((n=1 and a.remitted_current and not a.denied)::int)/count(*),2) from e join ledger.adjudications a using(pcn,payer_id) group by 1 order by 1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain claim+payer pair over all 835 events (not just current). Expected commercial 1181/886/75.02, medicaid 51/31/60.78, MA 159/110/69.18."
+ },
+ {
+  "id": "a_2149838506",
+  "category": "denial_trends",
+  "difficulty": "medium",
+  "question": "Among denied current adjudications (each claim once per payer), how many were denied at claim level only (the 835 carried no service-line detail) versus with service-line detail, by payer class? Return payer class, claim-level-only denials, their total billed charge as reported on the 835, line-detail denials, and their total 835 billed charge. Order by payer class.",
+  "gold_sql": "with r as (select r.remit_claim_id, r.payer_class, r.charge_amount, exists(select 1 from sem.remit_lines l where l.remit_claim_id=r.remit_claim_id) has_lines from sem.remit_claims r where r.is_current_adjudication and r.is_denied) select payer_class, sum((not has_lines)::int) claim_level_denials, sum(case when not has_lines then charge_amount else 0 end) claim_level_charge, sum(has_lines::int) line_detail_denials, sum(case when has_lines then charge_amount else 0 end) line_detail_charge from r group by 1 order by 1",
+  "answer_key_sql": "select a.payer_class, sum(e.claim_level_only::int), round(sum(case when e.claim_level_only then e.charge else 0 end),2), sum((not e.claim_level_only)::int), round(sum(case when not e.claim_level_only then e.charge else 0 end),2) from ledger.events e join ledger.adjudications a using(pcn,payer_id) where e.is_current and a.denied group by 1 order by 1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain claim+payer current adjudication, denied only; charge is the CLP charge on the current 835. Only commercial has claim-level-only denials (39, $17,029)."
+ },
+ {
+  "id": "a_0d43f7d4b6",
+  "category": "rework",
+  "difficulty": "hard",
+  "question": "Among claims we resubmitted as a corrected replacement claim (frequency 7), consider those where the same payer had sent a recorded denial (claim status 4) with a payment date before the replacement's submission date. Classify each such claim+payer by outcome: 'overturned' (a remit arrived on or after the correction date and the current adjudication is not denied), 'denied again' (a remit arrived on or after the correction date but the current adjudication is denied or there is none), or 'no remit since correction'. For each outcome, return the number of claims and the total paid on their current adjudications (rounded to 2 decimals, $0 when there is none), ordered by outcome.",
+  "gold_sql": "with r as (select claim_key, payer_key, submission_date rd from sem.claims where frequency_code='7'), x as (select r.claim_key, r.payer_key, bool_or(e.claim_status_code='4' and e.payment_date < r.rd) pre_denied, bool_or(e.payment_date >= r.rd) has_post from r join sem.remit_claims e on e.claim_key=r.claim_key and e.payer_key=r.payer_key group by all) select case when not x.has_post then 'no remit since correction' when c.remit_claim_id is not null and not c.is_denied then 'overturned' else 'denied again' end outcome, count(*) claims, round(sum(coalesce(c.paid_amount,0)),2) paid from x left join sem.remit_claims c on c.claim_key=x.claim_key and c.payer_key=x.payer_key and c.is_current_adjudication where x.pre_denied group by 1 order by 1",
+  "answer_key_sql": "with r as (select pcn,payer_id,submission_date::DATE rd from ledger.submissions where frequency='7'), x as (select r.pcn, r.payer_id, bool_or(e.status='4' and e.event_date::DATE < r.rd) pre_denied, bool_or(e.event_date::DATE >= r.rd) has_post from r join ledger.events e on e.pcn=r.pcn and e.payer_id=r.payer_id group by all) select case when not has_post then 'no remit since correction' when a.remitted_current and not a.denied then 'overturned' else 'denied again' end outcome, count(*) claims, round(sum(coalesce(a.paid_current,0)),2) paid from x left join ledger.adjudications a using(pcn,payer_id) where pre_denied group by 1 order by 1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain is claim+payer, limited to frequency-7 replacement claims whose payer sent a status-4 remit dated before the replacement's submission date. 'Post-correction remit' means any 835 event with payment_date on or after the replacement submission_date. Outcome uses the current adjudication's is_denied flag (recorded or signal v3). Expected answer: no remit since correction 21 claims / $0.00; overturned 9 claims / $56.17. No claim landed in 'denied again'."
+ },
+ {
+  "id": "a_88c4640755",
+  "category": "rework",
+  "difficulty": "medium",
+  "question": "For corrected replacement claims (frequency 7), how long did it take us to send the correction? By payer class, return the number of corrected claims, the average number of days from the original submission (frequency 1) to the replacement submission to the same payer (rounded to 1 decimal), and the maximum days. Order by payer class.",
+  "gold_sql": "with r as (select claim_key, payer_key, payer_class, submission_date rd from sem.claims where frequency_code='7'), o as (select claim_key, payer_key, submission_date od from sem.claims where frequency_code='1') select payer_class, count(*) corrected_claims, round(avg(rd-od),1) avg_days_to_correction, max(rd-od) max_days_to_correction from r join o using(claim_key,payer_key) group by 1 order by 1",
+  "answer_key_sql": "with r as (select pcn,payer_id,submission_date::DATE rd from ledger.submissions where frequency='7'), o as (select pcn,payer_id,submission_date::DATE od from ledger.submissions where frequency='1'), pc as (select distinct payer_id, payer_class from ledger.adjudications) select pc.payer_class, count(*) corrected_claims, round(avg(rd-od),1) avg_days_to_correction, max(rd-od) max_days_to_correction from r join o using(pcn,payer_id) join pc using(payer_id) group by 1 order by 1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain is one replacement claim, paired with its original submission to the same payer, using submission dates. Expected answer: commercial 35 / 19.0 / 33; medicaid 2 / 29.5 / 30; medicare_advantage 9 / 27.3 / 40."
+ },
+ {
+  "id": "a_dca9da6d52",
+  "category": "rework",
+  "difficulty": "hard",
+  "question": "After we sent a corrected replacement claim (frequency 7), how quickly did the payer respond? For each payer class with at least one response, look at corrected claim+payer pairs that got an 835 with a payment date on or after the replacement's submission date. Return the number of such corrected claims, the average days from replacement submission to the first such remit (rounded to 1 decimal), and the minimum and maximum days. Order by payer class.",
+  "gold_sql": "with r as (select claim_key, payer_key, payer_class, submission_date rd from sem.claims where frequency_code='7'), f as (select r.claim_key, r.payer_class, min(e.payment_date) - min(r.rd) d from r join sem.remit_claims e on e.claim_key=r.claim_key and e.payer_key=r.payer_key and e.payment_date >= r.rd group by all) select payer_class, count(*) corrected_claims_with_response, round(avg(d),1) avg_days_to_first_remit, min(d) min_days, max(d) max_days from f group by 1 order by 1",
+  "answer_key_sql": "with r as (select pcn,payer_id,submission_date::DATE rd from ledger.submissions where frequency='7'), pc as (select distinct payer_id, payer_class from ledger.adjudications), f as (select r.pcn, r.payer_id, min(e.event_date::DATE) - any_value(rd) d from r join ledger.events e on e.pcn=r.pcn and e.payer_id=r.payer_id and e.event_date::DATE >= r.rd group by all) select pc.payer_class, count(*) corrected_claims_with_response, round(avg(d),1) avg_days_to_first_remit, min(d) min_days, max(d) max_days from f join pc using(payer_id) group by 1 order by 1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain is claim+payer for frequency-7 replacements. A response is the first 835 claim event of any status with payment_date on or after the replacement submission_date. Payer classes with no response are left out. Expected answer: one row, commercial 12 / 11.0 / 6 / 17."
+ },
+ {
+  "id": "a_921f1bf366",
+  "category": "rework",
+  "difficulty": "hard",
+  "question": "For claims we voided (frequency 8 submissions), return in one row: the number of voided claims, how many had a remit with paid amount > $0 dated before the void's submission date, how many the payer then reversed (an 835 reversal dated on or after the void date), and the total paid still on their current adjudications (rounded to 2 decimals).",
+  "gold_sql": "with v as (select claim_key, payer_key, submission_date vd from sem.claims where frequency_code='8'), x as (select v.claim_key, v.payer_key, bool_or(e.payment_date < vd and e.paid_amount>0) paid_before, bool_or(e.payment_date >= vd and e.is_reversal) reversed_after from v left join sem.remit_claims e using(claim_key,payer_key) group by all) select count(*) voided_claims, count(*) filter (paid_before) paid_before_void, count(*) filter (reversed_after) reversed_after_void, round(sum(coalesce(c.paid_amount,0)),2) paid_still_on_current from x left join sem.remit_claims c on c.claim_key=x.claim_key and c.payer_key=x.payer_key and c.is_current_adjudication",
+  "answer_key_sql": "with v as (select pcn,payer_id,submission_date::DATE vd from ledger.submissions where frequency='8'), x as (select v.pcn, v.payer_id, bool_or(e.event_date::DATE < vd and e.paid>0) paid_before, bool_or(e.event_date::DATE >= vd and e.status='22') reversed_after from v left join ledger.events e using(pcn,payer_id) group by all) select count(*) voided_claims, count(*) filter (paid_before) paid_before_void, count(*) filter (reversed_after) reversed_after_void, round(sum(coalesce(a.paid_current,0)),2) paid_still_on_current from x left join ledger.adjudications a using(pcn,payer_id)",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain is claim+payer for the payer the void went to. Dates are 835 payment dates compared with the void's submission date. A reversal is claim status 22. Paid still on file is the current adjudication's paid amount; a pair whose latest event is a reversal counts as $0. Expected answer: 4 / 2 / 1 / 382.50."
+ },
+ {
+  "id": "a_fca405b635",
+  "category": "rework",
+  "difficulty": "easy",
+  "question": "By submission month of the replacement, how many corrected replacement claims (frequency 7) did we submit, and what was their total billed charge (rounded to 2 decimals)? Order by month.",
+  "gold_sql": "select submission_month, count(*) corrected_claims, round(sum(charge_amount),2) total_charge from sem.claims where frequency_code='7' group by 1 order by 1",
+  "answer_key_sql": "select date_trunc('month', s.submission_date::DATE)::DATE submission_month, count(*) corrected_claims, round(sum(c.charge),2) total_charge from ledger.submissions s join ledger.claims c using(pcn) where s.frequency='7' group by 1 order by 1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain is one frequency-7 submission, bucketed by the month of the replacement's own submission date, with the charge from the replacement claim (no corrected claim changed its charge). Expected answer: 2026-07: 14 claims / $1,869.00; 2026-08: 32 claims / $4,168.00."
+ },
+ {
+  "id": "a_9a40343e18",
+  "category": "payer_mix",
+  "difficulty": "medium",
+  "question": "What is our payer-class mix by primary payer? For each payer class of the claim's primary payer (the payer billed with payer responsibility 'P', taken from the claim's latest primary submission), show the number of claims, the percent of all claims, the billed charge at that latest primary submission, and the percent of total billed charge. Count each claim once and include voided claims. Round percentages to 1 decimal place.",
+  "gold_sql": "with p as (select claim_key, payer_class, charge_amount, row_number() over (partition by claim_key order by submission_date desc, claim_id desc) rn from sem.claims where payer_responsibility='P') select payer_class, count(*) as claims, round(100.0*count(*)/sum(count(*)) over (),1) as pct_claims, sum(charge_amount) as billed, round(100.0*sum(charge_amount)/sum(sum(charge_amount)) over (),1) as pct_billed from p where rn=1 group by 1 order by 1",
+  "answer_key_sql": "with pm as (select distinct payer_id, payer_class from ledger.adjudications), p as (select s.pcn, s.payer_id, row_number() over (partition by s.pcn order by s.submission_date desc) rn from ledger.submissions s where payer_sequence=0) select pm.payer_class, count(*) as claims, round(100.0*count(*)/sum(count(*)) over (),1) as pct_claims, round(sum(c.charge),2) as billed, round(100.0*sum(c.charge)/sum(sum(c.charge)) over (),1) as pct_billed from p join ledger.claims c using(pcn) join pm using(payer_id) where rn=1 group by 1 order by 1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Claim grain (one row per claim_key), with the primary payer taken from the latest submission where payer_responsibility='P'. Charge is at that submission, voided claims are included, and shares are computed over all claims. Result: commercial 1839 claims (76.1%), $597,315 (76.6%); medicaid 214 (8.9%), $64,277 (8.2%); medicare_advantage 362 (15.0%), $118,643 (15.2%)."
+ },
+ {
+  "id": "a_439d7186d8",
+  "category": "payer_mix",
+  "difficulty": "hard",
+  "question": "Coordination of benefits: for claims we billed to a secondary payer (payer responsibility 'S'), grouped by the secondary payer's class, show the number of claims billed to a secondary, how many have a current adjudication from that secondary payer, the total patient responsibility on the primary payer's current adjudication of those claims, the total paid by the secondary payer on its current adjudications ($0 if none), and the secondary paid amount as a percent of the primary patient responsibility (1 decimal place). Use claim grain, with one row per claim and secondary payer.",
+  "gold_sql": "with sec as (select distinct claim_key, payer_key, payer_class from sem.claims where payer_responsibility='S'), prim as (select distinct claim_key, payer_key from sem.claims where payer_responsibility='P'), cur as (select claim_key, payer_key, paid_amount, patient_responsibility_amount from sem.remit_claims where is_current_adjudication) select sec.payer_class as secondary_payer_class, count(*) as claims_billed_to_secondary, count(sc.claim_key) as claims_with_secondary_adjudication, sum(pc.patient_responsibility_amount) as primary_patient_responsibility, coalesce(sum(sc.paid_amount),0) as secondary_paid, round(100.0*coalesce(sum(sc.paid_amount),0)/sum(pc.patient_responsibility_amount),1) as pct_of_primary_pr_paid_by_secondary from sec join prim using(claim_key) left join cur pc on pc.claim_key=prim.claim_key and pc.payer_key=prim.payer_key left join cur sc on sc.claim_key=sec.claim_key and sc.payer_key=sec.payer_key group by 1 order by 1",
+  "answer_key_sql": "with pm as (select distinct payer_id, payer_class from ledger.adjudications), sec as (select distinct pcn, payer_id from ledger.submissions where payer_sequence=1), prim as (select distinct pcn, payer_id from ledger.submissions where payer_sequence=0), cur as (select pcn, payer_id, paid, patient_responsibility from ledger.events where is_current) select pm.payer_class as secondary_payer_class, count(*) as claims_billed_to_secondary, count(sc.pcn) as claims_with_secondary_adjudication, round(sum(pc.patient_responsibility),2) as primary_patient_responsibility, round(coalesce(sum(sc.paid),0),2) as secondary_paid, round(100.0*coalesce(sum(sc.paid),0)/sum(pc.patient_responsibility),1) as pct_of_primary_pr_paid_by_secondary from sec join pm using(payer_id) join prim using(pcn) left join cur pc on pc.pcn=prim.pcn and pc.payer_id=prim.payer_id left join cur sc on sc.pcn=sec.pcn and sc.payer_id=sec.payer_id group by 1 order by 1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Crossover cohort: claims with any 'S' submission. Primary patient responsibility comes from the primary payer's current adjudication, and secondary paid from the secondary payer's current adjudication. Result: commercial 26 billed, 13 adjudicated, primary PR $2,915.76, secondary paid $1,348.26 (46.2%); medicaid 30 billed, 1 adjudicated, primary PR $3,242.79, secondary paid $200.66 (6.2%)."
+ },
+ {
+  "id": "a_26d4c3f4ca",
+  "category": "payer_mix",
+  "difficulty": "easy",
+  "question": "By payer class, using current adjudications only (one per claim+payer, so primary and secondary payers both count), show the number of current adjudications, total billed charge, total paid, total patient responsibility, paid as a percent of billed, and patient responsibility as a percent of billed. Treat missing patient responsibility as $0 and round percentages to 1 decimal place.",
+  "gold_sql": "select payer_class, count(*) as current_adjudications, sum(charge_amount) as billed, sum(paid_amount) as paid, coalesce(sum(patient_responsibility_amount),0) as patient_responsibility, round(100.0*sum(paid_amount)/sum(charge_amount),1) as paid_pct_of_billed, round(100.0*coalesce(sum(patient_responsibility_amount),0)/sum(charge_amount),1) as pr_pct_of_billed from sem.remit_claims where is_current_adjudication group by 1 order by 1",
+  "answer_key_sql": "select a.payer_class, count(*) as current_adjudications, round(sum(e.charge),2) as billed, round(sum(e.paid),2) as paid, round(sum(e.patient_responsibility),2) as patient_responsibility, round(100.0*sum(e.paid)/sum(e.charge),1) as paid_pct_of_billed, round(100.0*sum(e.patient_responsibility)/sum(e.charge),1) as pr_pct_of_billed from ledger.events e join (select distinct payer_id, payer_class from ledger.adjudications) a using(payer_id) where e.is_current group by 1 order by 1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Claim+payer grain over current adjudications, with charge, paid and patient responsibility taken from the 835 claim payment. Result: commercial 1170, $375,571 billed, $55,019.64 paid, $85,675.96 PR (14.6% / 22.8%); medicaid 51, $19,551, $2,547.98, $0 (13.0% / 0.0%); medicare_advantage 158, $53,549, $12,303.22, $0 (23.0% / 0.0%)."
+ },
+ {
+  "id": "a_82bacc820b",
+  "category": "payer_mix",
+  "difficulty": "medium",
+  "question": "Which top 3 payers have the largest total contractual-obligation (CO group) adjustment dollars on their current adjudications, counting both claim-level and line-level CO adjustments? For each, show the payer name, total CO adjustments, total billed charge on those current adjudications, and CO adjustments as a percent of billed (1 decimal place). Rank by CO dollars descending, breaking ties by payer name.",
+  "gold_sql": "with co as (select remit_claim_id, sum(adjustment_amount) co from sem.adjustments where is_current_adjudication and group_code='CO' group by 1) select r.payer_name, sum(coalesce(co.co,0)) as co_adjustment_total, sum(r.charge_amount) as billed, round(100.0*sum(coalesce(co.co,0))/sum(r.charge_amount),1) as co_pct_of_billed from sem.remit_claims r left join co using(remit_claim_id) where r.is_current_adjudication group by 1 order by 2 desc, 1 ",
+  "answer_key_sql": "with co as (select pcn, payer_id, event_number, sum(amount) co from ledger.event_adjustments where group_code='CO' group by all) select array_to_string(list_transform(string_split(lower(a.payer),' '), lambda x: upper(x[1]) || x[2:]), ' ') as payer_name, round(sum(coalesce(co.co,0)),2) as co_adjustment_total, round(sum(e.charge),2) as billed, round(100.0*sum(coalesce(co.co,0))/sum(e.charge),1) as co_pct_of_billed from ledger.events e join (select distinct payer_id, payer from ledger.adjudications) a using(payer_id) left join co using(pcn,payer_id,event_number) where e.is_current group by 1 order by 2 desc, 1 ",
+  "compare": {
+   "tol": 0.01,
+   "order": "topn",
+   "n": 3,
+   "metric_col": 1
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Payer grain over current adjudications. CO adjustments are summed over claim- and line-level CAS rows, and billed charge over the same current adjudications. Result: Acme Health Plan $89,374.59 CO on $151,331 (59.1%); Contoso Mutual $62,597.16 on $105,150 (59.5%); Northwind Health $56,631.68 on $71,161 (79.6%). The ledger names are converted to Title Case to match the semantic layer."
+ },
+ {
+  "id": "a_856b95a70c",
+  "category": "payer_mix",
+  "difficulty": "hard",
+  "question": "How did the payer-class mix of paid dollars shift between July 2026 and August 2026 payment months? Use current adjudications (one per claim+payer) and the payment date. For each payer class, show its share of that month's total paid in July, its share in August, and the change in percentage points (August minus July). Round all three to 1 decimal place, computing the change from the unrounded shares.",
+  "gold_sql": "with m as (select payer_class, payment_month, sum(paid_amount) paid from sem.remit_claims where is_current_adjudication and payment_month in (date '2026-07-01', date '2026-08-01') group by all), s as (select *, 100.0*paid/sum(paid) over (partition by payment_month) share from m) select payer_class, round(max(share) filter (where payment_month=date '2026-07-01'),1) as july_share_pct, round(max(share) filter (where payment_month=date '2026-08-01'),1) as august_share_pct, round(max(share) filter (where payment_month=date '2026-08-01') - max(share) filter (where payment_month=date '2026-07-01'),1) as change_pct_points from s group by 1 order by 1",
+  "answer_key_sql": "with m as (select a.payer_class, date_trunc('month', e.event_date::date) mon, sum(e.paid) paid from ledger.events e join (select distinct payer_id, payer_class from ledger.adjudications) a using(payer_id) where e.is_current and e.event_date::date >= date '2026-07-01' and e.event_date::date < date '2026-09-01' group by all), s as (select *, 100.0*paid/sum(paid) over (partition by mon) share from m) select payer_class, round(max(share) filter (where mon=date '2026-07-01'),1) as july_share_pct, round(max(share) filter (where mon=date '2026-08-01'),1) as august_share_pct, round(max(share) filter (where mon=date '2026-08-01') - max(share) filter (where mon=date '2026-07-01'),1) as change_pct_points from s group by 1 order by 1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Paid dollars from current adjudications, bucketed by the 835 payment month. Each class's share is taken within its month, then the two months are compared. Result: commercial 85.0% to 73.2% (-11.8 pp); medicaid 0.9% to 6.1% (+5.2 pp); medicare_advantage 14.1% to 20.7% (+6.5 pp)."
+ },
+ {
+  "id": "a_f3c42ce766",
+  "category": "test_mix",
+  "difficulty": "easy",
+  "question": "What is the distribution of lines per claim? Counting each claim once at its latest submission (include voided claims), show the number of service lines on the claim, how many claims have that many lines, their share of all claims (percent, rounded to 1 decimal) and the average billed charge per claim (rounded to 2 decimals), ordered by line count.",
+  "gold_sql": "select line_count, count(*) as claims, round(100.0*count(*)/sum(count(*)) over (),1) as pct_of_claims, round(avg(charge_amount),2) as avg_billed_charge from sem.claims where is_latest_submission group by 1 order by 1",
+  "answer_key_sql": "select n_lines, count(*) as claims, round(100.0*count(*)/sum(count(*)) over (),1) as pct_of_claims, round(avg(charge),2) as avg_billed_charge from ledger.claims group by 1 order by 1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain: claim (claim_key) at latest submission across all payers, voided included. line_count = number of billed 837 service lines. Share = claims with that line count / all claims. Avg charge = claim total billed charge. Result: 1 line 1161 (48.1%, 439.98); 2 lines 291 (12.0%, 401.51); 3 lines 461 (19.1%, 114.48); 4 lines 502 (20.8%, 198.82)."
+ },
+ {
+  "id": "a_d29f83c935",
+  "category": "test_mix",
+  "difficulty": "medium",
+  "question": "For each CPT/HCPCS code we bill, which principal diagnosis code appears most often on the claims carrying that code? Count each claim once at its latest submission (include voided claims). Show the procedure code, the top principal diagnosis code (tie-break: lowest diagnosis code), the number of claims with that code+diagnosis, the total number of claims carrying the procedure code, and the top diagnosis's share of those claims (percent, 1 decimal), ordered by procedure code.",
+  "gold_sql": "with p as (select l.procedure_code cpt, c.principal_diagnosis_code dx, count(distinct c.claim_key) n from sem.claims c join sem.claim_lines l on l.claim_id=c.claim_id where c.is_latest_submission and l.is_latest_submission group by 1,2), r as (select *, row_number() over (partition by cpt order by n desc, dx) rn, sum(n) over (partition by cpt) tot from p) select cpt as procedure_code, dx as top_principal_diagnosis_code, n as claims_with_dx, tot as claims_with_cpt, round(100.0*n/tot,1) as pct_of_cpt_claims from r where rn=1 order by cpt",
+  "answer_key_sql": "with p as (select l.cpt, c.principal_dx dx, count(distinct c.pcn) n from ledger.claims c join ledger.claim_lines l using(pcn) group by 1,2), t as (select cpt, count(distinct pcn) tot from ledger.claim_lines group by 1), r as (select p.*, t.tot, row_number() over (partition by p.cpt order by n desc, dx) rn from p join t using(cpt)) select cpt, dx, n, tot, round(100.0*n/tot,1) from r where rn=1 order by cpt",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain: claim x billed procedure code at latest submission; principal diagnosis from the claim header. No ties at rank 1 in this data. 15 codes, e.g. 0240U Z113 40/147 27.2%; 80307 F1120 124/322 38.5%; 81479 Z1211 37/124 29.8%; 81528 Z8000 33/113 29.2%; G0480 F1120 116/308 37.7%."
+ },
+ {
+  "id": "a_c0e1460912",
+  "category": "test_mix",
+  "difficulty": "hard",
+  "question": "What is the payment impact of modifier 59? For each CPT code that appears on current-adjudication 835 service lines both with and without modifier 59, show the procedure code, whether the line carried modifier 59, the number of 835 service lines on current adjudications (all payers), the average paid per line (rounded to 2 decimals) and the percent of those lines denied at line level (1 decimal). Order by procedure code, then without-59 before with-59.",
+  "gold_sql": "with l as (select procedure_code, coalesce(modifier_1='59' or modifier_2='59', false) has_modifier_59, line_paid_amount, line_is_denied from sem.remit_lines where is_current_adjudication), c as (select procedure_code from l group by 1 having bool_or(has_modifier_59) and bool_or(not has_modifier_59)) select procedure_code, has_modifier_59, count(*) remit_lines, round(avg(line_paid_amount),2) avg_paid_per_line, round(100.0*avg(line_is_denied::int),1) pct_lines_denied from l join c using(procedure_code) group by 1,2 order by 1,2",
+  "answer_key_sql": "with l as (select el.cpt, coalesce(list_contains(cl.modifiers,'59'),false) m59, el.paid, el.denied from ledger.event_lines el join ledger.events e using(pcn,payer_id,event_number) join ledger.claim_lines cl using(pcn,line_number) where e.is_current), c as (select cpt from l group by 1 having bool_or(m59) and bool_or(not m59)) select cpt, m59, count(*), round(avg(paid),2), round(100.0*avg(denied::int),1) from l join c using(cpt) group by 1,2 order by 1,2",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain: 835 service line on a current adjudication (any payer, primary or secondary); claims denied only at claim level have no 835 lines and are excluded. Codes qualifying: 87491 and 87798. Result: 87491 no-59 116 lines $16.12 21.6%; 87491 59 26 lines $19.54 15.4%; 87798 no-59 100 lines $40.83 30.0%; 87798 59 50 lines $34.05 34.0%."
+ },
+ {
+  "id": "a_8663c777cd",
+  "category": "test_mix",
+  "difficulty": "hard",
+  "question": "How concentrated is our ordering-provider volume month to month? For each service month from June 2026 onward (service month = month of the claim's service-from date), counting each claim once at its latest submission (include voided claims), rank referring/ordering provider NPIs by claim count (tie-break: NPI ascending) and show the month, total claims, claims from that month's top 5 referring providers, and the top 5's share of the month's claims (percent, 1 decimal).",
+  "gold_sql": "with p as (select service_month, referring_npi, count(*) n from sem.claims where is_latest_submission and service_month >= date '2026-06-01' group by 1,2), r as (select *, row_number() over (partition by service_month order by n desc, referring_npi) rn from p) select service_month, sum(n) total_claims, sum(n) filter (where rn<=5) top5_claims, round(100.0*sum(n) filter (where rn<=5)/sum(n),1) top5_share_pct from r group by 1 order by 1",
+  "answer_key_sql": "with p as (select date_trunc('month', dos::date)::date m, referring_npi, count(*) n from ledger.claims where dos >= '2026-06-01' group by 1,2), r as (select *, row_number() over (partition by m order by n desc, referring_npi) rn from p) select m, sum(n), sum(n) filter (where rn<=5), round(100.0*sum(n) filter (where rn<=5)/sum(n),1) from r group by 1 order by 1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain: claim at latest submission; time basis service-from date month; top 5 ranked separately within each month. Result: 2026-06 148 total, 41 top-5, 27.7%; 2026-07 1581, 314, 19.9%; 2026-08 661, 145, 21.9%."
+ },
+ {
+  "id": "a_189bcbfd9c",
+  "category": "test_mix",
+  "difficulty": "hard",
+  "question": "How do molecular tests compare with routine testing on payment by payer class? Define molecular as CPT codes starting with 81 or PLA codes ending in U; everything else is other. Using 835 service lines on current adjudications (all payers), show payer class, test group, number of lines, total line billed charge, total line paid, and paid as a percent of billed (1 decimal), ordered by payer class then test group.",
+  "gold_sql": "select payer_class, case when procedure_code like '81%' or procedure_code like '%U' then 'molecular' else 'other' end as test_group, count(*) as lines, sum(line_charge_amount) as billed, sum(line_paid_amount) as paid, round(100.0*sum(line_paid_amount)/sum(line_charge_amount),1) as paid_pct_of_billed from sem.remit_lines where is_current_adjudication group by 1,2 order by 1,2",
+  "answer_key_sql": "select a.payer_class, case when el.cpt like '81%' or el.cpt like '%U' then 'molecular' else 'other' end grp, count(*), round(sum(cl.charge),2), round(sum(el.paid),2), round(100.0*sum(el.paid)/sum(cl.charge),1) from ledger.event_lines el join ledger.events e using(pcn,payer_id,event_number) join ledger.claim_lines cl using(pcn,line_number) join ledger.adjudications a using(pcn,payer_id) where e.is_current group by 1,2 order by 1,2",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain: 835 service line on a current adjudication; claim-level-only denials have no lines and are excluded. Molecular = 81479, 81528, 0240U. Result: commercial molecular 175 / 175326.00 / 33264.43 / 19.0%; commercial other 2283 / 183216.00 / 21755.21 / 11.9%; medicaid molecular 8 / 10408.00 / 955.06 / 9.2%; medicaid other 102 / 9143.00 / 1592.92 / 17.4%; medicare_advantage molecular 26 / 28172.00 / 6448.56 / 22.9%; medicare_advantage other 285 / 25377.00 / 5854.66 / 23.1%."
+ },
+ {
+  "id": "a_553c1034d1",
+  "category": "remit_ops",
+  "difficulty": "easy",
+  "question": "Break down all provider-level adjustments (PLB) on our 835s by PLB reason code: for each reason code, give the number of adjustments, the net adjustment amount (signed, as sent), and the gross amount (sum of absolute values), both rounded to 2 decimals. Order by reason code.",
+  "gold_sql": "select plb_reason_code, count(*) as adjustment_count, round(sum(provider_adjustment_amount),2) as net_adjustment_amount, round(sum(abs(provider_adjustment_amount)),2) as gross_adjustment_amount from sem.provider_adjustments group by 1 order by 1",
+  "answer_key_sql": "select code as plb_reason_code, count(*) as adjustment_count, round(sum(amount),2) as net_adjustment_amount, round(sum(abs(amount)),2) as gross_adjustment_amount from ledger.plb group by 1 order by 1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain: one PLB adjustment entry. All PLB entries on all received 835 payments, no date filter. Expected: FB 8 / 0.00 / 181.62; L6 5 / -2.92 / 2.92; WO 8 / 141.53 / 141.53."
+ },
+ {
+  "id": "a_e83408d6a2",
+  "category": "remit_ops",
+  "difficulty": "medium",
+  "question": "By payer class, how many 835 payments (one per check/EFT trace number) did we receive, how many of those were non-payment notices (payment method NON, $0), what percent of payments were non-payment (rounded to 1 decimal), the total payment amount (BPR total, after provider-level adjustments, 2 decimals), and the average payment amount per actual EFT/ACH payment excluding non-payment notices (2 decimals)? Order by payer class.",
+  "gold_sql": "select payer_class, count(*) as payments, count(*) filter (where payment_method='NON') as non_payment_count, round(100.0*count(*) filter (where payment_method='NON')/count(*),1) as non_payment_pct, round(sum(total_payment_amount),2) as total_payment_amount, round(sum(total_payment_amount)/count(*) filter (where payment_method<>'NON'),2) as avg_eft_payment_amount from sem.payments group by 1 order by 1",
+  "answer_key_sql": "with pc as (select distinct payer_id, payer_class from ledger.adjudications), e as (select trn, payer_id, sum(paid) p from ledger.events group by all), pl as (select trn, sum(amount) a from ledger.plb group by 1), pay as (select payer_id, round(p-coalesce(a,0),2) amt from e left join pl using(trn)) select payer_class, count(*) as payments, count(*) filter (where amt=0) as non_payment_count, round(100.0*count(*) filter (where amt=0)/count(*),1) as non_payment_pct, round(sum(amt),2) as total_payment_amount, round(sum(amt)/count(*) filter (where amt<>0),2) as avg_eft_payment_amount from pay join pc using(payer_id) group by 1 order by 1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain: 835 payment (trace number). Payment amount = sum of claim payments minus PLB amounts; NON payments are the $0 ones. All payments, no date filter. Expected: commercial 119/53/44.5/54932.41/832.31; medicaid 15/1/6.7/2550.90/182.21; medicare_advantage 22/1/4.5/12248.92/583.28."
+ },
+ {
+  "id": "a_b541bf06a1",
+  "category": "remit_ops",
+  "difficulty": "hard",
+  "question": "For each claim a payer recouped through a provider-level overpayment recovery (PLB reason WO, whose reference is the payer claim control number), show the payer claim control number, payer class, the original paid amount on that claim's (non-reversal) adjudication, the total amount recouped via WO across all 835s, the recouped amount as a percent of the original paid (1 decimal), and the days from the original payment date to the first WO recoupment payment date. Order by days descending, then payer claim control number.",
+  "gold_sql": "with wo as (select reference_id, payer_key, min(payment_date) first_recoup, sum(provider_adjustment_amount) amt from sem.provider_adjustments where plb_reason_code='WO' group by all) select wo.reference_id as payer_claim_control_number, rc.payer_class, rc.paid_amount as original_paid_amount, wo.amt as total_recouped, round(100*wo.amt/rc.paid_amount,1) as pct_recouped, date_diff('day', rc.payment_date, wo.first_recoup) as days_to_first_recoupment from wo join sem.remit_claims rc on rc.payer_claim_control_number=wo.reference_id and rc.payer_key=wo.payer_key and not rc.is_reversal order by days_to_first_recoupment desc, 1",
+  "answer_key_sql": "with pc as (select distinct payer_id, payer_class from ledger.adjudications), wo as (select reference, payer_id, min(day::date) fr, round(sum(amount),2) amt from ledger.plb where code='WO' group by all) select wo.reference as payer_claim_control_number, pc.payer_class, e.paid as original_paid_amount, wo.amt as total_recouped, round(100*wo.amt/e.paid,1) as pct_recouped, date_diff('day', e.event_date::date, wo.fr) as days_to_first_recoupment from wo join ledger.events e on e.icn=wo.reference and e.payer_id=wo.payer_id and e.status<>'22' join pc on pc.payer_id=wo.payer_id order by days_to_first_recoupment desc, 1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain: recouped claim (WO reference ICN), with multiple WO entries on the same ICN summed. Time basis: 835 payment dates. 7 rows; e.g. FMA9482436395 medicare_advantage 124.91 / 23.51 / 18.8% / 9 days; AHP3147389719 commercial 610.76 / 44.85 (two WO entries) / 7.3% / 7 days."
+ },
+ {
+  "id": "a_9108c7aacb",
+  "category": "remit_ops",
+  "difficulty": "hard",
+  "question": "For each forward balance a payer carried forward on an 835 (PLB reason FB with a negative amount), show the FB reference id, the payment date it was carried forward, the amount carried forward (as a positive number, 2 decimals), the payment date of the first later 835 from the same payer that offset it (FB with the same reference and the opposite amount), and the days between the two. Order by carry-forward date, then reference id.",
+  "gold_sql": "with fb as (select payer_key, reference_id, payment_date, provider_adjustment_amount amt from sem.provider_adjustments where plb_reason_code='FB'), c as (select * from fb where amt<0), m as (select c.reference_id, c.payment_date as carried_forward_date, -c.amt as carried_forward_amount, (select min(r.payment_date) from fb r where r.payer_key=c.payer_key and r.reference_id=c.reference_id and r.amt=-c.amt and r.payment_date>c.payment_date) as offset_date from c) select *, date_diff('day', carried_forward_date, offset_date) as days_carried from m order by 2,1",
+  "answer_key_sql": "with fb as (select payer_id, reference, day::date d, amount amt from ledger.plb where code='FB'), c as (select * from fb where amt<0), m as (select c.reference as reference_id, c.d as carried_forward_date, round(-c.amt,2) as carried_forward_amount, (select min(r.d) from fb r where r.payer_id=c.payer_id and r.reference=c.reference and r.amt=-c.amt and r.d>c.d) as offset_date from c) select *, date_diff('day', carried_forward_date, offset_date) as days_carried from m order by 2,1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain: one negative FB entry (a balance carried forward). Offset = earliest strictly later payment from the same payer with an FB of the same reference and opposite amount. Expected 4 rows: FWDAHP01 2026-07-16 33.56 -> 2026-07-17 (1); FWDAHP01 2026-07-17 44.85 -> 2026-07-20 (3); FWDWGB06 2026-07-30 6.20 -> 2026-07-31 (1); FWDWGB06 2026-07-31 6.20 -> 2026-08-03 (3)."
+ },
+ {
+  "id": "a_7d45c279a7",
+  "category": "remit_ops",
+  "difficulty": "hard",
+  "question": "Some claims are adjudicated by the same payer across more than one 835 payment (different check/EFT trace numbers). By payer class, how many claim+payer pairs have remits spread across two or more distinct trace numbers, how many of those pairs include a reversal, how many have no current adjudication (latest event is a reversal), and what is the total paid on their current adjudications (2 decimals, 0 if none)? Order by payer class.",
+  "gold_sql": "with p as (select claim_key, payer_key, payer_class, count(distinct check_or_eft_number) n, bool_or(is_reversal) rev, bool_or(is_current_adjudication) has_cur, sum(paid_amount) filter (where is_current_adjudication) cur_paid from sem.remit_claims group by all) select payer_class, count(*) as split_claim_payer_pairs, count(*) filter (where rev) as pairs_with_reversal, count(*) filter (where not has_cur) as pairs_without_current_adjudication, round(coalesce(sum(cur_paid),0),2) as current_paid_amount from p where n>1 group by 1 order by 1",
+  "answer_key_sql": "with pc as (select distinct payer_id, payer_class from ledger.adjudications), p as (select pcn, payer_id, count(distinct trn) n, bool_or(status='22') rev, bool_or(is_current) hc, sum(paid) filter (where is_current) cp from ledger.events group by all) select payer_class, count(*) as split_claim_payer_pairs, count(*) filter (where rev) as pairs_with_reversal, count(*) filter (where not hc) as pairs_without_current_adjudication, round(coalesce(sum(cp),0),2) as current_paid_amount from p join pc using(payer_id) where n>1 group by 1 order by 1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain: claim+payer pair; all adjudication events (including reversals) considered to count distinct trace numbers; paid is from the current adjudication only. Expected: commercial 30 / 18 / 11 / 70.40; medicare_advantage 1 / 1 / 1 / 0.00."
  }
 ]
