@@ -95,7 +95,8 @@ def _insert(con, table: str, rows: list[dict]):
 #   GOLD_MODE=incremental (default)  recompute only the claims the new batch touched, rewrite only their partitions
 #   GOLD_MODE=full                   rebuild all of gold from all of silver every batch (what a rules change does)
 PARQUET = "FORMAT parquet, COMPRESSION zstd"
-GOLD_LAYOUT = "cohort-month-1"
+GOLD_LAYOUT = "cohort-tiered-1"
+OPEN_MONTHS = 3          # newest months kept as their own gold partition; older months fold into one file per year
 CLAIM_RELATIONS = [f"sem.{t}" for t in ("remit_claims", "remit_lines", "claims", "claim_lines", "adjustments", "remarks",
                                         "diagnoses")]                    # partitioned by claim cohort, copy-on-write
 SMALL_RELATIONS = ["sem.payments", "sem.provider_adjustments", "sem.payers"]   # one file each, rewritten per batch
@@ -248,8 +249,7 @@ def _parse_batch_locked(env, store: Store) -> dict:
     stats["published"] = build_gold(env, s3, gold_con, B, c, store.kms, run_id, silver=silver, report=gold)
     stats["gold_s"] = round(time.perf_counter() - t0, 2)
     if stats["published"]:
-        stats.update(gold_full=gold["full"], gold_files_written=gold["written"], touched_claims=gold["touched_claims"],
-                     touched_files=gold.get("touched_files"))
+        stats.update(gold_full=gold["full"], gold=gold)
         t0 = time.perf_counter()
         compact_silver(gold_con, store, silver, before_month=gold["last_month"])
         stats["compact_s"] = round(time.perf_counter() - t0, 2)
@@ -292,7 +292,8 @@ def rules_hash() -> str:
     con.execute(DDL_LOSSLESS)
     seed_ref(con)
     h = hashlib.sha256()
-    for part in (DDL_LOSSLESS, DDL_SEMANTIC, repr(sorted(ESCALATION.items())), GOLD_LAYOUT, PARQUET, repr(GOLD_SORT)):
+    for part in (DDL_LOSSLESS, DDL_SEMANTIC, repr(sorted(ESCALATION.items())), GOLD_LAYOUT, PARQUET, repr(GOLD_SORT),
+                 str(OPEN_MONTHS)):
         h.update(part.encode())
     for (t,) in con.execute("SELECT schema_name || '.' || table_name FROM duckdb_tables() WHERE schema_name = 'ref' "
                             "ORDER BY 1").fetchall():
@@ -358,9 +359,23 @@ def _load_closure(con, store: Store, silver: Silver, pending_runs: list[str]) ->
         for t, closure_filter in CLOSURE:
             older = [k for k in silver.files(t, months) if k not in pending_parts]
             if older:
-                con.execute(f"INSERT INTO {t} BY NAME SELECT * FROM {_scan(store, older, ', union_by_name=true')} "
-                            f"WHERE file_id IN ({in_files}) AND ({closure_filter})")
+                con.execute(f"INSERT INTO {t} BY NAME SELECT {_view_columns(con, t)} FROM "
+                            f"{_scan(store, older, ', union_by_name=true')} WHERE file_id IN ({in_files}) AND ({closure_filter})")
     return dict(touched_files=len(touched_files), touched_months=sorted(months))
+
+
+def _view_columns(con, table: str) -> str:
+    """The columns of `table` the view SQL or the closure filters can mention (any identifier in their text: a
+    superset, so it stays right as the views change). Older rows only feed the views, so only these are read."""
+    if table in ("c837.claim", "r835.claim_payment"):           # sem_int.submission selects c.*
+        return "*"
+    schema, name = table.split(".")
+    cols = [c for (c,) in con.execute("SELECT column_name FROM duckdb_columns() WHERE schema_name = ? AND table_name = ? "
+                                      "ORDER BY column_index", [schema, name]).fetchall() if c in _VIEW_WORDS]
+    return ", ".join(cols)
+
+
+_VIEW_WORDS = set(re.findall(r"[a-z_][a-z0-9_]*", (DDL_SEMANTIC + " ".join(f for _, f in CLOSURE)).lower()))
 
 
 def build_gold(env, s3, con, B: str, c: str, kms: str, run_id: str, silver: Silver | None = None,
@@ -390,23 +405,30 @@ def build_gold(env, s3, con, B: str, c: str, kms: str, run_id: str, silver: Silv
     last_month = max(map(run_month, silver.committed_runs))
     out = report if report is not None else {}
     out.update(full=full, written=0)
+    clock = _Phases(out)
     with tempfile.TemporaryDirectory() as tmp:
         writer = _GoldWriter(con, store, run_id, Path(tmp))
         if full:
             _load_all(con, store, silver)
+            clock("load_s")
             out.update(touched_claims=None)
-            relations = _gold_full(con, writer)
+            relations = _gold_full(con, writer, last_month)
             retired = sorted(manifest_files(base))
         else:
             out.update(_load_closure(con, store, silver, pending))
-            relations, retired = _gold_incremental(con, writer, base, store)
+            clock("load_s")
+            relations = {rel: {p: list(keys) for p, keys in base["relations"].get(rel, {}).items()} for rel in RELATIONS}
+            retired = _retier(writer, relations, last_month) if last_month > base["last_month"] else []
+            clock("retier_s")
+            retired += _gold_incremental(con, writer, relations, base, last_month, clock)
             out["touched_claims"] = con.execute("SELECT count(*) FROM touched_claim").fetchone()[0]
-            if last_month > base["last_month"]:                  # a month closed: compact its daily lossless parts
-                retired += _compact_gold(con, writer, relations, before_month=last_month)
+            out["touched_cohorts"] = dict(con.execute("SELECT cohort, count(*) FROM cohort GROUP BY 1 ORDER BY 1").fetchall())
         for rel in RELATIONS:                                    # every relation needs a file for its schema
             if not any(relations.get(rel, {}).values()):
                 relations[rel] = {"empty": [writer.write(rel, f"SELECT * FROM {_source_sql(rel)} LIMIT 0", "empty")]}
-        out["written"] = writer.count
+            elif relations[rel].get("empty") and len(relations[rel]) > 1:
+                retired += relations[rel].pop("empty")
+        out["written"], out["written_mb"] = writer.count, round(writer.bytes / 1e6, 1)
     manifest = dict(version=f"v={run_id}", run_id=run_id, previous=version, rules=rules,
                     silver_through=max(silver.committed_runs, default=""), last_month=last_month,
                     relations=relations, retired=sorted(set(retired)))
@@ -416,26 +438,54 @@ def build_gold(env, s3, con, B: str, c: str, kms: str, run_id: str, silver: Silv
         store.delete(base["retired"] + ([manifest_key(store, base["previous"])] if base.get("previous") else []))
     if full or last_month > (base or {}).get("last_month", ""):
         _sweep_gold_orphans(store, manifest, base)
+    clock("publish_s")
     out["last_month"] = last_month
     return True
 
 
+class _Phases:
+    """Wall time per build phase, into the build report."""
+
+    def __init__(self, report: dict):
+        self.report, self.t = report, time.perf_counter()
+
+    def __call__(self, name: str):
+        now = time.perf_counter()
+        self.report[name] = round(self.report.get(name, 0) + now - self.t, 2)
+        self.t = now
+
+
 class _GoldWriter:
     def __init__(self, con, store: Store, run_id: str, tmp: Path):
-        self.con, self.store, self.run_id, self.tmp, self.count = con, store, run_id, tmp, 0
+        self.con, self.store, self.run_id, self.tmp, self.count, self.bytes = con, store, run_id, tmp, 0, 0
 
     def write(self, relation: str, sql: str, partition: str) -> str:
         p = self.tmp / "gold.parquet"
         order = f" ORDER BY {GOLD_SORT[relation]}" if relation in GOLD_SORT else ""
         _copy(self.con, f"SELECT * FROM ({sql}){order}", p)
         key = gold_key(self.store, relation, partition, self.run_id)
-        self.store.put(key, p.read_bytes())
+        body = p.read_bytes()
+        self.store.put(key, body)
         self.count += 1
+        self.bytes += len(body)
         return key
 
 
 def _source_sql(relation: str) -> str:
     return f"({APPEND_RELATIONS[relation]})" if relation in APPEND_RELATIONS else relation
+
+
+def tier(month: str, last_month: str) -> str:
+    """Gold partition of a month ('YYYY-MM'): its own while it is one of the OPEN_MONTHS newest, else its year.
+    Recent cohorts still change daily and stay small to rewrite; settled ones collapse into few large files."""
+    age = (int(last_month[:4]) * 12 + int(last_month[5:7])) - (int(month[:4]) * 12 + int(month[5:7]))
+    return month if age < OPEN_MONTHS else month[:4]
+
+
+def _tier_sql(month_sql: str, last_month: str) -> str:
+    age = (f"({int(last_month[:4]) * 12 + int(last_month[5:7])} - (CAST(left({month_sql}, 4) AS INT) * 12 "
+           f"+ CAST(right({month_sql}, 2) AS INT)))")
+    return f"CASE WHEN {age} < {OPEN_MONTHS} THEN {month_sql} ELSE left({month_sql}, 4) END"
 
 
 def _cohorts(con):
@@ -452,6 +502,15 @@ def _file_months(con):
                 "FROM edi.source_file")
 
 
+def _claim_rows(rel: str, last_month: str) -> str:
+    return f"SELECT v.*, {_tier_sql('c.cohort', last_month)} AS __part FROM {rel} v JOIN cohort c USING (claim_key)"
+
+
+def _append_rows(rel: str, last_month: str) -> str:
+    return (f"SELECT x.*, {_tier_sql('fm.month', last_month)} AS __part FROM {_source_sql(rel)} x "
+            "JOIN file_month fm USING (file_id)")
+
+
 def _write_partitioned(con, writer: _GoldWriter, relation: str, rows_sql: str, prefix: str, merge_old=None) -> dict:
     """rows_sql has the relation's columns plus __part. One file per partition; merge_old(partition) may return
     SQL for the rows of the previous file to keep."""
@@ -459,7 +518,7 @@ def _write_partitioned(con, writer: _GoldWriter, relation: str, rows_sql: str, p
     out = {}
     for (part,) in con.execute("SELECT DISTINCT __part FROM part_rows ORDER BY 1").fetchall():
         sql = f"SELECT * EXCLUDE (__part) FROM part_rows WHERE __part = '{part}'"
-        old = merge_old(part) if merge_old else None
+        old = merge_old(f"{prefix}={part}") if merge_old else None
         if old:
             sql = f"{old} UNION ALL BY NAME {sql}"
         out[f"{prefix}={part}"] = [writer.write(relation, sql, f"{prefix}={part}")]
@@ -467,36 +526,55 @@ def _write_partitioned(con, writer: _GoldWriter, relation: str, rows_sql: str, p
     return out
 
 
-def _gold_full(con, writer: _GoldWriter) -> dict:
+def _gold_full(con, writer: _GoldWriter, last_month: str) -> dict:
     _cohorts(con)
     _file_months(con)
     relations = {}
     for rel in CLAIM_RELATIONS:
-        relations[rel] = _write_partitioned(con, writer, rel, f"SELECT v.*, c.cohort AS __part FROM {rel} v "
-                                            "JOIN cohort c USING (claim_key)", "cohort_month")
+        relations[rel] = _write_partitioned(con, writer, rel, _claim_rows(rel, last_month), "cohort")
     for rel in APPEND_RELATIONS:
-        relations[rel] = _write_partitioned(con, writer, rel, f"SELECT x.*, fm.month AS __part FROM {_source_sql(rel)} x "
-                                            "JOIN file_month fm USING (file_id)", "received_month")
+        relations[rel] = _write_partitioned(con, writer, rel, _append_rows(rel, last_month), "received")
     for rel in SMALL_RELATIONS:
         relations[rel] = {"all": [writer.write(rel, f"SELECT * FROM {rel}", "all")]}
     return relations
 
 
-def _gold_incremental(con, writer: _GoldWriter, base: dict, store: Store) -> tuple[dict, list]:
-    """Rewrite the cohort partitions of the touched claims (their old rows replaced), append the pending files'
-    lossless rows, and fold the pending payments and payers into the small relations."""
-    relations = {rel: {p: list(keys) for p, keys in base["relations"].get(rel, {}).items()} for rel in RELATIONS}
+def _retier(writer: _GoldWriter, relations: dict, last_month: str) -> list:
+    """A month closed: every partition except the new current month becomes one file, and months that left the
+    OPEN_MONTHS window fold into their year's file. Rows are copied, not recomputed. Returns the retired files."""
     retired = []
+    for rel in CLAIM_RELATIONS + list(APPEND_RELATIONS):
+        groups = {}
+        for part, keys in relations[rel].items():
+            if part != "empty":
+                prefix, period = part.split("=", 1)
+                target = f"{prefix}={tier(period, last_month) if len(period) == 7 else period}"
+                groups.setdefault(target, []).append((part, keys))
+        for target, entries in groups.items():
+            keys = [k for _, ks in entries for k in ks]
+            if target.endswith(last_month) or (len(keys) == 1 and entries[0][0] == target):
+                continue
+            for part, _ in entries:
+                del relations[rel][part]
+            relations[rel][target] = [writer.write(rel, f"SELECT * FROM {_scan(writer.store, keys)}", target)]
+            retired += keys
+    return retired
+
+
+def _gold_incremental(con, writer: _GoldWriter, relations: dict, base: dict, last_month: str, clock) -> list:
+    """Rewrite the partitions holding the touched claims (their old rows replaced), append the pending files'
+    lossless rows, and fold the pending payments and payers into the small relations. Returns the retired files."""
+    retired = []
+    store = writer.store
     _cohorts(con)
     for rel in CLAIM_RELATIONS:
         def keep_old(part, rel=rel):
-            old = relations[rel].get(f"cohort_month={part}", [])
+            old = relations[rel].get(part, [])
             return f"SELECT * FROM {_scan(store, old)} ANTI JOIN touched_claim USING (claim_key)" if old else None
-        new = _write_partitioned(con, writer, rel, f"SELECT v.*, c.cohort AS __part FROM {rel} v "
-                                 "JOIN cohort c USING (claim_key)", "cohort_month", keep_old)
-        for part, keys in new.items():
+        for part, keys in _write_partitioned(con, writer, rel, _claim_rows(rel, last_month), "cohort", keep_old).items():
             retired += relations[rel].get(part, [])
             relations[rel][part] = keys
+    clock("claims_s")
     # from here on only the pending files' rows: payments, payers and lossless rows are per file
     con.execute("CREATE OR REPLACE TEMP TABLE pending_file AS SELECT file_id FROM edi.source_file "
                 f"WHERE ingest_run_id > '{base['silver_through']}'")
@@ -504,19 +582,17 @@ def _gold_incremental(con, writer: _GoldWriter, base: dict, store: Store) -> tup
         con.execute(f"DELETE FROM {t} WHERE file_id NOT IN (SELECT file_id FROM pending_file)")
     _file_months(con)
     for rel in APPEND_RELATIONS:
-        rows = f"SELECT x.*, fm.month AS __part FROM {_source_sql(rel)} x JOIN file_month fm USING (file_id)"
-        for part, keys in _write_partitioned(con, writer, rel, rows, "received_month").items():
+        for part, keys in _write_partitioned(con, writer, rel, _append_rows(rel, last_month), "received").items():
             relations[rel].setdefault(part, []).extend(keys)
+    clock("append_s")
     for rel in SMALL_RELATIONS:
         old = [k for keys in relations[rel].values() for k in keys]
         sql = _payers_merge_sql(_scan(store, old)) if rel == "sem.payers" else \
             f"SELECT * FROM {_scan(store, old)} UNION ALL BY NAME SELECT * FROM {rel}"
         retired += old
         relations[rel] = {"all": [writer.write(rel, sql, "all")]}
-    for rel in RELATIONS:
-        if relations[rel].get("empty") and len(relations[rel]) > 1:
-            retired += relations[rel].pop("empty")
-    return relations, retired
+    clock("small_s")
+    return retired
 
 
 def _payers_merge_sql(old_scan: str) -> str:
@@ -529,16 +605,6 @@ def _payers_merge_sql(old_scan: str) -> str:
             f"COALESCE(o.claim_submissions, 0) + COALESCE(n.claim_submissions, 0) AS claim_submissions, "
             f"COALESCE(o.payments, 0) + COALESCE(n.payments, 0) AS payments "
             f"FROM {old_scan} o FULL JOIN sem.payers n USING (payer_key)")
-
-
-def _compact_gold(con, writer: _GoldWriter, relations: dict, before_month: str) -> list:
-    retired = []
-    for rel in APPEND_RELATIONS:
-        for part, keys in relations[rel].items():
-            if len(keys) > 1 and part.split("=", 1)[1] < before_month:
-                relations[rel][part] = [writer.write(rel, f"SELECT * FROM {_scan(writer.store, keys)}", part)]
-                retired += keys
-    return retired
 
 
 def _sweep_gold_orphans(store: Store, manifest: dict, base: dict | None):

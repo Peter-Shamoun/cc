@@ -178,6 +178,23 @@ def run_queries_local(aws, dep, upn: str, tmp: Path) -> list[dict]:
     return out
 
 
+def export_gold(aws, dep, customer: str, dest: Path):
+    """Plaintext copy of the customer's current gold version (manifest + every file it lists), for layout_bench."""
+    upn = next(u for u, c in DEFAULT_USERS.items() if c == customer)
+    s = open_session(aws, dep, login(aws, upn))
+    s3 = aws.client("s3", s.credentials)
+    prefix = f"{customer}/semantic_layer/"
+    manifest = s3.get_object(Bucket=BUCKET, Key=f"{prefix}{s.version}/manifest.json")["Body"].read()
+    shutil.rmtree(dest, ignore_errors=True)
+    dest.mkdir(parents=True)
+    (dest / "manifest.json").write_bytes(manifest)
+    for parts in json.loads(manifest)["relations"].values():
+        for key in (k for keys in parts.values() for k in keys):
+            p = dest / key.removeprefix(prefix)
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes(s3.get_object(Bucket=BUCKET, Key=key)["Body"].read())
+
+
 def checkpoint(aws, dep, customers: list[str], n_batches: int, queries: bool) -> dict:
     out = dict(batches=n_batches, inventory={c: inventory(aws, c) for c in customers})
     if queries:
@@ -189,7 +206,7 @@ def checkpoint(aws, dep, customers: list[str], n_batches: int, queries: bool) ->
 
 
 def stream(root: Path, customers: list[str], scenario: edi_mock.Scenario, pipeline_env: dict, purge_raw: bool,
-           checkpoints: set[int], queries: bool, progress_every: int = 10) -> tuple:
+           checkpoints: set[int], queries: bool, progress_every: int = 10, partial_path: Path | None = None) -> tuple:
     """checkpoints: business-day counts (of the first customer) after which to inventory and run the workload."""
     reset(root)
     aws = LocalAWS(root / "aws")
@@ -220,13 +237,18 @@ def stream(root: Path, customers: list[str], scenario: edi_mock.Scenario, pipeli
                             bytes_written=d["bytes_in"], ops={k[3:]: v for k, v in d.items() if k.startswith("op_")},
                             s3_model_s=s3_model_s(d["requests"], d["bytes_out"] + d["bytes_in"]),
                             **{k: r.get(k) for k in ("status", "loaded", "rejected", "parse_s", "silver_s", "gold_s",
-                                                     "compact_s", "gold_mode")}))
+                                                     "compact_s", "gold_mode", "gold")}))
         if purge_raw:
             purge_raw_blobs(aws, dd.tenant, day)
+        if dd.tenant == customers[-1]:              # a business day passes: S3 lifecycle expires noncurrent versions
+            aws.clock.advance(86400)                # (deleted gold / silver files), as the bucket's rules say
+            aws.s3.run_lifecycle()
         n_first = sum(b["customer"] == customers[0] for b in batches)
         if dd.tenant == customers[-1] and n_first in checkpoints:
             cps.append(checkpoint(aws, dep, customers, n_first, queries))
             print(render_checkpoint(cps[-1]), flush=True)
+        if partial_path and len(batches) % progress_every == 0:   # long runs: keep what we have if killed later
+            partial_path.write_text(json.dumps(dict(batches=batches, checkpoints=cps), indent=1))
         if len(batches) % progress_every == 0:
             b = batches[-1]
             print(f"[{time.perf_counter() - t_start:7.0f}s] batch {len(batches)} {b['customer']} {day}: {b['s']} s, "
@@ -240,13 +262,17 @@ def stream(root: Path, customers: list[str], scenario: edi_mock.Scenario, pipeli
 
 
 def main(days: int, customers: list[str], mb_per_day: float, label: str, pipeline_env: dict, purge_raw: bool,
-         queries: bool, start: date, keep_world: bool, checkpoints: set[int]) -> dict:
+         queries: bool, start: date, keep_world: bool, checkpoints: set[int], export: Path | None = None) -> dict:
     root = ROOT / ".ccsim" / f"lake-{label}-{days}d"
     sc = edi_mock.Scenario(start=start, days=days, target_mb_per_day=mb_per_day)
     t0 = time.perf_counter()
-    aws, dep, batches, cps = stream(root, customers, sc, pipeline_env, purge_raw, checkpoints, queries)
+    OUT.mkdir(parents=True, exist_ok=True)
+    aws, dep, batches, cps = stream(root, customers, sc, pipeline_env, purge_raw, checkpoints, queries,
+                                    partial_path=OUT / f"{label}-{days}d.partial.json")
     res = dict(label=label, days=days, customers=customers, mb_per_day=mb_per_day, pipeline_env=pipeline_env,
                ingest_wall_s=round(time.perf_counter() - t0, 1), batches=batches, checkpoints=cps)
+    if export:
+        export_gold(aws, dep, customers[0], export)
     aws.shutdown()
     if not keep_world:
         shutil.rmtree(root, ignore_errors=True)
@@ -322,8 +348,9 @@ if __name__ == "__main__":
     ap.add_argument("--purge-raw", action="store_true", help="drop ingested raw ciphertext from the sim's disk")
     ap.add_argument("--no-queries", action="store_true")
     ap.add_argument("--keep-world", action="store_true")
+    ap.add_argument("--export-gold", type=Path, help="write a plaintext copy of the final gold here (layout_bench)")
     ap.add_argument("--checkpoints", default="20,60,120,250,500,750", help="business days at which to run the workload")
     a = ap.parse_args()
     env = dict(kv.split("=", 1) for kv in a.env.split(",") if kv)
     main(a.days, a.customers.split(","), a.mb_per_day, a.label, env, a.purge_raw, not a.no_queries,
-         date.fromisoformat(a.start), a.keep_world, {int(x) for x in a.checkpoints.split(",") if x})
+         date.fromisoformat(a.start), a.keep_world, {int(x) for x in a.checkpoints.split(",") if x}, a.export_gold)
