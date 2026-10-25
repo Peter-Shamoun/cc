@@ -55,12 +55,31 @@ function Shell() {
   const [draft, setDraft] = useState<{ text: string; n: number } | undefined>();
   const scroller = useRef<HTMLDivElement>(null);
   const [atBottom, setAtBottom] = useState(true);
+  const pinned = useRef(false);
+  const lastLen = useRef(0);
   const { messages } = chat;
 
   useEffect(() => {
     const el = scroller.current;
-    if (el && atBottom) el.scrollTop = el.scrollHeight;
+    if (!el) return;
+    // ChatGPT/Claude: a follow-up question is pinned to the top of the viewport and the answer
+    // streams in below it, instead of the view chasing the bottom token by token.
+    const grew = messages.length > lastLen.current;
+    lastLen.current = messages.length;
+    const last = messages[messages.length - 1];
+    const prev = messages[messages.length - 2];
+    if (grew && messages.length > 2 && last?.role === 'assistant' && prev?.role === 'user') {
+      const users = el.querySelectorAll<HTMLElement>('[data-testid="msg-user"]');
+      const u = users[users.length - 1];
+      if (u) {
+        pinned.current = true;
+        el.scrollTo({ top: el.scrollTop + u.getBoundingClientRect().top - el.getBoundingClientRect().top - 16, behavior: 'smooth' });
+        return;
+      }
+    }
+    if (atBottom && !pinned.current) el.scrollTop = el.scrollHeight;
   }, [messages, atBottom]);
+  useEffect(() => { pinned.current = false; lastLen.current = 0; }, [chat.convId]);
   useEffect(() => setArtifact(null), [chat.convId]);
 
   const edit = (t: string) => setDraft((d) => ({ text: t, n: (d?.n ?? 0) + 1 }));
@@ -120,13 +139,16 @@ function Shell() {
                     m.role === 'user' ? (
                       <UserBubble key={m.id} msg={m} disabled={chat.busy} onEdit={(t) => { setAtBottom(true); chat.editAt(i, t); }} version={chat.versionOf(i)} onVersion={(k) => chat.switchVersion(i, k)} />
                     ) : (
-                      <AssistantTurn key={m.id} msg={m} isLast={i === messages.length - 1} onOpen={setArtifact} onRegenerate={chat.regenerate} onEdit={edit} />
+                      // The newest answer reserves most of a viewport so the pinned question can sit at the top.
+                      <div key={m.id} style={i === messages.length - 1 && messages.length > 2 ? { minHeight: 'calc(100dvh - 330px)' } : undefined}>
+                        <AssistantTurn msg={m} isLast={i === messages.length - 1} onOpen={setArtifact} onRegenerate={chat.regenerate} onEdit={edit} />
+                      </div>
                     ),
                   )}
                 </div>
               </div>
               {!atBottom && (
-                <button type="button" aria-label="Jump to latest" onClick={() => scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' })} className="absolute bottom-32 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full border border-line bg-bg shadow">
+                <button type="button" aria-label="Jump to latest" onClick={() => { pinned.current = false; scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' }); }} className="absolute bottom-32 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full border border-line bg-bg shadow">
                   <ArrowDown size={16} />
                 </button>
               )}
