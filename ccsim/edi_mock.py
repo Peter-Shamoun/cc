@@ -501,6 +501,7 @@ def patient_service_centers(t: "Tenant") -> list[tuple]:
     return out
 
 
+@lru_cache(maxsize=None)
 def payer_contacts(payer: "Payer") -> dict:
     """Fixed per payer: provider-services and EDI support lines (toll-free), and an EDI mailbox for some."""
     r = random.Random(_stable_int("contacts", payer.payer_id))
@@ -1139,10 +1140,15 @@ def fill_template(template: str, draw) -> str:
                    for ch in template)
 
 
-def blues_prefixes(payer: Payer) -> list[str]:
+def blues_prefixes(payer: Payer) -> tuple[str, ...]:
     """A Blues plan's three-character alpha prefixes (one per employer group or product line)."""
-    return ["".join(ID_LETTERS[_stable_int(payer.payer_id, "prefix", k, i) % len(ID_LETTERS)] for i in range(3))
-            for k in range(36)]
+    return _blues_prefixes(payer.payer_id)
+
+
+@lru_cache(maxsize=None)
+def _blues_prefixes(payer_id: str) -> tuple[str, ...]:
+    return tuple("".join(ID_LETTERS[_stable_int(payer_id, "prefix", k, i) % len(ID_LETTERS)] for i in range(3))
+                 for k in range(36))
 
 
 def member_id(style: str, payer: Payer, r: random.Random) -> str:
@@ -2579,7 +2585,7 @@ class _TenantRun(Generator):
                     cpts=[l.cpt for l in c.lines], units=[l.units for l in c.lines],
                     modifiers=[list(l.modifiers) for l in c.lines],
                     line_charges=[l.charge for l in c.lines], charge=round(sum(l.charge for l in c.lines), 2),
-                    dx=c.dx, principal_dx=c.dx[0], line_dx_pointers=[list(l.pointers) for l in c.lines],
+                    dx=c.dx, principal_dx=c.dx[0],
                     referring_npi=c.referring.npi, risky_provider=c.referring.risky,
                     dependent=c.patient.coverages[0].relationship != "18", segment=c.patient.segment,
                     payer_class=c.patient.coverages[0].payer.payer_class, place_of_service=c.pos,
