@@ -59,7 +59,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.005,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_b853266803",
@@ -105,7 +106,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0054,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -135,7 +137,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0055,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_a5888f64a4",
@@ -187,7 +190,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0035,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7d45c279a7",
@@ -211,7 +215,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0054,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q15_partial_line_denials",
@@ -224,7 +229,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0015,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q25_primary_deductible",
@@ -237,7 +243,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0059,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_8663c777cd",
@@ -259,7 +266,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0035,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__87798",
@@ -272,7 +280,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0018,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q11_cpt_denial_rate",
@@ -297,7 +306,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0055,
-   "pass": null
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_a123bba47f",
@@ -328,7 +338,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0053,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_9108c7aacb",
@@ -373,7 +384,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0041,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_856b95a70c",
@@ -425,7 +437,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0036,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_1b7e02d0b0",
@@ -442,7 +455,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0067,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_921f1bf366",
@@ -458,7 +472,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0073,
-   "pass": null
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "q14_zero_paid_not_denied",
@@ -471,7 +486,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0016,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_dca9da6d52",
@@ -488,7 +504,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0061,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q19_reversed_no_correction",
@@ -501,7 +518,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0023,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__80307",
@@ -514,7 +532,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0019,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d383370345",
@@ -566,7 +585,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0482",
@@ -579,7 +599,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0017,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_0d43f7d4b6",
@@ -594,7 +615,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.011,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_923951a050",
@@ -608,7 +630,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0042,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7423e6eb91",
@@ -628,7 +651,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0077,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_never_remitted_submitted_in_month__2026-07-01",
@@ -641,7 +665,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0034,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_ab202d4b23",
@@ -846,7 +871,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0059,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0480",
@@ -859,7 +885,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0018,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d671e0b995",
@@ -925,7 +952,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0042,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__81479",
@@ -938,7 +966,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.002,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q12_referring_provider_denials",
@@ -947,12 +976,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0046,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   }
  ],
- "accuracy": null,
+ "accuracy": "28/30",
  "n": 30,
  "mean_sql_execs": 3.0,
- "notes": "Planner pass then separate writer pass; writer saw TF-IDF top-3 few-shot examples (non-dev, non-heldout_hard_1, other family). Three genuinely different direct-SQL candidates per question (different tables/joins/interpretations), all executed; majority result chosen (first agreeing candidate). No verifier, no repair (candidate errors simply lose the vote). Questions with only 2/3 agreement: f_cpt_share_of_line_payments__g0483:2/3, a_b853266803:2/3, q10_top_denial_carcs:2/3, q15_partial_line_denials:2/3, q25_primary_deductible:2/3, a_8663c777cd:2/3, f_cpt_share_of_line_payments__87798:2/3, q11_cpt_denial_rate:2/3, a_9108c7aacb:2/3, a_1b7e02d0b0:2/3, f_cpt_share_of_line_payments__80307:2/3, a_d383370345:2/3, f_cpt_share_of_line_payments__g0482:2/3, a_7423e6eb91:2/3, a_ab202d4b23:2/3, f_cpt_share_of_line_payments__g0480:2/3, f_cpt_share_of_line_payments__81479:2/3. Assumptions: primary payer = claims rows with payer_responsibility='P'; billed CPT from latest-submission claim_lines; current adjudication grain claim+payer. Answers committed before scoring.",
- "n_pass": null
+ "notes": "Planner pass then separate writer pass; writer saw TF-IDF top-3 few-shot examples (non-dev, non-heldout_hard_1, other family). Three genuinely different direct-SQL candidates per question (different tables/joins/interpretations), all executed; majority result chosen (first agreeing candidate). No verifier, no repair (candidate errors simply lose the vote). Questions with only 2/3 agreement: f_cpt_share_of_line_payments__g0483:2/3, a_b853266803:2/3, q10_top_denial_carcs:2/3, q15_partial_line_denials:2/3, q25_primary_deductible:2/3, a_8663c777cd:2/3, f_cpt_share_of_line_payments__87798:2/3, q11_cpt_denial_rate:2/3, a_9108c7aacb:2/3, a_1b7e02d0b0:2/3, f_cpt_share_of_line_payments__80307:2/3, a_d383370345:2/3, f_cpt_share_of_line_payments__g0482:2/3, a_7423e6eb91:2/3, a_ab202d4b23:2/3, f_cpt_share_of_line_payments__g0480:2/3, f_cpt_share_of_line_payments__81479:2/3. Assumptions: primary payer = claims rows with payer_responsibility='P'; billed CPT from latest-submission claim_lines; current adjudication grain claim+payer. Answers committed before scoring. Scored with bench.compare.match after answers were committed. Failures: 2.",
+ "n_pass": 28
 }
