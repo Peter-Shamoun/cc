@@ -66,6 +66,22 @@ answer key: `truth.json` and `truth/` sit outside the directories their DuckDB s
 - median seconds per question, SQL calls per question, and input/output tokens
 - the run's JSON and a Markdown report, both in `.ccsim/bench/runs/`
 
+### Glossary as a trained artifact
+
+Train failures may be read. Validation only accepts or rejects a change. The test split is sealed.
+
+```bash
+python -m bench.splits verify                 # frozen assignment; fails if a question or bundle changed
+python -m bench.splits ids --split validation
+python -m bench.splits sync                   # new catalog questions (round 3) go to validation
+python -m bench.glossary_contamination        # research/glossary_contamination.md
+python -m bench.power                         # research/screen2_power.md
+python -m bench.screen2 plan                  # one-factor ascent; every factor scored on validation
+python -m bench.eval_subagents prepare <run> --configs configs.json --split validation
+```
+
+`prepare --split test` raises unless `--unseal-test` is set. That flag is the one end-of-protocol run. A `version:<id>` glossary setting serves `bench/glossaries/<id>.json`.
+
 ## Storage layout: `python -m bench.lake_bench` and `python -m bench.layout_bench`
 
 ```bash
