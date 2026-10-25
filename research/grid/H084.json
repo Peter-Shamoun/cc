@@ -64,14 +64,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.005,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "f_payer_class_denial_rate__commercial",
     "f_payer_class_denial_rate__medicare",
     "f_cpt_denied_lines__80053"
    ],
    "assumption": "fraction (0-1) of line_paid_amount on current-adjudication 835 lines, by submitted procedure_code",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "a_b853266803",
@@ -125,14 +126,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.007,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "a_f786e11aec",
     "a_88c4640755",
     "a_b541bf06a1"
    ],
    "assumption": "first submission = earliest P submission to that payer; days on payment_date",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -168,14 +170,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.005,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "a_436f690741",
     "q09_denials_by_type",
     "a_f494340e13"
    ],
    "assumption": "reviewed denial CARC = is_denial_carc; denied = is_denied on current adjudication",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "a_a5888f64a4",
@@ -235,14 +238,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.004,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "a_436f690741",
     "a_54dd76175a",
     "a_5059b5e0e6"
    ],
    "assumption": "every remit_claims row is an 835 claim payment event",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "a_7d45c279a7",
@@ -275,14 +279,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.005,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "a_e83408d6a2",
     "a_439d7186d8",
     "q01_claims_submitted"
    ],
    "assumption": "trace = check_or_eft_number",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "q15_partial_line_denials",
@@ -300,14 +305,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.002,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "f_cpt_denied_lines__36415",
     "f_cpt_denied_lines__80053",
     "q07_denial_rate"
    ],
    "assumption": "835 lines on current adjudications",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "q25_primary_deductible",
@@ -325,14 +331,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.004,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "q24_primary_patient_responsibility",
     "a_553c1034d1",
     "a_436f690741"
    ],
    "assumption": "primary = payer billed with P on sem.claims (as in few-shot q24); claim+line adjustments",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "a_8663c777cd",
@@ -362,14 +369,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "a_d29f83c935",
     "a_f3c42ce766",
     "a_9a40343e18"
    ],
    "assumption": "null referring NPIs excluded from ranking but kept in totals",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__87798",
@@ -387,14 +395,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.002,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "a_c0e1460912",
     "a_477b034f58",
     "a_f494340e13"
    ],
    "assumption": "fraction (0-1) of line_paid_amount on current-adjudication 835 lines, by submitted procedure_code",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "q11_cpt_denial_rate",
@@ -426,14 +435,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.004,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "q13_principal_dx_denials",
     "a_436f690741",
     "a_f494340e13"
    ],
    "assumption": "rate as fraction (few-shot q13 style); every billed CPT on any submission of the claim, all payers' current adjudications",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "a_a123bba47f",
@@ -473,14 +483,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "a_5059b5e0e6",
     "a_f3c42ce766",
     "a_f494340e13"
    ],
    "assumption": "claims with a current primary adjudication only",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "a_9108c7aacb",
@@ -534,14 +545,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.003,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "a_b541bf06a1",
     "a_f786e11aec",
     "a_553c1034d1"
    ],
    "assumption": "unmatched carry-forwards kept with null offset",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "a_856b95a70c",
@@ -601,14 +613,15 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.005,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "a_477b034f58",
     "a_54dd76175a",
     "a_9a40343e18"
    ],
    "assumption": "shares in percent",
-   "verifier": "verifier: no August 2026 payments exist, so August shares are undefined (null), not 0; revised"
+   "verifier": "verifier: no August 2026 payments exist, so August shares are undefined (null), not 0; revised",
+   "why_scored": "ok"
   },
   {
    "qid": "a_1b7e02d0b0",
@@ -634,14 +647,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "a_88c4640755",
     "a_fca405b635",
     "a_f786e11aec"
    ],
    "assumption": "first replacement date; original = earliest frequency-1 submission to the primary payer",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "a_921f1bf366",
@@ -665,14 +679,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.004,
-   "pass": null,
+   "pass": false,
    "fewshot_ids": [
     "a_fca405b635",
     "a_f786e11aec",
     "q18_voided"
    ],
    "assumption": "any payer",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "values differ (or extra / missing columns)"
   },
   {
    "qid": "q14_zero_paid_not_denied",
@@ -690,14 +705,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.002,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "q09_denials_by_type",
     "q21_timely_filing",
     "q27_unbalanced_payments"
    ],
    "assumption": "",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "a_dca9da6d52",
@@ -723,14 +739,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.005,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "a_88c4640755",
     "a_f786e11aec",
     "q22_days_to_first_remit"
    ],
    "assumption": "replacement date = first frequency-7 submission to that payer",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "q19_reversed_no_correction",
@@ -748,14 +765,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.002,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "a_436f690741",
     "q03_total_paid",
     "a_2149838506"
    ],
    "assumption": "",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__80307",
@@ -773,14 +791,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.002,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "a_c0e1460912",
     "a_477b034f58",
     "a_f494340e13"
    ],
    "assumption": "fraction (0-1) of line_paid_amount on current-adjudication 835 lines, by submitted procedure_code",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "a_d383370345",
@@ -840,14 +859,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "a_f786e11aec",
     "a_88c4640755",
     "q22_days_to_first_remit"
    ],
    "assumption": "",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0482",
@@ -865,14 +885,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.002,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "f_payer_class_denial_rate__commercial",
     "f_payer_class_denial_rate__medicare",
     "f_cpt_denied_lines__80053"
    ],
    "assumption": "fraction (0-1) of line_paid_amount on current-adjudication 835 lines, by submitted procedure_code",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "a_0d43f7d4b6",
@@ -894,14 +915,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.011,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "a_88c4640755",
     "a_fca405b635",
     "q17_resubmitted"
    ],
    "assumption": "correction date = first frequency-7 submission to that payer",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "a_923951a050",
@@ -921,14 +943,15 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.002,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "a_436f690741",
     "a_b541bf06a1",
     "a_2149838506"
    ],
    "assumption": "duplicate-claim denials excluded from 'earlier denied'",
-   "verifier": "verifier: literal reading counts any superseded non-reversal denied event, including a duplicate-claim denial dated before the paid adjudication; revised"
+   "verifier": "verifier: literal reading counts any superseded non-reversal denied event, including a duplicate-claim denial dated before the paid adjudication; revised",
+   "why_scored": "ok"
   },
   {
    "qid": "a_7423e6eb91",
@@ -955,14 +978,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "a_9a40343e18",
     "a_f786e11aec",
     "a_b541bf06a1"
    ],
    "assumption": "",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "f_never_remitted_submitted_in_month__2026-07-01",
@@ -980,14 +1004,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.004,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "q20_never_remitted",
     "f_claims_first_submitted_in_month__2026-07-01",
     "q01_claims_submitted"
    ],
    "assumption": "first submission across any payer",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "a_ab202d4b23",
@@ -1199,14 +1224,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "a_f494340e13",
     "a_a23ce7f1de",
     "a_f3c42ce766"
    ],
    "assumption": "payers = those with qualifying lines",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0480",
@@ -1224,14 +1250,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.002,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "a_c0e1460912",
     "a_477b034f58",
     "a_f494340e13"
    ],
    "assumption": "fraction (0-1) of line_paid_amount on current-adjudication 835 lines, by submitted procedure_code",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "a_d671e0b995",
@@ -1307,14 +1334,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.004,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "a_54dd76175a",
     "a_477b034f58",
     "a_837ce03435"
    ],
    "assumption": "",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__81479",
@@ -1332,14 +1360,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.002,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "f_payer_class_denial_rate__commercial",
     "f_payer_class_denial_rate__medicare",
     "f_cpt_denied_lines__80053"
    ],
    "assumption": "fraction (0-1) of line_paid_amount on current-adjudication 835 lines, by submitted procedure_code",
-   "verifier": "verifier: semantics/population/units checked, no change"
+   "verifier": "verifier: semantics/population/units checked, no change",
+   "why_scored": "ok"
   },
   {
    "qid": "q12_referring_provider_denials",
@@ -1355,19 +1384,20 @@
    "sql_execs": 2,
    "repairs": 1,
    "seconds": 0.004,
-   "pass": null,
+   "pass": true,
    "fewshot_ids": [
     "q13_principal_dx_denials",
     "a_5059b5e0e6",
     "a_439d7186d8"
    ],
    "assumption": "NPI from the P submission(s); rate as fraction; >=15 primary current adjudications",
-   "verifier": "verifier+repair check: empty result; no NPI reaches 15 primary current adjudications, kept"
+   "verifier": "verifier+repair check: empty result; no NPI reaches 15 primary current adjudications, kept",
+   "why_scored": "ok"
   }
  ],
- "accuracy": null,
+ "accuracy": "29/30",
  "n": 30,
  "mean_sql_execs": 1.13,
- "notes": "Answers committed before scoring. multiagent: planner pass (interpretation + few-shot reading) then a separate SQL-writer pass, simulated as strictly separated passes by a single local analyst (no subagent API). fewshot: BM25 top-3 via analyst/approaches/a10_dynamic_fewshot (leakage guards: same family/template, heldout_hard_1 and dev ids excluded); retrieved ids per question are in fewshot_ids. Few-shot changed q25 (primary = P on claims), q11/q12 (rate as fraction). verifier: critic pass revised a_856b95a70c (no August data, so August shares are null) and a_923951a050 (literal superseded-denial reading). repair: one empty-result check. assumptions in the assumption field. CAVEAT: the writer's drafts are the same analyst's H080 candidate-A SQL for the 27 questions that the planner did not change, so this cell is not independent of H080-H083.",
- "n_pass": null
+ "notes": "Answers committed before scoring. multiagent: planner pass (interpretation + few-shot reading) then a separate SQL-writer pass, simulated as strictly separated passes by a single local analyst (no subagent API). fewshot: BM25 top-3 via analyst/approaches/a10_dynamic_fewshot (leakage guards: same family/template, heldout_hard_1 and dev ids excluded); retrieved ids per question are in fewshot_ids. Few-shot changed q25 (primary = P on claims), q11/q12 (rate as fraction). verifier: critic pass revised a_856b95a70c (no August data, so August shares are null) and a_923951a050 (literal superseded-denial reading). repair: one empty-result check. assumptions in the assumption field. CAVEAT: the writer's drafts are the same analyst's H080 candidate-A SQL for the 27 questions that the planner did not change, so this cell is not independent of H080-H083. Scored with bench.compare.match (gold from the question bank, run after all five cells' answers were committed): 29/30.",
+ "n_pass": 29
 }

@@ -64,12 +64,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.016,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "a_b853266803",
@@ -123,13 +124,14 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.019,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     1,
     2
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -165,13 +167,14 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.015,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     1,
     2
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "a_a5888f64a4",
@@ -231,12 +234,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.011,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "a_7d45c279a7",
@@ -269,12 +273,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.019,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "q15_partial_line_denials",
@@ -292,12 +297,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.007,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "q25_primary_deductible",
@@ -315,13 +321,14 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.011,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     1,
     2
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "a_8663c777cd",
@@ -351,12 +358,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.012,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__87798",
@@ -374,12 +382,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "q11_cpt_denial_rate",
@@ -415,13 +424,14 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.017,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     1,
     2
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "a_a123bba47f",
@@ -461,12 +471,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.024,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "a_9108c7aacb",
@@ -520,12 +531,13 @@
    "sql_execs": 4,
    "repairs": 1,
    "seconds": 0.018,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
    ],
-   "why": "candidate B binder error repaired and re-executed"
+   "why": "candidate B binder error repaired and re-executed",
+   "why_scored": "ok"
   },
   {
    "qid": "a_856b95a70c",
@@ -585,13 +597,14 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.012,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "B",
    "agreement": [
     1,
     2
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "a_1b7e02d0b0",
@@ -617,12 +630,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.017,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "a_921f1bf366",
@@ -646,13 +660,14 @@
    "sql_execs": 4,
    "repairs": 1,
    "seconds": 0.012,
-   "pass": null,
+   "pass": false,
    "picked_candidate": "A",
    "agreement": [
     1,
     2
    ],
-   "why": "repair check: zero voided claims judged legitimate (no frequency-8 submissions in data)"
+   "why": "repair check: zero voided claims judged legitimate (no frequency-8 submissions in data)",
+   "why_scored": "values differ (or extra / missing columns)"
   },
   {
    "qid": "q14_zero_paid_not_denied",
@@ -670,12 +685,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "a_dca9da6d52",
@@ -701,12 +717,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.014,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "q19_reversed_no_correction",
@@ -724,12 +741,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.009,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__80307",
@@ -747,12 +765,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.009,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "a_d383370345",
@@ -812,13 +831,14 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.027,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     1,
     2
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0482",
@@ -836,12 +856,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.009,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "a_0d43f7d4b6",
@@ -863,12 +884,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.021,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "a_923951a050",
@@ -888,13 +910,14 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.011,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "B",
    "agreement": [
     1,
     2
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "a_7423e6eb91",
@@ -921,12 +944,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.019,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "f_never_remitted_submitted_in_month__2026-07-01",
@@ -944,12 +968,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.012,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "a_ab202d4b23",
@@ -1161,12 +1186,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.018,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0480",
@@ -1184,12 +1210,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "a_d671e0b995",
@@ -1265,12 +1292,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.012,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__81479",
@@ -1288,12 +1316,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.009,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
    ],
-   "why": null
+   "why": null,
+   "why_scored": "ok"
   },
   {
    "qid": "q12_referring_provider_denials",
@@ -1310,15 +1339,16 @@
    "sql_execs": 4,
    "repairs": 1,
    "seconds": 0.015,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [],
-   "why": "repair check: empty result judged legitimate (no NPI reaches 15 primary current adjudications)"
+   "why": "repair check: empty result judged legitimate (no NPI reaches 15 primary current adjudications)",
+   "why_scored": "ok"
   }
  ],
- "accuracy": null,
+ "accuracy": "29/30",
  "n": 30,
  "mean_sql_execs": 3.1,
- "notes": "Answers committed before scoring. direct_sql with candidates3: three distinct SQL drafts per question (different joins/interpretations), all executed, majority by result agreement (values rounded to 2dp) with first candidate as tiebreak. repair on: 1 binder-error repair, 2 suspicious-result checks (empty/zero) that kept the answer. Caveat: same analyst also ran H083 earlier in this session, so drafts are not independent of H083's drafts (H083 was NOT scored yet).",
- "n_pass": null
+ "notes": "Answers committed before scoring. direct_sql with candidates3: three distinct SQL drafts per question (different joins/interpretations), all executed, majority by result agreement (values rounded to 2dp) with first candidate as tiebreak. repair on: 1 binder-error repair, 2 suspicious-result checks (empty/zero) that kept the answer. Caveat: same analyst also ran H083 earlier in this session, so drafts are not independent of H083's drafts (H083 was NOT scored yet). Scored with bench.compare.match (gold from the question bank, run after all five cells' answers were committed): 29/30.",
+ "n_pass": 29
 }
