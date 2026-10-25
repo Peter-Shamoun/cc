@@ -237,3 +237,31 @@ Ranked by how much each one distorts metrics a user would see (denial rates, top
   - weekday and seasonal indices
   - commercial line shares
   - quirk rates
+
+---
+
+## Generator 3.0 status (implemented 2026-10-25)
+
+`ccsim/edi_mock.py` 3.0 implements the gaps above; `tests/test_edi_calibration.py` asserts the distributions.
+Measured on a one-year, 5 MB/business-day run (one tenant, ~3,100 claims per business day) and a 150-day test run:
+
+| Gap | Status | Measured (spec target) |
+|---|---|---|
+| 1 Medicare / payer mix | Done: MAC by tenant state (Palmetto JM 11502, Novitas JH 04412), MA, Medicaid FFS + MCOs, Blues + FEP, national ids, 320-payer Zipf tail | segment shares within 1 pt of the spec; top 10 ids 72% (~70%); ~325 payer ids/month (150-600) |
+| 2 Allowed amounts | Done: CY2026 CLFS (shipped as `ccsim/data/clfs_2026q4.csv`) x payer multiplier x stable contract noise; Medicaid capped; OON = share of billed | allowed/CLFS: Medicare 1.00, MA 1.00, Medicaid 0.84, commercial 1.12; charge/CLFS 6.8 |
+| 3 Denial mix | Done (XiFin clinical/molecular/pathology mixes, Medicare edits 151/236/183/B7/50) | 11% of claims; bundling ~55-60% of non-duplicate denials; duplicates ~14% |
+| 4 Lines / CPT mix | Done: order profiles + long CLFS tail; 36415 on 75% of draws; 87798 multiples; 0240U/0241U dropped | 4.9 lines (Medicare 5.9, commercial 4.4); ~600 distinct codes/month at 60 claims/day |
+| 5 Volume | Done: 837s split at 2,500 CLM per file | 5 MB/day = ~3,130 claims per business day; 57/43 837/835 bytes |
+| 6 Partial denials | Done (emerges from the reason mix) | 60-70% of denied claims are line-level |
+| 7 835 cadence | Done: per-payer weekdays / every N weeks, NC half-year skip, no weekends/holidays, BPR16 0-2 business days after DTM*405 | ~32 835 files/day (25-80); Medicare daily file ~480 KB (420) |
+| 8 Identifiers | Done: ISA06 = clearinghouse, TRN03 = 1 + EIN, REF*2U on ~half, 835 names differ on ~60% | |
+| 9 Patient share | Done: KFF deductibles met through the year, coinsurance/copay, ACA preventive $0, Medicare CLFS $0 | 30% of claims with PR; deductible avg ~$1,900 |
+| 10 COB / crossover | Done: COBA CLP02=19 + NM1*TT + MA18 on ~20% of Medicare; secondary 837s | ~4% of claims billed to a secondary |
+| 11 837 lab segments | Done: REF*X4, G1, D9, NTE + SV101-7 for 81479, SV107, modifiers 91/90/QW/59/XU/GA/GZ/GY/26/TC, 2420E, 2310C, ZIP+4, POS mix | |
+| 12 Reversals | Done: rates cut, 30% split across 835s with -WO/+WO, MAC mass-adjustment waves, 72/J1/CS/IR, UHC-style WO refs | CLP22 ~1.4% of CLPs (0.5-4%) |
+| 13 Calendar | Done: weekday index, day-after-holiday 1.5x, holiday weeks 0.75x, monthly + respiratory index, DOS weekday mix, molecular DOS lag | respiratory Jan ~5x Jun |
+| 14 835 line fidelity | Mostly: SVC07 unit cuts, 87801 ceiling recode (SVC06), 6R echoed only when sent, AMT*AU, REF*1L, DTM*050/232, REF*0K NCD/LCD on Medicare med-nec | skipped: split lines (one billed line as two SVCs) |
+| 15 Quirks | Partly: 80-col wrap, BOM, NUL padding, several ISAs per file, ISA13 reuse; corrupt 1%, re-delivery 2% | skipped: payer-altered CLP01, SE01 off by one, unpadded ISA ids, lowercase content, mid-month payer renames, unbalanced payer 835s (each breaks a business-rule join or a fixed-width ISA read; decide in the lake phase) |
+
+Low-confidence items are typical values and stay tunable (`Scenario`, module constants): denial multipliers by payer
+class, the partial share, commercial lags, cadence, reversal/rework rates, quirk rates, plan designs.

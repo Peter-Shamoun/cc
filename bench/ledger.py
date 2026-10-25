@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import date
+from decimal import ROUND_HALF_UP, Decimal
+from fractions import Fraction
 
 
 def _claims(T):
@@ -28,7 +30,9 @@ def _current(T, seq=None):
 
 
 def _cur_event(a):
-    return [e for e in a["events"] if not e["duplicate_denial"]][-1]
+    """The current adjudication: the latest event per claim+payer (the business rule has no exception for a
+    duplicate denial that arrives after the payment)."""
+    return a["events"][-1]
 
 
 def _rate(pairs, key, min_n=1, r=4):
@@ -37,7 +41,13 @@ def _rate(pairs, key, min_n=1, r=4):
         for k in key(c, a):
             agg[k][0] += 1
             agg[k][1] += a["denied"]
-    return [(k, round(d / n, r), n) for k, (n, d) in agg.items() if n >= min_n]
+    return [(k, _round_half_up(Fraction(d, n), r), n) for k, (n, d) in agg.items() if n >= min_n]
+
+
+def _round_half_up(x: Fraction, digits: int) -> float:
+    """Round an exact ratio the way SQL round() does (half away from zero), not Python's float round: a mean of
+    22.25 days is 22.3 in the gold SQL, and round(22.25, 1) is 22.2 in Python."""
+    return float((Decimal(x.numerator) / Decimal(x.denominator)).quantize(Decimal(1).scaleb(-digits), ROUND_HALF_UP))
 
 
 def _title(name):
@@ -74,7 +84,7 @@ def interest_paid(T):
 
 def denial_rate(T):
     cur = _current(T)
-    return [(round(sum(a["denied"] for _, a in cur) / len(cur), 4),)]
+    return [(_round_half_up(Fraction(sum(a["denied"] for _, a in cur), len(cur)), 4),)]
 
 
 def denial_rate_by_payer(T):
@@ -150,7 +160,7 @@ def days_to_first_primary_remit(T):
         first_sub = min(date.fromisoformat(s["date"]) for s in c["submissions"] if s["seq"] == 0)
         first_remit = min(date.fromisoformat(e["date"]) for e in a["events"])
         m[_title(a["payer"])].append((first_remit - first_sub).days)
-    return [(k, round(sum(v) / len(v), 1)) for k, v in m.items()]
+    return [(k, _round_half_up(Fraction(sum(v), len(v)), 1)) for k, v in m.items()]
 
 
 def secondary_paid_claims(T):
