@@ -74,7 +74,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "f_payer_class_denial_rate__commercial",
@@ -137,7 +137,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "a_f786e11aec",
@@ -184,7 +184,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "a_436f690741",
@@ -253,7 +253,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "a_436f690741",
@@ -294,7 +294,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "a_e83408d6a2",
@@ -324,7 +324,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "f_cpt_denied_lines__36415",
@@ -354,7 +354,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "q24_primary_patient_responsibility",
@@ -393,7 +393,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "a_d29f83c935",
@@ -423,7 +423,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "a_477b034f58",
@@ -462,7 +462,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": false,
    "fewshot": [
     {
      "id": "q13_principal_dx_denials",
@@ -510,7 +510,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "a_5059b5e0e6",
@@ -572,7 +572,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "a_b541bf06a1",
@@ -598,7 +598,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": false,
    "fewshot": [
     {
      "id": "a_477b034f58",
@@ -632,7 +632,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "a_88c4640755",
@@ -665,7 +665,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": false,
    "fewshot": [
     {
      "id": "a_439d7186d8",
@@ -695,7 +695,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "q09_denials_by_type",
@@ -729,7 +729,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "a_88c4640755",
@@ -759,7 +759,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "a_436f690741",
@@ -789,7 +789,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "a_477b034f58",
@@ -858,7 +858,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "a_f786e11aec",
@@ -888,7 +888,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "f_payer_class_denial_rate__commercial",
@@ -920,7 +920,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "a_88c4640755",
@@ -951,7 +951,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "a_436f690741",
@@ -988,7 +988,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "a_f786e11aec",
@@ -1018,7 +1018,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "q20_never_remitted",
@@ -1240,7 +1240,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "a_a23ce7f1de",
@@ -1270,7 +1270,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "a_477b034f58",
@@ -1353,7 +1353,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "a_54dd76175a",
@@ -1383,7 +1383,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "f_payer_class_denial_rate__commercial",
@@ -1409,7 +1409,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "fewshot": [
     {
      "id": "q13_principal_dx_denials",
@@ -1428,7 +1428,7 @@
    "plan": "Population, grain, and date basis decided before SQL. Writer receives only that plan plus the three train-only examples."
   }
  ],
- "accuracy": null,
+ "accuracy": "27/30",
  "n": 30,
  "mean_sql_execs": 2.0,
  "notes": "Planner listed population and date basis; writer took that plan and three BM25 neighbors from outside DEV_HARD_v1, excluding the same family and heldout_hard_1. Repair is off, so the August alias parse error stands. Reference SQL of the neighbors was read and is not copied into this file."

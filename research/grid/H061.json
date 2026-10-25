@@ -74,7 +74,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0028,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -123,7 +123,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0035,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -156,7 +156,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0022,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -211,7 +211,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.004,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -238,7 +238,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0057,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -254,7 +254,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0018,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -270,7 +270,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0025,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -295,7 +295,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -311,7 +311,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0024,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -336,7 +336,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": false,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -370,7 +370,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -418,7 +418,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -473,7 +473,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "picked": "B",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -493,7 +493,7 @@
    "sql_execs": 4,
    "repairs": 1,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "picked": "repair",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -512,7 +512,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": false,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -528,7 +528,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0019,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -548,7 +548,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -564,7 +564,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -580,7 +580,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0023,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -635,7 +635,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -651,7 +651,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0022,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -669,7 +669,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.011,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -686,7 +686,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0046,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -709,7 +709,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -725,7 +725,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -933,7 +933,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0074,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -949,7 +949,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0022,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -1018,7 +1018,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0047,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -1034,7 +1034,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0027,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   },
@@ -1046,12 +1046,12 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": true,
    "picked": "A",
    "plan": "Metric spec: population, grain, filters, time window, rounding. SQL writer sees only the spec."
   }
  ],
- "accuracy": null,
+ "accuracy": "28/30",
  "n": 30,
  "mean_sql_execs": 3.033,
  "notes": "No data probes. Three candidates executed; pick the result returned by at least two, else the first successful candidate that is not a zero corrected-claim count. The inner join on frequency 1 returns zero claims and is repaired to a left join."
