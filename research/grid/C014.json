@@ -42,7 +42,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.027,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_f786e11aec",
@@ -51,7 +51,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.023,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0483",
@@ -60,7 +60,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_fca405b635",
@@ -69,7 +69,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_b853266803",
@@ -78,7 +78,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.018,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -87,7 +87,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.015,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_class_denial_rate__medicaid_mco",
@@ -96,7 +96,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_a5888f64a4",
@@ -105,7 +105,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.015,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_436f690741",
@@ -114,7 +114,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.018,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_d29f83c935",
@@ -123,7 +123,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.025,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q07_denial_rate",
@@ -132,7 +132,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.007,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_7d45c279a7",
@@ -141,7 +141,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.018,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_f3c42ce766",
@@ -150,7 +150,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.012,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q15_partial_line_denials",
@@ -159,7 +159,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q25_primary_deductible",
@@ -168,7 +168,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.016,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_26d4c3f4ca",
@@ -177,7 +177,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.013,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q18_voided",
@@ -186,7 +186,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.005,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_denied_lines__36415",
@@ -195,7 +195,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_8663c777cd",
@@ -204,7 +204,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.015,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_9a40343e18",
@@ -213,11 +213,11 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.016,
-   "pass": null
+   "pass": true
   }
  ],
- "accuracy": null,
+ "accuracy": "20/20",
  "n": 20,
  "mean_sql_execs": 3.0,
- "notes": "No value probes before the candidates. Three structurally different SQLs, majority result, then a critic pass. The critic checked empty results, rate bounds, and cross-question population counts already in the candidate results; it did not revise. Assumptions are the standard revenue-cycle reading and are stated on each answer."
+ "notes": "No value probes before the candidates. Three structurally different SQLs, majority result, then a critic pass. The critic checked empty results, rate bounds, and cross-question population counts already in the candidate results; it did not revise. Assumptions are the standard revenue-cycle reading and are stated on each answer. Scored with bench.compare.match after the answers were committed: 20/20. The three cells converged on the same SQL, so this slice does not separate the factors."
 }
