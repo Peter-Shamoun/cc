@@ -63,7 +63,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0114,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_b853266803",
@@ -117,7 +117,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.0182,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q10_top_denial_carcs",
@@ -153,7 +153,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.0121,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_a5888f64a4",
@@ -213,7 +213,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0058,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_7d45c279a7",
@@ -246,7 +246,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0183,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q15_partial_line_denials",
@@ -264,7 +264,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.0118,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q25_primary_deductible",
@@ -282,7 +282,7 @@
       "sql_execs": 5,
       "repairs": 0,
       "seconds": 0.0319,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_8663c777cd",
@@ -312,7 +312,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0115,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_cpt_share_of_line_payments__87798",
@@ -330,7 +330,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0068,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q11_cpt_denial_rate",
@@ -358,7 +358,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0157,
-      "pass": null
+      "pass": false
     },
     {
       "qid": "a_a123bba47f",
@@ -398,7 +398,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0208,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_9108c7aacb",
@@ -452,7 +452,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0115,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_856b95a70c",
@@ -512,7 +512,7 @@
       "sql_execs": 4,
       "repairs": 1,
       "seconds": 0.0264,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_1b7e02d0b0",
@@ -538,7 +538,7 @@
       "sql_execs": 5,
       "repairs": 0,
       "seconds": 0.0543,
-      "pass": null
+      "pass": false
     },
     {
       "qid": "a_921f1bf366",
@@ -562,7 +562,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0119,
-      "pass": null
+      "pass": false
     },
     {
       "qid": "q14_zero_paid_not_denied",
@@ -580,7 +580,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.0051,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_dca9da6d52",
@@ -606,7 +606,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0133,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q19_reversed_no_correction",
@@ -624,7 +624,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.0099,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_cpt_share_of_line_payments__80307",
@@ -642,7 +642,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0058,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_d383370345",
@@ -702,7 +702,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0272,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_cpt_share_of_line_payments__g0482",
@@ -720,7 +720,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0057,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_0d43f7d4b6",
@@ -742,7 +742,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0234,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_923951a050",
@@ -762,7 +762,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0103,
-      "pass": null
+      "pass": false
     },
     {
       "qid": "a_7423e6eb91",
@@ -789,7 +789,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0199,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_never_remitted_submitted_in_month__2026-07-01",
@@ -807,7 +807,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.0074,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_ab202d4b23",
@@ -1019,7 +1019,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.016,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_cpt_share_of_line_payments__g0480",
@@ -1037,7 +1037,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0068,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_d671e0b995",
@@ -1113,7 +1113,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0094,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_cpt_share_of_line_payments__81479",
@@ -1131,7 +1131,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.007,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q12_referring_provider_denials",
@@ -1146,10 +1146,10 @@
       "sql_execs": 5,
       "repairs": 0,
       "seconds": 0.056,
-      "pass": null
+      "pass": true
     }
   ],
-  "accuracy": null,
+  "accuracy": "26/30",
   "n": 30,
   "mean_sql_execs": 3.433,
   "notes": "Planner pass wrote grains only; the SQL writer then ran three candidates with no prior profiling. A and C implemented the planner reading; B was a diverse alternative (payer_sequence, line counts, or a different grain) and lost on disagreement. Intermediate counts were checked for the denial, deductible, reversal, partial-line, days-to-pay, and never-remitted steps. Verifier kept A except open AR, where it dropped the synthesized empty 0-14 bucket, and the August mix statement, which was repaired once after a parse error. q12 is empty: the busiest referring NPI has 4 current primary adjudications, under the stated minimum of 15. Frequency-7 claims have no paired frequency-1 original."
