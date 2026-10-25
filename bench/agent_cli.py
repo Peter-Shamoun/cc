@@ -249,6 +249,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="CC agent sandbox CLI")
     ap.add_argument("--session", required=True)
     sub = ap.add_subparsers(dest="command", required=True)
+    sub.add_parser("briefing")
     sub.add_parser("context")
     p = sub.add_parser("sql"); p.add_argument("query")
     p = sub.add_parser("metrics"); p.add_argument("request_json")
@@ -259,6 +260,10 @@ def main(argv=None):
     p = sub.add_parser("ask"); p.add_argument("question")
     a = ap.parse_args(argv)
     session = Session(Path(a.session))
+    if a.command == "briefing":                                      # the agent's instructions; not logged as a call
+        from bench.agent_session import build_prompt
+        print(build_prompt(session.dir))
+        return 0
     handlers = {
         "context": lambda: command_context(session),
         "sql": lambda: command_sql(session, a.query),
