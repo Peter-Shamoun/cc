@@ -363,7 +363,8 @@ def _seg_837(st, rows, add, e, sid, so, u, file_id, comp):
                        sv101_4_mod2=p[3], sv101_5_mod3=p[4], sv101_6_mod4=p[5], sv101_7_description=p[6], sv101_8=p[7],
                        sv102_charge=_num(_el(e, 2)), sv102_raw=_el(e, 2), sv103_unit_basis=_el(e, 3),
                        sv104_units=_num(_el(e, 4)), sv104_raw=_el(e, 4), sv105_place_of_service=_el(e, 5),
-                       sv106=_el(e, 6), sv107_raw=_el(e, 7), sv109_emergency=_el(e, 9))
+                       sv106=_el(e, 6), sv107_raw=_el(e, 7), sv109_emergency=_el(e, 9),
+                       sv107_dx_pointers=[int(x) for x in _el(e, 7).split(comp) if x.isdigit()] if _el(e, 7) else None)
         return
     if sid == "SVD":
         p = _proc(_el(e, 3), comp)

@@ -67,13 +67,21 @@ def seed_ref(con: duckdb.DuckDBPyConnection):
     con.executemany("INSERT INTO ref.denial_carc VALUES (?, 'v3-placeholder', 'mock', DATE '2026-10-01', NULL)",
                     [[c] for c in edi_mock.DENIAL_CARCS])
     con.execute("INSERT INTO ref.tenant_setting VALUES ('status4_is_recorded_denial', 'true', 'default profile')")
-    for p in edi_mock.PAYERS:                                 # the payer resolver's reviewed output
-        for src, name in (("837_2010BB", p.name), ("835_1000A", p.name_835 or p.name)):
-            con.execute("INSERT INTO ref.payer_alias VALUES (?, ?, ?, ?, ?, ?, 'exact_id')",
-                        [src, p.payer_id, name, p.name.replace(" ", "_"), p.name.title(), p.payer_class])
-    con.executemany("INSERT INTO ref.carc (code, description) VALUES (?, ?)", list(edi_mock.CARC_DESCRIPTIONS.items()))
-    for code, cpt in edi_mock.CPTS.items():
-        con.execute("INSERT INTO ref.procedure_code VALUES (?, 'CPT', ?, 'lab')", [code, cpt.description])
+    # the payer resolver's reviewed output: an 835 is known by REF*2U when the payer sends it, else by TRN03
+    con.executemany("INSERT INTO ref.payer_alias VALUES (?, ?, ?, ?, ?, ?, 'exact_id')", [
+        [src, pid, name, p.name.replace(" ", "_"), p.name.title(), p.payer_class]
+        for p in edi_mock.PAYERS
+        for src, pid, name in (("837_2010BB", p.payer_id, p.name), ("835_1000A", p.alias_id_835, p.name_835 or p.name))])
+    con.executemany("INSERT INTO ref.carc (code, description, category) VALUES (?, ?, ?)",
+                    [[k, v, edi_mock.CATEGORY_OF_CARC.get(k, "contractual" if k in ("45", "253") else
+                                                          "patient responsibility" if k in ("1", "2", "3") else
+                                                          "prior payer" if k == "23" else None)]
+                     for k, v in edi_mock.CARC_DESCRIPTIONS.items()])
+    con.executemany("INSERT INTO ref.rarc (code, description) VALUES (?, ?)", list(edi_mock.RARC_DESCRIPTIONS.items()))
+    con.executemany("INSERT INTO ref.plb_reason VALUES (?, ?)", list(edi_mock.PLB_REASON_DESCRIPTIONS.items()))
+    con.executemany("INSERT INTO ref.procedure_code VALUES (?, ?, ?, ?)",
+                    [[code, "HCPCS" if code[0].isalpha() else "CPT", cpt.description, cpt.category]
+                     for code, cpt in edi_mock.CPTS.items()])
 
 
 def _insert(con, table: str, rows: list[dict]):
@@ -158,7 +166,8 @@ def parse_batch(env) -> dict:
                     source_system="sftp", size_bytes=len(body), sha256=sha, received_at=datetime.fromisoformat(day),
                     character_encoding="ascii")
         try:
-            rows = parse_file(body.decode("ascii"), file_id, c, meta, run_id, started)
+            text = body[3:].decode("ascii") if body.startswith(b"\xef\xbb\xbf") else body.decode("ascii")   # UTF-8 BOM
+            rows = parse_file(text, file_id, c, meta, run_id, started)
         except (ParseError, UnicodeDecodeError, IndexError, ValueError, KeyError, TypeError) as err:
             stats["rejected"] += 1
             put(f"{c}/quarantine/{run_id}/{key.rsplit('/', 1)[-1]}", body)
