@@ -21,6 +21,8 @@ Never decide the work is done; when an item finishes, pick the next highest-valu
 - Disk: check `df -h /` before big runs; delete SFTP/raw copies after ingest; ~27 GB free.
 
 ## Backlog (top = next)
+- [done] Agent-SQL security stress (tests/test_security_stress.py, docs/security/stress-test.md): guard fuzz,
+  cross-tenant, Safe Harbor column scan, prompt-injection boundaries, hash-chained audit. Generator stays 3.3.
 - [running] Calibrate generator to research/edi_realism_calibration.yaml (worktree agent)
 - [running] Lake baseline + optimization (worktree agent)
 - [next] Independent realism audit of calibrated data (stats vs spec, X12 vs TR3, "would a biller believe it")

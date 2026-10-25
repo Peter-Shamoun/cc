@@ -8,6 +8,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+from ..audit_chain import GENESIS, seal, verify_lines
 from .iam import ACCOUNT, REGION, Principal
 
 READ_ONLY = {"GetObject", "HeadObject", "ListObjectsV2", "ListObjectVersions", "GetCallerIdentity", "Decrypt"}
@@ -18,6 +19,10 @@ class CloudTrail:
         self.path, self.clock = Path(path), clock
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
+        self._prev, self._seq = GENESIS, 0
+        if self.path.exists() and self.path.stat().st_size:
+            last = json.loads([ln for ln in self.path.read_text().splitlines() if ln.strip()][-1])
+            self._prev, self._seq = last["hash"], last["seq"] + 1
         self._fh = open(self.path, "a", buffering=1 << 16)
 
     def record(self, event_source: str, event_name: str, principal: Principal | None, request: dict,
@@ -41,8 +46,19 @@ class CloudTrail:
         if error:
             rec["errorCode"], rec["errorMessage"] = error
         with self._lock:
-            self._fh.write(json.dumps(rec, default=str) + "\n")
-        return rec
+            sealed = seal(self._prev, rec, self._seq)
+            self._fh.write(json.dumps(sealed, default=str) + "\n")
+            self._prev, self._seq = sealed["hash"], self._seq + 1
+        return sealed
+
+    def verify(self) -> int:
+        """Recompute the hash chain. Raises AuditTamper if a record was edited, reordered, or inserted.
+        Blank lines are checked, not skipped: skipping them would hide an inserted blank."""
+        with self._lock:
+            self._fh.flush()
+        if not self.path.exists() or self.path.stat().st_size == 0:
+            return 0
+        return verify_lines(self.path.read_text().splitlines())
 
     def events(self, **filters) -> list[dict]:
         with self._lock:

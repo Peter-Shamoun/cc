@@ -14,6 +14,7 @@ import shutil
 import time
 from pathlib import Path
 
+from ..audit_chain import HashChainLog
 from .cloudtrail import CloudTrail
 from .ecs import ECS
 from .errors import AWSError
@@ -102,6 +103,7 @@ class LocalAWS:
         self.root.mkdir(parents=True, exist_ok=True)
         self.clock = clock or Clock()
         self.trail = CloudTrail(self.root / "cloudtrail.jsonl", self.clock)
+        self.agent_audit = HashChainLog(self.root / "agent-audit.jsonl", self.clock)
         self.iam = IAM()
         self.kms = KMS(self.clock)
         self.kms.iam = self.iam

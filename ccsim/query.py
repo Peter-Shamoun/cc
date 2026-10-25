@@ -12,12 +12,19 @@ bucket policy, the secret's scope, and DuckDB's allowed_directories. The tests d
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import os
+import tempfile
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
 
 import duckdb
 
+from bench.guard import GuardError, guard
+
+from .aws.errors import ExpiredToken
 from .infra import BUCKET, SESSION_SECONDS, Deployment
 from .pipeline import APPEND_RELATIONS, SEM_TABLES
 
@@ -30,6 +37,19 @@ class QuerySession:
     con: duckdb.DuckDBPyConnection
     credentials: object
     gold_uri: str
+    escalated: bool
+    request_id: str
+    clock: object
+    audit: object
+
+
+def _read_only_temp_directory() -> str:
+    """DuckDB adds temp_directory to allowed_directories, and COPY into that directory succeeds even when
+    enable_external_access is false. A mode-0555 directory keeps the spill path from becoming a write target."""
+    path = Path(tempfile.gettempdir()) / "ccsim-duckdb-ro"
+    path.mkdir(exist_ok=True)
+    os.chmod(path, 0o555)
+    return str(path)
 
 
 def login(aws, upn: str) -> str:
@@ -69,8 +89,44 @@ def open_session(aws, dep: Deployment, id_token: str, escalate: bool = False, re
         con.execute("CREATE SCHEMA lossless")
         for rel in APPEND_RELATIONS:
             con.execute(f"CREATE VIEW {rel} AS SELECT * FROM read_parquet({files(rel)!r}, hive_partitioning=false)")
+    con.execute("SET temp_directory = ?", [_read_only_temp_directory()])
+    con.execute("SET memory_limit = '2GB'")
+    con.execute("SET enable_external_file_cache = false")
+    con.execute("SET allow_unredacted_secrets = false")
     if enforce_allowed_directories:
         con.execute("SET allowed_directories = ?", [prefixes])
         con.execute("SET enable_external_access = false")
     con.execute("SET lock_configuration = true")
-    return QuerySession(customer, claims.get("email", claims["sub"]), version, con, creds, gold)
+    user = claims.get("email", claims["sub"])
+    session = QuerySession(customer, user, version, con, creds, gold, escalate, rid, aws.clock, aws.agent_audit)
+    aws.agent_audit.append({"kind": "session_open", "outcome": "ok", "customer": customer, "user": user,
+                            "escalate": escalate, "version": version, "request_id": rid,
+                            "token_sha256": hashlib.sha256(id_token.encode()).hexdigest()[:16]})
+    return session
+
+
+def run_agent_sql(session: QuerySession, sql: str, row_limit: int = 1000):
+    """Guard, execute, and append a hash-chained audit record. The record stores the SQL and the row count,
+    never the result cells. Reader credentials older than SESSION_SECONDS are refused here even if DuckDB
+    still has the Parquet pages cached."""
+    base = {"kind": "agent_query", "customer": session.customer, "user": session.user,
+            "escalate": session.escalated, "version": session.version, "request_id": session.request_id,
+            "sql_sha256": hashlib.sha256(sql.encode() if isinstance(sql, str) else b"").hexdigest(),
+            "sql": sql[:4000] if isinstance(sql, str) else ""}
+    if session.clock() >= session.credentials.expiration:
+        session.audit.append({**base, "outcome": "expired"})
+        raise ExpiredToken("reader credentials have expired")
+    try:
+        guarded = guard(sql, row_limit=row_limit, escalate=session.escalated)
+    except GuardError as e:
+        session.audit.append({**base, "outcome": "blocked", "error": str(e)[:300]})
+        raise
+    try:
+        cur = session.con.execute(guarded)
+        rows = cur.fetchall()
+    except Exception as e:
+        session.audit.append({**base, "outcome": "error", "error": f"{type(e).__name__}: {str(e).splitlines()[0][:240]}"})
+        raise
+    session.audit.append({**base, "outcome": "ok", "row_count": len(rows),
+                          "column_count": len(cur.description or [])})
+    return rows
