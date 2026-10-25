@@ -27,7 +27,10 @@ Never decide the work is done; when an item finishes, pick the next highest-valu
 - [next] Generate full datasets (2x1y, 1x3y) through the winning lake; record sizes/timings
 - [done] Phase-4 sandbox: bench/agent_cli.py + agent_session.py + eval_subagents.py; pilot 12 Haiku runs OK
 - [done] Answer-key DB (bench/truth_db.py) + 16 question families (bench/question_families.py): 99 questions sound on a 45-day sample
-- [next] Opus-derived free-form questions (dual-Opus agreement) for what families cannot express
+- [done] Opus authoring pipeline (bench/authored_questions.py): author gold+answer-key SQL, independent Opus verifier,
+  accept on three-way agreement + non-trivial; prototype 4/4 accepted, selftest sound (103 questions)
+- [running] scaled authoring: 7 focus areas x 5 questions (ar_aging, contract_variance, denial_trends, rework,
+  payer_mix, test_mix, remit_ops)
 - [later] Expand families further after calibration lands (target 150+ at full scale)
 - [later] Ambiguity / abstention / multi-turn splits (T20-T22)
 - [later] Screening experiment, then adaptive search over technique permutations
