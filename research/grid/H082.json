@@ -64,11 +64,12 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.014,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_b853266803",
@@ -122,12 +123,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.016,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     1,
     2
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -163,12 +165,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.013,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     1,
     2
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_a5888f64a4",
@@ -228,11 +231,12 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.011,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_7d45c279a7",
@@ -265,11 +269,12 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.018,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "q15_partial_line_denials",
@@ -287,11 +292,12 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.007,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "q25_primary_deductible",
@@ -309,12 +315,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.011,
-   "pass": null,
+   "pass": false,
    "picked_candidate": "A",
    "agreement": [
     1,
     2
-   ]
+   ],
+   "why_scored": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_8663c777cd",
@@ -344,11 +351,12 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.015,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__87798",
@@ -366,11 +374,12 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "q11_cpt_denial_rate",
@@ -556,12 +565,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.016,
-   "pass": null,
+   "pass": false,
    "picked_candidate": "A",
    "agreement": [
     1,
     2
-   ]
+   ],
+   "why_scored": "expected 3 rows, got 28"
   },
   {
    "qid": "a_a123bba47f",
@@ -601,11 +611,12 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.027,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_9108c7aacb",
@@ -659,11 +670,12 @@
    "sql_execs": 4,
    "repairs": 1,
    "seconds": 0.013,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_856b95a70c",
@@ -723,12 +735,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.014,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "B",
    "agreement": [
     1,
     2
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_1b7e02d0b0",
@@ -754,11 +767,12 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.017,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_921f1bf366",
@@ -782,12 +796,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.014,
-   "pass": null,
+   "pass": false,
    "picked_candidate": "A",
    "agreement": [
     1,
     2
-   ]
+   ],
+   "why_scored": "values differ (or extra / missing columns)"
   },
   {
    "qid": "q14_zero_paid_not_denied",
@@ -805,11 +820,12 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.005,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_dca9da6d52",
@@ -835,11 +851,12 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.015,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "q19_reversed_no_correction",
@@ -857,11 +874,12 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.009,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__80307",
@@ -879,11 +897,12 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_d383370345",
@@ -943,12 +962,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.026,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     1,
     2
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0482",
@@ -966,11 +986,12 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_0d43f7d4b6",
@@ -992,11 +1013,12 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.019,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_923951a050",
@@ -1016,12 +1038,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.009,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "B",
    "agreement": [
     1,
     2
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_7423e6eb91",
@@ -1048,11 +1071,12 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.019,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "f_never_remitted_submitted_in_month__2026-07-01",
@@ -1070,11 +1094,12 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.011,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_ab202d4b23",
@@ -1286,11 +1311,12 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.023,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0480",
@@ -1308,11 +1334,12 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_d671e0b995",
@@ -1388,11 +1415,12 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__81479",
@@ -1410,11 +1438,12 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "q12_referring_provider_denials",
@@ -1431,14 +1460,15 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.015,
-   "pass": null,
+   "pass": true,
    "picked_candidate": "A",
-   "agreement": []
+   "agreement": [],
+   "why_scored": "ok"
   }
  ],
- "accuracy": null,
+ "accuracy": "27/30",
  "n": 30,
  "mean_sql_execs": 3.03,
- "notes": "Answers committed before scoring. decompose_cte: CTE sub-steps plus a batch of intermediate checks (one-row-per-claim on latest submission, one current adjudication per pair, line/claim paid sums reconcile 45,271, P-pair coverage: only 51 of 494 remitted claim+payer pairs have sem.claims rows, no freq-8 voids, FB row count). Two questions were redesigned from those checks: q25 (primary from the remit's processed-as-primary status rather than P on claims) and q11 (billed CPTs from claim lines plus 835 submitted codes). candidates3: three candidates executed per question, majority by result agreement. repair on: one binder error repaired. CAVEAT: for the other 28 questions the candidate texts are the ones drafted for H080 in this same session, so this cell is not independent of H080/H081.",
- "n_pass": null
+ "notes": "Answers committed before scoring. decompose_cte: CTE sub-steps plus a batch of intermediate checks (one-row-per-claim on latest submission, one current adjudication per pair, line/claim paid sums reconcile 45,271, P-pair coverage: only 51 of 494 remitted claim+payer pairs have sem.claims rows, no freq-8 voids, FB row count). Two questions were redesigned from those checks: q25 (primary from the remit's processed-as-primary status rather than P on claims) and q11 (billed CPTs from claim lines plus 835 submitted codes). candidates3: three candidates executed per question, majority by result agreement. repair on: one binder error repaired. CAVEAT: for the other 28 questions the candidate texts are the ones drafted for H080 in this same session, so this cell is not independent of H080/H081. Scored with bench.compare.match (gold from the question bank, run after all five cells' answers were committed): 27/30.",
+ "n_pass": 27
 }

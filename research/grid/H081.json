@@ -64,7 +64,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.016,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "sum(line_paid_amount) for procedure_code=X / sum(line_paid_amount)",
     "population": "sem.remit_lines on current adjudications",
@@ -78,7 +78,8 @@
    "rejected_by_spec": [],
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_b853266803",
@@ -132,7 +133,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.019,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "count, median, p90 (linear) of payment_date - first P submission date",
     "population": "current primary adjudications with paid>0",
@@ -147,7 +148,8 @@
    ],
    "agreement": [
     2
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -183,7 +185,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.015,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "distinct denied claim+payer per CARC",
     "population": "current adjudications with is_denied",
@@ -198,7 +200,8 @@
    ],
    "agreement": [
     2
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_a5888f64a4",
@@ -258,7 +261,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.011,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "pairs, first-pass pairs (exactly one remit_claims event, current, not denied), rate %",
     "population": "claim+payer pairs in remit_claims",
@@ -270,7 +273,8 @@
    "rejected_by_spec": [],
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_7d45c279a7",
@@ -303,7 +307,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.019,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "pairs with >=2 distinct check_or_eft_number; with reversal; with no current; current paid",
     "grain": "payer_class",
@@ -314,7 +318,8 @@
    "rejected_by_spec": [],
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "q15_partial_line_denials",
@@ -332,7 +337,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.007,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "count of remit_lines line_is_denied",
     "population": "current adjudications whose claim is not denied",
@@ -345,7 +350,8 @@
    ],
    "agreement": [
     2
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "q25_primary_deductible",
@@ -363,7 +369,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.011,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "sum adjustment_amount",
     "population": "current adjudications from payer billed as P on sem.claims",
@@ -376,7 +382,8 @@
    ],
    "agreement": [
     2
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_8663c777cd",
@@ -406,7 +413,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.012,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "claims, top5 NPI claims, share %",
     "population": "latest submission per claim incl voids, service_month>=2026-06",
@@ -423,7 +430,8 @@
    ],
    "agreement": [
     1
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__87798",
@@ -441,7 +449,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "sum(line_paid_amount) for procedure_code=X / sum(line_paid_amount)",
     "population": "sem.remit_lines on current adjudications",
@@ -455,7 +463,8 @@
    "rejected_by_spec": [],
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "q11_cpt_denial_rate",
@@ -491,7 +500,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.017,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "denied/current adjudications per CPT",
     "population": "current adjudications joined to every CPT billed on the claim (any submission, claim-level)",
@@ -506,7 +515,8 @@
    ],
    "agreement": [
     1
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_a123bba47f",
@@ -546,7 +556,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.024,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "claims, denied, rate %, denied latest-submission charge",
     "population": "claims with a current adjudication from the P payer",
@@ -557,7 +567,8 @@
    "rejected_by_spec": [],
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_9108c7aacb",
@@ -611,7 +622,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "FB carry-forward rows and first later opposite-amount offset",
     "population": "provider_adjustments FB negative",
@@ -623,7 +634,8 @@
    "rejected_by_spec": [],
    "agreement": [
     2
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_856b95a70c",
@@ -683,7 +695,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.012,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "class share of month paid (%), Jul, Aug, diff",
     "population": "current adjudications",
@@ -696,7 +708,8 @@
    "agreement": [
     1,
     2
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_1b7e02d0b0",
@@ -722,7 +735,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.017,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "count, avg orig->first replacement, count paid after, avg orig->payment, total paid",
     "population": "claims with freq 7 to P payer",
@@ -737,7 +750,8 @@
    ],
    "agreement": [
     1
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_921f1bf366",
@@ -761,7 +775,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.012,
-   "pass": null,
+   "pass": false,
    "spec": {
     "metric": "voided count, paid before void, reversed on/after void, current paid",
     "population": "claims with freq 8 submission",
@@ -774,7 +788,8 @@
    ],
    "agreement": [
     2
-   ]
+   ],
+   "why_scored": "values differ (or extra / missing columns)"
   },
   {
    "qid": "q14_zero_paid_not_denied",
@@ -792,7 +807,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "count current adjudications paid=0 and not is_denied"
    },
@@ -801,7 +816,8 @@
    "rejected_by_spec": [],
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_dca9da6d52",
@@ -827,7 +843,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.014,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "corrected pairs with remit on/after first replacement; avg/min/max days to first such remit",
     "grain": "payer_class",
@@ -840,7 +856,8 @@
    ],
    "agreement": [
     2
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "q19_reversed_no_correction",
@@ -858,7 +875,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.009,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "pairs with a reversal and no current adjudication"
    },
@@ -867,7 +884,8 @@
    "rejected_by_spec": [],
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__80307",
@@ -885,7 +903,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.009,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "sum(line_paid_amount) for procedure_code=X / sum(line_paid_amount)",
     "population": "sem.remit_lines on current adjudications",
@@ -899,7 +917,8 @@
    "rejected_by_spec": [],
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_d383370345",
@@ -959,7 +978,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.027,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "cohort claims, first remit within 14 days, %",
     "population": "first P submission (any freq) in July 2026",
@@ -973,7 +992,8 @@
    ],
    "agreement": [
     2
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0482",
@@ -991,7 +1011,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.009,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "sum(line_paid_amount) for procedure_code=X / sum(line_paid_amount)",
     "population": "sem.remit_lines on current adjudications",
@@ -1005,7 +1025,8 @@
    "rejected_by_spec": [],
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_0d43f7d4b6",
@@ -1027,7 +1048,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.021,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "pairs and current paid by outcome",
     "population": "freq-7 claim+payer with status-4 remit before first replacement date",
@@ -1041,7 +1062,8 @@
    ],
    "agreement": [
     2
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_923951a050",
@@ -1061,7 +1083,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.011,
-   "pass": null,
+   "pass": false,
    "spec": {
     "metric": "count and current paid",
     "population": "pairs with superseded non-reversal denied event (not a duplicate-claim denial) and current not denied"
@@ -1074,7 +1096,8 @@
    ],
    "agreement": [
     1
-   ]
+   ],
+   "why_scored": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_7423e6eb91",
@@ -1101,7 +1124,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.019,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "claims and latest-submission charge per age bucket",
     "population": "latest submission not freq 8, P pair without current adjudication",
@@ -1112,7 +1135,8 @@
    "rejected_by_spec": [],
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "f_never_remitted_submitted_in_month__2026-07-01",
@@ -1130,7 +1154,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.012,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "count claims",
     "population": "first submission (any payer) in July 2026 with no remit_claims rows"
@@ -1140,7 +1164,8 @@
    "rejected_by_spec": [],
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_ab202d4b23",
@@ -1352,7 +1377,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.018,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "underpaid lines and shortfall per payer",
     "population": "current, not denied, units_paid=1, allowed>0 remit lines",
@@ -1363,7 +1388,8 @@
    "rejected_by_spec": [],
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0480",
@@ -1381,7 +1407,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "sum(line_paid_amount) for procedure_code=X / sum(line_paid_amount)",
     "population": "sem.remit_lines on current adjudications",
@@ -1395,7 +1421,8 @@
    "rejected_by_spec": [],
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "a_d671e0b995",
@@ -1471,7 +1498,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.012,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "adjudications, denied, rate %, MoM pp",
     "grain": "payer_class x payment month",
@@ -1482,7 +1509,8 @@
    "rejected_by_spec": [],
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__81479",
@@ -1500,7 +1528,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.009,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "sum(line_paid_amount) for procedure_code=X / sum(line_paid_amount)",
     "population": "sem.remit_lines on current adjudications",
@@ -1514,7 +1542,8 @@
    "rejected_by_spec": [],
    "agreement": [
     3
-   ]
+   ],
+   "why_scored": "ok"
   },
   {
    "qid": "q12_referring_provider_denials",
@@ -1531,7 +1560,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.015,
-   "pass": null,
+   "pass": true,
    "spec": {
     "metric": "primary-payer denial rate per referring NPI",
     "population": "current adjudications from P payer; NPI from latest submission",
@@ -1544,12 +1573,13 @@
     "B",
     "C"
    ],
-   "agreement": []
+   "agreement": [],
+   "why_scored": "ok"
   }
  ],
- "accuracy": null,
+ "accuracy": "28/30",
  "n": 30,
  "mean_sql_execs": 3.0,
- "notes": "Answers committed before scoring. metric_spec: a structured spec (metric/population/filters/grain/time/rounding) was written per question first; three SQL translations were executed; translations contradicting the spec were rejected, and the answer is the majority among compliant ones. assumptions on: spec states the interpretation. repair off: no re-execution (one candidate binder error stayed an error). CAVEAT: the three translations reuse the SQL texts and executions drafted in H080 in this same session (single analyst, no API); this cell differs from H080 only in spec-based selection, so it is NOT an independent run.",
- "n_pass": null
+ "notes": "Answers committed before scoring. metric_spec: a structured spec (metric/population/filters/grain/time/rounding) was written per question first; three SQL translations were executed; translations contradicting the spec were rejected, and the answer is the majority among compliant ones. assumptions on: spec states the interpretation. repair off: no re-execution (one candidate binder error stayed an error). CAVEAT: the three translations reuse the SQL texts and executions drafted in H080 in this same session (single analyst, no API); this cell differs from H080 only in spec-based selection, so it is NOT an independent run. Scored with bench.compare.match (gold from the question bank, run after all five cells' answers were committed): 28/30.",
+ "n_pass": 28
 }

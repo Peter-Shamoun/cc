@@ -64,9 +64,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null,
+   "pass": true,
    "error": null,
-   "assumption": "fraction (0-1) of line_paid_amount on current-adjudication 835 lines, by submitted procedure_code"
+   "assumption": "fraction (0-1) of line_paid_amount on current-adjudication 835 lines, by submitted procedure_code",
+   "why_scored": "ok"
   },
   {
    "qid": "a_b853266803",
@@ -120,9 +121,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null,
+   "pass": true,
    "error": null,
-   "assumption": "first submission = earliest P submission to that payer; days on payment_date"
+   "assumption": "first submission = earliest P submission to that payer; days on payment_date",
+   "why_scored": "ok"
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -158,9 +160,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.005,
-   "pass": null,
+   "pass": true,
    "error": null,
-   "assumption": "reviewed denial CARC = is_denial_carc; denied = is_denied on current adjudication"
+   "assumption": "reviewed denial CARC = is_denial_carc; denied = is_denied on current adjudication",
+   "why_scored": "ok"
   },
   {
    "qid": "a_a5888f64a4",
@@ -220,9 +223,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.004,
-   "pass": null,
+   "pass": true,
    "error": null,
-   "assumption": "every remit_claims row is an 835 claim payment event"
+   "assumption": "every remit_claims row is an 835 claim payment event",
+   "why_scored": "ok"
   },
   {
    "qid": "a_7d45c279a7",
@@ -255,9 +259,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null,
+   "pass": true,
    "error": null,
-   "assumption": "trace = check_or_eft_number"
+   "assumption": "trace = check_or_eft_number",
+   "why_scored": "ok"
   },
   {
    "qid": "q15_partial_line_denials",
@@ -275,9 +280,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.003,
-   "pass": null,
+   "pass": true,
    "error": null,
-   "assumption": "835 lines on current adjudications"
+   "assumption": "835 lines on current adjudications",
+   "why_scored": "ok"
   },
   {
    "qid": "q25_primary_deductible",
@@ -295,9 +301,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.005,
-   "pass": null,
+   "pass": true,
    "error": null,
-   "assumption": "primary = payer billed with responsibility P; claim+line level adjustments"
+   "assumption": "primary = payer billed with responsibility P; claim+line level adjustments",
+   "why_scored": "ok"
   },
   {
    "qid": "a_8663c777cd",
@@ -306,9 +313,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.001,
-   "pass": null,
+   "pass": false,
    "error": "Parser Error: syntax error at or near \"month\"\n\nLINE 5: select strftime(t.m,'%Y-%m') month, t.tot total_claims, sum(r.n) top5_claims, round(100...\n                                     ^^^^^",
-   "assumption": "null referring NPIs excluded from ranking but kept in totals"
+   "assumption": "null referring NPIs excluded from ranking but kept in totals",
+   "why_scored": "final SQL fails: Parser Error: syntax error at or near \"month\"\n\nLINE 5: select strftime(t.m,'%Y-%m') month, t.tot total_claims, sum(r.n) top5_claims, round(100...\n    "
   },
   {
    "qid": "f_cpt_share_of_line_payments__87798",
@@ -326,9 +334,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.002,
-   "pass": null,
+   "pass": true,
    "error": null,
-   "assumption": "fraction (0-1) of line_paid_amount on current-adjudication 835 lines, by submitted procedure_code"
+   "assumption": "fraction (0-1) of line_paid_amount on current-adjudication 835 lines, by submitted procedure_code",
+   "why_scored": "ok"
   },
   {
    "qid": "q11_cpt_denial_rate",
@@ -364,9 +373,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.004,
-   "pass": null,
+   "pass": true,
    "error": null,
-   "assumption": "CPTs from billed claim lines (any submission), joined by claim_key"
+   "assumption": "CPTs from billed claim lines (any submission), joined by claim_key",
+   "why_scored": "ok"
   },
   {
    "qid": "a_a123bba47f",
@@ -406,9 +416,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null,
+   "pass": true,
    "error": null,
-   "assumption": "claims with a current primary adjudication only"
+   "assumption": "claims with a current primary adjudication only",
+   "why_scored": "ok"
   },
   {
    "qid": "a_9108c7aacb",
@@ -417,9 +428,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": false,
    "error": "Parser Error: syntax error at or near \"days\"\n\nLINE 4: ....payment_date) offset_date, min(o.payment_date)-c.payment_date days\n                                                                          ^^^^",
-   "assumption": "unmatched carry-forwards kept with null offset"
+   "assumption": "unmatched carry-forwards kept with null offset",
+   "why_scored": "final SQL fails: Parser Error: syntax error at or near \"days\"\n\nLINE 4: ....payment_date) offset_date, min(o.payment_date)-c.payment_date days\n                         "
   },
   {
    "qid": "a_856b95a70c",
@@ -479,9 +491,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null,
+   "pass": false,
    "error": null,
-   "assumption": "shares in percent"
+   "assumption": "shares in percent",
+   "why_scored": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_1b7e02d0b0",
@@ -507,9 +520,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null,
+   "pass": true,
    "error": null,
-   "assumption": "first replacement date; original = earliest frequency-1 submission to the primary payer"
+   "assumption": "first replacement date; original = earliest frequency-1 submission to the primary payer",
+   "why_scored": "ok"
   },
   {
    "qid": "a_921f1bf366",
@@ -533,9 +547,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.004,
-   "pass": null,
+   "pass": false,
    "error": null,
-   "assumption": "any payer"
+   "assumption": "any payer",
+   "why_scored": "values differ (or extra / missing columns)"
   },
   {
    "qid": "q14_zero_paid_not_denied",
@@ -553,9 +568,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.002,
-   "pass": null,
+   "pass": true,
    "error": null,
-   "assumption": ""
+   "assumption": "",
+   "why_scored": "ok"
   },
   {
    "qid": "a_dca9da6d52",
@@ -564,9 +580,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": false,
    "error": "Parser Error: syntax error at or near \"days\"\n\nLINE 3: ... (select r.payer_class, r.claim_key, min(rc.payment_date)-r.d days from r join sem.remit_claims rc on rc.claim_key=r.clai...\n                                                                         ^^^^",
-   "assumption": "replacement date = first frequency-7 submission to that payer"
+   "assumption": "replacement date = first frequency-7 submission to that payer",
+   "why_scored": "final SQL fails: Parser Error: syntax error at or near \"days\"\n\nLINE 3: ... (select r.payer_class, r.claim_key, min(rc.payment_date)-r.d days from r join sem.remit_clai"
   },
   {
    "qid": "q19_reversed_no_correction",
@@ -584,9 +601,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.002,
-   "pass": null,
+   "pass": true,
    "error": null,
-   "assumption": ""
+   "assumption": "",
+   "why_scored": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__80307",
@@ -604,9 +622,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.002,
-   "pass": null,
+   "pass": true,
    "error": null,
-   "assumption": "fraction (0-1) of line_paid_amount on current-adjudication 835 lines, by submitted procedure_code"
+   "assumption": "fraction (0-1) of line_paid_amount on current-adjudication 835 lines, by submitted procedure_code",
+   "why_scored": "ok"
   },
   {
    "qid": "a_d383370345",
@@ -666,9 +685,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null,
+   "pass": true,
    "error": null,
-   "assumption": ""
+   "assumption": "",
+   "why_scored": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0482",
@@ -686,9 +706,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.002,
-   "pass": null,
+   "pass": true,
    "error": null,
-   "assumption": "fraction (0-1) of line_paid_amount on current-adjudication 835 lines, by submitted procedure_code"
+   "assumption": "fraction (0-1) of line_paid_amount on current-adjudication 835 lines, by submitted procedure_code",
+   "why_scored": "ok"
   },
   {
    "qid": "a_0d43f7d4b6",
@@ -710,9 +731,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.012,
-   "pass": null,
+   "pass": true,
    "error": null,
-   "assumption": "correction date = first frequency-7 submission to that payer"
+   "assumption": "correction date = first frequency-7 submission to that payer",
+   "why_scored": "ok"
   },
   {
    "qid": "a_923951a050",
@@ -732,9 +754,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.005,
-   "pass": null,
+   "pass": false,
    "error": null,
-   "assumption": "duplicate-claim denials excluded from 'earlier denied'"
+   "assumption": "duplicate-claim denials excluded from 'earlier denied'",
+   "why_scored": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_7423e6eb91",
@@ -761,9 +784,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.007,
-   "pass": null,
+   "pass": true,
    "error": null,
-   "assumption": ""
+   "assumption": "",
+   "why_scored": "ok"
   },
   {
    "qid": "f_never_remitted_submitted_in_month__2026-07-01",
@@ -781,9 +805,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.005,
-   "pass": null,
+   "pass": true,
    "error": null,
-   "assumption": "first submission across any payer"
+   "assumption": "first submission across any payer",
+   "why_scored": "ok"
   },
   {
    "qid": "a_ab202d4b23",
@@ -995,9 +1020,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.007,
-   "pass": null,
+   "pass": true,
    "error": null,
-   "assumption": "payers = those with qualifying lines"
+   "assumption": "payers = those with qualifying lines",
+   "why_scored": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0480",
@@ -1015,9 +1041,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.002,
-   "pass": null,
+   "pass": true,
    "error": null,
-   "assumption": "fraction (0-1) of line_paid_amount on current-adjudication 835 lines, by submitted procedure_code"
+   "assumption": "fraction (0-1) of line_paid_amount on current-adjudication 835 lines, by submitted procedure_code",
+   "why_scored": "ok"
   },
   {
    "qid": "a_d671e0b995",
@@ -1026,9 +1053,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
+   "pass": false,
    "error": "Parser Error: syntax error at or near \"month\"\n\nLINE 3: select payer_class, strftime(m,'%Y-%m') month, n current_adjudications, d denied, round(r,2) denial...\n                                                ^^^^^",
-   "assumption": ""
+   "assumption": "",
+   "why_scored": "final SQL fails: Parser Error: syntax error at or near \"month\"\n\nLINE 3: select payer_class, strftime(m,'%Y-%m') month, n current_adjudications, d denied, round(r,2) de"
   },
   {
    "qid": "f_cpt_share_of_line_payments__81479",
@@ -1046,9 +1074,10 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.002,
-   "pass": null,
+   "pass": true,
    "error": null,
-   "assumption": "fraction (0-1) of line_paid_amount on current-adjudication 835 lines, by submitted procedure_code"
+   "assumption": "fraction (0-1) of line_paid_amount on current-adjudication 835 lines, by submitted procedure_code",
+   "why_scored": "ok"
   },
   {
    "qid": "q12_referring_provider_denials",
@@ -1065,14 +1094,15 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null,
+   "pass": true,
    "error": null,
-   "assumption": "referring NPI from latest submission"
+   "assumption": "referring NPI from latest submission",
+   "why_scored": "ok"
   }
  ],
- "accuracy": null,
+ "accuracy": "23/30",
  "n": 30,
  "mean_sql_execs": 1.0,
- "notes": "Answers committed before scoring. direct_sql, one SQL per question, repair off so the first execution stands (4 parser errors from unquoted aliases month/days count as fails). assumptions on: the assumption field states the interpretation used. No exploration queries. seconds = SQL execution time only (drafting time not metered).",
- "n_pass": null
+ "notes": "Answers committed before scoring. direct_sql, one SQL per question, repair off so the first execution stands (4 parser errors from unquoted aliases month/days count as fails). assumptions on: the assumption field states the interpretation used. No exploration queries. seconds = SQL execution time only (drafting time not metered). Scored with bench.compare.match (gold from the question bank, run after all five cells' answers were committed): 23/30.",
+ "n_pass": 23
 }
