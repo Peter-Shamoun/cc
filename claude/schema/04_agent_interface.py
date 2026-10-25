@@ -127,6 +127,10 @@ class SemanticAPI:
         group_by = group_by or []
         filters = filters or []
         notes: list[str] = []
+        if not isinstance(filters, list) or not all(isinstance(f, dict) and "field" in f and "op" in f for f in filters):
+            raise SemanticError('filters must be a list of {"field": <dimension>, "op": <operator>, "value": ...} '
+                                f"objects, e.g. [{{\"field\": \"payer_name\", \"op\": \"=\", \"value\": \"...\"}}]; "
+                                f"operators: {sorted(ALLOWED_OPS)}")
 
         if not metrics:
             raise SemanticError("Provide at least one metric. Valid metrics: " + ", ".join(self.metrics))
