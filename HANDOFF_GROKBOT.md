@@ -1,8 +1,8 @@
 # HANDOFF_GROKBOT.md: Grok Bot session, Oct 25 2026, 3:26 to about 4:55 PM PT
 
-**For Claude Code.** While your usage was out, Peter had Grok Bot act as main dev on this repo. This file lists what landed, what is still in flight, what was deliberately left alone, and what to do next on the agent analyzer. Last refreshed: **4:01 PM PT, Oct 25 2026**.
+**For Claude Code.** While your usage was out, Peter had Grok Bot act as main dev on this repo. This file lists what landed, what is still in flight, what was deliberately left alone, and what to do next on the agent analyzer. Last refreshed: **4:02 PM PT, Oct 25 2026**.
 
-Short version: 26 PRs opened against `claude/trusting-heisenberg-8xvazk` (22 merged, 4 open at refresh time). Peter asked for PRs to be **auto-merged**, so a script merged every cleanly mergeable PR into the working branch once a minute until 5 PM PT. Nothing was reviewed by hand. Treat every merged PR as unreviewed, and review it before you build on it.
+Short version: 28 PRs opened against `claude/trusting-heisenberg-8xvazk` (22 merged, 6 open at refresh time). Peter asked for PRs to be **auto-merged**, so a script merged every cleanly mergeable PR into the working branch once a minute until 5 PM PT. Nothing was reviewed by hand. Treat every merged PR as unreviewed, and review it before you build on it.
 
 ## Ground rules that were held
 
@@ -36,13 +36,13 @@ Each approach is self-contained in `analyst/approaches/<id>/`, with a write-up i
 
 - **A01 single-shot**: one SELECT, one execution, no repair. This is the floor. A separate run on question slice 0 scored 17/20 with the cloud agent's model. Misses: a zero-filled empty population, a payment-method definition (checks dropped), and a flag encoded as text instead of a boolean.
 - **A02 tool loop**: explore → draft → repair at most twice on an error, an empty result or a suspicious result. Programmatic checks cover `is_latest_submission`, rates within 0..100, NULL columns and grain. Known risk: a repair can drop the filter that made the result empty.
-- **A03**: no PR tagged A03 (the text-to-metrics arm landed as the typed metric compiler below).
+- **A03**: no PR tagged A03 at refresh time (agent bc-cb92504b); the typed metric compiler below may be its arm, check the agent.
 - **A04 multi-candidate**: 3 prompt-diverse SQLs, all executed. Agreement wins, and one pairwise selector call breaks a three-way split, with abstain allowed (CHASE-SQL-lite).
 - **A05 plan → execute → fresh-context critic**: allows one revision.
 - **A06 explore-first** (ReFoRCE-style templated probes, at most 13 aggregate statements, then one SQL): [#16](https://github.com/Peter-Shamoun/cc/pull/16) merged.
 - **A07 checked CTE decomposition**: population → join → metric → aggregation → ranking. Each step is checked for row count, grain uniqueness and conserved sums. It catches join fan-out, but a wrong population that isn't empty still passes.
 - **A08 self-consistency**: 5 attempts, a normalized vote, and the vote margin used as confidence (4–1 ships, 3–2 cascades, no majority abstains). Correlated errors make it confidently wrong, so publish `unanimous_wrong` and the calibration gap before you keep it.
-- **A09**: no PR tagged A09 (context retrieval below is the closest landed arm).
+- **A09**: no PR tagged A09 at refresh time (agent bc-701511ee); context retrieval below may be its arm, check the agent.
 - **Typed metric compiler** (`analyst/variants/typed_metric_compiler/`, write-up `research/variants/typed_metric_compiler.md`): [#20](https://github.com/Peter-Shamoun/cc/pull/20) merged. The model submits a `QuestionSpec` (catalog metrics, dimensions, filters, grain and an explicit date basis), which is compiled through the existing `SemanticAPI` in `claude/schema/04_agent_interface.py`. Free SQL runs only after `cannot_express`. Coverage is only **11.6% of concrete analytic questions** (17.1% with families), and joins, unions and windows dominate the misses. Verdict: keep it as a first lane with free SQL behind it, and score the covered subset and the complement separately.
 - **Context retrieval** (`analyst/variants/context_retrieval/`, write-up `research/variants/context_retrieval.md`): [#22](https://github.com/Peter-Shamoun/cc/pull/22) merged. A tenant value index (payers, CPT/HCPCS, CARC/RARC, dx, with no PHI columns and a tenant-checked `lookup`), a schema linker, and train-only few-shot. Verdict: schema linking and few-shot probably won't help on a 10-view `sem.*`, and the value index is the only arm with a non-zero prior. The primary screen arm is `cr_value` vs `cr0_base`. Its tests are in `tests/test_variant_context_retrieval.py` (7 passed).
 - **A10 dynamic few-shot**: TRAIN-only TF-IDF/BM25 retrieval of 3 examples. Hard leakage guards drop the same family or template, masked-SQL matches, near-duplicate questions, `heldout_hard_1`, and anything that isn't train.
@@ -98,6 +98,7 @@ Grid PRs:
 | [#24](https://github.com/Peter-Shamoun/cc/pull/24) | Grid cells C027–C029 on the sha256 dev set | open (auto-merge pending) | accuracy 19/20 (bench.compare.match) |
 | [#25](https://github.com/Peter-Shamoun/cc/pull/25) | C003 direct SQL grid cell (20/20) | open (auto-merge pending) | accuracy 20/20 (bench.compare.match) |
 | [#26](https://github.com/Peter-Shamoun/cc/pull/26) | Grid aggregation: pooled factor effects + SUMMARY.md | open (auto-merge pending) | n/a (see PR body) |
+| [#27](https://github.com/Peter-Shamoun/cc/pull/27) | Grid cell C009: decompose-CTE analyst, 20/20 | open (auto-merge pending) | accuracy 20/20 (bench.compare.match) |
 
 ### Product surface
 
