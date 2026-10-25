@@ -72,6 +72,12 @@ def build_prompt(session_dir: Path) -> str:
         f"Then reply with the single word DONE.\n\nUser question: {meta['question']}\n")
 
 
+def bootstrap_instruction(session_dir: Path) -> str:
+    """What the orchestrator sends the subagent: one command that prints its full briefing."""
+    return (f"Run this command with the Bash tool and follow the instructions it prints exactly:\n"
+            f"python3 {ROOT / 'bench/agent_cli.py'} --session {shlex.quote(str(session_dir))} briefing")
+
+
 def _reads_a_table(sql: str) -> bool:
     try:
         tree = sqlglot.parse_one(sql, read="duckdb")
