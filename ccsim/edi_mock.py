@@ -71,7 +71,7 @@ from typing import Iterator, NamedTuple
 
 from ccsim import edi_reference as R
 
-GENERATOR_VERSION = "3.1"
+GENERATOR_VERSION = "3.2"
 RECOUPMENT_CANDIDATE_SHARE = .15   # paid claims kept as possible targets of a later PLB recoupment (bounded memory)
 RECOUPMENT_MAX_DAYS = 400          # recoupments reach back at most about a year
 CLEARINGHOUSE_ID = "CC"
@@ -2261,9 +2261,9 @@ class _TenantRun(Generator):
             for n in names:
                 prof = PROFILES[n]
                 lo, hi = prof.get("ages", (0, 200))
-                ok = prof.get("sex", pat.sex) == pat.sex and lo <= age <= hi
+                ok = prof.get("sex", pat.sex) == pat.sex and lo <= key[3] <= hi
                 w.append(prof["weight"] * mult.get(n, 1.0) * ok *
-                         (PROFILES_FOR_CHILDREN.get(n, 0.0) if age < 13 else 1.0) *
+                         (PROFILES_FOR_CHILDREN.get(n, 0.0) if key[3] < 13 else 1.0) *
                          (RESPIRATORY_MONTH_INDEX[month] if self.seasonal and prof.get("seasonal") else 1.0))
             self._profile_cache[key] = (names, list(accumulate(w)))
         names, cum = self._profile_cache[key]
