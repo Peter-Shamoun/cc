@@ -406,9 +406,15 @@ class _Handler(BaseHTTPRequestHandler):
         self._send(200, xml.encode(), {"Content-Type": "text/xml"})
 
 
+class _Server(ThreadingHTTPServer):
+    # DuckDB opens many connections at once; the default listen backlog (5) drops SYNs, and each drop costs a
+    # 1 s TCP retransmit that real S3 never shows
+    request_queue_size = 256
+
+
 class Endpoint:
     def __init__(self, aws, host="127.0.0.1", port=0, latency_ms=0.0, bandwidth_mbps=None, secure_transport=True):
-        self.httpd = ThreadingHTTPServer((host, port), _Handler)
+        self.httpd = _Server((host, port), _Handler)
         self.httpd.daemon_threads = True
         self.httpd.aws = aws
         self.httpd.cfg = dict(latency_ms=latency_ms, bandwidth_mbps=bandwidth_mbps, secure_transport=secure_transport)

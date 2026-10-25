@@ -94,7 +94,8 @@ def _insert(con, table: str, rows: list[dict]):
 # Pipeline configuration (task-definition environment):
 #   GOLD_MODE=incremental (default)  recompute only the claims the new batch touched, rewrite only their partitions
 #   GOLD_MODE=full                   rebuild all of gold from all of silver every batch (what a rules change does)
-PARQUET = "FORMAT parquet, COMPRESSION zstd"
+PARQUET = "FORMAT parquet, COMPRESSION zstd"         # silver: default row groups keep lookups by file_id selective
+GOLD_PARQUET = PARQUET + ", ROW_GROUP_SIZE 1048576"   # gold: fewer, larger row groups = fewer range requests per query
 GOLD_LAYOUT = "cohort-tiered-3"
 OPEN_MONTHS = 3          # newest months kept as their own gold partition; older months fold into one file per quarter
 CLAIM_RELATIONS = [f"sem.{t}" for t in ("remit_claims", "remit_lines", "claims", "claim_lines", "adjustments", "remarks",
@@ -102,7 +103,7 @@ CLAIM_RELATIONS = [f"sem.{t}" for t in ("remit_claims", "remit_lines", "claims",
 SMALL_RELATIONS = ["sem.payments", "sem.provider_adjustments", "sem.payers"]   # one file each, rewritten per batch
 APPEND_RELATIONS = {f"lossless.{t.replace('.', '_')}": sql for t, sql in ESCALATION.items()}  # per received month
 RELATIONS = CLAIM_RELATIONS + SMALL_RELATIONS + list(APPEND_RELATIONS)
-GOLD_SORT = {rel: "claim_key" for rel in CLAIM_RELATIONS}
+GOLD_SORT = {rel: "payer_key, claim_key" for rel in CLAIM_RELATIONS}   # low-cardinality first: ~9% fewer bytes read
 VIEW_INPUTS = sorted(set(ESCALATION) | {"edi.transaction_set"})          # the silver tables gold is computed from
 assert sorted(CLAIM_RELATIONS + SMALL_RELATIONS) == sorted(f"sem.{t}" for t in SEM_TABLES)
 
@@ -152,9 +153,9 @@ def _scan(store: Store, keys, options: str = "") -> str:
     return "read_parquet([" + ", ".join(f"'{store.uri(k)}'" for k in keys) + f"], hive_partitioning=false{options})"
 
 
-def _copy(con, sql: str, path: Path) -> int:
+def _copy(con, sql: str, path: Path, options: str = PARQUET) -> int:
     """COPY a query to a local Parquet file; returns the row count."""
-    return con.execute(f"COPY ({sql}) TO '{path}' ({PARQUET})").fetchone()[0]
+    return con.execute(f"COPY ({sql}) TO '{path}' ({options})").fetchone()[0]
 
 
 # --- parser task ------------------------------------------------------------------------------------------------
@@ -295,7 +296,7 @@ def rules_hash() -> str:
     con.execute(DDL_LOSSLESS)
     seed_ref(con)
     h = hashlib.sha256()
-    for part in (DDL_LOSSLESS, DDL_SEMANTIC, repr(sorted(ESCALATION.items())), GOLD_LAYOUT, PARQUET, repr(GOLD_SORT),
+    for part in (DDL_LOSSLESS, DDL_SEMANTIC, repr(sorted(ESCALATION.items())), GOLD_LAYOUT, GOLD_PARQUET, repr(GOLD_SORT),
                  str(OPEN_MONTHS)):
         h.update(part.encode())
     for (t,) in con.execute("SELECT schema_name || '.' || table_name FROM duckdb_tables() WHERE schema_name = 'ref' "
@@ -463,7 +464,7 @@ class _GoldWriter:
     def write(self, relation: str, sql: str, partition: str) -> str:
         p = self.tmp / "gold.parquet"
         order = f" ORDER BY {GOLD_SORT[relation]}" if relation in GOLD_SORT else ""
-        _copy(self.con, f"SELECT * FROM ({sql}){order}", p)
+        _copy(self.con, f"SELECT * FROM ({sql}){order}", p, GOLD_PARQUET)
         key = gold_key(self.store, relation, partition, self.run_id)
         body = p.read_bytes()
         self.store.put(key, body)
