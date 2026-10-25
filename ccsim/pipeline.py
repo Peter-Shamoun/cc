@@ -25,8 +25,9 @@ import duckdb
 import pyarrow as pa
 
 from . import edi_mock
-from .lake import (COMMIT_TABLE, Silver, Store, acquire_lock, gold_key, manifest_files, manifest_key, publish, read_current,
-                   read_manifest, release_lock, run_month, silver_state)
+from .infra import SESSION_SECONDS
+from .lake import (COMMIT_TABLE, BatchLock, Silver, Store, check_manifest, gold_key, manifest_files, manifest_key, publish,
+                   read_current, read_manifest, run_month, silver_state)
 from .parser import TABLES, ParseError, parse_file
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -104,7 +105,8 @@ def _insert(con, table: str, rows: list[dict]):
 #   GOLD_MODE=full                   rebuild all of gold from all of silver every batch (what a rules change does)
 PARQUET = "FORMAT parquet, COMPRESSION zstd"         # silver: default row groups keep lookups by file_id selective
 GOLD_PARQUET = PARQUET + ", ROW_GROUP_SIZE 1048576"   # gold: fewer, larger row groups = fewer range requests per query
-GOLD_LAYOUT = "cohort-tiered-3"
+GOLD_LAYOUT = "cohort-tiered-4"
+READER_RETENTION_SECONDS = SESSION_SECONDS + 300   # a retired gold file outlives every reader session that saw it
 OPEN_MONTHS = 3          # newest months kept as their own gold partition; older months fold into one file per quarter
 CLAIM_RELATIONS = [f"sem.{t}" for t in ("remit_claims", "remit_lines", "claims", "claim_lines", "adjustments", "remarks",
                                         "diagnoses")]                    # partitioned by claim cohort, copy-on-write
@@ -173,14 +175,14 @@ def parse_batch(env) -> dict:
     e = env.environment
     c, B, kms = e["CUSTOMER"], e["BUCKET"], e["KMS_KEY_ARN"]
     store = Store(_clients(env), B, c, kms)
-    lock = acquire_lock(store, env.task_arn, env.aws.clock)
+    lock = BatchLock(store, env.task_arn, env.aws.clock).acquire()
     try:
-        return _parse_batch_locked(env, store)
+        return _parse_batch_locked(env, store, lock)
     finally:
-        release_lock(store, lock)
+        lock.release()
 
 
-def _parse_batch_locked(env, store: Store) -> dict:
+def _parse_batch_locked(env, store: Store, lock: BatchLock) -> dict:
     e = env.environment
     c, B = store.customer, store.bucket
     s3 = store.s3
@@ -254,27 +256,32 @@ def _parse_batch_locked(env, store: Store) -> dict:
                     "WHERE ingest_run_id = ?", [_now(env), len(raw), stats["loaded"], stats["rejected"], run_id])
         stats["parse_s"] = round(time.perf_counter() - t0, 2)
         t0 = time.perf_counter()
-        write_silver(con, store, run_id, day[:7])
+        write_silver(con, store, run_id, day[:7], lock)
         stats["silver_s"] = round(time.perf_counter() - t0, 2)
     t0 = time.perf_counter()
     silver = silver_state(store)
     gold = {}
-    stats["published"] = build_gold(env, s3, gold_con, B, c, store.kms, run_id, silver=silver, report=gold)
+    stats["published"] = build_gold(env, s3, gold_con, B, c, store.kms, run_id, silver=silver, report=gold, lock=lock)
     stats["gold_s"] = round(time.perf_counter() - t0, 2)
     if stats["published"]:
         stats.update(gold_full=gold["full"], gold=gold)
         t0 = time.perf_counter()
+        lock.renew()
         compact_silver(gold_con, store, silver, before_month=gold["last_month"])
         stats["compact_s"] = round(time.perf_counter() - t0, 2)
     return dict(stats, status="ok")
 
 
-def write_silver(con, store: Store, run_id: str, month: str):
-    """One part per non-empty table, straight into silver; the commit table (edi.source_file) goes last."""
+def write_silver(con, store: Store, run_id: str, month: str, lock: BatchLock):
+    """One part per non-empty table, straight into silver; the commit table (edi.source_file) goes last, and only
+    while this task still holds the lock (a task that overran its lease must not commit parts a successor may
+    already have deleted as garbage)."""
     order = [t for t in SILVER_TABLES if t != COMMIT_TABLE] + [COMMIT_TABLE]
     with tempfile.TemporaryDirectory() as tmp:
         for t in order:
             p = Path(tmp) / f"{t}.parquet"
+            if t == COMMIT_TABLE:
+                lock.renew()
             if _copy(con, f"SELECT * FROM {t}", p):
                 store.put(f"{store.root}parquet/{t}/received_month={month}/part-{run_id}.parquet", p.read_bytes())
 
@@ -392,14 +399,15 @@ _VIEW_WORDS = set(re.findall(r"[a-z_][a-z0-9_]*", (DDL_SEMANTIC + " ".join(f for
 
 
 def build_gold(env, s3, con, B: str, c: str, kms: str, run_id: str, silver: Silver | None = None,
-               full: bool | None = None, report: dict | None = None) -> bool:
+               full: bool | None = None, report: dict | None = None, lock: BatchLock | None = None) -> bool:
     """Bring gold up to date with silver as version v=<run_id>, then compare-and-set CURRENT. Returns True if it
     published; False if there was nothing to do or a newer version exists. `report` receives the build summary.
 
     Incremental (the default): the claims the pending (not yet in gold) runs touch are recomputed from their full
     silver history, and only the gold partitions holding them are rewritten. Full: every relation is rebuilt from
     all of silver. A full rebuild happens on GOLD_MODE=full, on the first build, when the rules hash changes (view
-    SQL, ref seeds, layout), or when a batch lands in a month older than gold's newest (claim cohorts could move)."""
+    SQL, ref seeds, layout), or when the pending runs are not all in the newest month: a late batch for an older month
+    (claim cohorts could move) or a crashed batch caught up across a month close (its month is being closed)."""
     store = Store(s3, B, c, kms)
     version, etag = read_current(store)
     if version is not None and version.removeprefix("v=") >= run_id:
@@ -413,7 +421,7 @@ def build_gold(env, s3, con, B: str, c: str, kms: str, run_id: str, silver: Silv
         return False
     if full is None:
         full = (env.environment.get("GOLD_MODE") == "full" or base is None or base["rules"] != rules
-                or not pending or min(map(run_month, pending)) < base["last_month"])
+                or not pending or any(run_month(r) != max(map(run_month, silver.committed_runs)) for r in pending))
     _working_catalog(con)
     last_month = max(map(run_month, silver.committed_runs))
     out = report if report is not None else {}
@@ -426,29 +434,39 @@ def build_gold(env, s3, con, B: str, c: str, kms: str, run_id: str, silver: Silv
             clock("load_s")
             out.update(touched_claims=None)
             relations = _gold_full(con, writer, last_month)
-            retired = sorted(manifest_files(base))
         else:
             out.update(_load_closure(con, store, silver, pending))
             clock("load_s")
             relations = {rel: {p: list(keys) for p, keys in base["relations"].get(rel, {}).items()} for rel in RELATIONS}
-            retired = _retier(writer, relations, last_month) if last_month > base["last_month"] else []
+            if last_month > base["last_month"]:
+                _retier(writer, relations, last_month)
             clock("retier_s")
-            retired += _gold_incremental(con, writer, relations, base, last_month, clock)
+            _gold_incremental(con, writer, relations, base, last_month, clock)
             out["touched_claims"] = con.execute("SELECT count(*) FROM touched_claim").fetchone()[0]
             out["touched_cohorts"] = dict(con.execute("SELECT cohort, count(*) FROM cohort GROUP BY 1 ORDER BY 1").fetchall())
         for rel in RELATIONS:          # a zero-row file per relation, listed first: binding a view reads only it
             if "schema" not in relations.setdefault(rel, {}):
                 relations[rel]["schema"] = [writer.write(rel, f"SELECT * FROM {_source_sql(rel)} LIMIT 0", "schema")]
         out["written"], out["written_mb"] = writer.count, round(writer.bytes / 1e6, 1)
+    # Retention: what this version stops listing (and the base's manifest) is retired now; a retired file is
+    # deleted only once it has been retired longer than a reader session can live, so a session that opened any
+    # recent version keeps working.
+    now = env.aws.clock()
+    live = manifest_files({"relations": relations})
+    newly = sorted((manifest_files(base) - live) | ({manifest_key(store, version)} if base else set()))
+    carried = [(k, t) for k, t in (base or {}).get("retired", []) if k not in live]
+    expired = [k for k, t in carried if now - t >= READER_RETENTION_SECONDS]
     manifest = dict(version=f"v={run_id}", run_id=run_id, previous=version, rules=rules,
-                    silver_through=max(silver.committed_runs, default=""), last_month=last_month,
-                    relations=relations, retired=sorted(set(retired)))
+                    silver_through=max(silver.committed_runs, default=""), last_month=last_month, relations=relations,
+                    retired=[[k, t] for k, t in carried if k not in expired] + [[k, now] for k in newly])
+    check_manifest(store, manifest)
+    if lock is not None:
+        lock.renew()
     if not publish(store, manifest, etag):
         return False
-    if base is not None:                       # no reader is still on base.previous: drop what only it referenced
-        store.delete(base["retired"] + ([manifest_key(store, base["previous"])] if base.get("previous") else []))
+    store.delete(expired)
     if full or last_month > (base or {}).get("last_month", ""):
-        _sweep_gold_orphans(store, manifest, base)
+        _sweep_gold_orphans(store, manifest)
     clock("publish_s")
     out["last_month"] = last_month
     return True
@@ -467,6 +485,9 @@ class _Phases:
 
 
 class _GoldWriter:
+    """Writes each gold file under a key no other write uses (run id + sequence number): a partition rewritten
+    twice in one build (folded, then a touched claim) gets two keys, so no live file is ever also retired."""
+
     def __init__(self, con, store: Store, run_id: str, tmp: Path):
         self.con, self.store, self.run_id, self.tmp, self.count, self.bytes = con, store, run_id, tmp, 0, 0
 
@@ -474,7 +495,7 @@ class _GoldWriter:
         p = self.tmp / "gold.parquet"
         order = f" ORDER BY {GOLD_SORT[relation]}" if relation in GOLD_SORT else ""
         _copy(self.con, f"SELECT * FROM ({sql}){order}", p, GOLD_PARQUET)
-        key = gold_key(self.store, relation, partition, self.run_id)
+        key = gold_key(self.store, relation, partition, self.run_id, f"-{self.count}")
         body = p.read_bytes()
         self.store.put(key, body)
         self.count += 1
@@ -553,8 +574,7 @@ def _gold_full(con, writer: _GoldWriter, last_month: str) -> dict:
 
 def _retier(writer: _GoldWriter, relations: dict, last_month: str) -> list:
     """A month closed: every partition except the new current month becomes one file, and months that left the
-    OPEN_MONTHS window fold into their quarter's file. Rows are copied, not recomputed. Returns the retired files."""
-    retired = []
+    OPEN_MONTHS window fold into their quarter's file. Rows are copied, not recomputed."""
     for rel in CLAIM_RELATIONS + list(APPEND_RELATIONS):
         groups = {}
         for part, keys in relations[rel].items():
@@ -569,14 +589,11 @@ def _retier(writer: _GoldWriter, relations: dict, last_month: str) -> list:
             for part, _ in entries:
                 del relations[rel][part]
             relations[rel][target] = [writer.write(rel, f"SELECT * FROM {_scan(writer.store, keys)}", target)]
-            retired += keys
-    return retired
 
 
 def _gold_incremental(con, writer: _GoldWriter, relations: dict, base: dict, last_month: str, clock) -> list:
     """Rewrite the partitions holding the touched claims (their old rows replaced), append the pending files'
-    lossless rows, and fold the pending payments and payers into the small relations. Returns the retired files."""
-    retired = []
+    lossless rows, and fold the pending payments and payers into the small relations."""
     store = writer.store
     _cohorts(con)
     for rel in CLAIM_RELATIONS:
@@ -584,7 +601,6 @@ def _gold_incremental(con, writer: _GoldWriter, relations: dict, base: dict, las
             old = relations[rel].get(part, [])
             return f"SELECT * FROM {_scan(store, old)} ANTI JOIN touched_claim USING (claim_key)" if old else None
         for part, keys in _write_partitioned(con, writer, rel, _claim_rows(rel, last_month), "cohort", keep_old).items():
-            retired += relations[rel].get(part, [])
             relations[rel][part] = keys
     clock("claims_s")
     # from here on only the pending files' rows: payments, payers and lossless rows are per file
@@ -601,28 +617,25 @@ def _gold_incremental(con, writer: _GoldWriter, relations: dict, base: dict, las
         old = relations[rel]["all"]
         sql = _payers_merge_sql(_scan(store, old)) if rel == "sem.payers" else \
             f"SELECT * FROM {_scan(store, old)} UNION ALL BY NAME SELECT * FROM {rel}"
-        retired += old
         relations[rel]["all"] = [writer.write(rel, sql, "all")]
     clock("small_s")
-    return retired
 
 
 def _payers_merge_sql(old_scan: str) -> str:
     """sem.payers is an aggregate over every submission and payment: fold the pending files' partial aggregate
-    into the previous one (counts add, as-sent lists union, the first-seen name and class are kept)."""
+    into the previous one (counts add, as-sent lists union, name and class take the least value, as the view does)."""
     lists = lambda col: (f"CASE WHEN o.{col} IS NULL AND n.{col} IS NULL THEN NULL ELSE "
                          f"list_sort(list_distinct(COALESCE(o.{col}, []) || COALESCE(n.{col}, []))) END AS {col}")
-    return (f"SELECT payer_key, COALESCE(o.payer_name, n.payer_name) AS payer_name, "
-            f"COALESCE(o.payer_class, n.payer_class) AS payer_class, {lists('names_as_sent')}, {lists('ids_as_sent')}, "
+    return (f"SELECT payer_key, least(o.payer_name, n.payer_name) AS payer_name, "
+            f"least(o.payer_class, n.payer_class) AS payer_class, {lists('names_as_sent')}, {lists('ids_as_sent')}, "
             f"COALESCE(o.claim_submissions, 0) + COALESCE(n.claim_submissions, 0) AS claim_submissions, "
             f"COALESCE(o.payments, 0) + COALESCE(n.payments, 0) AS payments "
             f"FROM {old_scan} o FULL JOIN sem.payers n USING (payer_key)")
 
 
-def _sweep_gold_orphans(store: Store, manifest: dict, base: dict | None):
-    """Data files no version references: left behind by a build that crashed or lost the CURRENT race. Runs under
-    the batch lock (no build in flight), at month close and after full rebuilds."""
-    keep = manifest_files(manifest) | manifest_files(base)
-    keep |= {manifest_key(store, manifest["version"])} | ({manifest_key(store, base["version"])} if base else set())
-    keep.add(f"{store.root}semantic_layer/CURRENT")
+def _sweep_gold_orphans(store: Store, manifest: dict):
+    """Files neither live nor retired: left behind by a build that crashed or lost the CURRENT race. Runs under the
+    batch lock (no build in flight), at month close and after full rebuilds."""
+    keep = manifest_files(manifest) | {k for k, _ in manifest["retired"]}
+    keep |= {manifest_key(store, manifest["version"]), f"{store.root}semantic_layer/CURRENT"}
     store.delete([k for k, _ in store.list(f"{store.root}semantic_layer/") if k not in keep])
