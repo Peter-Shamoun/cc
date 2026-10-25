@@ -325,3 +325,34 @@ Measured at 5 MB/day for 30 days from 2026-07-01: lines/claim 5.13; denial rate 
 unchanged; ~1,560 distinct diagnoses; 2,990 claims per business day; 32 835 files a day from day 1.
 One year at 5 MB/business day plus the burn-in: 1,330 MB raw, 3,088 claims per business day, 622 s CPU, peak RSS
 978 MB.
+
+## Generator 3.3: fixes for realism audit 3 (2026-10-25)
+
+`research/edi_realism_audit_3.md` scored 3.2 at 7.5/10: claim by claim hard to fault, giveaways at file-set level.
+
+| # | Finding | 3.3 |
+|---|---|---|
+| 1 | One payer tail for both labs | `TAIL_PAYERS[region]`: each lab's own tail (NC 260, TX 200), named for places in the lab's state and its neighbours (NC: SC VA TN GA; TX: OK LA AR NM) with claims offices there (80% home state); TPAs sit at home (60%), next door (25%) or at a national hub (15%). Ids and names unique across markets. Workers-comp state fund removed. 12% of home-Blues members carry another state's Blues prefix (BlueCard) |
+| 2 | Same market everywhere | `tenant_market(tc)`: fixed per lab (independent of the seed), lognormal factors (clipped at 1.5 sigma) on segment shares (sigma .10), profile weights (.20, relative to routine blood), menu probabilities (.15, certain tests stay certain) and long-tail weights (.35). `MEDICAID_FFS_SHARE` NC 20% (Medicaid Direct), TX 6% (STAR). Calibration tests use the lab's own shares and per-lab bands |
+| 3 | COB order | `_add_secondary`: own employer plan before a spouse's (rel 01), children by the birthday rule (rel 19, the parent born earlier in the year is primary), Medicaid and TRICARE last; TRICARE/VA primaries have no 837 secondary; second plans from the lab's market; Blues behind Blues x0.1 |
+| 4 | Diagnoses at volume | 83001/83002/82670 -> gyn / infertility / male; Z01.84 only on titers (new `immunity` domain: 86787, 86706); hepatitis head led by Z11.59, R74.01, R94.5 (B18.2 ~0.03% of slots); endocrine head reordered (E22.1 ~0%); electrolyte codes adult-only except E86.0 |
+| 5 | Modifiers | no QW (accredited high-complexity lab); 90 exactly on the lab's send-out list (40% of the rare CLFS tail, fixed per lab) |
+| 6 | No working aged; deductibles open in Q4 | 8.5% of self-subscribed commercial/Blues patients are 65-76 with Medicare second (MSP: SBR05 = 12; the MAC pays up to its allowed less the primary's payment, CO-253 on it, CO-45 the rest); deductible pace lognormal (median .4 years, sigma .55): ~10% of commercial claims still owe deductible in October |
+| 7 | Medicare corrections re-price | MAC reversal/corrections are always the denial-reprocessed flow (allowed = CLFS on every event) |
+| 8 | Patient service centers | Zipf volumes (s .9), suites in medical office buildings, the lab's own NPI |
+| 9 | Invented MA ids | Cigna-HealthSpring 63092. UHC/Humana/Aetna MA keep their own ids: real routing shares the parent id (87726/61101/60054), which the one-id-per-payer ledger cannot express without a routing-id split across parser and lake (not done) |
+| 10 | 2420E / REF*D9 rates | per billing system: acme_labs D9 on every claim, no 2420E; acme_diagnostics 2420E on every line, no D9 |
+| 11 | Duplicates | CARC 18 group fixed per payer; no N522; no N130 MOA with CARC 18 |
+| 12 | Misc | no freq-8 voids to the MAC; 837s on MLK, Presidents, Juneteenth, Columbus and Veterans Day (`lab_holidays`), 835/EFT still skip all federal holidays; 81479 carries the lab's panel name (NTE and SV101-7) |
+
+Also: `p_duplicate_submission` .015 -> .018 (the duplicate share of denials had drifted to ~9% against the spec's 15%);
+`dx_fits_cpt` looks codes up in one shared set per test instead of a per-(code, test) cache that grew with volume.
+
+Measured at 5 MB/day for 30 days from 2026-07-01 (acme_labs): lines/claim 5.18 (Medicare 6.2, commercial 4.7); denial
+rate 11.2%, 69% line-level; allowed/CLFS unchanged; ~1,530 distinct diagnoses; 2,847 claims per business day (the NC
+lab now sends REF*D9 on every claim and has more secondaries, so a claim is ~5% larger). From the generator directly
+(30,000 claims per lab, October): commercial claims for patients 65+ 6.6% (NC) / 5.3% (TX), all with Medicare second;
+deductible still open 10% / 13%; TX Medicaid FFS 6% of Medicaid; FEP behind the home Blues plan 4% (NC) / 1.4% (TX) of
+FEP coverages; BlueCard 11-12% of home-Blues claims; modifier 90 on 1.2-1.4% of lines.
+One year at 5 MB per file day plus the burn-in: 1,235 MB raw, 3,032 claims per billing day, patient share on 27.3% of
+primary adjudications, 3.7% of claims billed to a secondary; 602 s CPU, peak RSS 931 MB.

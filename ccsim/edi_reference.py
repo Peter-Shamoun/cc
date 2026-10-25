@@ -397,7 +397,8 @@ _domains("82570", dm=2, ckd=2, htn=1, proteinuria=1, drug=2)
 _domains("87491 87591 87389 87536", sti=5)
 _domains("86592 86780", sti=5, infect=.5, neuro=.3)
 _domains("87661 87510 87480", vaginitis=4, sti=1)
-_domains("86803 87522 86704 86706 86708 80074 87340", hepatitis=4)
+_domains("86803 87522 86704 86708 80074 87340", hepatitis=4)
+_domains("86706", hepatitis=2, immunity=2)
 _domains("87624 87623 87625", gyn=1)
 _domains("87637 87631 87635 87880", resp=1)
 _domains("87798 87481 87150", vaginitis=3, uti=2)
@@ -421,12 +422,13 @@ _domains("86141 83880 84484", cardio=5)
 _domains("85379", thrombophilia=3, cardio=1)
 _domains("85049", heme=4)
 _domains("86677 83690 82150 87338", gi=4)
-_domains("86787", infect=2)
+_domains("86787 86735 86765", immunity=4, infect=.5)
 _domains("82785", allergy=5)
 _domains("82533 82088", endocrine=4)
 _domains("82627", endocrine=2, gyn=2)
-_domains("83001 83002 82670", endocrine=1, infertility=1)
-_domains("84403 84402", male=2, gyn=1, endocrine=1)
+_domains("83001 83002", gyn=3, infertility=1.5, male=1)
+_domains("82670", gyn=3, infertility=1)
+_domains("84403 84402", male=3, gyn=1, endocrine=.3)
 _domains("87070 87081", infect=4)
 _domains("86618", general=3, rheum=1, infect=.3)            # Lyme serology: fatigue, joint pain; Lyme itself is rare in NC
 _domains("84550", gout=3, ckd=2)
@@ -556,15 +558,24 @@ DOMAIN_CODES = {d: frozenset(dx.code for dx in v) for d, v in DX_DOMAINS.items()
 def dx_fits_cpt(code: str, cpt: str) -> bool:
     """The diagnosis justifies the test: it is in one of the test's clinical domains, or it is a screening code
     that covers the test (a general exam covers any routine test)."""
-    key = (code, cpt)
-    fits = _DX_FITS_CACHE.get(key)
+    return code in GENERAL_EXAM_CODES or code in _justifying_codes(cpt)
+
+
+def _justifying_codes(cpt: str) -> frozenset:
+    """Every code that justifies the test (one set per test; tests with the same domains share it)."""
+    fits = _CPT_DX_CACHE.get(cpt)
     if fits is None:
-        fits = _DX_FITS_CACHE[key] = (code in GENERAL_EXAM_CODES or code in SCREENING_BY_CPT.get(cpt, ()) or
-                                      any(code in DOMAIN_CODES.get(d, ()) for d in cpt_domains(cpt)))
+        domains = tuple(sorted(cpt_domains(cpt)))
+        screening = frozenset(SCREENING_BY_CPT.get(cpt, ()))
+        key = (domains, screening)
+        if key not in _DOMAINS_DX_CACHE:
+            _DOMAINS_DX_CACHE[key] = screening.union(*(DOMAIN_CODES.get(d, ()) for d in domains))
+        fits = _CPT_DX_CACHE[cpt] = _DOMAINS_DX_CACHE[key]
     return fits
 
 
-_DX_FITS_CACHE: dict = {}
+_CPT_DX_CACHE: dict = {}
+_DOMAINS_DX_CACHE: dict = {}
 
 
 def pick_dx_for_cpt(r, cpt: str, sex: str, age: float) -> str:
