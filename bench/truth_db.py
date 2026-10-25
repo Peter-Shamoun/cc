@@ -16,9 +16,11 @@ the rows come straight from the generator's own decisions. Tables (all in schema
     event_lines(pcn, payer_id, event_number, line_number, cpt, adjudicated_cpt, paid, allowed, denied, co_carcs)
     files(day, kind, name, expect, payer_id)        plb(day, payer_id, trn, code, reference, amount)
     denial_carcs(carc)                              the reviewed CARCs that make a $0 CO adjustment a denial
+    payers(payer_id, payer, payer_class)            every payer billed, remitted or not
 
 `is_current` marks the event that defines the claim+payer's current state under the business rule
-(latest non-duplicate event, unless it is a reversal).
+(latest event that is not a duplicate-claim denial, unless it is a reversal; a duplicate denial is current only
+when the claim+payer has no other event).
 """
 from __future__ import annotations
 
@@ -28,7 +30,7 @@ from pathlib import Path
 import duckdb
 import pyarrow as pa
 
-from ccsim.edi_mock import iter_claims
+from ccsim.edi_mock import PAYER_BY_ID, iter_claims
 
 BATCH_ROWS = 50_000
 
@@ -69,6 +71,7 @@ def build_truth_db(generator_out_dir: Path, tenant: str, db_path: Path) -> Path:
     con.execute("CREATE SCHEMA ledger")
     sinks = {name: _Sink(con, name) for name in ("claims", "claim_lines", "claim_diagnoses", "submissions",
                                                  "adjudications", "events", "event_adjustments", "event_lines")}
+    billed_payer_ids = set()
     for c in iter_claims(generator_out_dir, tenant, index):
         pcn = c["pcn"]
         sinks["claims"].add(pcn=pcn, dos=c["dos"], submitted=c["submitted"], order_type=c.get("order_type"),
@@ -83,6 +86,7 @@ def build_truth_db(generator_out_dir: Path, tenant: str, db_path: Path) -> Path:
         for i, dx in enumerate(c.get("dx", [])):
             sinks["claim_diagnoses"].add(pcn=pcn, sequence=i + 1, dx=dx)
         for s in c["submissions"]:
+            billed_payer_ids.add(s["payer_id"])
             sinks["submissions"].add(pcn=pcn, submission_date=s["date"], payer_id=s["payer_id"], payer_sequence=s["seq"],
                                      frequency=s["frequency"])
         for payer_id, a in c["adjudications"].items():
@@ -92,7 +96,8 @@ def build_truth_db(generator_out_dir: Path, tenant: str, db_path: Path) -> Path:
                                        paid_current=a["paid_current"], status_current=a["status_current"],
                                        ever_reversed=a["ever_reversed"], claim_level_only=a["claim_level_only"],
                                        has_duplicate_denial=a["has_duplicate_denial"])
-            real_events = [i for i, e in enumerate(a["events"]) if not e.get("duplicate_denial")]
+            real_events = [i for i, e in enumerate(a["events"]) if not e.get("duplicate_denial")] or \
+                list(range(len(a["events"])))
             current_index = real_events[-1] if real_events and a["remitted_current"] else None
             for n, e in enumerate(a["events"]):
                 sinks["events"].add(pcn=pcn, payer_id=payer_id, event_number=n + 1, event_date=e["date"], status=e["status"],
@@ -116,7 +121,9 @@ def build_truth_db(generator_out_dir: Path, tenant: str, db_path: Path) -> Path:
     plb = [dict(day=p["day"], payer_id=p["payer_id"], trn=p["trn"], code=p["code"], reference=p["reference"],
                 amount=p["amount"]) for p in T.get("plb", [])]
     denial_carcs = [dict(carc=c) for c in index.get("denial_carcs", [])]   # the reviewed denial-CARC list
-    for name, rows in (("files", files), ("plb", plb), ("denial_carcs", denial_carcs)):
+    payers = [dict(payer_id=pid, payer=PAYER_BY_ID[pid].name, payer_class=PAYER_BY_ID[pid].payer_class)
+              for pid in sorted(billed_payer_ids)]
+    for name, rows in (("files", files), ("plb", plb), ("denial_carcs", denial_carcs), ("payers", payers)):
         sink = _Sink(con, name)
         for r in rows:
             sink.add(**r)
