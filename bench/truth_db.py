@@ -14,7 +14,7 @@ the rows come straight from the generator's own decisions. Tables (all in schema
            claim_level_only, trn, duplicate_denial, is_current)
     event_adjustments(pcn, payer_id, event_number, group_code, carc, amount)
     event_lines(pcn, payer_id, event_number, line_number, cpt, adjudicated_cpt, paid, allowed, denied, co_carcs,
-                units_paid, charge, modifiers)                 charge / modifiers as the 835 line echoes them
+                units, units_paid, charge, modifiers)          units billed / charge / modifiers as the 835 line echoes them
     files(day, kind, name, expect, payer_id)        plb(day, payer_id, trn, code, reference, amount, target_pcn,
                                                         payment_date)   day = DTM*405, payment_date = BPR16
     denial_carcs(carc)                              the reviewed CARCs that make a $0 CO adjustment a denial
@@ -127,7 +127,8 @@ def build_truth_db(generator_out_dir: Path, tenant: str, db_path: Path) -> Path:
                     sinks["event_lines"].add(pcn=pcn, payer_id=payer_id, event_number=n + 1, line_number=li + 1,
                                              cpt=ln["cpt"], adjudicated_cpt=ln.get("adjudicated_cpt"), paid=ln["paid"],
                                              allowed=ln.get("allowed"), denied=ln.get("denied"),
-                                             units_paid=ln.get("units_paid"), charge=ln.get("charge"),
+                                             units=ln.get("units"), units_paid=ln.get("units_paid"),
+                                             charge=ln.get("charge"),
                                              modifiers=ln.get("modifiers"),
                                              co_carcs=ln.get("co_carcs"))
     for s in sinks.values():

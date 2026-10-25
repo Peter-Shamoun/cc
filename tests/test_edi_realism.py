@@ -177,7 +177,7 @@ def test_npis_are_valid_spread_and_unrelated(run):
     T, _ = run
     npis = {c["referring_npi"] for c in T["claims"].values()} | {m.npi(t.npi_seed) for t in m.TENANTS.values()}
     assert all(m.npi_is_valid(n) and "1003000000" <= n <= "1993999999" for n in npis)
-    prefixes = Counter(n[:6] for n in npis)
+    prefixes = Counter(n[:7] for n in npis)
     assert max(prefixes.values()) == 1
     clia = {t.clia for t in m.TENANTS.values()}
     assert "34D0655059" not in clia and all(re.fullmatch(r"\d\dD\d{7}", c) for c in clia)
@@ -249,3 +249,142 @@ def test_window_opens_in_steady_state_with_trailing_recoupments(run):
     assert burn_in_billed and all(c["adjudications"] or c["submissions"] for c in burn_in_billed)
     assert any(c["resubmitted"] for c in burn_in_billed)          # corrected claims for earlier denials
     assert {p["code"] for p in T["plb"]} >= {"WO", "L6"}
+
+
+# --- audit 2 --------------------------------------------------------------------------------------------
+def _claim_rows_837(files):
+    """Per claim: payer id, member id, lines (code, SV101-7), 2310C facility, from the raw 837s."""
+    out = []
+    for f, body in files:
+        if f["kind"] != "837" or f["expect"] != "parsed":
+            continue
+        payer = member = None
+        cur = None
+        for e in _segments(body):
+            if e[0] == "NM1" and e[1] == "IL":
+                member = e[9]
+            elif e[0] == "NM1" and e[1] == "PR":
+                payer = e[9]
+            elif e[0] == "CLM":
+                cur = dict(pcn=e[1], payer=payer, member=member, lines=[], facility=None)
+                out.append(cur)
+            elif e[0] == "SV1" and cur is not None:
+                parts = re.split("[:>]", e[1])
+                cur["lines"].append((parts[1], parts[6] if len(parts) > 6 else ""))
+            elif e[0] == "NM1" and e[1] == "77" and cur is not None:
+                cur["facility"] = e[3]
+            elif e[0] == "N3" and cur is not None and cur["facility"] and "facility_street" not in cur:
+                cur["facility_street"] = e[1]
+    return out
+
+
+def test_moldx_zcodes_and_germline_prior_auth(run):
+    """Palmetto (MolDX): molecular lines carry the DEX Z-code in SV101-7, or are denied CO-16 (M20/N350).
+    Commercial plans deny a large share of germline genetic tests (prior authorization)."""
+    T, files = run
+    molecular = {c for c, cpt in m.CPTS.items() if cpt.category == "molecular"}
+    rows = _claim_rows_837(files)
+    medicare = [(c, code, desc) for c in rows if c["payer"] == "11502" for code, desc in c["lines"] if code in molecular]
+    assert medicare and sum(desc.startswith("Z") for _, _, desc in medicare) >= .8 * len(medicare)
+    for c, code, desc in medicare:
+        lines = _current_lines(T, c["pcn"])
+        if not desc.startswith("Z") and lines and len(lines) == len(c["lines"]):
+            i = [l[0] for l in c["lines"]].index(code)
+            assert lines[i]["paid"] == 0, c["pcn"]
+    germline = [c for c in T["claims"].values() if c["submissions"] and set(c["cpts"]) & m.GERMLINE_TESTS
+                and c["payer_class"] in ("commercial", "blues")]
+    denied = [c for c in germline if any(a["denied"] or any(ln["denied"] for ln in a["events"][-1]["lines"])
+                                         for a in c["adjudications"].values() if a["remitted_current"])]
+    remitted = [c for c in germline if any(a["remitted_current"] for a in c["adjudications"].values())]
+    assert remitted and .2 <= len(denied) / len(remitted) <= .65
+
+
+def test_member_ids_and_claim_numbers_follow_each_payers_format(run):
+    T, files = run
+    ids = defaultdict(set)
+    for c in _claim_rows_837(files):
+        ids[c["payer"]].add(c["member"])
+    fmt = {"60054": r"W\d{9}", "61473": r"[A-Z]{3}\d{9}", "FEPNC": r"R\d{8}", "NCMCD": r"\d{9}[A-Z]",
+           "11502": r"\d[A-Z][A-Z0-9]\d[A-Z][A-Z0-9]\d[A-Z]{2}\d{2}", "87726": r"\d{9}"}
+    for payer, pattern in fmt.items():
+        assert ids.get(payer), payer
+        assert all(re.fullmatch(pattern, i) for i in ids[payer]), (payer, sorted(ids[payer])[:3])
+    assert len({i[:3] for i in ids["61473"]}) >= 10                 # Blues prefixes vary by group
+    shapes = defaultdict(set)
+    checked = 0
+    for f, body in files:
+        if f["kind"] != "835" or f["expect"] != "parsed":
+            continue
+        icn = status = None
+        for e in _segments(body):
+            if e[0] == "CLP":
+                icn, status = e[7], e[2]
+                shapes[f.get("payer_id")].add(re.sub(r"\d", "9", re.sub(r"[A-Z]", "A", icn)))
+            elif e[0] == "DTM" and e[1] == "050" and f.get("payer_id") == "11502" and status != "22":
+                received = date(int(e[2][:4]), int(e[2][4:6]), int(e[2][6:8]))
+                assert icn[2:7] == f"{received:%y}{received.timetuple().tm_yday:03d}", (icn, e[2])
+                checked += 1
+    assert checked > 100
+    assert len({next(iter(v)) for v in shapes.values() if len(v) == 1}) >= 8   # formats differ by payer
+
+
+def test_tail_payers_are_geographically_coherent():
+    stems = Counter()
+    for p in m.TAIL_PAYERS:
+        for place, states in m._TAIL_PLACES.items():
+            if p.name.startswith(place + " "):
+                assert p.remit_address[2] in states.split(), (p.name, p.remit_address)
+                stems[place] += 1
+    assert max(stems.values()) <= m.MAX_PAYERS_PER_STEM
+    boxes = Counter(len(p.remit_address[0].split()[-1]) for p in m.TAIL_PAYERS if p.remit_address[0].startswith("PO BOX"))
+    assert len(boxes) >= 4 and max(boxes.values()) < .5 * sum(boxes.values())
+
+
+def test_every_diagnosis_fits_the_patients_age_and_add_ons_have_parents(run):
+    _, files = run
+    for c in _claims_837(files):
+        codes = {l[0] for l in c["lines"]}
+        if "82570" in codes:
+            assert codes & m.CREATININE_PARENTS, c["pcn"]
+    slots = lyme = 0
+    for f, body in files:
+        if f["kind"] != "837" or f["expect"] != "parsed":
+            continue
+        dob = sex = None
+        for e in _segments(body):
+            if e[0] == "DMG":
+                dob, sex = e[2], e[3]
+            elif e[0] == "HI":
+                age = 2026.5 - int(dob[:4])
+                for x in e[1:]:
+                    d = R.DX_BY_CODE[re.split("[:>]", x)[1]]
+                    assert d.min_age - 1.5 <= age <= d.max_age + 1.5, (d, dob)
+                    slots += 1
+                    lyme += d.code == "A6920"
+    assert lyme <= .002 * slots
+
+
+def test_streets_take_their_own_suffixes():
+    import random
+    r = random.Random(5)
+    streets = Counter(R.street_address(r, "NC")[0].split(" ", 1)[-1] for _ in range(20000))
+    main = {k: v for k, v in streets.items() if re.fullmatch(r"(?:[NSEW] )?MAIN [A-Z]+", k)}
+    assert sum(v for k, v in main.items() if k.endswith(" ST")) >= .6 * sum(main.values())
+    assert len(streets) > 5000
+
+
+def test_crossovers_ordering_providers_facilities_and_plb_periods(run):
+    T, files = run
+    partners = Counter()
+    periods = set()
+    for f, body in files:
+        if f["kind"] == "835" and f["expect"] == "parsed":
+            segs = _segments(body)
+            partners.update(e[3] for e in segs if e[0] == "NM1" and e[1] == "TT")
+            periods |= {e[2][4:] for e in segs if e[0] == "PLB"}
+    assert len(partners) >= 5 and partners.most_common(1)[0][0] == "BCBSNC MEDICARE SUPPLEMENT"
+    assert len(periods) > 1                                          # PLB02 differs by payer
+    npis = Counter(c["referring_npi"] for c in T["claims"].values() if c["submissions"])
+    assert npis.most_common(1)[0][1] <= .03 * sum(npis.values())
+    rows = [c for c in _claim_rows_837(files) if c["facility"]]
+    assert rows and not any(c.get("facility_street") == m.TENANTS["acme_labs"].address[0] for c in rows)
