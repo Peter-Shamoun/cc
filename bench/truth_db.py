@@ -15,6 +15,7 @@ the rows come straight from the generator's own decisions. Tables (all in schema
     event_adjustments(pcn, payer_id, event_number, group_code, carc, amount)
     event_lines(pcn, payer_id, event_number, line_number, cpt, adjudicated_cpt, paid, allowed, denied, co_carcs)
     files(day, kind, name, expect, payer_id)        plb(day, payer_id, trn, code, reference, amount)
+    denial_carcs(carc)                              the reviewed CARCs that make a $0 CO adjustment a denial
 
 `is_current` marks the event that defines the claim+payer's current state under the business rule
 (latest non-duplicate event, unless it is a reversal).
@@ -114,7 +115,8 @@ def build_truth_db(generator_out_dir: Path, tenant: str, db_path: Path) -> Path:
              for f in T.get("files", [])]
     plb = [dict(day=p["day"], payer_id=p["payer_id"], trn=p["trn"], code=p["code"], reference=p["reference"],
                 amount=p["amount"]) for p in T.get("plb", [])]
-    for name, rows in (("files", files), ("plb", plb)):
+    denial_carcs = [dict(carc=c) for c in index.get("denial_carcs", [])]   # the reviewed denial-CARC list
+    for name, rows in (("files", files), ("plb", plb), ("denial_carcs", denial_carcs)):
         sink = _Sink(con, name)
         for r in rows:
             sink.add(**r)
