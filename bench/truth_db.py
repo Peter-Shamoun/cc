@@ -1,0 +1,120 @@
+"""The generator's ledger (truth/<tenant>/claims.jsonl) as DuckDB tables, for answer keys at full scale.
+
+Expected answers are computed with SQL over these tables. They share nothing with the parser or the sem.* views:
+the rows come straight from the generator's own decisions. Tables (all in schema `ledger`):
+
+    claims(pcn, dos, submitted, order_type, charge, principal_dx, referring_npi, risky_provider, dependent,
+           resubmitted, voided, has_any_remit, n_lines)
+    claim_lines(pcn, line_number, cpt, units, charge, modifiers)
+    claim_diagnoses(pcn, sequence, dx)
+    submissions(pcn, submission_date, payer_id, payer_sequence, frequency)
+    adjudications(pcn, payer_id, payer, payer_class, payer_sequence, remitted_current, denied, denied_recorded,
+                  denied_signal_v3, paid_current, status_current, ever_reversed, claim_level_only, has_duplicate_denial)
+    events(pcn, payer_id, event_number, event_date, status, icn, paid, patient_responsibility, charge,
+           claim_level_only, trn, duplicate_denial, is_current)
+    event_adjustments(pcn, payer_id, event_number, group_code, carc, amount)
+    event_lines(pcn, payer_id, event_number, line_number, cpt, adjudicated_cpt, paid, allowed, denied, co_carcs)
+    files(day, kind, name, expect, payer_id)        plb(day, payer_id, trn, code, reference, amount)
+
+`is_current` marks the event that defines the claim+payer's current state under the business rule
+(latest non-duplicate event, unless it is a reversal).
+"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import duckdb
+import pyarrow as pa
+
+from ccsim.edi_mock import iter_claims
+
+BATCH_ROWS = 50_000
+
+
+class _Sink:
+    def __init__(self, con, table):
+        self.con, self.table, self.rows = con, table, []
+
+    def add(self, **row):
+        self.rows.append(row)
+        if len(self.rows) >= BATCH_ROWS:
+            self.flush()
+
+    def flush(self):
+        if not self.rows:
+            return
+        keys = list(dict.fromkeys(k for r in self.rows for k in r))
+        arrow = pa.table({k: [r.get(k) for r in self.rows] for k in keys})
+        self.con.register("_batch", arrow)
+        exists = self.con.execute("SELECT count(*) FROM duckdb_tables() WHERE schema_name = 'ledger' AND table_name = ?",
+                                  [self.table]).fetchone()[0]
+        if exists:
+            self.con.execute(f"INSERT INTO ledger.{self.table} BY NAME SELECT * FROM _batch")
+        else:
+            self.con.execute(f"CREATE TABLE ledger.{self.table} AS SELECT * FROM _batch")
+        self.con.unregister("_batch")
+        self.rows = []
+
+
+def build_truth_db(generator_out_dir: Path, tenant: str, db_path: Path) -> Path:
+    generator_out_dir, db_path = Path(generator_out_dir), Path(db_path)
+    db_path.unlink(missing_ok=True)
+    index = json.loads((generator_out_dir / "truth.json").read_text())
+    con = duckdb.connect(str(db_path))
+    con.execute("CREATE SCHEMA ledger")
+    sinks = {name: _Sink(con, name) for name in ("claims", "claim_lines", "claim_diagnoses", "submissions",
+                                                 "adjudications", "events", "event_adjustments", "event_lines")}
+    for c in iter_claims(generator_out_dir, tenant, index):
+        pcn = c["pcn"]
+        sinks["claims"].add(pcn=pcn, dos=c["dos"], submitted=c["submitted"], order_type=c.get("order_type"),
+                            charge=c["charge"], principal_dx=c.get("principal_dx"), referring_npi=c.get("referring_npi"),
+                            risky_provider=c.get("risky_provider"), dependent=c.get("dependent"),
+                            resubmitted=c.get("resubmitted"), voided=c.get("voided"),
+                            has_any_remit=bool(c["adjudications"]), n_lines=len(c["cpts"]))
+        for i, cpt in enumerate(c["cpts"]):
+            sinks["claim_lines"].add(pcn=pcn, line_number=i + 1, cpt=cpt, units=(c.get("units") or [None] * 99)[i],
+                                     charge=(c.get("line_charges") or [None] * 99)[i],
+                                     modifiers=(c.get("modifiers") or [[]] * 99)[i])
+        for i, dx in enumerate(c.get("dx", [])):
+            sinks["claim_diagnoses"].add(pcn=pcn, sequence=i + 1, dx=dx)
+        for s in c["submissions"]:
+            sinks["submissions"].add(pcn=pcn, submission_date=s["date"], payer_id=s["payer_id"], payer_sequence=s["seq"],
+                                     frequency=s["frequency"])
+        for payer_id, a in c["adjudications"].items():
+            sinks["adjudications"].add(pcn=pcn, payer_id=payer_id, payer=a["payer"], payer_class=a.get("payer_class"),
+                                       payer_sequence=a["seq"], remitted_current=a["remitted_current"], denied=a["denied"],
+                                       denied_recorded=a["denied_recorded"], denied_signal_v3=a["denied_signal_v3"],
+                                       paid_current=a["paid_current"], status_current=a["status_current"],
+                                       ever_reversed=a["ever_reversed"], claim_level_only=a["claim_level_only"],
+                                       has_duplicate_denial=a["has_duplicate_denial"])
+            real_events = [i for i, e in enumerate(a["events"]) if not e.get("duplicate_denial")]
+            current_index = real_events[-1] if real_events and a["remitted_current"] else None
+            for n, e in enumerate(a["events"]):
+                sinks["events"].add(pcn=pcn, payer_id=payer_id, event_number=n + 1, event_date=e["date"], status=e["status"],
+                                    icn=e.get("icn"), paid=e["paid"], patient_responsibility=e.get("pr"),
+                                    charge=e.get("charge"), claim_level_only=e.get("claim_level_only"), trn=e.get("trn"),
+                                    duplicate_denial=bool(e.get("duplicate_denial")), is_current=n == current_index)
+                for code, amount in (e.get("cas") or {}).items():
+                    group, _, carc = code.partition("-")
+                    sinks["event_adjustments"].add(pcn=pcn, payer_id=payer_id, event_number=n + 1, group_code=group,
+                                                   carc=carc, amount=amount)
+                for li, ln in enumerate(e.get("lines", [])):
+                    sinks["event_lines"].add(pcn=pcn, payer_id=payer_id, event_number=n + 1, line_number=li + 1,
+                                             cpt=ln["cpt"], adjudicated_cpt=ln.get("adjudicated_cpt"), paid=ln["paid"],
+                                             allowed=ln.get("allowed"), denied=ln.get("denied"),
+                                             co_carcs=ln.get("co_carcs"))
+    for s in sinks.values():
+        s.flush()
+    T = index["tenants"][tenant]
+    files = [dict(day=f["day"], kind=f["kind"], name=f["name"], expect=f["expect"], payer_id=f.get("payer_id"))
+             for f in T.get("files", [])]
+    plb = [dict(day=p["day"], payer_id=p["payer_id"], trn=p["trn"], code=p["code"], reference=p["reference"],
+                amount=p["amount"]) for p in T.get("plb", [])]
+    for name, rows in (("files", files), ("plb", plb)):
+        sink = _Sink(con, name)
+        for r in rows:
+            sink.add(**r)
+        sink.flush()
+    con.close()
+    return db_path
