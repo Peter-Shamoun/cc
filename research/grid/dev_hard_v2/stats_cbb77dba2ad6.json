@@ -1,0 +1,62 @@
+{
+ "rows": {
+  "claims": 2448,
+  "claim_lines": 12529,
+  "payments": 381,
+  "remit_claims": 2441,
+  "remit_lines": 12542,
+  "adjustments": 19604
+ },
+ "distinct_claim_keys": 2384,
+ "submission_date_range": [
+  "2026-07-01",
+  "2026-08-14"
+ ],
+ "payment_date_range": [
+  "2026-07-01",
+  "2026-08-18"
+ ],
+ "payments_by_month": {
+  "2026-07-01": 259,
+  "2026-08-01": 122
+ },
+ "remit_claims_by_payment_month": {
+  "2026-07-01": 1681,
+  "2026-08-01": 760
+ },
+ "august_payments": 122,
+ "august_remit_claims": 760,
+ "claims_by_frequency_code": {
+  "1": 2386,
+  "7": 61,
+  "8": 1
+ },
+ "freq8_void_claim_rows": 1,
+ "freq8_void_claim_keys": 1,
+ "remit_claims_freq8": 0,
+ "providers_referring_npi": {
+  "distinct": 298,
+  "max_claims": 84,
+  "with_ge_15_claims": 30
+ },
+ "providers_rendering_npi": {
+  "distinct": 0,
+  "max_claims": 0,
+  "with_ge_15_claims": 0
+ },
+ "providers_billing_npi": {
+  "distinct": 1,
+  "max_claims": 2384,
+  "with_ge_15_claims": 1
+ },
+ "providers_referring_npi_denied_latest": {
+  "distinct": 56,
+  "max_denied_claims": 3,
+  "with_ge_15_denied": 0
+ },
+ "denied_latest_claims": 72,
+ "freq7_corrected_claim_keys": 61,
+ "freq7_with_original_in_range": 6,
+ "claim_keys_with_multiple_submissions": 64,
+ "reversed_claims": 1
+}
