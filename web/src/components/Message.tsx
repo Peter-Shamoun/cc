@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Pencil, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pencil, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react';
 import clsx from 'clsx';
 import type { AssistantView, ChartPart, CodePart, ImagePart, Part, TablePart, ToolCallPart, UserMessage } from '../lib/contract';
 import { KNOWN_PART_TYPES } from '../lib/contract';
@@ -32,13 +32,38 @@ export function messageMarkdown(m: AssistantView): string {
     .join('\n\n');
 }
 
-export function UserBubble({ msg, onEdit }: { msg: UserMessage; onEdit?: (t: string) => void }) {
+export function UserBubble({ msg, onEdit, version, onVersion, disabled }: { msg: UserMessage; onEdit?: (t: string) => void; version?: { current: number; total: number }; onVersion?: (k: number) => void; disabled?: boolean }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(msg.text);
+  if (editing) {
+    const submit = () => { setEditing(false); if (value.trim() && value.trim() !== msg.text) onEdit?.(value); };
+    return (
+      <div className="flex flex-col items-end" data-testid="msg-user-editing">
+        <div className="w-full rounded-[18px] bg-muted px-4 py-3">
+          <textarea autoFocus value={value} aria-label="Edit message" onChange={(e) => setValue(e.target.value)} rows={Math.min(8, value.split('\n').length + 1)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } if (e.key === 'Escape') setEditing(false); }}
+            className="w-full resize-none bg-transparent leading-normal outline-none" />
+          <div className="mt-2 flex justify-end gap-2 font-sans text-sm">
+            <button type="button" onClick={() => { setEditing(false); setValue(msg.text); }} className="rounded-full border border-line bg-bg px-3.5 py-1.5 hover:bg-hover">Cancel</button>
+            <button type="button" onClick={submit} disabled={!value.trim()} className="rounded-full bg-fg px-3.5 py-1.5 text-bg disabled:opacity-40">Send</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="group flex flex-col items-end" data-testid="msg-user">
       <div className="max-w-[70%] whitespace-pre-wrap rounded-[18px] bg-muted px-4 py-2.5 leading-normal">{msg.text}</div>
-      <div className="mt-1 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+      <div className={clsx('mt-1 flex items-center gap-0.5 transition-opacity group-hover:opacity-100 focus-within:opacity-100', version ? 'opacity-100' : 'opacity-0')}>
         <CopyButton text={msg.text} />
-        {onEdit && <IconButton label="Edit message" onClick={() => onEdit(msg.text)}><Pencil size={15} /></IconButton>}
+        {onEdit && <IconButton label="Edit message" disabled={disabled} onClick={() => { setValue(msg.text); setEditing(true); }}><Pencil size={15} /></IconButton>}
+        {version && onVersion && (
+          <div className="flex items-center font-sans text-xs text-fg-muted" data-testid="version-nav">
+            <IconButton label="Previous version" className="h-7 w-7" disabled={disabled || version.current <= 1} onClick={() => onVersion(version.current - 2)}><ChevronLeft size={15} /></IconButton>
+            <span className="tabular-nums">{version.current}/{version.total}</span>
+            <IconButton label="Next version" className="h-7 w-7" disabled={disabled || version.current >= version.total} onClick={() => onVersion(version.current)}><ChevronRight size={15} /></IconButton>
+          </div>
+        )}
       </div>
     </div>
   );

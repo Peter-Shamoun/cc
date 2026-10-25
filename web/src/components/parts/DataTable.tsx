@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { flexRender, getCoreRowModel, getFilteredRowModel, getSortedRowModel, useReactTable, type ColumnDef, type SortingState } from '@tanstack/react-table';
 import { ArrowDown, ArrowUp, Download, Maximize2, ShieldAlert } from 'lucide-react';
 import clsx from 'clsx';
@@ -8,6 +9,8 @@ import { CopyButton, IconButton } from '../ui';
 import { useAdapter } from '../../adapters/context';
 
 type Row = unknown[];
+const VIRTUALIZE_AT = 200;
+const ROW_H = 37;
 
 export function DataTable({ part, onOpen, full }: { part: TablePart; onOpen?: () => void; full?: boolean }) {
   const adapter = useAdapter();
@@ -37,6 +40,14 @@ export function DataTable({ part, onOpen, full }: { part: TablePart; onOpen?: ()
     getFilteredRowModel: getFilteredRowModel(),
   });
   const rows = table.getRowModel().rows;
+  // Virtualize once a table is big enough to cost layout time (spec §4.3: 10k-row previews).
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const virtual = rows.length > VIRTUALIZE_AT;
+  const rv = useVirtualizer({ count: virtual ? rows.length : 0, getScrollElement: () => scrollRef.current, estimateSize: () => ROW_H, overscan: 12 });
+  const items = virtual ? rv.getVirtualItems() : [];
+  const padTop = virtual && items.length ? items[0].start : 0;
+  const padBottom = virtual && items.length ? rv.getTotalSize() - items[items.length - 1].end : 0;
+  const shown = virtual ? items.map((v) => rows[v.index]) : rows;
   const hasPhi = part.columns.some((c) => c.phi);
   const download = async () => {
     const name = csvFilename(part.title);
@@ -69,7 +80,7 @@ export function DataTable({ part, onOpen, full }: { part: TablePart; onOpen?: ()
           )}
         </div>
       </div>
-      <div className={clsx('overflow-auto', !full && 'max-h-[400px]')}>
+      <div ref={scrollRef} className={clsx('overflow-auto', full ? 'max-h-[calc(100vh-170px)]' : 'max-h-[400px]')} data-virtual={virtual || undefined}>
         <table className="w-full border-collapse font-sans text-sm">
           <thead className="sticky top-0 z-[1] bg-elev">
             {table.getHeaderGroups().map((hg) => (
@@ -92,8 +103,9 @@ export function DataTable({ part, onOpen, full }: { part: TablePart; onOpen?: ()
             ))}
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.id} className="hover:bg-hover">
+            {padTop > 0 && <tr aria-hidden style={{ height: padTop }} />}
+            {shown.map((r) => (
+              <tr key={r.id} className="hover:bg-hover" style={virtual ? { height: ROW_H } : undefined}>
                 {r.getVisibleCells().map((c) => {
                   const meta = c.column.columnDef.meta as { numeric?: boolean; phi?: boolean };
                   return (
@@ -104,6 +116,7 @@ export function DataTable({ part, onOpen, full }: { part: TablePart; onOpen?: ()
                 })}
               </tr>
             ))}
+            {padBottom > 0 && <tr aria-hidden style={{ height: padBottom }} />}
             {rows.length === 0 && (
               <tr><td colSpan={part.columns.length} className="px-3 py-6 text-center text-fg-subtle">Query returned 0 rows</td></tr>
             )}

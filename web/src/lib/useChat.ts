@@ -19,6 +19,18 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
   const [convId, setConvId] = useState<ID | null>(null);
   const [messages, setMessages] = useState<ViewMessage[]>([]);
   const [busy, setBusy] = useState(false);
+  /**
+   * Edit-and-branch (ChatGPT/Claude "< 2/3 >"): keyed by the index of the edited user message,
+   * each version is the thread tail from that index on. Held in memory only, like the store.
+   * Nested branches inside a non-visible version are flattened (v1 simplification).
+   */
+  const [branches, setBranches] = useState<Record<number, { versions: ViewMessage[][]; idx: number }>>({});
+  const persist = (m: ViewMessage): UserMessage | AssistantMessage => {
+    if (m.role === 'user') return m;
+    const { streaming: _s, status: _st, openText: _o, finishReason: _f, usage: _u, ...rest } = m;
+    void _s; void _st; void _o; void _f; void _u;
+    return rest as AssistantMessage;
+  };
   const abortRef = useRef<AbortController | null>(null);
 
   const refresh = useCallback(async () => setThreads((await store.listConversations()).items), [store]);
@@ -30,12 +42,14 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     abortRef.current?.abort();
     const c = await store.getConversation(id);
     setConvId(c ? id : null);
+    setBranches({});
     setMessages(c ? c.messages.map(toView) : []);
   }, [store]);
 
   const newChat = useCallback(() => {
     abortRef.current?.abort();
     setConvId(null);
+    setBranches({});
     setMessages([]);
   }, []);
 
@@ -94,5 +108,45 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     refresh();
   }, [convId, newChat, refresh, store]);
 
-  return { threads, convId, messages, busy, send, stop, open, newChat, regenerate, remove };
+  /** Edit user message `i`: keep the old tail as a version, run the edited question as a new one. */
+  const editAt = useCallback(async (i: number, text: string) => {
+    const t = text.trim();
+    const old = messages[i];
+    if (!convId || busy || !t || old?.role !== 'user' || t === old.text) return;
+    const tail = messages.slice(i);
+    const b = branches[i] ?? { versions: [tail], idx: 0 };
+    const versions = [...b.versions];
+    versions[b.idx] = tail;
+    const user: UserMessage = { id: uid('u'), role: 'user', text: t, createdAt: new Date().toISOString() };
+    versions.push([user]);
+    setBranches((all) => ({ ...Object.fromEntries(Object.entries(all).filter(([k]) => Number(k) < i)), [i]: { versions, idx: versions.length - 1 } }));
+    const prefix = messages.slice(0, i);
+    await store.replaceMessages(convId, [...prefix, user].map(persist));
+    await run(convId, [...prefix, user]);
+  }, [branches, busy, convId, messages, run, store]);
+
+  /** Show version `k` of the branch at user message `i`. */
+  const switchVersion = useCallback(async (i: number, k: number) => {
+    const b = branches[i];
+    if (!convId || busy || !b || k < 0 || k >= b.versions.length || k === b.idx) return;
+    const versions = [...b.versions];
+    versions[b.idx] = messages.slice(i);
+    const next = [...messages.slice(0, i), ...versions[k]];
+    setBranches((all) => ({ ...Object.fromEntries(Object.entries(all).filter(([key]) => Number(key) < i)), [i]: { versions, idx: k } }));
+    setMessages(next);
+    await store.replaceMessages(convId, next.map(persist));
+  }, [branches, busy, convId, messages, store]);
+
+  const rename = useCallback(async (id: ID, title: string) => {
+    await store.renameConversation(id, title);
+    refresh();
+  }, [refresh, store]);
+
+  /** `{current, total}` for the version arrows under user message `i`, if it was ever edited. */
+  const versionOf = (i: number) => {
+    const b = branches[i];
+    return b ? { current: b.idx + 1, total: b.versions.length } : undefined;
+  };
+
+  return { threads, convId, messages, busy, send, stop, open, newChat, regenerate, remove, editAt, switchVersion, versionOf, rename };
 }
