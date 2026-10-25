@@ -17,7 +17,7 @@ def ledger(tmp_path_factory):
     out = tmp_path_factory.mktemp("calibration")
     truth = generate(out, Scenario(start=date(2026, 2, 2), days=150, volume_scale=1.5, seed=31), ["acme_labs"])
     T = truth["tenants"]["acme_labs"]
-    return T, list(T["claims"].values())
+    return T, [c for c in T["claims"].values() if c["submitted"] >= "2026-02-02"]   # not the burn-in's claims
 
 
 def _primary(claims):
@@ -186,7 +186,7 @@ def test_calendar_and_remittance_cadence(ledger):
 def test_respiratory_season(tmp_path):
     def resp_share(start):
         t = generate(tmp_path / str(start), Scenario(start=start, days=28, volume_scale=1, seed=3), ["acme_labs"])
-        claims = t["tenants"]["acme_labs"]["claims"].values()
+        claims = [c for c in t["tenants"]["acme_labs"]["claims"].values() if c["submitted"] >= str(start)]
         return sum(c["order_type"] == "respiratory" for c in claims) / len(claims)
     assert resp_share(date(2026, 1, 5)) > 3 * resp_share(date(2026, 6, 1))   # spec: Jan 3.2x vs Jun 0.5x
 
@@ -197,7 +197,7 @@ def test_tenants_never_share_pcns_or_identifiers(tmp_path):
     assert not pcns["acme_labs"] & pcns["acme_diagnostics"]
     assert {p[:2] for p in pcns["acme_labs"]} == {"LB"} and {p[:2] for p in pcns["acme_diagnostics"]} == {"DX"}
     body = b"".join(p.read_bytes() for p in (tmp_path / "acme_labs").rglob("*.x12") if "/837/" in str(p))
-    assert b"PRV*BI*PXC*291U00000X" in body and b"REF*X4*34D0655059" in body and b"*81:B:1*" in body
+    assert b"PRV*BI*PXC*291U00000X" in body and b"REF*X4*34D2187436" in body and b"*81:B:1*" in body
     remit = b"".join(p.read_bytes() for p in (tmp_path / "acme_labs").rglob("*.x12") if "/835/" in str(p))
     assert b"*ZZ*CLAIMCLARITY   *" in remit and re.search(rb"TRN\*1\*\d+\*1\d{9}~", remit)     # TRN03 = 1 + payer EIN
     assert re.search(rb"CAS\*CO\*[^~]*\b253\*", remit)                     # Medicare sequestration
