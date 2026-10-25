@@ -1,0 +1,80 @@
+{
+  "cr0_base": {
+    "schema_mode": "full",
+    "value_index": false,
+    "fewshot_k": 0,
+    "fewshot_selector": "skeleton",
+    "near_duplicate_jaccard": 0.92,
+    "exclude_same_family": true,
+    "recall_floor_views": 2,
+    "glossary": "basic",
+    "context_style": "goal",
+    "hard_refuse": false,
+    "max_examples_in_prompt": 3
+  },
+  "cr_value": {
+    "schema_mode": "full",
+    "value_index": true,
+    "fewshot_k": 0,
+    "fewshot_selector": "skeleton",
+    "near_duplicate_jaccard": 0.92,
+    "exclude_same_family": true,
+    "recall_floor_views": 2,
+    "glossary": "basic",
+    "context_style": "goal",
+    "hard_refuse": false,
+    "max_examples_in_prompt": 3
+  },
+  "cr_fewshot_skeleton": {
+    "schema_mode": "full",
+    "value_index": false,
+    "fewshot_k": 3,
+    "fewshot_selector": "skeleton",
+    "near_duplicate_jaccard": 0.92,
+    "exclude_same_family": true,
+    "recall_floor_views": 2,
+    "glossary": "basic",
+    "context_style": "goal",
+    "hard_refuse": false,
+    "max_examples_in_prompt": 3
+  },
+  "cr_fewshot_lexical": {
+    "schema_mode": "full",
+    "value_index": false,
+    "fewshot_k": 3,
+    "fewshot_selector": "lexical",
+    "near_duplicate_jaccard": 0.92,
+    "exclude_same_family": true,
+    "recall_floor_views": 2,
+    "glossary": "basic",
+    "context_style": "goal",
+    "hard_refuse": false,
+    "max_examples_in_prompt": 3
+  },
+  "cr_schema_recall": {
+    "schema_mode": "linked_recall",
+    "value_index": false,
+    "fewshot_k": 0,
+    "fewshot_selector": "skeleton",
+    "near_duplicate_jaccard": 0.92,
+    "exclude_same_family": true,
+    "recall_floor_views": 2,
+    "glossary": "basic",
+    "context_style": "goal",
+    "hard_refuse": false,
+    "max_examples_in_prompt": 3
+  },
+  "cr_all": {
+    "schema_mode": "linked_recall",
+    "value_index": true,
+    "fewshot_k": 3,
+    "fewshot_selector": "skeleton",
+    "near_duplicate_jaccard": 0.92,
+    "exclude_same_family": true,
+    "recall_floor_views": 2,
+    "glossary": "basic",
+    "context_style": "goal",
+    "hard_refuse": false,
+    "max_examples_in_prompt": 3
+  }
+}
