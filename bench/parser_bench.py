@@ -202,7 +202,7 @@ def _cpu_s() -> float:
 def run_batch(batch_name: str, out_dir: Path, use_tracemalloc: bool = False, workers: int = 1) -> dict:
     """Parse and write one batch exactly as the pipeline does; returns its metrics. Call in a fresh process."""
     from ccsim.pipeline import silver_part_files
-    files = build_corpus()["batches"][batch_name]
+    files = backfill_batch() if batch_name == BACKFILL_BATCH else build_corpus()["batches"][batch_name]
     rss_after_imports = peak_rss_mb()
     if use_tracemalloc:
         import tracemalloc
@@ -210,7 +210,7 @@ def run_batch(batch_name: str, out_dir: Path, use_tracemalloc: bool = False, wor
     out_dir.mkdir(parents=True, exist_ok=True)
     started = datetime(2026, 10, 1, 12)                           # fixed: the reference must not depend on the corpus
     known_sha, raw_bytes, rejected = {}, 0, []
-    cpu0, wall0 = _cpu_s(), time.perf_counter()
+    cpu0, wall0, parent0 = _cpu_s(), time.perf_counter(), time.process_time()
     try:
         from ccsim.silver_staging import RawFile, SilverBatch, file_id_of
     except ImportError:                                           # the pre-optimisation code (reference runs)
@@ -246,7 +246,7 @@ def run_batch(batch_name: str, out_dir: Path, use_tracemalloc: bool = False, wor
                 [started + timedelta(minutes=5), len(files), len(files) - len(rejected), len(rejected)])
     cpu2 = _cpu_s()
     parquet_bytes = {t: p.stat().st_size for t, p in silver_part_files(con, out_dir) if p is not None}
-    cpu3, wall3 = _cpu_s(), time.perf_counter()
+    cpu3, wall3, parent3 = _cpu_s(), time.perf_counter(), time.process_time()
     for p in out_dir.glob("*.parquet"):                            # empty tables are not published
         if p.stem not in parquet_bytes:
             p.unlink()
@@ -257,7 +257,8 @@ def run_batch(batch_name: str, out_dir: Path, use_tracemalloc: bool = False, wor
         tracemalloc.stop()
     return dict(batch=batch_name, files=len(files), rejected=rejected, raw_bytes=raw_bytes,
                 cpu_parse_s=cpu1 - cpu0, cpu_stage_s=cpu2 - cpu1, cpu_write_s=cpu3 - cpu2, cpu_s=cpu3 - cpu0,
-                wall_s=wall3 - wall0, workers=workers,
+                wall_s=wall3 - wall0, workers=workers, cpu_task_process_s=parent3 - parent0,
+                cpu_workers_s=(cpu3 - cpu0) - (parent3 - parent0),
                 worker_peak_rss_mb=resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss / 1024 if workers > 1 else None,
                 peak_rss_mb=peak_rss_mb(), rss_after_imports_mb=rss_after_imports,
                 traced_peak_mb=traced_peak and traced_peak / 2**20, parquet_bytes=parquet_bytes)
@@ -399,6 +400,43 @@ def cmd_run(label: str, freeze: bool, only: list[str] | None, use_tracemalloc: b
     return report
 
 
+# --- scale-out: one big batch at 1, 2 and 4 workers ----------------------------------------------------------------
+BACKFILL_BATCH = "backfill_20_business_days"
+BACKFILL_SCENARIO = dict(target_mb_per_day=5, days=28, start="2026-08-03", seed=21)   # 20 business days, ~100 MB
+
+
+def backfill_batch() -> list[dict]:
+    """20 business days delivered as one batch (a backfill's unit of work). Not in the oracle corpus: the
+    pre-optimisation parser would need ~10 GB for it. Equivalence is covered by the oracle batches."""
+    from datetime import date
+
+    from ccsim.edi_mock import Scenario
+    sc = dict(BACKFILL_SCENARIO, start=date.fromisoformat(BACKFILL_SCENARIO["start"]))
+    return [dict(path=f["path"], day=f["day"]) for f in _generate("backfill", Scenario(**sc))]
+
+
+def cmd_scale(worker_counts: list[int]) -> list[dict]:
+    files = backfill_batch()
+    raw_mb = sum((CORPUS_DIR / f["path"]).stat().st_size for f in files) / MB
+    out, rows = BENCH_DIR / "candidate" / "scale", []
+    for n in worker_counts:
+        r = _run_batch_in_subprocess(BACKFILL_BATCH, out, False, n)
+        shutil.rmtree(out)
+        serial, total = r["cpu_task_process_s"], r["cpu_s"]
+        rows.append(dict(workers=n, raw_mb=round(raw_mb, 1), cpu_s_per_mb=round(total / raw_mb, 3),
+                         wall_s_per_mb=round(r["wall_s"] / raw_mb, 3),
+                         task_process_cpu_s_per_mb=round(serial / raw_mb, 3),
+                         worker_cpu_s_per_mb=round(r["cpu_workers_s"] / raw_mb, 3),
+                         # on n vCPUs nothing else runs: the task process's own work is serial, the rest spreads
+                         ideal_wall_s_per_mb=round(max(serial, total / n) / raw_mb, 3),
+                         task_peak_rss_mb=round(r["peak_rss_mb"]), worker_peak_rss_mb=r["worker_peak_rss_mb"]
+                         and round(r["worker_peak_rss_mb"])))
+        print(json.dumps(rows[-1]), flush=True)
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    (RESULTS_DIR / "scale.json").write_text(json.dumps(rows, indent=1))
+    return rows
+
+
 def cmd_profile(batch_name: str, use_cprofile: bool):
     out = BENCH_DIR / "profile" / batch_name
     shutil.rmtree(out, ignore_errors=True)
@@ -430,6 +468,8 @@ def main(argv=None):
     run.add_argument("--keep-output", action="store_true")
     run.add_argument("--repeat", type=int, default=1, help="run each batch N times, report the least CPU")
     run.add_argument("--workers", type=int, default=1, help="SilverBatch parse workers (PARSE_WORKERS)")
+    scale = sub.add_parser("scale", help=f"the {BACKFILL_BATCH} batch at several worker counts")
+    scale.add_argument("--workers", type=int, nargs="+", default=[1, 2, 4])
     prof = sub.add_parser("profile")
     prof.add_argument("--batch", required=True)
     prof.add_argument("--cprofile", action="store_true")
@@ -446,6 +486,8 @@ def main(argv=None):
         cmd_run("reference", True, a.only, False, False, True)
     elif a.cmd == "run":
         cmd_run(a.label, False, a.only, a.tracemalloc, a.slim_segment, a.keep_output, a.repeat, a.workers)
+    elif a.cmd == "scale":
+        cmd_scale(a.workers)
     elif a.cmd == "profile":
         cmd_profile(a.batch, a.cprofile)
     elif a.cmd == "_batch":
