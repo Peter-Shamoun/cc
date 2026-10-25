@@ -38,8 +38,8 @@ s.con.execute("SELECT payer_name, avg(is_denied::INT) FROM sem.remit_claims WHER
 | `aws/http.py` | The SigV4 endpoint: S3 REST (path style) and the STS Query API. Supports presigned URLs and aws-chunked bodies, plus injectable latency and bandwidth. |
 | `aws/cloudtrail.py` | One CloudTrail-shaped record per API call, allowed or denied. |
 | `infra.py` | The account as Terraform would build it: roles, ABAC bucket policy, key policies, lifecycle, the EventBridge rule and task definitions. |
-| `pipeline.py` | The Fargate parser. Bronze → staging → silver, quarantining bad files. Loads are idempotent. Gold is rebuilt from silver, CURRENT is flipped with a compare-and-set, and old versions are cleaned up. |
-| `query.py` | The per-request session: Cognito token → STS → DuckDB scoped to this customer's current gold version. |
+| `pipeline.py`, `lake.py` | The Fargate parser. Under a per-customer S3 lock: bronze → silver parts (edi.source_file last, as the commit record), quarantining bad files. Loads are idempotent. Gold is maintained incrementally: only the claims a batch touches are recomputed and only their partitions rewritten (`GOLD_MODE=full` rebuilds everything). A new gold version is a manifest; CURRENT moves to it with a compare-and-set. Closed months are compacted. Layout and measurements: `docs/data-backend/lake-optimization.md`. |
+| `query.py` | The per-request session: Cognito token → STS → CURRENT → manifest → DuckDB views over exactly the files of that version, scoped to this customer's gold prefix. |
 | `edi_mock.py`, `x12_validate.py`, `parser.py` | Mock EDI and its ledger; an independent validator; the X12 → lossless-schema parser. Patients, places and diagnoses come from `edi_reference.py` (Census/SSA name frequencies, real city/ZIP pairs and area codes per lab state, FY2026 billable ICD-10-CM codes in clinical domains so each line points at a fitting diagnosis, NCCI panel components a claim scrubber strips). A 90-day hidden burn-in (`Scenario.burn_in_days`) makes day 1 steady state: the window's 835s also answer, recoup and rework claims billed before it, and the ledger keeps only what the window delivered. The generator is calibrated to `research/edi_realism_calibration.yaml` (Medicare MAC + MA + Medicaid + Blues + national + a long payer tail, CLFS-based allowed amounts, XiFin denial mix, payer remittance cycles, holidays, seasonality; the CY2026 CLFS ships in `data/clfs_2026q4.csv`; `tests/test_edi_calibration.py` checks the distributions). It streams day by day with flat memory; volume is set in real units (`Scenario.target_mb_per_day`); the ledger is `truth.json` (index) + `truth/<customer>/claims.jsonl`, read back with `edi_mock.load_truth`. |
 
 ## Security model, and the test that checks each piece
@@ -54,6 +54,8 @@ s.con.execute("SELECT payer_name, avg(is_denied::INT) FROM sem.remit_claims WHER
 | A customer can be offboarded instantly | Disabling the customer's key leaves its objects unreadable everywhere. | `test_customer_offboarding_by_disabling_its_key` |
 | Duplicate events don't double-load | The parser skips raw objects already recorded in silver. | `test_redelivered_success_event_is_a_noop` |
 | Readers never see a half-built or older gold | CURRENT is flipped by a conditional write, and only forward. | `test_current_never_moves_backwards` |
+| Incremental gold equals a full rebuild | Same view SQL over each touched claim's full silver history; a batch that crashed after its silver commit is caught up by the next one. | `test_incremental_gold_equals_full_rebuild` |
+| One batch per customer at a time | S3 lease lock (`If-None-Match` create, `If-Match` takeover after expiry). | `test_batch_lock_is_exclusive_and_expires` |
 
 ## What the simulation found (fix before or while porting)
 
