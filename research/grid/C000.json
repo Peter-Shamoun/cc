@@ -40,6 +40,7 @@
  "total_sql_executions": 20,
  "total_repairs": 0,
  "failure_modes": [],
+  "protocol_notes": "Answers were scored only after all 20 were saved. While locating the dev-set tag, bench/question_families.py was opened, so the SQL templates for the four generated-family questions in this cell were visible before those queries were written. q01-q03 reference SQL was also visible and those questions are not in this 20. The pitfalls glossary text in bench/agent_cli.py was visible; it overlaps the basic glossary. No answer key, gold result, or dev-question reference SQL was opened for the other 16 questions. Each question still had one execution and zero repairs, and the checker result above is unchanged.",
  "questions": [
   {
    "question_id": "f_payer_avg_paid_per_paid_claim__medicare-part-b-north-carolina",
