@@ -1,5 +1,5 @@
 """Generate the design-check workload once: N business days of one customer at 5 MB/day (raw EDI kept on local
-disk for the current pipeline), and every day parsed with the unchanged ccsim.parser into per-table Parquet (one
+disk for the current pipeline), and every day parsed by the parser task's SilverBatch into per-table Parquet (one
 directory per day) for the table-format prototypes. Every system under test replays the same days.
 
     python -m bench.design_check.gen_days DATA_DIR [BUSINESS_DAYS]
@@ -14,13 +14,11 @@ import time
 from datetime import date, datetime
 from pathlib import Path
 
-import duckdb
-
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from ccsim import edi_mock
-from ccsim.parser import TABLES, ParseError, parse_file
-from ccsim.pipeline import DDL_LOSSLESS, _insert
+from ccsim.parser import TABLES
+from ccsim.silver_staging import RawFile, SilverBatch, file_id_of
 
 CUSTOMER = "acme_labs"
 BUCKET = "cc-prod"
@@ -30,43 +28,26 @@ def parse_day(day_dir: Path, day: str, out: Path, run_id: str, known_sha: dict) 
     """The parser task's per-file loop (pipeline._parse_batch_locked) without S3: same file ids, duplicate and
     quarantine handling. Writes one Parquet per non-empty table."""
     started = datetime.fromisoformat(day)
-    con = duckdb.connect()
-    con.execute(DDL_LOSSLESS)
-    rows_by_table = {t: [] for t in TABLES}
-    stats = dict(loaded=0, rejected=0)
-    _insert(con, "edi.ingest_run", [dict(ingest_run_id=run_id, started_at=started, status="SUCCEEDED",
-                                          parser_name="ccsim.parser", parser_version="ccsim-0.2", schema_version="1")])
-    for f in sorted(p for p in day_dir.rglob("*") if p.is_file()):
-        key = f"{CUSTOMER}/raw/received_date={day}/{f.relative_to(day_dir).as_posix()}"
-        body = f.read_bytes()
-        sha = hashlib.sha256(body).hexdigest()
-        file_id = hashlib.sha1(f"{key}#v1".encode()).hexdigest()[:16]
-        meta = dict(s3_uri=f"s3://{BUCKET}/{key}", s3_bucket=BUCKET, s3_key=key, s3_version_id="v1", s3_etag=sha[:32],
-                    s3_last_modified=started, s3_region="us-west-2", kms_key_arn=None, original_filename=f.name,
-                    source_system="sftp", size_bytes=len(body), sha256=sha, received_at=started, character_encoding="ascii")
-        try:
-            text = body[3:].decode("ascii") if body.startswith(b"\xef\xbb\xbf") else body.decode("ascii")
-            rows = parse_file(text, file_id, CUSTOMER, meta, run_id, started)
-        except (ParseError, UnicodeDecodeError, IndexError, ValueError, KeyError, TypeError) as err:
-            stats["rejected"] += 1
-            rows_by_table["edi.source_file"].append(dict(file_id=file_id, tenant_code=CUSTOMER, file_kind="UNKNOWN",
-                                                         ingest_run_id=run_id, ingested_at=started, parse_status="REJECTED",
-                                                         parse_messages=[f"{type(err).__name__}: {err}"[:500]], **meta))
-            continue
-        if sha in known_sha:
-            rows["edi.source_file"][0]["duplicate_of_file_id"] = known_sha[sha]
-        else:
-            known_sha[sha] = file_id
-        for t in TABLES:
-            rows_by_table[t] += rows.get(t, [])
-        stats["loaded"] += 1
-    for t in TABLES:
-        _insert(con, t, rows_by_table[t])
+    batch = SilverBatch(run_id, started, triggered_by=None, notes=None, parser_version="ccsim-0.2")
+
+    def raw_files():
+        for f in sorted(p for p in day_dir.rglob("*") if p.is_file()):
+            key = f"{CUSTOMER}/raw/received_date={day}/{f.relative_to(day_dir).as_posix()}"
+            body = f.read_bytes()
+            sha = hashlib.sha256(body).hexdigest()
+            meta = dict(s3_uri=f"s3://{BUCKET}/{key}", s3_bucket=BUCKET, s3_key=key, s3_version_id="v1",
+                        s3_etag=sha[:32], s3_last_modified=started, s3_region="us-west-2", kms_key_arn=None,
+                        original_filename=f.name, source_system="sftp", size_bytes=len(body), sha256=sha,
+                        received_at=started, character_encoding="ascii")
+            yield RawFile(key, body, file_id_of(key, "v1"), meta)
+
+    loaded = [ok for _, ok in batch.add_raw_files(raw_files(), CUSTOMER, known_sha)]
+    con = batch.finish()
     out.mkdir(parents=True, exist_ok=True)
     for t in ["edi.ingest_run"] + TABLES:
         if con.execute(f"SELECT count(*) FROM {t}").fetchone()[0]:
             con.execute(f"COPY {t} TO '{out / (t + '.parquet')}' (FORMAT parquet, COMPRESSION zstd)")
-    return stats
+    return dict(loaded=loaded.count(True), rejected=loaded.count(False))
 
 
 def main(data: Path, business_days: int = 120, start: date = date(2026, 1, 5)):

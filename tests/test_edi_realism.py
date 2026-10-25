@@ -29,7 +29,7 @@ def run(tmp_path_factory):
 def _segments(body: bytes):
     chunks = iter_segment_chunks(body.decode("utf-8", "replace"))
     next(chunks)                                                  # the delimiters
-    return [e for segments, _ in chunks for _, e, _ in segments]
+    return [e for segments in chunks for _, _, e, _ in segments]
 
 
 def _claims_837(files):
