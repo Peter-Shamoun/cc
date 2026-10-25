@@ -186,6 +186,41 @@ def test_a_late_batch_into_a_compacted_month_triggers_a_full_rebuild(world):
     check_manifest(store(world), current_manifest(world))
 
 
+def test_the_open_month_keeps_a_compacted_base_and_few_daily_parts(world):
+    aug = {t: by_month["2026-08"] for t, by_month in silver_state(store(world)).live.items() if "2026-08" in by_month}
+    n_batches = len({k.rsplit("part-", 1)[1] for k in aug["edi.segment"] if "part-" in k})
+    assert n_batches > pipeline.SILVER_OPEN_MONTH_MAX_PARTS          # (edi.segment: gold never reads it)
+    for t in pipeline.VIEW_INPUTS:
+        parts = [k for k in aug.get(t, []) if "/part-" in k]
+        compacted = [k for k in aug.get(t, []) if "/compacted-" in k]
+        assert len(compacted) <= 1 and len(parts) < pipeline.SILVER_OPEN_MONTH_MAX_PARTS, (t, len(parts))
+    assert any("/compacted-" in k for k in aug["c837.claim"])
+
+
+def test_a_crash_in_the_middle_of_an_open_month_compaction_loses_and_doubles_nothing(world, monkeypatch):
+    env = parser_env(world)
+    st = store(world)
+    con = pipeline._duck(env, f"s3://{BUCKET}/{C}/")
+    count = lambda s: {t: con.execute(f"SELECT count(*) FROM {pipeline._scan(st, s.files(t, {'2026-08'}))}").fetchone()[0]
+                       for t in ("c837.claim", "r835.claim_payment", "edi.date_time")}
+    before = silver_state(st)
+    rows = count(before)
+
+    def crash(keys):
+        raise RuntimeError("task killed after writing the compacted files, before deleting what they cover")
+    monkeypatch.setattr(st, "delete", crash)
+    with pytest.raises(RuntimeError, match="task killed"):
+        pipeline.compact_silver(con, st, before, before_month="2026-08", open_month_max_parts=1)
+    monkeypatch.undo()
+    after = silver_state(st)
+    assert count(after) == rows
+    for t in ("c837.claim", "r835.claim_payment", "edi.date_time"):
+        assert [k for k in after.files(t, {"2026-08"})] == [k for k in after.live[t]["2026-08"] if "/compacted-" in k]
+    assert set(before.files("c837.claim", {"2026-08"})) <= set(after.garbage)
+    st.delete(after.garbage)                                        # what the next batch does under the lock
+    assert count(silver_state(st)) == rows
+
+
 def test_states_a_crash_can_leave_in_silver_are_garbage(world):
     st = store(world)
     s = silver_state(st)
