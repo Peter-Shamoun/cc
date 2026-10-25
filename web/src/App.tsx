@@ -16,15 +16,29 @@ import { SUGGESTIONS } from './fixtures';
 
 function makeAdapter(): AnalystAdapter {
   const base = import.meta.env.VITE_ANALYST_BASE as string | undefined;
-  return base !== undefined && base !== '' ? new HttpAnalystAdapter(base) : new MockAnalystAdapter();
+  // VITE_ANALYST_BASE: '' or unset = offline mock; '/' = same origin (vite proxies /api to :8787); else an absolute URL.
+  if (base === undefined || base === '') return new MockAnalystAdapter();
+  return new HttpAnalystAdapter(base === '/' ? '' : base.replace(/\/$/, ''), import.meta.env.VITE_ANALYST_DEMO_TOKEN as string | undefined);
 }
+
+const phoneQuery = () => (typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 767px)') : null);
 
 function Shell() {
   const adapter = useMemo(makeAdapter, []);
   const store = useMemo(() => new MemoryTranscriptStore(), []);
   const chat = useChat(adapter, store);
   const { mode, palette, toggleMode, setPalette } = useTheme();
+  const [mobile, setMobile] = useState(() => phoneQuery()?.matches ?? false);
+  useEffect(() => {
+    const mq = phoneQuery();
+    if (!mq) return;
+    const on = () => { setMobile(mq.matches); setSidebar(!mq.matches); };
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
   const [sidebar, setSidebar] = useState(() => window.innerWidth >= 768);
+  /** On phones the sidebar is a drawer: picking anything closes it. */
+  const closeDrawer = () => { if (mobile) setSidebar(false); };
   const [artifact, setArtifact] = useState<Artifact | null>(null);
   useEffect(() => { if (artifact && window.innerWidth < 1400) setSidebar(false); }, [artifact]);
   const [draft, setDraft] = useState<{ text: string; n: number } | undefined>();
@@ -47,13 +61,14 @@ function Shell() {
   return (
     <AdapterCtx.Provider value={adapter}>
       <div className="flex h-full overflow-hidden">
+        {sidebar && mobile && <div className="fixed inset-0 z-30 bg-black/40" aria-hidden onClick={() => setSidebar(false)} data-testid="drawer-scrim" />}
         {sidebar && (
-          <Sidebar threads={chat.threads} activeId={chat.convId} onSelect={chat.open} onNew={chat.newChat} onDelete={chat.remove} onCollapse={() => setSidebar(false)} storeMode={store.mode} />
+          <Sidebar threads={chat.threads} activeId={chat.convId} drawer={mobile} onSelect={(id) => { chat.open(id); closeDrawer(); }} onNew={() => { chat.newChat(); closeDrawer(); }} onDelete={chat.remove} onRename={chat.rename} onCollapse={() => setSidebar(false)} storeMode={store.mode} />
         )}
-        <main className="relative flex min-w-[400px] flex-1 flex-col font-sans">
+        <main className="relative flex min-w-0 flex-1 flex-col font-sans md:min-w-[400px]">
           <header className="flex h-[52px] shrink-0 items-center justify-between px-2">
             <div className="flex items-center gap-1">
-              {!sidebar && (
+              {(!sidebar || mobile) && (
                 <>
                   <IconButton label="Open sidebar" onClick={() => setSidebar(true)}><PanelLeft size={18} /></IconButton>
                   <IconButton label="New chat" onClick={chat.newChat}><SquarePen size={18} /></IconButton>
@@ -66,7 +81,8 @@ function Shell() {
             </div>
             <div className="flex items-center gap-1.5 whitespace-nowrap">
               <span className="hidden rounded-full border border-line px-2.5 py-1 text-xs text-fg-muted xl:inline" title="Dataset scope">payer: all · 2025-10..2026-09</span>
-              <span className="rounded-full bg-[#10a37f]/12 px-2.5 py-1 text-xs font-medium text-[#0b7a5f] dark:text-[#4fd1a5]" title="PHI mode, set by the server">De-identified</span>
+              <span className="hidden rounded-full bg-[#10a37f]/12 sm:inline px-2.5 py-1 text-xs font-medium text-[#0b7a5f] dark:text-[#4fd1a5]" title="PHI mode, set by the server">De-identified</span>
+              {adapter.name === 'http' && <span className="hidden rounded-full border border-line px-2.5 py-1 text-xs text-fg-muted sm:inline" data-testid="live-badge">Live API</span>}
               {adapter.name === 'mock' && <span className="hidden rounded-full border border-line px-2.5 py-1 text-xs text-fg-muted sm:inline">Demo data</span>}
               <IconButton label={palette === 'paper' ? 'Neutral theme' : 'Paper theme'} onClick={() => setPalette(palette === 'paper' ? 'neutral' : 'paper')}><PaletteIcon size={18} /></IconButton>
               <IconButton label={mode === 'dark' ? 'Light mode' : 'Dark mode'} onClick={toggleMode}>{mode === 'dark' ? <Sun size={18} /> : <Moon size={18} />}</IconButton>
@@ -91,7 +107,7 @@ function Shell() {
                 <div className="mx-auto flex max-w-[48rem] flex-col gap-6 px-4 pb-10 pt-4 md:px-6">
                   {messages.map((m, i) =>
                     m.role === 'user' ? (
-                      <UserBubble key={m.id} msg={m} onEdit={edit} />
+                      <UserBubble key={m.id} msg={m} disabled={chat.busy} onEdit={(t) => { setAtBottom(true); chat.editAt(i, t); }} version={chat.versionOf(i)} onVersion={(k) => chat.switchVersion(i, k)} />
                     ) : (
                       <AssistantTurn key={m.id} msg={m} isLast={i === messages.length - 1} onOpen={setArtifact} onRegenerate={chat.regenerate} onEdit={edit} />
                     ),
