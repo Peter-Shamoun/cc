@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -37,9 +38,14 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+# The code measured: this checkout, or another one (PARSER_BENCH_CODE_ROOT: e.g. an export of the commit before the
+# optimisation, to freeze the reference for a new corpus).
+CODE_ROOT = Path(os.environ.get("PARSER_BENCH_CODE_ROOT", ROOT))
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(CODE_ROOT))
 
-BENCH_DIR = ROOT / ".ccsim" / "bench" / "parser"
+SMALL_CORPUS = os.environ.get("PARSER_BENCH_CORPUS") == "small"   # a quick corpus, e.g. for a new generator version
+BENCH_DIR = Path(os.environ.get("PARSER_BENCH_DIR", ROOT / ".ccsim" / "bench" / "parser"))
 CORPUS_DIR = BENCH_DIR / "corpus"
 REFERENCE_DIR = BENCH_DIR / "reference"
 RESULTS_DIR = BENCH_DIR / "results"
@@ -47,6 +53,9 @@ CUSTOMER = "acme_labs"
 VOLUME_SCENARIO = dict(target_mb_per_day=5, days=15)          # 15 calendar days from 2026-07-01 = 10 business days
 STRESS_SCENARIO = dict(days=60, volume_scale=.3, seed=11)
 LARGE_FILES = {"large_837_20mb": ("837", 20), "large_835_35mb": ("835", 35), "large_835_50mb": ("835", 50)}
+if SMALL_CORPUS:
+    VOLUME_SCENARIO, STRESS_SCENARIO = dict(target_mb_per_day=5, days=5), dict(days=15, volume_scale=.3, seed=11)
+    LARGE_FILES = {"large_837_20mb": ("837", 20)}
 MB = 1e6
 
 
@@ -106,6 +115,14 @@ def _bad_se_count(body: bytes) -> bytes:
     return body[:m.start(1)] + str(int(m.group(1)) + 1).encode() + body[m.end(1):]
 
 
+def _corrupt_last_se02(body: bytes) -> bytes:
+    """The last SE02 no longer matches its ST02: a broken envelope found at the very end of a big file."""
+    el = body[3:4]
+    i = body.rindex(b"SE" + el)
+    j = body.index(el, i + 3) + 1                                 # SE02 starts here
+    return body[:j] + b"X" + body[j:]
+
+
 def build_corpus() -> dict:
     from ccsim.edi_mock import Scenario
     CORPUS_DIR.mkdir(parents=True, exist_ok=True)
@@ -142,6 +159,14 @@ def build_corpus() -> dict:
                 written += len(bodies[i % len(bodies)])
                 i += 1
         batches[name] = [dict(path=f"large/{name}.x12", day="2026-07-15")]
+    # rejections found only after the batch has flushed part of the file into staging, next to a good file
+    big = (large_dir / f"{next(iter(LARGE_FILES))}.x12").read_bytes()[: int(12 * MB)]
+    term = big[105:106]
+    complete = big[: big.index(term, big.rindex(b"IEA")) + 1]    # whole interchanges only
+    (noise_dir / "large_truncated.x12").write_bytes(complete[: complete.rindex(b"IEA")])
+    (noise_dir / "large_bad_se02.x12").write_bytes(_corrupt_last_se02(complete))
+    batches["noise_large_rejects"] = [dict(path=f"noise/{n}", day="2026-07-01") for n in
+                                      ("large_truncated.x12", "bom.x12", "large_bad_se02.x12")]
     manifest = dict(batches=batches, raw_bytes={b: sum((CORPUS_DIR / f["path"]).stat().st_size for f in fs)
                                                  for b, fs in batches.items()})
     manifest_path.write_text(json.dumps(manifest, indent=1))
@@ -176,7 +201,7 @@ def run_batch(batch_name: str, out_dir: Path, use_tracemalloc: bool = False) -> 
         import tracemalloc
         tracemalloc.start()
     out_dir.mkdir(parents=True, exist_ok=True)
-    started = datetime(2026, 10, 1, 12) + timedelta(days=sorted(build_corpus()["batches"]).index(batch_name))
+    started = datetime(2026, 10, 1, 12)                           # fixed: the reference must not depend on the corpus
     known_sha, raw_bytes, rejected = {}, 0, []
     cpu0 = time.process_time()
     batch = SilverBatch(f"run_bench_{batch_name}", started, triggered_by="bench", notes=None)
@@ -290,9 +315,9 @@ def _summary(results: list[dict]) -> dict:
     large = [r for r in results if r["batch"].startswith("large_")]
     return dict(raw_mb=round(raw / MB, 1), cpu_s=round(sum(r["cpu_s"] for r in results), 1),
                 cpu_s_per_mb=round(sum(r["cpu_s"] for r in results) / (raw / MB), 4),
-                volume_cpu_s_per_mb=round(sum(r["cpu_s"] for r in volume) / (sum(r["raw_bytes"] for r in volume) / MB), 4),
+                volume_cpu_s_per_mb=volume and round(sum(r["cpu_s"] for r in volume) / (sum(r["raw_bytes"] for r in volume) / MB), 4),
                 parse_share=round(sum(r["cpu_parse_s"] for r in results) / sum(r["cpu_s"] for r in results), 3),
-                peak_rss_mb_volume_batch=round(max(r["peak_rss_mb"] for r in volume), 0),
+                peak_rss_mb_volume_batch=volume and round(max(r["peak_rss_mb"] for r in volume), 0),
                 peak_rss_mb_by_large_file={r["batch"]: round(r["peak_rss_mb"], 0) for r in large},
                 parquet_mb=round(sum(sum(r["parquet_bytes"].values()) for r in results) / MB, 1),
                 segment_parquet_mb=round(sum(r["parquet_bytes"].get("edi.segment", 0) for r in results) / MB, 1))
@@ -302,12 +327,14 @@ def cmd_run(label: str, freeze: bool, only: list[str] | None, use_tracemalloc: b
             keep_output: bool) -> dict:
     manifest = build_corpus()
     names = only or sorted(manifest["batches"])
-    if freeze:
+    if freeze and not only:
         shutil.rmtree(REFERENCE_DIR, ignore_errors=True)
     out_root = REFERENCE_DIR if freeze else BENCH_DIR / "candidate" / label
-    shutil.rmtree(out_root, ignore_errors=True)
+    if not freeze:
+        shutil.rmtree(out_root, ignore_errors=True)
     results, problems = [], {}
     for name in names:
+        shutil.rmtree(out_root / name, ignore_errors=True)
         r = _run_batch_in_subprocess(name, out_root / name, use_tracemalloc)
         if not freeze:
             found = compare_batch(REFERENCE_DIR / name, out_root / name, slim_segment)
@@ -323,8 +350,9 @@ def cmd_run(label: str, freeze: bool, only: list[str] | None, use_tracemalloc: b
               flush=True)
     if freeze:
         (REFERENCE_DIR / "schemas.json").write_text(json.dumps(
-            {name: {p.stem: _schema_of(p) for p in sorted((REFERENCE_DIR / name).glob("*.parquet"))} for name in names},
-            indent=1))
+            {d.name: {p.stem: _schema_of(p) for p in sorted(d.glob("*.parquet"))}
+             for d in sorted(REFERENCE_DIR.iterdir()) if d.is_dir()}, indent=1))
+        (REFERENCE_DIR / "code_root.txt").write_text(str(CODE_ROOT))
     elif not keep_output:
         shutil.rmtree(out_root)
     report = dict(label=label, frozen_reference=freeze, identical=None if freeze else not problems,
@@ -358,7 +386,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("corpus")
-    sub.add_parser("freeze")
+    freeze = sub.add_parser("freeze")
+    freeze.add_argument("--only", nargs="*", help="(re)freeze only these batches, keep the others")
     run = sub.add_parser("run")
     run.add_argument("--label", required=True)
     run.add_argument("--only", nargs="*", help="batch names (default: all)")
@@ -377,7 +406,7 @@ def main(argv=None):
         m = build_corpus()
         print(f"{len(m['batches'])} batches, {sum(m['raw_bytes'].values()) / MB:.1f} MB raw in {CORPUS_DIR}")
     elif a.cmd == "freeze":
-        cmd_run("reference", True, None, False, False, True)
+        cmd_run("reference", True, a.only, False, False, True)
     elif a.cmd == "run":
         cmd_run(a.label, False, a.only, a.tracemalloc, a.slim_segment, a.keep_output)
     elif a.cmd == "profile":
