@@ -762,24 +762,24 @@ I7301,cardio,113,,30,120,Raynaud's syndrome with gangrene
 I731,cardio,114,,30,120,Thromboangiitis obliterans [Buerger's disease]
 I7381,cardio,115,,30,120,Erythromelalgia
 I7389,cardio,116,,30,120,Other specified peripheral vascular diseases
-E871,electrolytes,0,,0,120,Hypo-osmolality and hyponatremia
-E876,electrolytes,1,,0,120,Hypokalemia
-E875,electrolytes,2,,0,120,Hyperkalemia
-E860,electrolytes,3,,0,120,Dehydration
-E8720,electrolytes,4,,0,120,"Acidosis, unspecified"
-E8770,electrolytes,5,,0,120,"Fluid overload, unspecified"
-E8779,electrolytes,6,,0,120,Other fluid overload
-E8339,electrolytes,7,,0,120,Other disorders of phosphorus metabolism
-E8351,electrolytes,8,,0,120,Hypocalcemia
-E8352,electrolytes,9,,0,120,Hypercalcemia
-E8342,electrolytes,10,,0,120,Hypomagnesemia
-E8341,electrolytes,11,,0,120,Hypermagnesemia
-E873,electrolytes,12,,0,120,Alkalosis
-E8721,electrolytes,13,,0,120,Acute metabolic acidosis
-E8722,electrolytes,14,,0,120,Chronic metabolic acidosis
-E8729,electrolytes,15,,0,120,Other acidosis
-E861,electrolytes,16,,0,120,Hypovolemia
-E869,electrolytes,17,,0,120,"Volume depletion, unspecified"
+E876,electrolytes,0,,18,120,Hypokalemia
+E875,electrolytes,1,,18,120,Hyperkalemia
+E860,electrolytes,2,,0,120,Dehydration
+E871,electrolytes,3,,18,120,Hypo-osmolality and hyponatremia
+E8720,electrolytes,4,,18,120,"Acidosis, unspecified"
+E8770,electrolytes,5,,18,120,"Fluid overload, unspecified"
+E8779,electrolytes,6,,18,120,Other fluid overload
+E8339,electrolytes,7,,18,120,Other disorders of phosphorus metabolism
+E8351,electrolytes,8,,18,120,Hypocalcemia
+E8352,electrolytes,9,,18,120,Hypercalcemia
+E8342,electrolytes,10,,18,120,Hypomagnesemia
+E8341,electrolytes,11,,18,120,Hypermagnesemia
+E873,electrolytes,12,,18,120,Alkalosis
+E8721,electrolytes,13,,18,120,Acute metabolic acidosis
+E8722,electrolytes,14,,18,120,Chronic metabolic acidosis
+E8729,electrolytes,15,,18,120,Other acidosis
+E861,electrolytes,16,,18,120,Hypovolemia
+E869,electrolytes,17,,18,120,"Volume depletion, unspecified"
 N390,uti,0,,0,120,"Urinary tract infection, site not specified"
 R300,uti,1,,0,120,Dysuria
 R350,uti,2,,0,120,Frequency of micturition
@@ -2162,67 +2162,66 @@ J112,resp,77,,0,120,Influenza due to unidentified influenza virus with gastroint
 J1181,resp,78,,0,120,Influenza due to unidentified influenza virus with encephalopathy
 J1182,resp,79,,0,120,Influenza due to unidentified influenza virus with myocarditis
 J1183,resp,80,,0,120,Influenza due to unidentified influenza virus with otitis media
-Z0184,infect,0,,0,120,Encounter for antibody response examination
-B349,infect,1,,0,120,"Viral infection, unspecified"
-R509,infect,2,,0,120,"Fever, unspecified"
-B2799,infect,3,,0,120,"Infectious mononucleosis, unspecified with other complication"
-Z1159,infect,4,,0,120,Encounter for screening for other viral diseases
-A499,infect,5,,0,120,"Bacterial infection, unspecified"
-L0390,infect,6,,0,120,"Cellulitis, unspecified"
-Z111,infect,7,,0,120,Encounter for screening for respiratory tuberculosis
-Z117,infect,8,,0,120,Encounter for testing for latent tuberculosis infection
-R7611,infect,9,,0,120,Nonspecific reaction to tuberculin skin test without active tuberculosis
-Z201,infect,10,,0,120,Contact with and (suspected) exposure to tuberculosis
-A419,infect,11,,0,120,"Sepsis, unspecified organism"
-B9689,infect,12,,0,120,Other specified bacterial agents as the cause of diseases classified elsewhere
-B9620,infect,13,,0,120,Unspecified Escherichia coli [E. coli] as the cause of diseases classified elsewhere
-L0291,infect,14,,0,120,"Cutaneous abscess, unspecified"
-B370,infect,15,,0,120,Candidal stomatitis
-B379,infect,16,,0,120,"Candidiasis, unspecified"
-B372,infect,17,,0,120,Candidiasis of skin and nail
-Z2239,infect,18,,0,120,Carrier of other specified bacterial diseases
-Z22321,infect,19,,0,120,Carrier or suspected carrier of Methicillin susceptible Staphylococcus aureus
-Z22322,infect,20,,0,120,Carrier or suspected carrier of Methicillin resistant Staphylococcus aureus
-B354,infect,21,,0,120,Tinea corporis
-B351,infect,22,,0,120,Tinea unguium
-A6920,infect,23,,0,120,"Lyme disease, unspecified"
-B3731,infect,24,F,0,120,Acute candidiasis of vulva and vagina
-B3732,infect,25,F,0,120,Chronic candidiasis of vulva and vagina
-B3781,infect,26,,0,120,Candidal esophagitis
-B3782,infect,27,,0,120,Candidal enteritis
-B3783,infect,28,,0,120,Candidal cheilitis
-B3784,infect,29,,0,120,Candidal otitis externa
-B3789,infect,30,,0,120,Other sites of candidiasis
-A4901,infect,31,,0,120,"Methicillin susceptible Staphylococcus aureus infection, unspecified site"
-A4902,infect,32,,0,120,"Methicillin resistant Staphylococcus aureus infection, unspecified site"
-A491,infect,33,,0,120,"Streptococcal infection, unspecified site"
-A492,infect,34,,0,120,"Hemophilus influenzae infection, unspecified site"
-A493,infect,35,,0,120,"Mycoplasma infection, unspecified site"
-A498,infect,36,,0,120,Other bacterial infections of unspecified site
-B950,infect,37,,0,120,"Streptococcus, group A, as the cause of diseases classified elsewhere"
-B951,infect,38,,0,120,"Streptococcus, group B, as the cause of diseases classified elsewhere"
-B952,infect,39,,0,120,Enterococcus as the cause of diseases classified elsewhere
-B953,infect,40,,0,120,Streptococcus pneumoniae as the cause of diseases classified elsewhere
-B954,infect,41,,0,120,Other streptococcus as the cause of diseases classified elsewhere
-B955,infect,42,,0,120,Unspecified streptococcus as the cause of diseases classified elsewhere
-B9561,infect,43,,0,120,Methicillin susceptible Staphylococcus aureus infection as the cause of diseases classified elsewhere
-B9562,infect,44,,0,120,Methicillin resistant Staphylococcus aureus infection as the cause of diseases classified elsewhere
-B957,infect,45,,0,120,Other staphylococcus as the cause of diseases classified elsewhere
-B958,infect,46,,0,120,Unspecified staphylococcus as the cause of diseases classified elsewhere
-B960,infect,47,,0,120,Mycoplasma pneumoniae [M. pneumoniae] as the cause of diseases classified elsewhere
-B961,infect,48,,0,120,Klebsiella pneumoniae [K. pneumoniae] as the cause of diseases classified elsewhere
-B9621,infect,49,,0,120,Shiga toxin-producing Escherichia coli [E. coli] [STEC] O157 as the cause of diseases classified elsewhere
-B9622,infect,50,,0,120,Other specified Shiga toxin-producing Escherichia coli [E. coli] [STEC] as the cause of diseases classified elsewhere
-B9623,infect,51,,0,120,Unspecified Shiga toxin-producing Escherichia coli [E. coli] [STEC] as the cause of diseases classified elsewhere
-B9629,infect,52,,0,120,Other Escherichia coli [E. coli] as the cause of diseases classified elsewhere
-B963,infect,53,,0,120,Hemophilus influenzae [H. influenzae] as the cause of diseases classified elsewhere
-B964,infect,54,,0,120,Proteus (mirabilis) (morganii) as the cause of diseases classified elsewhere
-B965,infect,55,,0,120,Pseudomonas (aeruginosa) (mallei) (pseudomallei) as the cause of diseases classified elsewhere
-B966,infect,56,,0,120,Bacteroides fragilis [B. fragilis] as the cause of diseases classified elsewhere
-B967,infect,57,,0,120,Clostridium perfringens [C. perfringens] as the cause of diseases classified elsewhere
-B9681,infect,58,,0,120,Helicobacter pylori [H. pylori] as the cause of diseases classified elsewhere
-B9682,infect,59,,0,120,Vibrio vulnificus as the cause of diseases classified elsewhere
-B9683,infect,60,,0,120,Acinetobacter baumannii as the cause of diseases classified elsewhere
+B349,infect,0,,0,120,"Viral infection, unspecified"
+R509,infect,1,,0,120,"Fever, unspecified"
+B2799,infect,2,,0,120,"Infectious mononucleosis, unspecified with other complication"
+Z1159,infect,3,,0,120,Encounter for screening for other viral diseases
+A499,infect,4,,0,120,"Bacterial infection, unspecified"
+L0390,infect,5,,0,120,"Cellulitis, unspecified"
+Z111,infect,6,,0,120,Encounter for screening for respiratory tuberculosis
+Z117,infect,7,,0,120,Encounter for testing for latent tuberculosis infection
+R7611,infect,8,,0,120,Nonspecific reaction to tuberculin skin test without active tuberculosis
+Z201,infect,9,,0,120,Contact with and (suspected) exposure to tuberculosis
+A419,infect,10,,0,120,"Sepsis, unspecified organism"
+B9689,infect,11,,0,120,Other specified bacterial agents as the cause of diseases classified elsewhere
+B9620,infect,12,,0,120,Unspecified Escherichia coli [E. coli] as the cause of diseases classified elsewhere
+L0291,infect,13,,0,120,"Cutaneous abscess, unspecified"
+B370,infect,14,,0,120,Candidal stomatitis
+B379,infect,15,,0,120,"Candidiasis, unspecified"
+B372,infect,16,,0,120,Candidiasis of skin and nail
+Z2239,infect,17,,0,120,Carrier of other specified bacterial diseases
+Z22321,infect,18,,0,120,Carrier or suspected carrier of Methicillin susceptible Staphylococcus aureus
+Z22322,infect,19,,0,120,Carrier or suspected carrier of Methicillin resistant Staphylococcus aureus
+B354,infect,20,,0,120,Tinea corporis
+B351,infect,21,,0,120,Tinea unguium
+A6920,infect,22,,0,120,"Lyme disease, unspecified"
+B3731,infect,23,F,0,120,Acute candidiasis of vulva and vagina
+B3732,infect,24,F,0,120,Chronic candidiasis of vulva and vagina
+B3781,infect,25,,0,120,Candidal esophagitis
+B3782,infect,26,,0,120,Candidal enteritis
+B3783,infect,27,,0,120,Candidal cheilitis
+B3784,infect,28,,0,120,Candidal otitis externa
+B3789,infect,29,,0,120,Other sites of candidiasis
+A4901,infect,30,,0,120,"Methicillin susceptible Staphylococcus aureus infection, unspecified site"
+A4902,infect,31,,0,120,"Methicillin resistant Staphylococcus aureus infection, unspecified site"
+A491,infect,32,,0,120,"Streptococcal infection, unspecified site"
+A492,infect,33,,0,120,"Hemophilus influenzae infection, unspecified site"
+A493,infect,34,,0,120,"Mycoplasma infection, unspecified site"
+A498,infect,35,,0,120,Other bacterial infections of unspecified site
+B950,infect,36,,0,120,"Streptococcus, group A, as the cause of diseases classified elsewhere"
+B951,infect,37,,0,120,"Streptococcus, group B, as the cause of diseases classified elsewhere"
+B952,infect,38,,0,120,Enterococcus as the cause of diseases classified elsewhere
+B953,infect,39,,0,120,Streptococcus pneumoniae as the cause of diseases classified elsewhere
+B954,infect,40,,0,120,Other streptococcus as the cause of diseases classified elsewhere
+B955,infect,41,,0,120,Unspecified streptococcus as the cause of diseases classified elsewhere
+B9561,infect,42,,0,120,Methicillin susceptible Staphylococcus aureus infection as the cause of diseases classified elsewhere
+B9562,infect,43,,0,120,Methicillin resistant Staphylococcus aureus infection as the cause of diseases classified elsewhere
+B957,infect,44,,0,120,Other staphylococcus as the cause of diseases classified elsewhere
+B958,infect,45,,0,120,Unspecified staphylococcus as the cause of diseases classified elsewhere
+B960,infect,46,,0,120,Mycoplasma pneumoniae [M. pneumoniae] as the cause of diseases classified elsewhere
+B961,infect,47,,0,120,Klebsiella pneumoniae [K. pneumoniae] as the cause of diseases classified elsewhere
+B9621,infect,48,,0,120,Shiga toxin-producing Escherichia coli [E. coli] [STEC] O157 as the cause of diseases classified elsewhere
+B9622,infect,49,,0,120,Other specified Shiga toxin-producing Escherichia coli [E. coli] [STEC] as the cause of diseases classified elsewhere
+B9623,infect,50,,0,120,Unspecified Shiga toxin-producing Escherichia coli [E. coli] [STEC] as the cause of diseases classified elsewhere
+B9629,infect,51,,0,120,Other Escherichia coli [E. coli] as the cause of diseases classified elsewhere
+B963,infect,52,,0,120,Hemophilus influenzae [H. influenzae] as the cause of diseases classified elsewhere
+B964,infect,53,,0,120,Proteus (mirabilis) (morganii) as the cause of diseases classified elsewhere
+B965,infect,54,,0,120,Pseudomonas (aeruginosa) (mallei) (pseudomallei) as the cause of diseases classified elsewhere
+B966,infect,55,,0,120,Bacteroides fragilis [B. fragilis] as the cause of diseases classified elsewhere
+B967,infect,56,,0,120,Clostridium perfringens [C. perfringens] as the cause of diseases classified elsewhere
+B9681,infect,57,,0,120,Helicobacter pylori [H. pylori] as the cause of diseases classified elsewhere
+B9682,infect,58,,0,120,Vibrio vulnificus as the cause of diseases classified elsewhere
+B9683,infect,59,,0,120,Acinetobacter baumannii as the cause of diseases classified elsewhere
 M109,gout,0,,18,120,"Gout, unspecified"
 E790,gout,1,,18,120,Hyperuricemia without signs of inflammatory arthritis and tophaceous disease
 M1A9XX0,gout,2,,18,120,"Chronic gout, unspecified, without tophus (tophi)"
@@ -2248,26 +2247,27 @@ K5289,gi_infect,10,,0,120,Other specified noninfective gastroenteritis and colit
 K529,gi_infect,11,,0,120,"Noninfective gastroenteritis and colitis, unspecified"
 R1084,gi_infect,12,,0,120,Generalized abdominal pain
 R109,gi_infect,13,,0,120,Unspecified abdominal pain
-B182,hepatitis,0,,12,120,Chronic viral hepatitis C
-B1920,hepatitis,1,,12,120,Unspecified viral hepatitis C without hepatic coma
-B181,hepatitis,2,,12,120,Chronic viral hepatitis B without delta-agent
-B1910,hepatitis,3,,12,120,Unspecified viral hepatitis B without hepatic coma
-Z1159,hepatitis,4,,12,120,Encounter for screening for other viral diseases
-R7401,hepatitis,5,,12,120,Elevation of levels of liver transaminase levels
-R7402,hepatitis,6,,12,120,Elevation of levels of lactic acid dehydrogenase [LDH]
-B1710,hepatitis,7,,12,120,Acute hepatitis C without hepatic coma
-B1711,hepatitis,8,,12,120,Acute hepatitis C with hepatic coma
-B160,hepatitis,9,,12,120,Acute hepatitis B with delta-agent with hepatic coma
-B169,hepatitis,10,,12,120,Acute hepatitis B without delta-agent and without hepatic coma
-B172,hepatitis,11,,12,120,Acute hepatitis E
-Z9189,hepatitis,12,,12,120,"Other specified personal risk factors, not elsewhere classified"
-B180,hepatitis,13,,12,120,Chronic viral hepatitis B with delta-agent
-B188,hepatitis,14,,12,120,Other chronic viral hepatitis
-B189,hepatitis,15,,12,120,"Chronic viral hepatitis, unspecified"
-B190,hepatitis,16,,12,120,Unspecified viral hepatitis with hepatic coma
-B1911,hepatitis,17,,12,120,Unspecified viral hepatitis B with hepatic coma
-B1921,hepatitis,18,,12,120,Unspecified viral hepatitis C with hepatic coma
-B199,hepatitis,19,,12,120,Unspecified viral hepatitis without hepatic coma
+Z1159,hepatitis,0,,12,120,Encounter for screening for other viral diseases
+R7401,hepatitis,1,,12,120,Elevation of levels of liver transaminase levels
+R945,hepatitis,2,,12,120,Abnormal results of liver function studies
+R7402,hepatitis,3,,12,120,Elevation of levels of lactic acid dehydrogenase [LDH]
+B1920,hepatitis,4,,12,120,Unspecified viral hepatitis C without hepatic coma
+Z9189,hepatitis,5,,12,120,"Other specified personal risk factors, not elsewhere classified"
+B182,hepatitis,6,,12,120,Chronic viral hepatitis C
+B1910,hepatitis,7,,12,120,Unspecified viral hepatitis B without hepatic coma
+B181,hepatitis,8,,12,120,Chronic viral hepatitis B without delta-agent
+B1710,hepatitis,9,,12,120,Acute hepatitis C without hepatic coma
+B1711,hepatitis,10,,12,120,Acute hepatitis C with hepatic coma
+B160,hepatitis,11,,12,120,Acute hepatitis B with delta-agent with hepatic coma
+B169,hepatitis,12,,12,120,Acute hepatitis B without delta-agent and without hepatic coma
+B172,hepatitis,13,,12,120,Acute hepatitis E
+B180,hepatitis,14,,12,120,Chronic viral hepatitis B with delta-agent
+B188,hepatitis,15,,12,120,Other chronic viral hepatitis
+B189,hepatitis,16,,12,120,"Chronic viral hepatitis, unspecified"
+B190,hepatitis,17,,12,120,Unspecified viral hepatitis with hepatic coma
+B1911,hepatitis,18,,12,120,Unspecified viral hepatitis B with hepatic coma
+B1921,hepatitis,19,,12,120,Unspecified viral hepatitis C with hepatic coma
+B199,hepatitis,20,,12,120,Unspecified viral hepatitis without hepatic coma
 G629,neuro,0,,18,120,"Polyneuropathy, unspecified"
 G309,neuro,1,,50,120,"Alzheimer's disease, unspecified"
 F0390,neuro,2,,50,120,"Unspecified dementia, unspecified severity, without behavioral disturbance, psychotic disturbance, mood disturbance, and anxiety"
@@ -2348,36 +2348,37 @@ Z8262,bone,6,,40,120,Family history of osteoporosis
 Z8739,bone,7,,40,120,Personal history of other diseases of the musculoskeletal system and connective tissue
 M816,bone,8,,40,120,Localized osteoporosis [Lequesne]
 M818,bone,9,,40,120,Other osteoporosis without current pathological fracture
-E221,endocrine,0,,12,120,Hyperprolactinemia
-E2740,endocrine,1,,12,120,Unspecified adrenocortical insufficiency
-E230,endocrine,2,,12,120,Hypopituitarism
-E271,endocrine,3,,12,120,Primary adrenocortical insufficiency
-E249,endocrine,4,,12,120,"Cushing's syndrome, unspecified"
-E222,endocrine,5,,12,120,Syndrome of inappropriate secretion of antidiuretic hormone
-E236,endocrine,6,,12,120,Other disorders of pituitary gland
-E240,endocrine,7,,12,120,Pituitary-dependent Cushing's disease
-E243,endocrine,8,,12,120,Ectopic ACTH syndrome
-E248,endocrine,9,,12,120,Other Cushing's syndrome
-E272,endocrine,10,,12,120,Addisonian crisis
-E2749,endocrine,11,,12,120,Other adrenocortical insufficiency
-E278,endocrine,12,,12,120,Other specified disorders of adrenal gland
-E229,endocrine,13,,12,120,"Hyperfunction of pituitary gland, unspecified"
-E232,endocrine,14,,12,120,Diabetes insipidus
-E237,endocrine,15,,12,120,"Disorder of pituitary gland, unspecified"
-E259,endocrine,16,,12,120,"Adrenogenital disorder, unspecified"
-E301,endocrine,17,,12,120,Precocious puberty
-E309,endocrine,18,,12,120,"Disorder of puberty, unspecified"
-E220,endocrine,19,,12,120,Acromegaly and pituitary gigantism
-E228,endocrine,20,,12,120,Other hyperfunction of pituitary gland
-E231,endocrine,21,,12,120,Drug-induced hypopituitarism
-E233,endocrine,22,,12,120,"Hypothalamic dysfunction, not elsewhere classified"
-E241,endocrine,23,,12,120,Nelson's syndrome
-E242,endocrine,24,,12,120,Drug-induced Cushing's syndrome
-E244,endocrine,25,,12,120,Alcohol-induced pseudo-Cushing's syndrome
-E270,endocrine,26,,12,120,Other adrenocortical overactivity
-E273,endocrine,27,,12,120,Drug-induced adrenocortical insufficiency
-E275,endocrine,28,,12,120,Adrenomedullary hyperfunction
-E279,endocrine,29,,12,120,"Disorder of adrenal gland, unspecified"
+E2740,endocrine,0,,12,120,Unspecified adrenocortical insufficiency
+E279,endocrine,1,,12,120,"Disorder of adrenal gland, unspecified"
+E349,endocrine,2,,12,120,"Endocrine disorder, unspecified"
+E249,endocrine,3,,12,120,"Cushing's syndrome, unspecified"
+E230,endocrine,4,,12,120,Hypopituitarism
+E271,endocrine,5,,12,120,Primary adrenocortical insufficiency
+E2749,endocrine,6,,12,120,Other adrenocortical insufficiency
+E278,endocrine,7,,12,120,Other specified disorders of adrenal gland
+E272,endocrine,8,,12,120,Addisonian crisis
+E236,endocrine,9,,12,120,Other disorders of pituitary gland
+E222,endocrine,10,,12,120,Syndrome of inappropriate secretion of antidiuretic hormone
+E240,endocrine,11,,12,120,Pituitary-dependent Cushing's disease
+E221,endocrine,12,,12,120,Hyperprolactinemia
+E243,endocrine,13,,12,120,Ectopic ACTH syndrome
+E248,endocrine,14,,12,120,Other Cushing's syndrome
+E229,endocrine,15,,12,120,"Hyperfunction of pituitary gland, unspecified"
+E232,endocrine,16,,12,120,Diabetes insipidus
+E237,endocrine,17,,12,120,"Disorder of pituitary gland, unspecified"
+E259,endocrine,18,,12,120,"Adrenogenital disorder, unspecified"
+E301,endocrine,19,,12,120,Precocious puberty
+E309,endocrine,20,,12,120,"Disorder of puberty, unspecified"
+E220,endocrine,21,,12,120,Acromegaly and pituitary gigantism
+E228,endocrine,22,,12,120,Other hyperfunction of pituitary gland
+E231,endocrine,23,,12,120,Drug-induced hypopituitarism
+E233,endocrine,24,,12,120,"Hypothalamic dysfunction, not elsewhere classified"
+E241,endocrine,25,,12,120,Nelson's syndrome
+E242,endocrine,26,,12,120,Drug-induced Cushing's syndrome
+E244,endocrine,27,,12,120,Alcohol-induced pseudo-Cushing's syndrome
+E270,endocrine,28,,12,120,Other adrenocortical overactivity
+E273,endocrine,29,,12,120,Drug-induced adrenocortical insufficiency
+E275,endocrine,30,,12,120,Adrenomedullary hyperfunction
 Z940,transplant,0,,18,120,Kidney transplant status
 Z941,transplant,1,,18,120,Heart transplant status
 Z942,transplant,2,,18,120,Lung transplant status
@@ -2448,6 +2449,13 @@ Z8709,allergy,10,,1,120,Personal history of other diseases of the respiratory sy
 Z889,allergy,11,,1,120,"Allergy status to unspecified drugs, medicaments and biological substances"
 Z91010,allergy,12,,1,120,Allergy to peanuts
 Z91018,allergy,13,,1,120,Allergy to other foods
+Z0184,immunity,0,,0,120,Encounter for antibody response examination
+Z021,immunity,1,,0,120,Encounter for pre-employment examination
+Z0289,immunity,2,,0,120,Encounter for other administrative examinations
+Z111,immunity,3,,0,120,Encounter for screening for respiratory tuberculosis
+Z20828,immunity,4,,0,120,Contact with and (suspected) exposure to other viral communicable diseases
+Z0189,immunity,5,,0,120,Encounter for other specified special examinations
+Z23,immunity,6,,0,120,Encounter for immunization
 N979,infertility,0,F,18,50,"Female infertility, unspecified"
 N978,infertility,1,F,18,50,Female infertility of other origin
 N970,infertility,2,F,18,50,Female infertility associated with anovulation
