@@ -1,0 +1,525 @@
+{
+ "generated": "2026-10-25 16:01 PDT",
+ "n_found": 7,
+ "n_valid": 7,
+ "invalid": [],
+ "warnings": [],
+ "flagged": [
+  "C000",
+  "C007",
+  "C010",
+  "C011"
+ ],
+ "fits": {
+  "H": {
+   "n_cells": 0,
+   "n_obs": 0,
+   "effects": [],
+   "logit": [],
+   "interactions": [],
+   "dropped_constant_q": 0,
+   "questions": 0,
+   "note": "no cells"
+  },
+  "C": {
+   "n_cells": 7,
+   "n_obs": 0,
+   "effects": [],
+   "logit": [],
+   "interactions": [],
+   "dropped_constant_q": 29,
+   "questions": 29,
+   "note": "every question has the same outcome in every cell (all pass or all fail) - no factor is identified"
+  }
+ },
+ "ranking": [
+  {
+   "id": "000",
+   "generation": "direct_sql",
+   "flags": "0000000",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "001",
+   "generation": "direct_sql",
+   "flags": "1111111",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "002",
+   "generation": "metric_spec",
+   "flags": "0000000",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "003",
+   "generation": "direct_sql",
+   "flags": "0000100",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "004",
+   "generation": "decompose_cte",
+   "flags": "1101001",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "005",
+   "generation": "decompose_cte",
+   "flags": "0101010",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "006",
+   "generation": "decompose_cte",
+   "flags": "0101011",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "007",
+   "generation": "direct_sql",
+   "flags": "1110010",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "008",
+   "generation": "metric_spec",
+   "flags": "1110011",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "009",
+   "generation": "decompose_cte",
+   "flags": "0111010",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "010",
+   "generation": "decompose_cte",
+   "flags": "0100001",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "011",
+   "generation": "direct_sql",
+   "flags": "0010000",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "012",
+   "generation": "direct_sql",
+   "flags": "0101000",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "013",
+   "generation": "metric_spec",
+   "flags": "0100100",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "014",
+   "generation": "metric_spec",
+   "flags": "0011010",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "015",
+   "generation": "decompose_cte",
+   "flags": "1001100",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "016",
+   "generation": "direct_sql",
+   "flags": "1010010",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "017",
+   "generation": "metric_spec",
+   "flags": "0110010",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "018",
+   "generation": "metric_spec",
+   "flags": "1010100",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "019",
+   "generation": "decompose_cte",
+   "flags": "0001011",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "020",
+   "generation": "metric_spec",
+   "flags": "0110100",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "021",
+   "generation": "decompose_cte",
+   "flags": "0110001",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "022",
+   "generation": "decompose_cte",
+   "flags": "1000110",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "023",
+   "generation": "direct_sql",
+   "flags": "0011100",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "024",
+   "generation": "metric_spec",
+   "flags": "1010010",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "025",
+   "generation": "metric_spec",
+   "flags": "0110001",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "026",
+   "generation": "metric_spec",
+   "flags": "1101001",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "027",
+   "generation": "decompose_cte",
+   "flags": "0000110",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "028",
+   "generation": "decompose_cte",
+   "flags": "0110100",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "029",
+   "generation": "direct_sql",
+   "flags": "1110110",
+   "pred_acc": null,
+   "pred_execs": null,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  }
+ ],
+ "caveats": [
+  "Every cell's analyst is the cloud/box agent's own model (see the model column), not Haiku or Sonnet; effects describe that model and may not transfer.",
+  "Contamination is flagged from free-text notes (agent_note/notes/protocol_notes) by keyword, so it is a screen, not a verdict. Read the flagged cells' notes. Most admissions so far are about seeing family SQL templates in bench/question_families.py while locating the dev-set rule.",
+  "H cells with dev_set=v1_fallback are pooled with the C-series, not the H-series.",
+  "Pass/fail is the repo's deterministic matcher (bench.compare.match) unless the cell says otherwise."
+ ],
+ "headline": [
+  "No identified H-series effects yet (0 H cells pooled). no cells",
+  "C-series (v1 dev set): all 7 cells scored 100% - ceiling, no factor information."
+ ],
+ "cells": [
+  {
+   "cell": "C000",
+   "series": "C",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": false,
+    "verifier": false,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 20,
+   "k": 20,
+   "mean_sql_execs": 1.0,
+   "model": "Grok 4.7",
+   "dev_set": "v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [
+    "family SQL templates",
+    "pitfalls glossary",
+    "reference SQL",
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "C001",
+   "series": "C",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": true,
+    "verifier": true,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": true
+   },
+   "n": 20,
+   "k": 20,
+   "mean_sql_execs": 3.0,
+   "model": "Grok 4.7",
+   "dev_set": "v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "C002",
+   "series": "C",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": false,
+    "verifier": false,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 20,
+   "k": 20,
+   "mean_sql_execs": 1.0,
+   "model": "grok-4.7",
+   "dev_set": "v1",
+   "dataset_id": "e21410ce6805",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "C005",
+   "series": "C",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": false,
+    "verifier": true,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 20,
+   "k": 20,
+   "mean_sql_execs": 3.8,
+   "model": "Grok 4.7",
+   "dev_set": "v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "C007",
+   "series": "C",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": true,
+    "verifier": false,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 20,
+   "k": 20,
+   "mean_sql_execs": 3.0,
+   "model": "Grok 4.7",
+   "dev_set": "v1",
+   "dataset_id": "e21410ce6805",
+   "contamination": [
+    "family SQL templates",
+    "gold SQL/answers",
+    "self-reported contamination"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "C010",
+   "series": "C",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": false,
+    "verifier": false,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 20,
+   "k": 20,
+   "mean_sql_execs": 2.0,
+   "model": "Grok 4.7",
+   "dev_set": "v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [
+    "self-reported contamination"
+   ],
+   "partial": false,
+   "source": "PR #23"
+  },
+  {
+   "cell": "C011",
+   "series": "C",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": true,
+    "verifier": false,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 20,
+   "k": 20,
+   "mean_sql_execs": 3.0,
+   "model": "Grok 4.7",
+   "dev_set": "v1",
+   "dataset_id": "e21410ce6805",
+   "contamination": [
+    "family SQL templates",
+    "gold SQL/answers",
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  }
+ ]
+}
