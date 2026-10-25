@@ -82,6 +82,12 @@ describe('Edit and branch', () => {
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Previous version' })));
     expect(screen.getByTestId('version-nav')).toHaveTextContent('1/2');
     expect(screen.getByTestId('msg-user')).toHaveTextContent('Which CARC codes');
+    // thumbs-down opens the reason panel
+    fireEvent.click(screen.getByRole('button', { name: 'Bad response' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Wrong numbers' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+    expect(screen.queryByTestId('feedback-panel')).toBeNull();
+    expect(screen.getByText('Thanks for the feedback')).toBeInTheDocument();
     // search filters the sidebar by title
     fireEvent.click(screen.getByRole('button', { name: /Search chats/ }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Search chats' }), { target: { value: 'zzz' } });
