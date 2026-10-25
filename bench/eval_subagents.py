@@ -1,7 +1,9 @@
 """Batch evaluation of technique configurations with real Haiku / Sonnet subagents.
 
     python -m bench.eval_subagents prepare RUN --configs configs.json --models haiku,sonnet --repeats 3 [--only cat]
+        [--agent cli|analyzer]
         -> .ccsim/agent_sessions/RUN/manifest.json  (one entry per session: path, model, prompt)
+        --agent analyzer writes the analyzer's briefing plus its tool spec (analyzer.harness). Default stays the CLI.
     (the orchestrator runs one subagent per manifest entry, with the entry's model and prompt)
     python -m bench.eval_subagents score RUN
         -> .ccsim/agent_sessions/RUN/results.json + results.md (accuracy by config x model, pass^k, calls, errors)
@@ -31,7 +33,9 @@ from bench.eval import load_cases  # noqa: E402
 
 
 def prepare(run_label: str, configs: dict, models: list[str], repeats: int, only: str | None = None,
-            snapshot_path: Path | None = None) -> Path:
+            snapshot_path: Path | None = None, agent: str = "cli") -> Path:
+    if agent not in {"cli", "analyzer"}:
+        raise ValueError(f"unknown agent {agent!r}; expected cli or analyzer")
     snap = Path(snapshot_path) if snapshot_path else snapshot()
     run_dir = SESSIONS_ROOT / run_label
     if run_dir.exists():
@@ -50,9 +54,16 @@ def prepare(run_label: str, configs: dict, models: list[str], repeats: int, only
                     meta = json.loads((s / "session.json").read_text())
                     meta.update(config_name=config_name, repeat=repeat)
                     (s / "session.json").write_text(json.dumps(meta, indent=1))
+                    if agent == "analyzer":
+                        from analyzer.harness import manifest_fields
+                        fields = manifest_fields(s)
+                        prompt = fields.pop("prompt")
+                    else:
+                        fields = {}
+                        prompt = build_prompt(s)
                     entries.append(dict(session=str(s), model=model, config=config_name, question_id=case["id"],
                                         repeat=repeat, effort=technique_config.get("effort", "default"),
-                                        prompt=build_prompt(s)))
+                                        agent=agent, prompt=prompt, **fields))
     (run_dir / "manifest.json").write_text(json.dumps(dict(run=run_label, snapshot=str(snap), configs=configs,
                                                            entries=entries), indent=1))
     return run_dir / "manifest.json"
@@ -158,9 +169,12 @@ def main():
     ap.add_argument("--repeats", type=int, default=1)
     ap.add_argument("--only")
     ap.add_argument("--snapshot")
+    ap.add_argument("--agent", choices=["cli", "analyzer"], default="cli",
+                    help="cli: bench.agent_cli briefing. analyzer: analyzer prompt and tool spec")
     a = ap.parse_args()
     if a.cmd == "prepare":
-        print(prepare(a.run, json.loads(Path(a.configs).read_text()), a.models.split(","), a.repeats, a.only, a.snapshot))
+        print(prepare(a.run, json.loads(Path(a.configs).read_text()), a.models.split(","), a.repeats, a.only,
+                      a.snapshot, a.agent))
     elif a.cmd == "contrast":
         print(json.dumps(contrast(a.run, a.baseline), indent=1))
     elif a.cmd == "effects":
