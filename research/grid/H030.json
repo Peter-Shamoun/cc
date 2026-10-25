@@ -1,0 +1,328 @@
+{
+ "cell": "H030",
+ "config": {
+  "generation": "decompose_cte",
+  "fewshot": true,
+  "explore": false,
+  "candidates3": true,
+  "verifier": true,
+  "repair": true,
+  "assumptions": false,
+  "multiagent": false
+ },
+ "model": "Grok Bot (local executor acting as analyst)",
+ "agent_note": "grokbot local executor b3",
+ "dev_set": "DEV_HARD_v1",
+ "protocol": "v2",
+ "dataset": "98e61f03e594",
+ "dev_ids": [
+  "f_cpt_share_of_line_payments__g0483",
+  "a_b853266803",
+  "q10_top_denial_carcs",
+  "a_a5888f64a4",
+  "a_7d45c279a7",
+  "q15_partial_line_denials",
+  "q25_primary_deductible",
+  "a_8663c777cd",
+  "f_cpt_share_of_line_payments__87798",
+  "q11_cpt_denial_rate",
+  "a_a123bba47f",
+  "a_9108c7aacb",
+  "a_856b95a70c",
+  "a_1b7e02d0b0",
+  "a_921f1bf366",
+  "q14_zero_paid_not_denied",
+  "a_dca9da6d52",
+  "q19_reversed_no_correction",
+  "f_cpt_share_of_line_payments__80307",
+  "a_d383370345",
+  "f_cpt_share_of_line_payments__g0482",
+  "a_0d43f7d4b6",
+  "a_923951a050",
+  "a_7423e6eb91",
+  "f_never_remitted_submitted_in_month__2026-07-01",
+  "a_ab202d4b23",
+  "f_cpt_share_of_line_payments__g0480",
+  "a_d671e0b995",
+  "f_cpt_share_of_line_payments__81479",
+  "q12_referring_provider_denials"
+ ],
+ "results": [
+  {
+   "qid": "f_cpt_share_of_line_payments__g0483",
+   "answer": "Fraction of current service-line paid dollars from CPT G0483 (submitted code).",
+   "final_sql": "SELECT sum(line_paid_amount) FILTER (WHERE procedure_code='G0483')/sum(line_paid_amount) AS share FROM sem.remit_lines WHERE is_current_adjudication",
+   "sql_execs": 2,
+   "repairs": 0,
+   "seconds": 65.2,
+   "pass": null
+  },
+  {
+   "qid": "a_b853266803",
+   "answer": "Days to pay by payer class.",
+   "final_sql": "WITH p AS (SELECT claim_key,payer_key,payer_class, min(submission_date) sd FROM sem.claims WHERE payer_responsibility='P' GROUP BY 1,2,3), r AS (SELECT claim_key,payer_key,payment_date FROM sem.remit_claims WHERE is_current_adjudication AND paid_amount>0) SELECT payer_class, count(*) AS paid_claims, round(median(payment_date-sd),1) AS median_days, round(quantile_cont(payment_date-sd,0.9),1) AS p90_days FROM p JOIN r USING(claim_key,payer_key) GROUP BY 1 ORDER BY 1",
+   "sql_execs": 4,
+   "repairs": 0,
+   "seconds": 65.2,
+   "pass": null
+  },
+  {
+   "qid": "q10_top_denial_carcs",
+   "answer": "Top 5 CO denial CARCs on denied current adjudications: 18 (4), then 11, 16, 22, 96 (2 each).",
+   "final_sql": "SELECT carc_code, count(DISTINCT claim_key||'|'||payer_key) AS denied_claims FROM sem.adjustments a WHERE is_current_adjudication AND group_code='CO' AND is_denial_carc AND EXISTS (SELECT 1 FROM sem.remit_claims r WHERE r.claim_key=a.claim_key AND r.payer_key=a.payer_key AND r.is_current_adjudication AND r.is_denied) GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 5",
+   "sql_execs": 2,
+   "repairs": 0,
+   "seconds": 65.2,
+   "pass": null
+  },
+  {
+   "qid": "a_a5888f64a4",
+   "answer": "First-pass resolution by payer class.",
+   "final_sql": "WITH x AS (SELECT payer_class, claim_key, payer_key, count(*) n, bool_or(is_current_adjudication AND NOT is_denied) ok FROM sem.remit_claims GROUP BY 1,2,3) SELECT payer_class, count(*) AS pairs_remitted, sum((n=1 AND ok)::int) AS first_pass_resolved, round(100.0*sum((n=1 AND ok)::int)/count(*),2) AS rate_pct FROM x GROUP BY 1 ORDER BY 1",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 65.1,
+   "pass": null
+  },
+  {
+   "qid": "a_7d45c279a7",
+   "answer": "Multi-trace claim+payer pairs by payer class.",
+   "final_sql": "WITH x AS (SELECT payer_class, claim_key, payer_key, count(DISTINCT check_or_eft_number) nt, bool_or(is_reversal) rv, bool_or(is_current_adjudication) cur, sum(paid_amount) FILTER (WHERE is_current_adjudication) paid FROM sem.remit_claims GROUP BY 1,2,3) SELECT payer_class, count(*) AS multi_trace_pairs, sum(rv::int) AS with_reversal, sum((NOT cur)::int) AS no_current, round(coalesce(sum(paid),0),2) AS current_paid FROM x WHERE nt>=2 GROUP BY 1 ORDER BY 1",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 65.1,
+   "pass": null
+  },
+  {
+   "qid": "q15_partial_line_denials",
+   "answer": "36 denied service lines on current adjudications whose claim is not denied overall.",
+   "final_sql": "SELECT count(*) AS denied_lines FROM sem.remit_lines WHERE is_current_adjudication AND line_is_denied AND NOT claim_is_denied",
+   "sql_execs": 2,
+   "repairs": 0,
+   "seconds": 65.1,
+   "pass": null
+  },
+  {
+   "qid": "q25_primary_deductible",
+   "answer": "$297.24 deductible (PR-1) from primary payers on current adjudications. Primary = payer_responsibility P on sem.claims.",
+   "final_sql": "SELECT sum(a.adjustment_amount) AS primary_deductible FROM sem.adjustments a JOIN (SELECT DISTINCT claim_key,payer_key FROM sem.claims WHERE payer_responsibility='P') c USING(claim_key,payer_key) WHERE a.is_current_adjudication AND a.group_code='PR' AND a.carc_code='1'",
+   "sql_execs": 2,
+   "repairs": 0,
+   "seconds": 65.0,
+   "pass": null
+  },
+  {
+   "qid": "a_8663c777cd",
+   "answer": "Top-5 referring provider concentration per service month.",
+   "final_sql": "WITH l AS (SELECT claim_key, referring_npi, service_date_from FROM sem.claims WHERE is_latest_submission), m AS (SELECT date_trunc('month',service_date_from) mo, referring_npi, count(*) n FROM l WHERE service_date_from>=DATE '2026-06-01' GROUP BY 1,2), r AS (SELECT *, row_number() OVER (PARTITION BY mo ORDER BY n DESC, referring_npi) rk FROM m) SELECT strftime(mo,'%Y-%m') AS month, sum(n) AS total_claims, sum(n) FILTER (WHERE rk<=5) AS top5_claims, round(100.0*sum(n) FILTER (WHERE rk<=5)/sum(n),1) AS top5_share_pct FROM r GROUP BY mo ORDER BY mo",
+   "sql_execs": 5,
+   "repairs": 0,
+   "seconds": 64.9,
+   "pass": null
+  },
+  {
+   "qid": "f_cpt_share_of_line_payments__87798",
+   "answer": "Fraction of current service-line paid dollars from CPT 87798 (submitted code).",
+   "final_sql": "SELECT sum(line_paid_amount) FILTER (WHERE procedure_code='87798')/sum(line_paid_amount) AS share FROM sem.remit_lines WHERE is_current_adjudication",
+   "sql_execs": 2,
+   "repairs": 0,
+   "seconds": 64.9,
+   "pass": null
+  },
+  {
+   "qid": "q11_cpt_denial_rate",
+   "answer": "Denial rate by CPT (CPTs from 835 current lines plus 837 billed lines), CPTs with 20+ adjudications.",
+   "final_sql": "WITH ca AS (SELECT claim_key,payer_key,is_denied FROM sem.remit_claims WHERE is_current_adjudication), cp AS (SELECT claim_key,payer_key,procedure_code FROM sem.remit_lines WHERE is_current_adjudication UNION SELECT claim_key,payer_key,procedure_code FROM sem.claim_lines) SELECT procedure_code, count(*) AS adjudications, sum(is_denied::int) AS denied, round(100.0*sum(is_denied::int)/count(*),2) AS denial_rate_pct FROM ca JOIN cp USING(claim_key,payer_key) GROUP BY 1 HAVING count(*)>=20 ORDER BY denial_rate_pct DESC, procedure_code",
+   "sql_execs": 7,
+   "repairs": 0,
+   "seconds": 64.8,
+   "pass": null
+  },
+  {
+   "qid": "a_a123bba47f",
+   "answer": "Primary denial rate by line-count bucket.",
+   "final_sql": "WITH l AS (SELECT claim_key, line_count, charge_amount FROM sem.claims WHERE is_latest_submission), p AS (SELECT DISTINCT claim_key,payer_key FROM sem.claims WHERE payer_responsibility='P'), r AS (SELECT r.claim_key, r.is_denied FROM sem.remit_claims r JOIN p USING(claim_key,payer_key) WHERE r.is_current_adjudication) SELECT CASE WHEN line_count>=3 THEN '3+' ELSE line_count::varchar END AS bucket, count(*) AS claims, sum(is_denied::int) AS denied, round(100.0*sum(is_denied::int)/count(*),2) AS denial_rate_pct, coalesce(sum(charge_amount) FILTER (WHERE is_denied),0) AS denied_billed FROM r JOIN l USING(claim_key) GROUP BY 1 ORDER BY 1",
+   "sql_execs": 5,
+   "repairs": 0,
+   "seconds": 64.7,
+   "pass": null
+  },
+  {
+   "qid": "a_9108c7aacb",
+   "answer": "Each FB carry-forward with its offsetting later FB (null if not yet offset).",
+   "final_sql": "WITH cf AS (SELECT payer_key, reference_id, payment_date, provider_adjustment_amount amt FROM sem.provider_adjustments WHERE plb_reason_code='FB' AND provider_adjustment_amount<0), off AS (SELECT cf.reference_id, cf.payment_date, min(o.payment_date) od FROM cf JOIN sem.provider_adjustments o ON o.plb_reason_code='FB' AND o.payer_key=cf.payer_key AND o.reference_id=cf.reference_id AND o.provider_adjustment_amount=-cf.amt AND o.payment_date>cf.payment_date GROUP BY 1,2) SELECT cf.reference_id, cf.payment_date AS carried_forward_date, round(-cf.amt,2) AS amount_carried, off.od AS offset_date, datediff('day', cf.payment_date, off.od) AS days_between FROM cf LEFT JOIN off USING(reference_id, payment_date) ORDER BY cf.payment_date, cf.reference_id",
+   "sql_execs": 4,
+   "repairs": 0,
+   "seconds": 64.7,
+   "pass": null
+  },
+  {
+   "qid": "a_856b95a70c",
+   "answer": "July vs August paid mix by payer class. No August 2026 payments exist in the data, so August shares and changes are null. Assumption: current adjudications by payment month.",
+   "final_sql": "WITH c AS (SELECT payer_class, payment_month m, sum(paid_amount) p FROM sem.remit_claims WHERE is_current_adjudication AND payment_month IN (DATE '2026-07-01', DATE '2026-08-01') GROUP BY 1,2), s AS (SELECT payer_class, m, p/sum(p) OVER (PARTITION BY m) sh FROM c), cls AS (SELECT DISTINCT payer_class FROM c) SELECT cls.payer_class, round(100*j.sh,1) AS july_share_pct, round(100*a.sh,1) AS aug_share_pct, round(100*(a.sh-j.sh),1) AS change_pp FROM cls LEFT JOIN s j ON j.payer_class=cls.payer_class AND j.m=DATE '2026-07-01' LEFT JOIN s a ON a.payer_class=cls.payer_class AND a.m=DATE '2026-08-01' ORDER BY 1",
+   "sql_execs": 5,
+   "repairs": 0,
+   "seconds": 64.6,
+   "pass": null
+  },
+  {
+   "qid": "a_1b7e02d0b0",
+   "answer": "10 corrected replacements to primary; their originals predate the data so cycle-time averages are null; 1 paid after replacement, $34.64.",
+   "final_sql": "WITH o AS (SELECT claim_key,payer_key,min(submission_date) od FROM sem.claims WHERE payer_responsibility='P' AND frequency_code='1' GROUP BY 1,2), rp AS (SELECT claim_key,payer_key,min(submission_date) rd FROM sem.claims WHERE payer_responsibility='P' AND frequency_code='7' GROUP BY 1,2), b AS (SELECT * FROM rp LEFT JOIN o USING(claim_key,payer_key)), ca AS (SELECT claim_key,payer_key,payment_date,paid_amount FROM sem.remit_claims WHERE is_current_adjudication) SELECT count(*) AS corrected_claims, round(avg(rd-od),2) AS avg_days_to_replacement, count(ca.payment_date) FILTER (WHERE ca.payment_date>=rd) AS paid_after_replacement, round(avg(ca.payment_date-od) FILTER (WHERE ca.payment_date>=rd),2) AS avg_days_orig_to_pay, coalesce(sum(paid_amount) FILTER (WHERE ca.payment_date>=rd),0) AS total_paid FROM b LEFT JOIN ca USING(claim_key,payer_key)",
+   "sql_execs": 6,
+   "repairs": 0,
+   "seconds": 64.6,
+   "pass": null
+  },
+  {
+   "qid": "a_921f1bf366",
+   "answer": "No frequency-8 void submissions exist in sem.claims for this data window, so all counts are 0.",
+   "final_sql": "WITH v AS (SELECT claim_key, payer_key, min(submission_date) vd FROM sem.claims WHERE frequency_code='8' GROUP BY 1,2), r AS (SELECT v.claim_key, bool_or(r.paid_amount>0 AND r.payment_date<v.vd) paid_before, bool_or(r.is_reversal AND r.payment_date>=v.vd) rev, sum(r.paid_amount) FILTER (WHERE r.is_current_adjudication) cur FROM v LEFT JOIN sem.remit_claims r ON r.claim_key=v.claim_key AND r.payer_key=v.payer_key GROUP BY 1) SELECT count(*) AS voided_claims, count(*) FILTER (WHERE paid_before) AS paid_before_void, count(*) FILTER (WHERE rev) AS reversed_after_void, round(coalesce(sum(cur),0),2) AS current_paid FROM r",
+   "sql_execs": 5,
+   "repairs": 0,
+   "seconds": 64.5,
+   "pass": null
+  },
+  {
+   "qid": "q14_zero_paid_not_denied",
+   "answer": "46 current claim+payer adjudications paid $0 but are not denials. Assumption: current adjudication per claim+payer, denial per is_denied.",
+   "final_sql": "SELECT count(*) AS zero_paid_not_denied FROM sem.remit_claims WHERE is_current_adjudication AND paid_amount=0 AND NOT is_denied",
+   "sql_execs": 2,
+   "repairs": 0,
+   "seconds": 64.5,
+   "pass": null
+  },
+  {
+   "qid": "a_dca9da6d52",
+   "answer": "Only medicare_advantage has a response after a correction: 1 claim, 19 days.",
+   "final_sql": "WITH rp AS (SELECT claim_key,payer_key,payer_class,min(submission_date) rd FROM sem.claims WHERE frequency_code='7' GROUP BY 1,2,3), f AS (SELECT rp.payer_class, rp.claim_key, min(r.payment_date)-rp.rd d FROM rp JOIN sem.remit_claims r ON r.claim_key=rp.claim_key AND r.payer_key=rp.payer_key AND r.payment_date>=rp.rd GROUP BY 1,2,rp.rd) SELECT payer_class, count(*) AS corrected_claims, round(avg(d),1) AS avg_days, min(d) AS min_days, max(d) AS max_days FROM f GROUP BY 1 ORDER BY 1",
+   "sql_execs": 4,
+   "repairs": 0,
+   "seconds": 64.4,
+   "pass": null
+  },
+  {
+   "qid": "q19_reversed_no_correction",
+   "answer": "2 claim+payer pairs were reversed and have no current adjudication.",
+   "final_sql": "SELECT count(*) AS reversed_no_correction FROM (SELECT claim_key,payer_key, bool_or(is_reversal) r, bool_or(is_current_adjudication) c FROM sem.remit_claims GROUP BY 1,2) WHERE r AND NOT c",
+   "sql_execs": 2,
+   "repairs": 0,
+   "seconds": 64.4,
+   "pass": null
+  },
+  {
+   "qid": "f_cpt_share_of_line_payments__80307",
+   "answer": "Fraction of current service-line paid dollars from CPT 80307 (submitted code).",
+   "final_sql": "SELECT sum(line_paid_amount) FILTER (WHERE procedure_code='80307')/sum(line_paid_amount) AS share FROM sem.remit_lines WHERE is_current_adjudication",
+   "sql_execs": 2,
+   "repairs": 0,
+   "seconds": 64.4,
+   "pass": null
+  },
+  {
+   "qid": "a_d383370345",
+   "answer": "July primary cohort remit-within-14-days share by payer class.",
+   "final_sql": "WITH c AS (SELECT claim_key,payer_key,payer_class,min(submission_date) sd FROM sem.claims WHERE payer_responsibility='P' GROUP BY 1,2,3 HAVING min(submission_date) BETWEEN DATE '2026-07-01' AND DATE '2026-07-31'), f AS (SELECT c.*, (SELECT min(payment_date) FROM sem.remit_claims r WHERE r.claim_key=c.claim_key AND r.payer_key=c.payer_key) fp FROM c) SELECT payer_class, count(*) AS cohort_claims, count(*) FILTER (WHERE fp-sd<=14) AS remitted_within_14d, round(100.0*count(*) FILTER (WHERE fp-sd<=14)/count(*),1) AS pct FROM f GROUP BY 1 ORDER BY 1",
+   "sql_execs": 4,
+   "repairs": 0,
+   "seconds": 64.3,
+   "pass": null
+  },
+  {
+   "qid": "f_cpt_share_of_line_payments__g0482",
+   "answer": "Fraction of current service-line paid dollars from CPT G0482 (submitted code).",
+   "final_sql": "SELECT sum(line_paid_amount) FILTER (WHERE procedure_code='G0482')/sum(line_paid_amount) AS share FROM sem.remit_lines WHERE is_current_adjudication",
+   "sql_execs": 2,
+   "repairs": 0,
+   "seconds": 64.3,
+   "pass": null
+  },
+  {
+   "qid": "a_0d43f7d4b6",
+   "answer": "One corrected claim had a prior recorded denial; no remit since the correction.",
+   "final_sql": "WITH rp AS (SELECT claim_key,payer_key,min(submission_date) rd FROM sem.claims WHERE frequency_code='7' GROUP BY 1,2), d AS (SELECT DISTINCT rp.claim_key, rp.payer_key, rp.rd FROM rp JOIN sem.remit_claims r ON r.claim_key=rp.claim_key AND r.payer_key=rp.payer_key AND r.claim_status_code='4' AND r.payment_date<rp.rd), o AS (SELECT d.claim_key, CASE WHEN NOT EXISTS (SELECT 1 FROM sem.remit_claims r WHERE r.claim_key=d.claim_key AND r.payer_key=d.payer_key AND r.payment_date>=d.rd) THEN 'no remit since correction' WHEN EXISTS (SELECT 1 FROM sem.remit_claims r WHERE r.claim_key=d.claim_key AND r.payer_key=d.payer_key AND r.is_current_adjudication AND NOT r.is_denied) THEN 'overturned' ELSE 'denied again' END outcome, (SELECT sum(paid_amount) FROM sem.remit_claims r WHERE r.claim_key=d.claim_key AND r.payer_key=d.payer_key AND r.is_current_adjudication) paid FROM d) SELECT outcome, count(*) AS claims, round(coalesce(sum(paid),0),2) AS current_paid FROM o GROUP BY 1 ORDER BY 1",
+   "sql_execs": 5,
+   "repairs": 0,
+   "seconds": 64.2,
+   "pass": null
+  },
+  {
+   "qid": "a_923951a050",
+   "answer": "Overturned denials: superseded non-reversal denied event, current not denied.",
+   "final_sql": "WITH x AS (SELECT claim_key,payer_key, bool_or(adjudication_state='superseded' AND NOT is_reversal AND is_denied) ed, bool_or(is_current_adjudication AND NOT is_denied) cnd, sum(paid_amount) FILTER (WHERE is_current_adjudication) paid FROM sem.remit_claims GROUP BY 1,2) SELECT count(*) AS overturned, coalesce(sum(paid),0) AS total_current_paid FROM x WHERE ed AND cnd",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 64.2,
+   "pass": null
+  },
+  {
+   "qid": "a_7423e6eb91",
+   "answer": "Open primary AR aging as of 2026-08-14.",
+   "final_sql": "WITH l AS (SELECT claim_key, frequency_code, charge_amount FROM sem.claims WHERE is_latest_submission), p AS (SELECT claim_key,payer_key,min(submission_date) sd FROM sem.claims WHERE payer_responsibility='P' GROUP BY 1,2), o AS (SELECT p.claim_key, DATE '2026-08-14'-p.sd age, l.charge_amount FROM p JOIN l USING(claim_key) WHERE l.frequency_code<>'8' AND NOT EXISTS (SELECT 1 FROM sem.remit_claims r WHERE r.claim_key=p.claim_key AND r.payer_key=p.payer_key AND r.is_current_adjudication)) SELECT CASE WHEN age<=14 THEN '0-14' WHEN age<=29 THEN '15-29' ELSE '30+' END AS bucket, count(*) AS claims, sum(charge_amount) AS billed FROM o GROUP BY 1 ORDER BY min(age)",
+   "sql_execs": 5,
+   "repairs": 0,
+   "seconds": 64.2,
+   "pass": null
+  },
+  {
+   "qid": "f_never_remitted_submitted_in_month__2026-07-01",
+   "answer": "Claims first submitted in July 2026 with no 835 at all.",
+   "final_sql": "WITH f AS (SELECT claim_key, min(submission_date) d FROM sem.claims GROUP BY 1) SELECT count(*) AS never_remitted FROM f WHERE d >= DATE '2026-07-01' AND d < DATE '2026-08-01' AND NOT EXISTS (SELECT 1 FROM sem.remit_claims r WHERE r.claim_key=f.claim_key)",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 64.1,
+   "pass": null
+  },
+  {
+   "qid": "a_ab202d4b23",
+   "answer": "Underpaid lines vs payer typical allowed (mode, ties high) per payer.",
+   "final_sql": "WITH l AS (SELECT payer_name, procedure_code, line_allowed_amount a FROM sem.remit_lines WHERE is_current_adjudication AND NOT line_is_denied AND NOT claim_is_denied AND units_paid=1 AND line_allowed_amount>0), t AS (SELECT payer_name, procedure_code, a typ FROM (SELECT payer_name, procedure_code, a, row_number() OVER (PARTITION BY payer_name, procedure_code ORDER BY count(*) DESC, a DESC) rk FROM l GROUP BY 1,2,3) WHERE rk=1), p AS (SELECT DISTINCT payer_name FROM l) SELECT p.payer_name, count(*) FILTER (WHERE l.a<t.typ) AS underpaid_lines, round(coalesce(sum(t.typ-l.a) FILTER (WHERE l.a<t.typ),0),2) AS shortfall FROM p LEFT JOIN l USING(payer_name) LEFT JOIN t USING(payer_name, procedure_code) GROUP BY 1 ORDER BY shortfall DESC, 1",
+   "sql_execs": 5,
+   "repairs": 0,
+   "seconds": 64.1,
+   "pass": null
+  },
+  {
+   "qid": "f_cpt_share_of_line_payments__g0480",
+   "answer": "Fraction of current service-line paid dollars from CPT G0480 (submitted code).",
+   "final_sql": "SELECT sum(line_paid_amount) FILTER (WHERE procedure_code='G0480')/sum(line_paid_amount) AS share FROM sem.remit_lines WHERE is_current_adjudication",
+   "sql_execs": 2,
+   "repairs": 0,
+   "seconds": 64.0,
+   "pass": null
+  },
+  {
+   "qid": "a_d671e0b995",
+   "answer": "Monthly denial rate by payer class; only July 2026 present so change is null.",
+   "final_sql": "WITH m AS (SELECT payer_class, payment_month mo, count(*) n, sum(is_denied::int) d, 100.0*sum(is_denied::int)/count(*) r FROM sem.remit_claims WHERE is_current_adjudication GROUP BY 1,2) SELECT payer_class, strftime(mo,'%Y-%m') AS month, n AS current_adjudications, d AS denied, round(r,2) AS denial_rate_pct, round(r - lag(r) OVER (PARTITION BY payer_class ORDER BY mo),2) AS mom_change_pp FROM m ORDER BY 1,2",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 64.0,
+   "pass": null
+  },
+  {
+   "qid": "f_cpt_share_of_line_payments__81479",
+   "answer": "Fraction of current service-line paid dollars from CPT 81479 (submitted code).",
+   "final_sql": "SELECT sum(line_paid_amount) FILTER (WHERE procedure_code='81479')/sum(line_paid_amount) AS share FROM sem.remit_lines WHERE is_current_adjudication",
+   "sql_execs": 2,
+   "repairs": 0,
+   "seconds": 64.0,
+   "pass": null
+  },
+  {
+   "qid": "q12_referring_provider_denials",
+   "answer": "No referring provider has 15+ primary-adjudicated claims in this data (max is 4), so no provider qualifies.",
+   "final_sql": "WITH p AS (SELECT DISTINCT claim_key,payer_key,referring_npi FROM sem.claims WHERE payer_responsibility='P') SELECT referring_npi, count(*) AS claims, sum(r.is_denied::int) AS denied, round(100.0*sum(r.is_denied::int)/count(*),2) AS denial_rate_pct FROM p JOIN sem.remit_claims r USING(claim_key,payer_key) WHERE r.is_current_adjudication GROUP BY 1 HAVING count(*)>=15 ORDER BY denial_rate_pct DESC, referring_npi LIMIT 5",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 64.0,
+   "pass": null
+  }
+ ],
+ "accuracy": null,
+ "n": 30,
+ "correct": null,
+ "mean_sql_execs": 3.47,
+ "scorer": "pending",
+ "notes": "Same local executor as H029, so NOT independent of H029: H029 final SQL served as the starting draft, then decompose_cte stage checks (row counts per CTE, flags empty stages) were run on every question, candidates3 was run for q11 (3 CPT-mapping candidates executed), and a verifier population-coverage pass changed q11 (claim_lines covered only ~72 of 492 current adjudications, so 835 lines were unioned in). Repair probe on a_921f1bf366's empty void population found no void submission in sem.claims, so the answer was kept. Executor had seen H029's pass/fail outcomes (but no gold values or reference SQL) before running this cell; that is a contamination caveat."
+}
