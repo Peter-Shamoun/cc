@@ -149,11 +149,11 @@ s3://cc-prod/<customer>/
 └── semantic_layer/                                             # gold: sem.* + PHI-stripped lossless.*
     ├── CURRENT                         # "v=<run>", compare-and-set, forward only
     ├── v=<run>/manifest.json           # the version: exact file list per relation + build state
-    ├── sem.<view>/schema/part-<run>.parquet          # zero rows, listed first (cheap view binding)
-    ├── sem.<view>/cohort=YYYY-MM/part-<run>.parquet  # claim relations: 3 open cohort months, one file each
-    ├── sem.<view>/cohort=YYYY-Qn/part-<run>.parquet  # settled cohorts: one file per quarter
-    ├── sem.{payments,provider_adjustments,payers}/all/part-<run>.parquet
-    └── lossless.<table>/received=YYYY-MM|YYYY-Qn/part-<run>.parquet   # daily parts in the open month
+    ├── sem.<view>/schema/part-<run>-<n>.parquet      # zero rows, listed first (cheap view binding)
+    ├── sem.<view>/cohort=YYYY-MM/part-<run>-<n>.parquet  # claim relations: 3 open cohort months, one file each
+    ├── sem.<view>/cohort=YYYY-Qn/part-<run>-<n>.parquet  # settled cohorts: one file per quarter
+    ├── sem.{payments,provider_adjustments,payers}/all/part-<run>-<n>.parquet
+    └── lossless.<table>/received=YYYY-MM|YYYY-Qn/part-<run>-<n>.parquet   # daily parts in the open month
 ```
 
 Rules:
@@ -167,28 +167,53 @@ Rules:
   runs the unchanged view SQL, and replaces the touched claims' rows in their partitions (copy-on-write).
   Payments, provider adjustments and lossless rows are per file, so they are appended; `sem.payers` is merged.
 - **Full rebuild** on `GOLD_MODE=full`, on the first build, when the rules hash changes (view SQL, ref seeds,
-  ESCALATION, layout constants), or for a backfilled older month. Same layout, so either path is a valid base.
+  ESCALATION, layout constants), or whenever the pending runs are not all in the newest month: a late batch for an
+  older month, or a crashed batch caught up across a month close. Same layout, so either path is a valid base.
+- **File keys** are `part-<run>-<n>`: unique per write, so a partition rewritten twice in one build (folded into its
+  quarter, then rewritten for a touched claim) never reuses a key. Before publishing, `check_manifest` refuses a
+  version that lists a missing file or a file it also retires.
 - **Commit and recovery.** A batch writes its silver parts directly (no staging copy) and `edi.source_file` last.
   Parts without that commit record are garbage; the next batch deletes them under the lock. A batch that crashed
   after its silver commit leaves `silver_through` behind; the next batch (or a redelivered event) includes it.
-- **Concurrency.** One batch per customer at a time: `staging/LOCK` lease created with `If-None-Match`, taken
-  over with `If-Match` after 2 h. CURRENT is still a compare-and-set, against the version the build started from.
-- **Retention.** A data file is deleted once two newer versions no longer list it; lifecycle expires the
-  noncurrent bytes after a day. Orphans from crashed builds are swept at month close.
+- **Concurrency.** One batch per customer at a time: `staging/LOCK` (`BatchLock`) is a lease changed only by
+  conditional writes: created with `If-None-Match`, taken over with `If-Match` after 2 h, renewed with `If-Match`
+  on the holder's own ETag before the silver commit record, compaction and CURRENT, and released by an `If-Match`
+  overwrite with an expired lease. A task that overran its lease gets `LockLost` and stops before any shared
+  write; it can never release a successor's lease. CURRENT is still a compare-and-set against the build's base.
+- **Retention.** Each manifest carries `retired: [[key, retired_at]]` (files the version stopped listing, and the
+  previous manifest). A retired file is deleted only after `READER_RETENTION_SECONDS` (reader session lifetime
+  900 s + 300 s), so any session that opened a recent version keeps working however fast versions are published.
+  Lifecycle then expires the noncurrent bytes after a day. Orphans from crashed builds are swept at month close.
 - **Reader.** CURRENT → manifest (one extra GET) → views over exact file lists, schema file first. The DuckDB
-  secret and `allowed_directories` are scoped to `<customer>/semantic_layer/` (was: the version prefix), because
-  versions share files. Tenant isolation is unchanged (the tests check each layer on its own); a reader could now
-  open files of an older version of its own customer's gold, which holds no PHI.
+  secrets and `allowed_directories` cover only the prefixes of the relations the session may read: the ten
+  `sem.*` relations, plus the `lossless.*` ones only for an escalated session. So a non-escalated session cannot
+  open a lossless file even with SQL the guard missed. Tenant isolation is unchanged (each layer is tested alone).
 - **Parquet.** ZSTD (default level). Gold: 1,048,576-row groups, claim relations sorted by payer_key, claim_key.
   Silver: default row groups (122,880), closed months sorted by file_id, seg_ord. `edi.segment` is stored as is (ZSTD halves it against Snappy) and never read by gold.
 
 ## 6. Correctness
 
-- `tests/test_lake.py::test_incremental_gold_equals_full_rebuild`: a 36-day stress-ish run (duplicate and corrupt
-  deliveries, secondaries, reversals, voids) across a month close, with `OPEN_MONTHS=1` so a month folds into its
-  quarter, and with one batch killed after its silver commit; every one of the 25 reader relations equals a full
-  rebuild, row for row (`EXCEPT ALL` both ways).
-- Same module: crashed batch caught up, closed months compacted, uncommitted parts treated as garbage, the lock.
+`tests/test_lake.py`, on generator 3.1 data (90-day burn-in, so the window opens with remits for claims billed
+before it):
+
+- a 36-day run with duplicate and corrupt deliveries, secondaries, reversals and voids, across a month close with
+  `OPEN_MONTHS=1` (July folds into Q3 while late events keep touching it), and the **last July batch killed after
+  its silver commit**: the August batch catches it up with a full rebuild; every published version passes
+  `check_manifest`; incremental gold equals a rebuild triggered by a **rules change**, row for row in all 25
+  reader relations (`EXCEPT ALL` both ways);
+- a **reader holding an older version** survives two further publishes; its files go once retention expires;
+- a **late batch into a compacted month** forces a full rebuild and is recompacted;
+- the states a **crash mid-compaction** can leave (two compacted files, covered parts, uncommitted parts) are
+  garbage, never double rows;
+- the **lock**: exclusive, expires, a stale holder gets `LockLost`, cannot release the successor's lease, and
+  `write_silver` refuses to write the commit record without the lock;
+- a non-escalated session cannot read a `lossless.*` file with raw SQL;
+- the **default `OPEN_MONTHS=3`** over 4 months: three open months, two settled quarters, equal to a full rebuild.
+- Bug found by an independent review and fixed: a partition folded and then rewritten in one build reused one key,
+  listed as both live and retired, so the next build deleted a live file (HTTP 404 for every later build). Also
+  fixed from that review: catch-up across a month close lost July's lossless rows; the lock had no fencing; files
+  were deleted one publish after retirement regardless of reader age; `sem.payers` used `any_value`, so name and
+  class were not deterministic (now `min`, and the merge uses `least`).
 - `tests/test_backend_e2e.py` (ledger checks and every security layer) passes unchanged.
 
 ## 7. Risks
@@ -200,7 +225,10 @@ Rules:
   the equality test is the guard; keep it in CI.
 - **Manifest size** grows with partitions (~25 relations × (3 + quarters) files): ~100 KB at 3 years. Fine, but
   every session open fetches it.
-- **Reader scope widened** from a version prefix to the customer's gold prefix (see above).
+- **Reader scope** is per relation prefix of the customer's gold, no longer per version: a session could open files
+  of another recent version of the same relations (no PHI, same customer).
+- **Lock lease** is 2 h and renewed only at the shared writes; a single phase longer than 2 h (a full rebuild at
+  multi-year history) would lose the lock and stop, not corrupt. Renew inside long phases if that happens.
 - **Not exercised here:** multipart uploads of large gold files (the local endpoint has none; real S3 needs it
   above 5 GB, boto3 switches at 8 MB), real S3 latency, and the 2×1-year / 1×3-year runs (left for the full-scale
   datasets).

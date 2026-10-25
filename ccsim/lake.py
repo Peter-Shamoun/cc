@@ -10,9 +10,10 @@ Silver, s3://<bucket>/<customer>/parquet/<table>/received_month=YYYY-MM/
 Gold, s3://<bucket>/<customer>/semantic_layer/
     CURRENT                                   "v=<run>"; compare-and-set, only ever forward
     v=<run>/manifest.json                     one gold version: every data file of every relation + build state
-    <relation>/<partition>/part-<run>.parquet immutable data files, shared by versions until a version replaces them
-  Readers open CURRENT, then that version's manifest, and read exactly the files it lists. A data file is deleted
-  only after two newer versions stopped referencing it, so a reader that opened the previous version still works.
+    <relation>/<partition>/part-<run>-<n>.parquet  immutable data files (key unique per write), shared by versions
+  Readers open CURRENT, then that version's manifest, and read exactly the files it lists. A file a version stops
+  listing is retired with a timestamp and deleted only after a reader session's lifetime, so a reader on any recent
+  version keeps working.
 
 Batch lock, s3://<bucket>/<customer>/staging/LOCK: a lease changed only by conditional writes (BatchLock). It
 serialises one customer's batches; a task re-checks it before every shared write and stops if it was taken over.
