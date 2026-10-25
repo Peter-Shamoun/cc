@@ -102,7 +102,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0529,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_fca405b635",
@@ -125,7 +125,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0088,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_b853266803",
@@ -162,7 +162,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0131,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q10_top_denial_carcs",
@@ -199,7 +199,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.009,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_a5888f64a4",
@@ -260,7 +260,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0089,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_436f690741",
@@ -308,7 +308,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0099,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_d29f83c935",
@@ -1469,7 +1469,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.012,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q07_denial_rate",
@@ -1492,7 +1492,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0063,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_7d45c279a7",
@@ -1561,7 +1561,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0129,
-      "pass": null
+      "pass": false
     },
     {
       "qid": "a_f3c42ce766",
@@ -1664,7 +1664,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0076,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q15_partial_line_denials",
@@ -1683,7 +1683,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0062,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q25_primary_deductible",
@@ -1702,7 +1702,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.01,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_26d4c3f4ca",
@@ -1787,7 +1787,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0089,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q18_voided",
@@ -1806,7 +1806,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0064,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_8663c777cd",
@@ -1837,7 +1837,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0092,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_9a40343e18",
@@ -1906,7 +1906,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0106,
-      "pass": null
+      "pass": false
     },
     {
       "qid": "q03_total_paid",
@@ -1925,7 +1925,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0059,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q11_cpt_denial_rate",
@@ -2046,7 +2046,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0092,
-      "pass": null
+      "pass": false
     },
     {
       "qid": "a_a123bba47f",
@@ -2073,7 +2073,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0166,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_9108c7aacb",
@@ -2100,11 +2100,11 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0089,
-      "pass": null
+      "pass": true
     }
   ],
-  "accuracy": null,
+  "accuracy": "17/20",
   "n": 20,
   "mean_sql_execs": 3.0,
-  "notes": "BM25 few-shot (k1=1.5, b=0.75) took the 3 most similar solved questions from outside this dev set, excluding the held-out 27 and the same category (the template stand-in; family is unset). Their reference SQL was used only as examples. No exploration. One CTE statement per question; two intermediate checks (counts, uniqueness or sums) ran before the final select. Repair budget was 2; every final executed and no result was empty, so repairs stayed 0. A zero primary deductible was kept: primary is payer_responsibility P, not payer_sequence. Assumptions are stated on each answer. pass is filled only after this file is committed."
+  "notes": "BM25 few-shot (k1=1.5, b=0.75) took the 3 most similar solved questions from outside this dev set, excluding the held-out 27 and the same category (the template stand-in; family is unset). Their reference SQL was used only as examples. No exploration. One CTE statement per question; two intermediate checks (counts, uniqueness or sums) ran before the final select. Repair budget was 2; every final executed and no result was empty, so repairs stayed 0. A zero primary deductible was kept: primary is payer_responsibility P, not payer_sequence. Assumptions are stated on each answer. Scored with bench.compare after the answer commit: 17/20. Misses: a_7d45c279a7 (zero-filled payer classes; key is empty), a_9a40343e18 (percents use all claims, key uses the primary-claim base), q11_cpt_denial_rate (835 CPTs; key population is empty on this extract)."
 }
