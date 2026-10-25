@@ -64,7 +64,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.03,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_b853266803",
@@ -118,7 +119,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -154,7 +156,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_a5888f64a4",
@@ -214,7 +217,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7d45c279a7",
@@ -247,7 +251,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q15_partial_line_denials",
@@ -265,7 +270,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q25_primary_deductible",
@@ -283,7 +289,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_8663c777cd",
@@ -313,7 +320,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__87798",
@@ -331,7 +339,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q11_cpt_denial_rate",
@@ -367,7 +376,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_a123bba47f",
@@ -407,7 +417,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_9108c7aacb",
@@ -461,7 +472,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_856b95a70c",
@@ -521,7 +533,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_1b7e02d0b0",
@@ -547,7 +560,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_921f1bf366",
@@ -571,7 +585,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "q14_zero_paid_not_denied",
@@ -589,7 +604,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_dca9da6d52",
@@ -615,7 +631,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q19_reversed_no_correction",
@@ -633,7 +650,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__80307",
@@ -651,7 +669,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d383370345",
@@ -711,7 +730,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0482",
@@ -729,7 +749,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_0d43f7d4b6",
@@ -751,7 +772,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_923951a050",
@@ -771,7 +793,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7423e6eb91",
@@ -798,7 +821,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_never_remitted_submitted_in_month__2026-07-01",
@@ -816,7 +840,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_ab202d4b23",
@@ -908,7 +933,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0480",
@@ -926,7 +952,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d671e0b995",
@@ -1002,7 +1029,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__81479",
@@ -1020,7 +1048,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q12_referring_provider_denials",
@@ -1037,11 +1066,14 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   }
  ],
- "accuracy": null,
+ "accuracy": "29/30",
  "n": 30,
  "mean_sql_execs": 1,
- "notes": "Same local executor ran H025 first in the same session and saw H025's own execution errors and pass/fail flags (never gold SQL/answers/glossary), so H026-H028 are NOT independent of H025: drafts were reused and the two DuckDB binder-error fixes were known. Weight these cells lower. Answers committed before scoring. fewshot: 3 TF-IDF neighbours per question from non-dev, non-heldout pool (same family excluded) with reference SQL; they changed no drafts. verifier: static critic pass + one revision before the single execution (fixed the 2 group-by-all queries). repair=0: single execution stands."
+ "notes": "Same local executor ran H025 first in the same session and saw H025's own execution errors and pass/fail flags (never gold SQL/answers/glossary), so H026-H028 are NOT independent of H025: drafts were reused and the two DuckDB binder-error fixes were known. Weight these cells lower. Answers committed before scoring. fewshot: 3 TF-IDF neighbours per question from non-dev, non-heldout pool (same family excluded) with reference SQL; they changed no drafts. verifier: static critic pass + one revision before the single execution (fixed the 2 group-by-all queries). repair=0: single execution stands.",
+ "accuracy_frac": 0.9667,
+ "scoring": "deterministic matcher bench.compare.match vs gold_sql on the snapshot (no LLM judge: no paid API calls); a judge could flip some deterministic fails"
 }
