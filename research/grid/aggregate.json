@@ -1,256 +1,32 @@
 {
- "generated": "2026-10-25 16:20 PDT",
- "n_found": 122,
- "n_valid": 117,
+ "generated": "2026-10-25 16:22 PDT",
+ "n_found": 124,
+ "n_valid": 122,
  "invalid": [
   [
    "H019",
    "branch",
    [
-    "no scored results"
+    "unscored: 30 answers written but every pass is null (scoring not done yet)"
    ]
   ],
   [
    "H020",
    "branch",
    [
-    "no scored results"
-   ]
-  ],
-  [
-   "H090",
-   "branch",
-   [
-    "no scored results"
-   ]
-  ],
-  [
-   "H091",
-   "branch",
-   [
-    "no scored results"
-   ]
-  ],
-  [
-   "H092",
-   "branch",
-   [
-    "no scored results"
+    "unscored: 30 answers written but every pass is null (scoring not done yet)"
    ]
   ]
  ],
- "warnings": [
-  [
-   "H019",
-   "branch",
-   [
-    "row 0 missing qid/pass; dropped",
-    "row 1 missing qid/pass; dropped",
-    "row 2 missing qid/pass; dropped",
-    "row 3 missing qid/pass; dropped",
-    "row 4 missing qid/pass; dropped",
-    "row 5 missing qid/pass; dropped",
-    "row 6 missing qid/pass; dropped",
-    "row 7 missing qid/pass; dropped",
-    "row 8 missing qid/pass; dropped",
-    "row 9 missing qid/pass; dropped",
-    "row 10 missing qid/pass; dropped",
-    "row 11 missing qid/pass; dropped",
-    "row 12 missing qid/pass; dropped",
-    "row 13 missing qid/pass; dropped",
-    "row 14 missing qid/pass; dropped",
-    "row 15 missing qid/pass; dropped",
-    "row 16 missing qid/pass; dropped",
-    "row 17 missing qid/pass; dropped",
-    "row 18 missing qid/pass; dropped",
-    "row 19 missing qid/pass; dropped",
-    "row 20 missing qid/pass; dropped",
-    "row 21 missing qid/pass; dropped",
-    "row 22 missing qid/pass; dropped",
-    "row 23 missing qid/pass; dropped",
-    "row 24 missing qid/pass; dropped",
-    "row 25 missing qid/pass; dropped",
-    "row 26 missing qid/pass; dropped",
-    "row 27 missing qid/pass; dropped",
-    "row 28 missing qid/pass; dropped",
-    "row 29 missing qid/pass; dropped"
-   ]
-  ],
-  [
-   "H020",
-   "branch",
-   [
-    "row 0 missing qid/pass; dropped",
-    "row 1 missing qid/pass; dropped",
-    "row 2 missing qid/pass; dropped",
-    "row 3 missing qid/pass; dropped",
-    "row 4 missing qid/pass; dropped",
-    "row 5 missing qid/pass; dropped",
-    "row 6 missing qid/pass; dropped",
-    "row 7 missing qid/pass; dropped",
-    "row 8 missing qid/pass; dropped",
-    "row 9 missing qid/pass; dropped",
-    "row 10 missing qid/pass; dropped",
-    "row 11 missing qid/pass; dropped",
-    "row 12 missing qid/pass; dropped",
-    "row 13 missing qid/pass; dropped",
-    "row 14 missing qid/pass; dropped",
-    "row 15 missing qid/pass; dropped",
-    "row 16 missing qid/pass; dropped",
-    "row 17 missing qid/pass; dropped",
-    "row 18 missing qid/pass; dropped",
-    "row 19 missing qid/pass; dropped",
-    "row 20 missing qid/pass; dropped",
-    "row 21 missing qid/pass; dropped",
-    "row 22 missing qid/pass; dropped",
-    "row 23 missing qid/pass; dropped",
-    "row 24 missing qid/pass; dropped",
-    "row 25 missing qid/pass; dropped",
-    "row 26 missing qid/pass; dropped",
-    "row 27 missing qid/pass; dropped",
-    "row 28 missing qid/pass; dropped",
-    "row 29 missing qid/pass; dropped"
-   ]
-  ],
-  [
-   "H090",
-   "branch",
-   [
-    "row 0 missing qid/pass; dropped",
-    "row 1 missing qid/pass; dropped",
-    "row 2 missing qid/pass; dropped",
-    "row 3 missing qid/pass; dropped",
-    "row 4 missing qid/pass; dropped",
-    "row 5 missing qid/pass; dropped",
-    "row 6 missing qid/pass; dropped",
-    "row 7 missing qid/pass; dropped",
-    "row 8 missing qid/pass; dropped",
-    "row 9 missing qid/pass; dropped",
-    "row 10 missing qid/pass; dropped",
-    "row 11 missing qid/pass; dropped",
-    "row 12 missing qid/pass; dropped",
-    "row 13 missing qid/pass; dropped",
-    "row 14 missing qid/pass; dropped",
-    "row 15 missing qid/pass; dropped",
-    "row 16 missing qid/pass; dropped",
-    "row 17 missing qid/pass; dropped",
-    "row 18 missing qid/pass; dropped",
-    "row 19 missing qid/pass; dropped",
-    "row 20 missing qid/pass; dropped",
-    "row 21 missing qid/pass; dropped",
-    "row 22 missing qid/pass; dropped",
-    "row 23 missing qid/pass; dropped",
-    "row 24 missing qid/pass; dropped",
-    "row 25 missing qid/pass; dropped",
-    "row 26 missing qid/pass; dropped",
-    "row 27 missing qid/pass; dropped",
-    "row 28 missing qid/pass; dropped",
-    "row 29 missing qid/pass; dropped"
-   ]
-  ],
-  [
-   "H091",
-   "branch",
-   [
-    "row 0 missing qid/pass; dropped",
-    "row 1 missing qid/pass; dropped",
-    "row 2 missing qid/pass; dropped",
-    "row 3 missing qid/pass; dropped",
-    "row 4 missing qid/pass; dropped",
-    "row 5 missing qid/pass; dropped",
-    "row 6 missing qid/pass; dropped",
-    "row 7 missing qid/pass; dropped",
-    "row 8 missing qid/pass; dropped",
-    "row 9 missing qid/pass; dropped",
-    "row 10 missing qid/pass; dropped",
-    "row 11 missing qid/pass; dropped",
-    "row 12 missing qid/pass; dropped",
-    "row 13 missing qid/pass; dropped",
-    "row 14 missing qid/pass; dropped",
-    "row 15 missing qid/pass; dropped",
-    "row 16 missing qid/pass; dropped",
-    "row 17 missing qid/pass; dropped",
-    "row 18 missing qid/pass; dropped",
-    "row 19 missing qid/pass; dropped",
-    "row 20 missing qid/pass; dropped",
-    "row 21 missing qid/pass; dropped",
-    "row 22 missing qid/pass; dropped",
-    "row 23 missing qid/pass; dropped",
-    "row 24 missing qid/pass; dropped",
-    "row 25 missing qid/pass; dropped",
-    "row 26 missing qid/pass; dropped",
-    "row 27 missing qid/pass; dropped",
-    "row 28 missing qid/pass; dropped",
-    "row 29 missing qid/pass; dropped"
-   ]
-  ],
-  [
-   "H092",
-   "branch",
-   [
-    "row 0 missing qid/pass; dropped",
-    "row 1 missing qid/pass; dropped",
-    "row 2 missing qid/pass; dropped",
-    "row 3 missing qid/pass; dropped",
-    "row 4 missing qid/pass; dropped",
-    "row 5 missing qid/pass; dropped",
-    "row 6 missing qid/pass; dropped",
-    "row 7 missing qid/pass; dropped",
-    "row 8 missing qid/pass; dropped",
-    "row 9 missing qid/pass; dropped",
-    "row 10 missing qid/pass; dropped",
-    "row 11 missing qid/pass; dropped",
-    "row 12 missing qid/pass; dropped",
-    "row 13 missing qid/pass; dropped",
-    "row 14 missing qid/pass; dropped",
-    "row 15 missing qid/pass; dropped",
-    "row 16 missing qid/pass; dropped",
-    "row 17 missing qid/pass; dropped",
-    "row 18 missing qid/pass; dropped",
-    "row 19 missing qid/pass; dropped",
-    "row 20 missing qid/pass; dropped",
-    "row 21 missing qid/pass; dropped",
-    "row 22 missing qid/pass; dropped",
-    "row 23 missing qid/pass; dropped",
-    "row 24 missing qid/pass; dropped",
-    "row 25 missing qid/pass; dropped",
-    "row 26 missing qid/pass; dropped",
-    "row 27 missing qid/pass; dropped",
-    "row 28 missing qid/pass; dropped",
-    "row 29 missing qid/pass; dropped"
-   ]
-  ]
- ],
+ "warnings": [],
  "flagged": [
   "C000",
-  "C003",
   "C006",
   "C007",
-  "C008",
   "C010",
   "C011",
-  "C021",
-  "C022",
-  "C024",
-  "C025",
-  "C026",
   "H000",
   "H001",
-  "H004",
-  "H008",
-  "H015",
-  "H016",
-  "H018",
-  "H022",
-  "H026",
-  "H027",
-  "H028",
-  "H029",
-  "H030",
-  "H038",
-  "H039",
-  "H040",
-  "H047",
   "H050",
   "H051",
   "H052",
@@ -263,214 +39,223 @@
   "H062",
   "H063",
   "H064",
-  "H072",
-  "H075",
-  "H078"
+  "H091"
+ ],
+ "soft": [
+  "H018",
+  "H026",
+  "H027",
+  "H028",
+  "H030",
+  "H031",
+  "H038",
+  "H039",
+  "H040"
  ],
  "fits": {
   "H": {
-   "n_cells": 90,
-   "n_obs": 2070,
+   "n_cells": 95,
+   "n_obs": 2185,
    "effects": [
     {
      "term": "gen:metric_spec",
      "identified": true,
-     "est": 0.00909481334071045,
-     "se": 0.019091356860076902,
-     "lo": -0.02870607324224182,
-     "hi": 0.046895699923662715,
-     "cells_on": 30
+     "est": 0.007998722303020322,
+     "se": 0.018279190162239473,
+     "lo": -0.02819407421821383,
+     "hi": 0.044191518824254476,
+     "cells_on": 31
     },
     {
      "term": "gen:decompose_cte",
      "identified": true,
-     "est": -0.015413609296454307,
-     "se": 0.024933071821924994,
-     "lo": -0.0647810915038658,
-     "hi": 0.03395387291095718,
-     "cells_on": 29
+     "est": -0.013062124766038661,
+     "se": 0.023706462589739987,
+     "lo": -0.06000092069372384,
+     "hi": 0.03387667116164651,
+     "cells_on": 31
     },
     {
      "term": "fewshot",
      "identified": true,
-     "est": -0.004612538460927635,
-     "se": 0.019056613064069538,
-     "lo": -0.04234463232778532,
-     "hi": 0.03311955540593005,
-     "cells_on": 47
+     "est": -0.0045310419827312995,
+     "se": 0.018214943369564154,
+     "lo": -0.040596629854468325,
+     "hi": 0.03153454588900573,
+     "cells_on": 49
     },
     {
      "term": "explore",
      "identified": true,
-     "est": 0.003091041806000775,
-     "se": 0.017589058016285387,
-     "lo": -0.03173529306624429,
-     "hi": 0.037917376678245844,
-     "cells_on": 46
+     "est": 0.0009720670283480896,
+     "se": 0.016514233821081057,
+     "lo": -0.031726115937392406,
+     "hi": 0.03367024999408858,
+     "cells_on": 48
     },
     {
      "term": "candidates3",
      "identified": true,
-     "est": 0.018510990209092915,
-     "se": 0.01907258760621312,
-     "lo": -0.01925273325120906,
-     "hi": 0.05627471366939489,
-     "cells_on": 43
+     "est": 0.019679866033427446,
+     "se": 0.018163415130410792,
+     "lo": -0.016283695924785922,
+     "hi": 0.05564342799164081,
+     "cells_on": 46
     },
     {
      "term": "verifier",
      "identified": true,
-     "est": -0.013954335935848036,
-     "se": 0.019896941841512125,
-     "lo": -0.05335028078204204,
-     "hi": 0.02544160891034597,
-     "cells_on": 36
+     "est": -0.011273933995283576,
+     "se": 0.018682713853118458,
+     "lo": -0.048265707424458126,
+     "hi": 0.02571783943389097,
+     "cells_on": 40
     },
     {
      "term": "repair",
      "identified": true,
-     "est": 0.018253554586019623,
-     "se": 0.01848320021668898,
-     "lo": -0.018343181843024556,
-     "hi": 0.05485029101506381,
-     "cells_on": 48
+     "est": 0.01973803226070048,
+     "se": 0.017798907552949255,
+     "lo": -0.015503804694139044,
+     "hi": 0.05497986921554,
+     "cells_on": 52
     },
     {
      "term": "assumptions",
      "identified": true,
-     "est": 0.0015908526417011287,
-     "se": 0.019988805709002553,
-     "lo": -0.03798698266212393,
-     "hi": 0.04116868794552618,
-     "cells_on": 43
+     "est": 0.004091589492806411,
+     "se": 0.01909796251534228,
+     "lo": -0.0337223762875713,
+     "hi": 0.041905555273184125,
+     "cells_on": 46
     },
     {
      "term": "multiagent",
      "identified": true,
-     "est": -0.0010177365010836212,
-     "se": 0.019033486502174953,
-     "lo": -0.03870403977539003,
-     "hi": 0.036668566773222784,
-     "cells_on": 36
+     "est": 0.0010271621132845385,
+     "se": 0.017998577607353357,
+     "lo": -0.03461002154927511,
+     "hi": 0.03666434577584419,
+     "cells_on": 39
     }
    ],
    "logit": [
     {
      "term": "gen:metric_spec",
-     "logodds": 0.4165216706239332,
-     "lo": 0.05772571849969638,
-     "hi": 0.77531762274817
+     "logodds": 0.38780108864311286,
+     "lo": 0.030742900694286646,
+     "hi": 0.7448592765919391
     },
     {
      "term": "gen:decompose_cte",
-     "logodds": 0.13944139554313953,
-     "lo": -0.2113175713102898,
-     "hi": 0.49020036239656883
+     "logodds": 0.13549685083916715,
+     "lo": -0.21263016192488401,
+     "hi": 0.4836238636032183
     },
     {
      "term": "fewshot",
-     "logodds": 0.11391084077077608,
-     "lo": -0.18510789320259224,
-     "hi": 0.4129295747441444
+     "logodds": 0.11815075127582601,
+     "lo": -0.17909334486466943,
+     "hi": 0.4153948474163215
     },
     {
      "term": "explore",
-     "logodds": 0.2656433343134385,
-     "lo": -0.04189205927978429,
-     "hi": 0.5731787279066614
+     "logodds": 0.23255802749404822,
+     "lo": -0.06916219673557059,
+     "hi": 0.534278251723667
     },
     {
      "term": "candidates3",
-     "logodds": 0.5240556932462076,
-     "lo": 0.22984222295707307,
-     "hi": 0.8182691635353421
+     "logodds": 0.541099920436133,
+     "lo": 0.24979207223909433,
+     "hi": 0.8324077686331717
     },
     {
      "term": "verifier",
-     "logodds": -0.004957712778103404,
-     "lo": -0.30596142197004317,
-     "hi": 0.29604599641383633
+     "logodds": 0.01820605672986973,
+     "lo": -0.2794925445719746,
+     "hi": 0.3159046580317141
     },
     {
      "term": "repair",
-     "logodds": 0.5497317711109877,
-     "lo": 0.26229100918696174,
-     "hi": 0.8371725330350137
+     "logodds": 0.5733608742110202,
+     "lo": 0.28764360745350886,
+     "hi": 0.8590781409685315
     },
     {
      "term": "assumptions",
-     "logodds": 0.301541189304782,
-     "lo": 0.006092541904128945,
-     "hi": 0.5969898367054352
+     "logodds": 0.3240116793274985,
+     "lo": 0.03127341422777774,
+     "hi": 0.6167499444272193
     },
     {
      "term": "multiagent",
-     "logodds": 0.147404564939818,
-     "lo": -0.16470939297330103,
-     "hi": 0.45951852285293704
+     "logodds": 0.19886305749579447,
+     "lo": -0.10466859564473369,
+     "hi": 0.5023947106363227
     }
    ],
    "interactions": [
     {
      "terms": "fewshot x assumptions",
-     "est": 0.10079133354497209,
-     "se": 0.03936309165218859,
-     "t": 2.56055429882292,
-     "lo": 0.02285241207363868,
-     "hi": 0.17873025501630552,
-     "cells_on": 24
-    },
-    {
-     "terms": "fewshot x verifier",
-     "est": 0.061765733597183625,
-     "se": 0.04034005382755757,
-     "t": 1.5311267025377515,
-     "lo": -0.018107572981380368,
-     "hi": 0.14163904017574763,
-     "cells_on": 20
-    },
-    {
-     "terms": "repair x assumptions",
-     "est": 0.05903540915265593,
-     "se": 0.04023163107122922,
-     "t": 1.467387912961695,
-     "lo": -0.020623220368377923,
-     "hi": 0.1386940386736898,
-     "cells_on": 22
+     "est": 0.10087178108242657,
+     "se": 0.037202940568601246,
+     "t": 2.711392689414474,
+     "lo": 0.02720995875659611,
+     "hi": 0.17453360340825702,
+     "cells_on": 26
     },
     {
      "terms": "explore x assumptions",
-     "est": -0.05217638481707431,
-     "se": 0.036782472298088814,
-     "t": -1.4185121759688064,
-     "lo": -0.12500567996729017,
-     "hi": 0.020652910333141546,
-     "cells_on": 25
+     "est": -0.05567054880747122,
+     "se": 0.035421961660422475,
+     "t": -1.5716393502190709,
+     "lo": -0.12580603289510772,
+     "hi": 0.014464935280165285,
+     "cells_on": 26
+    },
+    {
+     "terms": "fewshot x verifier",
+     "est": 0.054818137809255214,
+     "se": 0.037446454075662564,
+     "t": 1.463907308779951,
+     "lo": -0.019325841260556663,
+     "hi": 0.12896211687906708,
+     "cells_on": 21
+    },
+    {
+     "terms": "repair x assumptions",
+     "est": 0.05395912465231927,
+     "se": 0.03749181786995574,
+     "t": 1.4392240152099878,
+     "lo": -0.0202746747301931,
+     "hi": 0.12819292403483165,
+     "cells_on": 24
     },
     {
      "terms": "verifier x multiagent",
-     "est": 0.04007394271418548,
-     "se": 0.03946871086962919,
-     "t": 1.0153344720722057,
-     "lo": -0.038074104807680316,
-     "hi": 0.11822199023605129,
-     "cells_on": 16
+     "est": 0.036258644499088985,
+     "se": 0.037170611909094445,
+     "t": 0.9754653646209593,
+     "lo": -0.037339167080918015,
+     "hi": 0.10985645607909598,
+     "cells_on": 18
     }
    ],
    "dropped_constant_q": 7,
    "questions": 30,
    "note": "",
-   "clusters": 90,
+   "clusters": 95,
    "b": [
-    0.00909481334071045,
-    -0.015413609296454307,
-    -0.004612538460927635,
-    0.003091041806000775,
-    0.018510990209092915,
-    -0.013954335935848036,
-    0.018253554586019623,
-    0.0015908526417011287,
-    -0.0010177365010836212
+    0.007998722303020322,
+    -0.013062124766038661,
+    -0.0045310419827312995,
+    0.0009720670283480896,
+    0.019679866033427446,
+    -0.011273933995283576,
+    0.01973803226070048,
+    0.004091589492806411,
+    0.0010271621132845385
    ]
   },
   "C": {
@@ -633,258 +418,258 @@
    ]
   },
   "H_clean": {
-   "n_cells": 58,
-   "n_obs": 1218,
+   "n_cells": 80,
+   "n_obs": 1680,
    "effects": [
     {
      "term": "gen:metric_spec",
      "identified": true,
-     "est": 0.018091840913782804,
-     "se": 0.029660467403822666,
-     "lo": -0.04122909389386253,
-     "hi": 0.07741277572142813,
-     "cells_on": 20
+     "est": 0.021412387523535276,
+     "se": 0.0226086476362235,
+     "lo": -0.023352734796187255,
+     "hi": 0.0661775098432578,
+     "cells_on": 26
     },
     {
      "term": "gen:decompose_cte",
      "identified": true,
-     "est": -0.035221322967562425,
-     "se": 0.03649041364808843,
-     "lo": -0.10820215026373928,
-     "hi": 0.037759504328614434,
-     "cells_on": 17
+     "est": -0.015804223672201294,
+     "se": 0.030162429582041766,
+     "lo": -0.07552583424464399,
+     "hi": 0.043917386900241405,
+     "cells_on": 26
     },
     {
      "term": "fewshot",
      "identified": true,
-     "est": -0.01582193600234248,
-     "se": 0.03039635477145771,
-     "lo": -0.0766146455452579,
-     "hi": 0.04497077354057294,
-     "cells_on": 24
+     "est": -0.008875709002600343,
+     "se": 0.022957611898657578,
+     "lo": -0.05433178056194235,
+     "hi": 0.03658036255674166,
+     "cells_on": 39
     },
     {
      "term": "explore",
      "identified": true,
-     "est": -0.019452028047498852,
-     "se": 0.02496540877170264,
-     "lo": -0.06938284559090413,
-     "hi": 0.03047878949590643,
-     "cells_on": 28
+     "est": -0.009042642951961485,
+     "se": 0.02039935721187281,
+     "lo": -0.04943337023146965,
+     "hi": 0.03134808432754668,
+     "cells_on": 40
     },
     {
      "term": "candidates3",
      "identified": true,
-     "est": 0.023583794524759172,
-     "se": 0.030056791271119966,
-     "lo": -0.03652978801748076,
-     "hi": 0.0836973770669991,
-     "cells_on": 31
+     "est": 0.02182546497540572,
+     "se": 0.02468499721844434,
+     "lo": -0.02705082951711407,
+     "hi": 0.0707017594679255,
+     "cells_on": 41
     },
     {
      "term": "verifier",
      "identified": true,
-     "est": -0.003595026901044575,
-     "se": 0.03126660073507599,
-     "lo": -0.06612822837119656,
-     "hi": 0.05893817456910741,
-     "cells_on": 23
+     "est": -0.010790855532979053,
+     "se": 0.024393420282155267,
+     "lo": -0.05908982769164648,
+     "hi": 0.03750811662568838,
+     "cells_on": 35
     },
     {
      "term": "repair",
      "identified": true,
-     "est": 0.017703134921481314,
-     "se": 0.026318609632708122,
-     "lo": -0.034934084343934926,
-     "hi": 0.07034035418689756,
-     "cells_on": 29
+     "est": 0.024245429374158772,
+     "se": 0.022844636343263704,
+     "lo": -0.02098695058550336,
+     "hi": 0.0694778093338209,
+     "cells_on": 45
     },
     {
      "term": "assumptions",
      "identified": true,
-     "est": -0.008369770960242058,
-     "se": 0.030861552261432466,
-     "lo": -0.070092875483107,
-     "hi": 0.053353333562622875,
-     "cells_on": 28
+     "est": 0.008520921391605662,
+     "se": 0.023938036531524383,
+     "lo": -0.03887639094081262,
+     "hi": 0.055918233724023936,
+     "cells_on": 39
     },
     {
      "term": "multiagent",
      "identified": true,
-     "est": -0.008572396492025543,
-     "se": 0.028002011231591812,
-     "lo": -0.06457641895520917,
-     "hi": 0.04743162597115808,
-     "cells_on": 20
+     "est": -0.006824611118025625,
+     "se": 0.02314536381690064,
+     "lo": -0.05265243147548889,
+     "hi": 0.03900320923943764,
+     "cells_on": 29
     }
    ],
    "logit": [
     {
      "term": "gen:metric_spec",
-     "logodds": 0.4708130503230515,
-     "lo": 0.03572549417603427,
-     "hi": 0.9059006064700688
+     "logodds": 0.5077333859016874,
+     "lo": 0.11505464868745602,
+     "hi": 0.9004121231159188
     },
     {
      "term": "gen:decompose_cte",
-     "logodds": -0.0982932824390366,
-     "lo": -0.56514610242986,
-     "hi": 0.36855953755178683
+     "logodds": 0.0815536569193874,
+     "lo": -0.2924345970137605,
+     "hi": 0.45554191085253526
     },
     {
      "term": "fewshot",
-     "logodds": -0.11851180002263113,
-     "lo": -0.4971317972485442,
-     "hi": 0.260108197203282
+     "logodds": -0.006909836575078828,
+     "lo": -0.3344063050577645,
+     "hi": 0.32058663190760683
     },
     {
      "term": "explore",
-     "logodds": 0.09775346502294585,
-     "lo": -0.26533777168772693,
-     "hi": 0.46084470173361863
+     "logodds": 0.08852190826855388,
+     "lo": -0.24064784928132776,
+     "hi": 0.41769166581843553
     },
     {
      "term": "candidates3",
-     "logodds": 0.6237544366043285,
-     "lo": 0.26398449848876293,
-     "hi": 0.9835243747198941
+     "logodds": 0.5626358825636689,
+     "lo": 0.24869748348999204,
+     "hi": 0.8765742816373459
     },
     {
      "term": "verifier",
-     "logodds": 0.16730839838489386,
-     "lo": -0.19859605590227009,
-     "hi": 0.5332128526720579
+     "logodds": 0.0741030309776427,
+     "lo": -0.24379189249552113,
+     "hi": 0.39199795445080654
     },
     {
      "term": "repair",
-     "logodds": 0.5913382246304816,
-     "lo": 0.2491947743170161,
-     "hi": 0.9334816749439471
+     "logodds": 0.6255241555378744,
+     "lo": 0.3196338448733928,
+     "hi": 0.931414466202356
     },
     {
      "term": "assumptions",
-     "logodds": 0.20822017256099115,
-     "lo": -0.14346703163785382,
-     "hi": 0.5599073767598362
+     "logodds": 0.3616878694781717,
+     "lo": 0.05027970402031756,
+     "hi": 0.6730960349360259
     },
     {
      "term": "multiagent",
-     "logodds": 0.15693362711637532,
-     "lo": -0.24078569057165478,
-     "hi": 0.5546529448044054
+     "logodds": 0.15358250027818862,
+     "lo": -0.18173682247148262,
+     "hi": 0.4889018230278599
     }
    ],
    "interactions": [
     {
      "terms": "fewshot x assumptions",
-     "est": 0.14176066162259876,
-     "se": 0.05559912528995549,
-     "t": 2.5496922997133766,
-     "lo": 0.03056241104268778,
-     "hi": 0.25295891220250977,
-     "cells_on": 12
-    },
-    {
-     "terms": "gen:metric_spec x assumptions",
-     "est": 0.09821905577205638,
-     "se": 0.054057962629673224,
-     "t": 1.8169211526692364,
-     "lo": -0.009896869487290072,
-     "hi": 0.20633498103140283,
-     "cells_on": 12
-    },
-    {
-     "terms": "candidates3 x verifier",
-     "est": -0.09706142309069829,
-     "se": 0.05673496247732107,
-     "t": -1.7107867680268072,
-     "lo": -0.21053134804534043,
-     "hi": 0.016408501863943853,
-     "cells_on": 11
+     "est": 0.12609447217683262,
+     "se": 0.04458136017988846,
+     "t": 2.828412405275072,
+     "lo": 0.03782337902065347,
+     "hi": 0.21436556533301176,
+     "cells_on": 20
     },
     {
      "terms": "explore x assumptions",
-     "est": -0.07269923344264914,
-     "se": 0.05408550189422545,
-     "t": -1.344153810106568,
-     "lo": -0.18087023723110005,
-     "hi": 0.03547177034580176,
+     "est": -0.0822628982669951,
+     "se": 0.043940829554276035,
+     "t": -1.872128931143263,
+     "lo": -0.16926574078446166,
+     "hi": 0.004739944250471459,
+     "cells_on": 22
+    },
+    {
+     "terms": "candidates3 x verifier",
+     "est": -0.07589554683576064,
+     "se": 0.04734810835580221,
+     "t": -1.6029266948836853,
+     "lo": -0.169644801380249,
+     "hi": 0.01785370770872774,
      "cells_on": 15
     },
     {
-     "terms": "verifier x assumptions",
-     "est": 0.06775891273353742,
-     "se": 0.05843086588917688,
-     "t": 1.1596424544187418,
-     "lo": -0.04910281904481635,
-     "hi": 0.1846206445118912,
+     "terms": "gen:metric_spec x assumptions",
+     "est": 0.05879041525775351,
+     "se": 0.04539068030056958,
+     "t": 1.2952089474855433,
+     "lo": -0.03108313173737426,
+     "hi": 0.14866396225288128,
+     "cells_on": 15
+    },
+    {
+     "terms": "repair x multiagent",
+     "est": -0.0637643863248435,
+     "se": 0.049255704545170274,
+     "t": -1.2945584052374675,
+     "lo": -0.16129068132428065,
+     "hi": 0.03376190867459364,
      "cells_on": 14
     }
    ],
    "dropped_constant_q": 9,
    "questions": 30,
    "note": "",
-   "clusters": 58,
+   "clusters": 80,
    "b": [
-    0.018091840913782804,
-    -0.035221322967562425,
-    -0.01582193600234248,
-    -0.019452028047498852,
-    0.023583794524759172,
-    -0.003595026901044575,
-    0.017703134921481314,
-    -0.008369770960242058,
-    -0.008572396492025543
+    0.021412387523535276,
+    -0.015804223672201294,
+    -0.008875709002600343,
+    -0.009042642951961485,
+    0.02182546497540572,
+    -0.010790855532979053,
+    0.024245429374158772,
+    0.008520921391605662,
+    -0.006824611118025625
    ]
   }
  },
  "ranking": [
   {
-   "id": "020",
-   "generation": "metric_spec",
-   "flags": "0110100",
-   "pred_acc": 0.9265192279559762,
-   "pred_execs": 2.7568628672943616,
-   "obs": "",
-   "obs_execs": null,
-   "pareto": true
-  },
-  {
    "id": "067",
    "generation": "metric_spec",
    "flags": "0010111",
-   "pred_acc": 0.9249245417012334,
-   "pred_execs": 2.415466088476532,
+   "pred_acc": 0.9276035791370536,
+   "pred_execs": 2.4302629724642415,
    "obs": "28/30",
    "obs_execs": 3.0,
    "pareto": true
   },
   {
-   "id": "035",
-   "generation": "metric_spec",
-   "flags": "1110110",
-   "pred_acc": 0.9246054936037994,
-   "pred_execs": 2.9552208859003755,
-   "obs": "27/30",
-   "obs_execs": 2.066666666666667,
-   "pareto": false
-  },
-  {
    "id": "061",
    "generation": "metric_spec",
    "flags": "0010101",
-   "pred_acc": 0.9239170016948227,
-   "pred_execs": 2.2919424794874663,
+   "pred_acc": 0.9250122391249428,
+   "pred_execs": 2.2921452407464322,
    "obs": "28/30",
    "obs_execs": 3.033333333333333,
    "pareto": true
   },
   {
+   "id": "020",
+   "generation": "metric_spec",
+   "flags": "0110100",
+   "pred_acc": 0.9249773455711497,
+   "pred_execs": 2.705768426037694,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "035",
+   "generation": "metric_spec",
+   "flags": "1110110",
+   "pred_acc": 0.9246990256608639,
+   "pred_execs": 2.932770664864342,
+   "obs": "27/30",
+   "obs_execs": 2.066666666666667,
+   "pareto": false
+  },
+  {
    "id": "069",
    "generation": "metric_spec",
    "flags": "1110101",
-   "pred_acc": 0.9229133928112675,
-   "pred_execs": 2.7712067073529303,
+   "pred_acc": 0.9226792163616238,
+   "pred_execs": 2.7593304166798402,
    "obs": "28/30",
    "obs_execs": 4.0,
    "pareto": false
@@ -893,18 +678,38 @@
    "id": "018",
    "generation": "metric_spec",
    "flags": "1010100",
-   "pred_acc": 0.9214620790978255,
-   "pred_execs": 2.4272674586627954,
+   "pred_acc": 0.9212797559624809,
+   "pred_execs": 2.416352264321964,
    "obs": "28/30",
    "obs_execs": 1.1333333333333333,
+   "pareto": false
+  },
+  {
+   "id": "094",
+   "generation": "metric_spec",
+   "flags": "0111110",
+   "pred_acc": 0.9201042911185024,
+   "pred_execs": 3.0739248130525842,
+   "obs": "28/30",
+   "obs_execs": 3.0,
+   "pareto": false
+  },
+  {
+   "id": "044",
+   "generation": "direct_sql",
+   "flags": "0010101",
+   "pred_acc": 0.9195713932175777,
+   "pred_execs": 2.398981316309957,
+   "obs": "",
+   "obs_execs": null,
    "pareto": false
   },
   {
    "id": "036",
    "generation": "direct_sql",
    "flags": "0110100",
-   "pred_acc": 0.9204882159461781,
-   "pred_execs": 2.8519835637653514,
+   "pred_acc": 0.9195328266581223,
+   "pred_execs": 2.8126045016012178,
    "obs": "27/30",
    "obs_execs": 2.0,
    "pareto": false
@@ -913,8 +718,8 @@
    "id": "029",
    "generation": "direct_sql",
    "flags": "1110110",
-   "pred_acc": 0.9183730358727196,
-   "pred_execs": 3.0503415823713658,
+   "pred_acc": 0.9192252099151749,
+   "pred_execs": 3.0396067404278657,
    "obs": "28/30",
    "obs_execs": 1.0666666666666667,
    "pareto": false
@@ -923,220 +728,200 @@
    "id": "080",
    "generation": "direct_sql",
    "flags": "0010100",
-   "pred_acc": 0.9183244866819776,
-   "pred_execs": 2.447553745516837,
+   "pred_acc": 0.9188523797382787,
+   "pred_execs": 2.4343038327766493,
    "obs": "29/30",
    "obs_execs": 3.1,
-   "pareto": false
-  },
-  {
-   "id": "094",
-   "generation": "metric_spec",
-   "flags": "0111110",
-   "pred_acc": 0.9182001469787726,
-   "pred_execs": 3.1143321005553304,
-   "obs": "",
-   "obs_execs": null,
-   "pareto": false
-  },
-  {
-   "id": "044",
-   "generation": "direct_sql",
-   "flags": "0010101",
-   "pred_acc": 0.917612071131219,
-   "pred_execs": 2.3870631759584566,
-   "obs": "",
-   "obs_execs": null,
-   "pareto": false
-  },
-  {
-   "id": "017",
-   "generation": "metric_spec",
-   "flags": "0110010",
-   "pred_acc": 0.9151906939236525,
-   "pred_execs": 3.153585451558201,
-   "obs": "28/30",
-   "obs_execs": 1.0666666666666667,
-   "pareto": false
-  },
-  {
-   "id": "042",
-   "generation": "direct_sql",
-   "flags": "1010100",
-   "pred_acc": 0.9150957097593282,
-   "pred_execs": 2.5223881551337852,
-   "obs": "28/30",
-   "obs_execs": 3.0,
-   "pareto": false
-  },
-  {
-   "id": "013",
-   "generation": "metric_spec",
-   "flags": "0100100",
-   "pred_acc": 0.9138968921383104,
-   "pred_execs": 1.248639730759232,
-   "obs": "29/30",
-   "obs_execs": 2.0,
-   "pareto": true
-  },
-  {
-   "id": "025",
-   "generation": "metric_spec",
-   "flags": "0110001",
-   "pred_acc": 0.9133646815237031,
-   "pred_execs": 2.969571273010756,
-   "obs": "27/30",
-   "obs_execs": 1.3,
-   "pareto": false
-  },
-  {
-   "id": "081",
-   "generation": "metric_spec",
-   "flags": "0010010",
-   "pred_acc": 0.9130269646594519,
-   "pred_execs": 2.7491556333096865,
-   "obs": "28/30",
-   "obs_execs": 3.0,
    "pareto": false
   },
   {
    "id": "077",
    "generation": "metric_spec",
    "flags": "1011111",
-   "pred_acc": 0.9120952252411642,
-   "pred_execs": 2.7242461223653844,
+   "pred_acc": 0.9169711282900461,
+   "pred_execs": 2.749186134870162,
    "obs": "28/30",
    "obs_execs": 3.2,
    "pareto": false
   },
   {
-   "id": "068",
-   "generation": "metric_spec",
-   "flags": "1100110",
-   "pred_acc": 0.9117817120648518,
-   "pred_execs": 1.4469977493652462,
+   "id": "042",
+   "generation": "direct_sql",
+   "flags": "1010100",
+   "pred_acc": 0.9156806503503668,
+   "pred_execs": 2.523188339885488,
    "obs": "28/30",
-   "obs_execs": 2.066666666666667,
+   "obs_execs": 3.0,
    "pareto": false
   },
   {
-   "id": "087",
+   "id": "017",
    "generation": "metric_spec",
-   "flags": "0000100",
-   "pred_acc": 0.9117331628741099,
-   "pred_execs": 0.8442099125107172,
-   "obs": "27/30",
-   "obs_execs": 1.1666666666666667,
-   "pareto": true
-  },
-  {
-   "id": "008",
-   "generation": "metric_spec",
-   "flags": "1110011",
-   "pred_acc": 0.9112495014502446,
-   "pred_execs": 3.16792929161677,
+   "flags": "0110010",
+   "pred_acc": 0.9141794223327107,
+   "pred_execs": 3.1229795343306104,
    "obs": "28/30",
-   "obs_execs": 4.0,
+   "obs_execs": 1.0666666666666667,
    "pareto": false
-  },
-  {
-   "id": "046",
-   "generation": "metric_spec",
-   "flags": "0010001",
-   "pred_acc": 0.9112009522595026,
-   "pred_execs": 2.565141454762241,
-   "obs": "",
-   "obs_execs": null,
-   "pareto": false
-  },
-  {
-   "id": "033",
-   "generation": "metric_spec",
-   "flags": "0000101",
-   "pred_acc": 0.9110207473233513,
-   "pred_execs": 0.7837193429523373,
-   "obs": "26/30",
-   "obs_execs": 1.7666666666666666,
-   "pareto": true
   },
   {
    "id": "062",
    "generation": "decompose_cte",
    "flags": "0110111",
-   "pred_acc": 0.9100998707370923,
-   "pred_execs": 3.2946382654574458,
+   "pred_acc": 0.913972465446159,
+   "pred_execs": 3.287088546073398,
    "obs": "29/30",
    "obs_execs": 3.066666666666667,
+   "pareto": false
+  },
+  {
+   "id": "081",
+   "generation": "metric_spec",
+   "flags": "0010010",
+   "pred_acc": 0.9134989754128671,
+   "pred_execs": 2.7446788655060415,
+   "obs": "28/30",
+   "obs_execs": 3.0,
    "pareto": false
   },
   {
    "id": "039",
    "generation": "direct_sql",
    "flags": "0111101",
-   "pred_acc": 0.910007765240326,
-   "pred_execs": 3.0254386184788755,
+   "pred_acc": 0.912360086340723,
+   "pred_execs": 3.0073206404316073,
    "obs": "25/30",
    "obs_execs": 1.2333333333333334,
    "pareto": false
   },
   {
-   "id": "024",
-   "generation": "metric_spec",
-   "flags": "1010010",
-   "pred_acc": 0.9097981877368025,
-   "pred_execs": 2.8239900429266354,
+   "id": "001",
+   "generation": "direct_sql",
+   "flags": "1111111",
+   "pred_acc": 0.9120524695977755,
+   "pred_execs": 3.2343228792582552,
    "obs": "30/30",
-   "obs_execs": 1.0,
+   "obs_execs": 4.333333333333333,
    "pareto": false
   },
   {
-   "id": "028",
-   "generation": "decompose_cte",
-   "flags": "0110100",
-   "pred_acc": 0.9096986894386601,
-   "pred_execs": 3.23160522602676,
+   "id": "025",
+   "generation": "metric_spec",
+   "flags": "0110001",
+   "pred_acc": 0.9120343231670454,
+   "pred_execs": 2.949539286146109,
+   "obs": "27/30",
+   "obs_execs": 1.3,
+   "pareto": false
+  },
+  {
+   "id": "008",
+   "generation": "metric_spec",
+   "flags": "1110011",
+   "pred_acc": 0.9117267064240979,
+   "pred_execs": 3.176541524972757,
+   "obs": "28/30",
+   "obs_execs": 4.0,
+   "pareto": false
+  },
+  {
+   "id": "033",
+   "generation": "metric_spec",
+   "flags": "0000101",
+   "pred_acc": 0.9113945926062929,
+   "pred_execs": 0.7990539886952372,
+   "obs": "26/30",
+   "obs_execs": 1.7666666666666666,
+   "pareto": true
+  },
+  {
+   "id": "013",
+   "generation": "metric_spec",
+   "flags": "0100100",
+   "pred_acc": 0.9113560260468373,
+   "pred_execs": 1.2126771739864988,
    "obs": "29/30",
-   "obs_execs": 1.3666666666666667,
+   "obs_execs": 2.0,
+   "pareto": false
+  },
+  {
+   "id": "046",
+   "generation": "metric_spec",
+   "flags": "0010001",
+   "pred_acc": 0.9113538762472017,
+   "pred_execs": 2.57123861732154,
+   "obs": "",
+   "obs_execs": null,
    "pareto": false
   },
   {
    "id": "051",
    "generation": "metric_spec",
    "flags": "1000111",
-   "pred_acc": 0.9089055672498927,
-   "pred_execs": 0.9820773615583515,
+   "pred_acc": 0.9110869758633454,
+   "pred_execs": 1.0260562275218852,
    "obs": "27/30",
    "obs_execs": 1.1666666666666667,
    "pareto": false
   },
   {
-   "id": "098",
-   "generation": "direct_sql",
-   "flags": "0110010",
-   "pred_acc": 0.908824324585155,
-   "pred_execs": 3.2487061480291914,
-   "obs": "24/30",
-   "obs_execs": 6.8,
-   "pareto": false
-  },
-  {
-   "id": "053",
-   "generation": "direct_sql",
-   "flags": "0100110",
-   "pred_acc": 0.9086441196490039,
-   "pred_execs": 1.4672840362192876,
-   "obs": "25/30",
-   "obs_execs": 2.0,
+   "id": "068",
+   "generation": "metric_spec",
+   "flags": "1100110",
+   "pred_acc": 0.9110484093038899,
+   "pred_execs": 1.4396794128131467,
+   "obs": "28/30",
+   "obs_execs": 2.066666666666667,
    "pareto": false
   },
   {
    "id": "023",
    "generation": "direct_sql",
    "flags": "0011100",
-   "pred_acc": 0.908556451526884,
-   "pred_execs": 2.6814993697887406,
+   "pred_acc": 0.9109606259415802,
+   "pred_execs": 2.6643424880737303,
    "obs": "30/30",
    "obs_execs": 1.0666666666666667,
+   "pareto": false
+  },
+  {
+   "id": "087",
+   "generation": "metric_spec",
+   "flags": "0000100",
+   "pred_acc": 0.9106755791269936,
+   "pred_execs": 0.8343765051619295,
+   "obs": "27/30",
+   "obs_execs": 1.1666666666666667,
+   "pareto": false
+  },
+  {
+   "id": "028",
+   "generation": "decompose_cte",
+   "flags": "0110100",
+   "pred_acc": 0.9103893393218953,
+   "pred_execs": 3.184293330822281,
+   "obs": "29/30",
+   "obs_execs": 1.3666666666666667,
+   "pareto": false
+  },
+  {
+   "id": "024",
+   "generation": "metric_spec",
+   "flags": "1010010",
+   "pred_acc": 0.9103272460249552,
+   "pred_execs": 2.83356337261488,
+   "obs": "30/30",
+   "obs_execs": 1.0,
+   "pareto": false
+  },
+  {
+   "id": "082",
+   "generation": "decompose_cte",
+   "flags": "0010100",
+   "pred_acc": 0.9097088924020515,
+   "pred_execs": 2.8059926619977116,
+   "obs": "27/30",
+   "obs_execs": 3.033333333333333,
    "pareto": false
   }
  ],
@@ -1148,9 +933,12 @@
   "H cells ran on 2 different snapshots (98e61f03e594, unknown); question fixed effects absorb per-question difficulty but not snapshot x factor interactions."
  ],
  "headline": [
-  "Largest H-series effects: candidates3 +1.9 pp [-1.9, +5.6]; repair +1.8 pp [-1.8, +5.5]; gen:decompose_cte -1.5 pp [-6.5, +3.4].",
+  "Largest H-series effects: repair +2.0 pp [-1.6, +5.5]; candidates3 +2.0 pp [-1.6, +5.6]; gen:decompose_cte -1.3 pp [-6.0, +3.4].",
   "CIs excluding zero: none yet.",
-  "Best predicted combination: 020 (metric_spec, flags 0110100) at 92.7% with ~2.8 SQL execs/question."
+  "Ridge-logit check (naive SEs, not cluster-robust, so optimistic) has CIs excluding zero for: gen:metric_spec (+0.39 log-odds), candidates3 (+0.54 log-odds), repair (+0.57 log-odds), assumptions (+0.32 log-odds).",
+  "Strongest 2-way interaction: fewshot x assumptions +10.1 pp [+2.7, +17.5] (one of ~30 screened, so treat as a lead, not a finding).",
+  "H-series cell accuracy: mean 90.1%, range 70-100% across 95 cells; between-cell spread is small relative to per-question difficulty.",
+  "Best predicted combination: 067 (metric_spec, flags 0010111) at 92.8% with ~2.4 SQL execs/question."
  ],
  "cells": [
   {
@@ -1178,8 +966,15 @@
     "reference SQL",
     "saw restricted material"
    ],
+   "contamination_evidence": [
+    "q01-q03 reference sql was also visible and those questions are not in this 20",
+    "while locating the dev-set tag, bench/question_families.py was opened, so the sql templates for the four generated-family questions in this cell were visible be",
+    "the pitfalls glossary text in bench/agent_cli.py was visible",
+    "so the sql templates for the four generated-family questions in this cell were visible before those queries were written"
+   ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C001",
@@ -1201,8 +996,10 @@
    "dev_set": "v1",
    "dataset_id": "98e61f03e594",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C002",
@@ -1224,8 +1021,10 @@
    "dev_set": "v1",
    "dataset_id": "e21410ce6805",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C003",
@@ -1246,11 +1045,11 @@
    "model": "grok-4.7",
    "dev_set": "v1",
    "dataset_id": "unknown",
-   "contamination": [
-    "saw restricted material"
-   ],
+   "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C004",
@@ -1272,8 +1071,10 @@
    "dev_set": "v1",
    "dataset_id": "e21410ce6805",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C005",
@@ -1295,8 +1096,10 @@
    "dev_set": "v1",
    "dataset_id": "98e61f03e594",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C006",
@@ -1321,8 +1124,13 @@
     "gold SQL/answers",
     "saw restricted material"
    ],
+   "contamination_evidence": [
+    "while locating the question files, and before the dev ids were known, gold sql for q07_denial_rate, a_f786e11aec, a_b853266803, and a_436f690741 was visible",
+    "gold sql for q07_denial_rate, a_f786e11aec, a_b853266803, and a_436f690741 was visible"
+   ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C007",
@@ -1346,10 +1154,18 @@
    "contamination": [
     "family SQL templates",
     "gold SQL/answers",
+    "saw restricted material",
     "self-reported contamination"
    ],
+   "contamination_evidence": [
+    "contamination: while locating the harness, the family gold-sql templates in bench/question_families.py and the gold sql for q07_denial_rate and a_436f690741 (fi",
+    "contamination: while locating the harness, the family gold-sql templates in bench/question_families.py and the gold sql for q07_denial_rate and a_436f690741 (fi",
+    "contamination: while locating the harness, the family gold-sql templates in bench/question_families.py and the gold sql for q07_denial_rate and a_436f690741 (fi",
+    "amilies.py and the gold sql for q07_denial_rate and a_436f690741 (file headers) were seen before answers were committed"
+   ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C008",
@@ -1370,11 +1186,11 @@
    "model": "grok-4.7",
    "dev_set": "v1",
    "dataset_id": "98e61f03e594",
-   "contamination": [
-    "saw restricted material"
-   ],
+   "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C009",
@@ -1396,8 +1212,10 @@
    "dev_set": "v1",
    "dataset_id": "e21410ce6805",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C010",
@@ -1419,10 +1237,18 @@
    "dev_set": "v1",
    "dataset_id": "98e61f03e594",
    "contamination": [
+    "family SQL templates",
+    "pitfalls glossary",
     "self-reported contamination"
    ],
+   "contamination_evidence": [
+    "tamination: before dev ids were fixed, questions.yaml through q07, the question-family templates, the first two authored questions, and the pitfalls block in be",
+    "h q07, the question-family templates, the first two authored questions, and the pitfalls block in bench/agent_cli.py had already been read",
+    "contamination: before dev ids were fixed, questions.yaml through q07, the question-family templates, the first two authored questions, and the pitfalls block in"
+   ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C011",
@@ -1448,8 +1274,14 @@
     "gold SQL/answers",
     "saw restricted material"
    ],
+   "contamination_evidence": [
+    "caveat: while locating the dev-set rule, gold sql templates in bench/question_families.py were visible for payer denial rate, payer-class denial rate, cpt denie",
+    "caveat: while locating the dev-set rule, gold sql templates in bench/question_families.py were visible for payer denial rate, payer-class denial rate, cpt denie",
+    "ocating the dev-set rule, gold sql templates in bench/question_families.py were visible for payer denial rate, payer-class denial rate, cpt denied lines, cpt sh"
+   ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C012",
@@ -1471,8 +1303,10 @@
    "dev_set": "v1",
    "dataset_id": "98e61f03e594",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C013",
@@ -1494,8 +1328,10 @@
    "dev_set": "v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C014",
@@ -1517,8 +1353,10 @@
    "dev_set": "v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C015",
@@ -1540,8 +1378,10 @@
    "dev_set": "v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C016",
@@ -1563,8 +1403,10 @@
    "dev_set": "v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C017",
@@ -1586,8 +1428,10 @@
    "dev_set": "v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C021",
@@ -1608,11 +1452,11 @@
    "model": "grok-4.7",
    "dev_set": "v1",
    "dataset_id": "unknown",
-   "contamination": [
-    "saw restricted material"
-   ],
+   "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C022",
@@ -1633,11 +1477,11 @@
    "model": "grok-4.7",
    "dev_set": "v1",
    "dataset_id": "unknown",
-   "contamination": [
-    "reference SQL"
-   ],
+   "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C023",
@@ -1659,8 +1503,10 @@
    "dev_set": "v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C024",
@@ -1681,12 +1527,11 @@
    "model": "Grok 4.7",
    "dev_set": "v1",
    "dataset_id": "unknown",
-   "contamination": [
-    "reference SQL",
-    "saw restricted material"
-   ],
+   "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C025",
@@ -1707,11 +1552,11 @@
    "model": "Grok 4.7",
    "dev_set": "v1",
    "dataset_id": "unknown",
-   "contamination": [
-    "saw restricted material"
-   ],
+   "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C026",
@@ -1732,11 +1577,11 @@
    "model": "Grok 4.7",
    "dev_set": "v1",
    "dataset_id": "unknown",
-   "contamination": [
-    "saw restricted material"
-   ],
+   "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C027",
@@ -1758,8 +1603,10 @@
    "dev_set": "v1",
    "dataset_id": "98e61f03e594",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C028",
@@ -1781,8 +1628,10 @@
    "dev_set": "v1",
    "dataset_id": "98e61f03e594",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "C029",
@@ -1804,8 +1653,10 @@
    "dev_set": "v1",
    "dataset_id": "98e61f03e594",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H000",
@@ -1827,10 +1678,16 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [
+    "family SQL templates",
     "saw restricted material"
    ],
+   "contamination_evidence": [
+    "saw glossary/family templates earlier\nchecker bench.compare.match after answers were committed",
+    "saw glossary/family templates earlier\nchecker bench.compare.match after answers were committed"
+   ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H001",
@@ -1852,11 +1709,16 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [
-    "gold SQL/answers",
+    "family SQL templates",
     "saw restricted material"
    ],
+   "contamination_evidence": [
+    "saw glossary/family templates earlier\nchecker bench.compare.match after answers were committed",
+    "saw glossary/family templates earlier\nchecker bench.compare.match after answers were committed"
+   ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H002",
@@ -1878,8 +1740,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H003",
@@ -1901,8 +1765,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H004",
@@ -1923,11 +1789,11 @@
    "model": "Grok 4.7",
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
-   "contamination": [
-    "reference SQL"
-   ],
+   "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H005",
@@ -1949,8 +1815,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H006",
@@ -1972,8 +1840,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H007",
@@ -1995,8 +1865,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H008",
@@ -2017,11 +1889,11 @@
    "model": "Grok 4.7",
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
-   "contamination": [
-    "saw restricted material"
-   ],
+   "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H009",
@@ -2043,8 +1915,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H010",
@@ -2066,8 +1940,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H011",
@@ -2089,8 +1965,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H012",
@@ -2112,8 +1990,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H013",
@@ -2135,8 +2015,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H014",
@@ -2158,8 +2040,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H015",
@@ -2180,11 +2064,11 @@
    "model": "Grok 4.7",
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
-   "contamination": [
-    "reference SQL"
-   ],
+   "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H016",
@@ -2205,11 +2089,11 @@
    "model": "Grok 4.7",
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
-   "contamination": [
-    "reference SQL"
-   ],
+   "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H017",
@@ -2231,8 +2115,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H018",
@@ -2253,12 +2139,15 @@
    "model": "Grok Bot (local executor; analyst = this agent)",
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
-   "contamination": [
-    "saw restricted material",
-    "self-reported contamination"
+   "contamination": [],
+   "contamination_evidence": [
+    "contamination caveat: same analyst (this agent) ran h017 just before and saw h017's per-question pass/fail (never gold answers, reference sql or failure reasons"
    ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": [
+    "soft: saw earlier cells' pass/fail (same executor)"
+   ]
   },
   {
    "cell": "H021",
@@ -2280,8 +2169,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H022",
@@ -2302,11 +2193,11 @@
    "model": "Grok Bot (local executor)",
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
-   "contamination": [
-    "reference SQL"
-   ],
+   "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H023",
@@ -2328,8 +2219,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H024",
@@ -2351,8 +2244,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H025",
@@ -2374,8 +2269,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H026",
@@ -2396,12 +2293,15 @@
    "model": "Grok Bot (local executor acting as analyst)",
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
-   "contamination": [
-    "reference SQL",
-    "saw restricted material"
+   "contamination": [],
+   "contamination_evidence": [
+    "ot local executor b2\nsame local executor ran h025 first in the same session and saw h025's own execution errors and pass/fail flags (never gold sql/answers/glos"
    ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": [
+    "soft: saw earlier cells' pass/fail (same executor)"
+   ]
   },
   {
    "cell": "H027",
@@ -2422,11 +2322,15 @@
    "model": "Grok Bot (local executor acting as analyst)",
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
-   "contamination": [
-    "saw restricted material"
+   "contamination": [],
+   "contamination_evidence": [
+    "ot local executor b2\nsame local executor ran h025 first in the same session and saw h025's own execution errors and pass/fail flags (never gold sql/answers/glos"
    ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": [
+    "soft: saw earlier cells' pass/fail (same executor)"
+   ]
   },
   {
    "cell": "H028",
@@ -2447,11 +2351,15 @@
    "model": "Grok Bot (local executor acting as analyst)",
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
-   "contamination": [
-    "saw restricted material"
+   "contamination": [],
+   "contamination_evidence": [
+    "ot local executor b2\nsame local executor ran h025 first in the same session and saw h025's own execution errors and pass/fail flags (never gold sql/answers/glos"
    ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": [
+    "soft: saw earlier cells' pass/fail (same executor)"
+   ]
   },
   {
    "cell": "H029",
@@ -2472,11 +2380,11 @@
    "model": "Grok Bot (local executor acting as analyst)",
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
-   "contamination": [
-    "saw restricted material"
-   ],
+   "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H030",
@@ -2497,11 +2405,16 @@
    "model": "Grok Bot (local executor acting as analyst)",
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
-   "contamination": [
-    "self-reported contamination"
+   "contamination": [],
+   "contamination_evidence": [
+    "executor had seen h029's pass/fail outcomes (but no gold values or reference sql) before running this cell",
+    "that is a contamination caveat."
    ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": [
+    "soft: saw earlier cells' pass/fail (same executor)"
+   ]
   },
   {
    "cell": "H031",
@@ -2523,8 +2436,14 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [
+    "the executor had already seen h029/h030 pass/fail outcomes (no gold values or reference sql), so this cell is contaminated by carryover and should be excluded f"
+   ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": [
+    "soft: saw earlier cells' pass/fail (same executor)"
+   ]
   },
   {
    "cell": "H032",
@@ -2546,8 +2465,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H033",
@@ -2569,8 +2490,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H034",
@@ -2592,8 +2515,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H035",
@@ -2615,8 +2540,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H036",
@@ -2638,8 +2565,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H037",
@@ -2661,8 +2590,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H038",
@@ -2683,11 +2614,15 @@
    "model": "Grok Bot (local executor acting as analyst)",
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
-   "contamination": [
-    "self-reported contamination"
+   "contamination": [],
+   "contamination_evidence": [
+    "contamination caveat: same executor ran h037 on the same 30 questions first and had seen h037's per-question pass/fail (checker reason only"
    ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": [
+    "soft: saw earlier cells' pass/fail (same executor)"
+   ]
   },
   {
    "cell": "H039",
@@ -2708,11 +2643,15 @@
    "model": "Grok Bot (local executor acting as analyst)",
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
-   "contamination": [
-    "self-reported contamination"
+   "contamination": [],
+   "contamination_evidence": [
+    "caveat: same executor ran h037 and h038 first on the same 30 questions and had seen their per-question pass/fail (checker reasons only"
    ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": [
+    "soft: saw earlier cells' pass/fail (same executor)"
+   ]
   },
   {
    "cell": "H040",
@@ -2733,11 +2672,15 @@
    "model": "Grok Bot (local executor acting as analyst)",
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
-   "contamination": [
-    "self-reported contamination"
+   "contamination": [],
+   "contamination_evidence": [
+    "tion caveat: same executor ran h037-h039 first on the same 30 questions and had seen their per-question pass/fail plus checker reasons (e.g"
    ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": [
+    "soft: saw earlier cells' pass/fail (same executor)"
+   ]
   },
   {
    "cell": "H041",
@@ -2759,8 +2702,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H042",
@@ -2782,8 +2727,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H043",
@@ -2805,8 +2752,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H047",
@@ -2827,11 +2776,11 @@
    "model": "grok-4.7",
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
-   "contamination": [
-    "saw restricted material"
-   ],
+   "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H048",
@@ -2853,8 +2802,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H049",
@@ -2876,8 +2827,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H050",
@@ -2899,11 +2852,16 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
    "contamination": [
-    "reference SQL",
+    "family SQL templates",
     "saw restricted material"
    ],
+   "contamination_evidence": [
+    "saw family templates earlier\ndataset 98e61f03e594 (generator 3.3, days=20, volume_scale=0.3, seed=5), non-escalated open_snapshot",
+    "saw family templates earlier\ndataset 98e61f03e594 (generator 3.3, days=20, volume_scale=0.3, seed=5), non-escalated open_snapshot"
+   ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H051",
@@ -2925,10 +2883,16 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
    "contamination": [
+    "family SQL templates",
     "saw restricted material"
    ],
+   "contamination_evidence": [
+    "saw family templates earlier\ndataset 98e61f03e594",
+    "saw family templates earlier\ndataset 98e61f03e594"
+   ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H052",
@@ -2950,10 +2914,16 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
    "contamination": [
+    "family SQL templates",
     "saw restricted material"
    ],
+   "contamination_evidence": [
+    "saw family templates earlier\ndataset 98e61f03e594",
+    "saw family templates earlier\ndataset 98e61f03e594"
+   ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H053",
@@ -2975,8 +2945,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H054",
@@ -2998,8 +2970,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H055",
@@ -3021,8 +2995,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H056",
@@ -3044,10 +3020,16 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
    "contamination": [
+    "gold SQL/answers",
     "saw restricted material"
    ],
+   "contamination_evidence": [
+    "saw gold queries for coverage\ndirect sql after a shared explore (payer class, frequency, payment and service months, referring-npi volume, plb sign, units, adju",
+    "saw gold queries for coverage\ndirect sql after a shared explore (payer class, frequency, payment and service months, referring-npi volume, plb sign, units, adju"
+   ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H057",
@@ -3069,10 +3051,16 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
    "contamination": [
+    "gold SQL/answers",
     "saw restricted material"
    ],
+   "contamination_evidence": [
+    "saw gold queries for coverage\nplanner pass named the population, grain, date basis, and the cte boundaries",
+    "saw gold queries for coverage\nplanner pass named the population, grain, date basis, and the cte boundaries"
+   ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H058",
@@ -3094,10 +3082,16 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
    "contamination": [
+    "gold SQL/answers",
     "saw restricted material"
    ],
+   "contamination_evidence": [
+    "saw gold queries for coverage\neach question was written first as a metric spec (population, grain, date basis, ties, rounding) and then as one sql statement",
+    "saw gold queries for coverage\neach question was written first as a metric spec (population, grain, date basis, ties, rounding) and then as one sql statement"
+   ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H059",
@@ -3119,10 +3113,16 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
    "contamination": [
-    "gold SQL/answers"
+    "gold SQL/answers",
+    "saw restricted material"
+   ],
+   "contamination_evidence": [
+    "read gold sql earlier\ncte grain check plus one explore probe per question before the final select",
+    "read gold sql earlier\ncte grain check plus one explore probe per question before the final select"
    ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H060",
@@ -3145,10 +3145,15 @@
    "dataset_id": "98e61f03e594",
    "contamination": [
     "gold SQL/answers",
-    "reference SQL"
+    "saw restricted material"
+   ],
+   "contamination_evidence": [
+    "read gold sql earlier\nplanner listed population and date basis",
+    "read gold sql earlier\nplanner listed population and date basis"
    ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H061",
@@ -3170,10 +3175,16 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
    "contamination": [
-    "gold SQL/answers"
+    "gold SQL/answers",
+    "saw restricted material"
+   ],
+   "contamination_evidence": [
+    "read gold sql earlier\nno data probes",
+    "read gold sql earlier\nno data probes"
    ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H062",
@@ -3197,8 +3208,12 @@
    "contamination": [
     "saw restricted material"
    ],
+   "contamination_evidence": [
+    "saw some harness sql earlier\nplanner listed grain, filters, and checks"
+   ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H063",
@@ -3222,8 +3237,12 @@
    "contamination": [
     "saw restricted material"
    ],
+   "contamination_evidence": [
+    "saw some harness sql earlier\neach question started as a metric spec (metric, population, filters, grain, time window, ties, rounding) and was then translated to"
+   ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H064",
@@ -3247,8 +3266,12 @@
    "contamination": [
     "saw restricted material"
    ],
+   "contamination_evidence": [
+    "saw some harness sql earlier\nbm25 few-shot used the 3 most similar non-dev questions, excluding heldout_hard_1 and the same parametric family"
+   ],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H065",
@@ -3270,8 +3293,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H066",
@@ -3293,8 +3318,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H067",
@@ -3316,8 +3343,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H068",
@@ -3339,8 +3368,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H069",
@@ -3362,8 +3393,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H070",
@@ -3385,8 +3418,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H071",
@@ -3408,8 +3443,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H072",
@@ -3430,11 +3467,11 @@
    "model": "Grok Bot",
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
-   "contamination": [
-    "reference SQL"
-   ],
+   "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H073",
@@ -3456,8 +3493,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H074",
@@ -3479,8 +3518,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H075",
@@ -3501,12 +3542,11 @@
    "model": "Grok Bot (local executor l2)",
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
-   "contamination": [
-    "family SQL templates",
-    "gold SQL/answers"
-   ],
+   "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H076",
@@ -3528,8 +3568,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H077",
@@ -3551,8 +3593,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H078",
@@ -3573,12 +3617,11 @@
    "model": "Grok Bot (local executor l2)",
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
-   "contamination": [
-    "family SQL templates",
-    "gold SQL/answers"
-   ],
+   "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H079",
@@ -3600,8 +3643,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H080",
@@ -3623,8 +3668,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H081",
@@ -3646,8 +3693,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H082",
@@ -3669,8 +3718,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H083",
@@ -3692,8 +3743,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H084",
@@ -3715,8 +3768,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H085",
@@ -3738,8 +3793,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H086",
@@ -3761,8 +3818,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H087",
@@ -3784,8 +3843,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H088",
@@ -3807,8 +3868,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H089",
@@ -3830,8 +3893,139 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "98e61f03e594",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
+  },
+  {
+   "cell": "H090",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": false,
+    "verifier": true,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 27,
+   "mean_sql_execs": 1.2,
+   "model": "Grok Bot (local executor)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "contamination_evidence": [],
+   "partial": false,
+   "source": "branch",
+   "contamination_soft": []
+  },
+  {
+   "cell": "H091",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": false,
+    "verifier": true,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 2.0,
+   "model": "Grok Bot (local executor)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [
+    "reference SQL"
+   ],
+   "contamination_evidence": [
+    "reference sql shown) - adopted conventions: primary payer = distinct claims rows with payer_responsibility='p' joined on claim_key+payer_key, rates via round(av"
+   ],
+   "partial": false,
+   "source": "branch",
+   "contamination_soft": []
+  },
+  {
+   "cell": "H092",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": true,
+    "verifier": false,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 3.0,
+   "model": "Grok Bot (local executor)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "contamination_evidence": [],
+   "partial": false,
+   "source": "branch",
+   "contamination_soft": []
+  },
+  {
+   "cell": "H093",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": true,
+    "verifier": true,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 3.1,
+   "model": "Grok Bot (local executor)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "contamination_evidence": [],
+   "partial": false,
+   "source": "branch",
+   "contamination_soft": []
+  },
+  {
+   "cell": "H094",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": true,
+    "verifier": true,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 3.0,
+   "model": "Grok Bot (local executor)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "contamination_evidence": [],
+   "partial": false,
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H095",
@@ -3853,8 +4047,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H096",
@@ -3876,8 +4072,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H097",
@@ -3899,8 +4097,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H098",
@@ -3922,8 +4122,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   },
   {
    "cell": "H099",
@@ -3945,8 +4147,10 @@
    "dev_set": "DEV_HARD_v1",
    "dataset_id": "unknown",
    "contamination": [],
+   "contamination_evidence": [],
    "partial": false,
-   "source": "branch"
+   "source": "branch",
+   "contamination_soft": []
   }
  ]
 }
