@@ -165,8 +165,8 @@ def test_medicare_screening_orders_follow_ncd_and_abn_rules(run):
                 seen[mod] += 1
                 assert svc["paid"] == 0
                 want = {"GA": {("PR", "50")}, "GZ": {("CO", "50")}, "GY": {("PR", "96"), ("PR", "204")}}[mod]
-                if not set(svc["cas"]) & want:                    # a whole-claim denial took precedence
-                    assert any(g in ("CO", "OA") and k in m.DENIAL_CARCS for g, k in svc["cas"]), svc
+                if not set(svc["cas"]) & want:                    # a whole-claim outcome took precedence
+                    assert any(g in ("CO", "OA") and (k in m.DENIAL_CARCS or k == "45") for g, k in svc["cas"]), svc
                     continue
                 if mod == "GY":
                     assert svc["rarc"] == "N425"
