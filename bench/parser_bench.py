@@ -324,7 +324,7 @@ def _summary(results: list[dict]) -> dict:
 
 
 def cmd_run(label: str, freeze: bool, only: list[str] | None, use_tracemalloc: bool, slim_segment: bool,
-            keep_output: bool) -> dict:
+            keep_output: bool, repeat: int = 1) -> dict:
     manifest = build_corpus()
     names = only or sorted(manifest["batches"])
     if freeze and not only:
@@ -336,6 +336,11 @@ def cmd_run(label: str, freeze: bool, only: list[str] | None, use_tracemalloc: b
     for name in names:
         shutil.rmtree(out_root / name, ignore_errors=True)
         r = _run_batch_in_subprocess(name, out_root / name, use_tracemalloc)
+        for _ in range(repeat - 1):                   # a shared machine only ever adds CPU time: keep the least
+            again = _run_batch_in_subprocess(name, BENCH_DIR / "candidate" / "_repeat", use_tracemalloc)
+            shutil.rmtree(BENCH_DIR / "candidate" / "_repeat")
+            if again["cpu_s"] < r["cpu_s"]:
+                r.update({k: again[k] for k in again if k.startswith("cpu_")})
         if not freeze:
             found = compare_batch(REFERENCE_DIR / name, out_root / name, slim_segment)
             if decisions(REFERENCE_DIR / name) != decisions(out_root / name):
@@ -371,7 +376,7 @@ def cmd_profile(batch_name: str, use_cprofile: bool):
     if use_cprofile:
         import cProfile
         import pstats
-        prof = cProfile.Profile()
+        prof = cProfile.Profile(time.process_time)                  # CPU, not wall: the machine is shared
         prof.enable()
         r = run_batch(batch_name, out)
         prof.disable()
@@ -394,6 +399,7 @@ def main(argv=None):
     run.add_argument("--tracemalloc", action="store_true", help="also record the Python heap peak (slower)")
     run.add_argument("--slim-segment", action="store_true", help="edi.segment without raw_text/elements (step 5)")
     run.add_argument("--keep-output", action="store_true")
+    run.add_argument("--repeat", type=int, default=1, help="run each batch N times, report the least CPU")
     prof = sub.add_parser("profile")
     prof.add_argument("--batch", required=True)
     prof.add_argument("--cprofile", action="store_true")
@@ -408,7 +414,7 @@ def main(argv=None):
     elif a.cmd == "freeze":
         cmd_run("reference", True, a.only, False, False, True)
     elif a.cmd == "run":
-        cmd_run(a.label, False, a.only, a.tracemalloc, a.slim_segment, a.keep_output)
+        cmd_run(a.label, False, a.only, a.tracemalloc, a.slim_segment, a.keep_output, a.repeat)
     elif a.cmd == "profile":
         cmd_profile(a.batch, a.cprofile)
     elif a.cmd == "_batch":

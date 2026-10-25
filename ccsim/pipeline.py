@@ -309,6 +309,7 @@ class SilverBatch(TableRows):
     batch or the file. A file rejected after a flush has its flushed rows deleted again."""
 
     FLUSH_SEGMENTS = 50_000
+    FLUSH_MIN_ROWS = 2_000
     STAGING_MEMORY_LIMIT = "256MB"
 
     def __init__(self, run_id: str, started: datetime, triggered_by: str, notes: str | None):
@@ -348,7 +349,7 @@ class SilverBatch(TableRows):
     def _flush(self, keep_latest_rows: bool):
         for t, rows in self.rows.items():
             n = len(rows) - 1 if keep_latest_rows and t != "edi.segment" else len(rows)
-            if n > 0:
+            if n > (self.FLUSH_MIN_ROWS if keep_latest_rows else 0):  # small tables: one insert at the end
                 (_insert_segments(self.con, rows[:n]) if t == "edi.segment" else _insert(self.con, t, rows[:n]))
                 del rows[:n]                                      # in place: the parser's adders append to it
 
