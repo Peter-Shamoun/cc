@@ -55,7 +55,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_b853266803",
@@ -64,7 +65,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -73,7 +75,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_a5888f64a4",
@@ -82,7 +85,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7d45c279a7",
@@ -91,7 +95,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q15_partial_line_denials",
@@ -100,7 +105,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q25_primary_deductible",
@@ -109,7 +115,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_8663c777cd",
@@ -118,7 +125,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__87798",
@@ -127,7 +135,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q11_cpt_denial_rate",
@@ -136,7 +145,8 @@
    "sql_execs": 4,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_a123bba47f",
@@ -145,7 +155,8 @@
    "sql_execs": 4,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_9108c7aacb",
@@ -154,7 +165,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_856b95a70c",
@@ -163,7 +175,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_1b7e02d0b0",
@@ -172,7 +185,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_921f1bf366",
@@ -181,7 +195,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "q14_zero_paid_not_denied",
@@ -190,7 +205,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_dca9da6d52",
@@ -199,7 +215,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q19_reversed_no_correction",
@@ -208,7 +225,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__80307",
@@ -217,7 +235,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d383370345",
@@ -226,7 +245,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0482",
@@ -235,7 +255,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_0d43f7d4b6",
@@ -244,7 +265,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_923951a050",
@@ -253,7 +275,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7423e6eb91",
@@ -262,7 +285,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_never_remitted_submitted_in_month__2026-07-01",
@@ -271,7 +295,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_ab202d4b23",
@@ -280,7 +305,8 @@
    "sql_execs": 4,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0480",
@@ -289,7 +315,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d671e0b995",
@@ -298,7 +325,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__81479",
@@ -307,7 +335,8 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q12_referring_provider_denials",
@@ -316,11 +345,12 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": null,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   }
  ],
- "accuracy": null,
- "accuracy_frac": null,
+ "accuracy": "25/30",
+ "accuracy_frac": 0.8333,
  "n": 30,
  "mean_sql_execs": 1.4,
  "notes": "Answers committed before scoring. CONTAMINATION CAVEAT: same executor ran H037 on the same 30 questions first and had seen H037's per-question pass/fail (checker reason only; no gold, reference SQL or answer keys were read). So H038 is not independent of H037: direct_sql drafts reuse the executor's own H037 SQL. explore=1: probe queries on grain/population (claim_lines grain, P/S latest-submission mix, line_count distribution, payment months, frequency codes, payer populations) were run for q9,q10,q12,q13,q14,q25 only (time). verifier=1: a critic pass by the same executor (not fresh context) revised one answer (a_ab202d4b23: payer population restricted to payers with qualifying lines, from the explore finding 40 vs 42 payers). assumptions=1: stated in each answer text. multiagent emulated by the same executor. repair=0. Seconds not tracked. Dataset 98e61f03e594 covers July 2026 only."
