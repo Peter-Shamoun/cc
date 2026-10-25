@@ -1,0 +1,1037 @@
+{
+ "cell": "H096",
+ "protocol": "v2",
+ "dev_set": "DEV_HARD_v1",
+ "agent_note": "local Grok Bot executor l6",
+ "config": {
+  "generation": "metric_spec",
+  "fewshot": true,
+  "explore": true,
+  "candidates3": true,
+  "verifier": true,
+  "repair": false,
+  "assumptions": false,
+  "multiagent": false
+ },
+ "model": "Grok Bot (local executor)",
+ "dataset_id": "98e61f03e594",
+ "dev_ids": [
+  "f_cpt_share_of_line_payments__g0483",
+  "a_b853266803",
+  "q10_top_denial_carcs",
+  "a_a5888f64a4",
+  "a_7d45c279a7",
+  "q15_partial_line_denials",
+  "q25_primary_deductible",
+  "a_8663c777cd",
+  "f_cpt_share_of_line_payments__87798",
+  "q11_cpt_denial_rate",
+  "a_a123bba47f",
+  "a_9108c7aacb",
+  "a_856b95a70c",
+  "a_1b7e02d0b0",
+  "a_921f1bf366",
+  "q14_zero_paid_not_denied",
+  "a_dca9da6d52",
+  "q19_reversed_no_correction",
+  "f_cpt_share_of_line_payments__80307",
+  "a_d383370345",
+  "f_cpt_share_of_line_payments__g0482",
+  "a_0d43f7d4b6",
+  "a_923951a050",
+  "a_7423e6eb91",
+  "f_never_remitted_submitted_in_month__2026-07-01",
+  "a_ab202d4b23",
+  "f_cpt_share_of_line_payments__g0480",
+  "a_d671e0b995",
+  "f_cpt_share_of_line_payments__81479",
+  "q12_referring_provider_denials"
+ ],
+ "results": [
+  {
+   "qid": "f_cpt_share_of_line_payments__g0483",
+   "answer": {
+    "columns": [
+     "share"
+    ],
+    "rows": [
+     [
+      0.041
+     ]
+    ]
+   },
+   "final_sql": "SELECT round(sum(CASE WHEN coalesce(adjudicated_procedure_code,procedure_code)='G0483' THEN line_paid_amount ELSE 0 END)/sum(line_paid_amount),4) AS share\nFROM sem.remit_lines WHERE adjudication_state='current'",
+   "sql_execs": 6,
+   "repairs": 0,
+   "seconds": 0.0173,
+   "trace": "explore: 3 probes; fewshot (TF-IDF, non-dev, other family): f_payer_class_denial_rate__medicare,f_payer_class_denial_rate__commercial,f_cpt_denied_lines__80053; spec: metric/population/filters/grain/time/ties: CPT G0483 accounts for what fraction of total paid dollars across current service lines?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+  },
+  {
+   "qid": "a_b853266803",
+   "answer": {
+    "columns": [
+     "payer_class",
+     "paid_claims",
+     "median_days",
+     "p90_days"
+    ],
+    "rows": [
+     [
+      "blues",
+      12,
+      16.0,
+      19.0
+     ],
+     [
+      "commercial",
+      20,
+      14.0,
+      16.3
+     ],
+     [
+      "medicaid_mco",
+      1,
+      20.0,
+      20.0
+     ],
+     [
+      "medicare",
+      3,
+      18.0,
+      18.8
+     ],
+     [
+      "medicare_advantage",
+      9,
+      14.0,
+      19.2
+     ],
+     [
+      "other",
+      1,
+      -11.0,
+      -11.0
+     ]
+    ]
+   },
+   "final_sql": "SELECT c.payer_class, count(*) paid_claims, round(percentile_cont(0.5) WITHIN GROUP (ORDER BY date_diff('day',f.fs,rc.payment_date)),1) median_days,\n round(percentile_cont(0.9) WITHIN GROUP (ORDER BY date_diff('day',f.fs,rc.payment_date)),1) p90_days\nFROM (SELECT claim_key,payer_key,min(submission_date) fs FROM sem.claims GROUP BY 1,2) f\nJOIN (SELECT DISTINCT claim_key,payer_key,payer_class FROM sem.claims WHERE payer_responsibility='P') c USING(claim_key,payer_key)\nJOIN sem.remit_claims rc ON rc.claim_key=c.claim_key AND rc.payer_key=c.payer_key AND rc.is_current_adjudication AND rc.paid_amount>0\nGROUP BY 1 ORDER BY 1",
+   "sql_execs": 7,
+   "repairs": 0,
+   "seconds": 0.0237,
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_f786e11aec,q22_days_to_first_remit,a_88c4640755; spec: metric/population/filters/grain/time/ties: Days-to-pay by payer class: for each claim's primary payer (payer_responsibility = 'P'), take the current adjudicatio; candidates: A=6r, B=errr, C=6r; agree=2; pick=C; verifier: ok"
+  },
+  {
+   "qid": "q10_top_denial_carcs",
+   "answer": {
+    "columns": [
+     "carc_code",
+     "denied_claims"
+    ],
+    "rows": [
+     [
+      "18",
+      4
+     ],
+     [
+      "11",
+      2
+     ],
+     [
+      "16",
+      2
+     ],
+     [
+      "22",
+      2
+     ],
+     [
+      "96",
+      2
+     ]
+    ]
+   },
+   "final_sql": "SELECT carc_code, count(*) denied_claims FROM (SELECT DISTINCT a.claim_key,a.payer_key,a.carc_code FROM sem.adjustments a\n WHERE a.is_current_adjudication AND a.group_code='CO' AND a.carc_category IS NOT NULL AND a.is_denial_carc\n AND EXISTS (SELECT 1 FROM sem.remit_claims r WHERE r.remit_claim_id=a.remit_claim_id AND r.is_denied)) GROUP BY 1 ORDER BY 2 DESC,1 LIMIT 5",
+   "sql_execs": 7,
+   "repairs": 0,
+   "seconds": 0.022,
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_436f690741,a_f494340e13,q08_denial_rate_by_payer; spec: metric/population/filters/grain/time/ties: Which 5 denial reason codes (CARCs) appear on the most denied claims? Only count reviewed denial reasons under group ; candidates: A=5r, B=5r, C=5r; agree=3; pick=C; verifier: ok"
+  },
+  {
+   "qid": "a_a5888f64a4",
+   "answer": {
+    "columns": [
+     "payer_class",
+     "pairs_remitted",
+     "first_pass_resolved",
+     "rate_pct"
+    ],
+    "rows": [
+     [
+      "blues",
+      93,
+      85,
+      91.4
+     ],
+     [
+      "commercial",
+      139,
+      130,
+      93.53
+     ],
+     [
+      "medicaid",
+      16,
+      15,
+      93.75
+     ],
+     [
+      "medicaid_mco",
+      51,
+      50,
+      98.04
+     ],
+     [
+      "medicare",
+      110,
+      105,
+      95.45
+     ],
+     [
+      "medicare_advantage",
+      75,
+      73,
+      97.33
+     ],
+     [
+      "other",
+      10,
+      6,
+      60.0
+     ]
+    ]
+   },
+   "final_sql": "SELECT r.payer_class, count(DISTINCT r.claim_payer_key) pairs_remitted,\n count(DISTINCT r.claim_payer_key) FILTER (WHERE r.is_current_adjudication AND NOT r.is_denied AND NOT EXISTS (SELECT 1 FROM sem.remit_claims o WHERE o.claim_payer_key=r.claim_payer_key AND o.remit_claim_id<>r.remit_claim_id)) first_pass_resolved,\n round(100.0*count(DISTINCT r.claim_payer_key) FILTER (WHERE r.is_current_adjudication AND NOT r.is_denied AND NOT EXISTS (SELECT 1 FROM sem.remit_claims o WHERE o.claim_payer_key=r.claim_payer_key AND o.remit_claim_id<>r.remit_claim_id))/count(DISTINCT r.claim_payer_key),2) rate_pct\nFROM sem.remit_claims r GROUP BY 1 ORDER BY 1",
+   "sql_execs": 7,
+   "repairs": 0,
+   "seconds": 0.0317,
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_436f690741,q22_days_to_first_remit,f_payer_days_to_first_remit__blue-cross-blue-shield-of-north-carolina; spec: metric/population/filters/grain/time/ties: What is our first-pass resolution rate by payer class? Among all claim+payer pairs that have received at least one 83; candidates: A=7r, B=7r, C=7r; agree=3; pick=C; verifier: ok"
+  },
+  {
+   "qid": "a_7d45c279a7",
+   "answer": {
+    "columns": [
+     "payer_class",
+     "multi_trace_pairs",
+     "with_reversal",
+     "no_current",
+     "current_paid"
+    ],
+    "rows": [
+     [
+      "blues",
+      3,
+      2,
+      0,
+      180.33
+     ],
+     [
+      "commercial",
+      2,
+      0,
+      0,
+      84.34
+     ]
+    ]
+   },
+   "final_sql": "SELECT payer_class, count(*) multi_trace_pairs, count(*) FILTER (WHERE nrev>0) with_reversal, count(*) FILTER (WHERE ncur=0) no_current, round(sum(paid),2) current_paid\nFROM (SELECT payer_class, claim_key, payer_key, count(DISTINCT check_or_eft_number) nt, sum(CASE WHEN adjudication_state='reversal' THEN 1 ELSE 0 END) nrev,\n sum(CASE WHEN adjudication_state='current' THEN 1 ELSE 0 END) ncur, sum(CASE WHEN adjudication_state='current' THEN paid_amount ELSE 0 END) paid\n FROM sem.remit_claims GROUP BY 1,2,3) WHERE nt>=2 GROUP BY 1 ORDER BY 1",
+   "sql_execs": 7,
+   "repairs": 0,
+   "seconds": 0.0275,
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_e83408d6a2,q01_claims_submitted,a_436f690741; spec: metric/population/filters/grain/time/ties: Some claims are adjudicated by the same payer across more than one 835 payment (different check/EFT trace numbers). B; candidates: A=2r, B=2r, C=2r; agree=3; pick=C; verifier: ok"
+  },
+  {
+   "qid": "q15_partial_line_denials",
+   "answer": {
+    "columns": [
+     "partial_denied_lines"
+    ],
+    "rows": [
+     [
+      36
+     ]
+    ]
+   },
+   "final_sql": "SELECT count(*) partial_denied_lines FROM sem.remit_lines l JOIN sem.remit_claims r ON r.remit_claim_id=l.remit_claim_id\nWHERE r.adjudication_state='current' AND NOT r.is_denied AND l.line_paid_amount=0 AND l.line_is_denied",
+   "sql_execs": 7,
+   "repairs": 0,
+   "seconds": 0.0159,
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): q07_denial_rate,f_cpt_denied_lines__36415,f_cpt_denied_lines__80053; spec: metric/population/filters/grain/time/ties: How many service lines were denied on claims whose current adjudication is not a denial overall (partial denials)?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+  },
+  {
+   "qid": "q25_primary_deductible",
+   "answer": {
+    "columns": [
+     "total_deductible"
+    ],
+    "rows": [
+     [
+      4905.69
+     ]
+    ]
+   },
+   "final_sql": "SELECT sum(a.adjustment_amount) total_deductible FROM sem.adjustments a JOIN sem.remit_claims r ON r.remit_claim_id=a.remit_claim_id\nWHERE a.is_current_adjudication AND a.group_code='PR' AND a.carc_code='1' AND r.payer_sequence='primary'",
+   "sql_execs": 7,
+   "repairs": 0,
+   "seconds": 0.0178,
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): q24_primary_patient_responsibility,a_553c1034d1,a_436f690741; spec: metric/population/filters/grain/time/ties: What is the total deductible (adjustment group PR, reason code 1) assigned by primary payers on current adjudications; candidates: A=1r, B=1r, C=1r; agree=2; pick=A; verifier: ok"
+  },
+  {
+   "qid": "a_8663c777cd",
+   "answer": {
+    "error": "Parser Error: syntax error at or near \"month\"\n\nLINE 1: SELECT strftime(m,'%Y-%m') month, sum(n) total_claims, sum(CASE WHEN rk<=5 THEN n ELSE...\n                                   ^^^^^"
+   },
+   "final_sql": "SELECT strftime(m,'%Y-%m') month, sum(n) total_claims, sum(CASE WHEN rk<=5 THEN n ELSE 0 END) top5_claims, round(100*sum(CASE WHEN rk<=5 THEN n ELSE 0 END)::DOUBLE/sum(n),1) top5_share_pct\nFROM (SELECT m, referring_npi, n, rank() OVER (PARTITION BY m ORDER BY n DESC, referring_npi ASC) rk FROM\n (SELECT date_trunc('month',service_date_from) m, referring_npi, count(DISTINCT claim_key) n FROM sem.claims WHERE is_latest_submission AND service_date_from>='2026-06-01' GROUP BY 1,2)) GROUP BY m ORDER BY m",
+   "sql_execs": 8,
+   "repairs": 0,
+   "seconds": 0.01,
+   "trace": "explore: 5 probes; fewshot (TF-IDF, non-dev, other family): a_54dd76175a,q04_paid_by_month,a_837ce03435; spec: metric/population/filters/grain/time/ties: How concentrated is our ordering-provider volume month to month? For each service month from June 2026 onward (servic; candidates: A=errr, B=errr, C=errr; agree=0; pick=C"
+  },
+  {
+   "qid": "f_cpt_share_of_line_payments__87798",
+   "answer": {
+    "columns": [
+     "share"
+    ],
+    "rows": [
+     [
+      0.1202
+     ]
+    ]
+   },
+   "final_sql": "SELECT round(sum(CASE WHEN coalesce(adjudicated_procedure_code,procedure_code)='87798' THEN line_paid_amount ELSE 0 END)/sum(line_paid_amount),4) AS share\nFROM sem.remit_lines WHERE adjudication_state='current'",
+   "sql_execs": 6,
+   "repairs": 0,
+   "seconds": 0.0135,
+   "trace": "explore: 3 probes; fewshot (TF-IDF, non-dev, other family): f_cpt_denied_lines__80053,a_f3c42ce766,a_f494340e13; spec: metric/population/filters/grain/time/ties: What share of all service-line payments (current adjudications) came from lines billed as CPT 87798?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+  },
+  {
+   "qid": "q11_cpt_denial_rate",
+   "answer": {
+    "columns": [
+     "procedure_code",
+     "adjudications",
+     "denied",
+     "denial_rate"
+    ],
+    "rows": [
+     [
+      "36415",
+      26,
+      1,
+      0.0385
+     ],
+     [
+      "80053",
+      21,
+      0,
+      0.0
+     ],
+     [
+      "85025",
+      25,
+      0,
+      0.0
+     ]
+    ]
+   },
+   "final_sql": "WITH pc AS (SELECT DISTINCT r.claim_payer_key, r.is_denied, l.procedure_code FROM sem.remit_claims r JOIN sem.claim_lines l ON l.claim_key=r.claim_key AND l.payer_key=r.payer_key AND l.is_latest_submission WHERE r.is_current_adjudication)\nSELECT procedure_code, count(*) adjudications, sum(is_denied::int) denied, round(avg(is_denied::INT),4) denial_rate FROM pc GROUP BY 1 HAVING count(*)>=20 ORDER BY denial_rate DESC, procedure_code",
+   "sql_execs": 7,
+   "repairs": 0,
+   "seconds": 0.0209,
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): q13_principal_dx_denials,f_cpt_denied_lines__80053,a_a23ce7f1de; spec: metric/population/filters/grain/time/ties: What is the denial rate by CPT code billed, among CPT codes on at least 20 claim+payer current adjudications? A claim; candidates: A=3r, B=3r, C=28r; agree=2; pick=A; verifier: ok"
+  },
+  {
+   "qid": "a_a123bba47f",
+   "answer": {
+    "columns": [
+     "bucket",
+     "claims",
+     "denied_claims",
+     "denial_rate_pct",
+     "denied_billed"
+    ],
+    "rows": [
+     [
+      "1",
+      8,
+      1,
+      12.5,
+      3805.44
+     ],
+     [
+      "2",
+      3,
+      0,
+      0.0,
+      0.0
+     ],
+     [
+      "3+",
+      40,
+      1,
+      2.5,
+      447.2
+     ]
+    ]
+   },
+   "final_sql": "SELECT bucket, count(*) claims, sum(d) denied_claims, round(100.0*avg(d),2) denial_rate_pct, sum(d*charge_amount) denied_billed FROM\n(SELECT CASE WHEN c.line_count>2 THEN '3+' ELSE CAST(c.line_count AS VARCHAR) END bucket, CASE WHEN r.is_denied THEN 1 ELSE 0 END d, c.charge_amount\n FROM sem.remit_claims r JOIN sem.claims c ON c.claim_key=r.claim_key AND c.payer_key=r.payer_key AND c.is_latest_submission\n WHERE r.adjudication_state='current' AND c.payer_responsibility='P') GROUP BY 1 ORDER BY 1",
+   "sql_execs": 7,
+   "repairs": 0,
+   "seconds": 0.0213,
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_9a40343e18,a_5059b5e0e6,a_f3c42ce766; spec: metric/population/filters/grain/time/ties: How does the primary-payer denial rate vary with the number of billed service lines? Bucket claims by line count on t; candidates: A=3r, B=3r, C=3r; agree=3; pick=C; verifier: ok"
+  },
+  {
+   "qid": "a_9108c7aacb",
+   "answer": {
+    "error": "Parser Error: syntax error at or near \"days\"\n\nLINE 1: ..., o.payment_date offset_date, o.payment_date-f.payment_date days\n                                                                       ^^^^"
+   },
+   "final_sql": "SELECT f.reference_id, f.payment_date carried_forward_date, round(abs(f.provider_adjustment_amount),2) amount, o.payment_date offset_date, o.payment_date-f.payment_date days\nFROM sem.provider_adjustments f LEFT JOIN LATERAL (SELECT payment_date FROM sem.provider_adjustments x WHERE x.plb_reason_code='FB' AND x.payer_name=f.payer_name AND x.reference_id=f.reference_id AND x.provider_adjustment_amount+f.provider_adjustment_amount=0 AND x.payment_date>f.payment_date ORDER BY payment_date LIMIT 1) o ON true\nWHERE f.plb_reason_code='FB' AND f.provider_adjustment_amount<0 ORDER BY 2,1",
+   "sql_execs": 4,
+   "repairs": 0,
+   "seconds": 0.0021,
+   "trace": "explore: 1 probes; fewshot (TF-IDF, non-dev, other family): a_b541bf06a1,a_88c4640755,a_f786e11aec; spec: metric/population/filters/grain/time/ties: For each forward balance a payer carried forward on an 835 (PLB reason FB with a negative amount), show the FB refere; candidates: A=errr, B=errr, C=errr; agree=0; pick=C"
+  },
+  {
+   "qid": "a_856b95a70c",
+   "answer": {
+    "columns": [
+     "payer_class",
+     "jul_share",
+     "aug_share",
+     "change_pp"
+    ],
+    "rows": [
+     [
+      "blues",
+      19.7,
+      0.0,
+      -19.7
+     ],
+     [
+      "commercial",
+      27.2,
+      0.0,
+      -27.2
+     ],
+     [
+      "medicaid",
+      2.4,
+      0.0,
+      -2.4
+     ],
+     [
+      "medicaid_mco",
+      8.1,
+      0.0,
+      -8.1
+     ],
+     [
+      "medicare",
+      25.3,
+      0.0,
+      -25.3
+     ],
+     [
+      "medicare_advantage",
+      15.5,
+      0.0,
+      -15.5
+     ],
+     [
+      "other",
+      1.8,
+      0.0,
+      -1.8
+     ]
+    ]
+   },
+   "final_sql": "SELECT payer_class, round(js,1) jul_share, round(coalesce(as_,0),1) aug_share, round(coalesce(as_,0)-js,1) change_pp FROM\n(SELECT payer_class, 100*sum(CASE WHEN month(payment_date)=7 THEN paid_amount END)/(SELECT sum(paid_amount) FROM sem.remit_claims WHERE is_current_adjudication AND month(payment_date)=7) js,\n 100*sum(CASE WHEN month(payment_date)=8 THEN paid_amount END)/nullif((SELECT sum(paid_amount) FROM sem.remit_claims WHERE is_current_adjudication AND month(payment_date)=8),0) as_\n FROM sem.remit_claims WHERE is_current_adjudication AND year(payment_date)=2026 GROUP BY 1) ORDER BY 1",
+   "sql_execs": 7,
+   "repairs": 0,
+   "seconds": 0.0217,
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_477b034f58,f_payer_paid_in_month__unitedhealthcare_2026-07-01,f_claims_first_submitted_in_month__2026-07-01; spec: metric/population/filters/grain/time/ties: How did the payer-class mix of paid dollars shift between July 2026 and August 2026 payment months? Use current adjud; candidates: A=7r, B=errr, C=7r; agree=1; pick=C; verifier: ok"
+  },
+  {
+   "qid": "a_1b7e02d0b0",
+   "answer": {
+    "columns": [
+     "claims",
+     "avg_days_to_replacement",
+     "paid_after",
+     "avg_days_to_payment",
+     "total_paid"
+    ],
+    "rows": [
+     [
+      10,
+      null,
+      1,
+      null,
+      34.64
+     ]
+    ]
+   },
+   "final_sql": "SELECT count(DISTINCT c.claim_key) claims, round(avg(c.submission_date - o.od),2) avg_days_to_replacement,\n count(DISTINCT r.claim_key) paid_after, round(avg(r.payment_date-o.od),2) avg_days_to_payment, coalesce(sum(r.paid_amount),0) total_paid\nFROM sem.claims c LEFT JOIN (SELECT claim_key, min(submission_date) od FROM sem.claims WHERE frequency_code='1' GROUP BY 1) o ON o.claim_key=c.claim_key\nLEFT JOIN sem.remit_claims r ON r.claim_key=c.claim_key AND r.payer_key=c.payer_key AND r.is_current_adjudication AND r.payment_date>=c.submission_date\nWHERE c.frequency_code='7' AND c.payer_responsibility='P'",
+   "sql_execs": 7,
+   "repairs": 0,
+   "seconds": 0.0293,
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_88c4640755,a_fca405b635,q17_resubmitted; spec: metric/population/filters/grain/time/ties: Rework cycle time for corrected claims: for claims that were resubmitted to their primary payer (payer_responsibility; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+  },
+  {
+   "qid": "a_921f1bf366",
+   "answer": {
+    "columns": [
+     "voided_claims",
+     "paid_before_void",
+     "reversed_after",
+     "current_paid"
+    ],
+    "rows": [
+     [
+      0,
+      0,
+      0,
+      0.0
+     ]
+    ]
+   },
+   "final_sql": "SELECT count(DISTINCT c.claim_key) voided_claims, count(DISTINCT CASE WHEN r.paid_amount>0 AND r.payment_date<c.submission_date THEN c.claim_key END) paid_before_void,\n count(DISTINCT CASE WHEN r.adjudication_state='reversal' AND r.payment_date>=c.submission_date THEN c.claim_key END) reversed_after,\n round(coalesce(sum(CASE WHEN r.adjudication_state='current' THEN r.paid_amount END),0),2) current_paid\nFROM sem.claims c LEFT JOIN sem.remit_claims r ON r.claim_key=c.claim_key WHERE c.frequency_code='8'",
+   "sql_execs": 7,
+   "repairs": 0,
+   "seconds": 0.0289,
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): q18_voided,a_f786e11aec,a_f3c42ce766; spec: metric/population/filters/grain/time/ties: For claims we voided (frequency 8 submissions), return in one row: the number of voided claims, how many had a remit ; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+  },
+  {
+   "qid": "q14_zero_paid_not_denied",
+   "answer": {
+    "columns": [
+     "n"
+    ],
+    "rows": [
+     [
+      46
+     ]
+    ]
+   },
+   "final_sql": "SELECT sum(CASE WHEN paid_amount=0 AND is_denied=false THEN 1 ELSE 0 END) n FROM sem.remit_claims WHERE adjudication_state='current'",
+   "sql_execs": 7,
+   "repairs": 0,
+   "seconds": 0.0197,
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): q09_denials_by_type,f_payer_class_denial_rate__medicare,f_payer_class_denial_rate__commercial; spec: metric/population/filters/grain/time/ties: How many current claim+payer adjudications paid $0 but are NOT denials?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+  },
+  {
+   "qid": "a_dca9da6d52",
+   "answer": {
+    "columns": [
+     "payer_class",
+     "corrected_claims",
+     "avg_days",
+     "min_days",
+     "max_days"
+    ],
+    "rows": [
+     [
+      "medicare_advantage",
+      1,
+      19.0,
+      19,
+      19
+     ]
+    ]
+   },
+   "final_sql": "SELECT payer_class, count(*) corrected_claims, round(avg(d),1) avg_days, min(d) min_days, max(d) max_days FROM\n(SELECT c.payer_class, c.claim_key, (SELECT min(r.payment_date) FROM sem.remit_claims r WHERE r.claim_payer_key=c.claim_key||'|'||c.payer_key AND r.payment_date>=c.submission_date)-c.submission_date d\n FROM sem.claims c WHERE c.frequency_code='7') WHERE d IS NOT NULL GROUP BY 1 ORDER BY 1",
+   "sql_execs": 7,
+   "repairs": 0,
+   "seconds": 0.0186,
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_88c4640755,a_fca405b635,q17_resubmitted; spec: metric/population/filters/grain/time/ties: After we sent a corrected replacement claim (frequency 7), how quickly did the payer respond? For each payer class wi; candidates: A=errr, B=errr, C=1r; agree=1; pick=C; verifier: ok"
+  },
+  {
+   "qid": "q19_reversed_no_correction",
+   "answer": {
+    "columns": [
+     "n"
+    ],
+    "rows": [
+     [
+      2
+     ]
+    ]
+   },
+   "final_sql": "SELECT count(DISTINCT claim_key||payer_key) n FROM sem.remit_claims r WHERE adjudication_state='reversal' AND NOT EXISTS (SELECT 1 FROM sem.remit_claims c WHERE c.claim_key=r.claim_key AND c.payer_key=r.payer_key AND c.adjudication_state='current')",
+   "sql_execs": 7,
+   "repairs": 0,
+   "seconds": 0.0222,
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_436f690741,a_2149838506,a_88c4640755; spec: metric/population/filters/grain/time/ties: How many claim+payer pairs were reversed by the payer and have no current adjudication since (no correction)?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+  },
+  {
+   "qid": "f_cpt_share_of_line_payments__80307",
+   "answer": {
+    "columns": [
+     "share"
+    ],
+    "rows": [
+     [
+      0.0617
+     ]
+    ]
+   },
+   "final_sql": "SELECT round(sum(CASE WHEN coalesce(adjudicated_procedure_code,procedure_code)='80307' THEN line_paid_amount ELSE 0 END)/sum(line_paid_amount),4) AS share\nFROM sem.remit_lines WHERE adjudication_state='current'",
+   "sql_execs": 6,
+   "repairs": 0,
+   "seconds": 0.0134,
+   "trace": "explore: 3 probes; fewshot (TF-IDF, non-dev, other family): f_cpt_denied_lines__80053,a_f3c42ce766,a_f494340e13; spec: metric/population/filters/grain/time/ties: What share of all service-line payments (current adjudications) came from lines billed as CPT 80307?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+  },
+  {
+   "qid": "a_d383370345",
+   "answer": {
+    "columns": [
+     "payer_class",
+     "cohort_claims",
+     "remitted_14d",
+     "pct"
+    ],
+    "rows": [
+     [
+      "blues",
+      83,
+      2,
+      2.4
+     ],
+     [
+      "commercial",
+      154,
+      11,
+      7.1
+     ],
+     [
+      "medicaid",
+      11,
+      0,
+      0.0
+     ],
+     [
+      "medicaid_mco",
+      53,
+      0,
+      0.0
+     ],
+     [
+      "medicare",
+      100,
+      0,
+      0.0
+     ],
+     [
+      "medicare_advantage",
+      73,
+      5,
+      6.8
+     ],
+     [
+      "other",
+      13,
+      1,
+      7.7
+     ]
+    ]
+   },
+   "final_sql": "SELECT c.payer_class, count(*) cohort_claims, sum(CASE WHEN (SELECT min(payment_date) FROM sem.remit_claims r WHERE r.claim_payer_key=c.claim_key||'|'||c.payer_key) <= c.fs + 14 THEN 1 ELSE 0 END) remitted_14d,\n round(100.0*avg(CASE WHEN (SELECT min(payment_date) FROM sem.remit_claims r WHERE r.claim_payer_key=c.claim_key||'|'||c.payer_key) <= c.fs + 14 THEN 1 ELSE 0 END),1) pct\nFROM (SELECT claim_key,payer_key,min(payer_class) payer_class,min(submission_date) fs FROM sem.claims WHERE payer_responsibility='P' GROUP BY 1,2) c WHERE c.fs BETWEEN '2026-07-01' AND '2026-07-31' GROUP BY 1 ORDER BY 1",
+   "sql_execs": 7,
+   "repairs": 0,
+   "seconds": 0.031,
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_f786e11aec,q22_days_to_first_remit,a_9a40343e18; spec: metric/population/filters/grain/time/ties: Payment velocity for the July 2026 submission cohort: take claims whose first 837 submission to their primary payer (; candidates: A=7r, B=7r, C=7r; agree=3; pick=C; verifier: ok"
+  },
+  {
+   "qid": "f_cpt_share_of_line_payments__g0482",
+   "answer": {
+    "columns": [
+     "share"
+    ],
+    "rows": [
+     [
+      0.0628
+     ]
+    ]
+   },
+   "final_sql": "SELECT round(sum(CASE WHEN coalesce(adjudicated_procedure_code,procedure_code)='G0482' THEN line_paid_amount ELSE 0 END)/sum(line_paid_amount),4) AS share\nFROM sem.remit_lines WHERE adjudication_state='current'",
+   "sql_execs": 6,
+   "repairs": 0,
+   "seconds": 0.0136,
+   "trace": "explore: 3 probes; fewshot (TF-IDF, non-dev, other family): f_payer_class_denial_rate__medicare,f_payer_class_denial_rate__commercial,f_cpt_denied_lines__80053; spec: metric/population/filters/grain/time/ties: CPT G0482 accounts for what fraction of total paid dollars across current service lines?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+  },
+  {
+   "qid": "a_0d43f7d4b6",
+   "answer": {
+    "columns": [
+     "outcome",
+     "claims",
+     "total_paid"
+    ],
+    "rows": [
+     [
+      "no remit since correction",
+      1,
+      0.0
+     ]
+    ]
+   },
+   "final_sql": "SELECT outcome, count(*) claims, round(sum(cp),2) total_paid FROM (SELECT c.claim_key,\n CASE WHEN max(CASE WHEN r.payment_date>=c.submission_date THEN 1 ELSE 0 END)=0 THEN 'no remit since correction'\n      WHEN max(CASE WHEN r.adjudication_state='current' AND NOT r.is_denied THEN 1 ELSE 0 END)=1 THEN 'overturned' ELSE 'denied again' END outcome,\n coalesce(sum(CASE WHEN r.adjudication_state='current' THEN r.paid_amount END),0) cp\n FROM sem.claims c JOIN sem.remit_claims r ON r.claim_key=c.claim_key AND r.payer_key=c.payer_key WHERE c.frequency_code='7'\n GROUP BY c.claim_key, c.submission_date HAVING max(CASE WHEN r.is_denied_recorded AND r.payment_date<c.submission_date THEN 1 ELSE 0 END)=1) GROUP BY 1 ORDER BY 1",
+   "sql_execs": 7,
+   "repairs": 0,
+   "seconds": 0.0265,
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_88c4640755,q17_resubmitted,a_fca405b635; spec: metric/population/filters/grain/time/ties: Among claims we resubmitted as a corrected replacement claim (frequency 7), consider those where the same payer had s; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+  },
+  {
+   "qid": "a_923951a050",
+   "answer": {
+    "columns": [
+     "overturned",
+     "total_paid"
+    ],
+    "rows": [
+     [
+      2,
+      118.91
+     ]
+    ]
+   },
+   "final_sql": "SELECT count(*) overturned, coalesce(sum(cp),0) total_paid FROM (SELECT claim_payer_key, sum(paid_amount) FILTER (WHERE adjudication_state='current') cp\nFROM sem.remit_claims GROUP BY 1 HAVING bool_or(adjudication_state='superseded' AND is_denied_recorded OR adjudication_state='superseded' AND is_denied) AND bool_or(adjudication_state='current' AND NOT is_denied))",
+   "sql_execs": 7,
+   "repairs": 0,
+   "seconds": 0.0177,
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_436f690741,q16_denied_charges_by_payer,a_b541bf06a1; spec: metric/population/filters/grain/time/ties: How many denials were overturned? Count the claim+payer pairs that had an earlier, superseded non-reversal adjudicati; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+  },
+  {
+   "qid": "a_7423e6eb91",
+   "answer": {
+    "columns": [
+     "bucket",
+     "claims",
+     "billed"
+    ],
+    "rows": [
+     [
+      "15-29",
+      102,
+      52399.08
+     ],
+     [
+      "30+",
+      334,
+      170145.57
+     ]
+    ]
+   },
+   "final_sql": "SELECT bucket, count(*) claims, sum(charge_amount) billed FROM (SELECT c.charge_amount,\n CASE WHEN DATE '2026-08-14'-(SELECT min(submission_date) FROM sem.claims x WHERE x.claim_key=c.claim_key AND x.payer_key=c.payer_key) < 15 THEN '0-14'\n      WHEN DATE '2026-08-14'-(SELECT min(submission_date) FROM sem.claims x WHERE x.claim_key=c.claim_key AND x.payer_key=c.payer_key) < 30 THEN '15-29' ELSE '30+' END bucket\n FROM sem.claims c WHERE c.is_latest_submission AND c.payer_responsibility='P' AND c.frequency_code<>'8'\n AND c.claim_key||'|'||c.payer_key NOT IN (SELECT claim_payer_key FROM sem.remit_claims WHERE adjudication_state='current')) GROUP BY 1 ORDER BY 1",
+   "sql_execs": 7,
+   "repairs": 0,
+   "seconds": 0.0311,
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_9a40343e18,a_f786e11aec,q22_days_to_first_remit; spec: metric/population/filters/grain/time/ties: Open primary AR aging as of 2026-08-14: which non-voided claims (latest submission is not a void, frequency 8) still ; candidates: A=2r, B=2r, C=2r; agree=3; pick=C; verifier: ok"
+  },
+  {
+   "qid": "f_never_remitted_submitted_in_month__2026-07-01",
+   "answer": {
+    "columns": [
+     "n"
+    ],
+    "rows": [
+     [
+      441
+     ]
+    ]
+   },
+   "final_sql": "SELECT count(DISTINCT claim_key) n FROM sem.claims c WHERE submission_month='2026-07-01' AND NOT EXISTS (SELECT 1 FROM sem.claims e WHERE e.claim_key=c.claim_key AND e.submission_date<'2026-07-01') AND NOT EXISTS (SELECT 1 FROM sem.remit_claims r WHERE r.claim_key=c.claim_key)",
+   "sql_execs": 7,
+   "repairs": 0,
+   "seconds": 0.0196,
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): q20_never_remitted,f_claims_first_submitted_in_month__2026-07-01,q01_claims_submitted; spec: metric/population/filters/grain/time/ties: Of the claims first submitted in July 2026, how many have never received any 835 remittance?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+  },
+  {
+   "qid": "a_ab202d4b23",
+   "answer": {
+    "columns": [
+     "payer_name",
+     "underpaid_lines",
+     "shortfall"
+    ],
+    "rows": [
+     [
+      "Unitedhealthcare",
+      4,
+      75.67
+     ],
+     [
+      "Cigna",
+      3,
+      65.29
+     ],
+     [
+      "Healthy Blue North Carolina",
+      4,
+      23.36
+     ],
+     [
+      "Aetna",
+      1,
+      17.95
+     ],
+     [
+      "Wellcare Of North Carolina",
+      3,
+      13.1
+     ],
+     [
+      "Blue Cross Blue Shield Of North Carolina",
+      6,
+      12.17
+     ],
+     [
+      "Medicare Part B North Carolina",
+      1,
+      0.31
+     ],
+     [
+      "Aetna Medicare",
+      0,
+      0.0
+     ],
+     [
+      "Alignment Health Plan",
+      0,
+      0.0
+     ],
+     [
+      "Amerihealth Caritas North Carolina",
+      0,
+      0.0
+     ],
+     [
+      "Ashcroft Tpa",
+      0,
+      0.0
+     ],
+     [
+      "Bcbs Federal Employee Program Nc",
+      0,
+      0.0
+     ],
+     [
+      "Blackstone Employer Services",
+      0,
+      0.0
+     ],
+     [
+      "Carolina Complete Health",
+      0,
+      0.0
+     ],
+     [
+      "Cigna Healthspring",
+      0,
+      0.0
+     ],
+     [
+      "Coastal Carolina Food And Commercial Workers Health Fund",
+      0,
+      0.0
+     ],
+     [
+      "Crestview Employer Services",
+      0,
+      0.0
+     ],
+     [
+      "Cromwell Claims Administration",
+      0,
+      0.0
+     ],
+     [
+      "Devoted Health",
+      0,
+      0.0
+     ],
+     [
+      "Everly Plan Administrators",
+      0,
+      0.0
+     ],
+     [
+      "Garrison Health Services",
+      0,
+      0.0
+     ],
+     [
+      "Humana",
+      0,
+      0.0
+     ],
+     [
+      "Humana Medicare Advantage",
+      0,
+      0.0
+     ],
+     [
+      "Lake Norman Farm Bureau Health Plan",
+      0,
+      0.0
+     ],
+     [
+      "Lancaster Employer Services",
+      0,
+      0.0
+     ],
+     [
+      "Meritain Health",
+      0,
+      0.0
+     ],
+     [
+      "Nc Medicaid",
+      0,
+      0.0
+     ],
+     [
+      "Oscar Health",
+      0,
+      0.0
+     ],
+     [
+      "Palmetto Employee Benefit Trust",
+      0,
+      0.0
+     ],
+     [
+      "Pamlico Teachers Health Fund",
+      0,
+      0.0
+     ],
+     [
+      "Tar Heel Health Cooperative",
+      0,
+      0.0
+     ],
+     [
+      "Tricare East Region",
+      0,
+      0.0
+     ],
+     [
+      "Umr",
+      0,
+      0.0
+     ],
+     [
+      "Unitedhealthcare Community Plan Nc",
+      0,
+      0.0
+     ],
+     [
+      "Unitedhealthcare Medicare Advantage",
+      0,
+      0.0
+     ],
+     [
+      "Uwharrie Carpenters Health Trust",
+      0,
+      0.0
+     ],
+     [
+      "Uwharrie Health Alliance",
+      0,
+      0.0
+     ],
+     [
+      "Va Community Care Network",
+      0,
+      0.0
+     ],
+     [
+      "Wellcare Medicare",
+      0,
+      0.0
+     ]
+    ]
+   },
+   "final_sql": "WITH l AS (SELECT payer_name, procedure_code, line_allowed_amount a FROM sem.remit_lines WHERE adjudication_state='current' AND claim_is_denied=false AND line_is_denied=false AND units_paid=1 AND line_allowed_amount>0),\nm AS (SELECT payer_name, procedure_code, a typ FROM (SELECT payer_name, procedure_code, a, rank() OVER (PARTITION BY payer_name, procedure_code ORDER BY count(*) DESC, a DESC) rk FROM l GROUP BY 1,2,3) WHERE rk=1)\nSELECT l.payer_name, count(*) FILTER (WHERE l.a<m.typ) underpaid_lines, round(coalesce(sum(m.typ-l.a) FILTER (WHERE l.a<m.typ),0),2) shortfall FROM l JOIN m USING(payer_name,procedure_code) GROUP BY 1 ORDER BY 3 DESC, 1",
+   "sql_execs": 8,
+   "repairs": 0,
+   "seconds": 0.0299,
+   "trace": "explore: 5 probes; fewshot (TF-IDF, non-dev, other family): a_a23ce7f1de,a_f494340e13,a_439d7186d8; spec: metric/population/filters/grain/time/ties: For every payer, how many service lines were allowed below that payer's typical allowed amount for the CPT, and what ; candidates: A=39r, B=39r, C=39r; agree=3; pick=C; verifier: ok"
+  },
+  {
+   "qid": "f_cpt_share_of_line_payments__g0480",
+   "answer": {
+    "columns": [
+     "share"
+    ],
+    "rows": [
+     [
+      0.0433
+     ]
+    ]
+   },
+   "final_sql": "SELECT round(sum(CASE WHEN coalesce(adjudicated_procedure_code,procedure_code)='G0480' THEN line_paid_amount ELSE 0 END)/sum(line_paid_amount),4) AS share\nFROM sem.remit_lines WHERE adjudication_state='current'",
+   "sql_execs": 6,
+   "repairs": 0,
+   "seconds": 0.0133,
+   "trace": "explore: 3 probes; fewshot (TF-IDF, non-dev, other family): f_cpt_denied_lines__80053,a_f3c42ce766,a_f494340e13; spec: metric/population/filters/grain/time/ties: What share of all service-line payments (current adjudications) came from lines billed as CPT G0480?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+  },
+  {
+   "qid": "a_d671e0b995",
+   "answer": {
+    "error": "Parser Error: syntax error at or near \"month\"\n\nLINE 2: FROM (SELECT payer_class, strftime(payment_month,'%Y-%m') month, count(DISTINCT claim_payer_key) n, count(DISTINCT...\n                           "
+   },
+   "final_sql": "SELECT payer_class, month, n current_adjudications, d denied, round(100.0*d/n,2) denial_rate_pct, round(100.0*d/n - 100.0*lag(d) OVER w / lag(n) OVER w,2) mom_change_pp\nFROM (SELECT payer_class, strftime(payment_month,'%Y-%m') month, count(DISTINCT claim_payer_key) n, count(DISTINCT CASE WHEN is_denied THEN claim_payer_key END) d FROM sem.remit_claims WHERE adjudication_state='current' GROUP BY 1,2)\nWINDOW w AS (PARTITION BY payer_class ORDER BY month) ORDER BY 1,2",
+   "sql_execs": 7,
+   "repairs": 0,
+   "seconds": 0.0093,
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_54dd76175a,a_837ce03435,q04_paid_by_month; spec: metric/population/filters/grain/time/ties: For each payer class and payment month, what is the denial rate of current adjudications (each claim counted once per; candidates: A=errr, B=errr, C=errr; agree=0; pick=C"
+  },
+  {
+   "qid": "f_cpt_share_of_line_payments__81479",
+   "answer": {
+    "columns": [
+     "share"
+    ],
+    "rows": [
+     [
+      0.0445
+     ]
+    ]
+   },
+   "final_sql": "SELECT round(sum(CASE WHEN coalesce(adjudicated_procedure_code,procedure_code)='81479' THEN line_paid_amount ELSE 0 END)/sum(line_paid_amount),4) AS share\nFROM sem.remit_lines WHERE adjudication_state='current'",
+   "sql_execs": 6,
+   "repairs": 0,
+   "seconds": 0.0122,
+   "trace": "explore: 3 probes; fewshot (TF-IDF, non-dev, other family): f_payer_class_denial_rate__medicare,f_payer_class_denial_rate__commercial,f_cpt_denied_lines__80053; spec: metric/population/filters/grain/time/ties: CPT 81479 accounts for what fraction of total paid dollars across current service lines?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+  },
+  {
+   "qid": "q12_referring_provider_denials",
+   "answer": {
+    "columns": [
+     "referring_npi",
+     "denial_rate",
+     "claims"
+    ],
+    "rows": []
+   },
+   "final_sql": "SELECT c.referring_npi, round(avg(CASE WHEN r.is_denied THEN 1 ELSE 0 END),4) denial_rate, count(*) claims\nFROM sem.remit_claims r JOIN (SELECT DISTINCT claim_key, payer_key, referring_npi FROM sem.claims WHERE payer_responsibility='P') c USING(claim_key,payer_key)\nWHERE r.adjudication_state='current' GROUP BY 1 HAVING count(*)>=15 ORDER BY 2 DESC,1 LIMIT 5",
+   "sql_execs": 9,
+   "repairs": 0,
+   "seconds": 0.0238,
+   "trace": "explore: 5 probes; fewshot (TF-IDF, non-dev, other family): q13_principal_dx_denials,a_9a40343e18,a_5059b5e0e6; spec: metric/population/filters/grain/time/ties: Which 5 ordering (referring) providers, by NPI, have the highest primary-payer denial rate, among providers with at l; candidates: A=0r, B=0r, C=0r; agree=0; pick=C; verifier: flagged empty/null, kept"
+  }
+ ],
+ "n": 30,
+ "mean_sql_execs": 6.83
+}
