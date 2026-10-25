@@ -83,7 +83,7 @@ def test_denial_rate_by_payer_matches_ledger(world):
 
 def test_claim_level_submission_facts_match_ledger(world):
     s = session(world)
-    claims = world.truth["tenants"]["acme_labs"]["claims"]
+    claims = {k: v for k, v in world.truth["tenants"]["acme_labs"]["claims"].items() if v["submissions"]}
     n, resub, never = q(s, "SELECT count(DISTINCT claim_key), count(DISTINCT claim_key) FILTER (WHERE frequency_code = '7'), "
                            "count(DISTINCT claim_key) FILTER (WHERE NOT has_remit AND is_latest_submission) FROM sem.claims")[0]
     assert n == len(claims)
@@ -288,8 +288,20 @@ def _member_ids(world) -> list[str]:
     return sorted(ids)
 
 
+def _patient_names(world) -> list[str]:
+    """Subscriber and patient last names in the 837s that are not also an ordering provider's or a payer's name."""
+    names, others = set(), {p.name for p in edi_mock.PAYERS}
+    for p in world.sftp_root.rglob("*.x12"):
+        if "/837/" in str(p):
+            body = p.read_bytes()
+            names |= {m.decode() for m in re.findall(rb"NM1[*|](?:IL|QC)[*|]1[*|]([^*|~]+)", body)}
+            others |= {m.decode() for m in re.findall(rb"NM1[*|](?:DN|DK)[*|]1[*|]([^*|~]+)", body)}
+    assert len(names) > 100
+    return sorted(names - others)
+
+
 def test_gold_has_no_direct_patient_identifiers(world):
-    names_ = set(edi_mock.LAST) | set(edi_mock.FIRST)
+    names_ = _patient_names(world)
     members = _member_ids(world)
     for escalate in (False, True):
         s = session(world, escalate=escalate)
