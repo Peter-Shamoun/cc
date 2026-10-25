@@ -87,7 +87,7 @@ If agent SQL ever pointed at `customer_a/`, IAM would deny it: role B's credenti
 - Lane 2: guarded agent SQL over PHI-stripped silver views is designed but not built. Today the agent sees only `semantic_layer/`.
 - The real GitHub path for the view SQL. `semantic/views/` is a placeholder.
 - How file supersession (`duplicate_of_file_id`, `superseded_by_file_id`) works when Parquet is append-only: either rewrite `edi.source_file` each batch, or add a separate log table.
-- Chat transcripts and an app-level audit log, and retention periods (audit logs about 6 years, transcripts 30–90 days). These need compliance sign-off.
+- Chat transcripts: two designs are written up in [`chat-transcripts.md`](chat-transcripts.md). The simulator default is Design A (no message text stored). Design B (persisted, 90 days, separate KMS key) stays off until compliance signs the retention and whether a chat is part of the designated record set. The query audit (no message text, 6 years) is kept in both.
 - 277 files arrive later. A possible later move to Iceberg / S3 Tables.
   [`lake-design-check.md`](lake-design-check.md) measured DuckLake and Iceberg against the current lake on 120 days
   of one customer and recommends keeping the current design, with the conditions that would change that.

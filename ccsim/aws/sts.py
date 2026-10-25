@@ -121,12 +121,14 @@ class STS:
             ctx["aws:TagKeys"] = list(new_tags)
         actions = ["sts:AssumeRole"] + (["sts:TagSession"] if new_tags else [])
         for action in actions:
+            # The trust policy has to allow the call. An identity policy that says sts:AssumeRole is not a
+            # second door: unlike S3, a role's trust conditions (external id, session tags) are mandatory.
             if caller_session is not None:
                 r = self.iam.role_by_arn(caller_session.role_arn)
                 d = decide(caller, action, RoleArn, ctx, r.policies if r else [], role.trust_policy,
-                           caller_session.session_policies, r.boundary if r else None)
+                           caller_session.session_policies, r.boundary if r else None, require_resource_allow=True)
             else:                                              # AWS service principal
-                d = decide(caller, action, RoleArn, ctx, [], role.trust_policy)
+                d = decide(caller, action, RoleArn, ctx, [], role.trust_policy, require_resource_allow=True)
             if not d:
                 self.audit.record("sts.amazonaws.com", "AssumeRole", caller, {"roleArn": RoleArn,
                                   "roleSessionName": RoleSessionName}, error=("AccessDenied", d.reason), resources=[RoleArn])
@@ -162,7 +164,7 @@ class STS:
             ctx["aws:TagKeys"] = list(tags)
         caller = Principal(f"{prov_arn}/{claims['sub']}", (claims["sub"],), "WebIdentityUser", federated=prov_arn)
         for action in ["sts:AssumeRoleWithWebIdentity"] + (["sts:TagSession"] if tags else []):
-            d = decide(caller, action, RoleArn, ctx, [], role.trust_policy)
+            d = decide(caller, action, RoleArn, ctx, [], role.trust_policy, require_resource_allow=True)
             if not d:
                 self.audit.record("sts.amazonaws.com", "AssumeRoleWithWebIdentity", caller,
                                   {"roleArn": RoleArn, "roleSessionName": RoleSessionName},
