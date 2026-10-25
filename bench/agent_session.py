@@ -34,7 +34,8 @@ def create_session(snapshot_path: Path, question: dict, technique_config: dict, 
     session_dir = SESSIONS_ROOT / run_label / f"{question['id']}-{model_label}-{uuid.uuid4().hex[:8]}"
     session_dir.mkdir(parents=True)
     (session_dir / "session.json").write_text(json.dumps({
-        "question_id": question["id"], "question": question["question"], "escalate": question.get("escalate", False),
+        "question_id": question["id"], "question_family": question.get("family"), "question": question["question"],
+        "escalate": question.get("escalate", False),
         "technique_config": technique_config, "model": model_label, "snapshot_path": str(Path(snapshot_path).resolve()),
         "example_library_path": str(example_library_path) if example_library_path else None}, indent=1))
     return session_dir
@@ -61,12 +62,19 @@ def build_prompt(session_dir: Path) -> str:
     finals.append(f'{cli} refuse "<reason>"   # for requests you must not fulfil')
     if config["enable_ask"]:
         finals.append(f'{cli} ask "<clarifying question>"   # only if the question cannot be answered as asked')
+    if config["context_style"] not in ("goal", "procedural"):
+        raise ValueError(f"unknown context_style {config['context_style']!r}")
+    procedure = ("" if config["context_style"] == "goal" else
+                 "Work in these steps: 1) run context and read the definitions; 2) restate the question's grain, "
+                 "population, time basis and output columns to yourself; 3) query to check the values and filters you "
+                 "need; 4) write the final query and sanity-check its result (row count, ranges, totals); "
+                 "5) submit it.\n\n")
     return (
         "You are CC, an analytics assistant for a clinical lab's insurance claims (837P) and remittances (835).\n"
         "Answer the user's question by querying the data through the command-line tool below. Use the Bash tool ONLY to "
         "run these exact commands; do not read, list, search or open any file or directory, do not run any other program, "
         "and do not write code. The answer is scored by re-running the query you submit, so the submitted query itself "
-        "must compute the answer from the data.\n\n"
+        "must compute the answer from the data.\n\n" + procedure +
         "Commands:\n" + "\n".join(commands) + "\n\nFinish with exactly one of:\n" + "\n".join(finals) +
         f"\n\nYou may make at most {config['max_tool_calls']} commands besides context. "
         f"Then reply with the single word DONE.\n\nUser question: {meta['question']}\n")
