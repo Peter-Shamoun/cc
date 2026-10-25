@@ -259,13 +259,14 @@ _SUFFIX_CACHE: dict = {}
 
 def _suffixes(stem: str, kind: str) -> WeightedList:
     """The stem's own suffix mix: its kind's mix, with one suffix (stable per stem) taking most of the weight."""
-    if stem not in _SUFFIX_CACHE:
+    key = (stem, kind)
+    if key not in _SUFFIX_CACHE:
         mix = _SUFFIX_MIX[kind]
         favored = _stable("suffix", stem) % len(mix) if kind in ("nature", "person") else 0
-        _SUFFIX_CACHE[stem] = WeightedList(tuple(x for x, _ in mix),
+        _SUFFIX_CACHE[key] = WeightedList(tuple(x for x, _ in mix),
                                            tuple(accumulate(w * (6 if i == favored else 1) if kind in ("nature", "person")
                                                             else w for i, (_, w) in enumerate(mix))))
-    return _SUFFIX_CACHE[stem]
+    return _SUFFIX_CACHE[key]
 
 
 _STREET_SURNAME_CUM = list(accumulate(c for _, c, _ in _SURNAME_ROWS[:3000]))
@@ -471,10 +472,10 @@ def cpt_fits(code: str, sex: str, age: float) -> bool:
     """The test can be ordered for this patient: right sex and age, and some diagnosis that justifies it applies
     to them (no digoxin level on a child, no urine pregnancy test at 60)."""
     key = (code, sex, min(int(age), 110))
-    if key not in _FITS_CACHE:
+    if key not in _FITS_CACHE:                            # decided on whole years, so the cache cannot drift
         lo, hi = CPT_AGE.get(code, (0, 200))
-        _FITS_CACHE[key] = (CPT_SEX.get(code, sex) == sex and lo <= age <= hi and
-                            any(SAMPLERS[d].has_codes(sex, age) for d in cpt_domains(code) if d in SAMPLERS))
+        _FITS_CACHE[key] = (CPT_SEX.get(code, sex) == sex and lo <= key[2] <= hi and
+                            any(SAMPLERS[d].has_codes(sex, key[2]) for d in cpt_domains(code) if d in SAMPLERS))
     return _FITS_CACHE[key]
 
 
