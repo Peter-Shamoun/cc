@@ -32,16 +32,22 @@ def prepare(run_label: str, configs: dict, models: list[str], repeats: int, only
     if run_dir.exists():
         raise FileExistsError(f"{run_dir} exists; choose a new run label")
     entries = []
-    for case in load_cases(only, snapshot_path=snap):
+    cases = load_cases(snapshot_path=snap)
+    if only:
+        wanted = set(only.split(","))
+        cases = [c for c in cases if wanted & {c["id"], c["category"], c["difficulty"], c.get("family")}]
+    for case in cases:
         for config_name, technique_config in configs.items():
             for model in models:
                 for repeat in range(repeats):
-                    s = create_session(snap, case, technique_config, model, run_label)
+                    library = snap / "generated_questions.json" if technique_config.get("enable_examples") else None
+                    s = create_session(snap, case, technique_config, model, run_label, library)
                     meta = json.loads((s / "session.json").read_text())
                     meta.update(config_name=config_name, repeat=repeat)
                     (s / "session.json").write_text(json.dumps(meta, indent=1))
                     entries.append(dict(session=str(s), model=model, config=config_name, question_id=case["id"],
-                                        repeat=repeat, prompt=build_prompt(s)))
+                                        repeat=repeat, effort=technique_config.get("effort", "default"),
+                                        prompt=build_prompt(s)))
     (run_dir / "manifest.json").write_text(json.dumps(dict(run=run_label, snapshot=str(snap), configs=configs,
                                                            entries=entries), indent=1))
     return run_dir / "manifest.json"

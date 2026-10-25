@@ -39,7 +39,7 @@ SEMANTIC_MODEL_PATH = ROOT / "claude/schema/03_semantic_model.yaml"
 ROWS_SHOWN_TO_AGENT = 20
 
 DEFAULT_TECHNIQUE_CONFIG = {
-    "glossary": "basic",             # none | basic
+    "glossary": "basic",             # none | basic | pitfalls (basic + invariants and common traps)
     "data_dictionary": False,        # column descriptions from the semantic model
     "data_profile": False,           # value distributions / sample values per view
     "enable_sql": True,
@@ -48,6 +48,9 @@ DEFAULT_TECHNIQUE_CONFIG = {
     "enable_examples": False,
     "enable_ask": False,
     "sql_error_hints": False,        # append actionable hints to SQL errors
+    "result_checks": False,          # append programmatic warnings to successful SQL results
+    "context_style": "goal",         # goal | procedural (numbered working steps in the briefing)
+    "effort": "default",             # default | low | high: reasoning effort, applied by the orchestrator
     "max_tool_calls": 12,
 }
 
@@ -101,6 +104,44 @@ class Session:
         return module, module.SemanticAPI(self.con, str(SEMANTIC_MODEL_PATH))
 
 
+PITFALLS = """Invariants and common traps:
+- sem.claims and sem.claim_lines have one row per 837 submission: resubmissions and claims sent on to a secondary
+  payer are extra rows. is_latest_submission keeps exactly one row per claim_key, but that row may be the secondary
+  payer's submission; for primary-payer questions filter payer_responsibility = 'P' and count DISTINCT claim_key.
+- Money paid, patient responsibility and denials come from current adjudications only (is_current_adjudication);
+  summing every 835 event double-counts reversals and superseded payments.
+- Re-delivered 835 files are already de-duplicated in the sem views; do not de-duplicate again.
+- sem.remit_lines has no rows for claims denied at claim level; billed codes and units are in sem.claim_lines.
+  Joining remit_lines to remit_claims repeats claim amounts once per line: aggregate lines first.
+- Time basis matters: payment_date/payment_month (835), service_date/service_month (date of service) and
+  submission_date (837) give different answers; use the one the question names.
+- Rates: use 100.0 * x / y for percentages (integer division truncates); round only at the end, as asked.
+- Ranked questions: ORDER BY the measure (and the stated tie-break) and LIMIT to the number asked for.
+"""
+
+
+def _result_warnings(query: str, columns, rows) -> list[str]:
+    """Programmatic checks on a successful result: cheap signals that a query may not answer what was asked."""
+    warnings = []
+    lowered = query.lower()
+    if not rows:
+        warnings.append("the query returned no rows: check filters and value spellings")
+    for i, name in enumerate(columns):
+        values = [r[i] for r in rows]
+        if rows and all(v is None for v in values):
+            warnings.append(f"column {name} is NULL in every row")
+        if re.search(r"rate|pct|percent|share", name.lower()) and any(
+                isinstance(v, (int, float)) and not isinstance(v, bool) and (v > 100 or v < 0) for v in values):
+            warnings.append(f"column {name} has values outside 0..100")
+    if "remit_claims" in lowered and "is_current_adjudication" not in lowered:
+        warnings.append("sem.remit_claims used without is_current_adjudication: includes reversals and superseded events")
+    if re.search(r"sem\.claim(s|_lines)\b", lowered) and "is_latest_submission" not in lowered:
+        warnings.append("sem.claims/claim_lines used without is_latest_submission: resubmitted claims count more than once")
+    if rows and columns and len({r[0] for r in rows}) < len(rows) and len(columns) > 1:
+        warnings.append(f"the first column ({columns[0]}) repeats across rows: check the GROUP BY grain")
+    return warnings
+
+
 def _digest(columns, rows) -> dict:
     return {"columns": columns, "row_count": len(rows), "rows": [list(r) for r in rows[:ROWS_SHOWN_TO_AGENT]],
             "truncated": len(rows) > ROWS_SHOWN_TO_AGENT}
@@ -123,8 +164,12 @@ def command_context(session: Session) -> str:
         cols = session.con.execute(f"DESCRIBE {schema}.{view}").fetchall()
         parts.append(f"{schema}.{view}(" + ", ".join(f"{c[0]} {c[1]}" for c in cols) + ")")
     text = "\n".join(parts)
+    if session.config["glossary"] not in ("none", "basic", "pitfalls"):
+        raise CliError(f"unknown glossary setting {session.config['glossary']!r}")
     if session.config["glossary"] != "none":
         text += "\n\n" + GLOSSARY
+    if session.config["glossary"] == "pitfalls":
+        text += "\n" + PITFALLS
     if session.config["data_dictionary"]:
         _, api = session.semantic_api()
         text += "\n\n" + api.describe_semantic_layer()
@@ -166,7 +211,11 @@ def command_sql(session: Session, query: str) -> dict:
     except (GuardError, Exception) as e:                             # noqa: BLE001 - errors go back to the agent
         message = str(e).splitlines()[0][:400]
         raise CliError(message + (_sql_error_hint(message) if session.config["sql_error_hints"] else "")) from None
-    return _digest([d[0] for d in cur.description], cur.fetchall())
+    columns, rows = [d[0] for d in cur.description], cur.fetchall()
+    digest = _digest(columns, rows)
+    if session.config["result_checks"]:
+        digest["warnings"] = _result_warnings(query, columns, rows)
+    return digest
 
 
 def command_metrics(session: Session, request_json: str) -> dict:
@@ -191,7 +240,11 @@ def command_lookup(session: Session, dimension: str, text: str) -> dict:
 
 def command_examples(session: Session, question: str, k: int = 3) -> dict:
     session.require("enable_examples", "examples")
-    library = json.loads(Path(session.meta["example_library_path"]).read_text())
+    # Never show the session's own question or another instance of its question family (no answer leakage).
+    library = [ex for ex in json.loads(Path(session.meta["example_library_path"]).read_text())
+               if ex["id"] != session.meta["question_id"]
+               and not (ex.get("family") and ex.get("family") == session.meta.get("question_family"))]
+    library = [{"question": ex["question"], "sql": ex["gold_sql"]} for ex in library]
     words = lambda s: set(re.findall(r"[a-z0-9]+", s.lower()))
     target = words(question)
     scored = sorted(library, key=lambda ex: -len(target & words(ex["question"])) / max(1, len(target | words(ex["question"]))))

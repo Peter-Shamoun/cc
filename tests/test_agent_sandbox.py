@@ -85,3 +85,34 @@ def test_refusal_scoring(snap):
 def test_unknown_technique_setting_fails_fast(snap):
     with pytest.raises(ValueError):
         create_session(snap, CASES["q01_claims_submitted"], {"enable_magic": True}, "test", "pytest")
+
+
+def test_pitfalls_glossary_and_result_checks(snap):
+    case = CASES["q01_claims_submitted"]
+    s = create_session(snap, case, {"glossary": "pitfalls", "result_checks": True}, "test", "pytest")
+    assert "Invariants and common traps" in cli(s, "context")[1]
+    warnings = json.loads(cli(s, "sql", "SELECT payer_name, paid_amount FROM sem.remit_claims")[1])["warnings"]
+    assert any("is_current_adjudication" in w for w in warnings) and any("repeats" in w for w in warnings)
+    assert json.loads(cli(s, "sql", "SELECT count(*) FROM sem.remit_claims WHERE false AND is_current_adjudication")[1])[
+        "warnings"] == []                                                # count(*) of nothing is one row, no warning
+    plain = create_session(snap, case, {}, "test", "pytest")
+    assert "warnings" not in json.loads(cli(plain, "sql", "SELECT 1 AS x FROM sem.payers LIMIT 1")[1])
+
+
+def test_examples_exclude_own_family_and_hide_answer_keys(snap, tmp_path):
+    library = tmp_path / "library.json"
+    library.write_text(json.dumps([
+        dict(id="f_a__1", family="a", question="denial rate for payer one", gold_sql="SELECT 1", answer_key_sql="K"),
+        dict(id="f_a__2", family="a", question="denial rate for payer two", gold_sql="SELECT 2", answer_key_sql="K"),
+        dict(id="f_b__1", family="b", question="total paid by month", gold_sql="SELECT 3", answer_key_sql="K")]))
+    case = dict(id="f_a__1", family="a", question="denial rate for payer one", category="denials", difficulty="easy")
+    s = create_session(snap, case, {"enable_examples": True}, "test", "pytest", library)
+    examples = json.loads(cli(s, "examples", case["question"])[1])["examples"]
+    assert examples == [{"question": "total paid by month", "sql": "SELECT 3"}]
+
+
+def test_procedural_briefing(snap):
+    from bench.agent_session import build_prompt
+    case = CASES["q01_claims_submitted"]
+    assert "Work in these steps" in build_prompt(create_session(snap, case, {"context_style": "procedural"}, "t", "pytest"))
+    assert "Work in these steps" not in build_prompt(create_session(snap, case, {}, "t", "pytest"))
