@@ -49,6 +49,10 @@ Never decide the work is done; when an item finishes, pick the next highest-valu
   - [running] silver: open-month small-file compaction, claim-key index, re-measure
   - [running] design check: DuckLake / Iceberg / current, measured + security fit -> lake-design-check.md
   - [next] scale runs 2 customers x 1 year, 1 customer x 3 years through the merged pipeline
+  - [decide after parser numbers] manager/worker parse fan-out (owner idea): stage 1 in-task process pool
+    (parser loop measures 1/2/4 workers + 3-year backfill projection); build SQS / Distributed Map fan-out
+    (+ SQS mock in the sim) only if a 3-year onboarding backfill does not fit one task comfortably (~30 min on
+    4 vCPU, well inside the 2 h batch lease). Commit + gold stay single-writer per customer under the lock.
 - PARKED until after the groundwork (owner): authoring round 3 ingest (13 verifiers failed on the limit),
   SOTA research refresh, screen 2 / gradient search, then React front end
 - [running] held-out validation (heldout_hard_1, 27 questions, 4 configs x Haiku/Sonnet x 2 repeats)
