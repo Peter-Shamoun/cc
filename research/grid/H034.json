@@ -149,9 +149,9 @@
   },
   {
    "qid": "a_9108c7aacb",
-   "answer": "Forward balances and their offsets. Assumptions: current adjudications (one per claim+payer); primary = payer_responsibility P on sem.claims; denial = is_denied; dates as given in the question. | result: \"ERROR Binder Error: Alias \\\"offset_date\\\" referenced in a SELECT clause - but the expression has a subquery. This is not yet supported.\\n\\nLINE 1: ...mount AND o.payment_date > c.payment_date) AS offset_d\"",
-   "final_sql": "WITH f AS (SELECT * FROM sem.provider_adjustments WHERE plb_reason_code='FB') SELECT c.reference_id, c.payment_date AS carried_forward_date, round(-c.provider_adjustment_amount,2) AS amount_carried, (SELECT min(o.payment_date) FROM f o WHERE o.payer_key=c.payer_key AND o.reference_id=c.reference_id AND o.provider_adjustment_amount=-c.provider_adjustment_amount AND o.payment_date>c.payment_date) AS offset_date, offset_date - c.payment_date AS days_between FROM f c WHERE c.provider_adjustment_amount<0 ORDER BY carried_forward_date, reference_id",
-   "sql_execs": 4,
+   "answer": "FB carry-forwards and offsets (repair: binder error fixed). Assumption: offset = same payer, same reference, opposite amount, strictly later payment date. | result: [[\"007138800000042\", \"2026-07-02\", \"217.61\", \"2026-07-06\", 4], [\"790227000000006\", \"2026-07-02\", \"14.58\", null, null], [\"007138800000043\", \"2026-07-06\", \"157.11\", \"2026-07-07\", 1], [\"957149190000052\", \"2026-07-09\", \"85.52\", \"2026-07-10\", 1], [\"174754440000012\", \"2026-07-16\", \"44.92\", null, null]]",
+   "final_sql": "WITH f AS (SELECT * FROM sem.provider_adjustments WHERE plb_reason_code='FB'), x AS (SELECT c.reference_id, c.payment_date AS carried_forward_date, round(-c.provider_adjustment_amount,2) AS amount_carried, (SELECT min(o.payment_date) FROM f o WHERE o.payer_key=c.payer_key AND o.reference_id=c.reference_id AND o.provider_adjustment_amount=-c.provider_adjustment_amount AND o.payment_date>c.payment_date) AS offset_date FROM f c WHERE c.provider_adjustment_amount<0) SELECT reference_id, carried_forward_date, amount_carried, offset_date, offset_date - carried_forward_date AS days_between FROM x ORDER BY carried_forward_date, reference_id",
+   "sql_execs": 6,
    "repairs": 0,
    "seconds": null,
    "pass": null
@@ -321,6 +321,6 @@
  ],
  "accuracy": null,
  "n": 30,
- "mean_sql_execs": 2.13,
+ "mean_sql_execs": 2.2,
  "notes": "Answers committed before scoring (no cell scored yet when written). Same Grok Bot context ran H033 first, so H034 reuses that analysis; the verifier pass revised q11 (billed CPT = sem.claim_lines) and repaired a_9108c7aacb (binder error). Assumptions stated in each answer text."
 }
