@@ -1,0 +1,6 @@
+{
+ "base": {},
+ "pitfalls": {"glossary": "pitfalls"},
+ "pitfalls_procedural": {"glossary": "pitfalls", "context_style": "procedural"},
+ "screen1_winner": {"glossary": "pitfalls", "data_dictionary": true, "data_profile": true, "effort": "low", "context_style": "procedural"}
+}
