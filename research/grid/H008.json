@@ -63,7 +63,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.003,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "Fraction of current service-line paid dollars, billed procedure G0483, rounded to 4 decimals",
         "population": "Fraction of current service-line paid dollars, billed procedure G0483, rounded to 4 decimals.",
@@ -132,7 +132,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.007,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "Primary payer is payer_responsibility P",
         "population": "Primary payer is payer_responsibility P. Days are current paid adjudication date minus first 837 to that payer. Median and linear 90th percentile rounded to 1 decimal.",
@@ -183,7 +183,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.006,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "Reviewed CO denial CARCs on current denied adjudications",
         "population": "Reviewed CO denial CARCs on current denied adjudications. Each claim+payer once per code. Top 5 by count, CARC ascending on ties.",
@@ -258,7 +258,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.005,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "First pass means exactly one 835 event, and that event is the current non-denial",
         "population": "First pass means exactly one 835 event, and that event is the current non-denial. Rate is a percentage rounded to 2 decimals.",
@@ -306,7 +306,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.007,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "Trace is check_or_eft_number",
         "population": "Trace is check_or_eft_number. No current adjudication means the latest event is a reversal. Classes with no multi-trace pair are omitted. Paid is 0 when none.",
@@ -339,7 +339,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.002,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "Current 835 lines with line_is_denied and the claim adjudication not denied",
         "population": "Current 835 lines with line_is_denied and the claim adjudication not denied. Zero pay alone is not a denial.",
@@ -372,7 +372,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.007,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "Primary payer comes from 837 payer_responsibility P, not 835 payer_sequence",
         "population": "Primary payer comes from 837 payer_responsibility P, not 835 payer_sequence. Sum of PR/1 amounts on that current adjudication.",
@@ -417,7 +417,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.007,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "Latest submission including voids, service month from June 2026",
         "population": "Latest submission including voids, service month from June 2026. Top 5 referring NPIs by claim count, NPI ascending on ties. Share rounded to 1 decimal.",
@@ -450,7 +450,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.003,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "Fraction of current service-line paid dollars, billed procedure 87798, rounded to 4 decimals",
         "population": "Fraction of current service-line paid dollars, billed procedure 87798, rounded to 4 decimals.",
@@ -497,7 +497,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.006,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "Claim-level denial of each current adjudication, attributed to every CPT on the claim's latest 837",
         "population": "Claim-level denial of each current adjudication, attributed to every CPT on the claim's latest 837. Rate is a fraction rounded to 4 decimals. CPT needs at least 20 claim+payer adjudications.",
@@ -552,7 +552,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.009,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "Buckets from line count on the latest submission",
         "population": "Buckets from line count on the latest submission. Denial is the current adjudication of the primary payer. Rate is a percentage rounded to 2 decimals. Denied charge is the latest submission charge.",
@@ -621,7 +621,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.006,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "A carry-forward is PLB FB with a negative amount",
         "population": "A carry-forward is PLB FB with a negative amount. The offset is the earliest later payment from the same payer with FB on the same reference and the opposite amount. Amount reported positive.",
@@ -696,7 +696,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.006,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "Shares of current-adjudication paid dollars by payment month",
         "population": "Shares of current-adjudication paid dollars by payment month. August has no payments on this extract, so August share and the change are null rather than a share of a zero total. Change would be unrounded-share difference.",
@@ -737,7 +737,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.022,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "Primary payer only",
         "population": "Primary payer only. One row. Clock starts at the frequency-1 submission and the frequency-7 replacement to that payer. Post-correction adjudication requires payment date on or after the replacement.",
@@ -776,7 +776,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.009,
-      "pass": null,
+      "pass": false,
       "metric_spec": {
         "metric": "Void is an 837 frequency 8",
         "population": "Void is an 837 frequency 8. This extract has none, so the row is zeros rather than empty.",
@@ -809,7 +809,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.003,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "Current adjudications with paid amount 0 and is_denied false",
         "population": "Current adjudications with paid amount 0 and is_denied false. Reversals are not current.",
@@ -850,7 +850,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.008,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "Frequency-7 claim+payer pairs with any 835 on or after the replacement date",
         "population": "Frequency-7 claim+payer pairs with any 835 on or after the replacement date. Days from that submission to the first such remit. Classes with no response are omitted.",
@@ -883,7 +883,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.003,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "Claim+payer pairs with a reversal event and no current adjudication",
         "population": "Claim+payer pairs with a reversal event and no current adjudication.",
@@ -916,7 +916,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.003,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "Fraction of current service-line paid dollars, billed procedure 80307, rounded to 4 decimals",
         "population": "Fraction of current service-line paid dollars, billed procedure 80307, rounded to 4 decimals.",
@@ -991,7 +991,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.007,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "Cohort is first primary 837 in July 2026",
         "population": "Cohort is first primary 837 in July 2026. Any 835 event counts as the first remit. No remit is not within 14 days. Percentage rounded to 1 decimal.",
@@ -1024,7 +1024,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.003,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "Fraction of current service-line paid dollars, billed procedure G0482, rounded to 4 decimals",
         "population": "Fraction of current service-line paid dollars, billed procedure G0482, rounded to 4 decimals.",
@@ -1071,7 +1071,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.011,
-      "pass": null,
+      "pass": false,
       "metric_spec": {
         "metric": "Only frequency-7 pairs whose payer sent a status-4 denial before the replacement",
         "population": "Only frequency-7 pairs whose payer sent a status-4 denial before the replacement. Outcomes are exhaustive, including zero rows. Paid is 0 when there is no current adjudication.",
@@ -1106,7 +1106,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.005,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "A superseded non-reversal denial followed by a current adjudication that is not denied",
         "population": "A superseded non-reversal denial followed by a current adjudication that is not denied. Dollars are that current paid amount.",
@@ -1148,7 +1148,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.008,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "As of 2026-08-14",
         "population": "As of 2026-08-14. Non-void latest submission, no current adjudication from the primary payer. Age from the first primary 837. Charge is the latest submission charge. Empty buckets omitted.",
@@ -1181,7 +1181,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.003,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "Claims whose earliest 837 submission is in July 2026 and that have no 835 on any submission",
         "population": "Claims whose earliest 837 submission is in July 2026 and that have no 835 on any submission.",
@@ -1408,7 +1408,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.008,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "Current non-denied 835 lines with one unit and a positive allowed amount",
         "population": "Current non-denied 835 lines with one unit and a positive allowed amount. Typical allowed is the modal amount, higher amount wins a tie. Every payer in that population is returned.",
@@ -1441,7 +1441,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.003,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "Fraction of current service-line paid dollars, billed procedure G0480, rounded to 4 decimals",
         "population": "Fraction of current service-line paid dollars, billed procedure G0480, rounded to 4 decimals.",
@@ -1532,7 +1532,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.005,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "Current adjudications, month from payment date",
         "population": "Current adjudications, month from payment date. Rate and month-over-month change in percentage points, change from unrounded rates, null in the first month.",
@@ -1565,7 +1565,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.003,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "Fraction of current service-line paid dollars, billed procedure 81479, rounded to 4 decimals",
         "population": "Fraction of current service-line paid dollars, billed procedure 81479, rounded to 4 decimals.",
@@ -1596,7 +1596,7 @@
       "sql_execs": 4,
       "repairs": 0,
       "seconds": 0.006,
-      "pass": null,
+      "pass": true,
       "metric_spec": {
         "metric": "Referring NPI on the primary 837",
         "population": "Referring NPI on the primary 837. Denial rate of that payer's current adjudication. At least 15 adjudicated claims. Top 5 by rate, NPI ascending on ties. None meet 15 on this extract, so the result is empty.",
@@ -1614,8 +1614,8 @@
       "candidate_agreement": "3/3"
     }
   ],
-  "accuracy": null,
+  "accuracy": "28/30",
   "n": 30,
   "mean_sql_execs": 4.0,
-  "notes": "Planner pass wrote the metric spec (metric, population, filters, grain, time window, ties and rounding). SQL writer pass saw the spec, the question, the basic glossary, the profile, and three BM25 few-shot ids drawn from outside DEV_HARD_v1, excluding heldout_hard_1 and the dev parametric families. No shared scratch beyond the spec. Three candidates executed; majority agreement selected the final SQL. No verifier and no repair. Snapshot 98e61f03e594 (generator 3.3, 20-day bench-test world named by DEV_HARD_v1). Explore probes before final SQL: payment months (July 2026 only), frequency codes (no frequency 8), PLB FB sign counts, referring-NPI adjudication cardinality (max 4), CPT population at the 20-adjudication cutoff, superseded denials, and zero-pay non-denials. repair=false, so no SQL was rewritten after its recorded execution. agent_note records that this is the same agent that ran C001, sequentially."
+  "notes": "Planner pass wrote the metric spec (metric, population, filters, grain, time window, ties and rounding). SQL writer pass saw the spec, the question, the basic glossary, the profile, and three BM25 few-shot ids drawn from outside DEV_HARD_v1, excluding heldout_hard_1 and the dev parametric families. No shared scratch beyond the spec. Three candidates executed; majority agreement selected the final SQL. No verifier and no repair. Snapshot 98e61f03e594 (generator 3.3, 20-day bench-test world named by DEV_HARD_v1). Explore probes before final SQL: payment months (July 2026 only), frequency codes (no frequency 8), PLB FB sign counts, referring-NPI adjudication cardinality (max 4), CPT population at the 20-adjudication cutoff, superseded denials, and zero-pay non-denials. repair=false, so no SQL was rewritten after its recorded execution. agent_note records that this is the same agent that ran C001, sequentially. Checker accuracy 28/30 after the answers were committed. SQL was not edited after scoring."
 }
