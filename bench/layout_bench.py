@@ -19,6 +19,8 @@ import threading
 import time
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+
+ThreadingHTTPServer.request_queue_size = 256      # no SYN drops (1 s retransmits) under DuckDB's parallel opens
 from pathlib import Path
 
 import duckdb
@@ -79,8 +81,8 @@ def serve(directory: Path) -> ThreadingHTTPServer:
 
 def relation_files(export: Path) -> dict[str, list[Path]]:
     manifest = json.loads((export / "manifest.json").read_text())
-    return {rel: [export / k.split("/semantic_layer/", 1)[1] for keys in parts.values() for k in keys]
-            for rel, parts in manifest["relations"].items()}
+    return {rel: [export / k.split("/semantic_layer/", 1)[1] for part in sorted(parts, key=lambda p: (p != "schema", p))
+                  for k in parts[part]] for rel, parts in manifest["relations"].items()}   # as ccsim/query.py lists them
 
 
 SORTS = {
@@ -100,7 +102,7 @@ def build_variant(con, files: dict[str, list[Path]], out: Path, split: str, code
         opts += f", COMPRESSION_LEVEL {codec.split(':')[1]}"
     res = {}
     for rel, paths in files.items():
-        groups = [paths] if split == "single" else [[p] for p in paths]
+        groups = [paths[:1], paths[1:]] if split == "single" else [[p] for p in paths]   # keep the schema file first
         res[rel] = []
         for i, group in enumerate(groups):
             src = f"read_parquet({[str(p) for p in group]!r}, hive_partitioning=false)"
@@ -163,6 +165,7 @@ VARIANTS = [  # (name, split, codec, sort, row group rows); one knob changes at 
     ("unsorted (insertion order)", "as_published", "zstd", "insertion", 122_880),
     ("row groups of 32k rows", "as_published", "zstd", "claim_key", 32_768),
     ("row groups of 1M rows", "as_published", "zstd", "claim_key", 1_048_576),
+    ("combined: sorted payer_key, claim_key + 1M-row groups", "as_published", "zstd", "payer_then_claim", 1_048_576),
 ]
 
 
