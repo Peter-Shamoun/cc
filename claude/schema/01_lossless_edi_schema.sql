@@ -7,10 +7,12 @@
 -- DESIGN RULES (read these before changing anything)
 --
 -- 1. Two levels of losslessness.
---    * BYTE-LEVEL: edi.segment stores every segment of every file, in order,
---      with the raw text and the parsed element list. Together with the
---      delimiters on edi.interchange, any source file can be re-emitted
---      byte-for-byte. This is the ground truth.
+--    * BYTE-LEVEL: the bronze object (raw/, immutable under 7-year Object
+--      Lock) is the ground truth. edi.segment stores every segment of every
+--      file, in order, with its exact location in that object: bronze bytes
+--      [byte_offset, byte_offset + byte_length) are the segment as received
+--      (without its terminator). The segment's text and element list are not
+--      copied into silver: they were half of its bytes and nothing reads them.
 --    * ELEMENT-LEVEL: every data element of every segment also lands in a
 --      typed column (or a typed child row) somewhere below. Nothing is dropped
 --      by the typed tables; composites are kept raw AND split.
@@ -101,6 +103,12 @@ CREATE TABLE edi.source_file (
 -- =============================================================================
 -- B. BYTE-LEVEL SPINE: every segment, in order
 -- =============================================================================
+-- Change 2026-10 (silver written before it has elements/raw_text, no byte_length):
+--   ALTER TABLE edi.segment ADD COLUMN byte_length INTEGER;
+--   ALTER TABLE edi.segment DROP COLUMN elements;
+--   ALTER TABLE edi.segment DROP COLUMN raw_text;
+--   byte_offset is now into the bronze object as stored (it was into the text
+--   after removing a BOM, leading whitespace and 80-column line breaks).
 
 CREATE TABLE edi.segment (
     file_id              VARCHAR NOT NULL REFERENCES edi.source_file(file_id),
@@ -113,9 +121,9 @@ CREATE TABLE edi.segment (
     loop_id              VARCHAR,                  -- '2100', '2400', '2010BB', ...
     loop_path            VARCHAR,                  -- e.g. '2000A/2000B/2300/2400' (TR3 path)
     loop_instance_uid    VARCHAR,                  -- uid of the loop instance this segment belongs to
-    elements             VARCHAR[] NOT NULL,       -- elements[1] = XX01 (raw, composites unsplit)
-    raw_text             VARCHAR NOT NULL,         -- exact bytes incl. element separators, excl. terminator
-    byte_offset          BIGINT,                   -- offset in decompressed file
+    byte_offset          BIGINT,                   -- first byte of the segment in the bronze object
+    byte_length          INTEGER,                  -- its length; excludes the terminator, includes line breaks
+                                                   -- inside a wrapped segment
     PRIMARY KEY (file_id, seg_ord)
 );
 

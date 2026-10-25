@@ -273,8 +273,8 @@ def test_every_parsed_value_survives_into_the_lossless_tables(stress):
     assert [ok for _, ok in batch.add_raw_files([RawFile("x", body, "F1", meta)], tc, {})] == [True]
     con = batch.finish()
     for t in TABLES:
-        if t == "edi.segment":                          # tuples; elements are split at insert
-            assert con.execute("SELECT count(*), count(elements) FROM edi.segment").fetchone() == (len(rows[t]),) * 2
+        if t == "edi.segment":                          # tuples: the segment's location in bronze
+            assert con.execute("SELECT count(*), count(byte_length) FROM edi.segment").fetchone() == (len(rows[t]),) * 2
             continue
         for col in {k for r in rows.get(t, []) for k, v in r.items() if v not in (None, [], "")}:
             n_rows = sum(1 for r in rows[t] if r.get(col) not in (None, [], ""))

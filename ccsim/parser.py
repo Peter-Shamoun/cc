@@ -1,8 +1,9 @@
 """X12 837P / 835 parser -> rows for the lossless schema (claude/schema/01_lossless_edi_schema.sql).
 
-Lossless at two levels: every segment lands in edi.segment (raw text + elements + delimiters on the
-interchange), and every segment also lands in a typed table or, when it has none, in edi.misc_segment.
-Keys are deterministic, <file_id>:<seg_ord>, so re-parsing a file gives identical rows.
+Lossless at two levels: every segment lands in edi.segment with its exact location in the bronze object (byte_offset,
+byte_length; bronze is immutable under Object Lock), and every element of every segment lands in a typed table or,
+when the segment has none, in edi.misc_segment. Keys are deterministic, <file_id>:<seg_ord>, so re-parsing a file
+gives identical rows.
 
 A file is rejected (quarantined) when its envelope is broken: no ISA, a missing SE/GE/IEA trailer,
 control numbers that do not match, or a segment outside a transaction set. A wrong SE01 count is kept and
@@ -17,7 +18,6 @@ entity, envelope, ...), so a sink may flush every other row after any chunk (Tab
 from __future__ import annotations
 
 import json
-import re
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
@@ -30,11 +30,10 @@ TABLES = ["edi.source_file", "edi.segment", "edi.interchange", "edi.functional_g
           "edi.misc_segment", "c837.hl", "c837.claim", "c837.claim_code", "c837.other_payer", "c837.service_line",
           "c837.line_adjudication", "r835.payment", "r835.claim_payment", "r835.medicare_adjudication",
           "r835.service_payment", "r835.remark", "r835.provider_adjustment"]
-# edi.segment rows are tuples of these. The elements column is not among them: it is computed at insert, as
-# string_split(raw_text, element_separator)[2:], or, for a file whose elements hold control characters, as
-# elements_json cast to VARCHAR[] (the representation always stored, including how that cast reads JSON escapes).
-SEGMENT_FIELDS = ("file_id", "seg_ord", "interchange_uid", "group_uid", "txn_uid", "segment_id", "loop_id", "raw_text",
-                  "byte_offset", "element_separator", "elements_json")
+# edi.segment rows are tuples of these. bronze[byte_offset:byte_offset + byte_length] is the segment as received
+# (without its terminator; an 80-column-wrapped segment includes its line breaks).
+SEGMENT_FIELDS = ("file_id", "seg_ord", "interchange_uid", "group_uid", "txn_uid", "segment_id", "loop_id",
+                  "byte_offset", "byte_length")
 TEXT_CHUNK_CHARS = 1 << 20
 
 LOOP_837_NM1 = {"41": "1000A", "40": "1000B", "85": "2010AA", "87": "2010AB", "IL": "2010BA", "PR": "2010BB",
@@ -114,10 +113,13 @@ _LEADING_NOISE = " \t\r\n"           # before ISA (after a BOM)
 _TRAILING_NOISE = " \t\r\n\x00"      # after IEA: space / NUL padding of fixed-block transfers
 
 
-def _normalized_text(data: str | bytes):
+def _received_text(data: str | bytes):
     """Delivery noise that is not part of the interchange: a UTF-8 BOM or whitespace before ISA, 80-column line
-    wrapping (CR/LF inside segments), and space / NUL padding after IEA. Returns the first 106 or more normalized
-    characters and an iterator over the whole normalized text in chunks. Bytes must be ASCII after a BOM."""
+    wrapping (CR/LF inside segments), and space / NUL padding after IEA.
+
+    Returns (the first 106 or more characters with the noise removed, the offset of ISA in data, whether CR/LF
+    inside segments are noise, an iterator over data from ISA up to the trailing padding in chunks of text).
+    Bytes must be ASCII after a BOM."""
     is_bytes = not isinstance(data, str)
     if is_bytes:
         start = len(_BOM) if data.startswith(_BOM) else 0
@@ -125,7 +127,7 @@ def _normalized_text(data: str | bytes):
             data[start:].decode("ascii")                      # raises the UnicodeDecodeError a decode would
         leading, trailing = set(_LEADING_NOISE.encode()), set(_TRAILING_NOISE.encode())
     else:
-        start, leading, trailing = 0, set("﻿" + _LEADING_NOISE), set(_TRAILING_NOISE)
+        start, leading, trailing = 0, set("\ufeff" + _LEADING_NOISE), set(_TRAILING_NOISE)
     end = len(data)
     while start < end and data[start] in leading:
         start += 1
@@ -146,37 +148,39 @@ def _normalized_text(data: str | bytes):
     head, width = normalized(start, min(start + 4096, end)), 8192
     while len(head) < 106 and start + width // 2 < end:       # only many CR/LF can leave the first 4 KB short
         head, width = normalized(start, min(start + width, end)), width * 2
-    return head, (normalized(a, min(a + TEXT_CHUNK_CHARS, end)) for a in range(start, end, TEXT_CHUNK_CHARS))
+    return head, start, remove_newlines, (text(a, min(a + TEXT_CHUNK_CHARS, end))
+                                          for a in range(start, end, TEXT_CHUNK_CHARS))
 
 
 def iter_segment_chunks(data: str | bytes):
     """Yields the delimiters (element, component, repetition, terminator) first, then, per chunk of text, the list
-    of its segments as (byte_offset, elements, raw text), offsets into the normalized text, and whether that text
-    holds a control character other than a delimiter (json.dumps would escape it in an element)."""
-    head, chunks = _normalized_text(data)
+    of its segments as (byte_offset, byte_length, elements, text): where the segment is in data, and its text
+    without delivery noise (CR/LF of line wrapping removed). The terminator is never CR/LF when CR/LF are noise."""
+    head, start, remove_newlines, chunks = _received_text(data)
     if not head.startswith("ISA") or len(head) < 106:
         raise ParseError("not an X12 interchange (no ISA)")
     el, rep, comp, term = head[3], head[82], head[104], head[105]
     if len({el, comp, term}) != 3:
         raise ParseError("ISA delimiters are not distinct")
     yield el, comp, rep, term
-    control = re.compile("[" + "".join(f"\\x{c:02x}" for c in range(32) if chr(c) not in (el, term)) + "]")
     strip_chars = "\r\n\x00 " if term not in " " else "\r\n\x00"
-    pos, carry, last = 0, "", False
+    pos, carry, last = start, "", False
     chunks = iter(chunks)
     while not last:
         chunk = next(chunks, None)
         last = chunk is None
-        text = carry + chunk if not last else carry
-        pieces = text.split(term)
+        pieces = (carry + chunk if not last else carry).split(term)
         carry = "" if last else pieces.pop()
         out = []
-        for raw in pieces:
-            seg = raw.strip(strip_chars)
-            if seg:
-                out.append((pos + (len(raw) - len(raw.lstrip("\r\n")) if raw[0] in "\r\n" else 0), seg.split(el), seg))
-            pos += len(raw) + 1
-        yield out, control.search(text) is not None
+        for piece in pieces:
+            span = piece.strip(strip_chars)
+            if span:
+                seg = span.replace("\r", "").replace("\n", "") if remove_newlines and (
+                    "\n" in span or "\r" in span) else span
+                lead = len(piece) - len(piece.lstrip(strip_chars)) if piece[0] in strip_chars else 0
+                out.append((pos + lead, len(span), seg.split(el), seg))
+            pos += len(piece) + 1
+        yield out
 
 
 def _proc(composite, comp) -> list:
@@ -222,8 +226,8 @@ def _parse(data, file_id, tenant, s3, ingest_run_id, ingested_at, sink: TableRow
     add, add_segment = sink.add, sink.rows["edi.segment"].append
     st = _State()
     so = 0
-    for segments, json_elements in chunks:
-        for offset, e, raw in segments:
+    for segments in chunks:
+        for offset, length, e, raw in segments:
             sid = e[0].strip()
             u = f"{file_id}:{so}"
             interchange_uid, group_uid, txn_uid = st.ic, st.gp, st.tx
@@ -292,8 +296,7 @@ def _parse(data, file_id, tenant, s3, ingest_run_id, ingested_at, sink: TableRow
                 st.tx = st.kind = st.loop = None
             else:
                 raise ParseError(f"segment {sid} outside a transaction set")
-            add_segment((file_id, so, interchange_uid, group_uid, txn_uid, sid, st.loop, raw, offset, el_sep,
-                         json.dumps(e[1:]) if json_elements else None))
+            add_segment((file_id, so, interchange_uid, group_uid, txn_uid, sid, st.loop, offset, length))
             so += 1
         sink.after_chunk()
     if st.ic is not None or st.gp is not None or st.tx is not None:

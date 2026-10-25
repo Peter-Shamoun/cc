@@ -56,12 +56,7 @@ def arrow_table(table: str, rows: list) -> pa.Table:
 
 def insert_arrow(con, table: str, data: pa.Table):
     con.register("_rows", data)
-    if table == "edi.segment":                    # elements is split from raw_text here (see parser.SEGMENT_FIELDS)
-        con.execute("INSERT INTO edi.segment BY NAME SELECT * EXCLUDE (element_separator, elements_json), "
-                    "CASE WHEN elements_json IS NULL THEN string_split(raw_text, element_separator)[2:] "
-                    "ELSE elements_json::VARCHAR[] END AS elements FROM _rows")
-    else:
-        con.execute(f"INSERT INTO {table} BY NAME SELECT * FROM _rows")
+    con.execute(f"INSERT INTO {table} BY NAME SELECT * FROM _rows")
     con.unregister("_rows")
 
 

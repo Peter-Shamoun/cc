@@ -35,7 +35,7 @@ The agent sends:
 The compiler sees `procedure_code` isn't on `sem.remit_claims`, picks `sem.remit_lines`, applies the default `is_current_adjudication` filter, counts distinct claim+payer (not lines), and drops groups under 20. In the test this matches hand-computed truth for every code.
 
 ## Design decisions worth arguing about
-1. **Two-level losslessness.** `edi.segment` (raw text + element list + delimiters) reproduces files byte-for-byte; typed tables are lossless at the element level and every row points back to its `seg_ord`. Low-volume segments (PWK, CR*, CN1, HCP, MEA…) land in `edi.misc_segment` instead of 15 more tables.
+1. **Two-level losslessness.** `edi.segment` locates every segment in the immutable bronze object (`byte_offset`, `byte_length`), so files are reproducible byte-for-byte from bronze; typed tables are lossless at the element level and every row points back to its `seg_ord`. Low-volume segments (PWK, CR*, CN1, HCP, MEA…) land in `edi.misc_segment` instead of 15 more tables.
 2. **Shared children** (`entity`, `reference`, `date_time`, `amount`, `quantity`, `note`, `contact`, `adjustment`) keyed by `owner_uid + owner_table`. CAS is exploded to one row per triplet — this is what makes CARC analysis a one-table question.
 3. **Tenant isolation is physical** (bucket/prefix per customer); no tenant column on data tables.
 4. **Business rules live in views + `ref.*` config**, not in the stored data: the denial CARC list (`ref.denial_carc`), whether status 4 counts (`ref.tenant_setting`), and payer resolution (`ref.payer_alias`) can change without reloading.
