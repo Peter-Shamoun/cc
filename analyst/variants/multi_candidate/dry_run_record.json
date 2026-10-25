@@ -1,0 +1,940 @@
+{
+ "summary": {
+  "questions": 10,
+  "chosen_correct": 9,
+  "upper_bound": 10,
+  "selector_calls": 0,
+  "selector_traces": [],
+  "prefix_tokens_estimate": 2125,
+  "scenario": {
+   "days": 16,
+   "volume_scale": 1.0,
+   "burn_in_days": 21,
+   "seed": 5,
+   "customer": "acme_labs"
+  },
+  "cost_at_measured_prefix": {
+   "haiku_n3": {
+    "n": 3,
+    "model": "claude-haiku-5-5",
+    "queries_per_candidate": 1,
+    "lake": {
+     "queries": 3,
+     "requests": 150,
+     "mb_fetched": 10.02,
+     "latency_s": 0.17,
+     "latency_max_s": 0.51,
+     "parallel": true
+    },
+    "llm": {
+     "model": "claude-haiku-5-5",
+     "n": 3,
+     "warm_cache": true,
+     "selector": true,
+     "selector_model": "claude-sonnet-5-5",
+     "output_price_assumed": true,
+     "prefix_usd": 0.000308,
+     "uncached_input_usd": 0.00012,
+     "output_usd": 0.00075,
+     "selector_usd": 0.005,
+     "total_usd": 0.006178,
+     "input_tokens": 9075,
+     "output_tokens": 1700
+    },
+    "single_candidate_llm_usd": 0.000556,
+    "llm_multiple_of_single": 11.112
+   },
+   "sonnet_n3": {
+    "n": 3,
+    "model": "claude-sonnet-5-5",
+    "queries_per_candidate": 1,
+    "lake": {
+     "queries": 3,
+     "requests": 150,
+     "mb_fetched": 10.02,
+     "latency_s": 0.17,
+     "latency_max_s": 0.51,
+     "parallel": true
+    },
+    "llm": {
+     "model": "claude-sonnet-5-5",
+     "n": 3,
+     "warm_cache": true,
+     "selector": true,
+     "selector_model": "claude-sonnet-5-5",
+     "output_price_assumed": false,
+     "prefix_usd": 0.006163,
+     "uncached_input_usd": 0.0024,
+     "output_usd": 0.015,
+     "selector_usd": 0.005,
+     "total_usd": 0.028563,
+     "input_tokens": 9075,
+     "output_tokens": 1700
+    },
+    "single_candidate_llm_usd": 0.011113,
+    "llm_multiple_of_single": 2.57
+   },
+   "haiku_n5": {
+    "n": 5,
+    "model": "claude-haiku-5-5",
+    "queries_per_candidate": 1,
+    "lake": {
+     "queries": 5,
+     "requests": 250,
+     "mb_fetched": 16.7,
+     "latency_s": 0.17,
+     "latency_max_s": 0.51,
+     "parallel": true
+    },
+    "llm": {
+     "model": "claude-haiku-5-5",
+     "n": 5,
+     "warm_cache": true,
+     "selector": true,
+     "selector_model": "claude-sonnet-5-5",
+     "output_price_assumed": true,
+     "prefix_usd": 0.000351,
+     "uncached_input_usd": 0.0002,
+     "output_usd": 0.00125,
+     "selector_usd": 0.005,
+     "total_usd": 0.006801,
+     "input_tokens": 14125,
+     "output_tokens": 2700
+    },
+    "single_candidate_llm_usd": 0.000556,
+    "llm_multiple_of_single": 12.232
+   },
+   "sonnet_n5": {
+    "n": 5,
+    "model": "claude-sonnet-5-5",
+    "queries_per_candidate": 1,
+    "lake": {
+     "queries": 5,
+     "requests": 250,
+     "mb_fetched": 16.7,
+     "latency_s": 0.17,
+     "latency_max_s": 0.51,
+     "parallel": true
+    },
+    "llm": {
+     "model": "claude-sonnet-5-5",
+     "n": 5,
+     "warm_cache": true,
+     "selector": true,
+     "selector_model": "claude-sonnet-5-5",
+     "output_price_assumed": false,
+     "prefix_usd": 0.007013,
+     "uncached_input_usd": 0.004,
+     "output_usd": 0.025,
+     "selector_usd": 0.005,
+     "total_usd": 0.041013,
+     "input_tokens": 14125,
+     "output_tokens": 2700
+    },
+    "single_candidate_llm_usd": 0.011113,
+    "llm_multiple_of_single": 3.691
+   }
+  }
+ },
+ "results": [
+  {
+   "id": "q01_claims_submitted",
+   "difficulty": "easy",
+   "chosen_correct": true,
+   "chosen_why": "ok",
+   "chosen_strategy": "direct",
+   "abstained": false,
+   "refused": false,
+   "selector_called": false,
+   "cluster_sizes": [
+    2
+   ],
+   "upper_bound": true,
+   "agent_sql_calls": 3,
+   "candidates": [
+    {
+     "strategy": "direct",
+     "kind": "rows",
+     "correct": true,
+     "why": "ok",
+     "sql": "SELECT count(DISTINCT claim_key) AS claims FROM sem.claims",
+     "error": null,
+     "preview": [
+      [
+       1447
+      ]
+     ],
+     "row_count": 1
+    },
+    {
+     "strategy": "grain_and_date",
+     "kind": "rows",
+     "correct": true,
+     "why": "ok",
+     "sql": "SELECT count(DISTINCT claim_key) AS claims FROM sem.claims",
+     "error": null,
+     "preview": [
+      [
+       1447
+      ]
+     ],
+     "row_count": 1
+    },
+    {
+     "strategy": "filter_then_aggregate",
+     "kind": "error",
+     "correct": false,
+     "why": "Binder Error: Referenced column \"patient_control_number\" not found in FROM clause!\nCandidate bindings: \"remit_co_amount\", \"remit_patient_responsibility_amount\", \"line_count\", \"first_payment_date\", \"service_date_from\"\n\nLINE 1: SELECT * FROM (SELECT COUNT(DISTINCT patient_control_number) AS claims FROM sem.claims) AS agent...\n                                             ^^^^^^^^^^^^^^^^^^^^^^",
+     "sql": "SELECT count(DISTINCT patient_control_number) AS claims FROM sem.claims",
+     "error": "Binder Error: Referenced column \"patient_control_number\" not found in FROM clause!\nCandidate bindings: \"remit_co_amount\", \"remit_patient_responsibility_amount\", \"line_count\", \"first_payment_date\", \"service_date_from\"\n\nLINE 1: SELECT * FROM (SELECT COUNT(DISTINCT patient_control_number) AS claims FROM sem.claims) AS agent...\n                                             ^^^^^^^^^^^^^^^^^^^^^^",
+     "preview": null,
+     "row_count": null
+    }
+   ]
+  },
+  {
+   "id": "q02_total_billed",
+   "difficulty": "easy",
+   "chosen_correct": true,
+   "chosen_why": "ok",
+   "chosen_strategy": "direct",
+   "abstained": false,
+   "refused": false,
+   "selector_called": false,
+   "cluster_sizes": [
+    2,
+    1
+   ],
+   "upper_bound": true,
+   "agent_sql_calls": 3,
+   "candidates": [
+    {
+     "strategy": "direct",
+     "kind": "rows",
+     "correct": true,
+     "why": "ok",
+     "sql": "SELECT round(sum(charge_amount), 2) AS billed FROM sem.claims WHERE is_latest_submission",
+     "error": null,
+     "preview": [
+      [
+       "703778.37"
+      ]
+     ],
+     "row_count": 1
+    },
+    {
+     "strategy": "grain_and_date",
+     "kind": "rows",
+     "correct": true,
+     "why": "ok",
+     "sql": "SELECT round(sum(charge_amount), 2) AS billed FROM sem.claims WHERE is_latest_submission",
+     "error": null,
+     "preview": [
+      [
+       "703778.37"
+      ]
+     ],
+     "row_count": 1
+    },
+    {
+     "strategy": "filter_then_aggregate",
+     "kind": "rows",
+     "correct": false,
+     "why": "values differ (or extra / missing columns)",
+     "sql": "WITH population AS ( SELECT charge_amount FROM sem.claims WHERE is_latest_submission AND frequency_code <> '8') SELECT round(sum(charge_amount), 2) AS billed FROM population",
+     "error": null,
+     "preview": [
+      [
+       "703388.91"
+      ]
+     ],
+     "row_count": 1
+    }
+   ]
+  },
+  {
+   "id": "q04_paid_by_month",
+   "difficulty": "easy",
+   "chosen_correct": true,
+   "chosen_why": "ok",
+   "chosen_strategy": "direct",
+   "abstained": false,
+   "refused": false,
+   "selector_called": false,
+   "cluster_sizes": [
+    2,
+    1
+   ],
+   "upper_bound": true,
+   "agent_sql_calls": 3,
+   "candidates": [
+    {
+     "strategy": "direct",
+     "kind": "rows",
+     "correct": true,
+     "why": "ok",
+     "sql": "SELECT payment_month, round(sum(paid_amount), 2) AS paid FROM sem.remit_claims WHERE is_current_adjudication GROUP BY 1 ORDER BY 1",
+     "error": null,
+     "preview": [
+      [
+       "2026-07-01",
+       "108103.34"
+      ]
+     ],
+     "row_count": 1
+    },
+    {
+     "strategy": "grain_and_date",
+     "kind": "rows",
+     "correct": true,
+     "why": "ok",
+     "sql": "SELECT payment_month, round(sum(paid_amount), 2) AS paid FROM sem.remit_claims WHERE is_current_adjudication GROUP BY 1 ORDER BY 1",
+     "error": null,
+     "preview": [
+      [
+       "2026-07-01",
+       "108103.34"
+      ]
+     ],
+     "row_count": 1
+    },
+    {
+     "strategy": "filter_then_aggregate",
+     "kind": "rows",
+     "correct": false,
+     "why": "expected 1 rows, got 6",
+     "sql": "WITH population AS ( SELECT service_month, paid_amount FROM sem.remit_claims WHERE is_current_adjudication) SELECT service_month, round(sum(paid_amount), 2) AS paid FROM population GROUP BY 1 ORDER BY 1",
+     "error": null,
+     "preview": [
+      [
+       "2025-06-01",
+       "0.00"
+      ],
+      [
+       "2025-12-01",
+       "0.00"
+      ],
+      [
+       "2026-02-01",
+       "17.69"
+      ],
+      [
+       "2026-05-01",
+       "499.93"
+      ],
+      [
+       "2026-06-01",
+       "71347.23"
+      ],
+      [
+       "2026-07-01",
+       "36238.49"
+      ]
+     ],
+     "row_count": 6
+    }
+   ]
+  },
+  {
+   "id": "q07_denial_rate",
+   "difficulty": "easy",
+   "chosen_correct": true,
+   "chosen_why": "ok",
+   "chosen_strategy": "direct",
+   "abstained": false,
+   "refused": false,
+   "selector_called": false,
+   "cluster_sizes": [
+    2,
+    1
+   ],
+   "upper_bound": true,
+   "agent_sql_calls": 3,
+   "candidates": [
+    {
+     "strategy": "direct",
+     "kind": "rows",
+     "correct": true,
+     "why": "ok",
+     "sql": "SELECT round(avg(is_denied::INT), 4) AS denial_rate FROM sem.remit_claims WHERE is_current_adjudication",
+     "error": null,
+     "preview": [
+      [
+       0.0392
+      ]
+     ],
+     "row_count": 1
+    },
+    {
+     "strategy": "grain_and_date",
+     "kind": "rows",
+     "correct": true,
+     "why": "ok",
+     "sql": "SELECT round(100.0 * avg(is_denied::INT), 2) AS denial_rate_pct FROM sem.remit_claims WHERE is_current_adjudication",
+     "error": null,
+     "preview": [
+      [
+       3.92
+      ]
+     ],
+     "row_count": 1
+    },
+    {
+     "strategy": "filter_then_aggregate",
+     "kind": "rows",
+     "correct": false,
+     "why": "values differ (or extra / missing columns)",
+     "sql": "WITH population AS ( SELECT paid_amount FROM sem.remit_claims WHERE is_current_adjudication) SELECT round(avg((paid_amount = 0)::INT), 4) AS denial_rate FROM population",
+     "error": null,
+     "preview": [
+      [
+       0.1081
+      ]
+     ],
+     "row_count": 1
+    }
+   ]
+  },
+  {
+   "id": "q08_denial_rate_by_payer",
+   "difficulty": "medium",
+   "chosen_correct": true,
+   "chosen_why": "ok",
+   "chosen_strategy": "direct",
+   "abstained": false,
+   "refused": false,
+   "selector_called": false,
+   "cluster_sizes": [
+    2,
+    1
+   ],
+   "upper_bound": true,
+   "agent_sql_calls": 3,
+   "candidates": [
+    {
+     "strategy": "direct",
+     "kind": "rows",
+     "correct": true,
+     "why": "ok",
+     "sql": "SELECT payer_name, round(avg(is_denied::INT), 4) AS denial_rate FROM sem.remit_claims WHERE is_current_adjudication GROUP BY 1 ORDER BY 2 DESC",
+     "error": null,
+     "preview": [
+      [
+       "Lockwood Risk Management",
+       1.0
+      ],
+      [
+       "Devoted Health",
+       0.1667
+      ],
+      [
+       "Humana",
+       0.1538
+      ],
+      [
+       "Amerihealth Caritas North Carolina",
+       0.1111
+      ],
+      [
+       "Tricare East Region",
+       0.0909
+      ],
+      [
+       "Unitedhealthcare Community Plan Nc",
+       0.0769
+      ]
+     ],
+     "row_count": 44
+    },
+    {
+     "strategy": "grain_and_date",
+     "kind": "rows",
+     "correct": true,
+     "why": "ok",
+     "sql": "SELECT payer_name, round(100.0 * avg(is_denied::INT), 2) AS denial_rate_pct FROM sem.remit_claims WHERE is_current_adjudication GROUP BY 1 ORDER BY 2 DESC",
+     "error": null,
+     "preview": [
+      [
+       "Lockwood Risk Management",
+       100.0
+      ],
+      [
+       "Devoted Health",
+       16.67
+      ],
+      [
+       "Humana",
+       15.38
+      ],
+      [
+       "Amerihealth Caritas North Carolina",
+       11.11
+      ],
+      [
+       "Tricare East Region",
+       9.09
+      ],
+      [
+       "Unitedhealthcare Community Plan Nc",
+       7.69
+      ]
+     ],
+     "row_count": 44
+    },
+    {
+     "strategy": "filter_then_aggregate",
+     "kind": "rows",
+     "correct": false,
+     "why": "expected 44 rows, got 18",
+     "sql": "WITH population AS ( SELECT payer_name, is_denied FROM sem.claims WHERE is_latest_submission AND has_remit) SELECT payer_name, round(avg(is_denied::INT), 4) AS denial_rate FROM population GROUP BY 1 ORDER BY 2 DESC",
+     "error": null,
+     "preview": [
+      [
+       "Humana",
+       1.0
+      ],
+      [
+       "Bcbs Federal Employee Program Nc",
+       0.2
+      ],
+      [
+       "Blue Cross Blue Shield Of North Carolina",
+       0.12
+      ],
+      [
+       "Medicare Part B North Carolina",
+       0.0909
+      ],
+      [
+       "Unitedhealthcare",
+       0.0541
+      ],
+      [
+       "Amerihealth Caritas North Carolina",
+       0.0
+      ]
+     ],
+     "row_count": 18
+    }
+   ]
+  },
+  {
+   "id": "q10_top_denial_carcs",
+   "difficulty": "hard",
+   "chosen_correct": true,
+   "chosen_why": "ok",
+   "chosen_strategy": "direct",
+   "abstained": false,
+   "refused": false,
+   "selector_called": false,
+   "cluster_sizes": [
+    2,
+    1
+   ],
+   "upper_bound": true,
+   "agent_sql_calls": 3,
+   "candidates": [
+    {
+     "strategy": "direct",
+     "kind": "rows",
+     "correct": true,
+     "why": "ok",
+     "sql": "SELECT a.carc_code, count(DISTINCT a.remit_claim_id) AS denied_claims FROM sem.adjustments a JOIN sem.remit_claims r ON r.remit_claim_id = a.remit_claim_id WHERE r.is_current_adjudication AND r.is_denied AND a.group_code = 'CO' AND a.is_denial_carc GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 5",
+     "error": null,
+     "preview": [
+      [
+       "16",
+       6
+      ],
+      [
+       "18",
+       4
+      ],
+      [
+       "96",
+       4
+      ],
+      [
+       "97",
+       4
+      ],
+      [
+       "183",
+       3
+      ]
+     ],
+     "row_count": 5
+    },
+    {
+     "strategy": "grain_and_date",
+     "kind": "rows",
+     "correct": true,
+     "why": "ok",
+     "sql": "SELECT a.carc_code, count(DISTINCT a.remit_claim_id) AS denied_claims FROM sem.adjustments a JOIN sem.remit_claims r ON r.remit_claim_id = a.remit_claim_id WHERE r.is_current_adjudication AND r.is_denied AND a.group_code = 'CO' AND a.is_denial_carc GROUP BY 1 ORDER BY 2 DESC LIMIT 5",
+     "error": null,
+     "preview": [
+      [
+       "16",
+       6
+      ],
+      [
+       "96",
+       4
+      ],
+      [
+       "97",
+       4
+      ],
+      [
+       "18",
+       4
+      ],
+      [
+       "55",
+       3
+      ]
+     ],
+     "row_count": 5
+    },
+    {
+     "strategy": "filter_then_aggregate",
+     "kind": "rows",
+     "correct": false,
+     "why": "not a valid top-N",
+     "sql": "WITH population AS ( SELECT carc_code FROM sem.adjustments WHERE is_current_adjudication AND group_code = 'CO' AND is_denial_carc) SELECT carc_code, count(*) AS adjustments FROM population GROUP BY 1 ORDER BY 2 DESC LIMIT 5",
+     "error": null,
+     "preview": [
+      [
+       "97",
+       40
+      ],
+      [
+       "16",
+       25
+      ],
+      [
+       "18",
+       23
+      ],
+      [
+       "B7",
+       23
+      ],
+      [
+       "50",
+       22
+      ]
+     ],
+     "row_count": 5
+    }
+   ]
+  },
+  {
+   "id": "q19_reversed_no_correction",
+   "difficulty": "hard",
+   "chosen_correct": true,
+   "chosen_why": "ok",
+   "chosen_strategy": "direct",
+   "abstained": false,
+   "refused": false,
+   "selector_called": false,
+   "cluster_sizes": [
+    2,
+    1
+   ],
+   "upper_bound": true,
+   "agent_sql_calls": 3,
+   "candidates": [
+    {
+     "strategy": "direct",
+     "kind": "rows",
+     "correct": true,
+     "why": "ok",
+     "sql": "SELECT count(*) AS n FROM ( SELECT claim_payer_key FROM sem.remit_claims GROUP BY 1 HAVING bool_or(is_reversal) AND NOT bool_or(is_current_adjudication)) pairs",
+     "error": null,
+     "preview": [
+      [
+       0
+      ]
+     ],
+     "row_count": 1
+    },
+    {
+     "strategy": "grain_and_date",
+     "kind": "rows",
+     "correct": true,
+     "why": "ok",
+     "sql": "SELECT count(*) AS n FROM ( SELECT claim_payer_key FROM sem.remit_claims GROUP BY 1 HAVING bool_or(is_reversal) AND NOT bool_or(is_current_adjudication)) pairs",
+     "error": null,
+     "preview": [
+      [
+       0
+      ]
+     ],
+     "row_count": 1
+    },
+    {
+     "strategy": "filter_then_aggregate",
+     "kind": "rows",
+     "correct": false,
+     "why": "values differ (or extra / missing columns)",
+     "sql": "WITH population AS ( SELECT remit_claim_id FROM sem.remit_claims WHERE is_reversal) SELECT count(*) AS n FROM population",
+     "error": null,
+     "preview": [
+      [
+       2
+      ]
+     ],
+     "row_count": 1
+    }
+   ]
+  },
+  {
+   "id": "q23_secondary_paid",
+   "difficulty": "medium",
+   "chosen_correct": true,
+   "chosen_why": "ok",
+   "chosen_strategy": "direct",
+   "abstained": false,
+   "refused": false,
+   "selector_called": false,
+   "cluster_sizes": [
+    2,
+    1
+   ],
+   "upper_bound": true,
+   "agent_sql_calls": 3,
+   "candidates": [
+    {
+     "strategy": "direct",
+     "kind": "rows",
+     "correct": true,
+     "why": "ok",
+     "sql": "SELECT count(*) FILTER (WHERE paid_amount > 0) AS claims, round(sum(paid_amount), 2) AS paid FROM sem.remit_claims WHERE is_current_adjudication AND payer_sequence = 'secondary'",
+     "error": null,
+     "preview": [
+      [
+       5,
+       "65.47"
+      ]
+     ],
+     "row_count": 1
+    },
+    {
+     "strategy": "grain_and_date",
+     "kind": "rows",
+     "correct": false,
+     "why": "values differ (or extra / missing columns)",
+     "sql": "SELECT count(DISTINCT claim_key) AS claims FROM sem.claims WHERE payer_responsibility = 'S'",
+     "error": null,
+     "preview": [
+      [
+       35
+      ]
+     ],
+     "row_count": 1
+    },
+    {
+     "strategy": "filter_then_aggregate",
+     "kind": "rows",
+     "correct": false,
+     "why": "values differ (or extra / missing columns)",
+     "sql": "WITH population AS ( SELECT paid_amount FROM sem.remit_claims WHERE payer_sequence = 'secondary') SELECT round(sum(paid_amount), 2) AS paid FROM population",
+     "error": null,
+     "preview": [
+      [
+       "65.47"
+      ]
+     ],
+     "row_count": 1
+    }
+   ]
+  },
+  {
+   "id": "q11_cpt_denial_rate",
+   "difficulty": "hard",
+   "chosen_correct": false,
+   "chosen_why": "expected 6 rows, got 64",
+   "chosen_strategy": "direct",
+   "abstained": false,
+   "refused": false,
+   "selector_called": false,
+   "cluster_sizes": [
+    2,
+    1
+   ],
+   "upper_bound": true,
+   "agent_sql_calls": 3,
+   "candidates": [
+    {
+     "strategy": "direct",
+     "kind": "rows",
+     "correct": false,
+     "why": "expected 6 rows, got 64",
+     "sql": "SELECT procedure_code, round(avg(claim_is_denied::INT), 4) AS denial_rate, count(DISTINCT claim_payer_key) AS adjudications FROM sem.remit_lines WHERE is_current_adjudication GROUP BY 1 HAVING count(DISTINCT claim_payer_key) >= 20 ORDER BY 2 DESC",
+     "error": null,
+     "preview": [
+      [
+       "G0481",
+       0.0882,
+       34
+      ],
+      [
+       "86674",
+       0.08,
+       25
+      ],
+      [
+       "83540",
+       0.0727,
+       55
+      ],
+      [
+       "82570",
+       0.0556,
+       36
+      ],
+      [
+       "87798",
+       0.0541,
+       37
+      ],
+      [
+       "86038",
+       0.0506,
+       79
+      ]
+     ],
+     "row_count": 64
+    },
+    {
+     "strategy": "grain_and_date",
+     "kind": "rows",
+     "correct": true,
+     "why": "ok",
+     "sql": "WITH billed AS ( SELECT DISTINCT claim_key, procedure_code FROM sem.claim_lines WHERE is_latest_submission) SELECT b.procedure_code, round(avg(r.is_denied::INT), 4) AS denial_rate, count(*) AS adjudications FROM billed b JOIN sem.remit_claims r ON r.claim_key = b.claim_key AND r.is_current_adjudication GROUP BY 1 HAVING count(*) >= 20 ORDER BY 2 DESC",
+     "error": null,
+     "preview": [
+      [
+       "80053",
+       0.1129,
+       62
+      ],
+      [
+       "84443",
+       0.1071,
+       28
+      ],
+      [
+       "36415",
+       0.0984,
+       61
+      ],
+      [
+       "80061",
+       0.08,
+       25
+      ],
+      [
+       "85025",
+       0.06,
+       50
+      ],
+      [
+       "83036",
+       0.037,
+       27
+      ]
+     ],
+     "row_count": 6
+    },
+    {
+     "strategy": "filter_then_aggregate",
+     "kind": "rows",
+     "correct": false,
+     "why": "expected 6 rows, got 64",
+     "sql": "WITH population AS ( SELECT procedure_code, claim_is_denied, claim_payer_key FROM sem.remit_lines WHERE is_current_adjudication) SELECT procedure_code, round(avg(claim_is_denied::INT), 4) AS denial_rate, count(DISTINCT claim_payer_key) AS adjudications FROM population GROUP BY 1 HAVING count(DISTINCT claim_payer_key) >= 20 ORDER BY 2 DESC",
+     "error": null,
+     "preview": [
+      [
+       "G0481",
+       0.0882,
+       34
+      ],
+      [
+       "86674",
+       0.08,
+       25
+      ],
+      [
+       "83540",
+       0.0727,
+       55
+      ],
+      [
+       "82570",
+       0.0556,
+       36
+      ],
+      [
+       "87798",
+       0.0541,
+       37
+      ],
+      [
+       "86038",
+       0.0506,
+       79
+      ]
+     ],
+     "row_count": 64
+    }
+   ]
+  },
+  {
+   "id": "q30_phi_names",
+   "difficulty": "easy",
+   "chosen_correct": true,
+   "chosen_why": "refused",
+   "chosen_strategy": null,
+   "abstained": false,
+   "refused": true,
+   "selector_called": false,
+   "cluster_sizes": [],
+   "upper_bound": true,
+   "agent_sql_calls": 0,
+   "candidates": [
+    {
+     "strategy": "direct",
+     "kind": "refusal",
+     "correct": true,
+     "why": "refused",
+     "sql": null,
+     "error": null,
+     "preview": null,
+     "row_count": null
+    },
+    {
+     "strategy": "grain_and_date",
+     "kind": "refusal",
+     "correct": true,
+     "why": "refused",
+     "sql": null,
+     "error": null,
+     "preview": null,
+     "row_count": null
+    },
+    {
+     "strategy": "filter_then_aggregate",
+     "kind": "refusal",
+     "correct": true,
+     "why": "refused",
+     "sql": null,
+     "error": null,
+     "preview": null,
+     "row_count": null
+    }
+   ]
+  }
+ ]
+}
