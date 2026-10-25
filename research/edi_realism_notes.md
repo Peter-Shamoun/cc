@@ -303,3 +303,25 @@ resubmission). `bench/truth_db.py` `ledger.claims` holds claims with an 837 in t
 
 Not done: NCD frequency edits (e.g. A1c more often than every 3 months) need per-patient history; the 2-4 month
 tail of WO recoupments means a 45-day benchmark window sees few recoupments of its own payments.
+
+## Generator 3.2: fixes for realism audit 2 (2026-10-25)
+
+`research/edi_realism_audit_2.md` scored 3.1 at 7/10.
+
+| # | Finding | 3.2 |
+|---|---|---|
+| 1 | MolDX / germline genetics paid | Palmetto (JM) is flagged MolDX: molecular lines carry the lab's DEX Z-code in SV101-7 (8% dropped -> CO-16 M20, N350 on 81479); technical-assessment non-coverage (MTHFR always, CFTR carrier, BRCA without a cancer diagnosis, part of PGx/81479) -> CO-50 N386 or PR-50 M38 with GA. Commercial, Medicaid and MA plans require prior auth for germline tests: CO-197/15 without, CO-198/50/96 now and then with. Measured: 41% of commercial germline claims denied, 37% of Medicare's (plus GA patient-liable lines) |
+| 2 | Uniform identifiers | member id and claim-number templates per payer (UHC 9 digits, Aetna W+9, Cigna U+8+2, Humana H+8, FEP R+8, NC Medicaid and its MCOs 9 digits + letter, TX Medicaid 9 digits, Blues prefixes per group); CLP07 formats differ by payer; Medicare ICN Julian date = receipt date (DTM*050); corrections get their own ICN |
+| 3 | Tail payer geography | regional stems map to the states their claims office can be in; at most 3 payers per stem; PO boxes of 2-6 digits and some street-and-suite addresses |
+| 4 | Clinical misfits | sex/age limits on every code (L68.0 female, Z79.891 14+), code limits merged across domains; 82570 only with microalbumin or a drug test; uric acid -> gout/CKD; serology defaults to infection codes, Lyme demoted (A69.20 rare); targeted tests (PSA, hormones, coagulation) never point at general work-up codes; Z79.01 only with anticoagulation |
+| 5 | Streets and names | 10,000 Census 2010 surnames with counts and Hispanic share (`census2010_surnames.csv`), SSA top-400 first names per sex and birth decade 1920-2017 (`ssa_first_names.csv`): ~8,500 distinct surnames in a month at 5 MB/day; streets named after stems and surnames, each stem with its own suffix mix (MAIN ST, LAKE RD, CREEKSIDE DR), NC "<NAME> MILL/CHAPEL/STORE RD" |
+| 6 | COBA partners | BCBSNC (BCBSTX) Medicare Supplement leads, then AARP, the state Medicaid, Mutual of Omaha and a tail |
+| 7 | One ordering NPI dominant | 2 x daily volume ordering clinicians, flatter Zipf (top one <3% of claims) |
+| 8 | 2310C = billing address | 12 patient service centers per lab with their own NPI and address |
+| 9 | PLB02 constant; duplicates at Medicare | PLB02 per payer (fiscal year end, month end or remittance date); 70% of Medicare exact duplicates are front-end rejected (277CA) instead of CO-18 on an 835 |
+| - | Medicare 90+ = 11% | ~7% |
+
+Measured at 5 MB/day for 30 days from 2026-07-01: lines/claim 5.13; denial rate 10.4%, 70% line-level; allowed/CLFS
+unchanged; ~1,560 distinct diagnoses; 2,990 claims per business day; 32 835 files a day from day 1.
+One year at 5 MB/business day plus the burn-in: 1,330 MB raw, 3,088 claims per business day, 622 s CPU, peak RSS
+978 MB.
