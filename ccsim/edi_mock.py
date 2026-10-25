@@ -414,7 +414,7 @@ class Payer:
     remit_address: tuple = ()       # 835 N3/N4: (street or PO box, city, state, ZIP+4)
     website: str = ""               # 835 PER*IC UR (payer web site), when the payer sends one
     sequestration: bool = False     # MA plan paying at Medicare rates passes the 2% sequestration cut on (CO-253)
-    plb_reference_style: str = "dos_pcn"   # how PLB03-2 names the claim: icn | dos_pcn | pcn | icn_pcn
+    plb_reference_style: str = "icn"       # how PLB03-2 names the claim: icn | dos_pcn | pcn | icn_pcn
     reduction_group: str = "CO"     # group code of the fee reduction (PI on non-contracted payers that use it)
 
     @property
@@ -522,9 +522,9 @@ SEGMENT_VISITS_PER_YEAR = {"medicare_ffs": 2.7, "medicare_advantage": 2.6, "medi
 _NATIONAL = [
     _payer("UNITEDHEALTHCARE", "87726", "commercial", name_835="UNITEDHEALTHCARE INSURANCE COMPANY", weight=.38,
            remit_weekdays=(0, 1, 2, 3, 4), sends_ref_2u=False, multi_st_rate=.15, allowed_mult=1.08,
-           remit_address=("PO BOX 30555", "SALT LAKE CITY", "UT", "841300555"), website="UHCPROVIDER.COM"),
+           plb_reference_style="dos_pcn", remit_address=("PO BOX 30555", "SALT LAKE CITY", "UT", "841300555"), website="UHCPROVIDER.COM"),
     _payer("AETNA", "60054", "commercial", name_835="AETNA LIFE INSURANCE COMPANY", weight=.24,
-           remit_weekdays=(0, 2, 4), eft_lag_days=2, delimiters="C", allowed_mult=1.12, plb_reference_style="icn",
+           remit_weekdays=(0, 2, 4), eft_lag_days=2, delimiters="C", allowed_mult=1.12,
            remit_address=("PO BOX 981106", "EL PASO", "TX", "799981106"), website="AETNA.COM"),
     _payer("CIGNA", "62308", "commercial", name_835="CIGNA HEALTH AND LIFE INSURANCE CO", weight=.18,
            remit_weekdays=(1, 4), claim_level_denials=.5, ref6r_rate=.7, delimiters="B", allowed_mult=1.2,
@@ -671,13 +671,16 @@ def _tail_payers() -> list[Payer]:
     """Regional plans and TPAs: Zipf-weighted (s ~1.1), weekly to monthly 835s, many by paper check."""
     r = random.Random(1101)
     names, out = set(), []
+    taken = {p.payer_id for p in _NATIONAL + _MEDICARE_ADVANTAGE + _TRICARE_OTHER} | {
+        p.payer_id for region in REGIONS.values() for payers in region.values() for p in payers}
     while len(out) < N_TAIL_PAYERS:
         name = _tail_name(r)
-        if name in names:
+        pid = f"{r.choice('ABCDEGHJKLMNPRSTW')}{r.randint(1000, 9999)}" if r.random() < .5 else f"{r.randint(10000, 99999)}"
+        if name in names or pid in taken:
             continue
         names.add(name)
+        taken.add(pid)
         rank = len(out)
-        pid = f"{r.choice('ABCDEGHJKLMNPRSTW')}{r.randint(1000, 9999)}" if r.random() < .5 else f"{r.randint(10000, 99999)}"
         oon = r.random() < P_TAIL_OUT_OF_NETWORK
         city, state, zip5 = r.choice(_TAIL_OFFICES)
         name_835 = r.choice([None, None, f"{name} CLAIMS", name.replace(" AND ", " & "), f"{name} INC"])
@@ -691,7 +694,7 @@ def _tail_payers() -> list[Payer]:
             ref6r_rate=r.choice([.5, .9, .97]), member_id_style=r.choice(["digits9", "alnum10", "prefix3"]),
             icn_style=r.choice(["digits11", "digits12", "alpha2digits10", "digits15"]),
             delimiters=r.choice("AABC"), timely_filing_days=r.choice([90, 180, 180, 365]),
-            plb_reference_style=r.choice(["icn", "dos_pcn", "pcn", "icn_pcn"]),
+            plb_reference_style=r.choice(["icn", "icn", "icn", "dos_pcn", "pcn", "icn_pcn"]),
             reduction_group="PI" if oon and r.random() < .5 else "CO",
             remit_address=(f"PO BOX {r.randint(1000, 999999)}", city, state, f"{zip5}{r.randint(1, 9999):04d}")))
     return out
@@ -741,7 +744,7 @@ SEQUESTRATION = .02
 # share of denials by category (XiFin 2025, spec denials.denial_category_mix_*), level, CARC weights, RARC weights.
 # Duplicates (15-35% of denials) come from duplicate resends (Scenario.p_duplicate_submission), not from this draw.
 DENIAL_CATEGORIES = {
-    "bundling":          dict(clinical=.76, molecular=.142, pathology=.230, medicare=.42, level="line",
+    "bundling":          dict(clinical=.85, molecular=.142, pathology=.230, medicare=.42, level="line",
                               carcs={"97": .55, "234": .15, "236": .20, "B15": .10},
                               medicare_carcs={"97": .4, "236": .6}, rarcs={"M15": .4, "N19": .3, "M80": .1, "N20": .2}),
     "non_covered":       dict(clinical=.066, molecular=.046, pathology=.052, medicare=.05, level="line_or_claim",
@@ -2295,7 +2298,7 @@ class _TenantRun(Generator):
                 routine = bool(set(pointed) & {"Z0000", "Z0001"})
                 ncd = l.cpt in NCD_LIMITED
                 if cls == "medicare_advantage":
-                    if r.random() < .15:                          # MA plans apply the NCDs, less strictly
+                    if r.random() < .1:                           # MA plans apply the NCDs, less strictly
                         edits[i] = ("CO", "50", "N386" if ncd else None, "medical_necessity")
                     continue
                 u = r.random()
