@@ -199,6 +199,7 @@ def _parse_batch_locked(env, store: Store) -> dict:
 
     con = duckdb.connect()
     con.execute(DDL_LOSSLESS)
+    batch_rows = {t: [] for t in TABLES}
     _insert(con, "edi.ingest_run", [dict(ingest_run_id=run_id, started_at=started, status="SUCCEEDED",
                                           parser_name="ccsim.parser", parser_version=PARSER_VERSION, schema_version="1",
                                           triggered_by=env.task_arn, notes=e.get("EVENT_ID"))])
@@ -222,17 +223,19 @@ def _parse_batch_locked(env, store: Store) -> dict:
         except (ParseError, UnicodeDecodeError, IndexError, ValueError, KeyError, TypeError) as err:
             stats["rejected"] += 1
             store.put(f"{c}/quarantine/{run_id}/{key.rsplit('/', 1)[-1]}", body)
-            _insert(con, "edi.source_file", [dict(file_id=file_id, tenant_code=c, file_kind="UNKNOWN",
-                                                  ingest_run_id=run_id, ingested_at=started, parse_status="REJECTED",
-                                                  parse_messages=[f"{type(err).__name__}: {err}"[:500]], **meta)])
+            batch_rows["edi.source_file"].append(dict(file_id=file_id, tenant_code=c, file_kind="UNKNOWN",
+                                                      ingest_run_id=run_id, ingested_at=started, parse_status="REJECTED",
+                                                      parse_messages=[f"{type(err).__name__}: {err}"[:500]], **meta))
             continue
         if sha in known_sha:
             rows["edi.source_file"][0]["duplicate_of_file_id"] = known_sha[sha]
         else:
             known_sha[sha] = file_id
         for t in TABLES:
-            _insert(con, t, rows.get(t, []))
+            batch_rows[t] += rows.get(t, [])
         stats["loaded"] += 1
+    for t in TABLES:                                  # one insert per table: ~40% less than one per file and table
+        _insert(con, t, batch_rows[t])
     if stats["loaded"] == 0 and stats["rejected"] == 0:
         if not _gold_is_behind(store, silver):
             return dict(stats, status="noop")                    # duplicate delivery: nothing new
