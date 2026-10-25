@@ -48,11 +48,12 @@ class ParseError(ValueError):
 def _table_columns() -> dict[str, list[str]]:
     con = duckdb.connect()
     con.execute(DDL_LOSSLESS)
-    out = {}
-    for t in TABLES:
-        schema, name = t.split(".")
-        out[t] = [c for (c,) in con.execute("SELECT column_name FROM information_schema.columns WHERE table_schema = ? "
-                                            "AND table_name = ? ORDER BY ordinal_position", [schema, name]).fetchall()]
+    out = {t: [] for t in TABLES}
+    for table, column in con.execute("SELECT table_schema || '.' || table_name, column_name "
+                                     "FROM information_schema.columns ORDER BY table_schema, table_name, "
+                                     "ordinal_position").fetchall():
+        if table in out:
+            out[table].append(column)
     return out
 
 
