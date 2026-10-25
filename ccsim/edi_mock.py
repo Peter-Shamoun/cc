@@ -61,7 +61,7 @@ import hashlib
 import json
 import math
 import random
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, field, replace
 from datetime import date, timedelta
 from functools import lru_cache
 from itertools import accumulate
@@ -69,15 +69,18 @@ from pathlib import Path
 from statistics import NormalDist
 from typing import Iterator, NamedTuple
 
-GENERATOR_VERSION = "3.0"
-RECOUP_WINDOW = 5000            # paid ICNs per payer a PLB recoupment may point back to
+from ccsim import edi_reference as R
+
+GENERATOR_VERSION = "3.1"
+RECOUPMENT_CANDIDATE_SHARE = .15   # paid claims kept as possible targets of a later PLB recoupment (bounded memory)
+RECOUPMENT_MAX_DAYS = 400          # recoupments reach back at most about a year
 CLEARINGHOUSE_ID = "CLAIMCLARITY"
 CLEARINGHOUSE_NAME = "CLAIMCLARITY CLEARINGHOUSE"
 
 # The reviewed denial CARC list (ref.denial_carc): the denial reasons the calibration spec names. Contractual
 # (45), sequestration (253), patient share (1/2/3) and prior-payer (23) adjustments are NOT denials.
-DENIAL_CARCS = ["4", "11", "15", "16", "18", "22", "24", "27", "29", "50", "55", "96", "97", "109", "151", "167",
-                "183", "197", "198", "204", "234", "236", "B1", "B7", "B15"]
+DENIAL_CARCS = ["4", "11", "15", "16", "18", "22", "24", "27", "29", "50", "55", "96", "97", "109", "119", "151", "167",
+                "183", "197", "198", "204", "234", "236", "242", "252", "288", "B1", "B7", "B15"]
 CARC_DESCRIPTIONS = {
     "1": "Deductible amount", "2": "Coinsurance amount", "3": "Co-payment amount",
     "4": "Procedure code inconsistent with the modifier used, or a required modifier is missing",
@@ -101,6 +104,10 @@ CARC_DESCRIPTIONS = {
     "253": "Sequestration - reduction in federal payment", "B1": "Non-covered visits",
     "B7": "Provider was not certified/eligible to be paid for this procedure/service on this date of service",
     "B15": "Service not paid separately: qualifying service/procedure not received or adjudicated",
+    "119": "Benefit maximum for this time period or occurrence has been reached",
+    "242": "Services not provided by network/primary care providers",
+    "252": "An attachment/other documentation is required to adjudicate this claim/service",
+    "288": "Referral absent",
 }
 RARC_DESCRIPTIONS = {
     "M15": "Separately billed services/tests have been bundled", "N19": "Procedure code incidental to primary procedure",
@@ -124,6 +131,10 @@ RARC_DESCRIPTIONS = {
     "MA01": "Alert: if you do not agree with what we approved for these services, you may appeal",
     "MA18": "Alert: the claim information is also being forwarded to the patient's supplemental insurer",
     "N89": "Alert: payment information for this claim has been forwarded to more than one other payer",
+    "M38": "The patient is liable for the charges for this service as you informed the patient in writing before the "
+           "service was furnished that we would not pay for it, and the patient agreed to pay",
+    "MA39": "Missing/incomplete/invalid gender", "N706": "Missing documentation",
+    "N640": "Exceeds number/frequency approved/allowed within time period",
 }
 PLB_REASON_DESCRIPTIONS = {
     "WO": "Overpayment recovery", "72": "Authorized return (refund)", "FB": "Forward balance", "L6": "Interest owed",
@@ -214,12 +225,29 @@ _SPEC_CODES = [
     _cpt("87150", "Culture typing, amplified probe, per culture or isolate", "pcr", 63.45, units=(2, 8, 16), mue=12),
     _cpt("87631", "Respiratory virus panel, 3-5 targets", "respiratory", 241.64),
     _cpt("87637", "SARS-CoV-2, influenza A/B and RSV, multiplex amplified probe", "respiratory", 291.40),
-    _cpt("81528", "Colorectal cancer screening, stool DNA and hemoglobin", "molecular", 680.46, preventive=True),
     _cpt("81479", "Unlisted molecular pathology procedure", "molecular", 5989.99, rate=2457.65),
     _cpt("81225", "CYP2C19 gene analysis, common variants", "molecular", 1.8 * CLFS_2026["81225"]),
     _cpt("81226", "CYP2D6 gene analysis, common variants", "molecular", 1.8 * CLFS_2026["81226"]),
     _cpt("81162", "BRCA1/BRCA2 full sequence and duplication/deletion analysis", "molecular", 1.8 * CLFS_2026["81162"]),
-    _cpt("0037U", "Targeted genomic sequence analysis, solid organ neoplasm, 324 genes", "molecular", 1.8 * CLFS_2026["0037U"]),
+    _cpt("81220", "CFTR gene analysis, common variants", "molecular", 2.5 * CLFS_2026["81220"]),
+    _cpt("81240", "F2 (prothrombin) gene analysis, 20210G>A variant", "molecular", 2.5 * CLFS_2026["81240"]),
+    _cpt("81241", "F5 (factor V) gene analysis, Leiden variant", "molecular", 2.5 * CLFS_2026["81241"]),
+    _cpt("81291", "MTHFR gene analysis, common variants", "molecular", 2.5 * CLFS_2026["81291"]),
+    _cpt("81270", "JAK2 gene analysis, p.Val617Phe variant", "molecular", 2.5 * CLFS_2026["81270"]),
+    _cpt("G0103", "Prostate cancer screening; prostate specific antigen test (PSA)", "chemistry", 6 * CLFS_2026["G0103"],
+         preventive=True),
+    _cpt("G0328", "Colorectal cancer screening; fecal occult blood test, immunoassay", "chemistry",
+         6 * CLFS_2026["G0328"], preventive=True),
+    _cpt("82274", "Blood, occult, by fecal hemoglobin determination by immunoassay", "chemistry",
+         6 * CLFS_2026["82274"], preventive=True),
+    _cpt("80055", "Obstetric panel", "chemistry", 6 * CLFS_2026["80055"], preventive=True),
+    _cpt("80081", "Obstetric panel, including HIV testing", "chemistry", 6 * CLFS_2026["80081"], preventive=True),
+    _cpt("86762", "Rubella antibody", "sti", 6 * CLFS_2026["86762"]),
+    _cpt("84702", "Gonadotropin, chorionic (hCG), quantitative", "chemistry", 6 * CLFS_2026["84702"]),
+    _cpt("84703", "Gonadotropin, chorionic (hCG), qualitative", "chemistry", 6 * CLFS_2026["84703"]),
+    _cpt("84144", "Progesterone", "chemistry", 6 * CLFS_2026["84144"]),
+    _cpt("83655", "Lead", "chemistry", 6 * CLFS_2026["83655"]),
+    _cpt("87510", "Gardnerella vaginalis, direct probe", "pcr", 6 * CLFS_2026["87510"]),
     _cpt("88305", "Surgical pathology, level IV", "pathology", 186.06, rate=50.74, units=(1, 1, 4)),
 ]
 # Long tail of routine CLFS codes (the spec's ~30% of lines outside its top list): (code, category, relative weight).
@@ -235,13 +263,13 @@ _TAIL_CODES = [
     ("86141", "chemistry", 5), ("86038", "chemistry", 12), ("86431", "chemistry", 7), ("84436", "chemistry", 5),
     ("84480", "chemistry", 6), ("84481", "chemistry", 4), ("86376", "chemistry", 5), ("82746", "chemistry", 9),
     ("83550", "chemistry", 12), ("84466", "chemistry", 4), ("83001", "chemistry", 6), ("83002", "chemistry", 5),
-    ("84144", "chemistry", 3), ("82670", "chemistry", 5), ("84403", "chemistry", 10), ("84402", "chemistry", 4),
-    ("84702", "chemistry", 4), ("84703", "chemistry", 3), ("82627", "chemistry", 3), ("83970", "chemistry", 8),
+    ("82670", "chemistry", 5), ("84403", "chemistry", 10), ("84402", "chemistry", 4),
+    ("82627", "chemistry", 3), ("83970", "chemistry", 8),
     ("82330", "chemistry", 3), ("83880", "chemistry", 6), ("84484", "chemistry", 2), ("85379", "hematology", 3),
     ("85730", "hematology", 5), ("85384", "hematology", 2), ("85044", "hematology", 2), ("85014", "hematology", 2),
     ("85018", "hematology", 3), ("85049", "hematology", 2), ("86592", "sti", 6), ("86780", "sti", 5),
     ("87340", "sti", 5), ("86704", "sti", 3), ("86706", "sti", 4), ("86708", "sti", 2), ("87522", "sti", 2),
-    ("87536", "sti", 1), ("86677", "chemistry", 2), ("86762", "sti", 2), ("86787", "sti", 1), ("86900", "hematology", 2),
+    ("87536", "sti", 1), ("86677", "chemistry", 2), ("86787", "sti", 1), ("86900", "hematology", 2),
     ("86901", "hematology", 2), ("86850", "hematology", 2), ("82785", "chemistry", 3), ("83690", "chemistry", 4),
     ("82150", "chemistry", 2), ("86235", "chemistry", 2), ("86200", "chemistry", 3), ("82533", "chemistry", 3),
     ("83525", "chemistry", 2), ("80074", "chemistry", 2), ("86618", "sti", 1), ("84270", "chemistry", 1),
@@ -263,11 +291,18 @@ URINE_TAIL = [c for c, _, _ in _URINE_TAIL]
 _URINE_TAIL_CUM = list(accumulate(w for _, _, w in _URINE_TAIL))
 
 
+# Never in the random long tail: molecular / MAAA codes (81200-81599, often single-lab), cytopathology and
+# reproductive medicine (88xxx, 89xxx), and pregnancy- or sex-specific chemistry (ordered through the profiles).
+DEEP_TAIL_EXCLUDED = {"82105", "82143", "82677", "82731", "82757", "83661", "83662", "83663", "83664", "84112",
+                      "84152", "84154", "84163", "84704", "84830", "86336", "87623", "87625"}
+
+
 def _deep_tail() -> tuple[list, list]:
     """Rare routine CLFS codes (rate <= $60, not PLA/ADLT/G/M codes), Zipf-weighted in a fixed shuffled order:
     the distinct-codes-per-month long tail (spec: 400-1,500 distinct codes a month)."""
     pool = sorted(c for c, rate in CLFS_2026.items() if rate <= 60 and c[:1].isdigit() and c[-1].isdigit()
-                  and c not in CPTS and c[0] in "8")
+                  and c not in CPTS and c[:2] in ("80", "81", "82", "83", "84", "85", "86", "87")
+                  and not "81200" <= c <= "81599" and c not in DEEP_TAIL_EXCLUDED)
     random.Random(2026).shuffle(pool)
     return pool, list(accumulate(1 / (i + 1) ** 1.1 for i in range(len(pool))))
 
@@ -279,60 +314,69 @@ for _c in CPTS.values():                  # fail fast: every billed code is on t
     assert _c.code in CLFS_2026 or _c.code in NOT_ON_CLFS, _c.code
 
 # Order profiles (spec cpt_mix.order_profiles): one claim = one requisition. menu = independent order probability
-# per code; pick_one = exactly one code by weight. tail = mean number of long-tail add-on codes by payer class.
+# per code (menu_F / menu_M by the patient's sex); pick_one = exactly one code by weight. ages / sex = who gets the
+# profile at all. Every code is then checked against the patient (edi_reference.cpt_fits: PSA only for men, HPV and
+# hCG only for women, ...), so a test never contradicts the patient's sex or age.
 PROFILES = {
     "routine_blood": dict(weight=46, menu={"80053": .55, "85025": .55, "80061": .35, "83036": .30, "84443": .30,
                                            "82306": .12, "80048": .10, "84439": .12, "82607": .10, "82728": .08,
-                                           "83540": .07, "84153": .06, "85610": .04}, draw=True, tail=True),
+                                           "83540": .07, "84153": .11, "85610": .04}, draw=True, tail=True),
     "routine_urine": dict(weight=10, menu={"81001": .5, "81003": .35, "87086": .45, "82570": .15, "82043": .15},
                           reflex={"87088": .35, "87077": .25, "87186": .25}, urine_tail=True),
-    "sti_womens": dict(weight=10, menu={"87491": .9, "87591": .9, "87661": .4, "87624": .25, "87389": .15, "86803": .10}),
+    "sti_panel": dict(weight=10, ages=(13, 70), menu_F={"87491": .9, "87591": .9, "87661": .45, "87624": .2,
+                                                       "87389": .2, "86803": .1, "86592": .15},
+                      menu_M={"87491": .9, "87591": .9, "87389": .35, "86592": .3, "86803": .15},
+                      draw_if=("87389", "86592", "86803")),
+    "prenatal": dict(weight=3, sex="F", ages=(15, 45), pick_one={"80055": .6, "80081": .4},
+                     menu={"87389": .3, "86803": .5, "81003": .3, "87086": .45, "87491": .5, "87591": .5, "84702": .1},
+                     draw=True),
     "respiratory": dict(weight=6, pick_one={"87637": .70, "87631": .15, "87798": .15}, seasonal=True),
-    "pcr_panels": dict(weight=4, menu={"87798": 1.0, "87481": .5, "87150": .2}),
-    "drug_monitoring": dict(weight=7, menu={"80307": .85}, pick_one_optional=({"G0480": .22, "G0481": .18,
-                                                                                "G0482": .14, "G0483": .18})),
-    "molecular": dict(weight=2, pick_one={"81528": .45, "81479": .17, "81225": .12, "81226": .12, "81162": .08,
-                                          "0037U": .06}),
-    "pathology": dict(weight=2, menu={"88305": 1.0}),
+    "pcr_panels": dict(weight=4, ages=(13, 100), menu_F={"87798": 1.0, "87481": .5, "87510": .3, "87661": .3},
+                       menu_M={"87798": 1.0, "87150": .2}),
+    "drug_monitoring": dict(weight=7, ages=(14, 85), menu={"80307": .85, "82570": .3},     # 82570: specimen validity
+                            pick_one_optional=({"G0480": .22, "G0481": .18, "G0482": .14, "G0483": .18})),
+    "molecular": dict(weight=2, ages=(18, 90), pick_one={"81479": .22, "81225": .16, "81226": .16, "81162": .12,
+                                                        "81220": .08, "81240": .06, "81241": .09, "81291": .06,
+                                                        "81270": .05}),
+    "colorectal_screening": dict(weight=1.5, ages=(45, 85), pick_one={"82274": 1.0}),
+    "pathology": dict(weight=2, ages=(18, 100), menu={"88305": 1.0}),
     "mixed_blood_plus_urine": dict(weight=8, combine=("routine_blood", "routine_urine")),
 }
 # Profile mix by payer class (relative to the weights above): older Medicare patients get few STI/drug panels.
 PROFILE_CLASS_MULT = {
-    "medicare": {"sti_womens": .05, "drug_monitoring": .4, "routine_blood": 1.25, "mixed_blood_plus_urine": 1.3,
-                 "molecular": 1.5, "pathology": 1.5},
-    "medicare_advantage": {"sti_womens": .05, "drug_monitoring": .5, "routine_blood": 1.2, "mixed_blood_plus_urine": 1.3,
-                           "molecular": 1.3, "pathology": 1.3},
-    "medicaid": {"sti_womens": 1.8, "drug_monitoring": 1.8, "routine_blood": .85},
-    "medicaid_mco": {"sti_womens": 1.8, "drug_monitoring": 1.8, "routine_blood": .85},
+    "medicare": {"sti_panel": .05, "drug_monitoring": .4, "routine_blood": 1.25, "mixed_blood_plus_urine": 1.3,
+                 "molecular": 1.5, "pathology": 1.5, "colorectal_screening": 1.6},
+    "medicare_advantage": {"sti_panel": .05, "drug_monitoring": .5, "routine_blood": 1.2, "mixed_blood_plus_urine": 1.3,
+                           "molecular": 1.3, "pathology": 1.3, "colorectal_screening": 1.6},
+    "medicaid": {"sti_panel": 1.8, "drug_monitoring": 1.8, "routine_blood": .85, "prenatal": 3.0},
+    "medicaid_mco": {"sti_panel": 1.8, "drug_monitoring": 1.8, "routine_blood": .85, "prenatal": 3.0},
 }
+PROFILES_FOR_CHILDREN = {"routine_blood": .7, "routine_urine": 1.0, "respiratory": 2.5, "mixed_blood_plus_urine": .5}
 # Mean long-tail add-on codes on a blood draw, by payer class (calibrated to lines/claim: Medicare 6.0, MA 5.5,
-# commercial 4.3, Medicaid 4.0; spec volume.lines_per_claim.by_payer_class).
-TAIL_LINES_BY_CLASS = {"medicare": 4.4, "medicare_advantage": 3.9, "commercial": 2.6, "blues": 2.6, "other": 2.6,
-                       "medicaid": 2.4, "medicaid_mco": 2.4}
+# commercial 4.3, Medicaid 4.0; spec volume.lines_per_claim.by_payer_class). Drawn before the claim scrubber strips
+# NCCI panel components, so slightly above the billed means.
+TAIL_LINES_BY_CLASS = {"medicare": 6.5, "medicare_advantage": 5.8, "commercial": 4.0, "blues": 4.0, "other": 4.0,
+                       "medicaid": 4.3, "medicaid_mco": 4.3}
 DEEP_TAIL_SHARE = .08                   # share of long-tail add-ons drawn from the rare-code tail
 P_VENIPUNCTURE_BILLED = .75             # notes s.9 #4: the lab drew the specimen (patient service center)
 
-DX = {  # ICD-10-CM without the decimal point; screening codes first-listed on screening orders
-    "routine_blood": (["Z0000", "Z0001", "Z13220", "Z131"],
-                      ["E785", "E119", "E1165", "I10", "E039", "E559", "D649", "R5383", "N183", "R7303", "E669",
-                       "K760", "E782", "Z7901", "R739", "Z79899"]),
-    "routine_urine": ([], ["N390", "R3000", "R319", "E1122", "R809", "Z87440", "N189"]),
-    "sti_womens": (["Z113", "Z114", "Z01419"], ["N898", "N760", "Z202", "A749"]),
-    "respiratory": ([], ["J069", "R509", "J1100", "U071", "J209", "R051", "J029"]),
-    "pcr_panels": ([], ["N760", "N898", "B9689", "A6000", "B373"]),
-    "drug_monitoring": (["Z79899"], ["F1120", "F1110", "Z79891", "F1190", "F1910"]),
-    "molecular": (["Z1211", "Z8000", "Z803", "Z1501"], ["C189", "D126", "C50911", "I2510", "F329"]),
-    "pathology": ([], ["L989", "D485", "K635", "D229", "L821", "N879"]),
-}
-SCREENING_SHARE = {"routine_blood": .45, "sti_womens": .55, "drug_monitoring": .3, "molecular": .5}
-SCREENING_DX = {d for s, _ in DX.values() for d in s}
-DX_COUNT_CUM = list(accumulate([35, 28, 17, 12, 8]))       # 1..4 codes, then 5-12 (spec x12_837p.claim_2300.hi)
+SCREENING_DX = R.SCREENING_CODES
+# Share of requisitions ordered as screening (a Z00/Z01/Z11/Z12/Z13 code first-listed), by profile; Medicare
+# patients far less often (Medicare has no routine-physical benefit).
+SCREENING_SHARE = {"routine_blood": .35, "sti_panel": .55, "colorectal_screening": 1.0}
+MEDICARE_SCREENING_FACTOR = .25
+P_LISTED_DX_REUSED = .85                # a test shares a diagnosis already on the requisition when one fits
+P_PRIOR_DX_REUSED = .75                 # else it is ordered for one of the patient's known conditions when one fits
+DX_EXTRA_CHRONIC = .06                  # each further chronic condition listed as an extra diagnosis
+MAX_DX = 12                             # HI segment: 12 diagnoses
 
-# Bundling (procedure not paid separately): component codes payers fold into a panel billed on the same claim.
-BUNDLED_INTO = {"85027": "85025", "85014": "85025", "85018": "85025", "85049": "85025", "81003": "81001",
-                "81015": "81001", "82465": "80061", "83718": "80061", "84478": "80061", "87591": "87491"}
-for _code in ("82947", "84132", "82565", "84520", "82310", "82040", "84075", "84460", "84450", "82247", "84295"):
-    BUNDLED_INTO[_code] = "80053"
+# Payer-policy bundling a scrubber cannot remove (not NCCI): line -> the service it is folded into when both are
+# billed (None: folded into the lab work itself). Medicare pays these; commercial and Medicaid plans often do not.
+PAYER_BUNDLED_INTO = {"36415": None, "87088": ("87086",), "87077": ("87086",), "87186": ("87086",), "83721": ("80061",),
+                      "82570": ("82043", "80307"), "87481": ("87798",), "87150": ("87798",), "81015": ("81003",),
+                      "87510": ("87798",), "80307": ("G0480", "G0481", "G0482", "G0483")}
+P_NCCI_RESIDUE_GIVEN_CONFLICT = .02    # a panel component slips past the scrubber (~0.5% of claims; CO-97/236)
+P_GENDER_MARKER_DIFFERS = .004          # patients whose registered sex differs from the sex of their tests (KX)
 
 
 # --- payers ---------------------------------------------------------------------------------------
@@ -367,6 +411,11 @@ class Payer:
     member_id_style: str = "digits9"
     icn_style: str = "digits12"
     weight: float = 1.0             # share within its market segment
+    remit_address: tuple = ()       # 835 N3/N4: (street or PO box, city, state, ZIP+4)
+    website: str = ""               # 835 PER*IC UR (payer web site), when the payer sends one
+    sequestration: bool = False     # MA plan paying at Medicare rates passes the 2% sequestration cut on (CO-253)
+    plb_reference_style: str = "icn"       # how PLB03-2 names the claim: icn | dos_pcn | pcn | icn_pcn
+    reduction_group: str = "CO"     # group code of the fee reduction (PI on non-contracted payers that use it)
 
     @property
     def is_medicare(self) -> bool:
@@ -376,6 +425,56 @@ class Payer:
     def alias_id_835(self) -> str:
         """The payer id the semantic layer resolves an 835 by: REF*2U when sent, else TRN03."""
         return self.payer_id if self.sends_ref_2u else "1" + self.ein
+
+    @property
+    def bank(self) -> tuple[str, str]:
+        """The payer's originating bank (BPR07 ABA routing number, BPR09 account): fixed per payer."""
+        return payer_bank(self)
+
+
+FED_DISTRICT = {"CT": 1, "MA": 1, "NY": 2, "NJ": 2, "PA": 3, "OH": 4, "KY": 4, "NC": 5, "SC": 5, "VA": 5, "MD": 5,
+                "GA": 6, "FL": 6, "TN": 6, "AL": 6, "IL": 7, "WI": 7, "MI": 7, "IN": 7, "MO": 8, "AR": 8, "MN": 9,
+                "KS": 10, "CO": 10, "NE": 10, "OK": 10, "TX": 11, "CA": 12, "UT": 12, "WA": 12, "AZ": 12, "OR": 12}
+
+
+def aba_check_digit(first8: str) -> str:
+    """ABA routing number check digit: 3-7-1 weights over the nine digits sum to a multiple of 10."""
+    total = sum(int(d) * w for d, w in zip(first8, (3, 7, 1, 3, 7, 1, 3, 7)))
+    return str((10 - total % 10) % 10)
+
+
+def aba_is_valid(n: str) -> bool:
+    return len(n) == 9 and n.isdigit() and n[:2] in {f"{i:02d}" for i in list(range(1, 13)) + list(range(21, 33))} \
+        and aba_check_digit(n[:8]) == n[8]
+
+
+def _aba(state: str, *label) -> str:
+    h = _stable_int("aba", *label)
+    district = FED_DISTRICT.get(state, 5) + (20 if h % 7 == 0 else 0)      # some thrifts (21-32)
+    first8 = f"{district:02d}{h // 7 % 4 + 1}{h // 28 % 10}{h // 280 % 10000:04d}"
+    return first8 + aba_check_digit(first8)
+
+
+TOLL_FREE = ("800", "866", "877", "888", "855", "844")
+
+
+def payer_contacts(payer: "Payer") -> dict:
+    """Fixed per payer: provider-services and EDI support lines (toll-free), and an EDI mailbox for some."""
+    r = random.Random(_stable_int("contacts", payer.payer_id))
+    domain = payer.website.split("/")[0] if payer.website else ""
+    return dict(business=R.phone(r, r.choice(TOLL_FREE)) if r.random() < .85 or payer.is_medicare else "",
+                technical=R.phone(r, r.choice(TOLL_FREE)),
+                technical_name=r.choice(["EDI SUPPORT", "EDI HELP DESK", "ELECTRONIC DATA INTERCHANGE",
+                                         "TECHNICAL SUPPORT", "EDI CUSTOMER SERVICE"]),
+                email=f"EDI@{domain}" if domain and r.random() < .5 else "")
+
+
+def payer_bank(payer: "Payer") -> tuple[str, str]:
+    """Fixed per paying company (the 835 N1*PR name): one insurer's products pay from the same account."""
+    company = payer.name_835 or payer.name
+    state = payer.remit_address[2] if payer.remit_address else "NC"
+    h = _stable_int("account", company)
+    return _aba(state, company), f"{h % 10 ** (9 + h % 4):0{9 + h % 4}d}"
 
 
 def _ein(name: str) -> str:
@@ -422,97 +521,171 @@ SEGMENT_VISITS_PER_YEAR = {"medicare_ffs": 2.7, "medicare_advantage": 2.6, "medi
 
 _NATIONAL = [
     _payer("UNITEDHEALTHCARE", "87726", "commercial", name_835="UNITEDHEALTHCARE INSURANCE COMPANY", weight=.38,
-           remit_weekdays=(0, 1, 2, 3, 4), sends_ref_2u=False, multi_st_rate=.15, allowed_mult=1.08),
+           remit_weekdays=(0, 1, 2, 3, 4), sends_ref_2u=False, multi_st_rate=.15, allowed_mult=1.08,
+           plb_reference_style="dos_pcn", remit_address=("PO BOX 30555", "SALT LAKE CITY", "UT", "841300555"), website="UHCPROVIDER.COM"),
     _payer("AETNA", "60054", "commercial", name_835="AETNA LIFE INSURANCE COMPANY", weight=.24,
-           remit_weekdays=(0, 2, 4), eft_lag_days=2, delimiters="C", allowed_mult=1.12),
+           remit_weekdays=(0, 2, 4), eft_lag_days=2, delimiters="C", allowed_mult=1.12,
+           remit_address=("PO BOX 981106", "EL PASO", "TX", "799981106"), website="AETNA.COM"),
     _payer("CIGNA", "62308", "commercial", name_835="CIGNA HEALTH AND LIFE INSURANCE CO", weight=.18,
-           remit_weekdays=(1, 4), claim_level_denials=.5, ref6r_rate=.7, delimiters="B", allowed_mult=1.2),
-    _payer("HUMANA", "61101", "commercial", weight=.05, remit_weekdays=(2,), eft_lag_days=2),
+           remit_weekdays=(1, 4), claim_level_denials=.5, ref6r_rate=.7, delimiters="B", allowed_mult=1.2,
+           plb_reference_style="icn_pcn", remit_address=("PO BOX 188061", "CHATTANOOGA", "TN", "374228061"),
+           website="CIGNAFORHCP.COM"),
+    _payer("HUMANA", "61101", "commercial", weight=.05, remit_weekdays=(2,), eft_lag_days=2, plb_reference_style="icn",
+           remit_address=("PO BOX 14601", "LEXINGTON", "KY", "405124601"), website="HUMANA.COM"),
     _payer("UMR", "39026", "commercial", name_835="UMR (UNITEDHEALTHCARE)", weight=.08, remit_weekdays=(3,),
-           sends_ref_2u=False),
-    _payer("MERITAIN HEALTH", "41124", "commercial", weight=.04, remit_weekdays=(3,), payment_method="CHK"),
-    _payer("OSCAR HEALTH", "OSCAR", "commercial", weight=.03, remit_weekdays=(0, 3)),
+           sends_ref_2u=False, remit_address=("PO BOX 30541", "SALT LAKE CITY", "UT", "841300541"), website="UMR.COM"),
+    _payer("MERITAIN HEALTH", "41124", "commercial", weight=.04, remit_weekdays=(3,), payment_method="CHK",
+           plb_reference_style="pcn", remit_address=("PO BOX 853921", "RICHARDSON", "TX", "750853921")),
+    _payer("OSCAR HEALTH", "OSCAR", "commercial", weight=.03, remit_weekdays=(0, 3), plb_reference_style="icn",
+           remit_address=("PO BOX 52146", "PHOENIX", "AZ", "850722146"), website="HIOSCAR.COM"),
 ]
 _MEDICARE_ADVANTAGE = [
     _payer("UNITEDHEALTHCARE MEDICARE ADVANTAGE", "87727", "medicare_advantage",
            name_835="UNITEDHEALTHCARE INSURANCE COMPANY", weight=.29, remit_weekdays=(0, 1, 2, 3, 4),
-           sends_ref_2u=False, svc06_rate=.03, delimiters="C"),
+           sends_ref_2u=False, svc06_rate=.03, delimiters="C", sequestration=True,
+           remit_address=("PO BOX 31362", "SALT LAKE CITY", "UT", "841311362"), website="UHCPROVIDER.COM"),
     _payer("HUMANA MEDICARE ADVANTAGE", "61102", "medicare_advantage", name_835="HUMANA INSURANCE COMPANY", weight=.17,
-           remit_weekdays=(2,), eft_lag_days=2),
-    _payer("AETNA MEDICARE", "60055", "medicare_advantage", weight=.10, remit_weekdays=(0, 2, 4)),
-    _payer("WELLCARE MEDICARE", "14163", "medicare_advantage", name_835="WELLCARE HEALTH PLANS INC", weight=.08),
-    _payer("CIGNA MEDICARE ADVANTAGE", "62309", "medicare_advantage", weight=.05),
-    _payer("DEVOTED HEALTH", "DEV01", "medicare_advantage", weight=.04, remit_weekdays=(3,)),
-    _payer("ALIGNMENT HEALTH PLAN", "CCHPC", "medicare_advantage", weight=.03, remit_weekdays=(3,)),
-    _payer("CLOVER HEALTH", "CLOVR", "medicare_advantage", weight=.02, remit_weekdays=(4,)),
+           remit_weekdays=(2,), eft_lag_days=2, sequestration=True, plb_reference_style="icn",
+           remit_address=("PO BOX 14601", "LEXINGTON", "KY", "405124601"), website="HUMANA.COM"),
+    _payer("AETNA MEDICARE", "60055", "medicare_advantage", weight=.10, remit_weekdays=(0, 2, 4), sequestration=True,
+           plb_reference_style="icn", remit_address=("PO BOX 981106", "EL PASO", "TX", "799981106"), website="AETNA.COM"),
+    _payer("WELLCARE MEDICARE", "14163", "medicare_advantage", name_835="WELLCARE HEALTH PLANS INC", weight=.08,
+           sequestration=True, remit_address=("PO BOX 31372", "TAMPA", "FL", "336311372")),
+    _payer("CIGNA MEDICARE ADVANTAGE", "62309", "medicare_advantage", weight=.05, plb_reference_style="icn_pcn",
+           remit_address=("PO BOX 20002", "NASHVILLE", "TN", "372020002")),
+    _payer("DEVOTED HEALTH", "DEV01", "medicare_advantage", weight=.04, remit_weekdays=(3,),
+           remit_address=("PO BOX 211299", "EAGAN", "MN", "551211299")),
+    _payer("ALIGNMENT HEALTH PLAN", "CCHPC", "medicare_advantage", weight=.03, remit_weekdays=(3,),
+           remit_address=("PO BOX 14010", "ORANGE", "CA", "928631410")),
+    _payer("CLOVER HEALTH", "CLOVR", "medicare_advantage", weight=.02, remit_weekdays=(4,),
+           remit_address=("PO BOX 3236", "FRANKLIN", "TN", "370653236")),
 ]
 _TRICARE_OTHER = [
-    _payer("TRICARE EAST REGION", "TREST", "other", name_835="HUMANA MILITARY", weight=.55, lag=(10, 18, 45)),
-    _payer("VA COMMUNITY CARE NETWORK", "VACCN", "other", name_835="OPTUM VA CCN", weight=.25, lag=(14, 30, 75)),
+    _payer("TRICARE EAST REGION", "TREST", "other", name_835="HUMANA MILITARY", weight=.55, lag=(10, 18, 45),
+           remit_address=("PO BOX 7981", "MADISON", "WI", "537077981"), website="TRICARE-EAST.COM"),
+    _payer("VA COMMUNITY CARE NETWORK", "VACCN", "other", name_835="OPTUM VA CCN", weight=.25, lag=(14, 30, 75),
+           remit_address=("PO BOX 202117", "FLORENCE", "SC", "295022117")),
     _payer("WORKERS COMP STATE FUND", "WCSF1", "other", weight=.20, lag=(20, 35, 90), era=False, payment_method="CHK"),
 ]
 
 
 def _regional(state: str, mac: tuple, blues: tuple, medicaid: tuple, mcos: list, nc_skip: bool) -> dict:
-    mac_name, mac_id, mac_835 = mac
+    mac_name, mac_id, mac_835, mac_addr, mac_web = mac
     return {
-        "medicare_ffs": [_payer(mac_name, mac_id, "medicare", name_835=mac_835)],
-        "blues": [_payer(blues[0], blues[1], "blues", name_835=blues[2], weight=.9, multi_st_rate=.2),
+        "medicare_ffs": [_payer(mac_name, mac_id, "medicare", name_835=mac_835, remit_address=mac_addr,
+                                website=mac_web, plb_reference_style="icn")],
+        "blues": [_payer(blues[0], blues[1], "blues", name_835=blues[2], weight=.9, multi_st_rate=.2,
+                         remit_address=blues[3], website=blues[4]),
                   _payer(f"BCBS FEDERAL EMPLOYEE PROGRAM {state}", f"FEP{state}", "blues",
-                         name_835=f"FEP {blues[2]}", weight=.1, sends_ref_2u=False)],
+                         name_835=f"FEP {blues[2]}", weight=.1, sends_ref_2u=False, remit_address=blues[3],
+                         website="FEPBLUE.ORG")],
         "medicaid_ffs": [_payer(medicaid[0], medicaid[1], "medicaid", name_835=medicaid[2],
-                                skip_half_year_end_cycle=nc_skip, interest_rate=.06, sends_ref_2u=False)],
-        "medicaid_mco": [_payer(n, i, "medicaid_mco", name_835=n835, weight=w,
-                                remit_weekdays=wd) for n, i, n835, w, wd in mcos],
+                                skip_half_year_end_cycle=nc_skip, interest_rate=.06, sends_ref_2u=False,
+                                remit_address=medicaid[3], website=medicaid[4], plb_reference_style="icn")],
+        "medicaid_mco": [_payer(n, i, "medicaid_mco", name_835=n835, weight=w, remit_weekdays=wd, remit_address=addr)
+                         for n, i, n835, w, wd, addr in mcos],
     }
 
 
+CENTENE_CLAIMS = ("PO BOX 8040", "FARMINGTON", "MO", "636408040")
+ELEVANCE_CLAIMS = ("PO BOX 61010", "VIRGINIA BEACH", "VA", "234661010")
 REGIONS = {
-    "NC": _regional("NC", ("MEDICARE PART B NORTH CAROLINA", "11502", "PALMETTO GBA"),
-                    ("BLUE CROSS BLUE SHIELD OF NORTH CAROLINA", "61473", "BCBSNC"),
-                    ("NC MEDICAID", "NCMCD", "NC DEPARTMENT OF HEALTH AND HUMAN SERVICES"),
-                    [("WELLCARE OF NORTH CAROLINA", "68069", "WELLCARE OF NC INC", .30, (1,)),
-                     ("HEALTHY BLUE NORTH CAROLINA", "HBNC1", "BLUE CROSS NC HEALTHY BLUE", .25, (0, 3)),
-                     ("UNITEDHEALTHCARE COMMUNITY PLAN NC", "UHCNC", "UNITEDHEALTHCARE COMMUNITY PLAN", .20, (2,)),
-                     ("AMERIHEALTH CARITAS NORTH CAROLINA", "81671", "AMERIHEALTH CARITAS NC", .15, (3,)),
-                     ("CAROLINA COMPLETE HEALTH", "68068", "CAROLINA COMPLETE HEALTH INC", .10, (4,))], nc_skip=True),
-    "TX": _regional("TX", ("MEDICARE PART B TEXAS", "04412", "NOVITAS SOLUTIONS"),
-                    ("BLUE CROSS BLUE SHIELD OF TEXAS", "84980", "BCBSTX"),
-                    ("TEXAS MEDICAID", "TXMCD", "TEXAS MEDICAID AND HEALTHCARE PARTNERSHIP"),
-                    [("SUPERIOR HEALTHPLAN", "SHPTX", "SUPERIOR HEALTHPLAN INC", .30, (1,)),
-                     ("AMERIGROUP TEXAS", "26375", "AMERIGROUP TEXAS INC", .25, (0, 3)),
-                     ("MOLINA HEALTHCARE OF TEXAS", "20554", "MOLINA HEALTHCARE OF TEXAS INC", .20, (2,)),
-                     ("TEXAS CHILDRENS HEALTH PLAN", "76048", "TEXAS CHILDRENS HEALTH PLAN", .15, (3,)),
-                     ("COMMUNITY FIRST HEALTH PLANS", "COMM1", "COMMUNITY FIRST HEALTH PLANS INC", .10, (4,))],
+    "NC": _regional("NC", ("MEDICARE PART B NORTH CAROLINA", "11502", "PALMETTO GBA",
+                           ("PO BOX 100190", "COLUMBIA", "SC", "292023190"), "PALMETTOGBA.COM/JM"),
+                    ("BLUE CROSS BLUE SHIELD OF NORTH CAROLINA", "61473", "BCBSNC",
+                     ("PO BOX 35", "DURHAM", "NC", "277020035"), "BLUECROSSNC.COM"),
+                    ("NC MEDICAID", "NCMCD", "NC DEPARTMENT OF HEALTH AND HUMAN SERVICES",
+                     ("PO BOX 300001", "RALEIGH", "NC", "276220001"), "NCTRACKS.NCDHHS.GOV"),
+                    [("WELLCARE OF NORTH CAROLINA", "68069", "WELLCARE OF NC INC", .30, (1,), CENTENE_CLAIMS),
+                     ("HEALTHY BLUE NORTH CAROLINA", "HBNC1", "BLUE CROSS NC HEALTHY BLUE", .25, (0, 3),
+                      ("PO BOX 61010", "VIRGINIA BEACH", "VA", "234661010")),
+                     ("UNITEDHEALTHCARE COMMUNITY PLAN NC", "UHCNC", "UNITEDHEALTHCARE COMMUNITY PLAN", .20, (2,),
+                      ("PO BOX 31341", "SALT LAKE CITY", "UT", "841311341")),
+                     ("AMERIHEALTH CARITAS NORTH CAROLINA", "81671", "AMERIHEALTH CARITAS NC", .15, (3,),
+                      ("PO BOX 7110", "LONDON", "KY", "407427110")),
+                     ("CAROLINA COMPLETE HEALTH", "68068", "CAROLINA COMPLETE HEALTH INC", .10, (4,), CENTENE_CLAIMS)],
+                    nc_skip=True),
+    "TX": _regional("TX", ("MEDICARE PART B TEXAS", "04412", "NOVITAS SOLUTIONS",
+                           ("PO BOX 3095", "MECHANICSBURG", "PA", "170551849"), "NOVITAS-SOLUTIONS.COM"),
+                    ("BLUE CROSS BLUE SHIELD OF TEXAS", "84980", "BCBSTX",
+                     ("PO BOX 660044", "DALLAS", "TX", "752660044"), "BCBSTX.COM"),
+                    ("TEXAS MEDICAID", "TXMCD", "TEXAS MEDICAID AND HEALTHCARE PARTNERSHIP",
+                     ("PO BOX 200555", "AUSTIN", "TX", "787200555"), "TMHP.COM"),
+                    [("SUPERIOR HEALTHPLAN", "SHPTX", "SUPERIOR HEALTHPLAN INC", .30, (1,), CENTENE_CLAIMS),
+                     ("AMERIGROUP TEXAS", "26375", "AMERIGROUP TEXAS INC", .25, (0, 3), ELEVANCE_CLAIMS),
+                     ("MOLINA HEALTHCARE OF TEXAS", "20554", "MOLINA HEALTHCARE OF TEXAS INC", .20, (2,),
+                      ("PO BOX 22719", "LONG BEACH", "CA", "908012719")),
+                     ("TEXAS CHILDRENS HEALTH PLAN", "76048", "TEXAS CHILDRENS HEALTH PLAN", .15, (3,),
+                      ("PO BOX 300286", "HOUSTON", "TX", "772300286")),
+                     ("COMMUNITY FIRST HEALTH PLANS", "COMM1", "COMMUNITY FIRST HEALTH PLANS INC", .10, (4,),
+                      ("12238 SILICON DR STE 100", "SAN ANTONIO", "TX", "782492021"))],
                     nc_skip=False),
 }
 
-_TAIL_WORDS = (["PIEDMONT", "CAROLINA", "BLUE RIDGE", "COASTAL", "TRIAD", "LONE STAR", "GULF", "HILL COUNTRY",
-                "PRAIRIE", "SUMMIT", "HERITAGE", "PIONEER", "LIBERTY", "MERIDIAN", "KEYSTONE", "CARDINAL",
-                "MAGNOLIA", "RIVERBEND", "CYPRESS", "LAUREL", "BAYOU", "MESA", "PINNACLE", "FRONTIER"],
-               ["HEALTH PLAN", "BENEFIT ADMINISTRATORS", "EMPLOYEE BENEFIT TRUST", "HEALTH ALLIANCE",
-                "MUTUAL INSURANCE", "TEACHERS HEALTH FUND", "LABORERS HEALTH AND WELFARE FUND", "CARE NETWORK",
-                "PLAN ADMINISTRATORS", "HEALTH COOPERATIVE", "MEDICAL BENEFITS FUND", "SELECT HEALTH"])
+# Long tail: regional plans, TPAs, union and public-employee funds, cooperatives (name patterns from real payer lists,
+# words and places invented). Each gets a claims office in a plausible city.
+_TAIL_PLACES = ["PIEDMONT", "TRIAD", "CAPE FEAR", "BLUE RIDGE", "SANDHILLS", "CATAWBA VALLEY", "TAR HEEL", "YADKIN",
+                "CHEROKEE", "ALAMANCE", "PAMLICO", "GULF COAST", "HILL COUNTRY", "BRAZOS VALLEY", "PERMIAN BASIN",
+                "PANHANDLE", "RIO GRANDE", "PINEY WOODS", "BIG COUNTRY", "CROSS TIMBERS", "SOUTHEASTERN", "MID-SOUTH",
+                "TRI-STATE", "GREAT LAKES", "HEARTLAND", "MID-ATLANTIC", "SOUTHWEST", "TIDEWATER", "CUMBERLAND",
+                "SHENANDOAH", "OZARK", "BLUEGRASS", "LOWCOUNTRY", "APPALACHIAN", "CHESAPEAKE", "SUNBELT"]
+_TAIL_SURNAMES = ["BRIDGEWATER", "CALLOWAY", "PEMBERTON", "WHITFIELD", "ASHCROFT", "HOLLISTER", "KENDRICK", "MARLOWE",
+                  "STRATFORD", "WINSLOW", "THORNBURY", "LOCKWOOD", "EASTBROOK", "FAIRHAVEN", "GREYSTONE", "OAKMONT",
+                  "REDFORD", "SILVERTON", "WESTBRIDGE", "KINGSBRIDGE", "CRESTVIEW", "TRUEWAY", "HARTWELL", "BRANSON",
+                  "CALDER"]   # invented: no real administrator's name
+_TAIL_UNIONS = ["{place} LABORERS HEALTH AND WELFARE FUND", "{place} ELECTRICAL WORKERS BENEFIT FUND",
+                "{place} BUILDING TRADES HEALTH FUND", "{place} PIPE TRADES WELFARE FUND",
+                "{place} CARPENTERS HEALTH TRUST", "{place} FOOD AND COMMERCIAL WORKERS HEALTH FUND"]
+_TAIL_PATTERNS = ["{place} HEALTH PLAN", "{place} COMMUNITY HEALTH PLAN", "{place} EMPLOYEE BENEFIT TRUST",
+                  "{place} HEALTH ALLIANCE", "{place} MUTUAL INSURANCE COMPANY", "{place} TEACHERS HEALTH FUND",
+                  "{place} COUNTY EMPLOYEES HEALTH PLAN", "{place} SCHOOLS BENEFIT TRUST", "{place} CARE NETWORK",
+                  "{place} HEALTH COOPERATIVE", "{place} PHYSICIANS HEALTH PLAN", "{place} MEDICAL BENEFITS FUND",
+                  "{place} SELECT HEALTH", "{place} REGIONAL HEALTH PLAN", "{place} FARM BUREAU HEALTH PLAN",
+                  "{name} BENEFIT ADMINISTRATORS", "{name} HEALTH SERVICES", "{name} PLAN ADMINISTRATORS",
+                  "{name} AND ASSOCIATES BENEFITS", "{name} CLAIMS ADMINISTRATION", "{name} TPA",
+                  "{name} HEALTH SOLUTIONS", "{name} INSURANCE SERVICES", "{name} RISK MANAGEMENT"]
+_TAIL_OFFICES = [("RALEIGH", "NC", "27622"), ("CHARLOTTE", "NC", "28241"), ("GREENSBORO", "NC", "27420"),
+                 ("WINSTON SALEM", "NC", "27113"), ("DURHAM", "NC", "27717"), ("ASHEVILLE", "NC", "28813"),
+                 ("COLUMBIA", "SC", "29221"), ("GREENVILLE", "SC", "29602"), ("RICHMOND", "VA", "23285"),
+                 ("ROANOKE", "VA", "24022"), ("ATLANTA", "GA", "30348"), ("NASHVILLE", "TN", "37224"),
+                 ("KNOXVILLE", "TN", "37950"), ("BIRMINGHAM", "AL", "35238"), ("DALLAS", "TX", "75265"),
+                 ("HOUSTON", "TX", "77210"), ("SAN ANTONIO", "TX", "78265"), ("AUSTIN", "TX", "78711"),
+                 ("FORT WORTH", "TX", "76113"), ("OKLAHOMA CITY", "OK", "73124"), ("LITTLE ROCK", "AR", "72203"),
+                 ("LOUISVILLE", "KY", "40232"), ("COLUMBUS", "OH", "43216"), ("INDIANAPOLIS", "IN", "46206"),
+                 ("CHICAGO", "IL", "60680"), ("ST LOUIS", "MO", "63166"), ("MILWAUKEE", "WI", "53201"),
+                 ("MINNEAPOLIS", "MN", "55440"), ("DENVER", "CO", "80217"), ("PHOENIX", "AZ", "85062"),
+                 ("SALT LAKE CITY", "UT", "84130"), ("KANSAS CITY", "MO", "64121"), ("OMAHA", "NE", "68103")]
 N_TAIL_PAYERS = 320
 P_TAIL_PAPER, P_TAIL_OUT_OF_NETWORK = .30, .45   # small payers: no ERA (spec ~30%); non-contracted with the lab
+
+
+def _tail_name(r: random.Random) -> str:
+    u = r.random()
+    if u < .12:
+        return r.choice(_TAIL_UNIONS).format(place=r.choice(_TAIL_PLACES))
+    pattern = r.choice(_TAIL_PATTERNS)
+    return pattern.format(place=r.choice(_TAIL_PLACES), name=r.choice(_TAIL_SURNAMES))
 
 
 def _tail_payers() -> list[Payer]:
     """Regional plans and TPAs: Zipf-weighted (s ~1.1), weekly to monthly 835s, many by paper check."""
     r = random.Random(1101)
     names, out = set(), []
+    taken = {p.payer_id for p in _NATIONAL + _MEDICARE_ADVANTAGE + _TRICARE_OTHER} | {
+        p.payer_id for region in REGIONS.values() for payers in region.values() for p in payers}
     while len(out) < N_TAIL_PAYERS:
-        name = f"{r.choice(_TAIL_WORDS[0])} {r.choice(_TAIL_WORDS[1])}"
-        if name in names:
-            name = f"{name} {r.choice(['OF THE CAROLINAS', 'OF TEXAS', 'SOUTHEAST', 'MIDWEST', 'NATIONAL'])}"
-        if name in names:
+        name = _tail_name(r)
+        pid = f"{r.choice('ABCDEGHJKLMNPRSTW')}{r.randint(1000, 9999)}" if r.random() < .5 else f"{r.randint(10000, 99999)}"
+        if name in names or pid in taken:
             continue
         names.add(name)
+        taken.add(pid)
         rank = len(out)
-        pid = f"{r.choice('ABCDEGHJKLMNPRSTW')}{r.randint(1000, 9999)}" if r.random() < .5 else f"{r.randint(10000, 99999)}"
         oon = r.random() < P_TAIL_OUT_OF_NETWORK
+        city, state, zip5 = r.choice(_TAIL_OFFICES)
+        name_835 = r.choice([None, None, f"{name} CLAIMS", name.replace(" AND ", " & "), f"{name} INC"])
         out.append(_payer(
-            name, pid, "commercial", weight=1 / (rank + 1) ** 1.1, name_835=name + " CLAIMS" if r.random() < .5 else None,
+            name, pid, "commercial", weight=1 / (rank + 1) ** 1.1, name_835=name_835 if name_835 != name else None,
             lag=(10, r.choice([18, 21, 28]), 75), remit_weekdays=(r.randrange(5),), remit_every_weeks=r.choice([1, 1, 1, 2, 2, 4]),
             era=r.random() >= (P_TAIL_PAPER * (.4 if rank < 40 else 1.15)),
             payment_method="CHK" if r.random() < .4 else "ACH", sends_ref_2u=r.random() < .5,
@@ -520,7 +693,10 @@ def _tail_payers() -> list[Payer]:
             allowed_mult=round(math.exp(r.gauss(math.log(1.15), .25)), 3), claim_level_denials=r.choice([.05, .15, .3, .5]),
             ref6r_rate=r.choice([.5, .9, .97]), member_id_style=r.choice(["digits9", "alnum10", "prefix3"]),
             icn_style=r.choice(["digits11", "digits12", "alpha2digits10", "digits15"]),
-            delimiters=r.choice("AABC"), timely_filing_days=r.choice([90, 180, 180, 365])))
+            delimiters=r.choice("AABC"), timely_filing_days=r.choice([90, 180, 180, 365]),
+            plb_reference_style=r.choice(["icn", "icn", "icn", "dos_pcn", "pcn", "icn_pcn"]),
+            reduction_group="PI" if oon and r.random() < .5 else "CO",
+            remit_address=(f"PO BOX {r.randint(1000, 999999)}", city, state, f"{zip5}{r.randint(1, 9999):04d}")))
     return out
 
 
@@ -568,13 +744,15 @@ SEQUESTRATION = .02
 # share of denials by category (XiFin 2025, spec denials.denial_category_mix_*), level, CARC weights, RARC weights.
 # Duplicates (15-35% of denials) come from duplicate resends (Scenario.p_duplicate_submission), not from this draw.
 DENIAL_CATEGORIES = {
-    "bundling":          dict(clinical=.594, molecular=.142, pathology=.230, medicare=.42, level="line",
+    "bundling":          dict(clinical=.85, molecular=.142, pathology=.230, medicare=.42, level="line",
                               carcs={"97": .55, "234": .15, "236": .20, "B15": .10},
                               medicare_carcs={"97": .4, "236": .6}, rarcs={"M15": .4, "N19": .3, "M80": .1, "N20": .2}),
     "non_covered":       dict(clinical=.066, molecular=.046, pathology=.052, medicare=.05, level="line_or_claim",
-                              carcs={"96": .5, "204": .35, "B1": .15}, rarcs={"N130": .5, "N425": .2, "M76": .1, "": .2}),
+                              carcs={"96": .45, "204": .3, "B1": .1, "119": .1, "242": .05},
+                              medicare_carcs={"96": .6, "204": .4},
+                              rarcs={"N130": .5, "N425": .15, "M76": .1, "N640": .05, "": .2}),
     "prior_auth":        dict(clinical=.035, molecular=.276, pathology=.049, medicare=0, level="claim",
-                              carcs={"197": .7, "15": .15, "198": .15}, rarcs={"N54": .4, "M62": .3, "": .3}),
+                              carcs={"197": .62, "15": .13, "198": .13, "288": .12}, rarcs={"N54": .4, "M62": .3, "": .3}),
     "modifier":          dict(clinical=.032, molecular=.0, pathology=.029, medicare=.03, level="line",
                               carcs={"4": 1}, rarcs={"N519": .3, "M20": .3, "N657": .1, "": .3}),
     "cob":               dict(clinical=.021, molecular=.034, pathology=.150, medicare=.03, level="claim",
@@ -584,7 +762,8 @@ DENIAL_CATEGORIES = {
     "wrong_payer":       dict(clinical=.004, molecular=.009, pathology=.016, medicare=.01, level="claim",
                               carcs={"109": 1}, rarcs={"N418": .5, "": .5}),
     "information":       dict(clinical=.0256, molecular=.06, pathology=.02, medicare=.08, level="claim",
-                              carcs={"16": 1}, rarcs={"M127": .3, "N264": .3, "N290": .2, "MA130": .2}),
+                              carcs={"16": .82, "252": .18}, medicare_carcs={"16": 1},
+                              rarcs={"M127": .25, "N264": .3, "N290": .15, "MA130": .15, "N706": .15}),
     "medical_necessity": dict(clinical=.0314, molecular=.07, pathology=.012, medicare=.20, level="line",
                               carcs={"50": .58, "11": .23, "167": .19}, medicare_carcs={"50": 1},
                               rarcs={"N386": .6, "N115": .4}),
@@ -606,9 +785,14 @@ PATHOLOGY_PROFILES = {"pathology"}
 
 
 # --- reference world: tenants ---------------------------------------------------------------------
-def npi(seed: int) -> str:
-    """10-digit NPI with a valid Luhn check digit (computed over the 80840 prefix, as CMS specifies)."""
-    base = f"1{seed % 10**8:08d}"
+NPI_ISSUED_RANGE = (100300000, 199399999)      # first nine digits of the NPIs NPPES has issued so far
+
+
+def npi(seed) -> str:
+    """10-digit NPI with a valid Luhn check digit (computed over the 80840 prefix, as CMS specifies). The first nine
+    digits are spread over the issued range by a hash of the seed, so related providers share no prefix."""
+    lo, hi = NPI_ISSUED_RANGE
+    base = f"{lo + _stable_int('npi', seed) % (hi - lo + 1)}"
     total = 0
     for i, ch in enumerate(reversed("80840" + base)):
         d = int(ch)
@@ -635,7 +819,7 @@ class Tenant:
     code: str
     name: str
     tax_id: str
-    npi_seed: int
+    npi_seed: int                   # billing NPI = npi(npi_seed): checked absent from the NPPES registry
     claims_per_day: int
     price_mult: float
     sender_id: str
@@ -643,14 +827,19 @@ class Tenant:
     pcn_prefix: str                 # distinct per tenant: PCNs never collide across tenants
     region: str                     # state: decides the MAC, the home Blues plan and the state Medicaid
     address: tuple                  # street, city, state, 9-digit ZIP
-    clia: str                       # CLIA certificate number (REF*X4): 2-digit state code + 'D' + 7 digits
+    clia: str                       # CLIA certificate number (REF*X4): 2-digit state code + 'D' + 7 digits; invented
+    #                                 (checked absent from the CMS CLIA provider-of-services file, Q3 2026)
+    billing_phone: str              # 1000A PER: the billing office, a local number
+    bank: tuple                     # the lab's receiving account (BPR13 ABA, BPR15 account)
 
 
 TENANTS = {
     "acme_labs": Tenant("acme_labs", "ACME LABS INC", "561234567", 4242, 120, 1.0, "ACMELABS", "A", "LB", "NC",
-                        ("1 ACME WAY", "BURLINGTON", "NC", "272150001"), "34D0655059"),
-    "acme_diagnostics": Tenant("acme_diagnostics", "ACME DIAGNOSTICS LLC", "561234999", 7777, 40, 1.15, "ACMEDX", "B",
-                               "DX", "TX", ("500 ACME PKWY", "AUSTIN", "TX", "787010042"), "45D2034401"),
+                        ("2617 ANTHONY RD", "BURLINGTON", "NC", "272155230"), "34D2187436", "3365702140",
+                        ("053112929", "4410273395")),
+    "acme_diagnostics": Tenant("acme_diagnostics", "ACME DIAGNOSTICS LLC", "561234999", 7779, 40, 1.15, "ACMEDX", "B",
+                               "DX", "TX", ("8701 N MOPAC EXPY STE 300", "AUSTIN", "TX", "787594114"), "45D2034401",
+                               "5124673300", ("114924742", "3801159926")),
 }
 assert len({t.pcn_prefix for t in TENANTS.values()}) == len(TENANTS)
 
@@ -687,6 +876,7 @@ class Scenario:
     mac_mass_adjustment_waves_per_year: int = 2   # erroneous MAC edit (CO-B7) later reversed and paid in a wave
     skip_weekends: bool = True
     skip_federal_holidays: bool = True
+    burn_in_days: int = 90                # history simulated before `start` and not emitted: day 1 is steady state
 
     @staticmethod
     def stress(**kw) -> "Scenario":
@@ -724,7 +914,8 @@ ROUTINE_MONTH_INDEX = {1: 1.05, 2: 1.00, 3: 1.05, 4: 1.00, 5: 1.00, 6: .95, 7: .
                        11: .97, 12: .90}
 RESPIRATORY_MONTH_INDEX = {1: 3.2, 2: 2.5, 3: 1.6, 4: .9, 5: .6, 6: .5, 7: .6, 8: .7, 9: .9, 10: 1.3, 11: 2.0, 12: 3.0}
 WEEKDAY_INDEX_837 = {0: 1.30, 1: 1.10, 2: 1.00, 3: .95, 4: .85}
-DOS_WEEKDAY_SHARE = {0: .20, 1: .19, 2: .18, 3: .18, 4: .17, 5: .06, 6: .02}
+DOS_WEEKDAY_SHARE = {0: .195, 1: .19, 2: .19, 3: .185, 4: .165, 5: .055, 6: .02}   # collection dates
+DOS_HOLIDAY_FACTOR = .12                # patient service centers close on federal holidays (hospitals still draw)
 DAY_AFTER_HOLIDAY_INDEX, HOLIDAY_WEEK_INDEX = 1.5, .75
 PCN_DIGITS = 6
 
@@ -735,9 +926,11 @@ class Person:
     first: str
     last: str
     dob: date
-    gender: str
+    gender: str                     # DMG03 as registered (the gender marker on the patient's insurance)
     addr: str
-    city: tuple
+    city: tuple                     # (city, state, ZIP5)
+    middle: str = ""                # NM105 middle initial
+    addr2: str | None = None        # N302 apartment / unit
 
 
 @dataclass
@@ -756,12 +949,18 @@ class Patient:
     coverages: list                 # [primary, secondary?]
     segment: str
     repeater: bool
+    sex: str = "F"                  # clinical sex: decides sex-specific tests and diagnoses
+    conditions: tuple = ()          # known chronic conditions: ICD-10-CM codes carried from visit to visit
     deductible: float = 0.0         # annual (commercial); Medicare Part B for pathology lines
     lab_deductible: bool = True     # the plan applies the deductible to outpatient lab work
     coinsurance: float = 0.0
     copay: float = 0.0
     deductible_pace: float = 1.0    # years of other care it takes this patient to meet the deductible
     crossover: str | None = None    # Medicare supplemental carrier (COBA crossover)
+    repeater_kind: str = ""         # anticoag | drug: what a repeat patient comes back for
+
+    def age(self, on: date) -> float:
+        return (on - self.person.dob).days / 365.25
 
 
 @dataclass
@@ -770,6 +969,7 @@ class Provider:
     first: str
     npi: str
     risky: bool
+    middle: str = ""
 
 
 @dataclass
@@ -800,19 +1000,10 @@ class Claim:
     service_facility: bool = False  # 2310C NM1*77
     sends_line_ids: bool = True     # REF*6R on each line (the payer can only echo what was sent)
     interest_exempt: bool = False   # pended for information: not a clean claim, so no prompt-pay interest
+    line_edits: dict = field(default_factory=dict)   # line -> (group, CARC, RARC, category): the primary payer's
+    #                                 deterministic edits (NCCI residue, NCD coverage, ABN liability, sex edits)
 
 
-FIRST = ["AVERY", "JORDAN", "TAYLOR", "MORGAN", "CASEY", "RILEY", "QUINN", "JAMIE", "SKYLER", "PARKER", "ROWAN", "DREW",
-         "SAGE", "EMERY", "HARPER", "LOGAN", "REESE", "BLAKE", "DAKOTA", "FINLEY", "MARLOWE", "ELLIS", "ARDEN", "KAI"]
-LAST = ["ACMEFIELD", "TESTWOOD", "SAMPLEMAN", "MOCKLER", "DUMMIT", "FAKERSON", "PLACEHOLT", "SYNTHIA", "NULLMAN",
-        "FIXTURE", "STUBBS", "EXAMPLAR", "PROTOTOV", "DEMOSKI", "TRIALSON", "FIGMENTA", "PRETENDA", "LOREMSON",
-        "O'MOCKERY", "TEST-HYPHEN"]
-PROVIDER_LAST = ["OSLERTON", "HIPPOCRAS", "GALENSKI", "CURIEWOOD", "PASTEURO", "LISTERMAN", "SNOWDEN", "BLACKWELLO",
-                 "AVICENNO", "HARVEYSON", "JENNERTON", "NIGHTINGAL"]
-CITIES = {"NC": [("BURLINGTON", "NC", "27215"), ("RALEIGH", "NC", "27601"), ("GREENSBORO", "NC", "27401"),
-                 ("DURHAM", "NC", "27701"), ("CHARLOTTE", "NC", "28202"), ("DANVILLE", "VA", "24541")],
-          "TX": [("AUSTIN", "TX", "78701"), ("ROUND ROCK", "TX", "78664"), ("SAN MARCOS", "TX", "78666"),
-                 ("SAN ANTONIO", "TX", "78205"), ("KILLEEN", "TX", "76541"), ("WACO", "TX", "76701")]}
 DELIMS = {  # element, component, repetition, segment terminator, line ending after terminator
     "A": ("*", ":", "^", "~", "\n"), "B": ("|", ">", "^", "~", ""), "C": ("*", ":", "^", "~", "\r\n")}
 _MBI_ALPHA = "ACDEFGHJKMNPQRTUVWXY"
@@ -872,11 +1063,12 @@ def _x12str(e) -> str:
 
 
 def interchange(style: str, sender: str, receiver: str, d: date, ctl: int, gs_code: str, impl: str,
-                transactions: list[X12], st_id: str, gs_sender: str | None = None) -> str:
+                transactions: list[X12], st_id: str, gs_sender: str | None = None, sent_at: str = "120000") -> str:
+    """sent_at = HHMMSS the sender built the interchange (ISA10 = HHMM; GS05 carries the seconds)."""
     el, comp, rep, term, nl = DELIMS[style]
     isa = el.join(["ISA", "00", " " * 10, "00", " " * 10, "ZZ", f"{sender:<15}", "ZZ", f"{receiver:<15}",
-                   f"{d:%y%m%d}", "1200", rep, "00501", f"{ctl:09d}", "0", "P", comp])
-    out = [isa, el.join(["GS", gs_code, gs_sender or sender, receiver, f"{d:%Y%m%d}", "1200", str(ctl), "X", impl])]
+                   f"{d:%y%m%d}", sent_at[:4], rep, "00501", f"{ctl:09d}", "0", "P", comp])
+    out = [isa, el.join(["GS", gs_code, gs_sender or sender, receiver, f"{d:%Y%m%d}", sent_at, str(ctl), "X", impl])]
     for i, t in enumerate(transactions, 1):
         stn = f"{i:04d}"
         out.append(el.join(["ST", st_id, stn, impl]))
@@ -926,10 +1118,6 @@ def _tri(r: random.Random, lo, mode, hi) -> float:
     return r.triangular(lo, hi, mode)
 
 
-def _bundlable(code: str) -> bool:
-    return code == "36415" or code in BUNDLED_INTO
-
-
 def _poisson(r: random.Random, lam: float) -> int:
     limit, k, p = math.exp(-lam), 0, r.random()
     while p > limit:
@@ -957,7 +1145,7 @@ class Generator:
         self._prng = random.Random()                              # reseeded per patient
         self._pbase: dict[str, int] = {}
         self.tenant_codes = list(tenants or TENANTS)
-        self.ctl = 100
+        self.isa_ctl: dict = {}                                   # (sender, receiver) -> last ISA13 sent
         self.plb_log: dict = {}
         self.paid_history: dict = {}                              # (tenant, payer) -> ICNs paid in earlier 835s
         self.trace_seq: dict = {}                                 # payer -> running EFT trace / check number
@@ -996,20 +1184,46 @@ class Generator:
         return self._add_business_days(remit_day, payer.eft_lag_days)
 
     # people and providers
-    def _person(self, r: random.Random, region: str, age_range: tuple, ref: date) -> Person:
-        age_days = r.randint(int(age_range[0] * 365.25), int(age_range[1] * 365.25))
-        city = r.choice(CITIES[region])
-        return Person(r.choice(FIRST), r.choice(LAST), ref - timedelta(days=age_days), r.choice("MF"),
-                      f"{r.randint(1, 9999)} {r.choice(['TEST', 'SAMPLE', 'MOCK'])} ST", city)
+    def _person(self, r: random.Random, region: str, age_range: tuple, ref: date, sex: str | None = None,
+                surname: str | None = None, home: "Person | None" = None) -> Person:
+        """A fictional person: a common surname for the state, a first name of the right sex and birth cohort, a
+        street address in the lab's referral area. A household member shares the surname and address."""
+        lo, hi = age_range
+        age = lo + (hi - lo) * r.random() ** (1.6 if lo >= 65 else 1.0)   # Medicare: more 65-79 than 85+
+        dob = ref - timedelta(days=round(age * 365.25))
+        sex = sex or r.choice("FM")
+        last = surname or R.SURNAMES[bisect.bisect_left(self.surname_cum, r.random() * self.surname_cum[-1])]
+        first = R.first_name(r, sex, dob.year, last in R.HISPANIC_SURNAMES)
+        middle = r.choice(R.MIDDLE_INITIALS[:12] if r.random() < .7 else R.MIDDLE_INITIALS) \
+            if r.random() < R.P_MIDDLE_INITIAL else ""
+        if home is not None:
+            return Person(first, last, dob, sex, home.addr, home.city, middle, home.addr2)
+        where = R.place(r, region)
+        line1, line2 = R.street_address(r, region)
+        return Person(first, last, dob, sex, line1, (where.city, where.state, where.zip5), middle, line2)
 
     def _providers(self, seed: int, n: int) -> list[Provider]:
         r = self.rng
-        return [Provider(r.choice(PROVIDER_LAST), r.choice(FIRST), npi(seed * 10000 + i), r.random() < self.sc.p_risky_provider)
-                for i in range(n)]
+        out = []
+        for i in range(n):
+            sex = "F" if r.random() < .45 else "M"
+            last = R.SURNAMES[bisect.bisect_left(self.surname_cum, r.random() * self.surname_cum[-1])]
+            year = r.randint(1952, 1992)
+            out.append(Provider(last, R.first_name(r, sex, year, last in R.HISPANIC_SURNAMES), npi((seed, "ordering", i)),
+                                r.random() < self.sc.p_risky_provider, r.choice(R.MIDDLE_INITIALS)))
+        return out
 
-    def _next_ctl(self) -> int:
-        self.ctl += 1
-        return self.ctl
+    def _next_ctl(self, sender: str, receiver: str) -> int:
+        """ISA13: each sender numbers its interchanges to a receiver on its own running counter."""
+        key = (sender, receiver)
+        n = self.isa_ctl.get(key) or 1000 + _stable_int("isa13", sender, receiver) % 400000
+        self.isa_ctl[key] = n + 1
+        return n + 1
+
+    def _reused_ctl(self, sender: str, receiver: str) -> int:
+        """A control number this sender already used (a resend from a restored batch, spec quirks.envelope)."""
+        last = self._next_ctl(sender, receiver)
+        return max(1001, last - self.rng.randint(50, 500))
 
     def _trace(self, payer: Payer) -> str:
         n = self.trace_seq[payer.payer_id] = self.trace_seq.get(payer.payer_id, 0) + 1
@@ -1051,8 +1265,8 @@ class Generator:
         x.s("HL", str(sub_hl), "1", "22", "1" if dependent else "0")
         x.s("SBR", "S" if seq else "P", "" if dependent else "18", cov.group, "", "", "", "", "", cov.payer.sbr09)
         s = cov.subscriber
-        x.s("NM1", "IL", "1", s.last, s.first, "", "", "", "MI", cov.member_id)
-        x.s("N3", s.addr)
+        x.s("NM1", "IL", "1", s.last, s.first, s.middle, "", "", "MI", cov.member_id)
+        x.s("N3", s.addr, s.addr2)
         x.s("N4", s.city[0], s.city[1], _zip(s))
         x.s("DMG", "D8", f"{s.dob:%Y%m%d}", s.gender)
         x.s("NM1", "PR", "2", cov.payer.name, "", "", "", "", "PI", cov.payer.payer_id)
@@ -1060,8 +1274,8 @@ class Generator:
             hl[0] += 1
             x.s("HL", str(hl[0]), str(sub_hl), "23", "0")
             x.s("PAT", cov.relationship)
-            x.s("NM1", "QC", "1", pat.last, pat.first)
-            x.s("N3", pat.addr)
+            x.s("NM1", "QC", "1", pat.last, pat.first, pat.middle)
+            x.s("N3", pat.addr, pat.addr2)
             x.s("N4", pat.city[0], pat.city[1], _zip(pat))
             x.s("DMG", "D8", f"{pat.dob:%Y%m%d}", pat.gender)
         total = round(sum(l.charge for l in c.lines), 2)
@@ -1077,10 +1291,10 @@ class Generator:
             x.s("NTE", "ADD", "UNLISTED MOLECULAR PATHOLOGY - GENE PANEL")
         x.s("HI", *[x.c("ABK" if i == 0 else "ABF", dx) for i, dx in enumerate(c.dx)])
         r = c.referring
-        x.s("NM1", "DN", "1", r.last, r.first, "", "", "", "XX", r.npi)
+        x.s("NM1", "DN", "1", r.last, r.first, r.middle, "", "", "XX", r.npi)
         if c.service_facility:
             x.s("NM1", "77", "2", f"{t.name} PATIENT SERVICE CENTER", "", "", "", "", "XX", npi(t.npi_seed + 1))
-            x.s("N3", f"{100 + t.npi_seed % 900} CLINIC DR")
+            x.s("N3", t.address[0])
             x.s("N4", t.address[1], t.address[2], t.address[3])
         if prior:                                                 # 2320 / 2330A / 2330B: the primary's adjudication
             pcov = c.patient.coverages[0]
@@ -1103,7 +1317,7 @@ class Generator:
             if send_6r:
                 x.s("REF", "6R", f"{c.pcn}{i:02d}")
             if c.line_level_ordering:
-                x.s("NM1", "DK", "1", r.last, r.first, "", "", "", "XX", r.npi)
+                x.s("NM1", "DK", "1", r.last, r.first, r.middle, "", "", "XX", r.npi)
             if prior:
                 pl = prior["lines"][i - 1]
                 x.s("SVD", c.patient.coverages[0].payer.payer_id, money(pl["paid"]), x.c("HC", l.cpt, *l.modifiers), "",
@@ -1112,11 +1326,11 @@ class Generator:
                     x.s(*seg)
                 x.s("DTP", "573", "D8", f"{prior['date']:%Y%m%d}")
 
-    def _file_837(self, t: Tenant, d: date, items: list, batch: int) -> str:
+    def _file_837(self, t: Tenant, d: date, items: list, batch: int, sent_at: str) -> str:
         x = X12(t.delimiters)
-        x.s("BHT", "0019", "00", f"{t.sender_id}{d:%Y%m%d}{batch:02d}", f"{d:%Y%m%d}", "1200", "CH")
+        x.s("BHT", "0019", "00", f"{t.sender_id}{d:%Y%m%d}{batch:02d}", f"{d:%Y%m%d}", sent_at[:4], "CH")
         x.s("NM1", "41", "2", t.name, "", "", "", "", "46", t.tax_id)
-        x.s("PER", "IC", "BILLING OFFICE", "TE", "5555550100")
+        x.s("PER", "IC", "BILLING OFFICE", "TE", t.billing_phone)
         x.s("NM1", "40", "2", CLEARINGHOUSE_NAME, "", "", "", "", "46", "CCCH01")
         x.s("HL", "1", "", "20", "1")
         x.s("PRV", "BI", "PXC", "291U00000X")
@@ -1127,7 +1341,8 @@ class Generator:
         hl = [1]
         for c, seq, freq, prior, orig_icn in items:
             self._claim_837(x, t, c, seq, freq, hl, prior, orig_icn)
-        return interchange(t.delimiters, t.sender_id, CLEARINGHOUSE_ID, d, self._next_ctl(), "HC", "005010X222A1", [x], "837")
+        return interchange(t.delimiters, t.sender_id, CLEARINGHOUSE_ID, d, self._next_ctl(t.sender_id, CLEARINGHOUSE_ID),
+                           "HC", "005010X222A1", [x], "837", sent_at=sent_at)
 
     # -- adjudication ----------------------------------------------------------------------------------
     def _deductible_left(self, c: Claim, payer: Payer, accum: dict, base: float) -> tuple[float, tuple]:
@@ -1156,12 +1371,15 @@ class Generator:
         else:
             ded_left, acc_key = 0.0, None
         ded_used = 0.0
-        screening = c.dx[0] in SCREENING_DX
         denied_lines = denial["lines"] if denial else set()
         recodes = denial["recode"] if denial else {}
+        edits = c.line_edits if seq == 0 and outcome in ("paid", "partial") else {}
+        edit_category = None
+        sequestered = medicare or payer.sequestration
         for i, l in enumerate(c.lines):
             cpt = CPTS[l.cpt]
             cas, rarc, units_paid, units_billed, adjudicated = [], None, l.units, None, l.cpt
+            screening = c.dx[int(l.pointers[0]) - 1] in SCREENING_DX
             if outcome == "secondary":                            # pays toward what the primary left the patient
                 pl = prior["lines"][i]
                 left = round(sum(a for g, _, a in pl["cas"] if g == "PR"), 2)
@@ -1177,6 +1395,11 @@ class Generator:
                 rarc = denial["line_rarc"].get(i, denial["rarc"])
                 paid, allowed = 0.0, 0.0
                 cas.append((group, code, l.charge))
+            elif i in edits:                                      # NCCI residue, NCD coverage, ABN, sex edit
+                group, code, rarc, category = edits[i]
+                paid, allowed = 0.0, 0.0
+                cas.append((group, code, l.charge))
+                edit_category = edit_category or category
             elif outcome == "zero_fee":
                 paid, allowed = 0.0, 0.0
                 cas.append(("CO", "45", l.charge))
@@ -1228,11 +1451,11 @@ class Generator:
                     if co_ins > 0:
                         pr_parts.append(("2", co_ins))
                 pr = round(sum(a for _, a in pr_parts), 2)
-                seq_cut = round(SEQUESTRATION * (allowed - pr), 2) if medicare else 0.0
+                seq_cut = round(SEQUESTRATION * (allowed - pr), 2) if sequestered else 0.0
                 paid = round(allowed - pr - seq_cut, 2)
                 contractual = round(l.charge - excess - allowed, 2)
                 if contractual > 0:
-                    cas.append(("CO", "45", contractual))
+                    cas.append((payer.reduction_group, "45", contractual))
                 if excess:
                     cas.append(("CO", "151", excess))
                 if seq_cut:
@@ -1247,7 +1470,7 @@ class Generator:
         claim_level = bool(denial and denial["claim_level_only"] and outcome == "denied")
         e = dict(pcn=c.pcn, payer_id=payer.payer_id, seq=seq, lines=lines, claim_cas=[],
                  icn=self._icn(payer, c, salt, d), claim_level_only=claim_level, status=None,
-                 category=denial["category"] if denial else None, moa=[], plb=[], interest=0, crossover=None)
+                 category=denial["category"] if denial else edit_category, moa=[], plb=[], interest=0, crossover=None)
         if claim_level:                                           # move CAS to the claim, drop line detail
             e["claim_cas"] = [(denial["line_group"].get(0, "CO"), denial["carc"], round(sum(l.charge for l in c.lines), 2))]
             e["moa"] = [denial["rarc"] or "N130"]
@@ -1287,8 +1510,8 @@ class Generator:
         p = INITIAL_DENIAL_RATE[klass] * payer.denial_mult * self.sc.denial_rate_scale * DENIAL_CALIBRATION
         if c.dx[0] in SCREENING_DX and any(CPTS[l.cpt].medical_necessity for l in c.lines):
             p *= 2.2
-        if len(c.lines) == 1 and not _bundlable(c.lines[0].cpt):
-            p *= .45                                          # a single test: nothing to bundle (the top denial reason)
+        if not self._bundling_lines(c, payer):
+            p *= .45                                          # nothing to bundle (the top denial reason)
         if c.referring.risky:
             p *= 1.8
         if klass == "molecular" and not c.prior_auth and not payer.is_medicare:
@@ -1302,13 +1525,13 @@ class Generator:
         weights = {}
         for name, cat in DENIAL_CATEGORIES.items():
             w = cat[col]
-            if name == "medical_necessity":
-                w *= (4 if c.dx[0] in SCREENING_DX else 1) if has_mn else 0
+            if name == "medical_necessity":                  # Medicare: decided by the NCD edits (_line_edits)
+                w *= (1.5 if c.dx[0] in SCREENING_DX else 1) if has_mn and not payer.is_medicare else 0
             elif name == "prior_auth":
                 w *= 0 if c.prior_auth else (3 if klass == "molecular" else 1)
             elif name in ("information", "pecos") and c.referring.risky:
                 w *= 4
-            elif name == "bundling" and len(c.lines) == 1 and not _bundlable(c.lines[0].cpt):
+            elif name == "bundling" and not self._bundling_lines(c, payer):
                 w = 0                                         # nothing on the claim to fold into another service
             if w > 0:
                 weights[name] = w
@@ -1326,31 +1549,23 @@ class Generator:
         if level == "line_or_claim":
             level = "line" if n > 1 and r.random() < .7 else "claim"
         if level == "line" and n > 1:
-            codes = {l.cpt for l in c.lines}
-            free = [i for i, l in enumerate(c.lines) if not {"59", "XU"} & set(l.modifiers)]
-            if category == "bundling":
-                comp = [i for i in free if BUNDLED_INTO.get(c.lines[i].cpt) in codes
-                        or (BUNDLED_INTO.get(c.lines[i].cpt) == "80053" and "80048" in codes)]
-                draw = [i for i in free if c.lines[i].cpt == "36415"] if not payer.is_medicare else []
+            if category == "bundling":                        # payer policy, not NCCI (the scrubber removed those)
+                folded = [i for i in self._bundling_lines(c, payer) if c.lines[i].cpt not in ("87491", "87591")]
+                draw = [i for i in folded if c.lines[i].cpt == "36415"]
                 sti = [i for i, l in enumerate(c.lines) if l.cpt in ("87491", "87591")]
-                if len(sti) == 2 and not payer.is_medicare and r.random() < .5:
+                if len(sti) == 2 and not payer.is_medicare and (not folded or r.random() < .5):
                     a, b = sorted(sti, key=lambda i: c.lines[i].cpt)   # 87491 paid as 87801 (SVC06), 87591 -> CO-97
                     spec["recode"][a] = "87801"
                     spec["lines"] = {b}
                     spec["line_carc"][b] = "97"
-                elif draw and (not comp or r.random() < .5):
+                elif draw and (len(folded) == 1 or r.random() < .6):
                     spec["lines"] = set(draw)
-                elif comp:
-                    spec["lines"] = set(r.sample(comp, min(len(comp), r.choice([1, 1, 2]))))
                 else:
-                    spec["lines"] = {min(free or range(n), key=lambda i: c.lines[i].charge)}
+                    rest = [i for i in folded if i not in draw] or folded
+                    spec["lines"] = set(r.sample(rest, min(len(rest), r.choice([1, 1, 2]))))
             elif category == "medical_necessity":
                 mn = [i for i, l in enumerate(c.lines) if CPTS[l.cpt].medical_necessity]
                 spec["lines"] = set(r.sample(mn, max(1, min(len(mn), _poisson(r, .6) + 1))))
-                if payer.is_medicare:
-                    for i in spec["lines"]:
-                        if "GA" in c.lines[i].modifiers:
-                            spec["line_group"][i] = "PR"      # ABN on file: the patient is liable (PR-50)
             elif category == "modifier":
                 mods = [i for i, l in enumerate(c.lines) if l.modifiers]
                 spec["lines"] = {r.choice(mods or list(range(n)))}
@@ -1359,16 +1574,25 @@ class Generator:
                 spec["lines"] = {r.choice(mol or list(range(n)))}
             else:
                 spec["lines"] = {r.randrange(n)}
-            if category == "non_covered" and payer.is_medicare:
-                for i in spec["lines"]:
-                    if "GY" in c.lines[i].modifiers:
-                        spec["line_group"][i] = "PR"          # statutorily excluded screening: patient liable
         else:
             spec["lines"] = set(range(n))
             if not payer.is_medicare and r.random() < payer.claim_level_denials:
                 spec["claim_level_only"] = True
         spec["full"] = len(spec["lines"]) == n and not spec["recode"]
         return spec
+
+    @staticmethod
+    def _bundling_lines(c: Claim, payer: Payer) -> list[int]:
+        """Lines a payer's own bundling policy folds into another service on the claim (Medicare pays them)."""
+        if payer.is_medicare or len(c.lines) < 2:
+            return []
+        codes = {l.cpt for l in c.lines}
+        out = [i for i, l in enumerate(c.lines) if l.cpt in PAYER_BUNDLED_INTO
+               and (PAYER_BUNDLED_INTO[l.cpt] is None or codes & set(PAYER_BUNDLED_INTO[l.cpt]))
+               and not {"59", "XU"} & set(l.modifiers)]
+        if {"87491", "87591"} <= codes:
+            out += [i for i, l in enumerate(c.lines) if l.cpt in ("87491", "87591")]
+        return out
 
     def _fixed_denial(self, c: Claim, payer: Payer, category: str, carc: str, rarc: str | None,
                       group: str = "CO") -> dict:
@@ -1380,22 +1604,30 @@ class Generator:
 
     # -- 835 ------------------------------------------------------------------------------------------
     def _st_835(self, x: X12, t: Tenant, payer: Payer, d: date, pay_date: date, events: list, plbs: list, trn: str):
-        total = round(sum(e["paid"] for e in events) - sum(a for _, _, a in plbs), 2)
+        total = round(sum(e["paid"] for e in events) - sum(p[2] for p in plbs), 2)
         if total == 0:
             x.s("BPR", "H", "0", "C", "NON", "", "", "", "", "", "", "", "", "", "", "", f"{pay_date:%Y%m%d}")
         elif payer.payment_method == "CHK":
             x.s("BPR", "I", money(total), "C", "CHK", "", "", "", "", "", "", "", "", "", "", "", f"{pay_date:%Y%m%d}")
         else:
-            x.s("BPR", "I", money(total), "C", "ACH", "CCP", "01", "999999999", "DA", "1234567", "1" + payer.ein, "",
-                "01", "888888888", "DA", "7654321", f"{pay_date:%Y%m%d}")
+            aba, account = payer.bank
+            x.s("BPR", "I", money(total), "C", "ACH", "CCP", "01", aba, "DA", account, "1" + payer.ein, "",
+                "01", t.bank[0], "DA", t.bank[1], f"{pay_date:%Y%m%d}")
         x.s("TRN", "1", trn, "1" + payer.ein)
         x.s("DTM", "405", f"{d:%Y%m%d}")
         x.s("N1", "PR", payer.name_835 or payer.name)
-        x.s("N3", f"PO BOX {_stable_int(payer.payer_id, 'box') % 90000 + 1000}")
-        x.s("N4", *PAYER_CITIES[_stable_int(payer.payer_id, 'city') % len(PAYER_CITIES)])
+        if payer.remit_address:
+            x.s("N3", payer.remit_address[0])
+            x.s("N4", *payer.remit_address[1:])
         if payer.sends_ref_2u:
             x.s("REF", "2U", payer.payer_id)
-        x.s("PER", "CX", "PROVIDER SERVICES", "TE", f"800555{_stable_int(payer.payer_id, 'tel') % 10000:04d}")
+        contact = payer_contacts(payer)
+        if contact["business"]:
+            x.s("PER", "CX", "PROVIDER SERVICES", "TE", contact["business"])
+        x.s("PER", "BL", contact["technical_name"], "TE", contact["technical"], *(("EM", contact["email"])
+                                                                               if contact["email"] else ()))
+        if payer.website:
+            x.s("PER", "IC", "", "UR", payer.website)
         x.s("N1", "PE", t.name, "XX", npi(t.npi_seed))
         x.s("REF", "TJ", t.tax_id)
         medicare = payer.is_medicare
@@ -1449,7 +1681,7 @@ class Generator:
                     x.s("AMT", "B6", money(ln["allowed"]))
                 if ln["rarc"]:
                     x.s("LQ", "HE", ln["rarc"])
-        for code, ref, amt in plbs:
+        for code, ref, amt, _ in plbs:
             x.s("PLB", npi(t.npi_seed), f"{d.year}1231", x.c(code, ref) if ref else code, money(amt))
         return total
 
@@ -1466,14 +1698,37 @@ class Generator:
             return 0.0
         return round(e["paid"] * rate * (days - after) / 365, 2) if days > after else 0.0
 
-    def _plb_reference(self, payer: Payer, e: dict) -> str:
+    @staticmethod
+    def _plb_reference(payer: Payer, e: dict) -> str:
+        """PLB03-2 as this payer writes it: the payer's claim number (Medicare: the FCN; real MACs append the MBI,
+        which is PHI in a provider-level field), UHC's date of service + patient account, or the account alone."""
         c = e["claim"]
-        if payer.is_medicare:                                    # the FCN (real MACs append the MBI: PHI in PLB03-2)
+        style = "icn" if payer.is_medicare else payer.plb_reference_style
+        if style == "icn":
             return e["icn"]
-        return f"{c.dos:%Y%m%d}{c.pcn}"                         # UHC: date of service + patient account
+        if style == "pcn":
+            return c.pcn
+        if style == "icn_pcn":
+            return f"{e['icn']} {c.pcn}"
+        return f"{c.dos:%Y%m%d}{c.pcn}"
+
+    def _recoupment_target(self, history: list, day: date):
+        """A payment made 30-365 days ago (median ~3 months): overpayments surface in audits and retro-eligibility
+        reviews long after the check, so recoupments trail payment by months."""
+        if not history:
+            return None
+        lag = min(365, max(30, round(math.exp(self.rng.gauss(math.log(85), .7)))))
+        target = (day - timedelta(days=lag)).toordinal()
+        i = bisect.bisect_right(history, (target, "\uffff")) - 1
+        if i < 0:
+            i = 0
+        entry = history[i]
+        return entry if day.toordinal() - entry[0] >= 30 else None
 
     def _files_835(self, t: Tenant, payer: Payer, day: date, evs: list, fwd: dict, claims: dict) -> list[dict]:
-        r, sc = self.rng, self.sc
+        """One payer's 835 for the day. During the burn-in (self.emit False) the money still moves (recoupment
+        history, forward balances, trace numbers) but nothing is written or recorded."""
+        r, sc, emit = self.rng, self.sc, self.emit
         pay_date = self._pay_date(payer, day)
         groups = [evs]
         if len(evs) > 3 and r.random() < payer.multi_st_rate:
@@ -1482,75 +1737,121 @@ class Generator:
                 k += 1
             groups = [g for g in (evs[:k], evs[k:]) if g]
         txs = []
-        for gi, g in enumerate(groups):
-            x = X12(payer.delimiters)
-            plbs = []
+        history = self.paid_history.setdefault((t.code, payer.payer_id), [])
+        for g in groups:
+            trn = self._trace(payer)
+            plbs = []                                             # (reason, PLB03-2 reference, amount, target pcn)
             if fwd.get(payer.payer_id):
-                plbs.append(("FB", f"FWD{payer.payer_id}", fwd.pop(payer.payer_id)))   # recover last forward balance
-            earlier = self.paid_history.get((t.code, payer.payer_id), [])
-            if earlier and r.random() < sc.p_plb_recoupment:
-                icn, amt, ref = r.choice(earlier)                 # overpayment found on an earlier remit
-                plbs.append(("WO", ref, round(min(amt, math.exp(r.gauss(math.log(25), 1.0))), 2) or .01))
-            if earlier and r.random() < .005:                    # refund check received: 72 offsets a WO
-                icn, amt, ref = r.choice(earlier)
-                plbs += [("WO", ref, amt), ("72", ref, -amt)]
+                amount, origin = fwd.pop(payer.payer_id)
+                plbs.append(("FB", origin, amount, None))         # recover the balance carried forward
+            if r.random() < sc.p_plb_recoupment:                 # overpayments found on earlier remits: usually
+                for _ in range(1 if r.random() < .8 else r.randint(2, 6)):   # one claim, sometimes an audit batch
+                    hit = self._recoupment_target(history, day)
+                    if hit and not any(p[3] == hit[4] for p in plbs):
+                        _, icn, amt, ref, pcn = hit
+                        part = amt if r.random() < .4 else round(amt * r.uniform(.1, .9), 2)
+                        plbs.append(("WO", ref, max(.01, part), pcn))
+            if r.random() < .005:                                 # refund check received: 72 offsets a WO
+                hit = self._recoupment_target(history, day)
+                if hit:
+                    _, icn, amt, ref, pcn = hit
+                    plbs += [("WO", ref, amt, pcn), ("72", ref, -amt, pcn)]
             if r.random() < .005:
-                plbs.append(("J1", None, round(r.uniform(.01, 4.99), 2)))
-            if payer.payer_class == "blues" and earlier and r.random() < .01:
-                plbs.append(("CS", r.choice(earlier)[2], round(r.uniform(5, 150), 2)))
+                plbs.append(("J1", None, round(r.uniform(.01, 4.99), 2), None))
+            if payer.payer_class == "blues" and r.random() < .01:
+                hit = self._recoupment_target(history, day)
+                if hit:
+                    plbs.append(("CS", hit[3], round(r.uniform(5, min(150, max(5.01, hit[2]))), 2), hit[4]))
             if r.random() < .0005:
-                plbs.append(("IR", None, round(r.uniform(10, 300), 2)))
+                plbs.append(("IR", None, round(r.uniform(10, 300), 2), None))
             for e in g:
                 plbs += e["plb"]
                 e["interest"] = self._interest(payer, e, pay_date)
             interest = round(sum(e["interest"] for e in g), 2)
             if interest:
-                plbs.append(("L6", None, -interest))              # L6 = sum of the claims' AMT*I
-            total = round(sum(e["paid"] for e in g) - sum(a for _, _, a in plbs), 2)
-            if total < 0:                                         # an 835 never pays a negative amount
-                plbs.append(("FB", f"FWD{payer.payer_id}", total))
-                fwd[payer.payer_id] = round(fwd.get(payer.payer_id, 0) - total, 2)
-            trn = self._trace(payer)
+                plbs.append(("L6", None, -interest, None))        # L6 = sum of the claims' AMT*I
+            total = round(sum(e["paid"] for e in g) - sum(p[2] for p in plbs), 2)
+            if total < 0:                                         # an 835 never pays a negative amount: carry it
+                plbs.append(("FB", trn, total, None))             # forward, referencing this remittance's trace
+                prior = fwd.get(payer.payer_id, (0.0, trn))[0]
+                fwd[payer.payer_id] = (round(prior - total, 2), trn)
+            for e in g:
+                if e["status"] in ("1", "2", "19") and e["paid"] > 0 and r.random() < RECOUPMENT_CANDIDATE_SHARE:
+                    history.append((pay_date.toordinal(), e["icn"], e["paid"], self._plb_reference(payer, e), e["pcn"]))
+            if not emit:
+                continue
+            x = X12(payer.delimiters)
             bpr = self._st_835(x, t, payer, day, pay_date, g, plbs, trn)
             self.plb_log.setdefault(t.code, []).extend(
-                dict(day=str(day), payer_id=payer.payer_id, trn=trn, code=code, reference=ref, amount=amt)
-                for code, ref, amt in plbs)
+                dict(day=str(day), payment_date=str(pay_date), payer_id=payer.payer_id, trn=trn, code=code,
+                     reference=ref, amount=amt, target_pcn=pcn) for code, ref, amt, pcn in plbs)
             txs.append((x, bpr, trn))
-            hist = self.paid_history.setdefault((t.code, payer.payer_id), [])
-            hist.extend((e["icn"], e["paid"], self._plb_reference(payer, e)) for e in g
-                        if e["status"] in ("1", "2", "19") and e["paid"] > 0)
-            if len(hist) > 2 * RECOUP_WINDOW:                      # recoupments target recent payments; bounded memory
-                del hist[:-RECOUP_WINDOW]
             for e in g:
-                led = claims[e["pcn"]]["adjudications"].setdefault(e["payer_id"], dict(
-                    payer_id=e["payer_id"], payer=PAYER_BY_ID[e["payer_id"]].name, seq=e["seq"],
-                    payer_class=PAYER_BY_ID[e["payer_id"]].payer_class, events=[]))
-                cas_totals: dict = {}
-                for g_, k, amt in e["claim_cas"] + [x for ln in e["lines"] for x in ln["cas"]]:
-                    cas_totals[f"{g_}-{k}"] = round(cas_totals.get(f"{g_}-{k}", 0) + amt, 2)
-                led["events"].append(dict(date=str(pay_date), production_date=str(day), status=e["status"], icn=e["icn"],
-                                          paid=e["paid"], pr=e["pr"], interest=e["interest"],
-                                          charge=round(sum(ln["charge"] for ln in e["lines"]), 2), cas=cas_totals,
-                                          claim_level_only=e["claim_level_only"], trn=trn, category=e["category"],
-                                          received=str(e["received"]), crossover=bool(e["crossover"]),
-                                          duplicate_denial=bool(e.get("duplicate_denial")),
-                                          carcs=sorted({k for _, k, _ in e["claim_cas"]} |
-                                                       {k for ln in e["lines"] for _, k, _ in ln["cas"]}),
-                                          co_carcs=sorted({k for g_, k, _ in e["claim_cas"] if g_ == "CO"} |
-                                                          {k for ln in e["lines"] for g_, k, _ in ln["cas"] if g_ == "CO"}),
-                                          lines=[dict(cpt=ln["cpt"], adjudicated_cpt=ln["adjudicated_cpt"],
-                                                      units=ln["units"], units_paid=ln["units_paid"],
-                                                      paid=ln["paid"], allowed=ln["allowed"],
-                                                      co_carcs=sorted({k for g_, k, _ in ln["cas"] if g_ == "CO"}))
-                                                 for ln in ([] if e["claim_level_only"] else e["lines"])]))
-        ctl = self._next_ctl() if r.random() >= DELIVERY_NOISE["isa13_reused"] else max(101, self.ctl - r.randint(50, 500))
-        body = interchange(payer.delimiters, CLEARINGHOUSE_ID, t.sender_id, day, ctl, "HP", "005010X221A1",
-                           [tx[0] for tx in txs], "835", gs_sender=payer.payer_id)
-        out = [dict(day=day, kind="835", name=f"{t.code}_835_{payer.payer_id}_{day:%Y%m%d}.x12", body=self._noise(body),
+                self._record_event(claims, e, payer, day, pay_date, trn)
+        cutoff = (day - timedelta(days=RECOUPMENT_MAX_DAYS)).toordinal()
+        if history and history[0][0] < cutoff:                    # bounded memory: only the last year can be recouped
+            del history[:bisect.bisect_left(history, (cutoff,))]
+        if not emit:
+            self._next_ctl(CLEARINGHOUSE_ID, t.sender_id)
+            return []
+        sender, receiver = CLEARINGHOUSE_ID, t.sender_id
+        reused = r.random() < DELIVERY_NOISE["isa13_reused"]
+        ctl = self._reused_ctl(sender, receiver) if reused else self._next_ctl(sender, receiver)
+        sent_at = self._sent_at_835(payer)
+        body = interchange(payer.delimiters, sender, receiver, day, ctl, "HP", "005010X221A1",
+                           [tx[0] for tx in txs], "835", gs_sender=payer.payer_id, sent_at=sent_at)
+        out = [dict(day=day, kind="835", name=self._file_name(t, "835", day, sent_at, payer.payer_id), body=self._noise(body),
                     expect="parsed", payer_id=payer.payer_id, trns=[tx[2] for tx in txs], totals=[tx[1] for tx in txs])]
-        if r.random() < sc.p_duplicate_835_file:
-            out.append(dict(out[0], name=out[0]["name"].replace(".x12", "_redelivered.x12"), expect="duplicate"))
+        if r.random() < sc.p_duplicate_835_file:                  # the clearinghouse sends the same file again later
+            later = f"{min(23, int(sent_at[:2]) + r.randint(1, 9)):02d}{r.randint(0, 59):02d}{r.randint(0, 59):02d}"
+            out.append(dict(out[0], name=self._file_name(t, "835", day, later, payer.payer_id), expect="duplicate",
+                            redelivery_of=out[0]["name"]))
         return out
+
+    @staticmethod
+    def _record_event(claims: dict, e: dict, payer: Payer, day: date, pay_date: date, trn: str):
+        led = claims[e["pcn"]]["adjudications"].setdefault(e["payer_id"], dict(
+            payer_id=e["payer_id"], payer=PAYER_BY_ID[e["payer_id"]].name, seq=e["seq"],
+            payer_class=PAYER_BY_ID[e["payer_id"]].payer_class, events=[]))
+        cas_totals: dict = {}
+        for g_, k, amt in e["claim_cas"] + [x for ln in e["lines"] for x in ln["cas"]]:
+            cas_totals[f"{g_}-{k}"] = round(cas_totals.get(f"{g_}-{k}", 0) + amt, 2)
+        led["events"].append(dict(date=str(pay_date), production_date=str(day), status=e["status"], icn=e["icn"],
+                                  paid=e["paid"], pr=e["pr"], interest=e["interest"],
+                                  charge=round(sum(ln["charge"] for ln in e["lines"]), 2), cas=cas_totals,
+                                  claim_level_only=e["claim_level_only"], trn=trn, category=e["category"],
+                                  received=str(e["received"]), crossover=bool(e["crossover"]),
+                                  duplicate_denial=bool(e.get("duplicate_denial")),
+                                  carcs=sorted({k for _, k, _ in e["claim_cas"]} |
+                                               {k for ln in e["lines"] for _, k, _ in ln["cas"]}),
+                                  co_carcs=sorted({k for g_, k, _ in e["claim_cas"] if g_ == "CO"} |
+                                                  {k for ln in e["lines"] for g_, k, _ in ln["cas"] if g_ == "CO"}),
+                                  lines=[dict(cpt=ln["cpt"], adjudicated_cpt=ln["adjudicated_cpt"],
+                                              units=ln["units"], units_paid=ln["units_paid"], paid=ln["paid"],
+                                              allowed=ln["allowed"], charge=ln["charge"],
+                                              modifiers=list(ln["modifiers"]),
+                                              co_carcs=sorted({k for g_, k, _ in ln["cas"] if g_ == "CO"}))
+                                         for ln in ([] if e["claim_level_only"] else e["lines"])]))
+
+    def _sent_at_835(self, payer: Payer) -> str:
+        """The clearinghouse releases each payer's ERAs in its overnight run (some payers' files come mid-day)."""
+        base = (1, 2, 2, 3, 3, 4, 5, 6, 13, 16)[_stable_int(payer.payer_id, "era-hour") % 10]
+        minute = _stable_int(payer.payer_id, "era-minute") % 60 + self.rng.randint(-20, 20)
+        hour = base + minute // 60
+        return f"{hour % 24:02d}{minute % 60:02d}{self.rng.randint(0, 59):02d}"
+
+    def _file_name(self, t: Tenant, kind: str, day: date, sent_at: str, payer_id: str | None = None) -> str:
+        """As the clearinghouse names them: sender, transaction, payer (835), and the send timestamp. Names are
+        unique within a day; a re-delivery is a new name (new timestamp) with the same bytes."""
+        stem = (f"{t.sender_id}_837P_{day:%Y%m%d}{sent_at}" if kind == "837" else
+                f"ERA_{payer_id}_{t.sender_id}_{day:%Y%m%d}{sent_at}" if payer_id else
+                f"ERA_{t.sender_id}_{day:%Y%m%d}{sent_at}")
+        name, n = f"{stem}.x12", 1
+        while name in self.names_today:
+            n += 1
+            name = f"{stem}_{n}.x12"
+        self.names_today.add(name)
+        return name
 
     def _noise(self, body: str) -> str:
         """Delivery noise real feeds carry and a parser must survive (spec quirks.envelope): 80-column wrapping, a
@@ -1570,7 +1871,7 @@ class Generator:
     def _concatenate(self, remits: list, day: date) -> list:
         """The clearinghouse sometimes concatenates several payers' 835 interchanges into one file (several ISAs).
         Files that also arrive as a byte-identical re-delivery are left alone."""
-        redelivered = {f["name"].replace("_redelivered.x12", ".x12") for f in remits if f["expect"] == "duplicate"}
+        redelivered = {f["redelivery_of"] for f in remits if f["expect"] == "duplicate"}
         out, batches = [], {}
         for f in remits:
             plain = f["body"][:3] == "ISA" and "\x00" not in f["body"][-1:] and "\n" not in f["body"][:106]
@@ -1584,7 +1885,7 @@ class Generator:
             if len(batch) < 2:
                 out += batch
                 continue
-            out.append(dict(batch[0], name=f"{self.tc}_835_BATCH_{day:%Y%m%d}_{k + 1}.x12",
+            out.append(dict(batch[0], name=self._file_name(self.t, "835", day, f"0{k + 4}{self.rng.randint(0, 5959):04d}"),
                             payer_id="+".join(f["payer_id"] for f in batch), body="".join(f["body"] for f in batch),
                             trns=[x for f in batch for x in f["trns"]], totals=[x for f in batch for x in f["totals"]]))
         return out
@@ -1602,8 +1903,9 @@ class Generator:
         else:
             el = body.lstrip("\ufeff")[3]
             bad = body.replace("IEA" + el, "IEX" + el, 1)          # trailer damaged: IEA missing
-        return dict(day=day, kind=f["kind"], name=f["name"].replace(".x12", f"_{kind}.x12"), body=bad,
-                    expect="rejected", corruption=kind)
+        sent_at = f"{r.randint(0, 23):02d}{r.randint(0, 59):02d}{r.randint(0, 59):02d}"
+        name = self._file_name(self.t, f["kind"], day, sent_at, f.get("payer_id") if f["kind"] == "835" else None)
+        return dict(day=day, kind=f["kind"], name=name, body=bad, expect="rejected", corruption=kind)
 
     def run(self, out_dir: str | Path, workers: int = 1, return_claims: bool = True, truth_gzip: bool = False) -> dict:
         """Generate every tenant into out_dir. Each day's files are written as soon as the day is final, and the
@@ -1618,11 +1920,6 @@ class Generator:
         if return_claims and workers > 1:
             return load_truth(out_dir)
         return run.truth
-
-
-PAYER_CITIES = [("HARTFORD", "CT", "061510001"), ("LOUISVILLE", "KY", "402320001"), ("ATLANTA", "GA", "303480001"),
-                ("SALT LAKE CITY", "UT", "841300001"), ("COLUMBIA", "SC", "292020001"), ("DURHAM", "NC", "277020001"),
-                ("DALLAS", "TX", "752650001"), ("NASHVILLE", "TN", "372020001")]
 
 
 def _zip(p: Person) -> str:
@@ -1683,6 +1980,12 @@ class _TenantRun(Generator):
     still have a submission or remit to come, the events queued for later days, deductible accumulators for the
     plan years still being billed, and a bounded window of paid ICNs for recoupments. The tenant has its own
     random stream, so its output does not depend on which other tenants run, or where.
+
+    The simulation starts `burn_in_days` before the window: claims billed then are adjudicated, paid, recouped and
+    reworked as usual, but nothing is written until the window opens. Day 1 therefore already has a full 835 feed
+    (remits and PLB recoupments for claims billed before the window), as a lab's data does when a feed is switched
+    on. The ledger records only what is delivered inside the window: a claim billed in the burn-in appears with the
+    835 events (and 837 resubmissions) the window received, and an empty or partial `submissions` list.
     """
 
     def __init__(self, sc: Scenario, tc: str, claims_per_day: float, keep_claims: bool = False):
@@ -1690,6 +1993,10 @@ class _TenantRun(Generator):
         self.rng = random.Random(_derive_seed(sc.seed, tc))
         self.tc, self.t, self.cpd = tc, TENANTS[tc], claims_per_day
         self.end = sc.start + timedelta(days=sc.days)
+        self.first_day = sc.start - timedelta(days=sc.burn_in_days)
+        self.emit = sc.burn_in_days <= 0                      # False while simulating the burn-in
+        self.names_today: set = set()
+        self.surname_cum = R.surname_table(self.t.region)
         self.segments = segments_for(self.t.region)
         self.seg_names = list(SEGMENT_SHARE)
         self.seg_cum = list(accumulate(SEGMENT_SHARE.values()))
@@ -1725,7 +2032,7 @@ class _TenantRun(Generator):
     # people
     def _patient(self, pid: int) -> Patient:
         """Patient `pid`, rebuilt on demand from its own seed: the pool costs no memory, and a patient is the same
-        person (same coverage and plan) on every claim. The pid's pool fixes its market segment."""
+        person (same sex, coverage, plan and known conditions) on every claim. The pid's pool fixes its segment."""
         sc, t = self.sc, self.t
         lo, _, seg, rep = self.pools[bisect.bisect_right(self.pool_starts, pid) - 1]
         r = self._prng
@@ -1734,24 +2041,32 @@ class _TenantRun(Generator):
         payer = r.choices(self.segments[seg], cum_weights=self.seg_payer_cum[seg])[0]
         cls = payer.payer_class
         ref = date(2026, 7, 1)
+        dependent = False
         if cls in ("medicare", "medicare_advantage"):
             ages = (65, 95) if r.random() < .9 else (30, 64)      # ~10% are under-65 disability beneficiaries
         elif cls in ("medicaid", "medicaid_mco"):
-            ages = (0, 26) if r.random() < .5 else (19, 64)
+            ages = (1, 26) if r.random() < .5 else (19, 64)      # >= 1 year: born before any service date
         else:
             dependent = r.random() < sc.p_dependent               # a child (under 26) or a spouse on the policy
-            ages = ((0, 25) if r.random() < .6 else (26, 64)) if dependent else (22, 64)
-        pat = self._person(r, t.region, ages, ref)
+            ages = ((1, 25) if r.random() < .6 else (26, 64)) if dependent else (22, 64)
+        sex = "F" if r.random() < (.58 if ages[0] >= 18 else .5) else "M"   # women are most adult lab patients
+        pat = self._person(r, t.region, ages, ref, sex)
         age = (ref - pat.dob).days / 365.25
-        if cls in ("commercial", "blues", "other") and dependent:
-            sub = self._person(r, t.region, (age + 22, age + 45) if age < 26 else (max(age - 5, 26), age + 5), ref)
-            sub.last, sub.addr, sub.city = pat.last, pat.addr, pat.city
+        if age >= 18 and r.random() < P_GENDER_MARKER_DIFFERS:
+            pat.gender = "M" if sex == "F" else "F"               # insurance gender marker differs from the tests' sex
+        if dependent:
             rel = "19" if age < 26 else "01"
+            sub_sex = (("M" if sex == "F" else "F") if r.random() < .92 else sex) if rel == "01" else r.choice("FM")
+            sub_ages = (age + 22, age + 45) if rel == "19" else (max(age - 5, 26), age + 5)
+            sub = self._person(r, t.region, sub_ages, ref, sub_sex, surname=pat.last, home=pat)
         else:
             sub, rel = pat, "18"
         group = "" if cls == "medicare" else f"{r.randint(10**5, 10**6 - 1)}"
         covs = [Coverage(payer, member_id(payer.member_id_style, payer, r), group, sub, rel)]
-        p = Patient(pid, pat, covs, seg, rep, deductible_pace=r.uniform(.15, 1.7))
+        kind = ("anticoag" if age >= 30 and r.random() < .5 else "drug") if rep else ""
+        p = Patient(pid, pat, covs, seg, rep, sex=sex, conditions=self._conditions(r, sex, age, kind),
+                    deductible_pace=r.uniform(.15, 1.7))
+        p.repeater_kind = kind
         if cls in ("commercial", "blues", "other"):
             plan = _PLAN_NAMES[bisect.bisect_left(_PLAN_CUM, r.random() * _PLAN_CUM[-1])]
             _, (dlo, dhi), coins, p_coins, copay, p_lab_deductible = COMMERCIAL_PLANS[plan]
@@ -1770,32 +2085,53 @@ class _TenantRun(Generator):
             p.crossover = r.choice(MEDIGAP_CARRIERS)
         return p
 
+    @staticmethod
+    def _conditions(r: random.Random, sex: str, age: float, repeater_kind: str) -> tuple:
+        """The patient's known chronic conditions (the codes their physician lists visit after visit)."""
+        band = 0 if age < 18 else 1 if age < 45 else 2 if age < 65 else 3
+        out = []
+        for domain, prevalence in R.CHRONIC.items():
+            p = prevalence[band] * (R.CHRONIC_FEMALE_MULT.get(domain, 1.0) if sex == "F" else 1.0)
+            if r.random() < p:
+                code = R.SAMPLERS[domain].pick(r, sex, age)
+                if code and code not in out:
+                    out.append(code)
+        if repeater_kind == "anticoag":
+            out += [c for c in ("Z7901", R.SAMPLERS["anticoag"].pick(r, sex, age)) if c and c not in out]
+        elif repeater_kind == "drug":
+            out += [c for c in (R.SAMPLERS["drug"].pick(r, sex, age), "Z79891") if c and c not in out]
+        return tuple(out)
+
     # claims
-    def _profile(self, cls: str, month: int, repeater: bool, r: random.Random) -> str:
-        if repeater:
-            return "drug_monitoring" if r.random() < .5 else "routine_blood"
-        key = (cls, month if self.seasonal else 0)
+    def _profile(self, cls: str, month: int, pat: Patient, age: float, r: random.Random) -> str:
+        if pat.repeater:
+            return "drug_monitoring" if pat.repeater_kind == "drug" else "routine_blood"
+        key = (cls, month if self.seasonal else 0, pat.sex, min(int(age), 100))
         if key not in self._profile_cache:
             mult = PROFILE_CLASS_MULT.get(cls, {})
             names = list(PROFILES)
-            w = [PROFILES[n]["weight"] * mult.get(n, 1.0) *
-                 (RESPIRATORY_MONTH_INDEX[month] if self.seasonal and PROFILES[n].get("seasonal") else 1.0)
-                 for n in names]
+            w = []
+            for n in names:
+                prof = PROFILES[n]
+                lo, hi = prof.get("ages", (0, 200))
+                ok = prof.get("sex", pat.sex) == pat.sex and lo <= age <= hi
+                w.append(prof["weight"] * mult.get(n, 1.0) * ok *
+                         (PROFILES_FOR_CHILDREN.get(n, 0.0) if age < 13 else 1.0) *
+                         (RESPIRATORY_MONTH_INDEX[month] if self.seasonal and prof.get("seasonal") else 1.0))
             self._profile_cache[key] = (names, list(accumulate(w)))
         names, cum = self._profile_cache[key]
         return r.choices(names, cum_weights=cum)[0]
 
-    def _codes(self, profile: str, cls: str, r: random.Random, repeater: bool) -> list[str]:
+    def _codes(self, profile: str, cls: str, pat: Patient, age: float, r: random.Random) -> list[str]:
         prof = PROFILES[profile]
         if "combine" in prof:
             out = []
             for sub in prof["combine"]:
-                out += [c for c in self._codes(sub, cls, r, repeater) if c not in out]
+                out += [c for c in self._codes(sub, cls, pat, age, r) if c not in out]
             return out
-        codes = []
-        for code, p in prof.get("menu", {}).items():
-            if r.random() < p:
-                codes.append(code)
+        sex = pat.sex
+        menu = prof.get(f"menu_{sex}") or prof.get("menu", {})
+        codes = [code for code, p in menu.items() if r.random() < p]
         if "pick_one" in prof:
             codes.append(_pick(r, prof["pick_one"]))
         if "pick_one_optional" in prof:
@@ -1806,7 +2142,7 @@ class _TenantRun(Generator):
                 if u < cum:
                     codes.append(code)
                     break
-        if repeater and profile == "routine_blood" and "85610" not in codes:
+        if pat.repeater and profile == "routine_blood" and "85610" not in codes:
             codes.append("85610")                                 # anticoagulation monitoring
         for code, p in prof.get("reflex", {}).items():
             if "87086" in codes and r.random() < p:
@@ -1819,21 +2155,98 @@ class _TenantRun(Generator):
                     code = r.choices(TAIL, cum_weights=_TAIL_CUM)[0]
                 if code not in codes:
                     codes.append(code)
+            if age < 6 and r.random() < .35:
+                codes.append("83655")                             # blood lead screening (Medicaid EPSDT)
         if prof.get("urine_tail"):
             for _ in range(_poisson(r, .5)):
                 code = r.choices(URINE_TAIL, cum_weights=_URINE_TAIL_CUM)[0]
                 if code not in codes:
                     codes.append(code)
+        codes = [c for c in dict.fromkeys(codes) if R.cpt_fits(c, sex, age)]
         if not codes:
-            menu = prof.get("menu") or prof.get("pick_one")
-            codes.append(max(menu, key=menu.get))
-        if prof.get("draw") and r.random() < P_VENIPUNCTURE_BILLED:
+            choices = menu or prof.get("pick_one") or {}
+            codes = [c for c in sorted(choices, key=choices.get, reverse=True) if R.cpt_fits(c, sex, age)][:1] or ["85025"]
+        if (prof.get("draw") or set(codes) & set(prof.get("draw_if", ()))) and r.random() < P_VENIPUNCTURE_BILLED:
             codes.insert(0, "36415")
         return codes
 
-    def _lines(self, codes: list, profile: str, payer: Payer, r: random.Random, screening: bool, n_dx: int) -> list[Line]:
-        t, medicare = self.t, payer.is_medicare
-        present = set(codes)
+    @staticmethod
+    def _scrub(codes: list, r: random.Random) -> tuple[list, str | None]:
+        """The lab's claim scrubber: drop NCCI panel components billed with their panel. Now and then one slips
+        through (a manual override, an edit-table lag); the payer then denies it (CO-97 / CO-236)."""
+        conflicts = R.ncci_conflicts(codes)
+        if not conflicts:
+            return codes, None
+        conflicts.sort()                                          # deterministic order (codes come from a set)
+        keep = conflicts[0][0] if r.random() < P_NCCI_RESIDUE_GIVEN_CONFLICT else None
+        drop = {comp for comp, _ in conflicts} - {keep}
+        return [c for c in codes if c not in drop], keep
+
+    def _diagnose(self, codes: list, pat: Patient, age: float, profile: str, screening: bool,
+                  r: random.Random) -> tuple[list, dict]:
+        """ICD-10-CM codes for the requisition and each test's pointers. Every test points at a diagnosis that
+        justifies it: one of the patient's known conditions when one fits, else a code from the test's clinical
+        domains (sex- and age-appropriate). A screening order lists the screening code first."""
+        sex, dx = pat.sex, []
+
+        def add(code: str) -> int | None:
+            if code in dx:
+                return dx.index(code) + 1
+            if len(dx) >= MAX_DX:
+                return None
+            dx.append(code)
+            return len(dx)
+
+        tests = [c for c in codes if c != "36415"]
+        reason: dict = {}
+        if screening:
+            if profile == "colorectal_screening":
+                principal = "Z1211"
+            elif profile == "sti_panel":
+                principal = "Z113"
+            elif age < 18:
+                principal = "Z00129" if r.random() < .85 else "Z00121"
+            else:
+                principal = "Z0000" if r.random() < .85 else "Z0001"
+            first = add(principal)
+            for code in tests:
+                if code not in R.SCREENING_ROUTINE_TESTS:
+                    continue
+                specific = [d for d in R.SCREENING_BY_CPT.get(code, ()) if R.DX_BY_CODE[d].fits(sex, age)]
+                if specific and (r.random() < .55 or not R.dx_fits_cpt(principal, code)):
+                    reason[code] = add(r.choice(specific))
+                elif R.dx_fits_cpt(principal, code):
+                    reason[code] = first
+        for code in tests:
+            if code not in reason:
+                listed = [d for d in dx if R.dx_fits_cpt(d, code) and d not in SCREENING_DX]
+                fitting = [d for d in pat.conditions if R.dx_fits_cpt(d, code)]
+                if listed and r.random() < P_LISTED_DX_REUSED:
+                    chosen = r.choice(listed)                     # one diagnosis covers several tests
+                elif fitting and r.random() < P_PRIOR_DX_REUSED:
+                    chosen = r.choice(fitting)
+                else:
+                    chosen = R.pick_dx_for_cpt(r, code, sex, age)
+                idx = add(chosen)
+                if idx is None:                                   # HI is full: reuse a listed code that fits
+                    idx = next((i + 1 for i, d in enumerate(dx) if R.dx_fits_cpt(d, code)), 1)
+                reason[code] = idx
+        for d in pat.conditions:                                  # the rest of the problem list, sometimes
+            if d not in dx and r.random() < DX_EXTRA_CHRONIC:
+                add(d)
+        pointers = {}
+        for code in tests:
+            ptr = [reason[code]]
+            for i, d in enumerate(dx, 1):
+                if len(ptr) < 4 and i not in ptr and R.dx_fits_cpt(d, code) and r.random() < .3:
+                    ptr.append(i)
+            pointers[code] = tuple(str(i) for i in ptr)
+        if "36415" in codes:
+            pointers["36415"] = pointers[tests[0]] if tests else ("1",)
+        return dx or ["R6889"], pointers
+
+    def _lines(self, codes: list, pointers: dict, profile: str, r: random.Random) -> list[Line]:
+        t = self.t
         lines = []
         for code in codes:
             cpt = CPTS[code]
@@ -1850,41 +2263,71 @@ class _TenantRun(Generator):
                     mods, factor = ["TC"], .55
             if code in CLIA_WAIVED and r.random() < .02:
                 mods.append("QW")
-            if BUNDLED_INTO.get(code) in present and r.random() < .15:
-                mods.append("59" if r.random() < .7 else "XU")      # NCCI bypass: distinct procedural service
+            if code in ("87077", "87186", "87088") and units > 1 and r.random() < .3:
+                mods.append("59" if r.random() < .7 else "XU")      # a second isolate: distinct specimen
             if r.random() < .01:
-                mods.append("90")
-            if medicare:
-                if cpt.medical_necessity and r.random() < .02:
-                    mods.append("GA")                                # ABN on file
-                elif cpt.medical_necessity and r.random() < .003:
-                    mods.append("GZ")
-                elif screening and r.random() < .005:
-                    mods.append("GY")
+                mods.append("90")                                    # sent out to a reference laboratory
             price = _chargemaster(t.code, code, t.price_mult)
-            pointers = ("1", "2") if n_dx > 1 and r.random() < .3 else ("1",)
-            lines.append(Line(code, units, round(price * units * factor, 2), tuple(mods[:4]), factor, pointers))
+            lines.append(Line(code, units, round(price * units * factor, 2), tuple(mods[:4]), factor,
+                              pointers.get(code, ("1",))))
         if r.random() < .005:                                       # repeat test the same day (modifier 91)
-            chem = [l for l in lines if CPTS[l.cpt].category == "chemistry"]
+            chem = [l for l in lines if CPTS[l.cpt].category == "chemistry" and l.cpt not in R.NCCI_COMPONENT_OF]
             if chem:
                 l = r.choice(chem)
                 lines.append(replace(l, modifiers=("91",)))
         return lines
 
-    def _dx(self, profile: str, r: random.Random) -> list[str]:
-        key = PROFILES[profile]["combine"][0] if "combine" in PROFILES[profile] else profile
-        screening, diagnostic = DX[key]
-        principal = r.choice(screening) if screening and r.random() < SCREENING_SHARE.get(key, 0) else r.choice(diagnostic)
-        k = bisect.bisect_left(DX_COUNT_CUM, r.random() * DX_COUNT_CUM[-1]) + 1
-        if k == 5:
-            k = r.randint(5, 8)
-        pool = diagnostic + ["I10", "E785", "E119", "Z7901", "E669"]
-        dx = [principal]
-        while len(dx) < min(k, len(set(pool)) + 1):
-            d = r.choice(pool)
-            if d not in dx:
-                dx.append(d)
-        return dx
+    def _line_edits(self, c: Claim, payer: Payer, ncci_residue: str | None, r: random.Random) -> dict:
+        """Deterministic payer edits on the primary claim, decided when the claim is billed:
+        NCCI residue (a component billed with its panel) -> CO-97 or CO-236; Medicare coverage of screening-only
+        orders (NCD dx edits; the ABN modifiers GA / GZ / GY set who is liable); sex edits on patients whose
+        insurance gender marker differs from the sex the test applies to (Medicare: modifier KX, paid)."""
+        edits, cls = {}, payer.payer_class
+        for i, l in enumerate(c.lines):
+            if l.cpt == ncci_residue and l.modifiers[:1] != ("91",):
+                government = cls in ("medicare", "medicare_advantage", "medicaid", "medicaid_mco")
+                edits[i] = (("CO", "236", "N20") if government and r.random() < .5 else
+                            ("CO", "97", r.choice(["M80", "N20"]))) + ("bundling",)
+        if cls in ("medicare", "medicare_advantage"):
+            for i, l in enumerate(c.lines):
+                if l.cpt == "36415" or i in edits:
+                    continue
+                pointed = [c.dx[int(p) - 1] for p in l.pointers]
+                if any(d not in SCREENING_DX for d in pointed) or set(pointed) & MEDICARE_SCREENING_BENEFIT.get(l.cpt, set()):
+                    continue                                      # a diagnosis supports it, or a screening benefit
+                routine = bool(set(pointed) & {"Z0000", "Z0001"})
+                ncd = l.cpt in NCD_LIMITED
+                if cls == "medicare_advantage":
+                    if r.random() < .1:                           # MA plans apply the NCDs, less strictly
+                        edits[i] = ("CO", "50", "N386" if ncd else None, "medical_necessity")
+                    continue
+                u = r.random()
+                if routine and u < .35:                           # routine physical: statutorily excluded
+                    modifier, edit = "GY", ("PR", r.choice(["204", "96"]), "N425", None)
+                elif u < .82:                                     # ABN signed at the patient service center
+                    modifier, edit = "GA", ("PR", "50", "M38", None)
+                elif u < .91:
+                    modifier, edit = "GZ", ("CO", "50", "N386" if ncd else None, "medical_necessity")
+                else:                                             # the scrubber missed it
+                    modifier, edit = None, ("CO", "50", "N386" if ncd else None, "medical_necessity")
+                if modifier:
+                    c.lines[i] = replace(l, modifiers=(l.modifiers + (modifier,))[:4])
+                edits[i] = edit
+        gender = c.patient.person.gender
+        if gender != c.patient.sex:
+            for i, l in enumerate(c.lines):
+                sex_specific = R.CPT_SEX.get(l.cpt) or next(
+                    (R.DX_BY_CODE[d].sex for d in (c.dx[int(p) - 1] for p in l.pointers)
+                     if d in R.DX_BY_CODE and R.DX_BY_CODE[d].sex), "")
+                if not sex_specific or i in edits:
+                    continue
+                if cls in ("medicare", "medicare_advantage") or r.random() < .5:
+                    c.lines[i] = replace(l, modifiers=(l.modifiers + ("KX",))[:4])   # gender-specific service
+                elif R.CPT_SEX.get(l.cpt):
+                    edits[i] = ("CO", "16", "MA39", "sex_edit")
+                else:
+                    edits[i] = ("CO", "11", "M76", "sex_edit")
+        return edits
 
     def _dos(self, d: date, profile: str, r: random.Random) -> date:
         slow = profile in MOLECULAR_PROFILES or profile in PATHOLOGY_PROFILES
@@ -1893,7 +2336,10 @@ class _TenantRun(Generator):
             if r.random() < .05:
                 lag += 10                                           # held for missing information
             dos = d - timedelta(days=max(1, lag))
-            if r.random() < DOS_WEEKDAY_SHARE[dos.weekday()] / .20:
+            share = DOS_WEEKDAY_SHARE[dos.weekday()] / .20
+            if dos in federal_holidays(dos.year):
+                share *= DOS_HOLIDAY_FACTOR
+            if r.random() < share:
                 break
         if r.random() < self.sc.p_late_submission:
             dos = d - timedelta(days=r.randint(60, 400))
@@ -1907,26 +2353,38 @@ class _TenantRun(Generator):
         lo, size = self.pool_index[(seg, rep)]
         pat = self._patient(lo + r.randrange(size))
         payer = pat.coverages[0].payer
-        profile = self._profile(payer.payer_class, d.month, rep, r)
-        dx = self._dx(profile, r)
-        codes = self._codes(profile, payer.payer_class, r, rep)
-        lines = self._lines(codes, profile, payer, r, dx[0] in SCREENING_DX, len(dx))
-        pos = _pick(r, {"81": .92, "11": .03, "12": .02, "22": .02, "31": .01})
+        medicare_like = payer.payer_class in ("medicare", "medicare_advantage")
+        age = pat.age(d)
+        profile = self._profile(payer.payer_class, d.month, pat, age, r)
+        key = PROFILES[profile]["combine"][0] if "combine" in PROFILES[profile] else profile
+        screening = r.random() < SCREENING_SHARE.get(key, 0) * (
+            MEDICARE_SCREENING_FACTOR if medicare_like and key != "colorectal_screening" else 1)
+        codes = self._codes(profile, payer.payer_class, pat, age, r)
+        if medicare_like:                                         # Medicare's own screening codes
+            codes = [("G0103" if c == "84153" and screening else "G0328" if c == "82274" else c) for c in codes]
+        codes, residue = self._scrub(codes, r)
+        dx, pointers = self._diagnose(codes, pat, age, key, screening, r)
+        lines = self._lines(codes, pointers, profile, r)
+        pos = _pick(r, {"81": .90, "31": .04, "12": .03, "11": .02, "22": .01} if age >= 65 else
+                    {"81": .94, "11": .03, "22": .02, "12": .01})          # SNF (31) and home draws (12): elderly
         pa = None
         if r.random() < (.6 if profile in MOLECULAR_PROFILES else .005):
             pa = f"PA{r.randint(10**8, 10**9 - 1)}"
         pcn = f"{t.pcn_prefix}{d:%y%m%d}{self.n:0{PCN_DIGITS}d}"
         prov = self.providers[bisect.bisect_left(self.provider_cum, r.random() * self.provider_cum[-1])]
-        return Claim(pcn, t.code, pat, prov, self._dos(d, profile, r), lines, dx, d, profile, pos, pa,
-                     f"{CLEARINGHOUSE_ID[:4]}{d:%y%m%d}{self.n:07d}" if r.random() < .5 else None,
-                     r.random() < .25, r.random() < .15, _stable_unit(pcn, "6r") < .85)
+        c = Claim(pcn, t.code, pat, prov, self._dos(d, profile, r), lines, dx, d, profile, pos, pa,
+                  f"{CLEARINGHOUSE_ID[:4]}{d:%y%m%d}{self.n:07d}" if r.random() < .5 else None,
+                  r.random() < .25, r.random() < .15, _stable_unit(pcn, "6r") < .85)
+        c.line_edits = self._line_edits(c, payer, residue, r)
+        return c
 
     def _ledger_claim(self, c: Claim) -> dict:
         return dict(pcn=c.pcn, dos=str(c.dos), submitted=str(c.submitted), order_type=c.order_type,
                     cpts=[l.cpt for l in c.lines], units=[l.units for l in c.lines],
                     modifiers=[list(l.modifiers) for l in c.lines],
                     line_charges=[l.charge for l in c.lines], charge=round(sum(l.charge for l in c.lines), 2),
-                    dx=c.dx, principal_dx=c.dx[0], referring_npi=c.referring.npi, risky_provider=c.referring.risky,
+                    dx=c.dx, principal_dx=c.dx[0], line_dx_pointers=[list(l.pointers) for l in c.lines],
+                    referring_npi=c.referring.npi, risky_provider=c.referring.risky,
                     dependent=c.patient.coverages[0].relationship != "18", segment=c.patient.segment,
                     payer_class=c.patient.coverages[0].payer.payer_class, place_of_service=c.pos,
                     prior_auth=bool(c.prior_auth), patient_id=c.patient.pid,
@@ -1948,7 +2406,7 @@ class _TenantRun(Generator):
         """MAC edit errors (e.g. Noridian's CO-B7 CLIA denials in 2024 and 2025): for a week the MAC denies a share of
         claims in error, then reverses and repays them all in one mass adjustment weeks later."""
         out = []
-        for year in range(self.sc.start.year, self.end.year + 1):
+        for year in range(self.first_day.year, self.end.year + 1):
             for i in range(self.sc.mac_mass_adjustment_waves_per_year):
                 wr = random.Random(_derive_seed(self.sc.seed, self.tc, "wave", year, i))
                 start = date(year, 1, 1) + timedelta(days=wr.randrange(358))
@@ -2034,8 +2492,8 @@ class _TenantRun(Generator):
             rev = self._reverse(e)
             if e["paid"] > 0 and r.random() < sc.p_split_reversal_correction:
                 ref = self._plb_reference(payer, dict(e, claim=c))
-                rev["plb"] = [("WO", ref, -e["paid"])]            # reversal 835: negative WO keeps the check whole
-                cor["plb"] = [("WO", ref, e["paid"])]             # correction 835: positive WO recoups it
+                rev["plb"] = [("WO", ref, -e["paid"], c.pcn)]     # reversal 835: negative WO keeps the check whole
+                cor["plb"] = [("WO", ref, e["paid"], c.pcn)]      # correction 835: positive WO recoups it
                 add(rev, later, "22")
                 add(cor, later + timedelta(days=7), self._paid_status(c))
             else:
@@ -2160,6 +2618,7 @@ class _TenantRun(Generator):
         """Plan day d's new claims, then deliver day d. Returns (files with bodies, ledger rows of claims that
         have nothing left to deliver)."""
         sc, r, t = self.sc, self.rng, self.t
+        self.names_today = set()
         n_new = self._claims_today(d)
         if n_new:
             stale = (d - timedelta(days=60)).year             # service dates trail submission by <= ~55 days
@@ -2177,20 +2636,24 @@ class _TenantRun(Generator):
         items = self.outbox.pop(d, None)
         if items:
             for c, seq, freq, prior, orig in items:
-                self.claims[c.pcn]["submissions"].append(dict(
-                    date=str(d), payer_id=c.patient.coverages[seq].payer.payer_id, seq=seq, frequency=freq))
+                if self.emit:
+                    self.claims[c.pcn]["submissions"].append(dict(
+                        date=str(d), payer_id=c.patient.coverages[seq].payer.payer_id, seq=seq, frequency=freq))
                 touched.append(c.pcn)
-            for b, i in enumerate(range(0, len(items), CLAIMS_PER_837_FILE), 1):
-                files.append(dict(day=d, kind="837", name=f"{self.tc}_837P_{d:%Y%m%d}_{b:02d}.x12",
-                                  body=self._noise(self._file_837(t, d, items[i:i + CLAIMS_PER_837_FILE], b)),
-                                  expect="parsed"))
+            for b, (chunk, sent_at) in enumerate(self._batches_837(items), 1):
+                if self.emit:
+                    files.append(dict(day=d, kind="837", name=self._file_name(t, "837", d, sent_at),
+                                      body=self._noise(self._file_837(t, d, chunk, b, sent_at)), expect="parsed"))
+                else:
+                    self._next_ctl(t.sender_id, CLEARINGHOUSE_ID)
         remits = []
         for payer_id, evs in self.pending.pop(d, {}).items():
             remits += self._files_835(t, PAYER_BY_ID[payer_id], d, evs, self.fwd, self.claims)
             touched += [e["pcn"] for e in evs]
-        files += self._concatenate(remits, d)
-        if files and r.random() < sc.p_corrupt_file:
-            files.append(self._corrupt(r.choice(files), d))
+        if self.emit:
+            files += self._concatenate(remits, d)
+            if files and r.random() < sc.p_corrupt_file:
+                files.append(self._corrupt(r.choice(files), d))
         done = []
         for pcn in touched:
             k = self.open[pcn] - 1
@@ -2198,18 +2661,50 @@ class _TenantRun(Generator):
                 self.open[pcn] = k
             else:
                 del self.open[pcn]
-                done.append(self._close(pcn))
+                led = self._close(pcn)
+                if led is not None:
+                    done.append(led)
         return files, done
 
-    def _close(self, pcn: str) -> dict:
-        led = _finalize_claim(self.claims.pop(pcn))
+    def burn_in(self):
+        """Simulate the days before the window without writing anything (see the class docstring)."""
+        d = self.first_day
+        while d < self.sc.start:
+            self.step(d)
+            d += timedelta(days=1)
+        self.emit = True
+
+    def _batches_837(self, items: list) -> list[tuple[list, str]]:
+        """The lab's billing system releases claims in a few scheduled runs a day, of uneven size (at most
+        MAX_CLAIMS_PER_837_FILE claims per file, under the TR3's 5,000 per transaction)."""
+        r, n = self.rng, len(items)
+        k = max(-(-n // MAX_CLAIMS_PER_837_FILE), min(n, r.choice(BATCH_RUNS_PER_DAY)))
+        while True:
+            cuts = sorted(r.sample(range(1, n), k - 1)) if k > 1 else []
+            bounds = [0] + cuts + [n]
+            if max(b - a for a, b in zip(bounds, bounds[1:])) <= MAX_CLAIMS_PER_837_FILE:
+                break
+        runs = sorted(r.sample(BATCH_RUN_TIMES, k)) if k <= len(BATCH_RUN_TIMES) else \
+            sorted(r.choice(BATCH_RUN_TIMES) for _ in range(k))
+        out = []
+        for (a, b), hhmm in zip(zip(bounds, bounds[1:]), runs):
+            minute = int(hhmm[:2]) * 60 + int(hhmm[2:]) + r.randint(0, 14)
+            out.append((items[a:b], f"{minute // 60 % 24:02d}{minute % 60:02d}{r.randint(0, 59):02d}"))
+        return out
+
+    def _close(self, pcn: str) -> dict | None:
+        """The finalized ledger row, or None for a burn-in claim the window never saw (nothing was delivered)."""
+        led = self.claims.pop(pcn)
+        if not led["submissions"] and not led["adjudications"]:
+            return None
+        led = _finalize_claim(led)
         if self.done is not None:
             self.done[pcn] = led
         return led
 
     def finish(self) -> list[dict]:
         """Claims still open at the end of the window (their later deliveries fall outside it)."""
-        out = [self._close(pcn) for pcn in list(self.claims)]
+        out = [led for led in (self._close(pcn) for pcn in list(self.claims)) if led is not None]
         self.open.clear()
         self.outbox.clear()
         self.pending.clear()
@@ -2218,10 +2713,23 @@ class _TenantRun(Generator):
 
 MASS_ADJUSTMENT_SHARE = .15                                   # Medicare claims hit by an erroneous MAC edit in a wave
 DELIVERY_NOISE = {"wrapped_80": .02, "utf8_bom": .01, "nul_padding": .005, "multi_isa": .05, "isa13_reused": .01}
-COVERAGE_POLICY = {"80061": "190.23", "83036": "190.21", "84443": "190.22", "84439": "190.22", "84153": "190.31",
+# Medicare: tests limited by a national (or local) coverage determination; a screening-only order fails them.
+NCD_LIMITED = frozenset("85025 85027 84443 84439 84436 84480 84481 80061 82465 83718 84478 83721 83036 82947 82950 "
+                        "82951 85610 82728 83540 83550 84466 84153 84154 84152 82306 82607 82746".split())
+# Medicare screening benefits (covered without symptoms): cardiovascular screening blood tests (Z13.6, every 5
+# years), diabetes screening glucose, screening PSA (G0103), FIT (G0328), STI / HIV / hepatitis C screening.
+MEDICARE_SCREENING_BENEFIT = {"80061": {"Z136"}, "82465": {"Z136"}, "83718": {"Z136"}, "84478": {"Z136"},
+                              "82947": {"Z131"}, "G0103": {"Z125"}, "G0328": {"Z1211"}, "87491": {"Z113"},
+                              "87591": {"Z113"}, "86592": {"Z113"}, "87389": {"Z114"}, "86803": {"Z1159"}}
+COVERAGE_POLICY = {"85025": "190.15", "85027": "190.15", "82947": "190.20", "84436": "190.22", "84480": "190.22",
+                   "84481": "190.22", "82465": "190.23", "83718": "190.23", "84478": "190.23", "83721": "190.23",
+                   "84466": "190.18", "83550": "190.18", "84154": "190.31", "84152": "190.31",
+                   "80061": "190.23", "83036": "190.21", "84443": "190.22", "84439": "190.22", "84153": "190.31",
                    "85610": "190.17", "82306": "L34658", "82607": "L34914", "82728": "190.18", "83540": "190.18"}
-CLAIMS_PER_837_FILE = 2500                                    # TR3 limit is 5,000 CLM per ST
-DENIAL_CALIBRATION = .76                                      # set from a measured run so ~11% of claims see a denial
+MAX_CLAIMS_PER_837_FILE = 4500                                # TR3 limit is 5,000 CLM per ST
+BATCH_RUNS_PER_DAY = (1, 2, 2, 3, 3, 3, 4, 4, 5)                # billing system release runs per business day
+BATCH_RUN_TIMES = ("0205", "0540", "0915", "1130", "1410", "1650", "1925", "2240")
+DENIAL_CALIBRATION = .86                                      # set from a measured run so ~11% of claims see a denial
 class DayDir(NamedTuple):
     tenant: str
     day: date
@@ -2282,6 +2790,8 @@ def _tenant_days(sc: Scenario, cpds: dict, out: Path, gz: bool, keep_claims: boo
     """Run these tenants day by day (day-major, tenant order within a day). Yields ("day", DayDir) as each
     tenant-day is written, then ("done", {tenant: ledger index})."""
     sims = {tc: _TenantRun(sc, tc, cpd, keep_claims) for tc, cpd in cpds.items()}
+    for sim in sims.values():
+        sim.burn_in()
     writers = {tc: _TenantWriter(out, tc, gz) for tc in cpds}
     gc_was = gc.get_threshold()
     gc.set_threshold(max(gc_was[0], 100_000), 50, 1000)       # ~10^6 long-lived objects: default GC costs ~25%
@@ -2406,18 +2916,21 @@ def bytes_per_day_model(sc: Scenario, tc: str) -> tuple[float, float]:
     the same for every seed) at two volumes; each is measured over 4 whole weeks after an 8-week warm-up, once
     remits for earlier claims arrive at the steady-state rate. Depends on the scenario's probabilities (stress
     data has more reversals, re-deliveries and corrupt files) and on the tenant (delimiters, price levels)."""
-    knobs = {k: v for k, v in asdict(sc).items() if k not in ("start", "days", "seed", "volume_scale", "target_mb_per_day")}
+    knobs = {k: v for k, v in asdict(sc).items()
+             if k not in ("start", "days", "seed", "volume_scale", "target_mb_per_day", "burn_in_days")}
     key = (tc, GENERATOR_VERSION, tuple(sorted(knobs.items())))
     if key not in _CAL_CACHE:
-        cal = replace(sc, start=CAL_START, days=CAL_WARMUP_DAYS + CAL_WINDOW_DAYS, seed=0, target_mb_per_day=None)
+        cal = replace(sc, start=CAL_START + timedelta(days=CAL_WARMUP_DAYS), days=CAL_WINDOW_DAYS, seed=0,
+                      target_mb_per_day=None, burn_in_days=CAL_WARMUP_DAYS)
         pts = []
         for cpd in CAL_POINTS:
             sim = _TenantRun(cal, tc, cpd)
             sim.noise = sim.seasonal = False
+            sim.burn_in()
             total = n_days = 0
             for d in _calendar(cal):
                 files, _ = sim.step(d)
-                if d >= CAL_START + timedelta(days=CAL_WARMUP_DAYS) and files:
+                if files:
                     total += sum(len(f["body"]) for f in files)
                     n_days += 1
             pts.append((cpd, total / n_days))

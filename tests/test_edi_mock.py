@@ -227,10 +227,12 @@ def test_generator_regressions_from_review(stress, tmp_path):
     body = b"".join(b for _, f, b in _files(out, truth) if f["kind"] == "835" and f["expect"] == "parsed")
     assert re.search(rb"CLP\*[^*~]+\*(1|19)\*[^~]*\*7~", body)
     # secondary claims report the primary's payment date (DTP*573), a business day that is some 835's BPR16
+    # (or a payment made before the window opened, during the generator's burn-in)
     paid_on = {d.decode() for d in re.findall(rb"BPR[*|][^~]*[*|](\d{8})~", body)}
+    start = truth["scenario"]["start"].replace("-", "")
     for m in re.finditer(rb"DTP\*573\*D8\*(\d{8})", b"".join(b for _, f, b in _files(out, truth) if f["kind"] == "837")):
         d = m.group(1).decode()
-        assert datetime.strptime(d, "%Y%m%d").weekday() < 5 and d in paid_on
+        assert datetime.strptime(d, "%Y%m%d").weekday() < 5 and (d in paid_on or d < start)
     # duplicate resends: denied before or after the original pays; either way the original adjudication stays current
     orders = Counter()
     for c in claims:

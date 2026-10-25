@@ -4,7 +4,7 @@ Expected answers are computed with SQL over these tables. They share nothing wit
 the rows come straight from the generator's own decisions. Tables (all in schema `ledger`):
 
     claims(pcn, dos, submitted, order_type, charge, principal_dx, referring_npi, risky_provider, dependent,
-           resubmitted, voided, has_any_remit, n_lines)
+           resubmitted, voided, has_any_remit, n_lines, original_submission_date, first_billed_before_window)
     claim_lines(pcn, line_number, cpt, units, charge, modifiers)
     claim_diagnoses(pcn, sequence, dx)
     submissions(pcn, submission_date, payer_id, payer_sequence, frequency)
@@ -13,11 +13,19 @@ the rows come straight from the generator's own decisions. Tables (all in schema
     events(pcn, payer_id, event_number, event_date, status, icn, paid, patient_responsibility, charge,
            claim_level_only, trn, duplicate_denial, is_current)
     event_adjustments(pcn, payer_id, event_number, group_code, carc, amount)
-    event_lines(pcn, payer_id, event_number, line_number, cpt, adjudicated_cpt, units_paid, paid, allowed, denied,
-                co_carcs)
-    files(day, kind, name, expect, payer_id)        plb(day, payer_id, trn, code, reference, amount)
+    event_lines(pcn, payer_id, event_number, line_number, cpt, adjudicated_cpt, paid, allowed, denied, co_carcs,
+                units_paid, charge, modifiers)                 charge / modifiers as the 835 line echoes them
+    files(day, kind, name, expect, payer_id)        plb(day, payer_id, trn, code, reference, amount, target_pcn,
+                                                        payment_date)   day = DTM*405, payment_date = BPR16
     denial_carcs(carc)                              the reviewed CARCs that make a $0 CO adjustment a denial
-    payers(payer_id, payer, payer_class)            every payer billed, remitted or not
+    payers(payer_id, payer, payer_class)            every payer billed or remitting in the window
+
+The data starts in steady state: the generator simulates a burn-in before the window, so 835s inside the window
+also pay, deny, reverse and recoup claims billed before it. `claims` (and claim_lines, claim_diagnoses) hold the
+claims with an 837 inside the window, like sem.claims; `submitted` is the first submission inside the window
+(original_submission_date is the claim's real first submission, earlier for a claim first billed before the
+window). adjudications / events hold every 835 event delivered in the window, like sem.remit_claims, including
+those for claims billed before it (which then have no `claims` row unless they were resubmitted in the window).
 
 `is_current` marks the event that defines the claim+payer's current state under the business rule
 (latest event that is not a duplicate-claim denial, unless it is a reversal; a duplicate denial is current only
@@ -75,22 +83,27 @@ def build_truth_db(generator_out_dir: Path, tenant: str, db_path: Path) -> Path:
     billed_payer_ids = set()
     for c in iter_claims(generator_out_dir, tenant, index):
         pcn = c["pcn"]
-        sinks["claims"].add(pcn=pcn, dos=c["dos"], submitted=c["submitted"], order_type=c.get("order_type"),
-                            charge=c["charge"], principal_dx=c.get("principal_dx"), referring_npi=c.get("referring_npi"),
-                            risky_provider=c.get("risky_provider"), dependent=c.get("dependent"),
-                            resubmitted=c.get("resubmitted"), voided=c.get("voided"),
-                            has_any_remit=bool(c["adjudications"]), n_lines=len(c["cpts"]))
-        for i, cpt in enumerate(c["cpts"]):
-            sinks["claim_lines"].add(pcn=pcn, line_number=i + 1, cpt=cpt, units=(c.get("units") or [None] * 99)[i],
-                                     charge=(c.get("line_charges") or [None] * 99)[i],
-                                     modifiers=(c.get("modifiers") or [[]] * 99)[i])
-        for i, dx in enumerate(c.get("dx", [])):
-            sinks["claim_diagnoses"].add(pcn=pcn, sequence=i + 1, dx=dx)
+        if c["submissions"]:                                  # billed inside the window (sem.claims)
+            first_in_window = min(s["date"] for s in c["submissions"])
+            sinks["claims"].add(pcn=pcn, dos=c["dos"], submitted=first_in_window, order_type=c.get("order_type"),
+                                charge=c["charge"], principal_dx=c.get("principal_dx"),
+                                referring_npi=c.get("referring_npi"), risky_provider=c.get("risky_provider"),
+                                dependent=c.get("dependent"), resubmitted=c.get("resubmitted"), voided=c.get("voided"),
+                                has_any_remit=bool(c["adjudications"]), n_lines=len(c["cpts"]),
+                                original_submission_date=c["submitted"],
+                                first_billed_before_window=c["submitted"] < first_in_window)
+            for i, cpt in enumerate(c["cpts"]):
+                sinks["claim_lines"].add(pcn=pcn, line_number=i + 1, cpt=cpt, units=(c.get("units") or [None] * 99)[i],
+                                         charge=(c.get("line_charges") or [None] * 99)[i],
+                                         modifiers=(c.get("modifiers") or [[]] * 99)[i])
+            for i, dx in enumerate(c.get("dx", [])):
+                sinks["claim_diagnoses"].add(pcn=pcn, sequence=i + 1, dx=dx)
         for s in c["submissions"]:
             billed_payer_ids.add(s["payer_id"])
             sinks["submissions"].add(pcn=pcn, submission_date=s["date"], payer_id=s["payer_id"], payer_sequence=s["seq"],
                                      frequency=s["frequency"])
         for payer_id, a in c["adjudications"].items():
+            billed_payer_ids.add(payer_id)
             sinks["adjudications"].add(pcn=pcn, payer_id=payer_id, payer=a["payer"], payer_class=a.get("payer_class"),
                                        payer_sequence=a["seq"], remitted_current=a["remitted_current"], denied=a["denied"],
                                        denied_recorded=a["denied_recorded"], denied_signal_v3=a["denied_signal_v3"],
@@ -111,9 +124,10 @@ def build_truth_db(generator_out_dir: Path, tenant: str, db_path: Path) -> Path:
                                                    carc=carc, amount=amount)
                 for li, ln in enumerate(e.get("lines", [])):
                     sinks["event_lines"].add(pcn=pcn, payer_id=payer_id, event_number=n + 1, line_number=li + 1,
-                                             cpt=ln["cpt"], adjudicated_cpt=ln.get("adjudicated_cpt"),
-                                             units_paid=ln.get("units_paid"), paid=ln["paid"],
+                                             cpt=ln["cpt"], adjudicated_cpt=ln.get("adjudicated_cpt"), paid=ln["paid"],
                                              allowed=ln.get("allowed"), denied=ln.get("denied"),
+                                             units_paid=ln.get("units_paid"), charge=ln.get("charge"),
+                                             modifiers=ln.get("modifiers"),
                                              co_carcs=ln.get("co_carcs"))
     for s in sinks.values():
         s.flush()
@@ -121,7 +135,8 @@ def build_truth_db(generator_out_dir: Path, tenant: str, db_path: Path) -> Path:
     files = [dict(day=f["day"], kind=f["kind"], name=f["name"], expect=f["expect"], payer_id=f.get("payer_id"))
              for f in T.get("files", [])]
     plb = [dict(day=p["day"], payer_id=p["payer_id"], trn=p["trn"], code=p["code"], reference=p["reference"],
-                amount=p["amount"]) for p in T.get("plb", [])]
+                amount=p["amount"], target_pcn=p.get("target_pcn"), payment_date=p.get("payment_date"))
+           for p in T.get("plb", [])]
     denial_carcs = [dict(carc=c) for c in index.get("denial_carcs", [])]   # the reviewed denial-CARC list
     payers = [dict(payer_id=pid, payer=PAYER_BY_ID[pid].name, payer_class=PAYER_BY_ID[pid].payer_class)
               for pid in sorted(billed_payer_ids)]

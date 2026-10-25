@@ -1,7 +1,9 @@
 """Expected answers computed from the generator's ledger (`edi_mock.load_truth`), never from the parser or SQL views.
 
 Each function takes one tenant's ledger and returns rows in the same column order as the question's gold
-SQL. The self-test requires gold SQL == ledger answer for every question that has one; a mismatch means
+SQL. The window starts in steady state, so the ledger also holds claims billed before it that the window's 835s
+answered: claim-level questions (what we billed) count the claims with an 837 in the window (`_billed`), money and
+denial questions count every 835 event the window received. The self-test requires gold SQL == ledger answer for every question that has one; a mismatch means
 the semantic layer (or the parser) disagrees with the business rules, which is a data-layer finding, not
 an agent error.
 """
@@ -15,6 +17,17 @@ from fractions import Fraction
 
 def _claims(T):
     return T["claims"].values()
+
+
+def _billed(T):
+    """Claims with an 837 inside the window (what sem.claims shows)."""
+    return [c for c in _claims(T) if c["submissions"]]
+
+
+def _billed_to(c, a, seq=0) -> bool:
+    """The claim was billed inside the window to this adjudication's payer at this payer sequence (the
+    sem.claims payer_responsibility = 'P' join on claim and payer)."""
+    return any(s["seq"] == seq and s["payer_id"] == a["payer_id"] for s in c["submissions"])
 
 
 def _adj(T, seq=None):
@@ -56,11 +69,11 @@ def _title(name):
 
 
 def claims_submitted(T):
-    return [(len(T["claims"]),)]
+    return [(len(_billed(T)),)]
 
 
 def total_billed(T):
-    return [(round(sum(c["charge"] for c in _claims(T)), 2),)]
+    return [(round(sum(c["charge"] for c in _billed(T)), 2),)]
 
 
 def total_paid(T):
@@ -107,16 +120,21 @@ def top_denial_carcs(T, denial_carcs):
 
 
 def cpt_denial_rate_min20(T):
-    return [(cpt, r, n) for cpt, r, n in _rate(_current(T), lambda c, a: sorted(set(c["cpts"])), min_n=20)]
+    pairs = [(c, a) for c, a in _current(T) if c["submissions"]]
+    return [(cpt, r, n) for cpt, r, n in _rate(pairs, lambda c, a: sorted(set(c["cpts"])), min_n=20)]
+
+
+def _current_billed_primary(T):
+    return [(c, a) for c, a in _current(T, seq=0) if _billed_to(c, a)]
 
 
 def referring_provider_denials(T):
-    rows = _rate(_current(T, seq=0), lambda c, a: [c["referring_npi"]], min_n=15)
+    rows = _rate(_current_billed_primary(T), lambda c, a: [c["referring_npi"]], min_n=15)
     return sorted(rows, key=lambda r: (-r[1], r[0]))
 
 
 def principal_dx_denials(T):
-    return [(dx, r, n) for dx, r, n in _rate(_current(T, seq=0), lambda c, a: [c["principal_dx"]], min_n=30)]
+    return [(dx, r, n) for dx, r, n in _rate(_current_billed_primary(T), lambda c, a: [c["principal_dx"]], min_n=30)]
 
 
 def zero_paid_not_denied(T):
@@ -136,11 +154,11 @@ def denied_charges_by_payer(T):
 
 
 def resubmitted(T):
-    return [(sum(c["resubmitted"] for c in _claims(T)),)]
+    return [(sum(c["resubmitted"] for c in _billed(T)),)]
 
 
 def voided(T):
-    return [(sum(c["voided"] for c in _claims(T)),)]
+    return [(sum(c["voided"] for c in _billed(T)),)]
 
 
 def reversed_no_correction(T):
@@ -148,7 +166,7 @@ def reversed_no_correction(T):
 
 
 def never_remitted(T):
-    return [(sum(1 for c in _claims(T) if not c["adjudications"]),)]
+    return [(sum(1 for c in _billed(T) if not c["adjudications"]),)]
 
 
 def timely_filing_denials(T):
@@ -158,7 +176,10 @@ def timely_filing_denials(T):
 def days_to_first_primary_remit(T):
     m = defaultdict(list)
     for c, a in _adj(T, seq=0):
-        first_sub = min(date.fromisoformat(s["date"]) for s in c["submissions"] if s["seq"] == 0)
+        if not _billed_to(c, a):
+            continue
+        first_sub = min(date.fromisoformat(s["date"]) for s in c["submissions"]
+                        if s["seq"] == 0 and s["payer_id"] == a["payer_id"])
         first_remit = min(date.fromisoformat(e["date"]) for e in a["events"])
         m[_title(a["payer"])].append((first_remit - first_sub).days)
     return [(k, _round_half_up(Fraction(sum(v), len(v)), 1)) for k, v in m.items()]
@@ -170,11 +191,11 @@ def secondary_paid_claims(T):
 
 
 def primary_patient_responsibility(T):
-    return [(round(sum(_cur_event(a)["pr"] for _, a in _current(T, seq=0)), 2),)]
+    return [(round(sum(_cur_event(a)["pr"] for _, a in _current_billed_primary(T)), 2),)]
 
 
 def primary_deductible(T):
-    return [(round(sum(_cur_event(a)["cas"].get("PR-1", 0) for _, a in _current(T, seq=0)), 2),)]
+    return [(round(sum(_cur_event(a)["cas"].get("PR-1", 0) for _, a in _current_billed_primary(T)), 2),)]
 
 
 def payers_remitting(T):
@@ -204,7 +225,7 @@ def rejected_files(T):
 
 
 def modifier_59_claims(T):
-    return [(sum(1 for c in _claims(T) if any("59" in m for m in c["modifiers"])),)]
+    return [(sum(1 for c in _billed(T) if any("59" in m for m in c["modifiers"])),)]
 
 
 def answer(name: str, T: dict, truth: dict):
