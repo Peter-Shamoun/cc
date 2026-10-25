@@ -214,12 +214,7 @@ def _parse_batch_locked(env, store: Store, lock: BatchLock) -> dict:
             if dup is None:
                 known_sha.setdefault(sha, fid)
 
-    con = duckdb.connect()
-    con.execute(DDL_LOSSLESS)
-    batch_rows = {t: [] for t in TABLES}
-    _insert(con, "edi.ingest_run", [dict(ingest_run_id=run_id, started_at=started, status="SUCCEEDED",
-                                          parser_name="ccsim.parser", parser_version=PARSER_VERSION, schema_version="1",
-                                          triggered_by=env.task_arn, notes=e.get("EVENT_ID"))])
+    batch = SilverBatch(run_id, started, triggered_by=env.task_arn, notes=e.get("EVENT_ID"))
     for key in raw:
         head = s3.head_object(Bucket=B, Key=key)
         vid = head.get("VersionId")
@@ -235,25 +230,13 @@ def _parse_batch_locked(env, store: Store, lock: BatchLock) -> dict:
                     s3_region="us-west-2", kms_key_arn=head.get("SSEKMSKeyId"), original_filename=key.rsplit("/", 1)[-1],
                     source_system="sftp", size_bytes=len(body), sha256=sha, received_at=datetime.fromisoformat(day),
                     character_encoding="ascii")
-        try:
-            text = body[3:].decode("ascii") if body.startswith(b"\xef\xbb\xbf") else body.decode("ascii")   # UTF-8 BOM
-            rows = parse_file(text, file_id, c, meta, run_id, started)
-        except (ParseError, UnicodeDecodeError, IndexError, ValueError, KeyError, TypeError) as err:
+        if batch.add_raw_file(body, file_id, c, meta, duplicate_of_file_id=known_sha.get(sha)):
+            known_sha.setdefault(sha, file_id)
+            stats["loaded"] += 1
+        else:
             stats["rejected"] += 1
             store.put(f"{c}/quarantine/{run_id}/{key.rsplit('/', 1)[-1]}", body)
-            batch_rows["edi.source_file"].append(dict(file_id=file_id, tenant_code=c, file_kind="UNKNOWN",
-                                                      ingest_run_id=run_id, ingested_at=started, parse_status="REJECTED",
-                                                      parse_messages=[f"{type(err).__name__}: {err}"[:500]], **meta))
-            continue
-        if sha in known_sha:
-            rows["edi.source_file"][0]["duplicate_of_file_id"] = known_sha[sha]
-        else:
-            known_sha[sha] = file_id
-        for t in TABLES:
-            batch_rows[t] += rows.get(t, [])
-        stats["loaded"] += 1
-    for t in TABLES:                                  # one insert per table: ~40% less than one per file and table
-        _insert(con, t, batch_rows[t])
+    con = batch.finish()
     if stats["loaded"] == 0 and stats["rejected"] == 0:
         if not _gold_is_behind(store, silver):
             return dict(stats, status="noop")                    # duplicate delivery: nothing new
@@ -278,18 +261,64 @@ def _parse_batch_locked(env, store: Store, lock: BatchLock) -> dict:
     return dict(stats, status="ok")
 
 
+class SilverBatch:
+    """One batch's silver rows, staged in DuckDB under the lossless DDL (its types and NOT NULLs) for write_silver.
+    A raw file that fails to parse is recorded as a REJECTED edi.source_file row instead; the caller quarantines it."""
+
+    def __init__(self, run_id: str, started: datetime, triggered_by: str, notes: str | None):
+        self.run_id, self.started = run_id, started
+        self.con = duckdb.connect()
+        self.con.execute(DDL_LOSSLESS)
+        self.rows = {t: [] for t in TABLES}
+        _insert(self.con, "edi.ingest_run", [dict(ingest_run_id=run_id, started_at=started, status="SUCCEEDED",
+                                                  parser_name="ccsim.parser", parser_version=PARSER_VERSION,
+                                                  schema_version="1", triggered_by=triggered_by, notes=notes)])
+
+    def add_raw_file(self, body: bytes, file_id: str, customer: str, meta: dict,
+                     duplicate_of_file_id: str | None) -> bool:
+        """Parse one raw object into the batch. Returns False (and records the rejection) if it is not loadable."""
+        try:
+            text = body[3:].decode("ascii") if body.startswith(b"\xef\xbb\xbf") else body.decode("ascii")   # UTF-8 BOM
+            rows = parse_file(text, file_id, customer, meta, self.run_id, self.started)
+        except (ParseError, UnicodeDecodeError, IndexError, ValueError, KeyError, TypeError) as err:
+            self.rows["edi.source_file"].append(dict(file_id=file_id, tenant_code=customer, file_kind="UNKNOWN",
+                                                     ingest_run_id=self.run_id, ingested_at=self.started,
+                                                     parse_status="REJECTED",
+                                                     parse_messages=[f"{type(err).__name__}: {err}"[:500]], **meta))
+            return False
+        if duplicate_of_file_id is not None:
+            rows["edi.source_file"][0]["duplicate_of_file_id"] = duplicate_of_file_id
+        for t in TABLES:
+            self.rows[t] += rows.get(t, [])
+        return True
+
+    def finish(self) -> duckdb.DuckDBPyConnection:
+        """Insert the staged rows; returns the connection holding the batch's tables."""
+        for t in TABLES:                              # one insert per table: ~40% less than one per file and table
+            _insert(self.con, t, self.rows[t])
+        self.rows = None
+        return self.con
+
+
+def silver_part_files(con, directory):
+    """Write each staged table to <directory>/<table>.parquet, the commit table (edi.source_file) last. Yields
+    (table, path) after each write, path None for an empty table (no part is published for it)."""
+    for t in [t for t in SILVER_TABLES if t != COMMIT_TABLE] + [COMMIT_TABLE]:
+        p = Path(directory) / f"{t}.parquet"
+        yield t, (p if _copy(con, f"SELECT * FROM {t}", p) else None)
+
+
 def write_silver(con, store: Store, run_id: str, month: str, lock: BatchLock):
     """One part per non-empty table, straight into silver; the commit table (edi.source_file) goes last, and only
     while this task still holds the lock (a task that overran its lease must not commit parts a successor may
     already have deleted as garbage)."""
-    order = [t for t in SILVER_TABLES if t != COMMIT_TABLE] + [COMMIT_TABLE]
     with tempfile.TemporaryDirectory() as tmp:
-        for t in order:
-            p = Path(tmp) / f"{t}.parquet"
+        for t, p in silver_part_files(con, tmp):
+            if p is None:
+                continue
             if t == COMMIT_TABLE:
                 lock.renew()
-            if _copy(con, f"SELECT * FROM {t}", p):
-                store.put(f"{store.root}parquet/{t}/received_month={month}/part-{run_id}.parquet", p.read_bytes())
+            store.put(f"{store.root}parquet/{t}/received_month={month}/part-{run_id}.parquet", p.read_bytes())
 
 
 def compact_silver(con, store: Store, silver: Silver, before_month: str):
