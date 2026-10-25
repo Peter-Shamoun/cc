@@ -55,8 +55,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null,
-   "why": null,
+   "pass": false,
+   "why": "values differ (or extra / missing columns)",
    "assumption": "Paid dollars = 835 line_paid_amount on current adjudications, billed CPT = procedure_code; fraction of total."
   },
   {
@@ -66,8 +66,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null,
-   "why": null,
+   "pass": true,
+   "why": "ok",
    "assumption": "Primary = P on sem.claims; first submission to that payer; current adjudication paid>0; continuous percentile."
   },
   {
@@ -77,8 +77,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null,
-   "why": null,
+   "pass": true,
+   "why": "ok",
    "assumption": "Denied = is_denied on current adjudication; CO group; is_denial_carc as \"reviewed denial reason\"; claim+payer counted once per code."
   },
   {
@@ -88,8 +88,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
-   "why": null,
+   "pass": true,
+   "why": "ok",
    "assumption": "Pair = claim_key+payer_key; events = all remit_claims rows incl. duplicate-claim denials; resolved = 1 event, current, not denied."
   },
   {
@@ -99,8 +99,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null,
-   "why": null,
+   "pass": true,
+   "why": "ok",
    "assumption": "Trace = check_or_eft_number; current paid summed over current adjudication."
   },
   {
@@ -110,8 +110,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
-   "why": null,
+   "pass": true,
+   "why": "ok",
    "assumption": "Partial denial = denied 835 line on a current adjudication that is not denied overall."
   },
   {
@@ -121,8 +121,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
-   "why": null,
+   "pass": true,
+   "why": "ok",
    "assumption": "Deductible = PR-1 adjustments (all levels) on current adjudications of primary pairs."
   },
   {
@@ -132,8 +132,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
-   "why": null,
+   "pass": true,
+   "why": "ok",
    "assumption": "Latest submission per claim (includes voids); service month from service_date_from; months >= 2026-06."
   },
   {
@@ -143,8 +143,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
-   "why": null,
+   "pass": false,
+   "why": "values differ (or extra / missing columns)",
    "assumption": "Paid dollars = 835 line_paid_amount on current adjudications, billed CPT = procedure_code; fraction of total."
   },
   {
@@ -154,8 +154,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
-   "why": null,
+   "pass": true,
+   "why": "ok",
    "assumption": "Claim counts toward every CPT billed on any of its submissions; denominators = claim+payer current adjudications."
   },
   {
@@ -165,8 +165,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null,
-   "why": null,
+   "pass": true,
+   "why": "ok",
    "assumption": "Primary pair from P rows; line_count and charge from latest submission."
   },
   {
@@ -176,8 +176,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null,
-   "why": null,
+   "pass": true,
+   "why": "ok",
    "assumption": "Offset = first later FB from same payer with same reference and opposite amount; unmatched carry-forwards kept with NULLs."
   },
   {
@@ -187,8 +187,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
-   "why": null,
+   "pass": true,
+   "why": "ok",
    "assumption": "Payment month from current adjudication payment_date; classes with no August data get NULL August share."
   },
   {
@@ -198,8 +198,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null,
-   "why": null,
+   "pass": false,
+   "why": "values differ (or extra / missing columns)",
    "assumption": "Original = freq-1 submission to the same primary payer present in data."
   },
   {
@@ -209,8 +209,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null,
-   "why": null,
+   "pass": false,
+   "why": "values differ (or extra / missing columns)",
    "assumption": "Void = any freq-8 submission; remits matched by claim_key and the voided payer."
   },
   {
@@ -220,8 +220,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
-   "why": null,
+   "pass": true,
+   "why": "ok",
    "assumption": "Current adjudications, paid_amount = 0, is_denied false."
   },
   {
@@ -231,8 +231,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
-   "why": null,
+   "pass": true,
+   "why": "ok",
    "assumption": "Replacement date = earliest freq-7 submission per pair; first remit on/after it."
   },
   {
@@ -242,8 +242,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
-   "why": null,
+   "pass": true,
+   "why": "ok",
    "assumption": "Reversed pair whose latest event is a reversal (no current adjudication)."
   },
   {
@@ -253,8 +253,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
-   "why": null,
+   "pass": false,
+   "why": "values differ (or extra / missing columns)",
    "assumption": "Paid dollars = 835 line_paid_amount on current adjudications, billed CPT = procedure_code; fraction of total."
   },
   {
@@ -264,8 +264,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null,
-   "why": null,
+   "pass": true,
+   "why": "ok",
    "assumption": "Cohort by first P submission in July; first remit = earliest any event from that payer; no remit = not within 14."
   },
   {
@@ -275,8 +275,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
-   "why": null,
+   "pass": false,
+   "why": "values differ (or extra / missing columns)",
    "assumption": "Paid dollars = 835 line_paid_amount on current adjudications, billed CPT = procedure_code; fraction of total."
   },
   {
@@ -286,8 +286,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null,
-   "why": null,
+   "pass": true,
+   "why": "ok",
    "assumption": "Recorded denial = claim_status_code 4 before replacement date; outcome by remits on/after correction and current adjudication."
   },
   {
@@ -297,8 +297,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
-   "why": null,
+   "pass": true,
+   "why": "ok",
    "assumption": "Superseded = non-current non-reversal event; denied per is_denied."
   },
   {
@@ -308,8 +308,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null,
-   "why": null,
+   "pass": true,
+   "why": "ok",
    "assumption": "Open = primary pair with no current adjudication; latest submission not void; age from first P submission."
   },
   {
@@ -319,8 +319,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
-   "why": null,
+   "pass": true,
+   "why": "ok",
    "assumption": "First submission = earliest 837 in data; any 835 for the claim_key from any payer counts as remitted."
   },
   {
@@ -330,8 +330,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null,
-   "why": null,
+   "pass": true,
+   "why": "ok",
    "assumption": "Typical = modal allowed per payer+billed CPT, ties to higher; payers with lines but no shortfall shown with 0."
   },
   {
@@ -341,8 +341,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
-   "why": null,
+   "pass": false,
+   "why": "values differ (or extra / missing columns)",
    "assumption": "Paid dollars = 835 line_paid_amount on current adjudications, billed CPT = procedure_code; fraction of total."
   },
   {
@@ -352,8 +352,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
-   "why": null,
+   "pass": true,
+   "why": "ok",
    "assumption": "Month from current adjudication payment_date; MoM within class, null first month."
   },
   {
@@ -363,8 +363,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0,
-   "pass": null,
-   "why": null,
+   "pass": false,
+   "why": "values differ (or extra / missing columns)",
    "assumption": "Paid dollars = 835 line_paid_amount on current adjudications, billed CPT = procedure_code; fraction of total."
   },
   {
@@ -374,15 +374,15 @@
    "sql_execs": 4,
    "repairs": 1,
    "seconds": 0.01,
-   "pass": null,
-   "why": null,
+   "pass": true,
+   "why": "ok",
    "assumption": "Primary pairs; NPI from the claim latest submission; providers with >=15 primary current adjudications."
   }
  ],
- "accuracy": null,
+ "accuracy": "22/30",
  "n": 30,
  "mean_sql_execs": 3.03,
- "n_pass": null,
+ "n_pass": 22,
  "notes": "decompose_cte with 3 candidates per question (90 executions). Candidate 1 is this executor's pre-feedback H073 CTE draft; candidates 2 and 3 were newly written CTE variants, each built from a different stated interpretation (assumptions=1). Selection was by result agreement: 3/3 on 26 questions, 2/3 on 3, 0 on q12 (all empty). assumptions: the chosen interpretation is stored per result in an 'assumption' field. multiagent: a planner pass (interpretations and assumptions) and a writer pass (SQL), strictly separated but in one executor context because no subagent tool was available. verifier: one critic pass, no revisions. repair: one repair on q12 (empty), still empty. explore: reused this executor's probes. No few-shot. CONTAMINATION NOTE: written after H072/H073 were scored (sequencing mistake). The CPT-share form and the void/rework logic were kept as drafted, not tuned to that feedback.",
- "status": "answers_committed_unscored"
+ "status": "scored with bench.compare.match after answers were committed"
 }
