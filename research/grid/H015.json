@@ -1,0 +1,325 @@
+{
+  "cell": "H015",
+  "config": {
+    "generation": "decompose_cte",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": false,
+    "verifier": true,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+  },
+  "model": "Grok 4.7",
+  "dev_set": "DEV_HARD_v1",
+  "protocol": "v2",
+  "agent_note": "reused A08 builder",
+  "dev_ids": [
+    "f_cpt_share_of_line_payments__g0483",
+    "a_b853266803",
+    "q10_top_denial_carcs",
+    "a_a5888f64a4",
+    "a_7d45c279a7",
+    "q15_partial_line_denials",
+    "q25_primary_deductible",
+    "a_8663c777cd",
+    "f_cpt_share_of_line_payments__87798",
+    "q11_cpt_denial_rate",
+    "a_a123bba47f",
+    "a_9108c7aacb",
+    "a_856b95a70c",
+    "a_1b7e02d0b0",
+    "a_921f1bf366",
+    "q14_zero_paid_not_denied",
+    "a_dca9da6d52",
+    "q19_reversed_no_correction",
+    "f_cpt_share_of_line_payments__80307",
+    "a_d383370345",
+    "f_cpt_share_of_line_payments__g0482",
+    "a_0d43f7d4b6",
+    "a_923951a050",
+    "a_7423e6eb91",
+    "f_never_remitted_submitted_in_month__2026-07-01",
+    "a_ab202d4b23",
+    "f_cpt_share_of_line_payments__g0480",
+    "a_d671e0b995",
+    "f_cpt_share_of_line_payments__81479",
+    "q12_referring_provider_denials"
+  ],
+  "results": [
+    {
+      "qid": "f_cpt_share_of_line_payments__g0483",
+      "answer": "CTE steps, checked with a population query ([(2455,)]). Few-shot neighbors outside this dev set: f_payer_class_denial_rate__medicare (0.3696), f_payer_class_denial_rate__commercial (0.3536), f_cpt_denied_lines__80053 (0.2605). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"share\"], \"rows\": [[0.04097450292769689]]}",
+      "final_sql": "WITH computed AS (\nSELECT sum(line_paid_amount) FILTER (WHERE procedure_code = 'G0483')\n           / nullif(sum(line_paid_amount), 0) AS share\n    FROM sem.remit_lines\n    WHERE is_current_adjudication\n)\nSELECT * FROM computed",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0073,
+      "pass": true
+    },
+    {
+      "qid": "a_b853266803",
+      "answer": "CTE steps, checked with a population query ([(492,)]). Few-shot neighbors outside this dev set: a_f786e11aec (0.5943), q22_days_to_first_remit (0.5283), a_88c4640755 (0.5205). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"payer_class\", \"paid_claims\", \"median_days\", \"p90_days\"], \"rows\": [[\"blues\", 12, 16.0, 19.0], [\"commercial\", 20, 14.0, 16.3], [\"medicaid_mco\", 1, 20.0, 20.0], [\"medicare\", 3, 18.0, 18.8], [\"medicare_advantage\", 9, 14.0, 19.2], [\"other\", 1, -11.0, -11.0]]}",
+      "final_sql": "WITH first_sub AS (\n    SELECT claim_key, payer_key, min(submission_date) AS first_submission\n    FROM sem.claims\n    WHERE payer_responsibility = 'P'\n    GROUP BY claim_key, payer_key\n),\npaid AS (\n    SELECT r.payer_class,\n           date_diff('day', s.first_submission, r.payment_date) AS days_to_pay\n    FROM sem.remit_claims r\n    JOIN first_sub s ON s.claim_key = r.claim_key AND s.payer_key = r.payer_key\n    WHERE r.is_current_adjudication AND r.paid_amount > 0\n)\nSELECT payer_class,\n       count(*) AS paid_claims,\n       round(quantile_cont(days_to_pay, 0.5), 1) AS median_days,\n       round(quantile_cont(days_to_pay, 0.9), 1) AS p90_days\nFROM paid\nGROUP BY payer_class\nORDER BY payer_class",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0105,
+      "pass": true
+    },
+    {
+      "qid": "q10_top_denial_carcs",
+      "answer": "CTE steps, checked with a population query ([(93,)]). Few-shot neighbors outside this dev set: a_436f690741 (0.4579), a_f494340e13 (0.3663), q08_denial_rate_by_payer (0.3461). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"carc_code\", \"denied_claims\"], \"rows\": [[\"18\", 4], [\"11\", 2], [\"16\", 2], [\"22\", 2], [\"96\", 2]]}",
+      "final_sql": "WITH computed AS (\nSELECT a.carc_code,\n       count(DISTINCT r.claim_key || '|' || r.payer_key) AS denied_claims\nFROM sem.remit_claims r\nJOIN sem.adjustments a ON a.remit_claim_id = r.remit_claim_id\nWHERE r.is_current_adjudication\n  AND r.is_denied\n  AND a.group_code = 'CO'\n  AND a.is_denial_carc\nGROUP BY a.carc_code\nORDER BY denied_claims DESC, a.carc_code\nLIMIT 5\n)\nSELECT * FROM computed",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0083,
+      "pass": true
+    },
+    {
+      "qid": "a_a5888f64a4",
+      "answer": "CTE steps, checked with a population query ([(492,)]). Few-shot neighbors outside this dev set: q22_days_to_first_remit (0.3703), a_436f690741 (0.3224), a_dccab5ccfe (0.31). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"payer_class\", \"remitted_pairs\", \"first_pass_resolved\", \"first_pass_rate_pct\"], \"rows\": [[\"blues\", 93, 85, 91.4], [\"commercial\", 139, 130, 93.53], [\"medicaid\", 16, 15, 93.75], [\"medicaid_mco\", 51, 50, 98.04], [\"medicare\", 110, 105, 95.45], [\"medicare_advantage\", 75, 73, 97.33], [\"other\", 10, 6, 60.0]]}",
+      "final_sql": "WITH pairs AS (\n    SELECT payer_class, claim_key, payer_key,\n           count(*) AS events,\n           bool_or(is_current_adjudication AND NOT is_denied AND NOT is_reversal) AS current_not_denied\n    FROM sem.remit_claims\n    GROUP BY payer_class, claim_key, payer_key\n)\nSELECT payer_class,\n       count(*) AS remitted_pairs,\n       count(*) FILTER (WHERE events = 1 AND current_not_denied) AS first_pass_resolved,\n       round(100.0 * count(*) FILTER (WHERE events = 1 AND current_not_denied) / count(*), 2) AS first_pass_rate_pct\nFROM pairs\nGROUP BY payer_class\nORDER BY payer_class",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0062,
+      "pass": true
+    },
+    {
+      "qid": "a_7d45c279a7",
+      "answer": "CTE steps, checked with a population query ([(492,)]). Few-shot neighbors outside this dev set: a_e83408d6a2 (0.3128), a_439d7186d8 (0.2952), q01_claims_submitted (0.2801). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"payer_class\", \"multi_trace_pairs\", \"pairs_with_reversal\", \"pairs_with_no_current\", \"current_paid\"], \"rows\": [[\"blues\", 3, 2, 0, 180.33], [\"commercial\", 2, 0, 0, 84.34]]}",
+      "final_sql": "WITH pairs AS (\n    SELECT payer_class, claim_key, payer_key,\n           count(DISTINCT check_or_eft_number) AS traces,\n           bool_or(is_reversal) AS has_reversal,\n           bool_or(is_current_adjudication) AS has_current,\n           coalesce(sum(paid_amount) FILTER (WHERE is_current_adjudication), 0) AS current_paid\n    FROM sem.remit_claims\n    GROUP BY payer_class, claim_key, payer_key\n),\nmulti AS (\n    SELECT * FROM pairs WHERE traces >= 2\n)\nSELECT payer_class,\n       count(*) AS multi_trace_pairs,\n       count(*) FILTER (WHERE has_reversal) AS pairs_with_reversal,\n       count(*) FILTER (WHERE NOT has_current) AS pairs_with_no_current,\n       round(coalesce(sum(current_paid), 0), 2) AS current_paid\nFROM multi\nGROUP BY payer_class\nORDER BY payer_class",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0083,
+      "pass": true
+    },
+    {
+      "qid": "q15_partial_line_denials",
+      "answer": "CTE steps, checked with a population query ([(2455,)]). Few-shot neighbors outside this dev set: f_cpt_denied_lines__36415 (0.4292), q07_denial_rate (0.3296), f_cpt_denied_lines__80053 (0.2663). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"partial_denial_lines\"], \"rows\": [[36]]}",
+      "final_sql": "WITH computed AS (\nSELECT count(*) AS partial_denial_lines\nFROM sem.remit_lines\nWHERE is_current_adjudication AND line_is_denied AND NOT claim_is_denied\n)\nSELECT * FROM computed",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0039,
+      "pass": true
+    },
+    {
+      "qid": "q25_primary_deductible",
+      "answer": "CTE steps, checked with a population query ([(93,)]). Few-shot neighbors outside this dev set: q24_primary_patient_responsibility (0.6341), a_553c1034d1 (0.3264), q13_principal_dx_denials (0.2871). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"primary_deductible\"], \"rows\": [[297.24]]}",
+      "final_sql": "WITH computed AS (\nSELECT coalesce(round(sum(a.adjustment_amount), 2), 0) AS primary_deductible\nFROM sem.adjustments a\nJOIN sem.remit_claims r ON r.remit_claim_id = a.remit_claim_id\nWHERE r.is_current_adjudication\n  AND a.group_code = 'PR'\n  AND a.carc_code = '1'\n  AND EXISTS (\n      SELECT 1 FROM sem.claims c\n      WHERE c.claim_key = r.claim_key\n        AND c.payer_key = r.payer_key\n        AND c.payer_responsibility = 'P'\n  )\n)\nSELECT * FROM computed",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0101,
+      "pass": true
+    },
+    {
+      "qid": "a_8663c777cd",
+      "answer": "CTE steps, checked with a population query ([(492,)]). Few-shot neighbors outside this dev set: a_54dd76175a (0.5233), q04_paid_by_month (0.3751), a_837ce03435 (0.3718). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"service_month\", \"total_claims\", \"top5_claims\", \"top5_share_pct\"], \"rows\": [[\"2026-06-01\", 114, 21, 18.4], [\"2026-07-01\", 377, 44, 11.7]]}",
+      "final_sql": "WITH per_npi AS (\n    SELECT service_month, referring_npi, count(*) AS claims\n    FROM sem.claims\n    WHERE is_latest_submission\n      AND service_month >= DATE '2026-06-01'\n    GROUP BY service_month, referring_npi\n),\nranked AS (\n    SELECT service_month, referring_npi, claims,\n           row_number() OVER (\n               PARTITION BY service_month\n               ORDER BY claims DESC, referring_npi NULLS LAST\n           ) AS rk,\n           sum(claims) OVER (PARTITION BY service_month) AS total_claims\n    FROM per_npi\n)\nSELECT service_month,\n       max(total_claims) AS total_claims,\n       sum(claims) FILTER (WHERE rk <= 5) AS top5_claims,\n       round(100.0 * sum(claims) FILTER (WHERE rk <= 5) / max(total_claims), 1) AS top5_share_pct\nFROM ranked\nGROUP BY service_month\nORDER BY service_month",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0071,
+      "pass": true
+    },
+    {
+      "qid": "f_cpt_share_of_line_payments__87798",
+      "answer": "CTE steps, checked with a population query ([(2455,)]). Few-shot neighbors outside this dev set: f_cpt_denied_lines__80053 (0.3498), a_f3c42ce766 (0.3022), a_477b034f58 (0.2782). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"share\"], \"rows\": [[0.12018997558706353]]}",
+      "final_sql": "WITH computed AS (\nSELECT sum(line_paid_amount) FILTER (WHERE procedure_code = '87798')\n           / nullif(sum(line_paid_amount), 0) AS share\n    FROM sem.remit_lines\n    WHERE is_current_adjudication\n)\nSELECT * FROM computed",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0045,
+      "pass": true
+    },
+    {
+      "qid": "q11_cpt_denial_rate",
+      "answer": "CTE steps, checked with a population query ([(492,)]). Few-shot neighbors outside this dev set: q13_principal_dx_denials (0.3709), a_a23ce7f1de (0.315), q16_denied_charges_by_payer (0.3102). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"cpt\", \"denial_rate\", \"claim_payer_n\"], \"rows\": [[\"36415\", 0.038461538461538464, 26], [\"80053\", 0.0, 21], [\"85025\", 0.0, 25]]}",
+      "final_sql": "WITH billed AS (\n    SELECT DISTINCT c.claim_key, c.payer_key, cl.procedure_code\n    FROM sem.claim_lines cl\n    JOIN sem.claims c ON c.claim_id = cl.claim_id\n),\nadj AS (\n    SELECT claim_key, payer_key, is_denied\n    FROM sem.remit_claims\n    WHERE is_current_adjudication\n)\nSELECT b.procedure_code AS cpt,\n       avg(adj.is_denied::INT) AS denial_rate,\n       count(*) AS claim_payer_n\nFROM billed b\nJOIN adj ON adj.claim_key = b.claim_key AND adj.payer_key = b.payer_key\nGROUP BY b.procedure_code\nHAVING count(*) >= 20\nORDER BY b.procedure_code",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0103,
+      "pass": false
+    },
+    {
+      "qid": "a_a123bba47f",
+      "answer": "CTE steps, checked with a population query ([(492,)]). Few-shot neighbors outside this dev set: a_9a40343e18 (0.6349), a_5059b5e0e6 (0.6107), a_f3c42ce766 (0.5446). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"bucket\", \"claims\", \"denied_claims\", \"denial_rate_pct\", \"denied_billed_charge\"], \"rows\": [[\"1\", 8, 1, 12.5, 3805.44], [\"2\", 3, 0, 0.0, 0.0], [\"3+\", 40, 1, 2.5, 447.2]]}",
+      "final_sql": "WITH latest AS (\n    SELECT claim_key, charge_amount,\n           CASE WHEN line_count <= 1 THEN '1'\n                WHEN line_count = 2 THEN '2'\n                ELSE '3+' END AS bucket\n    FROM sem.claims\n    WHERE is_latest_submission\n),\nprimary_adj AS (\n    SELECT r.claim_key, r.is_denied\n    FROM sem.remit_claims r\n    WHERE r.is_current_adjudication\n      AND EXISTS (\n          SELECT 1 FROM sem.claims c\n          WHERE c.claim_key = r.claim_key\n            AND c.payer_key = r.payer_key\n            AND c.payer_responsibility = 'P'\n      )\n)\nSELECT l.bucket,\n       count(*) AS claims,\n       count(*) FILTER (WHERE p.is_denied) AS denied_claims,\n       round(100.0 * count(*) FILTER (WHERE p.is_denied) / count(*), 2) AS denial_rate_pct,\n       round(coalesce(sum(l.charge_amount) FILTER (WHERE p.is_denied), 0), 2) AS denied_billed_charge\nFROM latest l\nJOIN primary_adj p ON p.claim_key = l.claim_key\nGROUP BY l.bucket\nORDER BY l.bucket",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0115,
+      "pass": true
+    },
+    {
+      "qid": "a_9108c7aacb",
+      "answer": "CTE steps, checked with a population query ([(5,)]). Few-shot neighbors outside this dev set: a_b541bf06a1 (0.4384), a_837ce03435 (0.3428), a_88c4640755 (0.3188). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"reference_id\", \"carried_forward_date\", \"amount_carried_forward\", \"offset_date\", \"days_between\"], \"rows\": [[\"007138800000042\", \"2026-07-02\", 217.61, \"2026-07-06\", 4], [\"790227000000006\", \"2026-07-02\", 14.58, null, null], [\"007138800000043\", \"2026-07-06\", 157.11, \"2026-07-07\", 1], [\"957149190000052\", \"2026-07-09\", 85.52, \"2026-07-10\", 1], [\"174754440000012\", \"2026-07-16\", 44.92, null, null]]}",
+      "final_sql": "WITH fb AS (\n    SELECT provider_adjustment_id, payer_key, reference_id, payment_date,\n           provider_adjustment_amount AS amount\n    FROM sem.provider_adjustments\n    WHERE plb_reason_code = 'FB'\n)\nSELECT n.reference_id,\n       n.payment_date AS carried_forward_date,\n       round(abs(n.amount), 2) AS amount_carried_forward,\n       o.payment_date AS offset_date,\n       date_diff('day', n.payment_date, o.payment_date) AS days_between\nFROM fb n\nLEFT JOIN fb o\n  ON o.payer_key = n.payer_key\n AND o.reference_id = n.reference_id\n AND o.payment_date > n.payment_date\n AND abs(o.amount + n.amount) < 0.005\nWHERE n.amount < 0\nQUALIFY row_number() OVER (\n    PARTITION BY n.provider_adjustment_id\n    ORDER BY o.payment_date NULLS LAST\n) = 1\nORDER BY n.payment_date, n.reference_id",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0068,
+      "pass": true
+    },
+    {
+      "qid": "a_856b95a70c",
+      "answer": "CTE steps, checked with a population query ([(0,)]). Few-shot neighbors outside this dev set: a_477b034f58 (0.5663), f_payer_paid_in_month__unitedhealthcare_2026-07-01 (0.3479), a_9a40343e18 (0.3388). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"payer_class\", \"july_share_pct\", \"august_share_pct\", \"change_pp\"], \"rows\": [[\"blues\", 19.7, 0.0, -19.7], [\"commercial\", 27.2, 0.0, -27.2], [\"medicaid\", 2.4, 0.0, -2.4], [\"medicaid_mco\", 8.1, 0.0, -8.1], [\"medicare\", 25.3, 0.0, -25.3], [\"medicare_advantage\", 15.5, 0.0, -15.5], [\"other\", 1.8, 0.0, -1.8]]}",
+      "final_sql": "WITH paid AS (\n    SELECT payer_class, payment_month, sum(paid_amount) AS paid\n    FROM sem.remit_claims\n    WHERE is_current_adjudication\n      AND payment_month IN (DATE '2026-07-01', DATE '2026-08-01')\n    GROUP BY payer_class, payment_month\n),\ntotals AS (\n    SELECT payment_month, sum(paid) AS total FROM paid GROUP BY payment_month\n),\nclasses AS (\n    SELECT DISTINCT payer_class FROM paid\n),\nshares AS (\n    SELECT c.payer_class,\n           CASE WHEN july_tot.total IS NULL THEN 0\n                ELSE coalesce(july_paid.paid, 0) / nullif(july_tot.total, 0) END AS july_share,\n           CASE WHEN aug_tot.total IS NULL THEN 0\n                ELSE coalesce(aug_paid.paid, 0) / nullif(aug_tot.total, 0) END AS august_share\n    FROM classes c\n    LEFT JOIN paid july_paid ON july_paid.payer_class = c.payer_class AND july_paid.payment_month = DATE '2026-07-01'\n    LEFT JOIN totals july_tot ON july_tot.payment_month = DATE '2026-07-01'\n    LEFT JOIN paid aug_paid ON aug_paid.payer_class = c.payer_class AND aug_paid.payment_month = DATE '2026-08-01'\n    LEFT JOIN totals aug_tot ON aug_tot.payment_month = DATE '2026-08-01'\n)\nSELECT payer_class,\n       round(100 * july_share, 1) AS july_share_pct,\n       round(100 * august_share, 1) AS august_share_pct,\n       round(100 * (august_share - july_share), 1) AS change_pp\nFROM shares\nORDER BY payer_class",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0094,
+      "pass": false
+    },
+    {
+      "qid": "a_1b7e02d0b0",
+      "answer": "CTE steps, checked with a population query ([(10,)]). Few-shot neighbors outside this dev set: a_88c4640755 (0.652), q22_days_to_first_remit (0.5012), a_f786e11aec (0.4751). Null day averages were suspicious. Repair inner-joined frequency 1, matching the correction-lag few-shot shape, and returned {\"columns\": [\"corrected_claims\", \"avg_days_original_to_replacement\", \"paid_on_or_after_replacement\", \"avg_days_original_to_payment\", \"total_paid\"], \"rows\": [[0, null, 0, null, 0.0]]}. That drops frequency-7 claims that have no original in the extract, so the left join stands. Verifier re-executed the CTE statement. Result: {\"columns\": [\"corrected_claims\", \"avg_days_original_to_replacement\", \"paid_on_or_after_replacement\", \"avg_days_original_to_payment\", \"total_paid\"], \"rows\": [[10, null, 1, null, 34.64]]}",
+      "final_sql": "WITH primary_subs AS (\n    SELECT claim_key, payer_key, frequency_code, submission_date\n    FROM sem.claims\n    WHERE payer_responsibility = 'P'\n),\norig AS (\n    SELECT claim_key, payer_key, min(submission_date) AS original_date\n    FROM primary_subs WHERE frequency_code = '1'\n    GROUP BY claim_key, payer_key\n),\nrepl AS (\n    SELECT claim_key, payer_key, min(submission_date) AS replacement_date\n    FROM primary_subs WHERE frequency_code = '7'\n    GROUP BY claim_key, payer_key\n),\ncur AS (\n    SELECT claim_key, payer_key, payment_date, paid_amount\n    FROM sem.remit_claims\n    WHERE is_current_adjudication\n)\nSELECT count(*) AS corrected_claims,\n       round(avg(date_diff('day', o.original_date, r.replacement_date)), 2) AS avg_days_original_to_replacement,\n       count(*) FILTER (WHERE c.payment_date >= r.replacement_date) AS paid_on_or_after_replacement,\n       round(avg(date_diff('day', o.original_date, c.payment_date))\n             FILTER (WHERE c.payment_date >= r.replacement_date), 2) AS avg_days_original_to_payment,\n       round(coalesce(sum(c.paid_amount) FILTER (WHERE c.payment_date >= r.replacement_date), 0), 2) AS total_paid\nFROM repl r\nLEFT JOIN orig o USING (claim_key, payer_key)\nLEFT JOIN cur c USING (claim_key, payer_key)",
+      "sql_execs": 4,
+      "repairs": 1,
+      "seconds": 0.0157,
+      "pass": true
+    },
+    {
+      "qid": "a_921f1bf366",
+      "answer": "CTE steps, checked with a population query ([(0,)]). Few-shot neighbors outside this dev set: q18_voided (0.4656), a_f786e11aec (0.3459), a_f3c42ce766 (0.3422). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"voided_claims\", \"paid_before_void\", \"reversed_on_or_after_void\", \"current_paid\"], \"rows\": [[0, 0, 0, 0.0]]}",
+      "final_sql": "WITH voids AS (\n    SELECT claim_key, min(submission_date) AS void_date\n    FROM sem.claims\n    WHERE frequency_code = '8'\n    GROUP BY claim_key\n),\ncurrent_paid AS (\n    SELECT claim_key, sum(paid_amount) AS paid\n    FROM sem.remit_claims\n    WHERE is_current_adjudication\n    GROUP BY claim_key\n)\nSELECT count(*) AS voided_claims,\n       count(*) FILTER (WHERE EXISTS (\n           SELECT 1 FROM sem.remit_claims r\n           WHERE r.claim_key = v.claim_key AND r.paid_amount > 0 AND r.payment_date < v.void_date\n       )) AS paid_before_void,\n       count(*) FILTER (WHERE EXISTS (\n           SELECT 1 FROM sem.remit_claims r\n           WHERE r.claim_key = v.claim_key AND r.is_reversal AND r.payment_date >= v.void_date\n       )) AS reversed_on_or_after_void,\n       round(coalesce(sum(c.paid), 0), 2) AS current_paid\nFROM voids v\nLEFT JOIN current_paid c USING (claim_key)",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0123,
+      "pass": false
+    },
+    {
+      "qid": "q14_zero_paid_not_denied",
+      "answer": "CTE steps, checked with a population query ([(492,)]). Few-shot neighbors outside this dev set: q09_denials_by_type (0.4622), q21_timely_filing (0.4196), f_payer_class_denial_rate__medicare (0.3634). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"zero_paid_not_denied\"], \"rows\": [[46]]}",
+      "final_sql": "WITH computed AS (\nSELECT count(*) AS zero_paid_not_denied\nFROM sem.remit_claims\nWHERE is_current_adjudication AND paid_amount = 0 AND NOT is_denied\n)\nSELECT * FROM computed",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0041,
+      "pass": true
+    },
+    {
+      "qid": "a_dca9da6d52",
+      "answer": "CTE steps, checked with a population query ([(10,)]). Few-shot neighbors outside this dev set: a_88c4640755 (0.6951), a_f786e11aec (0.4769), a_fca405b635 (0.472). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"payer_class\", \"corrected_claims\", \"avg_days\", \"min_days\", \"max_days\"], \"rows\": [[\"medicare_advantage\", 1, 19.0, 19, 19]]}",
+      "final_sql": "WITH repl AS (\n    SELECT claim_key, payer_key, payer_class, min(submission_date) AS replacement_date\n    FROM sem.claims\n    WHERE payer_responsibility = 'P' AND frequency_code = '7'\n    GROUP BY claim_key, payer_key, payer_class\n),\nresponded AS (\n    SELECT r.payer_class, r.claim_key, r.payer_key, r.replacement_date,\n           min(m.payment_date) AS first_response\n    FROM repl r\n    JOIN sem.remit_claims m\n      ON m.claim_key = r.claim_key AND m.payer_key = r.payer_key\n     AND m.payment_date >= r.replacement_date\n    GROUP BY r.payer_class, r.claim_key, r.payer_key, r.replacement_date\n)\nSELECT payer_class,\n       count(*) AS corrected_claims,\n       round(avg(date_diff('day', replacement_date, first_response)), 1) AS avg_days,\n       min(date_diff('day', replacement_date, first_response)) AS min_days,\n       max(date_diff('day', replacement_date, first_response)) AS max_days\nFROM responded\nGROUP BY payer_class\nORDER BY payer_class",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0096,
+      "pass": true
+    },
+    {
+      "qid": "q19_reversed_no_correction",
+      "answer": "CTE steps, checked with a population query ([(492,)]). Few-shot neighbors outside this dev set: q16_denied_charges_by_payer (0.2567), a_2149838506 (0.2508), a_436f690741 (0.2367). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"reversed_without_current\"], \"rows\": [[2]]}",
+      "final_sql": "WITH computed AS (\nSELECT count(*) AS reversed_without_current\nFROM (\n    SELECT claim_key, payer_key\n    FROM sem.remit_claims\n    GROUP BY claim_key, payer_key\n    HAVING bool_or(is_reversal) AND NOT bool_or(is_current_adjudication)\n) pairs\n)\nSELECT * FROM computed",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0047,
+      "pass": true
+    },
+    {
+      "qid": "f_cpt_share_of_line_payments__80307",
+      "answer": "CTE steps, checked with a population query ([(2455,)]). Few-shot neighbors outside this dev set: f_cpt_denied_lines__80053 (0.3498), a_f3c42ce766 (0.3022), a_477b034f58 (0.2782). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"share\"], \"rows\": [[0.06165083757666042]]}",
+      "final_sql": "WITH computed AS (\nSELECT sum(line_paid_amount) FILTER (WHERE procedure_code = '80307')\n           / nullif(sum(line_paid_amount), 0) AS share\n    FROM sem.remit_lines\n    WHERE is_current_adjudication\n)\nSELECT * FROM computed",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0045,
+      "pass": true
+    },
+    {
+      "qid": "a_d383370345",
+      "answer": "CTE steps, checked with a population query ([(492,)]). Few-shot neighbors outside this dev set: a_f786e11aec (0.5739), q22_days_to_first_remit (0.5506), a_9a40343e18 (0.5136). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"payer_class\", \"cohort_claims\", \"remitted_within_14\", \"share_pct\"], \"rows\": [[\"blues\", 83, 2, 2.4], [\"commercial\", 154, 11, 7.1], [\"medicaid\", 11, 0, 0.0], [\"medicaid_mco\", 53, 0, 0.0], [\"medicare\", 100, 0, 0.0], [\"medicare_advantage\", 73, 5, 6.8], [\"other\", 13, 1, 7.7]]}",
+      "final_sql": "WITH cohort AS (\n    SELECT claim_key, payer_key, payer_class, min(submission_date) AS first_submission\n    FROM sem.claims\n    WHERE payer_responsibility = 'P'\n    GROUP BY claim_key, payer_key, payer_class\n    HAVING min(submission_date) BETWEEN DATE '2026-07-01' AND DATE '2026-07-31'\n),\nfirst_remit AS (\n    SELECT c.claim_key, c.payer_key, min(r.payment_date) AS first_payment\n    FROM cohort c\n    JOIN sem.remit_claims r ON r.claim_key = c.claim_key AND r.payer_key = c.payer_key\n    GROUP BY c.claim_key, c.payer_key\n)\nSELECT c.payer_class,\n       count(*) AS cohort_claims,\n       count(*) FILTER (\n           WHERE f.first_payment IS NOT NULL\n             AND date_diff('day', c.first_submission, f.first_payment) <= 14\n       ) AS remitted_within_14,\n       round(100.0 * count(*) FILTER (\n           WHERE f.first_payment IS NOT NULL\n             AND date_diff('day', c.first_submission, f.first_payment) <= 14\n       ) / count(*), 1) AS share_pct\nFROM cohort c\nLEFT JOIN first_remit f USING (claim_key, payer_key)\nGROUP BY c.payer_class\nORDER BY c.payer_class",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0104,
+      "pass": true
+    },
+    {
+      "qid": "f_cpt_share_of_line_payments__g0482",
+      "answer": "CTE steps, checked with a population query ([(2455,)]). Few-shot neighbors outside this dev set: f_payer_class_denial_rate__medicare (0.3696), f_payer_class_denial_rate__commercial (0.3536), f_cpt_denied_lines__80053 (0.2605). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"share\"], \"rows\": [[0.0628341537246295]]}",
+      "final_sql": "WITH computed AS (\nSELECT sum(line_paid_amount) FILTER (WHERE procedure_code = 'G0482')\n           / nullif(sum(line_paid_amount), 0) AS share\n    FROM sem.remit_lines\n    WHERE is_current_adjudication\n)\nSELECT * FROM computed",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0045,
+      "pass": true
+    },
+    {
+      "qid": "a_0d43f7d4b6",
+      "answer": "CTE steps, checked with a population query ([(10,)]). Few-shot neighbors outside this dev set: a_88c4640755 (0.3848), a_54dd76175a (0.3711), q16_denied_charges_by_payer (0.354). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"outcome\", \"claims\", \"current_paid\"], \"rows\": [[\"no remit since correction\", 1, 0.0]]}",
+      "final_sql": "WITH repl AS (\n    SELECT claim_key, payer_key, min(submission_date) AS replacement_date\n    FROM sem.claims\n    WHERE frequency_code = '7'\n    GROUP BY claim_key, payer_key\n),\nprior_denial AS (\n    SELECT r.claim_key, r.payer_key, r.replacement_date\n    FROM repl r\n    WHERE EXISTS (\n        SELECT 1 FROM sem.remit_claims d\n        WHERE d.claim_key = r.claim_key AND d.payer_key = r.payer_key\n          AND d.is_denied_recorded\n          AND d.payment_date < r.replacement_date\n    )\n),\ncur AS (\n    SELECT claim_key, payer_key, is_denied, paid_amount\n    FROM sem.remit_claims\n    WHERE is_current_adjudication\n),\nclassified AS (\n    SELECT p.claim_key, p.payer_key,\n           CASE\n               WHEN NOT EXISTS (\n                   SELECT 1 FROM sem.remit_claims m\n                   WHERE m.claim_key = p.claim_key AND m.payer_key = p.payer_key\n                     AND m.payment_date >= p.replacement_date\n               ) THEN 'no remit since correction'\n               WHEN c.is_denied IS NOT NULL AND NOT c.is_denied THEN 'overturned'\n               ELSE 'denied again'\n           END AS outcome,\n           coalesce(c.paid_amount, 0) AS current_paid\n    FROM prior_denial p\n    LEFT JOIN cur c ON c.claim_key = p.claim_key AND c.payer_key = p.payer_key\n)\nSELECT outcome,\n       count(*) AS claims,\n       round(sum(current_paid), 2) AS current_paid\nFROM classified\nGROUP BY outcome\nORDER BY outcome",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0158,
+      "pass": true
+    },
+    {
+      "qid": "a_923951a050",
+      "answer": "CTE steps, checked with a population query ([(492,)]). Few-shot neighbors outside this dev set: a_436f690741 (0.3931), q16_denied_charges_by_payer (0.3656), a_dccab5ccfe (0.3522). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"overturned_pairs\", \"current_paid\"], \"rows\": [[2, 118.91]]}",
+      "final_sql": "WITH current_ok AS (\n    SELECT claim_key, payer_key, paid_amount\n    FROM sem.remit_claims\n    WHERE is_current_adjudication AND NOT is_denied\n)\nSELECT count(*) AS overturned_pairs,\n       round(coalesce(sum(c.paid_amount), 0), 2) AS current_paid\nFROM current_ok c\nWHERE EXISTS (\n    SELECT 1 FROM sem.remit_claims earlier\n    WHERE earlier.claim_key = c.claim_key\n      AND earlier.payer_key = c.payer_key\n      AND earlier.adjudication_state = 'superseded'\n      AND NOT earlier.is_reversal\n      AND earlier.is_denied\n)",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0073,
+      "pass": true
+    },
+    {
+      "qid": "a_7423e6eb91",
+      "answer": "CTE steps, checked with a population query ([(492,)]). Few-shot neighbors outside this dev set: a_9a40343e18 (0.5314), a_f786e11aec (0.4264), q22_days_to_first_remit (0.4174). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"bucket\", \"claims\", \"billed_charge\"], \"rows\": [[\"0-14\", 0, 0.0], [\"15-29\", 102, 52399.08], [\"30+\", 334, 170145.57]]}",
+      "final_sql": "WITH latest AS (\n    SELECT claim_key, frequency_code, charge_amount\n    FROM sem.claims\n    WHERE is_latest_submission\n),\nprimary_first AS (\n    SELECT claim_key, payer_key, min(submission_date) AS first_submission\n    FROM sem.claims\n    WHERE payer_responsibility = 'P'\n    GROUP BY claim_key, payer_key\n),\nopen_ar AS (\n    SELECT l.claim_key, l.charge_amount,\n           date_diff('day', p.first_submission, DATE '2026-08-14') AS age_days\n    FROM latest l\n    JOIN primary_first p ON p.claim_key = l.claim_key\n    WHERE l.frequency_code <> '8'\n      AND NOT EXISTS (\n          SELECT 1 FROM sem.remit_claims r\n          WHERE r.claim_key = p.claim_key AND r.payer_key = p.payer_key\n            AND r.is_current_adjudication\n      )\n),\nbucketed AS (\n    SELECT CASE\n               WHEN age_days <= 14 THEN '0-14'\n               WHEN age_days <= 29 THEN '15-29'\n               ELSE '30+'\n           END AS bucket,\n           charge_amount\n    FROM open_ar\n),\nbuckets AS (\n    SELECT * FROM (VALUES ('0-14'), ('15-29'), ('30+')) v(bucket)\n)\nSELECT b.bucket,\n       count(u.charge_amount) AS claims,\n       round(coalesce(sum(u.charge_amount), 0), 2) AS billed_charge\nFROM buckets b\nLEFT JOIN bucketed u ON u.bucket = b.bucket\nGROUP BY b.bucket\nORDER BY CASE b.bucket WHEN '0-14' THEN 1 WHEN '15-29' THEN 2 ELSE 3 END",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0119,
+      "pass": false
+    },
+    {
+      "qid": "f_never_remitted_submitted_in_month__2026-07-01",
+      "answer": "CTE steps, checked with a population query ([(492,)]). Few-shot neighbors outside this dev set: q20_never_remitted (0.8399), f_claims_first_submitted_in_month__2026-07-01 (0.4564), q01_claims_submitted (0.2798). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"never_remitted\"], \"rows\": [[441]]}",
+      "final_sql": "WITH computed AS (\nSELECT count(*) AS never_remitted\nFROM (\n    SELECT claim_key, min(submission_date) AS first_submission\n    FROM sem.claims\n    GROUP BY claim_key\n) firsts\nWHERE date_trunc('month', first_submission) = DATE '2026-07-01'\n  AND NOT EXISTS (\n      SELECT 1 FROM sem.remit_claims r WHERE r.claim_key = firsts.claim_key\n  )\n)\nSELECT * FROM computed",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0084,
+      "pass": true
+    },
+    {
+      "qid": "a_ab202d4b23",
+      "answer": "CTE steps, checked with a population query ([(2455,)]). Few-shot neighbors outside this dev set: a_a23ce7f1de (0.5755), a_439d7186d8 (0.3213), a_f494340e13 (0.3003). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"payer_name\", \"underpaid_lines\", \"shortfall\"], \"rows\": [[\"Unitedhealthcare\", 4, 75.67], [\"Cigna\", 3, 65.29], [\"Healthy Blue North Carolina\", 4, 23.36], [\"Aetna\", 1, 17.95], [\"Wellcare Of North Carolina\", 3, 13.1], [\"Blue Cross Blue Shield Of North Carolina\", 6, 12.17], [\"Medicare Part B North Carolina\", 1, 0.31], [\"Aetna Medicare\", 0, 0.0], [\"Alignment Health Plan\", 0, 0.0], [\"Amerihealth Caritas North Carolina\", 0, 0.0], [\"Ashcroft Tpa\", 0, 0.0], [\"Bcbs Federal Employee Program Nc\", 0, 0.0], [\"Blackstone Employer Services\", 0, 0.0], [\"Carolina Complete Health\", 0, 0.0], [\"Cigna Healthspring\", 0, 0.0], [\"Coastal Carolina Food And Commercial Workers Health Fund\", 0, 0.0], [\"Crestview Employer Services\", 0, 0.0], [\"Cromwell Claims Administration\", 0, 0.0], [\"Devoted Health\", 0, 0.0], [\"Everly Plan Administrators\", 0, 0.0], [\"Garrison Health Services\", 0, 0.0], [\"Humana\", 0, 0.0], [\"Humana Medicare Advantage\", 0, 0.0], [\"Lake Norman Farm Bureau Health Plan\", 0, 0.0], [\"Lancaster Employer Services\", 0, 0.0], [\"Meritain Health\", 0, 0.0], [\"Nc Medicaid\", 0, 0.0], [\"Oscar Health\", 0, 0.0], [\"Palmetto Employee Benefit Trust\", 0, 0.0], [\"Pamlico Teachers Health Fund\", 0, 0.0], [\"Tar Heel Health Cooperative\", 0, 0.0], [\"Tricare East Region\", 0, 0.0], [\"Umr\", 0, 0.0], [\"Unitedhealthcare Community Plan Nc\", 0, 0.0], [\"Unitedhealthcare Medicare Advantage\", 0, 0.0], [\"Uwharrie Carpenters Health Trust\", 0, 0.0], [\"Uwharrie Health Alliance\", 0, 0.0], [\"Va Community Care Network\", 0, 0.0], [\"Wellcare Medicare\", 0, 0.0]]}",
+      "final_sql": "WITH lines AS (\n    SELECT payer_key, payer_name, procedure_code, line_allowed_amount\n    FROM sem.remit_lines\n    WHERE is_current_adjudication\n      AND NOT line_is_denied\n      AND units_paid = 1\n      AND line_allowed_amount > 0\n),\nfreq AS (\n    SELECT payer_key, procedure_code, line_allowed_amount AS allowed, count(*) AS n\n    FROM lines\n    GROUP BY payer_key, procedure_code, line_allowed_amount\n),\ntypical AS (\n    SELECT payer_key, procedure_code, allowed AS typical_allowed\n    FROM freq\n    QUALIFY row_number() OVER (\n        PARTITION BY payer_key, procedure_code\n        ORDER BY n DESC, allowed DESC\n    ) = 1\n),\nshort AS (\n    SELECT l.payer_name,\n           l.line_allowed_amount < t.typical_allowed AS under,\n           t.typical_allowed - l.line_allowed_amount AS gap\n    FROM lines l\n    JOIN typical t ON t.payer_key = l.payer_key AND t.procedure_code = l.procedure_code\n)\nSELECT payer_name,\n       count(*) FILTER (WHERE under) AS underpaid_lines,\n       round(coalesce(sum(gap) FILTER (WHERE under), 0), 2) AS shortfall\nFROM short\nGROUP BY payer_name\nORDER BY shortfall DESC, payer_name",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0105,
+      "pass": true
+    },
+    {
+      "qid": "f_cpt_share_of_line_payments__g0480",
+      "answer": "CTE steps, checked with a population query ([(2455,)]). Few-shot neighbors outside this dev set: f_cpt_denied_lines__80053 (0.3498), a_f3c42ce766 (0.3022), a_477b034f58 (0.2782). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"share\"], \"rows\": [[0.043294085318927665]]}",
+      "final_sql": "WITH computed AS (\nSELECT sum(line_paid_amount) FILTER (WHERE procedure_code = 'G0480')\n           / nullif(sum(line_paid_amount), 0) AS share\n    FROM sem.remit_lines\n    WHERE is_current_adjudication\n)\nSELECT * FROM computed",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0047,
+      "pass": true
+    },
+    {
+      "qid": "a_d671e0b995",
+      "answer": "CTE steps, checked with a population query ([(492,)]). Few-shot neighbors outside this dev set: a_54dd76175a (0.6631), a_837ce03435 (0.5011), q04_paid_by_month (0.3997). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"payer_class\", \"payment_month\", \"current_adjudications\", \"denied\", \"denial_rate_pct\", \"mom_change_pp\"], \"rows\": [[\"blues\", \"2026-07\", 93, 4, 4.3, null], [\"commercial\", \"2026-07\", 139, 7, 5.04, null], [\"medicaid\", \"2026-07\", 16, 1, 6.25, null], [\"medicaid_mco\", \"2026-07\", 51, 1, 1.96, null], [\"medicare\", \"2026-07\", 109, 4, 3.67, null], [\"medicare_advantage\", \"2026-07\", 74, 1, 1.35, null], [\"other\", \"2026-07\", 10, 3, 30.0, null]]}",
+      "final_sql": "WITH monthly AS (\n    SELECT payer_class,\n           strftime(payment_month, '%Y-%m') AS payment_month,\n           payment_month AS month_date,\n           count(*) AS current_adjudications,\n           count(*) FILTER (WHERE is_denied) AS denied\n    FROM sem.remit_claims\n    WHERE is_current_adjudication\n    GROUP BY payer_class, payment_month\n),\nrated AS (\n    SELECT payer_class, payment_month, month_date, current_adjudications, denied,\n           denied * 1.0 / current_adjudications AS rate\n    FROM monthly\n)\nSELECT payer_class,\n       payment_month,\n       current_adjudications,\n       denied,\n       round(100 * rate, 2) AS denial_rate_pct,\n       round(100 * (rate - lag(rate) OVER (PARTITION BY payer_class ORDER BY month_date)), 2) AS mom_change_pp\nFROM rated\nORDER BY payer_class, month_date",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.007,
+      "pass": true
+    },
+    {
+      "qid": "f_cpt_share_of_line_payments__81479",
+      "answer": "CTE steps, checked with a population query ([(2455,)]). Few-shot neighbors outside this dev set: f_payer_class_denial_rate__medicare (0.3696), f_payer_class_denial_rate__commercial (0.3536), f_cpt_denied_lines__80053 (0.2605). No repair. The population check was consistent with the result. Verifier re-executed the CTE statement. Result: {\"columns\": [\"share\"], \"rows\": [[0.04446547332204136]]}",
+      "final_sql": "WITH computed AS (\nSELECT sum(line_paid_amount) FILTER (WHERE procedure_code = '81479')\n           / nullif(sum(line_paid_amount), 0) AS share\n    FROM sem.remit_lines\n    WHERE is_current_adjudication\n)\nSELECT * FROM computed",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.0048,
+      "pass": true
+    },
+    {
+      "qid": "q12_referring_provider_denials",
+      "answer": "CTE steps, checked with a population query ([(4,)]). Few-shot neighbors outside this dev set: q13_principal_dx_denials (0.6133), a_9a40343e18 (0.3874), a_5059b5e0e6 (0.3621). Empty top-5 was suspicious. Repair dropped the 15-claim minimum and returned 5 rows, but the population check max is 4, so the minimum stands and the empty result is kept. Verifier re-executed the CTE statement. Result: {\"columns\": [\"referring_npi\", \"denial_rate\", \"claims\"], \"rows\": []}",
+      "final_sql": "WITH primary_sub AS (\n    SELECT claim_key, payer_key, referring_npi\n    FROM sem.claims\n    WHERE payer_responsibility = 'P'\n    QUALIFY row_number() OVER (\n        PARTITION BY claim_key, payer_key ORDER BY submission_date DESC\n    ) = 1\n)\nSELECT s.referring_npi,\n       avg(r.is_denied::INT) AS denial_rate,\n       count(*) AS claims\nFROM sem.remit_claims r\nJOIN primary_sub s ON s.claim_key = r.claim_key AND s.payer_key = r.payer_key\nWHERE r.is_current_adjudication\nGROUP BY s.referring_npi\nHAVING count(*) >= 15\nORDER BY denial_rate DESC, s.referring_npi\nLIMIT 5",
+      "sql_execs": 4,
+      "repairs": 1,
+      "seconds": 0.0141,
+      "pass": true
+    }
+  ],
+  "accuracy": "26/30",
+  "n": 30,
+  "mean_sql_execs": 3.0667,
+  "notes": "Questions are decomposed into CTEs. Three non-dev, non-held-out, non-same-family reference SQLs are retrieved with TF-IDF before the final statement. One population check runs per question. Empty or null-heavy results on q12 and the corrected-claim cycle time get one rejected repair. A verifier re-executes the kept statement. pass was filled afterward by bench.compare.match against the committed SQL. The statements were not edited after that score."
+}
