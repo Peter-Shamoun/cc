@@ -819,7 +819,7 @@ class Tenant:
     code: str
     name: str
     tax_id: str
-    npi_seed: int
+    npi_seed: int                   # billing NPI = npi(npi_seed): checked absent from the NPPES registry
     claims_per_day: int
     price_mult: float
     sender_id: str
@@ -837,7 +837,7 @@ TENANTS = {
     "acme_labs": Tenant("acme_labs", "ACME LABS INC", "561234567", 4242, 120, 1.0, "ACMELABS", "A", "LB", "NC",
                         ("2617 ANTHONY RD", "BURLINGTON", "NC", "272155230"), "34D2187436", "3365702140",
                         ("053112929", "4410273395")),
-    "acme_diagnostics": Tenant("acme_diagnostics", "ACME DIAGNOSTICS LLC", "561234999", 7777, 40, 1.15, "ACMEDX", "B",
+    "acme_diagnostics": Tenant("acme_diagnostics", "ACME DIAGNOSTICS LLC", "561234999", 7779, 40, 1.15, "ACMEDX", "B",
                                "DX", "TX", ("8701 N MOPAC EXPY STE 300", "AUSTIN", "TX", "787594114"), "45D2034401",
                                "5124673300", ("114924742", "3801159926")),
 }
