@@ -17,7 +17,7 @@ from ccsim.x12_validate import validate
 @pytest.fixture(scope="module")
 def stress(tmp_path_factory):
     out = tmp_path_factory.mktemp("stress")
-    return out, generate(out, Scenario.stress(days=50, volume_scale=.4))   # 50 days: enough late Medicaid remits for PLB L6
+    return out, generate(out, Scenario.stress(days=75, volume_scale=.3))   # 75 days: corrected claims come back, PLB L6
 
 
 def _files(out, truth):
@@ -42,7 +42,7 @@ def test_every_file_validates_and_every_corrupt_file_is_caught(stress):
     out, truth = stress
     outcome = Counter()
     for tc, f, body in _files(out, truth):
-        errs = validate(body.decode("ascii", "replace"))
+        errs = validate(body.decode("utf-8", "replace"))
         if f["expect"] == "rejected":
             assert errs, f["name"]
         else:
@@ -55,7 +55,7 @@ def test_parser_agrees_with_expectations(stress):
     out, truth = stress
     for tc, f, body in _files(out, truth):
         try:
-            rows = parse_file(body.decode("ascii", "replace"), "F", tc, dict(s3_uri="x", s3_bucket="x", s3_key="x",
+            rows = parse_file(body.decode("utf-8", "replace"), "F", tc, dict(s3_uri="x", s3_bucket="x", s3_key="x",
                               size_bytes=1, sha256="x"), "r", datetime(2026, 1, 1))
         except ParseError:
             assert f["expect"] == "rejected", f["name"]
@@ -70,7 +70,7 @@ def test_all_three_delimiter_styles_and_multi_st_files_appear(stress):
     seps, multi = set(), 0
     for tc, f, body in _files(out, truth):
         if f["expect"] != "rejected":
-            seps.add(chr(body[3]))
+            seps.add(chr(body.removeprefix(b"\xef\xbb\xbf")[3]))
             multi += body.count(b"\nST" if b"\n" in body else b"~ST") > 1 or body.count(b"ST" + body[3:4] + b"835") > 1
     assert seps == {"*", "|"} and multi
 
@@ -79,10 +79,15 @@ def test_all_three_delimiter_styles_and_multi_st_files_appear(stress):
 @pytest.fixture(scope="module")
 def samples(stress):
     out, truth = stress
-    s837 = next(b for _, f, b in _files(out, truth) if f["kind"] == "837" and f["expect"] == "parsed" and b[3:4] == b"*").decode()
-    s835 = next(b for _, f, b in _files(out, truth) if f["kind"] == "835" and f["expect"] == "parsed" and b[3:4] == b"*"
+    s837 = next(b for _, f, b in _files(out, truth) if f["kind"] == "837" and f["expect"] == "parsed" and _plain(b)).decode()
+    s835 = next(b for _, f, b in _files(out, truth) if f["kind"] == "835" and f["expect"] == "parsed" and _plain(b)
                 and b"\nCAS*CO" in b and b"\nSVC*" in b and b"\nPLB" not in b and b"\nBPR*I*" in b).decode()
     return s837, s835
+
+
+def _plain(body: bytes) -> bool:
+    """One '*'-delimited interchange, one segment per line (no BOM, wrapping, padding or concatenation)."""
+    return body[:4] == b"ISA*" and body.count(b"~\n") == body.count(b"~") and body.count(b"ISA*") == 1
 
 
 def _sub(text, pattern, repl):
@@ -139,7 +144,7 @@ def test_every_scenario_occurs_under_stress(stress):
         "dependent patient": any(c["dependent"] for c in claims),
         "claim-level denial": any(a["claim_level_only"] for a in ads),
         "partial line denial": any(a["remitted_current"] and a["paid_current"] > 0 and
-                                   any(ln["denied"] for ln in [e for e in a["events"] if not e["duplicate_denial"]][-1]["lines"])
+                                   any(ln["denied"] for ln in a["events"][-1]["lines"])
                                    for a in ads),
         "timely filing": any("29" in e["carcs"] for e in evs),
         "duplicate submission": any(a["has_duplicate_denial"] for a in ads),
@@ -154,16 +159,20 @@ def test_every_scenario_occurs_under_stress(stress):
 
 
 def test_denials_follow_the_drivers(tmp_path):
-    """Signals the agent should be able to find: risky providers, screening dx on medical-necessity tests."""
+    """Signals the agent should be able to find: risky providers (claim denials for missing information / PECOS),
+    screening dx on medical-necessity tests (mostly line-level CO-50/11/167 on an otherwise paid claim)."""
     t = generate(tmp_path, Scenario(days=60, volume_scale=1, seed=11), ["acme_labs"])
-    rate = lambda pred: (lambda xs: sum(xs) / len(xs))(
-        [a["denied"] for c in t["tenants"]["acme_labs"]["claims"].values() if pred(c)
-         for a in c["adjudications"].values() if a["remitted_current"] and a["seq"] == 0])
+
+    def rate(pred, any_line=False):
+        xs = [a["denied"] or (any_line and any(ln["denied"] for ln in a["events"][-1]["lines"]))
+              for c in t["tenants"]["acme_labs"]["claims"].values() if pred(c)
+              for a in c["adjudications"].values() if a["remitted_current"] and a["seq"] == 0]
+        return sum(xs) / len(xs)
     assert rate(lambda c: c["risky_provider"]) > 1.3 * rate(lambda c: not c["risky_provider"])
     screening = edi_mock.SCREENING_DX
     mn = {k for k, v in edi_mock.CPTS.items() if v.medical_necessity}
-    assert rate(lambda c: set(c["cpts"]) & mn and c["principal_dx"] in screening) > \
-        rate(lambda c: set(c["cpts"]) & mn and c["principal_dx"] not in screening)
+    assert rate(lambda c: set(c["cpts"]) & mn and c["principal_dx"] in screening, any_line=True) > \
+        1.3 * rate(lambda c: set(c["cpts"]) & mn and c["principal_dx"] not in screening, any_line=True)
 
 
 def test_npis_pass_luhn_and_identities_are_synthetic():
@@ -175,11 +184,11 @@ def test_npis_pass_luhn_and_identities_are_synthetic():
 def test_validator_status_and_cob_rules(stress):
     out, truth = stress
     files = list(_files(out, truth))
-    cob = next(b.decode() for _, f, b in files if f["kind"] == "837" and b"\nSVD*" in b and b[3:4] == b"*")
+    cob = next(b.decode() for _, f, b in files if f["kind"] == "837" and b"\nSVD*" in b and _plain(b))
     assert not validate(cob)
     assert any("SVD02" in e for e in validate(_sub(cob, r"^(SVD\*\w+\*)([0-9.]+)", r"\g<1>99999")))
-    assert any("SBR02" in e for e in validate(_sub(cob, r"^(SBR\*P\*)(\d\d)(\*G\d+\*{6}\w+~\r?\n(?:CAS|AMT))", r"\g<1>\g<3>")))
-    rem = next(b.decode() for _, f, b in files if f["kind"] == "835" and f["expect"] != "rejected" and b[3:4] == b"*"
+    assert any("SBR02" in e for e in validate(_sub(cob, r"^(SBR\*P\*)(\d\d)(\*\w+\*{6}\w+~\r?\n(?:CAS|AMT))", r"\g<1>\g<3>")))
+    rem = next(b.decode() for _, f, b in files if f["kind"] == "835" and f["expect"] != "rejected" and _plain(b)
                and re.search(rb"^CLP\*\w+\*4\*[0-9.]+\*0\*", b, re.M) and b"\nPLB" not in b)
     m = re.search(r"^CLP\*(\w+)\*4\*([0-9.]+)\*0\*", rem, re.M)
     assert m
@@ -211,18 +220,23 @@ def test_generator_regressions_from_review(stress, tmp_path):
     assert all(len(set(c["payers"])) == len(c["payers"]) for c in claims)
     # a replacement claim's remit echoes frequency 7 (CLP09)
     body = b"".join(b for _, f, b in _files(out, truth) if f["kind"] == "835" and f["expect"] == "parsed")
-    assert re.search(rb"CLP\*[^*~]+\*1\*[^~]*\*7~", body)
-    # secondary claims report a business-day primary adjudication date that has a primary 835
-    days = {f["day"] for _, f, _ in _files(out, truth) if f["kind"] == "835"}
+    assert re.search(rb"CLP\*[^*~]+\*(1|19)\*[^~]*\*7~", body)
+    # secondary claims report the primary's payment date (DTP*573), a business day that is some 835's BPR16
+    paid_on = {d.decode() for d in re.findall(rb"BPR[*|][^~]*[*|](\d{8})~", body)}
     for m in re.finditer(rb"DTP\*573\*D8\*(\d{8})", b"".join(b for _, f, b in _files(out, truth) if f["kind"] == "837")):
         d = m.group(1).decode()
-        assert datetime.strptime(d, "%Y%m%d").weekday() < 5 and f"{d[:4]}-{d[4:6]}-{d[6:]}" in days
-    # duplicate denials always arrive after the claim's real adjudication
+        assert datetime.strptime(d, "%Y%m%d").weekday() < 5 and d in paid_on
+    # duplicate resends: denied before the original pays (the real adjudication stays current) or after it
+    # (the duplicate denial is then the latest event, so it is current, as the business rule says)
+    orders = Counter()
     for c in claims:
         for a in c["adjudications"].values():
-            dup = [e["date"] for e in a["events"] if e["duplicate_denial"]]
-            real = [e["date"] for e in a["events"] if not e["duplicate_denial"]]
-            assert not dup or (real and min(real) < min(dup))
+            if a["has_duplicate_denial"]:
+                last = a["events"][-1]
+                orders["after" if last["duplicate_denial"] else "before"] += 1
+                if last["duplicate_denial"]:
+                    assert a["denied"] == (last["status"] == "4" or "18" in last["co_carcs"])
+    assert orders["before"] and orders["after"], orders
     # generator instances do not share state
     g1, g2 = edi_mock.Generator(Scenario(days=5, volume_scale=.1)), edi_mock.Generator(Scenario(days=5, volume_scale=.1))
     assert g1.plb_log is not g2.plb_log

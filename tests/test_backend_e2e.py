@@ -1,5 +1,6 @@
 """The whole backend, end to end: mock EDI -> SFTP copy -> EventBridge -> Fargate parser -> silver -> gold ->
 per-request DuckDB. Gold is checked against the generator's ledger; every security layer is checked on its own."""
+import re
 from collections import Counter, defaultdict
 
 import duckdb
@@ -109,7 +110,7 @@ def test_line_denials_match_ledger(world):
     want = Counter()
     for _, a in adjudications(world):
         if a["remitted_current"]:
-            cur = [e for e in a["events"] if not e["duplicate_denial"]][-1]
+            cur = a["events"][-1]                                # current = latest event (business rule)
             for ln in cur["lines"]:
                 want[(ln["adjudicated_cpt"], ln["denied"])] += 1
     got = Counter({(cpt, bool(d)): n for cpt, d, n in q(
@@ -277,8 +278,19 @@ def test_customer_offboarding_by_disabling_its_key(world):
 
 
 # --- PHI -------------------------------------------------------------------------------------------
+def _member_ids(world) -> list[str]:
+    """Every subscriber member id the 837s carried (NM1*IL ... MI <id>), read from the delivered files."""
+    ids = set()
+    for p in world.sftp_root.rglob("*.x12"):
+        if "/837/" in str(p):
+            ids |= {m.decode() for m in re.findall(rb"NM1[*|]IL[*|]1[*|][^~]*?[*|]MI[*|]([^~*|]+)~", p.read_bytes())}
+    assert len(ids) > 100
+    return sorted(ids)
+
+
 def test_gold_has_no_direct_patient_identifiers(world):
     names_ = set(edi_mock.LAST) | set(edi_mock.FIRST)
+    members = _member_ids(world)
     for escalate in (False, True):
         s = session(world, escalate=escalate)
         rels = [f"{a}.{b}" for a, b in q(s, "SELECT schema_name, view_name FROM duckdb_views() WHERE NOT internal")]
@@ -292,8 +304,8 @@ def test_gold_has_no_direct_patient_identifiers(world):
             for c, typ, *_ in cols:
                 if typ != "VARCHAR":
                     continue
-                hits = q(s, f'SELECT count(*) FROM {rel} WHERE "{c}" IN (SELECT unnest(?)) OR regexp_matches("{c}", '
-                            "'^(AH|NW|CT|FM|TS|WG)[0-9]{9}$')", list(names_))[0][0]
+                hits = q(s, f'SELECT count(*) FROM {rel} WHERE "{c}" IN (SELECT unnest(?)) OR "{c}" IN (SELECT unnest(?))',
+                         list(names_), members)[0][0]
                 assert hits == 0, f"patient name or member id in {rel}.{c}"
 
 

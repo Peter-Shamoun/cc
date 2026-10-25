@@ -19,7 +19,7 @@ import duckdb
 
 ROOT = Path(__file__).resolve().parent.parent
 CACHE = ROOT / ".ccsim" / "bench"
-DEFAULT = dict(days=45, volume_scale=.6, seed=2026)
+DEFAULT = dict(days=45, volume_scale=.6, seed=2026, p_corrupt_file=.1)   # enough quarantined files for q29
 
 
 def dataset_id(scenario) -> str:
@@ -27,7 +27,8 @@ def dataset_id(scenario) -> str:
     h = hashlib.sha256()
     h.update(json.dumps({k: str(v) for k, v in asdict(scenario).items()}, sort_keys=True).encode())
     h.update(edi_mock.GENERATOR_VERSION.encode() + b"layout-3")
-    for f in ("ccsim/edi_mock.py", "ccsim/parser.py", "ccsim/pipeline.py", "claude/schema/01_lossless_edi_schema.sql",
+    for f in ("ccsim/edi_mock.py", "ccsim/data/clfs_2026q4.csv", "ccsim/parser.py", "ccsim/pipeline.py",
+              "claude/schema/01_lossless_edi_schema.sql",
               "claude/schema/02_semantic_layer_views.sql"):
         h.update((ROOT / f).read_bytes())
     return h.hexdigest()[:12]
