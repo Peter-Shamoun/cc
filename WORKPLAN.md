@@ -35,8 +35,12 @@ Never decide the work is done; when an item finishes, pick the next highest-valu
   adjudication (views, generator ledger, answer key agree)
 - [done] realism audit 1 (independent): 5/10, research/edi_realism_audit_1.md
 - [running] realism engineer on audit-1 findings (worktree); then re-audit, loop until >= 8/10
-- [running] Phase 4 screen 1: 2^(7-3) res IV x 36 questions x Haiku (576 sessions) on generator-3.0 snapshot
-  29b42d74ee18; next: effects -> Sonnet screen on the same design -> fold-over/coordinate ascent on the winners
+- [done] Phase 4 screen 1 (research/screening_results_1.md): pitfalls glossary +16 pts Haiku / +6 Sonnet,
+  procedural steps +5 Haiku; others ~0. Haiku+pitfalls ~= Sonnet. Matcher false-reject fixed during scoring.
+- [next] held-out validation of the pitfalls text on independently authored questions (anti-overfit)
+- [next] harder question set (Sonnet at ceiling): Opus authors multi-step questions; then screen 2 =
+  coordinate ascent around the winner (glossary content variants, examples/semantic layer on hard questions,
+  model cascade Haiku->Sonnet, multi-candidate) with repeats for pass^k
 - [later] Expand families further after calibration lands (target 150+ at full scale)
 - [later] Ambiguity / abstention / multi-turn splits (T20-T22)
 - [later] Screening experiment, then adaptive search over technique permutations
