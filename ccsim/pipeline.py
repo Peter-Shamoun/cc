@@ -37,6 +37,11 @@ SEM_TABLES = ["remit_claims", "remit_lines", "claims", "claim_lines", "adjustmen
 SILVER_TABLES = ["edi.ingest_run"] + TABLES
 PARSER_VERSION = "ccsim-0.2"
 PERSON_ENTITY_CODES = ("IL", "QC", "74", "QD")
+# REF qualifiers that identify claims, payers, providers or the lab, never a person. Default deny: a qualifier
+# not listed here (EA medical record number, 1L/6P group or policy number, 1W member id, SY SSN, ...) never
+# reaches the escalation copy of edi.reference.
+NON_PHI_REFERENCE_QUALIFIERS = ("6R", "X4", "D9", "TJ", "EI", "2U", "F8", "G1", "0K", "9F", "9A", "9C", "EV", "LU",
+                                "G2", "0B", "1G", "HPI", "CE", "BB", "IG", "F2", "LX", "APC", "NF", "PQ")
 
 # Lossless tables the agent may escalate to, as PHI-stripped projections (materialized into gold)
 ESCALATION = {
@@ -53,7 +58,8 @@ ESCALATION = {
     "edi.date_time": "SELECT * FROM edi.date_time",
     "edi.amount": "SELECT * FROM edi.amount",
     "edi.reference": ("SELECT r.* FROM edi.reference r LEFT JOIN edi.entity e ON e.entity_uid = r.owner_uid "
-                      f"WHERE e.entity_id_code IS NULL OR e.entity_id_code NOT IN {PERSON_ENTITY_CODES}"),
+                      f"WHERE (e.entity_id_code IS NULL OR e.entity_id_code NOT IN {PERSON_ENTITY_CODES}) "
+                      f"AND r.qualifier IN {NON_PHI_REFERENCE_QUALIFIERS}"),
     "edi.source_file": "SELECT * EXCLUDE (original_filename) FROM edi.source_file",
     "r835.payment": ("SELECT * EXCLUDE (bpr07_sender_dfi_id, bpr09_sender_account, bpr13_receiver_dfi_id, "
                      "bpr15_receiver_account) FROM r835.payment"),
