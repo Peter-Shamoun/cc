@@ -3,7 +3,8 @@
 A candidate result is correct when it states the expected answer and nothing that contradicts it:
 
 - Columns are matched by value, not name (agents name columns freely). Every numeric column the candidate
-  returns must map to an expected column, so a result that lists several alternative numbers fails. Extra text
+  returns must map to an expected column, so a result that lists several alternative numbers fails, with one
+  exception: whole-number supporting counts beside fractional measures (rates, averages, amounts). Extra text
   columns (labels, names next to ids) are allowed. Expected columns are required unless the question marks
   them `optional_cols` (e.g. a supporting count).
 - Measures keep the expected column order, so two counts cannot be swapped.
@@ -76,6 +77,22 @@ def _rows_equal(gold_rows, cand_rows, factors, tol) -> bool:
     return not remaining
 
 
+def _is_whole_number_col(rows, j) -> bool:
+    vals = [_num(r[j]) for r in rows if r[j] is not None]
+    return bool(vals) and all(v is not None and float(v).is_integer() for v in vals)
+
+
+def _supporting_counts_allowed(gold, cand, gcols, g_num, unexplained, spec) -> bool:
+    """Extra numeric columns are tolerated only as supporting counts next to fractional measures (a rate, an
+    average, an amount): every extra column holds whole numbers and every expected measure is fractional. An extra
+    rate beside a rate, or an extra count beside a count, could be an alternative answer, so it fails."""
+    if spec.get("strict_extra_columns"):
+        return False
+    measures = [g for g in gcols if g in g_num]
+    return bool(measures) and all(_is_whole_number_col(cand, j) for j in unexplained) and \
+        not any(_is_whole_number_col(gold, g) for g in measures)
+
+
 def _mappings(gold, cand, spec):
     """Yield (gold_cols, cand_cols, factors): injective mappings honoring the rules in the module docstring."""
     k, m = len(gold[0]), len(cand[0])
@@ -91,8 +108,11 @@ def _mappings(gold, cand, spec):
             if len(gcols) > m:
                 continue
             for ccols in itertools.permutations(range(m), len(gcols)):
-                if not c_num <= set(ccols):                       # every candidate number must be explained
-                    continue
+                unexplained = c_num - set(ccols)
+                unused_optional_measures = [g for g in opt if g in g_num and g not in gcols]
+                if unexplained and (unused_optional_measures or   # a count the question defines must be the right one
+                                    not _supporting_counts_allowed(gold, cand, gcols, g_num, unexplained, spec)):
+                    continue                                      # extra numbers could be alternative answers
                 if any((g in g_num) != (c in c_num or (g in g_num and c in c_numstr)) for g, c in zip(gcols, ccols)):
                     continue
                 nums = [c for g, c in zip(gcols, ccols) if g in g_num]
