@@ -45,7 +45,7 @@
    "a_fca405b635"
   ]
  },
- "scored": false,
+ "scored": true,
  "questions": [
   {
    "id": "a_0d43f7d4b6",
@@ -69,7 +69,12 @@
      1,
      "0.00"
     ]
-   ]
+   ],
+   "correct": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok",
+   "category": "rework",
+   "difficulty": "hard"
   },
   {
    "id": "a_1b7e02d0b0",
@@ -97,7 +102,12 @@
      null,
      "34.64"
     ]
-   ]
+   ],
+   "correct": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok",
+   "category": "ar_aging",
+   "difficulty": "hard"
   },
   {
    "id": "a_26d4c3f4ca",
@@ -183,7 +193,12 @@
      20.4,
      3.3
     ]
-   ]
+   ],
+   "correct": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok",
+   "category": "payer_mix",
+   "difficulty": "easy"
   },
   {
    "id": "a_439d7186d8",
@@ -253,7 +268,12 @@
      "0.00",
      null
     ]
-   ]
+   ],
+   "correct": false,
+   "checker": "bench.compare.match",
+   "checker_why": "expected no rows",
+   "category": "payer_mix",
+   "difficulty": "hard"
   },
   {
    "id": "a_5059b5e0e6",
@@ -285,7 +305,12 @@
      0,
      0.0
     ]
-   ]
+   ],
+   "correct": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok",
+   "category": "denial_trends",
+   "difficulty": "medium"
   },
   {
    "id": "a_553c1034d1",
@@ -329,7 +354,12 @@
      "609.02",
      "609.02"
     ]
-   ]
+   ],
+   "correct": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok",
+   "category": "remit_ops",
+   "difficulty": "easy"
   },
   {
    "id": "a_7d45c279a7",
@@ -364,7 +394,12 @@
      0,
      "84.34"
     ]
-   ]
+   ],
+   "correct": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok",
+   "category": "remit_ops",
+   "difficulty": "hard"
   },
   {
    "id": "a_837ce03435",
@@ -525,7 +560,12 @@
      "2188.91",
      63.12
     ]
-   ]
+   ],
+   "correct": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok",
+   "category": "contract_variance",
+   "difficulty": "medium"
   },
   {
    "id": "a_8663c777cd",
@@ -557,7 +597,12 @@
      44,
      11.7
     ]
-   ]
+   ],
+   "correct": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok",
+   "category": "test_mix",
+   "difficulty": "hard"
   },
   {
    "id": "a_9108c7aacb",
@@ -613,7 +658,12 @@
      null,
      null
     ]
-   ]
+   ],
+   "correct": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok",
+   "category": "remit_ops",
+   "difficulty": "hard"
   },
   {
    "id": "a_923951a050",
@@ -635,7 +685,12 @@
      2,
      "118.91"
     ]
-   ]
+   ],
+   "correct": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok",
+   "category": "denial_rework",
+   "difficulty": "hard"
   },
   {
    "id": "a_a123bba47f",
@@ -677,7 +732,12 @@
      2.5,
      "447.20"
     ]
-   ]
+   ],
+   "correct": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok",
+   "category": "denial_trends",
+   "difficulty": "hard"
   },
   {
    "id": "a_a5888f64a4",
@@ -739,7 +799,12 @@
      6,
      60.0
     ]
-   ]
+   ],
+   "correct": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok",
+   "category": "denial_trends",
+   "difficulty": "hard"
   },
   {
    "id": "a_b541bf06a1",
@@ -760,7 +825,12 @@
    ],
    "result_row_count": 0,
    "result_truncated": false,
-   "result_rows_shown": []
+   "result_rows_shown": [],
+   "correct": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok",
+   "category": "remit_ops",
+   "difficulty": "hard"
   },
   {
    "id": "a_c0e1460912",
@@ -795,7 +865,12 @@
      6.46,
      0.0
     ]
-   ]
+   ],
+   "correct": false,
+   "checker": "bench.compare.match",
+   "checker_why": "values differ (or extra / missing columns)",
+   "category": "test_mix",
+   "difficulty": "hard"
   },
   {
    "id": "a_d383370345",
@@ -857,7 +932,12 @@
      1,
      7.7
     ]
-   ]
+   ],
+   "correct": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok",
+   "category": "ar_aging",
+   "difficulty": "hard"
   },
   {
    "id": "a_dca9da6d52",
@@ -885,7 +965,12 @@
      19,
      19
     ]
-   ]
+   ],
+   "correct": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok",
+   "category": "rework",
+   "difficulty": "hard"
   },
   {
    "id": "a_e83408d6a2",
@@ -963,7 +1048,12 @@
      "715.75",
      357.88
     ]
-   ]
+   ],
+   "correct": false,
+   "checker": "bench.compare.match",
+   "checker_why": "values differ (or extra / missing columns)",
+   "category": "remit_ops",
+   "difficulty": "medium"
   },
   {
    "id": "a_f494340e13",
@@ -1032,7 +1122,12 @@
      3,
      "289.41"
     ]
-   ]
+   ],
+   "correct": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok",
+   "category": "denial_management",
+   "difficulty": "medium"
   },
   {
    "id": "a_fca405b635",
@@ -1056,7 +1151,21 @@
      10,
      "7343.23"
     ]
-   ]
+   ],
+   "correct": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok",
+   "category": "rework",
+   "difficulty": "easy"
   }
- ]
+ ],
+ "checker": "bench.compare.match (deterministic; LLM judge not run)",
+ "accuracy": {
+  "passed": 17,
+  "n": 20,
+  "rate": 0.85
+ },
+ "sql_calls_total": 20,
+ "repairs_total": 0,
+ "wall_clock_seconds_sum": 6.172
 }
