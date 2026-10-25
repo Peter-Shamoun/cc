@@ -71,6 +71,8 @@ export function UserBubble({ msg, onEdit, version, onVersion, disabled }: { msg:
 
 export function AssistantTurn({ msg, isLast, onOpen, onRegenerate, onEdit }: { msg: AssistantView; isLast: boolean; onOpen: (a: Artifact) => void; onRegenerate: () => void; onEdit: (t: string) => void }) {
   const [vote, setVote] = useState<'up' | 'down' | null>(msg.feedback ?? null);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackSent, setFeedbackSent] = useState(false);
   const open = (part: Artifact['part'], title?: string, version?: number) => onOpen({ part, title: title ?? ((('title' in part && part.title) || (part.type === 'image' ? part.alt : 'Artifact')) as string), version, related: msg.parts });
 
   // Group consecutive tool calls into one disclosure.
@@ -100,12 +102,46 @@ export function AssistantTurn({ msg, isLast, onOpen, onRegenerate, onEdit }: { m
         <div className={clsx('-ml-2 mt-2 flex items-center gap-0.5 transition-opacity', isLast ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100')} data-testid="msg-actions">
           <CopyButton text={() => messageMarkdown(msg)} />
           <IconButton label="Good response" aria-pressed={vote === 'up'} onClick={() => setVote(vote === 'up' ? null : 'up')}><ThumbsUp size={16} fill={vote === 'up' ? 'currentColor' : 'none'} /></IconButton>
-          <IconButton label="Bad response" aria-pressed={vote === 'down'} onClick={() => setVote(vote === 'down' ? null : 'down')}><ThumbsDown size={16} fill={vote === 'down' ? 'currentColor' : 'none'} /></IconButton>
+          <IconButton label="Bad response" aria-pressed={vote === 'down'} onClick={() => { const next = vote === 'down' ? null : 'down'; setVote(next); setFeedbackOpen(next === 'down'); setFeedbackSent(false); }}><ThumbsDown size={16} fill={vote === 'down' ? 'currentColor' : 'none'} /></IconButton>
           {isLast && <IconButton label="Regenerate" onClick={onRegenerate}><RefreshCw size={16} /></IconButton>}
-          {msg.usage && <span className="ml-2 font-sans text-xs text-fg-subtle">{msg.usage.queries} {msg.usage.queries === 1 ? 'query' : 'queries'} · {(msg.usage.elapsedMs / 1000).toFixed(1)} s</span>}
+          {msg.usage && msg.usage.queries > 0 && <span className="ml-2 font-sans text-xs text-fg-subtle">{msg.usage.queries} {msg.usage.queries === 1 ? 'query' : 'queries'} · {(msg.usage.elapsedMs / 1000).toFixed(1)} s</span>}
           {msg.finishReason === 'aborted' && <span className="ml-2 font-sans text-xs text-fg-subtle">Stopped</span>}
+          {feedbackSent && <span className="ml-2 font-sans text-xs text-fg-subtle">Thanks for the feedback</span>}
         </div>
       )}
+      {feedbackOpen && <FeedbackPanel onClose={() => setFeedbackOpen(false)} onSubmit={() => { setFeedbackOpen(false); setFeedbackSent(true); }} />}
+    </div>
+  );
+}
+
+const FEEDBACK_REASONS = ['Wrong numbers', 'Wrong or missing filter', 'Misread the question', 'SQL looks wrong', 'Chart not helpful', 'Too slow', 'Other'];
+
+/**
+ * Thumbs-down follow-up (as in ChatGPT/Claude): reason chips plus optional detail. The detail can
+ * contain PHI, so v1 keeps it in component state only; a feedback endpoint with the same PHI
+ * handling as chat text is a backend follow-up.
+ */
+function FeedbackPanel({ onClose, onSubmit }: { onClose: () => void; onSubmit: (f: { reasons: string[]; detail: string }) => void }) {
+  const [reasons, setReasons] = useState<string[]>([]);
+  const [detail, setDetail] = useState('');
+  const toggle = (r: string) => setReasons((rs) => (rs.includes(r) ? rs.filter((x) => x !== r) : [...rs, r]));
+  return (
+    <div className="mt-2 rounded-xl border border-line bg-bg p-3 font-sans text-sm" data-testid="feedback-panel" role="group" aria-label="Tell us more">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="font-medium">Tell us more</span>
+        <IconButton label="Close feedback" className="h-7 w-7" onClick={onClose}>×</IconButton>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {FEEDBACK_REASONS.map((r) => (
+          <button key={r} type="button" aria-pressed={reasons.includes(r)} onClick={() => toggle(r)}
+            className={clsx('rounded-full border px-3 py-1.5 text-[13px]', reasons.includes(r) ? 'border-fg bg-hover' : 'border-line hover:bg-hover')}>{r}</button>
+        ))}
+      </div>
+      <textarea value={detail} onChange={(e) => setDetail(e.target.value)} rows={2} aria-label="Feedback detail" placeholder="What should the answer have been? (optional, no patient identifiers)"
+        className="mt-3 w-full resize-none rounded-lg border border-line bg-bg px-3 py-2 outline-none focus:border-fg-subtle" />
+      <div className="mt-2 flex justify-end">
+        <button type="button" disabled={!reasons.length && !detail.trim()} onClick={() => onSubmit({ reasons, detail })} className="rounded-full bg-fg px-3.5 py-1.5 text-bg disabled:opacity-40">Submit</button>
+      </div>
     </div>
   );
 }

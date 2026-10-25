@@ -39,7 +39,8 @@ node scripts/shots_v1.mjs http://127.0.0.1:5174/ http://127.0.0.1:5175/ /workspa
 - **Mobile drawer**: below 768 px the sidebar is a modal drawer with a scrim; choosing a chat or New chat closes it. The header keeps sidebar + new-chat buttons, and `main` no longer forces 400 px min width.
 - **Search and rename**: "Search chats" filters thread titles client-side (titles never leave the page); the pencil or a double-click renames inline (`TranscriptStore.renameConversation`).
 - **Table virtualization**: tables over 200 rows render a TanStack Virtual window (spacer rows keep native `<table>` semantics, sticky header, sorting and filtering still work on all rows).
-- Tests: 23 (was 18), adding the HTTP adapter contract, Streamdown repair, virtualization, store rename/replace and an edit-and-branch + search flow.
+- Tests: 23 (was 18), adding the HTTP adapter contract, Streamdown repair, virtualization, store rename/replace and an edit-and-branch + feedback + search + shortcut flow.
+- v1.1: thumbs-down "Tell us more" panel (reason chips + optional detail, kept in component state only until a PHI-safe feedback endpoint exists), Ctrl/⌘+K search chats, Ctrl/⌘+Shift+O new chat, single-series charts follow the palette (Paper = clay accent), usage line hidden for zero-query turns, inline favicon.
 
 ## Stack
 
@@ -129,8 +130,8 @@ Recommendation: keep the Vite app (structure already mirrors the template, small
 
 - KaTeX (Streamdown math plugin), explicit rehype-sanitize allowlist review.
 - react-resizable-panels for the artifact panel, column resize and visibility, and cell-selection "Ask about selection".
-- Nested branch trees (v1 keeps one level of versions per edited message), the regenerate strategy menu, and the thumbs-down feedback popover.
-- Full-text chat search (v1 searches titles), ⌘K palette, and the full-screen artifact sheet below lg.
+- Nested branch trees (v1 keeps one level of versions per edited message), the regenerate strategy menu.
+- Full-text chat search (v1 searches titles), and the full-screen artifact sheet below lg.
 - Live tool steps: `api/` emits tool_call parts after the analyzer loop finishes, so the UI shows "Analyzing" until then.
 - CSP and `Cache-Control: no-store` headers (server side), vega-interpreter for a CSP without `unsafe-eval`, self-hosted Inter and Source Serif 4 fonts, idle timeout, PHI unmask flow, and download confirmation for `limited` and `phi` sensitivity.
 - An ESLint rule banning direct `localStorage` use outside `prefs.ts`, and axe-core checks.
