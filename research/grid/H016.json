@@ -54,7 +54,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0056,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_b853266803",
@@ -63,7 +63,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0146,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q10_top_denial_carcs",
@@ -72,7 +72,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0098,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_a5888f64a4",
@@ -81,7 +81,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0074,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_7d45c279a7",
@@ -90,7 +90,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0109,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q15_partial_line_denials",
@@ -99,7 +99,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.004,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q25_primary_deductible",
@@ -108,7 +108,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0134,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_8663c777cd",
@@ -117,7 +117,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0084,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_cpt_share_of_line_payments__87798",
@@ -126,7 +126,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0053,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q11_cpt_denial_rate",
@@ -135,7 +135,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0132,
-      "pass": null
+      "pass": false
     },
     {
       "qid": "a_a123bba47f",
@@ -144,7 +144,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0161,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_9108c7aacb",
@@ -153,7 +153,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0083,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_856b95a70c",
@@ -162,7 +162,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0122,
-      "pass": null
+      "pass": false
     },
     {
       "qid": "a_1b7e02d0b0",
@@ -171,7 +171,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0145,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_921f1bf366",
@@ -180,7 +180,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0164,
-      "pass": null
+      "pass": false
     },
     {
       "qid": "q14_zero_paid_not_denied",
@@ -189,7 +189,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0039,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_dca9da6d52",
@@ -198,7 +198,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0121,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q19_reversed_no_correction",
@@ -207,7 +207,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0047,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_cpt_share_of_line_payments__80307",
@@ -216,7 +216,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0047,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_d383370345",
@@ -225,7 +225,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0141,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_cpt_share_of_line_payments__g0482",
@@ -234,7 +234,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0049,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_0d43f7d4b6",
@@ -243,7 +243,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0217,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_923951a050",
@@ -252,7 +252,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0092,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_7423e6eb91",
@@ -261,7 +261,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0159,
-      "pass": null
+      "pass": false
     },
     {
       "qid": "f_never_remitted_submitted_in_month__2026-07-01",
@@ -270,7 +270,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0108,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_ab202d4b23",
@@ -279,7 +279,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0138,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_cpt_share_of_line_payments__g0480",
@@ -288,7 +288,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0052,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_d671e0b995",
@@ -297,7 +297,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0092,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_cpt_share_of_line_payments__81479",
@@ -306,7 +306,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0049,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q12_referring_provider_denials",
@@ -315,11 +315,11 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.0107,
-      "pass": null
+      "pass": true
     }
   ],
-  "accuracy": null,
+  "accuracy": "26/30",
   "n": 30,
   "mean_sql_execs": 3.0,
-  "notes": "Direct SQL, three candidates, majority agreement. Three non-dev reference SQLs are retrieved with TF-IDF. The revenue-cycle choice is stated on each answer. Repair and the verifier are off, so the agreed statement stands. pass is filled only after this answer file is committed."
+  "notes": "Direct SQL, three candidates, majority agreement. Three non-dev reference SQLs are retrieved with TF-IDF. The revenue-cycle choice is stated on each answer. Repair and the verifier are off, so the agreed statement stands. pass was filled afterward by bench.compare.match against the committed SQL. The statements were not edited after that score."
 }
