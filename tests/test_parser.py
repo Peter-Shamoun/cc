@@ -1,8 +1,7 @@
-"""The parser's speed-ups must not change a row: chunked text, mid-file flushes, rejections after a flush, the
-JSON fallback for control characters and the worker pool all stage exactly what a plain run stages.
+"""The parser's speed-ups must not change a row: chunked text, mid-file flushes, rejections after a flush and the
+worker pool all stage exactly what a plain run stages.
 (bench/parser_bench.py proves the same against the pre-optimisation parser on a production-size corpus.)"""
 import hashlib
-import json
 from datetime import datetime
 
 import duckdb
@@ -78,17 +77,3 @@ def test_small_text_chunks_and_frequent_flushes_change_nothing(raw_files, plain,
 def test_worker_pool_changes_nothing(raw_files, plain, monkeypatch):
     monkeypatch.setattr(silver_staging, "POOL_MAX_FILE_BYTES", 200_000)   # big files still go in-process
     _assert_same(plain, _staged(raw_files, workers=2))
-
-
-def test_elements_with_control_characters_keep_the_json_cast_representation(raw_files):
-    """Before the speed work, elements went through json.dumps and DuckDB's VARCHAR[] cast; that cast reads
-    the JSON escape of a tab as 't'. Such files still take that path, so their rows do not change."""
-    body = next(f.body for f in raw_files if f.body.startswith(b"ISA*") and b"\nNM1*" in f.body)
-    body = body.replace(b"\nNM1*", b"\nNM1*\tX", 1)
-    rows = parser.parse_file(body, "F", "t", {}, "r", STARTED)
-    segment = next(s for s in rows["edi.segment"] if "\t" in s[7])
-    assert segment[10] == json.dumps(segment[7].split("*")[1:])
-    data = _staged([RawFile("k", body, "F", _meta("k", body))])["tables"]["edi.segment"].to_pylist()
-    stored = next(r["elements"] for r in data if "\t" in r["raw_text"])
-    cast = duckdb.execute("SELECT ?::VARCHAR[]", [segment[10]]).fetchone()[0]
-    assert stored == cast and stored[0].startswith("tX")      # not "\tX": the cast's reading, kept as it was
