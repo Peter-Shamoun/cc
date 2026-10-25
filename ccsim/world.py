@@ -46,7 +46,8 @@ def build_world(root, scenario: edi_mock.Scenario | None = None, customers=("acm
     aws.events.auto_drain = False                    # S3 -> EventBridge -> ECS is asynchronous, as in AWS
     for upn, c in (users or {u: c for u, c in DEFAULT_USERS.items() if c in customers}).items():
         add_user(aws, upn, c)
-    truth = edi_mock.generate(root / "sftp", scenario, list(customers))
+    edi_mock.generate(root / "sftp", scenario, list(customers), return_claims=False)
+    truth = edi_mock.load_truth(root / "sftp")             # truth.json index + truth/<customer>/claims.jsonl
     w = World(aws, dep, truth, root / "sftp")
     if deliver:
         days = sorted({(d, c) for c in customers for d in truth["tenants"][c]["file_days"]})

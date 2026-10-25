@@ -9,7 +9,9 @@ KMS checks AWS would make, and every decision is logged as a CloudTrail record. 
 ```bash
 pip install -e ".[dev]"
 pytest                                             # ~2 min, 140+ tests
-python -m ccsim.edi_mock /tmp/mock --days 30       # mock 837P/835 + truth.json (add --stress for every edge case)
+python -m ccsim.edi_mock /tmp/mock --days 30       # mock 837P/835 + ledger (add --stress for every edge case)
+python -m ccsim.edi_mock /tmp/big --mb-per-day 5 --days 365 --tenants acme_labs \
+    --each 'ingest {dir} && rm -r {dir}'           # a year at ~5 MB/business day, one day dir at a time
 python -m ccsim.x12_validate /tmp/mock/*/raw/*/*/*.x12
 python -m ccsim.infra --export /tmp/policies       # policy JSON for Terraform
 python -m bench.eval selftest                      # benchmark datasets and scoring (see bench/README.md)
@@ -38,7 +40,7 @@ s.con.execute("SELECT payer_name, avg(is_denied::INT) FROM sem.remit_claims WHER
 | `infra.py` | The account as Terraform would build it: roles, ABAC bucket policy, key policies, lifecycle, the EventBridge rule and task definitions. |
 | `pipeline.py` | The Fargate parser. Bronze → staging → silver, quarantining bad files. Loads are idempotent. Gold is rebuilt from silver, CURRENT is flipped with a compare-and-set, and old versions are cleaned up. |
 | `query.py` | The per-request session: Cognito token → STS → DuckDB scoped to this customer's current gold version. |
-| `edi_mock.py`, `x12_validate.py`, `parser.py` | Mock EDI and its ledger; an independent validator; the X12 → lossless-schema parser. |
+| `edi_mock.py`, `x12_validate.py`, `parser.py` | Mock EDI and its ledger; an independent validator; the X12 → lossless-schema parser. The generator streams day by day with flat memory; volume is set in real units (`Scenario.target_mb_per_day`); the ledger is `truth.json` (index) + `truth/<customer>/claims.jsonl`, read back with `edi_mock.load_truth`. |
 
 ## Security model, and the test that checks each piece
 

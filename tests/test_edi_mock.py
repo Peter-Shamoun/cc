@@ -1,5 +1,6 @@
 """Mock EDI generator + independent validator: deterministic, valid X12, balanced money, every scenario present."""
 import hashlib
+import shutil
 import re
 from collections import Counter
 from datetime import datetime
@@ -16,7 +17,7 @@ from ccsim.x12_validate import validate
 @pytest.fixture(scope="module")
 def stress(tmp_path_factory):
     out = tmp_path_factory.mktemp("stress")
-    return out, generate(out, Scenario.stress(days=40, volume_scale=.4))
+    return out, generate(out, Scenario.stress(days=50, volume_scale=.4))   # 50 days: enough late Medicaid remits for PLB L6
 
 
 def _files(out, truth):
@@ -138,7 +139,8 @@ def test_every_scenario_occurs_under_stress(stress):
         "dependent patient": any(c["dependent"] for c in claims),
         "claim-level denial": any(a["claim_level_only"] for a in ads),
         "partial line denial": any(a["remitted_current"] and a["paid_current"] > 0 and
-                                   any(ln["denied"] for ln in a["events"][-1]["lines"]) for a in ads),
+                                   any(ln["denied"] for ln in [e for e in a["events"] if not e["duplicate_denial"]][-1]["lines"])
+                                   for a in ads),
         "timely filing": any("29" in e["carcs"] for e in evs),
         "duplicate submission": any(a["has_duplicate_denial"] for a in ads),
         "never remitted": any(not c["adjudications"] for c in claims),
@@ -177,8 +179,8 @@ def test_validator_status_and_cob_rules(stress):
     assert not validate(cob)
     assert any("SVD02" in e for e in validate(_sub(cob, r"^(SVD\*\w+\*)([0-9.]+)", r"\g<1>99999")))
     assert any("SBR02" in e for e in validate(_sub(cob, r"^(SBR\*P\*)(\d\d)(\*G\d+\*{6}\w+~\r?\n(?:CAS|AMT))", r"\g<1>\g<3>")))
-    rem = next(b.decode() for _, f, b in files if f["kind"] == "835" and b"\nCLP*" in b and b[3:4] == b"*"
-               and b"*4*" in b and b"\nPLB" not in b)
+    rem = next(b.decode() for _, f, b in files if f["kind"] == "835" and f["expect"] != "rejected" and b[3:4] == b"*"
+               and re.search(rb"^CLP\*\w+\*4\*[0-9.]+\*0\*", b, re.M) and b"\nPLB" not in b)
     m = re.search(r"^CLP\*(\w+)\*4\*([0-9.]+)\*0\*", rem, re.M)
     assert m
     bad = rem.replace(m.group(0), f"CLP*{m.group(1)}*4*{m.group(2)}*5*", 1)
@@ -257,3 +259,101 @@ def test_every_parsed_value_survives_into_the_lossless_tables(stress):
             n_rows = sum(1 for r in rows[t] if r.get(col) not in (None, [], ""))
             n_tab = con.execute(f'SELECT count(*) FROM {t} WHERE "{col}" IS NOT NULL').fetchone()[0]
             assert n_tab == n_rows, f"{t}.{col}: {n_rows} parsed, {n_tab} stored"
+
+
+# --- volume, streaming, ledger layout ------------------------------------------------------------
+def _tree_digest(root):
+    h = hashlib.sha256()
+    for p in sorted(Path(root).rglob("*")):
+        if p.is_file():
+            h.update(str(p.relative_to(root)).encode() + b"\0" + p.read_bytes())
+    return h.hexdigest()
+
+
+def test_target_mb_per_day_sets_volume_from_measured_bytes(tmp_path):
+    """Steady-state raw volume (once remits for earlier claims have ramped up) lands within 15% of the target over
+    20 business days, and still varies day to day."""
+    target = .15
+    sc = Scenario(start=edi_mock.CAL_START, days=edi_mock.CAL_WARMUP_DAYS + 28, seed=5, target_mb_per_day=target)
+    sizes = [dd.bytes for dd in edi_mock.generate_days(tmp_path, sc, ["acme_labs"])]
+    last = sizes[-20:]
+    mean = sum(last) / len(last)
+    assert abs(mean / (target * 1e6) - 1) < .15, mean
+    assert max(last) > 1.2 * min(last)                                    # weekday pattern + noise
+    assert edi_mock.claims_per_day(Scenario(volume_scale=.5), "acme_labs") == 60      # volume_scale still works
+    assert edi_mock.claims_per_day(sc, "acme_labs") == edi_mock.claims_per_day(
+        Scenario(target_mb_per_day=target, seed=9), "acme_labs")           # deterministic, seed-independent
+
+
+def test_output_is_identical_for_any_worker_count(tmp_path):
+    sc = Scenario.stress(days=12, volume_scale=.3, seed=21)
+    generate(tmp_path / "w1", sc, workers=1, return_claims=False)
+    generate(tmp_path / "w2", sc, workers=2, return_claims=False)
+    assert _tree_digest(tmp_path / "w1") == _tree_digest(tmp_path / "w2")
+    # a tenant's data does not depend on which other tenants are generated with it
+    generate(tmp_path / "solo", sc, ["acme_diagnostics"], return_claims=False)
+    assert _tree_digest(tmp_path / "solo" / "acme_diagnostics") == _tree_digest(tmp_path / "w1" / "acme_diagnostics")
+
+
+def test_generate_days_streams_day_dirs_that_can_be_deleted(tmp_path):
+    sc = Scenario(days=10, volume_scale=.2, seed=4)
+    generate(tmp_path / "ref", sc)
+    seen = []
+    for workers in (1, 2):
+        out = tmp_path / f"days{workers}"
+        order = []
+        for dd in edi_mock.generate_days(out, sc, workers=workers):
+            assert dd.path.is_dir() and dd.bytes == sum(p.stat().st_size for p in dd.path.rglob("*.x12"))
+            assert _tree_digest(dd.path) == _tree_digest(tmp_path / "ref" / dd.tenant / "raw" / f"received_date={dd.day}")
+            order.append((dd.day, dd.tenant))
+            shutil.rmtree(dd.path)                  # the pipeline ingests day N, then drops the local copy
+        assert order == sorted(order, key=lambda k: (k[0], list(edi_mock.TENANTS).index(k[1])))
+        assert edi_mock.load_truth(out) == edi_mock.load_truth(tmp_path / "ref")
+        seen.append(order)
+    assert seen[0] == seen[1]
+
+
+def test_load_truth_round_trips_the_in_memory_ledger(tmp_path):
+    sc = Scenario.stress(days=15, volume_scale=.3)
+    mem = generate(tmp_path / "a", sc)
+    disk = edi_mock.load_truth(tmp_path / "a")
+    assert disk == mem
+    pcns = list(disk["tenants"]["acme_labs"]["claims"])
+    assert pcns == sorted(pcns, key=lambda p: int(p[8:]))                  # submission order
+    for tc, T in disk["tenants"].items():
+        assert T["n_claims"] == len(T["claims"]) == sum(1 for _ in edi_mock.iter_claims(tmp_path / "a", tc))
+    assert generate(tmp_path / "gz", sc, truth_gzip=True) == dict(mem, tenants={
+        tc: dict(T, claims_file=T["claims_file"] + ".gz") for tc, T in mem["tenants"].items()})
+    assert edi_mock.load_truth(tmp_path / "gz")["tenants"]["acme_labs"]["claims"] == mem["tenants"]["acme_labs"]["claims"]
+    sub = dict(mem, customer="acme_labs", tenants={"acme_labs": mem["tenants"]["acme_labs"]})
+    edi_mock.write_truth(tmp_path / "w", sub)
+    back = edi_mock.load_truth(tmp_path / "w")
+    assert back["tenants"]["acme_labs"]["claims"] == mem["tenants"]["acme_labs"]["claims"]
+    assert back["customer"] == "acme_labs" and list(back["tenants"]) == ["acme_labs"]
+
+
+def test_memory_stays_flat_while_streaming(tmp_path):
+    """Retained memory must not grow with the claims written: what remains is claims in flight, queued events and
+    bounded state (deductibles reset each plan year, a capped recoupment window). Measured: ~0.5 KB per claim while
+    those fill up; keeping the ledger in memory instead costs ~5.4 KB per claim. Average over two 15-day windows
+    (daily volume is noisy) and stop early, so events falling past the window end do not shrink the second one."""
+    import tracemalloc
+    sc = Scenario(days=365, volume_scale=.3, seed=8)
+    win: dict = {"a": [], "b": []}
+    tracemalloc.start()
+    days = edi_mock.generate_days(tmp_path, sc, ["acme_labs"])
+    try:
+        for i, dd in enumerate(days):
+            shutil.rmtree(dd.path)
+            for k, (lo, hi) in {"a": (30, 45), "b": (75, 90)}.items():
+                if lo <= i < hi:
+                    with open(tmp_path / "truth" / "acme_labs" / "claims.jsonl") as fh:
+                        win[k].append((tracemalloc.get_traced_memory()[0], sum(1 for _ in fh)))
+            if i == 90:
+                break
+    finally:
+        days.close()
+        tracemalloc.stop()
+    (m1, n1), (m2, n2) = [[sum(x) / len(x) for x in zip(*win[k])] for k in "ab"]
+    assert n2 - n1 > 1500
+    assert (m2 - m1) / (n2 - n1) < 1500, ((m2 - m1) / (n2 - n1), m1, m2)

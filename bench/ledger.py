@@ -1,4 +1,4 @@
-"""Expected answers computed from the generator's ledger (truth.json), never from the parser or SQL views.
+"""Expected answers computed from the generator's ledger (`edi_mock.load_truth`), never from the parser or SQL views.
 
 Each function takes one tenant's ledger and returns rows in the same column order as the question's gold
 SQL. The self-test requires gold SQL == ledger answer for every question that has one; a mismatch means
