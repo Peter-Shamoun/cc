@@ -37,7 +37,12 @@ Never decide the work is done; when an item finishes, pick the next highest-valu
 - [running] realism engineer on audit-1 findings (worktree); then re-audit, loop until >= 8/10
 - [done] Phase 4 screen 1 (research/screening_results_1.md): pitfalls glossary +16 pts Haiku / +6 Sonnet,
   procedural steps +5 Haiku; others ~0. Haiku+pitfalls ~= Sonnet. Matcher false-reject fixed during scoring.
-- [next] held-out validation of the pitfalls text on independently authored questions (anti-overfit)
+- [done] generator 3.1 merged (audit-1 fixes); audit 2 = 7/10 (research/edi_realism_audit_2.md); realism
+  engineer on audit-2 findings (target >= 8.5)
+- [done] lake optimization merged (incremental gold, manifests, quarter folds): KNOWN RED - 2 tests in
+  tests/test_lake.py fail on generator-3.1 data (manifest lists a missing gold file); lake architect fixing;
+  independent lake review running
+- [running] held-out validation (heldout_hard_1, 27 questions, 4 configs x Haiku/Sonnet x 2 repeats)
 - [next] harder question set (Sonnet at ceiling): Opus authors multi-step questions; then screen 2 =
   coordinate ascent around the winner (glossary content variants, examples/semantic layer on hard questions,
   model cascade Haiku->Sonnet, multi-candidate) with repeats for pass^k
