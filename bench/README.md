@@ -1,6 +1,6 @@
 # CC benchmarks
 
-Two benchmarks run on the local backend in `ccsim/`: agent accuracy (`eval.py`) and storage layout (`perf.py`).
+Two benchmarks run on the local backend in `ccsim/`: agent accuracy (`eval.py`) and storage layout (`lake_bench.py`, `layout_bench.py`).
 
 ## Agent accuracy: `python -m bench.eval`
 
@@ -66,33 +66,27 @@ answer key: `truth.json` and `truth/` sit outside the directories their DuckDB s
 - median seconds per question, SQL calls per question, and input/output tokens
 - the run's JSON and a Markdown report, both in `.ccsim/bench/runs/`
 
-## Storage layout: `python -m bench.perf --days 100`
+## Storage layout: `python -m bench.lake_bench` and `python -m bench.layout_bench`
 
-This answers the question "will 100 days of daily partitions make S3 slow?" with measurements. It
-replays N days through the real pipeline, then injects per-request latency at the S3 endpoint (0, 10
-and 30 ms; same-region S3 first-byte latency is around 10–30 ms). It records:
-- per-batch parser time and request count as history grows. Gold is a full rebuild every batch, so this
-  cost grows with history.
-- session open time and gold query time
-- the same views computed live from silver, as one file per table per day vs compacted to one file per table
+```bash
+python -m bench.lake_bench --days 168 --label winner --purge-raw --checkpoints 20,60,120   # one customer, 5 MB/day
+python -m bench.lake_bench --days 365 --customers acme_labs,acme_diagnostics --purge-raw --export-gold DIR
+python -m bench.layout_bench DIR                                                            # gold file-layout variants
+```
 
-Results go to `.ccsim/bench/perf-<days>d.{json,md}`.
+`lake_bench` streams N calendar days of mock EDI at a real volume (`--mb-per-day`, default 5) through the real
+path (SFTP copy, EventBridge, parser task, CURRENT), one day at a time, deleting the local SFTP copy as it goes.
+Per batch it records wall time (parse / silver / gold, and the gold build's phases), HTTP requests by method,
+bytes read and written, and peak RSS. At each checkpoint (business days) it inventories silver and gold and runs
+every `gold_sql` in `questions.yaml` as an agent request would: fresh session (STS, CURRENT, manifest, views) plus
+the query, then warm repeats, then the same queries on a local-disk copy of gold. Pipeline configuration goes in
+with `--env GOLD_MODE=full`. Results: `.ccsim/bench/lake/<label>-<days>d.{json,md}` (and `.partial.json` every
+10 batches, for runs that get killed).
 
-### Results: 100 days, scale 0.5 (4,447 claims, 72 daily batches, 1,800 silver files)
+`layout_bench` rewrites one gold export as variants (file split, codec, sort order, row-group size) and serves
+each from a plain ranged-HTTP server that counts requests and bytes, so the numbers show what the Parquet layout
+makes DuckDB fetch, without the simulator's SigV4/AES/IAM overhead.
 
-| | HTTP requests |
-|---|---|
-| parser batch, day 1 → day 100 | 160 → 1,981 (gold is a full rebuild, so this grows linearly with history) |
-| agent query on gold | ~1 per query once the session's files are open |
-| the same views computed live from daily silver | 1,825 to load |
-| the same views from compacted silver | 53 to load |
-
-- The agent path doesn't suffer from the daily tree, because it only touches gold: 10 small files per version.
-- The cost lands on the parser. Each daily rebuild re-reads every silver file, so total work grows
-  quadratically with history.
-- Two fixes at scale: compact silver periodically (one file per table per month cut reads about 34×), or
-  build gold incrementally.
-- The local endpoint is a single Python process, so its wall-clock times are not S3 times; use the
-  request counts.
-- DuckDB's file cache is shared across connections in one process, so the "cold" query here is warm on
-  file metadata.
+The local S3 endpoint is one Python process (AES-GCM, GIL), so its wall-clock is not S3's. The portable numbers
+are requests and bytes; both tools also print an S3 estimate, requests x 25 ms / parallelism + bytes / 100 MB/s.
+Findings and the recommended layout: `docs/data-backend/lake-optimization.md`.
