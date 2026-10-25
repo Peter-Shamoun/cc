@@ -5,6 +5,8 @@
     (the orchestrator runs one subagent per manifest entry, with the entry's model and prompt)
     python -m bench.eval_subagents score RUN
         -> .ccsim/agent_sessions/RUN/results.json + results.md (accuracy by config x model, pass^k, calls, errors)
+    python -m bench.eval_subagents contrast RUN --baseline base   (every other config minus the baseline, per model,
+        paired by question, question-level bootstrap 95% interval)
     python -m bench.eval_subagents effects RUN --design research/screening_design.json
         -> main effect of each two-level factor per model: accuracy at high minus low, with a question-level
            bootstrap 95% interval (questions are resampled, so the interval reflects question-set variance)
@@ -121,9 +123,34 @@ def effects(run_label: str, design_path: Path, resamples: int = 2000) -> dict:
     return out
 
 
+def _bootstrap_interval(values: list[float], resamples: int, seed: int = 0) -> list[float]:
+    import random
+    rng = random.Random(seed)
+    means = sorted(statistics.mean(rng.choice(values) for _ in values) for _ in range(resamples))
+    return [round(means[int(.025 * resamples)], 4), round(means[int(.975 * resamples) - 1], 4)]
+
+
+def contrast(run_label: str, baseline: str, resamples: int = 2000) -> dict:
+    rows = json.loads((SESSIONS_ROOT / run_label / "results.json").read_text())["results"]
+    by = defaultdict(list)
+    for r in rows:
+        by[(r["model"], r["config"], r["question_id"])].append(r["correct"])
+    out = {}
+    for model in sorted({r["model"] for r in rows}):
+        questions = sorted({q for m, _, q in by if m == model})
+        out[model] = {}
+        for config in sorted({c for m, c, _ in by if m == model} - {baseline}):
+            diffs = [statistics.mean(by[(model, config, q)]) - statistics.mean(by[(model, baseline, q)])
+                     for q in questions if by[(model, config, q)] and by[(model, baseline, q)]]
+            out[model][config] = dict(minus=baseline, effect=round(statistics.mean(diffs), 4),
+                                      ci95=_bootstrap_interval(diffs, resamples), questions=len(diffs))
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("cmd", choices=["prepare", "score", "effects"])
+    ap.add_argument("cmd", choices=["prepare", "score", "effects", "contrast"])
+    ap.add_argument("--baseline")
     ap.add_argument("--design")
     ap.add_argument("run")
     ap.add_argument("--configs")
@@ -134,6 +161,8 @@ def main():
     a = ap.parse_args()
     if a.cmd == "prepare":
         print(prepare(a.run, json.loads(Path(a.configs).read_text()), a.models.split(","), a.repeats, a.only, a.snapshot))
+    elif a.cmd == "contrast":
+        print(json.dumps(contrast(a.run, a.baseline), indent=1))
     elif a.cmd == "effects":
         print(json.dumps(effects(a.run, Path(a.design)), indent=1))
     else:

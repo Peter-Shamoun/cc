@@ -106,6 +106,7 @@ class _Handler(BaseHTTPRequestHandler):
             self.send_header(k, str(v))
         self.end_headers()
         if not head and body:
+            self.server.bytes_out += len(body)
             self.wfile.write(body)
 
     def _error(self, e: AWSError, head=False, sts=False):
@@ -180,6 +181,7 @@ class _Handler(BaseHTTPRequestHandler):
         raw_path = u.path or "/"
         query = parse_qsl(u.query, keep_blank_values=True)
         body = self._read_body() if self.command in ("PUT", "POST") else b""
+        self.server.bytes_in += len(body)
         is_sts = self.command == "POST" and raw_path == "/" and (
             "x-www-form-urlencoded" in (self.headers.get("Content-Type") or ""))
         head = self.command == "HEAD"
@@ -404,14 +406,21 @@ class _Handler(BaseHTTPRequestHandler):
         self._send(200, xml.encode(), {"Content-Type": "text/xml"})
 
 
+class _Server(ThreadingHTTPServer):
+    # DuckDB opens many connections at once; the default listen backlog (5) drops SYNs, and each drop costs a
+    # 1 s TCP retransmit that real S3 never shows
+    request_queue_size = 256
+
+
 class Endpoint:
     def __init__(self, aws, host="127.0.0.1", port=0, latency_ms=0.0, bandwidth_mbps=None, secure_transport=True):
-        self.httpd = ThreadingHTTPServer((host, port), _Handler)
+        self.httpd = _Server((host, port), _Handler)
         self.httpd.daemon_threads = True
         self.httpd.aws = aws
         self.httpd.cfg = dict(latency_ms=latency_ms, bandwidth_mbps=bandwidth_mbps, secure_transport=secure_transport)
         self.httpd.requests = 0
         self.httpd.op_counts = {}
+        self.httpd.bytes_in = self.httpd.bytes_out = 0      # request / response bodies (portable S3 transfer metrics)
         self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
         self.thread.start()
 
@@ -431,6 +440,11 @@ class Endpoint:
     @property
     def requests(self):
         return self.httpd.requests
+
+    def counters(self) -> dict:
+        """Snapshot of request and transfer counters; subtract two snapshots to measure one step."""
+        return dict(requests=self.httpd.requests, bytes_in=self.httpd.bytes_in, bytes_out=self.httpd.bytes_out,
+                    **{f"op_{k}": v for k, v in self.httpd.op_counts.items()})
 
     def stop(self):
         self.httpd.shutdown()

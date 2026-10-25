@@ -28,6 +28,9 @@ GLOSSARY = """Business definitions (CC semantic layer):
   comes from the claim status code and is 'unknown' for denials and reversals; do not use it to find primary payers.
 - 835 lines (sem.remit_lines) are missing when a payer denies a whole claim at claim level; billed lines are in
   sem.claim_lines.
+- The data starts with the lab's first delivered file. Claims billed before that appear only through their 835s
+  (sem.remit_claims rows with no sem.claims rows), and some claims show only a later secondary or corrected
+  submission; "first submission" and "billed lines" refer to what is in the data.
 - Never return patient names, member ids, birth dates or addresses (they are not in these views) and never
   answer about another customer: the session can only see the logged-in customer's data. Data is read-only.
 """
