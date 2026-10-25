@@ -1,204 +1,950 @@
 {
- "generated": "2026-10-25 16:01 PDT",
- "n_found": 7,
- "n_valid": 7,
- "invalid": [],
- "warnings": [],
+ "generated": "2026-10-25 16:20 PDT",
+ "n_found": 122,
+ "n_valid": 117,
+ "invalid": [
+  [
+   "H019",
+   "branch",
+   [
+    "no scored results"
+   ]
+  ],
+  [
+   "H020",
+   "branch",
+   [
+    "no scored results"
+   ]
+  ],
+  [
+   "H090",
+   "branch",
+   [
+    "no scored results"
+   ]
+  ],
+  [
+   "H091",
+   "branch",
+   [
+    "no scored results"
+   ]
+  ],
+  [
+   "H092",
+   "branch",
+   [
+    "no scored results"
+   ]
+  ]
+ ],
+ "warnings": [
+  [
+   "H019",
+   "branch",
+   [
+    "row 0 missing qid/pass; dropped",
+    "row 1 missing qid/pass; dropped",
+    "row 2 missing qid/pass; dropped",
+    "row 3 missing qid/pass; dropped",
+    "row 4 missing qid/pass; dropped",
+    "row 5 missing qid/pass; dropped",
+    "row 6 missing qid/pass; dropped",
+    "row 7 missing qid/pass; dropped",
+    "row 8 missing qid/pass; dropped",
+    "row 9 missing qid/pass; dropped",
+    "row 10 missing qid/pass; dropped",
+    "row 11 missing qid/pass; dropped",
+    "row 12 missing qid/pass; dropped",
+    "row 13 missing qid/pass; dropped",
+    "row 14 missing qid/pass; dropped",
+    "row 15 missing qid/pass; dropped",
+    "row 16 missing qid/pass; dropped",
+    "row 17 missing qid/pass; dropped",
+    "row 18 missing qid/pass; dropped",
+    "row 19 missing qid/pass; dropped",
+    "row 20 missing qid/pass; dropped",
+    "row 21 missing qid/pass; dropped",
+    "row 22 missing qid/pass; dropped",
+    "row 23 missing qid/pass; dropped",
+    "row 24 missing qid/pass; dropped",
+    "row 25 missing qid/pass; dropped",
+    "row 26 missing qid/pass; dropped",
+    "row 27 missing qid/pass; dropped",
+    "row 28 missing qid/pass; dropped",
+    "row 29 missing qid/pass; dropped"
+   ]
+  ],
+  [
+   "H020",
+   "branch",
+   [
+    "row 0 missing qid/pass; dropped",
+    "row 1 missing qid/pass; dropped",
+    "row 2 missing qid/pass; dropped",
+    "row 3 missing qid/pass; dropped",
+    "row 4 missing qid/pass; dropped",
+    "row 5 missing qid/pass; dropped",
+    "row 6 missing qid/pass; dropped",
+    "row 7 missing qid/pass; dropped",
+    "row 8 missing qid/pass; dropped",
+    "row 9 missing qid/pass; dropped",
+    "row 10 missing qid/pass; dropped",
+    "row 11 missing qid/pass; dropped",
+    "row 12 missing qid/pass; dropped",
+    "row 13 missing qid/pass; dropped",
+    "row 14 missing qid/pass; dropped",
+    "row 15 missing qid/pass; dropped",
+    "row 16 missing qid/pass; dropped",
+    "row 17 missing qid/pass; dropped",
+    "row 18 missing qid/pass; dropped",
+    "row 19 missing qid/pass; dropped",
+    "row 20 missing qid/pass; dropped",
+    "row 21 missing qid/pass; dropped",
+    "row 22 missing qid/pass; dropped",
+    "row 23 missing qid/pass; dropped",
+    "row 24 missing qid/pass; dropped",
+    "row 25 missing qid/pass; dropped",
+    "row 26 missing qid/pass; dropped",
+    "row 27 missing qid/pass; dropped",
+    "row 28 missing qid/pass; dropped",
+    "row 29 missing qid/pass; dropped"
+   ]
+  ],
+  [
+   "H090",
+   "branch",
+   [
+    "row 0 missing qid/pass; dropped",
+    "row 1 missing qid/pass; dropped",
+    "row 2 missing qid/pass; dropped",
+    "row 3 missing qid/pass; dropped",
+    "row 4 missing qid/pass; dropped",
+    "row 5 missing qid/pass; dropped",
+    "row 6 missing qid/pass; dropped",
+    "row 7 missing qid/pass; dropped",
+    "row 8 missing qid/pass; dropped",
+    "row 9 missing qid/pass; dropped",
+    "row 10 missing qid/pass; dropped",
+    "row 11 missing qid/pass; dropped",
+    "row 12 missing qid/pass; dropped",
+    "row 13 missing qid/pass; dropped",
+    "row 14 missing qid/pass; dropped",
+    "row 15 missing qid/pass; dropped",
+    "row 16 missing qid/pass; dropped",
+    "row 17 missing qid/pass; dropped",
+    "row 18 missing qid/pass; dropped",
+    "row 19 missing qid/pass; dropped",
+    "row 20 missing qid/pass; dropped",
+    "row 21 missing qid/pass; dropped",
+    "row 22 missing qid/pass; dropped",
+    "row 23 missing qid/pass; dropped",
+    "row 24 missing qid/pass; dropped",
+    "row 25 missing qid/pass; dropped",
+    "row 26 missing qid/pass; dropped",
+    "row 27 missing qid/pass; dropped",
+    "row 28 missing qid/pass; dropped",
+    "row 29 missing qid/pass; dropped"
+   ]
+  ],
+  [
+   "H091",
+   "branch",
+   [
+    "row 0 missing qid/pass; dropped",
+    "row 1 missing qid/pass; dropped",
+    "row 2 missing qid/pass; dropped",
+    "row 3 missing qid/pass; dropped",
+    "row 4 missing qid/pass; dropped",
+    "row 5 missing qid/pass; dropped",
+    "row 6 missing qid/pass; dropped",
+    "row 7 missing qid/pass; dropped",
+    "row 8 missing qid/pass; dropped",
+    "row 9 missing qid/pass; dropped",
+    "row 10 missing qid/pass; dropped",
+    "row 11 missing qid/pass; dropped",
+    "row 12 missing qid/pass; dropped",
+    "row 13 missing qid/pass; dropped",
+    "row 14 missing qid/pass; dropped",
+    "row 15 missing qid/pass; dropped",
+    "row 16 missing qid/pass; dropped",
+    "row 17 missing qid/pass; dropped",
+    "row 18 missing qid/pass; dropped",
+    "row 19 missing qid/pass; dropped",
+    "row 20 missing qid/pass; dropped",
+    "row 21 missing qid/pass; dropped",
+    "row 22 missing qid/pass; dropped",
+    "row 23 missing qid/pass; dropped",
+    "row 24 missing qid/pass; dropped",
+    "row 25 missing qid/pass; dropped",
+    "row 26 missing qid/pass; dropped",
+    "row 27 missing qid/pass; dropped",
+    "row 28 missing qid/pass; dropped",
+    "row 29 missing qid/pass; dropped"
+   ]
+  ],
+  [
+   "H092",
+   "branch",
+   [
+    "row 0 missing qid/pass; dropped",
+    "row 1 missing qid/pass; dropped",
+    "row 2 missing qid/pass; dropped",
+    "row 3 missing qid/pass; dropped",
+    "row 4 missing qid/pass; dropped",
+    "row 5 missing qid/pass; dropped",
+    "row 6 missing qid/pass; dropped",
+    "row 7 missing qid/pass; dropped",
+    "row 8 missing qid/pass; dropped",
+    "row 9 missing qid/pass; dropped",
+    "row 10 missing qid/pass; dropped",
+    "row 11 missing qid/pass; dropped",
+    "row 12 missing qid/pass; dropped",
+    "row 13 missing qid/pass; dropped",
+    "row 14 missing qid/pass; dropped",
+    "row 15 missing qid/pass; dropped",
+    "row 16 missing qid/pass; dropped",
+    "row 17 missing qid/pass; dropped",
+    "row 18 missing qid/pass; dropped",
+    "row 19 missing qid/pass; dropped",
+    "row 20 missing qid/pass; dropped",
+    "row 21 missing qid/pass; dropped",
+    "row 22 missing qid/pass; dropped",
+    "row 23 missing qid/pass; dropped",
+    "row 24 missing qid/pass; dropped",
+    "row 25 missing qid/pass; dropped",
+    "row 26 missing qid/pass; dropped",
+    "row 27 missing qid/pass; dropped",
+    "row 28 missing qid/pass; dropped",
+    "row 29 missing qid/pass; dropped"
+   ]
+  ]
+ ],
  "flagged": [
   "C000",
+  "C003",
+  "C006",
   "C007",
+  "C008",
   "C010",
-  "C011"
+  "C011",
+  "C021",
+  "C022",
+  "C024",
+  "C025",
+  "C026",
+  "H000",
+  "H001",
+  "H004",
+  "H008",
+  "H015",
+  "H016",
+  "H018",
+  "H022",
+  "H026",
+  "H027",
+  "H028",
+  "H029",
+  "H030",
+  "H038",
+  "H039",
+  "H040",
+  "H047",
+  "H050",
+  "H051",
+  "H052",
+  "H056",
+  "H057",
+  "H058",
+  "H059",
+  "H060",
+  "H061",
+  "H062",
+  "H063",
+  "H064",
+  "H072",
+  "H075",
+  "H078"
  ],
  "fits": {
   "H": {
-   "n_cells": 0,
-   "n_obs": 0,
-   "effects": [],
-   "logit": [],
-   "interactions": [],
-   "dropped_constant_q": 0,
-   "questions": 0,
-   "note": "no cells"
+   "n_cells": 90,
+   "n_obs": 2070,
+   "effects": [
+    {
+     "term": "gen:metric_spec",
+     "identified": true,
+     "est": 0.00909481334071045,
+     "se": 0.019091356860076902,
+     "lo": -0.02870607324224182,
+     "hi": 0.046895699923662715,
+     "cells_on": 30
+    },
+    {
+     "term": "gen:decompose_cte",
+     "identified": true,
+     "est": -0.015413609296454307,
+     "se": 0.024933071821924994,
+     "lo": -0.0647810915038658,
+     "hi": 0.03395387291095718,
+     "cells_on": 29
+    },
+    {
+     "term": "fewshot",
+     "identified": true,
+     "est": -0.004612538460927635,
+     "se": 0.019056613064069538,
+     "lo": -0.04234463232778532,
+     "hi": 0.03311955540593005,
+     "cells_on": 47
+    },
+    {
+     "term": "explore",
+     "identified": true,
+     "est": 0.003091041806000775,
+     "se": 0.017589058016285387,
+     "lo": -0.03173529306624429,
+     "hi": 0.037917376678245844,
+     "cells_on": 46
+    },
+    {
+     "term": "candidates3",
+     "identified": true,
+     "est": 0.018510990209092915,
+     "se": 0.01907258760621312,
+     "lo": -0.01925273325120906,
+     "hi": 0.05627471366939489,
+     "cells_on": 43
+    },
+    {
+     "term": "verifier",
+     "identified": true,
+     "est": -0.013954335935848036,
+     "se": 0.019896941841512125,
+     "lo": -0.05335028078204204,
+     "hi": 0.02544160891034597,
+     "cells_on": 36
+    },
+    {
+     "term": "repair",
+     "identified": true,
+     "est": 0.018253554586019623,
+     "se": 0.01848320021668898,
+     "lo": -0.018343181843024556,
+     "hi": 0.05485029101506381,
+     "cells_on": 48
+    },
+    {
+     "term": "assumptions",
+     "identified": true,
+     "est": 0.0015908526417011287,
+     "se": 0.019988805709002553,
+     "lo": -0.03798698266212393,
+     "hi": 0.04116868794552618,
+     "cells_on": 43
+    },
+    {
+     "term": "multiagent",
+     "identified": true,
+     "est": -0.0010177365010836212,
+     "se": 0.019033486502174953,
+     "lo": -0.03870403977539003,
+     "hi": 0.036668566773222784,
+     "cells_on": 36
+    }
+   ],
+   "logit": [
+    {
+     "term": "gen:metric_spec",
+     "logodds": 0.4165216706239332,
+     "lo": 0.05772571849969638,
+     "hi": 0.77531762274817
+    },
+    {
+     "term": "gen:decompose_cte",
+     "logodds": 0.13944139554313953,
+     "lo": -0.2113175713102898,
+     "hi": 0.49020036239656883
+    },
+    {
+     "term": "fewshot",
+     "logodds": 0.11391084077077608,
+     "lo": -0.18510789320259224,
+     "hi": 0.4129295747441444
+    },
+    {
+     "term": "explore",
+     "logodds": 0.2656433343134385,
+     "lo": -0.04189205927978429,
+     "hi": 0.5731787279066614
+    },
+    {
+     "term": "candidates3",
+     "logodds": 0.5240556932462076,
+     "lo": 0.22984222295707307,
+     "hi": 0.8182691635353421
+    },
+    {
+     "term": "verifier",
+     "logodds": -0.004957712778103404,
+     "lo": -0.30596142197004317,
+     "hi": 0.29604599641383633
+    },
+    {
+     "term": "repair",
+     "logodds": 0.5497317711109877,
+     "lo": 0.26229100918696174,
+     "hi": 0.8371725330350137
+    },
+    {
+     "term": "assumptions",
+     "logodds": 0.301541189304782,
+     "lo": 0.006092541904128945,
+     "hi": 0.5969898367054352
+    },
+    {
+     "term": "multiagent",
+     "logodds": 0.147404564939818,
+     "lo": -0.16470939297330103,
+     "hi": 0.45951852285293704
+    }
+   ],
+   "interactions": [
+    {
+     "terms": "fewshot x assumptions",
+     "est": 0.10079133354497209,
+     "se": 0.03936309165218859,
+     "t": 2.56055429882292,
+     "lo": 0.02285241207363868,
+     "hi": 0.17873025501630552,
+     "cells_on": 24
+    },
+    {
+     "terms": "fewshot x verifier",
+     "est": 0.061765733597183625,
+     "se": 0.04034005382755757,
+     "t": 1.5311267025377515,
+     "lo": -0.018107572981380368,
+     "hi": 0.14163904017574763,
+     "cells_on": 20
+    },
+    {
+     "terms": "repair x assumptions",
+     "est": 0.05903540915265593,
+     "se": 0.04023163107122922,
+     "t": 1.467387912961695,
+     "lo": -0.020623220368377923,
+     "hi": 0.1386940386736898,
+     "cells_on": 22
+    },
+    {
+     "terms": "explore x assumptions",
+     "est": -0.05217638481707431,
+     "se": 0.036782472298088814,
+     "t": -1.4185121759688064,
+     "lo": -0.12500567996729017,
+     "hi": 0.020652910333141546,
+     "cells_on": 25
+    },
+    {
+     "terms": "verifier x multiagent",
+     "est": 0.04007394271418548,
+     "se": 0.03946871086962919,
+     "t": 1.0153344720722057,
+     "lo": -0.038074104807680316,
+     "hi": 0.11822199023605129,
+     "cells_on": 16
+    }
+   ],
+   "dropped_constant_q": 7,
+   "questions": 30,
+   "note": "",
+   "clusters": 90,
+   "b": [
+    0.00909481334071045,
+    -0.015413609296454307,
+    -0.004612538460927635,
+    0.003091041806000775,
+    0.018510990209092915,
+    -0.013954335935848036,
+    0.018253554586019623,
+    0.0015908526417011287,
+    -0.0010177365010836212
+   ]
   },
   "C": {
-   "n_cells": 7,
-   "n_obs": 0,
-   "effects": [],
-   "logit": [],
+   "n_cells": 27,
+   "n_obs": 58,
+   "effects": [
+    {
+     "term": "gen:metric_spec",
+     "identified": true,
+     "est": 0.04759366225026271,
+     "se": 0.09099309104571371,
+     "lo": -0.13821422966508468,
+     "hi": 0.2334015541656101,
+     "cells_on": 8
+    },
+    {
+     "term": "gen:decompose_cte",
+     "identified": true,
+     "est": -0.2948110395100959,
+     "se": 0.162011029301851,
+     "lo": -0.6256375613444756,
+     "hi": 0.03601548232428381,
+     "cells_on": 10
+    },
+    {
+     "term": "fewshot",
+     "identified": true,
+     "est": -0.006143121001334073,
+     "se": 0.13691117667646327,
+     "lo": -0.28571574377467207,
+     "hi": 0.2734295017720039,
+     "cells_on": 10
+    },
+    {
+     "term": "explore",
+     "identified": true,
+     "est": 0.2482923997716737,
+     "se": 0.11609114035941746,
+     "lo": 0.011234291157743242,
+     "hi": 0.4853505083856041,
+     "cells_on": 16
+    },
+    {
+     "term": "candidates3",
+     "identified": true,
+     "est": -0.21374739772095375,
+     "se": 0.13787722197593466,
+     "lo": -0.4952926849958123,
+     "hi": 0.06779788955390481,
+     "cells_on": 14
+    },
+    {
+     "term": "verifier",
+     "identified": true,
+     "est": -0.019538282385776568,
+     "se": 0.11619828286421108,
+     "lo": -0.25681517599449555,
+     "hi": 0.21773861122294244,
+     "cells_on": 10
+    },
+    {
+     "term": "repair",
+     "identified": true,
+     "est": -0.17918101218872728,
+     "se": 0.10212157558652225,
+     "lo": -0.3877132695364057,
+     "hi": 0.029351245158951128,
+     "cells_on": 9
+    },
+    {
+     "term": "assumptions",
+     "identified": true,
+     "est": 0.1641399647128117,
+     "se": 0.12909084292395773,
+     "lo": -0.09946353653790993,
+     "hi": 0.4277434659635333,
+     "cells_on": 13
+    },
+    {
+     "term": "multiagent",
+     "identified": true,
+     "est": -0.08373930095013611,
+     "se": 0.12142977594092139,
+     "lo": -0.33169890342149755,
+     "hi": 0.16422030152122535,
+     "cells_on": 8
+    }
+   ],
+   "logit": [
+    {
+     "term": "gen:metric_spec",
+     "logodds": 1.1170840593527938,
+     "lo": -0.3470406433759996,
+     "hi": 2.5812087620815873
+    },
+    {
+     "term": "gen:decompose_cte",
+     "logodds": -0.6732552653092744,
+     "lo": -1.9023740535395173,
+     "hi": 0.5558635229209686
+    },
+    {
+     "term": "fewshot",
+     "logodds": 0.30709043790202223,
+     "lo": -1.0501313970399728,
+     "hi": 1.6643122728440174
+    },
+    {
+     "term": "explore",
+     "logodds": 1.2897420569793392,
+     "lo": 0.023828041993445792,
+     "hi": 2.555656071965233
+    },
+    {
+     "term": "candidates3",
+     "logodds": -0.3798719579665008,
+     "lo": -1.563424660260775,
+     "hi": 0.8036807443277734
+    },
+    {
+     "term": "verifier",
+     "logodds": 0.4534438638164322,
+     "lo": -0.8127853897956354,
+     "hi": 1.7196731174284998
+    },
+    {
+     "term": "repair",
+     "logodds": -0.435947515136696,
+     "lo": -1.6383363380155995,
+     "hi": 0.7664413077422074
+    },
+    {
+     "term": "assumptions",
+     "logodds": 0.7228870114831559,
+     "lo": -0.5413297258032511,
+     "hi": 1.987103748769563
+    },
+    {
+     "term": "multiagent",
+     "logodds": -0.010615732850875243,
+     "lo": -1.4504104176338126,
+     "hi": 1.4291789519320623
+    }
+   ],
    "interactions": [],
-   "dropped_constant_q": 29,
-   "questions": 29,
-   "note": "every question has the same outcome in every cell (all pass or all fail) - no factor is identified"
+   "dropped_constant_q": 31,
+   "questions": 34,
+   "note": "",
+   "clusters": 27,
+   "b": [
+    0.04759366225026271,
+    -0.2948110395100959,
+    -0.006143121001334073,
+    0.2482923997716737,
+    -0.21374739772095375,
+    -0.019538282385776568,
+    -0.17918101218872728,
+    0.1641399647128117,
+    -0.08373930095013611
+   ]
+  },
+  "H_clean": {
+   "n_cells": 58,
+   "n_obs": 1218,
+   "effects": [
+    {
+     "term": "gen:metric_spec",
+     "identified": true,
+     "est": 0.018091840913782804,
+     "se": 0.029660467403822666,
+     "lo": -0.04122909389386253,
+     "hi": 0.07741277572142813,
+     "cells_on": 20
+    },
+    {
+     "term": "gen:decompose_cte",
+     "identified": true,
+     "est": -0.035221322967562425,
+     "se": 0.03649041364808843,
+     "lo": -0.10820215026373928,
+     "hi": 0.037759504328614434,
+     "cells_on": 17
+    },
+    {
+     "term": "fewshot",
+     "identified": true,
+     "est": -0.01582193600234248,
+     "se": 0.03039635477145771,
+     "lo": -0.0766146455452579,
+     "hi": 0.04497077354057294,
+     "cells_on": 24
+    },
+    {
+     "term": "explore",
+     "identified": true,
+     "est": -0.019452028047498852,
+     "se": 0.02496540877170264,
+     "lo": -0.06938284559090413,
+     "hi": 0.03047878949590643,
+     "cells_on": 28
+    },
+    {
+     "term": "candidates3",
+     "identified": true,
+     "est": 0.023583794524759172,
+     "se": 0.030056791271119966,
+     "lo": -0.03652978801748076,
+     "hi": 0.0836973770669991,
+     "cells_on": 31
+    },
+    {
+     "term": "verifier",
+     "identified": true,
+     "est": -0.003595026901044575,
+     "se": 0.03126660073507599,
+     "lo": -0.06612822837119656,
+     "hi": 0.05893817456910741,
+     "cells_on": 23
+    },
+    {
+     "term": "repair",
+     "identified": true,
+     "est": 0.017703134921481314,
+     "se": 0.026318609632708122,
+     "lo": -0.034934084343934926,
+     "hi": 0.07034035418689756,
+     "cells_on": 29
+    },
+    {
+     "term": "assumptions",
+     "identified": true,
+     "est": -0.008369770960242058,
+     "se": 0.030861552261432466,
+     "lo": -0.070092875483107,
+     "hi": 0.053353333562622875,
+     "cells_on": 28
+    },
+    {
+     "term": "multiagent",
+     "identified": true,
+     "est": -0.008572396492025543,
+     "se": 0.028002011231591812,
+     "lo": -0.06457641895520917,
+     "hi": 0.04743162597115808,
+     "cells_on": 20
+    }
+   ],
+   "logit": [
+    {
+     "term": "gen:metric_spec",
+     "logodds": 0.4708130503230515,
+     "lo": 0.03572549417603427,
+     "hi": 0.9059006064700688
+    },
+    {
+     "term": "gen:decompose_cte",
+     "logodds": -0.0982932824390366,
+     "lo": -0.56514610242986,
+     "hi": 0.36855953755178683
+    },
+    {
+     "term": "fewshot",
+     "logodds": -0.11851180002263113,
+     "lo": -0.4971317972485442,
+     "hi": 0.260108197203282
+    },
+    {
+     "term": "explore",
+     "logodds": 0.09775346502294585,
+     "lo": -0.26533777168772693,
+     "hi": 0.46084470173361863
+    },
+    {
+     "term": "candidates3",
+     "logodds": 0.6237544366043285,
+     "lo": 0.26398449848876293,
+     "hi": 0.9835243747198941
+    },
+    {
+     "term": "verifier",
+     "logodds": 0.16730839838489386,
+     "lo": -0.19859605590227009,
+     "hi": 0.5332128526720579
+    },
+    {
+     "term": "repair",
+     "logodds": 0.5913382246304816,
+     "lo": 0.2491947743170161,
+     "hi": 0.9334816749439471
+    },
+    {
+     "term": "assumptions",
+     "logodds": 0.20822017256099115,
+     "lo": -0.14346703163785382,
+     "hi": 0.5599073767598362
+    },
+    {
+     "term": "multiagent",
+     "logodds": 0.15693362711637532,
+     "lo": -0.24078569057165478,
+     "hi": 0.5546529448044054
+    }
+   ],
+   "interactions": [
+    {
+     "terms": "fewshot x assumptions",
+     "est": 0.14176066162259876,
+     "se": 0.05559912528995549,
+     "t": 2.5496922997133766,
+     "lo": 0.03056241104268778,
+     "hi": 0.25295891220250977,
+     "cells_on": 12
+    },
+    {
+     "terms": "gen:metric_spec x assumptions",
+     "est": 0.09821905577205638,
+     "se": 0.054057962629673224,
+     "t": 1.8169211526692364,
+     "lo": -0.009896869487290072,
+     "hi": 0.20633498103140283,
+     "cells_on": 12
+    },
+    {
+     "terms": "candidates3 x verifier",
+     "est": -0.09706142309069829,
+     "se": 0.05673496247732107,
+     "t": -1.7107867680268072,
+     "lo": -0.21053134804534043,
+     "hi": 0.016408501863943853,
+     "cells_on": 11
+    },
+    {
+     "terms": "explore x assumptions",
+     "est": -0.07269923344264914,
+     "se": 0.05408550189422545,
+     "t": -1.344153810106568,
+     "lo": -0.18087023723110005,
+     "hi": 0.03547177034580176,
+     "cells_on": 15
+    },
+    {
+     "terms": "verifier x assumptions",
+     "est": 0.06775891273353742,
+     "se": 0.05843086588917688,
+     "t": 1.1596424544187418,
+     "lo": -0.04910281904481635,
+     "hi": 0.1846206445118912,
+     "cells_on": 14
+    }
+   ],
+   "dropped_constant_q": 9,
+   "questions": 30,
+   "note": "",
+   "clusters": 58,
+   "b": [
+    0.018091840913782804,
+    -0.035221322967562425,
+    -0.01582193600234248,
+    -0.019452028047498852,
+    0.023583794524759172,
+    -0.003595026901044575,
+    0.017703134921481314,
+    -0.008369770960242058,
+    -0.008572396492025543
+   ]
   }
  },
  "ranking": [
   {
-   "id": "000",
-   "generation": "direct_sql",
-   "flags": "0000000",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
-   "pareto": false
-  },
-  {
-   "id": "001",
-   "generation": "direct_sql",
-   "flags": "1111111",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
-   "pareto": false
-  },
-  {
-   "id": "002",
+   "id": "020",
    "generation": "metric_spec",
-   "flags": "0000000",
-   "pred_acc": null,
-   "pred_execs": null,
+   "flags": "0110100",
+   "pred_acc": 0.9265192279559762,
+   "pred_execs": 2.7568628672943616,
    "obs": "",
    "obs_execs": null,
-   "pareto": false
+   "pareto": true
   },
   {
-   "id": "003",
-   "generation": "direct_sql",
-   "flags": "0000100",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
-   "pareto": false
-  },
-  {
-   "id": "004",
-   "generation": "decompose_cte",
-   "flags": "1101001",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
-   "pareto": false
-  },
-  {
-   "id": "005",
-   "generation": "decompose_cte",
-   "flags": "0101010",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
-   "pareto": false
-  },
-  {
-   "id": "006",
-   "generation": "decompose_cte",
-   "flags": "0101011",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
-   "pareto": false
-  },
-  {
-   "id": "007",
-   "generation": "direct_sql",
-   "flags": "1110010",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
-   "pareto": false
-  },
-  {
-   "id": "008",
+   "id": "067",
    "generation": "metric_spec",
-   "flags": "1110011",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
-   "pareto": false
+   "flags": "0010111",
+   "pred_acc": 0.9249245417012334,
+   "pred_execs": 2.415466088476532,
+   "obs": "28/30",
+   "obs_execs": 3.0,
+   "pareto": true
   },
   {
-   "id": "009",
-   "generation": "decompose_cte",
-   "flags": "0111010",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
-   "pareto": false
-  },
-  {
-   "id": "010",
-   "generation": "decompose_cte",
-   "flags": "0100001",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
-   "pareto": false
-  },
-  {
-   "id": "011",
-   "generation": "direct_sql",
-   "flags": "0010000",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
-   "pareto": false
-  },
-  {
-   "id": "012",
-   "generation": "direct_sql",
-   "flags": "0101000",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
-   "pareto": false
-  },
-  {
-   "id": "013",
+   "id": "035",
    "generation": "metric_spec",
-   "flags": "0100100",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
+   "flags": "1110110",
+   "pred_acc": 0.9246054936037994,
+   "pred_execs": 2.9552208859003755,
+   "obs": "27/30",
+   "obs_execs": 2.066666666666667,
    "pareto": false
   },
   {
-   "id": "014",
+   "id": "061",
    "generation": "metric_spec",
-   "flags": "0011010",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
+   "flags": "0010101",
+   "pred_acc": 0.9239170016948227,
+   "pred_execs": 2.2919424794874663,
+   "obs": "28/30",
+   "obs_execs": 3.033333333333333,
+   "pareto": true
+  },
+  {
+   "id": "069",
+   "generation": "metric_spec",
+   "flags": "1110101",
+   "pred_acc": 0.9229133928112675,
+   "pred_execs": 2.7712067073529303,
+   "obs": "28/30",
+   "obs_execs": 4.0,
    "pareto": false
   },
   {
-   "id": "015",
-   "generation": "decompose_cte",
-   "flags": "1001100",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
+   "id": "018",
+   "generation": "metric_spec",
+   "flags": "1010100",
+   "pred_acc": 0.9214620790978255,
+   "pred_execs": 2.4272674586627954,
+   "obs": "28/30",
+   "obs_execs": 1.1333333333333333,
    "pareto": false
   },
   {
-   "id": "016",
+   "id": "036",
    "generation": "direct_sql",
-   "flags": "1010010",
-   "pred_acc": null,
-   "pred_execs": null,
+   "flags": "0110100",
+   "pred_acc": 0.9204882159461781,
+   "pred_execs": 2.8519835637653514,
+   "obs": "27/30",
+   "obs_execs": 2.0,
+   "pareto": false
+  },
+  {
+   "id": "029",
+   "generation": "direct_sql",
+   "flags": "1110110",
+   "pred_acc": 0.9183730358727196,
+   "pred_execs": 3.0503415823713658,
+   "obs": "28/30",
+   "obs_execs": 1.0666666666666667,
+   "pareto": false
+  },
+  {
+   "id": "080",
+   "generation": "direct_sql",
+   "flags": "0010100",
+   "pred_acc": 0.9183244866819776,
+   "pred_execs": 2.447553745516837,
+   "obs": "29/30",
+   "obs_execs": 3.1,
+   "pareto": false
+  },
+  {
+   "id": "094",
+   "generation": "metric_spec",
+   "flags": "0111110",
+   "pred_acc": 0.9182001469787726,
+   "pred_execs": 3.1143321005553304,
+   "obs": "",
+   "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "044",
+   "generation": "direct_sql",
+   "flags": "0010101",
+   "pred_acc": 0.917612071131219,
+   "pred_execs": 2.3870631759584566,
    "obs": "",
    "obs_execs": null,
    "pareto": false
@@ -207,130 +953,190 @@
    "id": "017",
    "generation": "metric_spec",
    "flags": "0110010",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
+   "pred_acc": 0.9151906939236525,
+   "pred_execs": 3.153585451558201,
+   "obs": "28/30",
+   "obs_execs": 1.0666666666666667,
    "pareto": false
   },
   {
-   "id": "018",
-   "generation": "metric_spec",
-   "flags": "1010100",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
-   "pareto": false
-  },
-  {
-   "id": "019",
-   "generation": "decompose_cte",
-   "flags": "0001011",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
-   "pareto": false
-  },
-  {
-   "id": "020",
-   "generation": "metric_spec",
-   "flags": "0110100",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
-   "pareto": false
-  },
-  {
-   "id": "021",
-   "generation": "decompose_cte",
-   "flags": "0110001",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
-   "pareto": false
-  },
-  {
-   "id": "022",
-   "generation": "decompose_cte",
-   "flags": "1000110",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
-   "pareto": false
-  },
-  {
-   "id": "023",
+   "id": "042",
    "generation": "direct_sql",
-   "flags": "0011100",
-   "pred_acc": null,
-   "pred_execs": null,
+   "flags": "1010100",
+   "pred_acc": 0.9150957097593282,
+   "pred_execs": 2.5223881551337852,
+   "obs": "28/30",
+   "obs_execs": 3.0,
+   "pareto": false
+  },
+  {
+   "id": "013",
+   "generation": "metric_spec",
+   "flags": "0100100",
+   "pred_acc": 0.9138968921383104,
+   "pred_execs": 1.248639730759232,
+   "obs": "29/30",
+   "obs_execs": 2.0,
+   "pareto": true
+  },
+  {
+   "id": "025",
+   "generation": "metric_spec",
+   "flags": "0110001",
+   "pred_acc": 0.9133646815237031,
+   "pred_execs": 2.969571273010756,
+   "obs": "27/30",
+   "obs_execs": 1.3,
+   "pareto": false
+  },
+  {
+   "id": "081",
+   "generation": "metric_spec",
+   "flags": "0010010",
+   "pred_acc": 0.9130269646594519,
+   "pred_execs": 2.7491556333096865,
+   "obs": "28/30",
+   "obs_execs": 3.0,
+   "pareto": false
+  },
+  {
+   "id": "077",
+   "generation": "metric_spec",
+   "flags": "1011111",
+   "pred_acc": 0.9120952252411642,
+   "pred_execs": 2.7242461223653844,
+   "obs": "28/30",
+   "obs_execs": 3.2,
+   "pareto": false
+  },
+  {
+   "id": "068",
+   "generation": "metric_spec",
+   "flags": "1100110",
+   "pred_acc": 0.9117817120648518,
+   "pred_execs": 1.4469977493652462,
+   "obs": "28/30",
+   "obs_execs": 2.066666666666667,
+   "pareto": false
+  },
+  {
+   "id": "087",
+   "generation": "metric_spec",
+   "flags": "0000100",
+   "pred_acc": 0.9117331628741099,
+   "pred_execs": 0.8442099125107172,
+   "obs": "27/30",
+   "obs_execs": 1.1666666666666667,
+   "pareto": true
+  },
+  {
+   "id": "008",
+   "generation": "metric_spec",
+   "flags": "1110011",
+   "pred_acc": 0.9112495014502446,
+   "pred_execs": 3.16792929161677,
+   "obs": "28/30",
+   "obs_execs": 4.0,
+   "pareto": false
+  },
+  {
+   "id": "046",
+   "generation": "metric_spec",
+   "flags": "0010001",
+   "pred_acc": 0.9112009522595026,
+   "pred_execs": 2.565141454762241,
    "obs": "",
    "obs_execs": null,
+   "pareto": false
+  },
+  {
+   "id": "033",
+   "generation": "metric_spec",
+   "flags": "0000101",
+   "pred_acc": 0.9110207473233513,
+   "pred_execs": 0.7837193429523373,
+   "obs": "26/30",
+   "obs_execs": 1.7666666666666666,
+   "pareto": true
+  },
+  {
+   "id": "062",
+   "generation": "decompose_cte",
+   "flags": "0110111",
+   "pred_acc": 0.9100998707370923,
+   "pred_execs": 3.2946382654574458,
+   "obs": "29/30",
+   "obs_execs": 3.066666666666667,
+   "pareto": false
+  },
+  {
+   "id": "039",
+   "generation": "direct_sql",
+   "flags": "0111101",
+   "pred_acc": 0.910007765240326,
+   "pred_execs": 3.0254386184788755,
+   "obs": "25/30",
+   "obs_execs": 1.2333333333333334,
    "pareto": false
   },
   {
    "id": "024",
    "generation": "metric_spec",
    "flags": "1010010",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
-   "pareto": false
-  },
-  {
-   "id": "025",
-   "generation": "metric_spec",
-   "flags": "0110001",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
-   "pareto": false
-  },
-  {
-   "id": "026",
-   "generation": "metric_spec",
-   "flags": "1101001",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
-   "pareto": false
-  },
-  {
-   "id": "027",
-   "generation": "decompose_cte",
-   "flags": "0000110",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
+   "pred_acc": 0.9097981877368025,
+   "pred_execs": 2.8239900429266354,
+   "obs": "30/30",
+   "obs_execs": 1.0,
    "pareto": false
   },
   {
    "id": "028",
    "generation": "decompose_cte",
    "flags": "0110100",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
+   "pred_acc": 0.9096986894386601,
+   "pred_execs": 3.23160522602676,
+   "obs": "29/30",
+   "obs_execs": 1.3666666666666667,
    "pareto": false
   },
   {
-   "id": "029",
+   "id": "051",
+   "generation": "metric_spec",
+   "flags": "1000111",
+   "pred_acc": 0.9089055672498927,
+   "pred_execs": 0.9820773615583515,
+   "obs": "27/30",
+   "obs_execs": 1.1666666666666667,
+   "pareto": false
+  },
+  {
+   "id": "098",
    "generation": "direct_sql",
-   "flags": "1110110",
-   "pred_acc": null,
-   "pred_execs": null,
-   "obs": "",
-   "obs_execs": null,
+   "flags": "0110010",
+   "pred_acc": 0.908824324585155,
+   "pred_execs": 3.2487061480291914,
+   "obs": "24/30",
+   "obs_execs": 6.8,
+   "pareto": false
+  },
+  {
+   "id": "053",
+   "generation": "direct_sql",
+   "flags": "0100110",
+   "pred_acc": 0.9086441196490039,
+   "pred_execs": 1.4672840362192876,
+   "obs": "25/30",
+   "obs_execs": 2.0,
+   "pareto": false
+  },
+  {
+   "id": "023",
+   "generation": "direct_sql",
+   "flags": "0011100",
+   "pred_acc": 0.908556451526884,
+   "pred_execs": 2.6814993697887406,
+   "obs": "30/30",
+   "obs_execs": 1.0666666666666667,
    "pareto": false
   }
  ],
@@ -338,11 +1144,13 @@
   "Every cell's analyst is the cloud/box agent's own model (see the model column), not Haiku or Sonnet; effects describe that model and may not transfer.",
   "Contamination is flagged from free-text notes (agent_note/notes/protocol_notes) by keyword, so it is a screen, not a verdict. Read the flagged cells' notes. Most admissions so far are about seeing family SQL templates in bench/question_families.py while locating the dev-set rule.",
   "H cells with dev_set=v1_fallback are pooled with the C-series, not the H-series.",
-  "Pass/fail is the repo's deterministic matcher (bench.compare.match) unless the cell says otherwise."
+  "Pass/fail is the repo's deterministic matcher (bench.compare.match) unless the cell says otherwise.",
+  "H cells ran on 2 different snapshots (98e61f03e594, unknown); question fixed effects absorb per-question difficulty but not snapshot x factor interactions."
  ],
  "headline": [
-  "No identified H-series effects yet (0 H cells pooled). no cells",
-  "C-series (v1 dev set): all 7 cells scored 100% - ceiling, no factor information."
+  "Largest H-series effects: candidates3 +1.9 pp [-1.9, +5.6]; repair +1.8 pp [-1.8, +5.5]; gen:decompose_cte -1.5 pp [-6.5, +3.4].",
+  "CIs excluding zero: none yet.",
+  "Best predicted combination: 020 (metric_spec, flags 0110100) at 92.7% with ~2.8 SQL execs/question."
  ],
  "cells": [
   {
@@ -420,6 +1228,54 @@
    "source": "branch"
   },
   {
+   "cell": "C003",
+   "series": "C",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": false,
+    "verifier": false,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 20,
+   "k": 20,
+   "mean_sql_execs": 1.0,
+   "model": "grok-4.7",
+   "dev_set": "v1",
+   "dataset_id": "unknown",
+   "contamination": [
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "C004",
+   "series": "C",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": false,
+    "verifier": true,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 20,
+   "k": 20,
+   "mean_sql_execs": 3.6,
+   "model": "Grok 4.7",
+   "dev_set": "v1",
+   "dataset_id": "e21410ce6805",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
    "cell": "C005",
    "series": "C",
    "config": {
@@ -439,6 +1295,32 @@
    "dev_set": "v1",
    "dataset_id": "98e61f03e594",
    "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "C006",
+   "series": "C",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": false,
+    "verifier": true,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": true
+   },
+   "n": 20,
+   "k": 20,
+   "mean_sql_execs": 2.15,
+   "model": "grok-4.7",
+   "dev_set": "v1",
+   "dataset_id": "e21410ce6805",
+   "contamination": [
+    "gold SQL/answers",
+    "saw restricted material"
+   ],
    "partial": false,
    "source": "branch"
   },
@@ -470,6 +1352,54 @@
    "source": "branch"
   },
   {
+   "cell": "C008",
+   "series": "C",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": true,
+    "verifier": false,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": true
+   },
+   "n": 20,
+   "k": 20,
+   "mean_sql_execs": 8.0,
+   "model": "grok-4.7",
+   "dev_set": "v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "C009",
+   "series": "C",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": true,
+    "verifier": true,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 20,
+   "k": 20,
+   "mean_sql_execs": 5.85,
+   "model": "Grok 4.7",
+   "dev_set": "v1",
+   "dataset_id": "e21410ce6805",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
    "cell": "C010",
    "series": "C",
    "config": {
@@ -492,7 +1422,7 @@
     "self-reported contamination"
    ],
    "partial": false,
-   "source": "PR #23"
+   "source": "branch"
   },
   {
    "cell": "C011",
@@ -518,6 +1448,2503 @@
     "gold SQL/answers",
     "saw restricted material"
    ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "C012",
+   "series": "C",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": false,
+    "verifier": true,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 20,
+   "k": 20,
+   "mean_sql_execs": 2.0,
+   "model": "grok-4.7",
+   "dev_set": "v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "C013",
+   "series": "C",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": false,
+    "verifier": false,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 20,
+   "k": 20,
+   "mean_sql_execs": 2.0,
+   "model": "grok-4.7",
+   "dev_set": "v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "C014",
+   "series": "C",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": true,
+    "verifier": true,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 20,
+   "k": 20,
+   "mean_sql_execs": 3.0,
+   "model": "grok-4.7",
+   "dev_set": "v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "C015",
+   "series": "C",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": false,
+    "verifier": true,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 20,
+   "k": 20,
+   "mean_sql_execs": 1.65,
+   "model": "Grok 4.7",
+   "dev_set": "v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "C016",
+   "series": "C",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": true,
+    "verifier": false,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 20,
+   "k": 20,
+   "mean_sql_execs": 3.0,
+   "model": "Grok 4.7",
+   "dev_set": "v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "C017",
+   "series": "C",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": true,
+    "verifier": false,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 20,
+   "k": 20,
+   "mean_sql_execs": 3.0,
+   "model": "Grok 4.7",
+   "dev_set": "v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "C021",
+   "series": "C",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": true,
+    "verifier": false,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 20,
+   "k": 17,
+   "mean_sql_execs": 3.0,
+   "model": "grok-4.7",
+   "dev_set": "v1",
+   "dataset_id": "unknown",
+   "contamination": [
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "C022",
+   "series": "C",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": false,
+    "verifier": false,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 20,
+   "k": 17,
+   "mean_sql_execs": 3.0,
+   "model": "grok-4.7",
+   "dev_set": "v1",
+   "dataset_id": "unknown",
+   "contamination": [
+    "reference SQL"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "C023",
+   "series": "C",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": true,
+    "verifier": true,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 20,
+   "k": 17,
+   "mean_sql_execs": 3.0,
+   "model": "grok-4.7",
+   "dev_set": "v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "C024",
+   "series": "C",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": true,
+    "verifier": false,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 20,
+   "k": 20,
+   "mean_sql_execs": 3.0,
+   "model": "Grok 4.7",
+   "dev_set": "v1",
+   "dataset_id": "unknown",
+   "contamination": [
+    "reference SQL",
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "C025",
+   "series": "C",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": true,
+    "verifier": false,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 20,
+   "k": 20,
+   "mean_sql_execs": 4.2,
+   "model": "Grok 4.7",
+   "dev_set": "v1",
+   "dataset_id": "unknown",
+   "contamination": [
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "C026",
+   "series": "C",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": false,
+    "verifier": true,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 20,
+   "k": 20,
+   "mean_sql_execs": 2.25,
+   "model": "Grok 4.7",
+   "dev_set": "v1",
+   "dataset_id": "unknown",
+   "contamination": [
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "C027",
+   "series": "C",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": false,
+    "verifier": false,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 20,
+   "k": 19,
+   "mean_sql_execs": 2.0,
+   "model": "grok-4.7",
+   "dev_set": "v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "C028",
+   "series": "C",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": true,
+    "verifier": false,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 20,
+   "k": 19,
+   "mean_sql_execs": 4.0,
+   "model": "grok-4.7",
+   "dev_set": "v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "C029",
+   "series": "C",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": true,
+    "verifier": false,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 20,
+   "k": 20,
+   "mean_sql_execs": 3.0,
+   "model": "grok-4.7",
+   "dev_set": "v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H000",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": false,
+    "verifier": false,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 1.0,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H001",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": true,
+    "verifier": true,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 30,
+   "mean_sql_execs": 4.333333333333333,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [
+    "gold SQL/answers",
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H002",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": false,
+    "verifier": false,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 1.0,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H003",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": false,
+    "verifier": false,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 1.1666666666666667,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H004",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": false,
+    "verifier": true,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 27,
+   "mean_sql_execs": 1.2333333333333334,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [
+    "reference SQL"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H005",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": false,
+    "verifier": true,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 27,
+   "mean_sql_execs": 1.2333333333333334,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H006",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": false,
+    "verifier": true,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 27,
+   "mean_sql_execs": 1.2333333333333334,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H007",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": true,
+    "verifier": false,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 3.2333333333333334,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H008",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": true,
+    "verifier": false,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 4.0,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H009",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": true,
+    "verifier": true,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 6.0,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H010",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": false,
+    "verifier": false,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 4.0,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H011",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": true,
+    "verifier": false,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 3.0,
+   "model": "grok-4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H012",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": false,
+    "verifier": true,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 29,
+   "mean_sql_execs": 2.2666666666666666,
+   "model": "grok-4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H013",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": false,
+    "verifier": false,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 29,
+   "mean_sql_execs": 2.0,
+   "model": "grok-4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H014",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": true,
+    "verifier": true,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 26,
+   "mean_sql_execs": 4.0,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H015",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": false,
+    "verifier": true,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 26,
+   "mean_sql_execs": 3.066666666666667,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [
+    "reference SQL"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H016",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": true,
+    "verifier": false,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 26,
+   "mean_sql_execs": 3.0,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [
+    "reference SQL"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H017",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": true,
+    "verifier": false,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 1.0666666666666667,
+   "model": "Grok Bot (local executor; analyst = this agent)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H018",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": true,
+    "verifier": false,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 1.1333333333333333,
+   "model": "Grok Bot (local executor; analyst = this agent)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [
+    "saw restricted material",
+    "self-reported contamination"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H021",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": true,
+    "verifier": false,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 30,
+   "mean_sql_execs": 2.466666666666667,
+   "model": "Grok Bot (local executor)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H022",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": false,
+    "verifier": false,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 30,
+   "mean_sql_execs": 1.0,
+   "model": "Grok Bot (local executor)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [
+    "reference SQL"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H023",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": true,
+    "verifier": true,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 30,
+   "mean_sql_execs": 1.0666666666666667,
+   "model": "Grok Bot (local executor)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H024",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": true,
+    "verifier": false,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 30,
+   "mean_sql_execs": 1.0,
+   "model": "Grok Bot (local executor)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H025",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": true,
+    "verifier": false,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 27,
+   "mean_sql_execs": 1.3,
+   "model": "Grok Bot (local executor acting as analyst)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H026",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": false,
+    "verifier": true,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 29,
+   "mean_sql_execs": 1.0,
+   "model": "Grok Bot (local executor acting as analyst)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [
+    "reference SQL",
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H027",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": false,
+    "verifier": false,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 29,
+   "mean_sql_execs": 1.0666666666666667,
+   "model": "Grok Bot (local executor acting as analyst)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H028",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": true,
+    "verifier": false,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 29,
+   "mean_sql_execs": 1.3666666666666667,
+   "model": "Grok Bot (local executor acting as analyst)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H029",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": true,
+    "verifier": false,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 1.0666666666666667,
+   "model": "Grok Bot (local executor acting as analyst)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H030",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": true,
+    "verifier": true,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 3.466666666666667,
+   "model": "Grok Bot (local executor acting as analyst)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [
+    "self-reported contamination"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H031",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": false,
+    "verifier": true,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 0.0,
+   "model": "Grok Bot (local executor acting as analyst)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H032",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": false,
+    "verifier": true,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 2.3333333333333335,
+   "model": "Grok Bot (local executor acting as analyst)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H033",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": false,
+    "verifier": false,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 26,
+   "mean_sql_execs": 1.7666666666666666,
+   "model": "Grok Bot (local executor; acting as analyst)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H034",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": false,
+    "verifier": true,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 27,
+   "mean_sql_execs": 2.2,
+   "model": "Grok Bot (local executor; acting as analyst)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H035",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": true,
+    "verifier": false,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 27,
+   "mean_sql_execs": 2.066666666666667,
+   "model": "Grok Bot (local executor; acting as analyst)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H036",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": true,
+    "verifier": false,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 27,
+   "mean_sql_execs": 2.0,
+   "model": "Grok Bot (local executor; acting as analyst)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H037",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": true,
+    "verifier": false,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 24,
+   "mean_sql_execs": 2.466666666666667,
+   "model": "Grok Bot (local executor acting as analyst)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H038",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": false,
+    "verifier": true,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 25,
+   "mean_sql_execs": 1.4,
+   "model": "Grok Bot (local executor acting as analyst)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [
+    "self-reported contamination"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H039",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": true,
+    "verifier": true,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 25,
+   "mean_sql_execs": 1.2333333333333334,
+   "model": "Grok Bot (local executor acting as analyst)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [
+    "self-reported contamination"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H040",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": false,
+    "verifier": true,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 25,
+   "mean_sql_execs": 1.0333333333333334,
+   "model": "Grok Bot (local executor acting as analyst)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [
+    "self-reported contamination"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H041",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": false,
+    "verifier": true,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 1.2333333333333334,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H042",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": true,
+    "verifier": false,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 3.0,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H043",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": true,
+    "verifier": true,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 3.0,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H047",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": false,
+    "verifier": true,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 27,
+   "mean_sql_execs": 2.3,
+   "model": "grok-4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H048",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": false,
+    "verifier": true,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 25,
+   "mean_sql_execs": 1.2,
+   "model": "grok-4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H049",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": false,
+    "verifier": true,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 27,
+   "mean_sql_execs": 1.3,
+   "model": "grok-4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H050",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": true,
+    "verifier": true,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 27,
+   "mean_sql_execs": 3.066666666666667,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [
+    "reference SQL",
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H051",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": false,
+    "verifier": false,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 27,
+   "mean_sql_execs": 1.1666666666666667,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H052",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": false,
+    "verifier": true,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 27,
+   "mean_sql_execs": 1.1333333333333333,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H053",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": false,
+    "verifier": false,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 25,
+   "mean_sql_execs": 2.0,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H054",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": true,
+    "verifier": true,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 26,
+   "mean_sql_execs": 3.433333333333333,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H055",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": false,
+    "verifier": true,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 25,
+   "mean_sql_execs": 2.0,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H056",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": false,
+    "verifier": false,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 1.0,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H057",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": false,
+    "verifier": false,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 1.1666666666666667,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H058",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": false,
+    "verifier": false,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 25,
+   "mean_sql_execs": 1.0,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H059",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": false,
+    "verifier": false,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 3.033333333333333,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [
+    "gold SQL/answers"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H060",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": false,
+    "verifier": false,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 27,
+   "mean_sql_execs": 2.0,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [
+    "gold SQL/answers",
+    "reference SQL"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H061",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": true,
+    "verifier": false,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 3.033333333333333,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [
+    "gold SQL/answers"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H062",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": true,
+    "verifier": false,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 29,
+   "mean_sql_execs": 3.066666666666667,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H063",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": true,
+    "verifier": true,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 29,
+   "mean_sql_execs": 3.033333333333333,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H064",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": false,
+    "verifier": false,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 29,
+   "mean_sql_execs": 2.033333333333333,
+   "model": "Grok 4.7",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [
+    "saw restricted material"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H065",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": true,
+    "verifier": true,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 4.0,
+   "model": "Grok Bot",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H066",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": false,
+    "verifier": false,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 2.066666666666667,
+   "model": "Grok Bot",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H067",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": true,
+    "verifier": false,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 3.0,
+   "model": "Grok Bot",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H068",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": false,
+    "verifier": false,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 2.066666666666667,
+   "model": "Grok Bot",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H069",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": true,
+    "verifier": false,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 4.0,
+   "model": "Grok Bot",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H070",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": true,
+    "verifier": true,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 22,
+   "mean_sql_execs": 3.0,
+   "model": "Grok Bot",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H071",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": false,
+    "verifier": false,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 22,
+   "mean_sql_execs": 1.0333333333333334,
+   "model": "Grok Bot",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H072",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": false,
+    "verifier": false,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 22,
+   "mean_sql_execs": 1.0333333333333334,
+   "model": "Grok Bot",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [
+    "reference SQL"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H073",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": false,
+    "verifier": true,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 22,
+   "mean_sql_execs": 1.0,
+   "model": "Grok Bot",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H074",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": true,
+    "verifier": true,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 22,
+   "mean_sql_execs": 3.033333333333333,
+   "model": "Grok Bot",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H075",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": false,
+    "verifier": true,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 1.2,
+   "model": "Grok Bot (local executor l2)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [
+    "family SQL templates",
+    "gold SQL/answers"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H076",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": false,
+    "verifier": false,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 27,
+   "mean_sql_execs": 1.0,
+   "model": "Grok Bot (local executor l2)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H077",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": true,
+    "verifier": true,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 3.2,
+   "model": "Grok Bot (local executor l2)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H078",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": false,
+    "verifier": false,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 1.2,
+   "model": "Grok Bot (local executor l2)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [
+    "family SQL templates",
+    "gold SQL/answers"
+   ],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H079",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": true,
+    "verifier": true,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 3.2,
+   "model": "Grok Bot (local executor l2)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H080",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": true,
+    "verifier": false,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 29,
+   "mean_sql_execs": 3.1,
+   "model": "Grok Bot (local executor, analyst played in-context)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H081",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": true,
+    "verifier": false,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 28,
+   "mean_sql_execs": 3.0,
+   "model": "Grok Bot (local executor, analyst played in-context)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H082",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": true,
+    "verifier": false,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 27,
+   "mean_sql_execs": 3.033333333333333,
+   "model": "Grok Bot (local executor, analyst played in-context)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H083",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": false,
+    "verifier": false,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 23,
+   "mean_sql_execs": 1.0,
+   "model": "Grok Bot (local executor, analyst played in-context)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H084",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": false,
+    "verifier": true,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 29,
+   "mean_sql_execs": 1.1333333333333333,
+   "model": "Grok Bot (local executor, analyst played in-context)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H085",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": true,
+    "verifier": false,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 27,
+   "mean_sql_execs": 3.0,
+   "model": "Grok Bot (l4 local executor)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H086",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": true,
+    "verifier": false,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 27,
+   "mean_sql_execs": 3.0,
+   "model": "Grok Bot (l4 local executor)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H087",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": false,
+    "verifier": false,
+    "repair": true,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 27,
+   "mean_sql_execs": 1.1666666666666667,
+   "model": "Grok Bot (l4 local executor)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H088",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": false,
+    "verifier": false,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 27,
+   "mean_sql_execs": 1.1666666666666667,
+   "model": "Grok Bot (l4 local executor)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H089",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": false,
+    "explore": false,
+    "candidates3": false,
+    "verifier": false,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 26,
+   "mean_sql_execs": 1.0,
+   "model": "Grok Bot (l4 local executor)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "98e61f03e594",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H095",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": true,
+    "verifier": false,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 24,
+   "mean_sql_execs": 3.0,
+   "model": "Grok Bot (local executor)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H096",
+   "series": "H",
+   "config": {
+    "generation": "metric_spec",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": true,
+    "verifier": true,
+    "repair": false,
+    "assumptions": false,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 23,
+   "mean_sql_execs": 6.833333333333333,
+   "model": "Grok Bot (local executor)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H097",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": true,
+    "verifier": false,
+    "repair": true,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 27,
+   "mean_sql_execs": 3.1666666666666665,
+   "model": "Grok Bot (local executor)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H098",
+   "series": "H",
+   "config": {
+    "generation": "direct_sql",
+    "fewshot": false,
+    "explore": true,
+    "candidates3": true,
+    "verifier": false,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": false
+   },
+   "n": 30,
+   "k": 24,
+   "mean_sql_execs": 6.8,
+   "model": "Grok Bot (local executor)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
+   "partial": false,
+   "source": "branch"
+  },
+  {
+   "cell": "H099",
+   "series": "H",
+   "config": {
+    "generation": "decompose_cte",
+    "fewshot": true,
+    "explore": true,
+    "candidates3": false,
+    "verifier": false,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": true
+   },
+   "n": 30,
+   "k": 21,
+   "mean_sql_execs": 4.8,
+   "model": "Grok Bot (local executor)",
+   "dev_set": "DEV_HARD_v1",
+   "dataset_id": "unknown",
+   "contamination": [],
    "partial": false,
    "source": "branch"
   }
