@@ -59,7 +59,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0056,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_b853266803",
@@ -105,7 +106,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0065,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -135,7 +137,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0053,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_a5888f64a4",
@@ -187,7 +190,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.004,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7d45c279a7",
@@ -211,7 +215,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0065,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q15_partial_line_denials",
@@ -224,7 +229,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0028,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q25_primary_deductible",
@@ -237,7 +243,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0062,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_8663c777cd",
@@ -259,7 +266,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0061,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__87798",
@@ -272,7 +280,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0023,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q11_cpt_denial_rate",
@@ -297,7 +306,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.005,
-   "pass": null
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_a123bba47f",
@@ -328,7 +338,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0056,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_9108c7aacb",
@@ -373,7 +384,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0042,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_856b95a70c",
@@ -425,7 +437,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0042,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_1b7e02d0b0",
@@ -442,7 +455,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0072,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_921f1bf366",
@@ -458,7 +472,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0059,
-   "pass": null
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "q14_zero_paid_not_denied",
@@ -471,7 +486,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0023,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_dca9da6d52",
@@ -488,7 +504,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0058,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q19_reversed_no_correction",
@@ -501,7 +518,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0021,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__80307",
@@ -514,7 +532,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0022,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d383370345",
@@ -566,7 +585,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0064,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0482",
@@ -579,7 +599,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0025,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_0d43f7d4b6",
@@ -594,7 +615,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_923951a050",
@@ -608,7 +630,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0045,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7423e6eb91",
@@ -628,7 +651,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0074,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_never_remitted_submitted_in_month__2026-07-01",
@@ -641,7 +665,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0044,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_ab202d4b23",
@@ -846,7 +871,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0480",
@@ -859,7 +885,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.003,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d671e0b995",
@@ -925,7 +952,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0045,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__81479",
@@ -938,7 +966,8 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0025,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q12_referring_provider_denials",
@@ -947,12 +976,13 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0045,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   }
  ],
- "accuracy": null,
+ "accuracy": "28/30",
  "n": 30,
  "mean_sql_execs": 2.0,
- "notes": "Planner pass produced CTE plans; writer pass wrote decomposed CTE SQL using TF-IDF top-3 few-shot examples (non-dev, non-heldout_hard_1, different family; reference SQL shown) - adopted conventions: primary payer = DISTINCT claims rows with payer_responsibility='P' joined on claim_key+payer_key, rates via round(avg(is_denied::INT),4), fractions rounded to 4. Intermediate checks (1 extra exec per question, batched): primary pair key uniqueness 487/487, current adjudication uniqueness 492/492, corrected claims 10 with 0 frequency-1 originals in snapshot (so avg days null), 0 void submissions, FB 9 rows/5 negative. Critic pass: no revisions; repair not needed (no errors). Assumptions: current adjudication grain claim+payer; billed CPT from latest submission claim_lines; payment month from current adjudication; referring NPI from primary claim rows; August rows absent because snapshot ends 2026-07-22. Answers committed before scoring.",
- "n_pass": null
+ "notes": "Planner pass produced CTE plans; writer pass wrote decomposed CTE SQL using TF-IDF top-3 few-shot examples (non-dev, non-heldout_hard_1, different family; reference SQL shown) - adopted conventions: primary payer = DISTINCT claims rows with payer_responsibility='P' joined on claim_key+payer_key, rates via round(avg(is_denied::INT),4), fractions rounded to 4. Intermediate checks (1 extra exec per question, batched): primary pair key uniqueness 487/487, current adjudication uniqueness 492/492, corrected claims 10 with 0 frequency-1 originals in snapshot (so avg days null), 0 void submissions, FB 9 rows/5 negative. Critic pass: no revisions; repair not needed (no errors). Assumptions: current adjudication grain claim+payer; billed CPT from latest submission claim_lines; payment month from current adjudication; referring NPI from primary claim rows; August rows absent because snapshot ends 2026-07-22. Answers committed before scoring. Scored with bench.compare.match after answers were committed. Failures: 2.",
+ "n_pass": 28
 }

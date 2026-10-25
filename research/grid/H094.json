@@ -1,0 +1,991 @@
+{
+ "cell": "H094",
+ "protocol": "v2",
+ "dev_set": "DEV_HARD_v1",
+ "agent_note": "local Grok Bot executor l5",
+ "config": {
+  "generation": "metric_spec",
+  "fewshot": false,
+  "explore": true,
+  "candidates3": true,
+  "verifier": true,
+  "repair": true,
+  "assumptions": true,
+  "multiagent": false
+ },
+ "model": "Grok Bot (local executor)",
+ "dataset_id": "98e61f03e594",
+ "dev_ids": [
+  "f_cpt_share_of_line_payments__g0483",
+  "a_b853266803",
+  "q10_top_denial_carcs",
+  "a_a5888f64a4",
+  "a_7d45c279a7",
+  "q15_partial_line_denials",
+  "q25_primary_deductible",
+  "a_8663c777cd",
+  "f_cpt_share_of_line_payments__87798",
+  "q11_cpt_denial_rate",
+  "a_a123bba47f",
+  "a_9108c7aacb",
+  "a_856b95a70c",
+  "a_1b7e02d0b0",
+  "a_921f1bf366",
+  "q14_zero_paid_not_denied",
+  "a_dca9da6d52",
+  "q19_reversed_no_correction",
+  "f_cpt_share_of_line_payments__80307",
+  "a_d383370345",
+  "f_cpt_share_of_line_payments__g0482",
+  "a_0d43f7d4b6",
+  "a_923951a050",
+  "a_7423e6eb91",
+  "f_never_remitted_submitted_in_month__2026-07-01",
+  "a_ab202d4b23",
+  "f_cpt_share_of_line_payments__g0480",
+  "a_d671e0b995",
+  "f_cpt_share_of_line_payments__81479",
+  "q12_referring_provider_denials"
+ ],
+ "results": [
+  {
+   "qid": "f_cpt_share_of_line_payments__g0483",
+   "answer": [
+    [
+     0.04097450292769689
+    ]
+   ],
+   "final_sql": "SELECT sum(line_paid_amount) FILTER (WHERE procedure_code='G0483')/sum(line_paid_amount) AS share FROM sem.remit_lines WHERE is_current_adjudication",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0056,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "a_b853266803",
+   "answer": [
+    [
+     "blues",
+     12,
+     16.0,
+     19.0
+    ],
+    [
+     "commercial",
+     20,
+     14.0,
+     16.3
+    ],
+    [
+     "medicaid_mco",
+     1,
+     20.0,
+     20.0
+    ],
+    [
+     "medicare",
+     3,
+     18.0,
+     18.8
+    ],
+    [
+     "medicare_advantage",
+     9,
+     14.0,
+     19.2
+    ],
+    [
+     "other",
+     1,
+     -11.0,
+     -11.0
+    ]
+   ],
+   "final_sql": "SELECT p.pc,count(*),round(median(r.payment_date-p.fs),1),round(quantile_cont(r.payment_date-p.fs,0.9),1) FROM (SELECT claim_key,payer_key,any_value(payer_class) pc,min(submission_date) fs FROM sem.claims WHERE payer_responsibility='P' GROUP BY 1,2) p JOIN sem.remit_claims r USING(claim_key,payer_key) WHERE r.is_current_adjudication AND r.paid_amount>0 GROUP BY 1 ORDER BY 1",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0064,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "q10_top_denial_carcs",
+   "answer": [
+    [
+     "18",
+     4
+    ],
+    [
+     "11",
+     2
+    ],
+    [
+     "16",
+     2
+    ],
+    [
+     "22",
+     2
+    ],
+    [
+     "96",
+     2
+    ]
+   ],
+   "final_sql": "SELECT a.carc_code,count(DISTINCT (a.claim_key,a.payer_key)) FROM sem.adjustments a JOIN sem.remit_claims r USING(remit_claim_id) WHERE r.is_current_adjudication AND r.is_denied AND a.group_code='CO' AND a.is_denial_carc GROUP BY 1 ORDER BY 2 DESC,1 LIMIT 5",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0048,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "a_a5888f64a4",
+   "answer": [
+    [
+     "blues",
+     93,
+     85,
+     91.4
+    ],
+    [
+     "commercial",
+     139,
+     130,
+     93.53
+    ],
+    [
+     "medicaid",
+     16,
+     15,
+     93.75
+    ],
+    [
+     "medicaid_mco",
+     51,
+     50,
+     98.04
+    ],
+    [
+     "medicare",
+     110,
+     105,
+     95.45
+    ],
+    [
+     "medicare_advantage",
+     75,
+     73,
+     97.33
+    ],
+    [
+     "other",
+     10,
+     6,
+     60.0
+    ]
+   ],
+   "final_sql": "SELECT pc,count(*),count(*) FILTER (WHERE fp),round(100.0*count(*) FILTER (WHERE fp)/count(*),2) FROM (SELECT claim_key,payer_key,any_value(payer_class) pc,count(*)=1 AND bool_and(is_current_adjudication AND NOT is_denied) fp FROM sem.remit_claims GROUP BY 1,2) GROUP BY 1 ORDER BY 1",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0043,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "a_7d45c279a7",
+   "answer": [
+    [
+     "blues",
+     3,
+     2,
+     0,
+     180.33
+    ],
+    [
+     "commercial",
+     2,
+     0,
+     0,
+     84.34
+    ]
+   ],
+   "final_sql": "SELECT pc,count(*),sum(rv::INT),sum((NOT cu)::INT),round(coalesce(sum(p),0),2) FROM (SELECT claim_key,payer_key,any_value(payer_class) pc,count(DISTINCT check_or_eft_number) t,bool_or(is_reversal) rv,bool_or(is_current_adjudication) cu,sum(paid_amount) FILTER (WHERE is_current_adjudication) p FROM sem.remit_claims GROUP BY 1,2) WHERE t>=2 GROUP BY 1 ORDER BY 1",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0063,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "q15_partial_line_denials",
+   "answer": [
+    [
+     36
+    ]
+   ],
+   "final_sql": "SELECT count(*) FROM sem.remit_lines WHERE is_current_adjudication AND line_is_denied AND NOT claim_is_denied",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0019,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "q25_primary_deductible",
+   "answer": [
+    [
+     297.24
+    ]
+   ],
+   "final_sql": "SELECT round(coalesce(sum(a.adjustment_amount),0),2) FROM sem.adjustments a WHERE a.is_current_adjudication AND a.group_code='PR' AND a.carc_code='1' AND (a.claim_key,a.payer_key) IN (SELECT (claim_key,payer_key) FROM sem.claims WHERE payer_responsibility='P')",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0041,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "a_8663c777cd",
+   "answer": [
+    [
+     "2026-06",
+     114,
+     21,
+     18.4
+    ],
+    [
+     "2026-07",
+     377,
+     44,
+     11.7
+    ]
+   ],
+   "final_sql": "SELECT strftime(m,'%Y-%m'),sum(n),sum(n) FILTER (WHERE rk<=5),round(100.0*sum(n) FILTER (WHERE rk<=5)/sum(n),1) FROM (SELECT service_month m,referring_npi,count(*) n,row_number() OVER (PARTITION BY service_month ORDER BY count(*) DESC,referring_npi) rk FROM sem.claims WHERE is_latest_submission AND service_date_from>=DATE '2026-06-01' GROUP BY 1,2) GROUP BY m ORDER BY 1",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0041,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "f_cpt_share_of_line_payments__87798",
+   "answer": [
+    [
+     0.12018997558706353
+    ]
+   ],
+   "final_sql": "SELECT sum(line_paid_amount) FILTER (WHERE procedure_code='87798')/sum(line_paid_amount) AS share FROM sem.remit_lines WHERE is_current_adjudication",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.002,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "q11_cpt_denial_rate",
+   "answer": [
+    [
+     "36415",
+     26,
+     1,
+     0.038461538461538464
+    ],
+    [
+     "80053",
+     21,
+     0,
+     0.0
+    ],
+    [
+     "85025",
+     25,
+     0,
+     0.0
+    ]
+   ],
+   "final_sql": "SELECT procedure_code,count(*),sum(d::INT),avg(d::INT) FROM (SELECT DISTINCT l.procedure_code,r.claim_key,r.payer_key,r.is_denied d FROM sem.remit_claims r JOIN sem.claim_lines l ON l.claim_key=r.claim_key AND l.payer_key=r.payer_key AND l.is_latest_submission WHERE r.is_current_adjudication) GROUP BY 1 HAVING count(*)>=20 ORDER BY 4 DESC,1",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0058,
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
+  },
+  {
+   "qid": "a_a123bba47f",
+   "answer": [
+    [
+     "1",
+     8,
+     1,
+     12.5,
+     3805.44
+    ],
+    [
+     "2",
+     3,
+     0,
+     0.0,
+     0.0
+    ],
+    [
+     "3+",
+     40,
+     1,
+     2.5,
+     447.2
+    ]
+   ],
+   "final_sql": "SELECT b,count(*),sum(d::INT),round(100.0*avg(d::INT),2),coalesce(sum(ch) FILTER (WHERE d),0) FROM (SELECT CASE WHEN c.line_count>=3 THEN '3+' ELSE c.line_count::VARCHAR END b,c.charge_amount ch,r.is_denied d FROM sem.claims c JOIN sem.remit_claims r USING(claim_key,payer_key) WHERE c.is_latest_submission AND c.payer_responsibility='P' AND r.is_current_adjudication) GROUP BY 1 ORDER BY 1",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0053,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "a_9108c7aacb",
+   "answer": [
+    [
+     "007138800000042",
+     "2026-07-02",
+     217.61,
+     "2026-07-06",
+     4
+    ],
+    [
+     "790227000000006",
+     "2026-07-02",
+     14.58,
+     null,
+     null
+    ],
+    [
+     "007138800000043",
+     "2026-07-06",
+     157.11,
+     "2026-07-07",
+     1
+    ],
+    [
+     "957149190000052",
+     "2026-07-09",
+     85.52,
+     "2026-07-10",
+     1
+    ],
+    [
+     "174754440000012",
+     "2026-07-16",
+     44.92,
+     null,
+     null
+    ]
+   ],
+   "final_sql": "SELECT a.reference_id,a.payment_date,round(-a.provider_adjustment_amount,2),min(b.payment_date),min(b.payment_date)-a.payment_date FROM sem.provider_adjustments a LEFT JOIN sem.provider_adjustments b ON b.plb_reason_code='FB' AND b.payer_key=a.payer_key AND b.reference_id=a.reference_id AND b.provider_adjustment_amount=-a.provider_adjustment_amount AND b.payment_date>a.payment_date WHERE a.plb_reason_code='FB' AND a.provider_adjustment_amount<0 GROUP BY a.provider_adjustment_id,a.reference_id,a.payment_date,a.provider_adjustment_amount ORDER BY 2,1",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0043,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "a_856b95a70c",
+   "answer": [
+    [
+     "blues",
+     19.7,
+     null,
+     null
+    ],
+    [
+     "commercial",
+     27.2,
+     null,
+     null
+    ],
+    [
+     "medicaid",
+     2.4,
+     null,
+     null
+    ],
+    [
+     "medicaid_mco",
+     8.1,
+     null,
+     null
+    ],
+    [
+     "medicare",
+     25.3,
+     null,
+     null
+    ],
+    [
+     "medicare_advantage",
+     15.5,
+     null,
+     null
+    ],
+    [
+     "other",
+     1.8,
+     null,
+     null
+    ]
+   ],
+   "final_sql": "SELECT payer_class,round(js,1),round(as_,1),round(as_-js,1) FROM (SELECT payer_class,100*sum(paid_amount) FILTER (WHERE payment_month='2026-07-01')/sum(sum(paid_amount) FILTER (WHERE payment_month='2026-07-01')) OVER () js,100*sum(paid_amount) FILTER (WHERE payment_month='2026-08-01')/sum(sum(paid_amount) FILTER (WHERE payment_month='2026-08-01')) OVER () as_ FROM sem.remit_claims WHERE is_current_adjudication GROUP BY 1) ORDER BY 1",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0045,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "a_1b7e02d0b0",
+   "answer": [
+    [
+     10,
+     null,
+     1,
+     null,
+     34.64
+    ]
+   ],
+   "final_sql": "WITH c AS (SELECT claim_key,payer_key,min(submission_date) FILTER (WHERE frequency_code='1') o,min(submission_date) FILTER (WHERE frequency_code='7') r FROM sem.claims WHERE payer_responsibility='P' GROUP BY 1,2 HAVING r IS NOT NULL) SELECT count(*),round(avg(r-o),2),count(x.payment_date),round(avg(x.payment_date-o),2),sum(x.paid_amount) FROM c LEFT JOIN sem.remit_claims x ON x.claim_key=c.claim_key AND x.payer_key=c.payer_key AND x.is_current_adjudication AND x.payment_date>=c.r",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0056,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "a_921f1bf366",
+   "answer": [
+    [
+     0,
+     0,
+     0,
+     0.0
+    ]
+   ],
+   "final_sql": "WITH v AS (SELECT claim_key,min(submission_date) vd FROM sem.claims WHERE frequency_code='8' GROUP BY 1) SELECT count(DISTINCT v.claim_key),count(DISTINCT v.claim_key) FILTER (WHERE r.paid_amount>0 AND r.payment_date<v.vd),count(DISTINCT v.claim_key) FILTER (WHERE r.is_reversal AND r.payment_date>=v.vd),round(coalesce(sum(r.paid_amount) FILTER (WHERE r.is_current_adjudication),0),2) FROM v LEFT JOIN sem.remit_claims r USING(claim_key)",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0053,
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
+  },
+  {
+   "qid": "q14_zero_paid_not_denied",
+   "answer": [
+    [
+     46
+    ]
+   ],
+   "final_sql": "SELECT count(*) FROM sem.remit_claims WHERE is_current_adjudication AND paid_amount=0 AND NOT is_denied",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0019,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "a_dca9da6d52",
+   "answer": [
+    [
+     "medicare_advantage",
+     1,
+     19.0,
+     19,
+     19
+    ]
+   ],
+   "final_sql": "SELECT pc,count(*),round(avg(dd),1),min(dd),max(dd) FROM (SELECT c.pc,min(r.payment_date)-c.rd dd FROM (SELECT claim_key,payer_key,any_value(payer_class) pc,min(submission_date) rd FROM sem.claims WHERE frequency_code='7' GROUP BY 1,2) c JOIN sem.remit_claims r USING(claim_key,payer_key) WHERE r.payment_date>=c.rd GROUP BY c.claim_key,c.payer_key,c.pc,c.rd) GROUP BY 1 ORDER BY 1",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0067,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "q19_reversed_no_correction",
+   "answer": [
+    [
+     2
+    ]
+   ],
+   "final_sql": "SELECT count(*) FROM (SELECT 1 FROM sem.remit_claims GROUP BY claim_key,payer_key HAVING bool_or(is_reversal) AND NOT bool_or(is_current_adjudication))",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0025,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "f_cpt_share_of_line_payments__80307",
+   "answer": [
+    [
+     0.06165083757666042
+    ]
+   ],
+   "final_sql": "SELECT sum(line_paid_amount) FILTER (WHERE procedure_code='80307')/sum(line_paid_amount) AS share FROM sem.remit_lines WHERE is_current_adjudication",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0022,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "a_d383370345",
+   "answer": [
+    [
+     "blues",
+     83,
+     2,
+     2.4
+    ],
+    [
+     "commercial",
+     154,
+     11,
+     7.1
+    ],
+    [
+     "medicaid",
+     11,
+     0,
+     0.0
+    ],
+    [
+     "medicaid_mco",
+     53,
+     0,
+     0.0
+    ],
+    [
+     "medicare",
+     100,
+     0,
+     0.0
+    ],
+    [
+     "medicare_advantage",
+     73,
+     5,
+     6.8
+    ],
+    [
+     "other",
+     13,
+     1,
+     7.7
+    ]
+   ],
+   "final_sql": "SELECT pc,count(*),count(*) FILTER (WHERE fr-fs<=14),round(100.0*count(*) FILTER (WHERE fr-fs<=14)/count(*),1) FROM (SELECT p.*,(SELECT min(payment_date) FROM sem.remit_claims r WHERE r.claim_key=p.claim_key AND r.payer_key=p.payer_key) fr FROM (SELECT claim_key,payer_key,any_value(payer_class) pc,min(submission_date) fs FROM sem.claims WHERE payer_responsibility='P' GROUP BY 1,2) p WHERE fs BETWEEN '2026-07-01' AND '2026-07-31') GROUP BY 1 ORDER BY 1",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0084,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "f_cpt_share_of_line_payments__g0482",
+   "answer": [
+    [
+     0.0628341537246295
+    ]
+   ],
+   "final_sql": "SELECT sum(line_paid_amount) FILTER (WHERE procedure_code='G0482')/sum(line_paid_amount) AS share FROM sem.remit_lines WHERE is_current_adjudication",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0023,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "a_0d43f7d4b6",
+   "answer": [
+    [
+     "no remit since correction",
+     1,
+     0.0
+    ]
+   ],
+   "final_sql": "SELECT CASE WHEN NOT af THEN 'no remit since correction' WHEN ok THEN 'overturned' ELSE 'denied again' END o,count(*),round(sum(p),2) FROM (SELECT c.claim_key,bool_or(r.claim_status_code='4' AND r.payment_date<c.rd) dn,bool_or(r.payment_date>=c.rd) af,bool_or(r.is_current_adjudication AND NOT r.is_denied) ok,coalesce(sum(r.paid_amount) FILTER (WHERE r.is_current_adjudication),0) p FROM (SELECT claim_key,payer_key,any_value(payer_class) pc,min(submission_date) rd FROM sem.claims WHERE frequency_code='7' GROUP BY 1,2) c JOIN sem.remit_claims r USING(claim_key,payer_key) GROUP BY c.claim_key,c.payer_key) WHERE dn GROUP BY 1 ORDER BY 1",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0072,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "a_923951a050",
+   "answer": [
+    [
+     2,
+     118.91
+    ]
+   ],
+   "final_sql": "SELECT count(*),coalesce(round(sum(p),2),0) FROM (SELECT claim_key,payer_key,sum(paid_amount) FILTER (WHERE is_current_adjudication) p FROM sem.remit_claims GROUP BY 1,2 HAVING bool_or(NOT is_current_adjudication AND NOT is_reversal AND is_denied) AND bool_or(is_current_adjudication AND NOT is_denied))",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0027,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "a_7423e6eb91",
+   "answer": [
+    [
+     "15-29",
+     102,
+     52399.08
+    ],
+    [
+     "30+",
+     334,
+     170145.57
+    ]
+   ],
+   "final_sql": "SELECT CASE WHEN age<=14 THEN '0-14' WHEN age<=29 THEN '15-29' ELSE '30+' END,count(*),sum(ch) FROM (SELECT DATE '2026-08-14'-p.fs age,l.charge_amount ch FROM (SELECT claim_key,payer_key,any_value(payer_class) pc,min(submission_date) fs FROM sem.claims WHERE payer_responsibility='P' GROUP BY 1,2) p JOIN sem.claims l ON l.claim_key=p.claim_key AND l.payer_key=p.payer_key AND l.is_latest_submission WHERE l.frequency_code<>'8' AND NOT EXISTS (SELECT 1 FROM sem.remit_claims r WHERE r.claim_key=p.claim_key AND r.payer_key=p.payer_key AND r.is_current_adjudication)) GROUP BY 1 ORDER BY 1",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0107,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "f_never_remitted_submitted_in_month__2026-07-01",
+   "answer": [
+    [
+     441
+    ]
+   ],
+   "final_sql": "SELECT count(*) FROM (SELECT claim_key FROM sem.claims GROUP BY 1 HAVING min(submission_date) BETWEEN '2026-07-01' AND '2026-07-31') c WHERE NOT EXISTS (SELECT 1 FROM sem.remit_claims r WHERE r.claim_key=c.claim_key)",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0059,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "a_ab202d4b23",
+   "answer": [
+    [
+     "Unitedhealthcare",
+     4,
+     75.67
+    ],
+    [
+     "Cigna",
+     3,
+     65.29
+    ],
+    [
+     "Healthy Blue North Carolina",
+     4,
+     23.36
+    ],
+    [
+     "Aetna",
+     1,
+     17.95
+    ],
+    [
+     "Wellcare Of North Carolina",
+     3,
+     13.1
+    ],
+    [
+     "Blue Cross Blue Shield Of North Carolina",
+     6,
+     12.17
+    ],
+    [
+     "Medicare Part B North Carolina",
+     1,
+     0.31
+    ],
+    [
+     "Aetna Medicare",
+     0,
+     0.0
+    ],
+    [
+     "Alignment Health Plan",
+     0,
+     0.0
+    ],
+    [
+     "Amerihealth Caritas North Carolina",
+     0,
+     0.0
+    ],
+    [
+     "Ashcroft Tpa",
+     0,
+     0.0
+    ],
+    [
+     "Bcbs Federal Employee Program Nc",
+     0,
+     0.0
+    ],
+    [
+     "Blackstone Employer Services",
+     0,
+     0.0
+    ],
+    [
+     "Carolina Complete Health",
+     0,
+     0.0
+    ],
+    [
+     "Cigna Healthspring",
+     0,
+     0.0
+    ],
+    [
+     "Coastal Carolina Food And Commercial Workers Health Fund",
+     0,
+     0.0
+    ],
+    [
+     "Crestview Employer Services",
+     0,
+     0.0
+    ],
+    [
+     "Cromwell Claims Administration",
+     0,
+     0.0
+    ],
+    [
+     "Devoted Health",
+     0,
+     0.0
+    ],
+    [
+     "Everly Plan Administrators",
+     0,
+     0.0
+    ],
+    [
+     "Garrison Health Services",
+     0,
+     0.0
+    ],
+    [
+     "Humana",
+     0,
+     0.0
+    ],
+    [
+     "Humana Medicare Advantage",
+     0,
+     0.0
+    ],
+    [
+     "Lake Norman Farm Bureau Health Plan",
+     0,
+     0.0
+    ],
+    [
+     "Lancaster Employer Services",
+     0,
+     0.0
+    ],
+    [
+     "Meritain Health",
+     0,
+     0.0
+    ],
+    [
+     "Nc Medicaid",
+     0,
+     0.0
+    ],
+    [
+     "Oscar Health",
+     0,
+     0.0
+    ],
+    [
+     "Palmetto Employee Benefit Trust",
+     0,
+     0.0
+    ],
+    [
+     "Pamlico Teachers Health Fund",
+     0,
+     0.0
+    ],
+    [
+     "Tar Heel Health Cooperative",
+     0,
+     0.0
+    ],
+    [
+     "Tricare East Region",
+     0,
+     0.0
+    ],
+    [
+     "Umr",
+     0,
+     0.0
+    ],
+    [
+     "Unitedhealthcare Community Plan Nc",
+     0,
+     0.0
+    ],
+    [
+     "Unitedhealthcare Medicare Advantage",
+     0,
+     0.0
+    ],
+    [
+     "Uwharrie Carpenters Health Trust",
+     0,
+     0.0
+    ],
+    [
+     "Uwharrie Health Alliance",
+     0,
+     0.0
+    ],
+    [
+     "Va Community Care Network",
+     0,
+     0.0
+    ],
+    [
+     "Wellcare Medicare",
+     0,
+     0.0
+    ]
+   ],
+   "final_sql": "WITH l AS (SELECT payer_name,procedure_code,line_allowed_amount a FROM sem.remit_lines WHERE is_current_adjudication AND NOT line_is_denied AND units_paid=1 AND line_allowed_amount>0), t AS (SELECT payer_name,procedure_code,a ty FROM (SELECT payer_name,procedure_code,a,count(*) c FROM l GROUP BY 1,2,3) QUALIFY row_number() OVER (PARTITION BY payer_name,procedure_code ORDER BY c DESC,a DESC)=1) SELECT payer_name,count(*) FILTER (WHERE a<ty),round(coalesce(sum(ty-a) FILTER (WHERE a<ty),0),2) FROM l JOIN t USING(payer_name,procedure_code) GROUP BY 1 ORDER BY 3 DESC,1",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0074,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "f_cpt_share_of_line_payments__g0480",
+   "answer": [
+    [
+     0.043294085318927665
+    ]
+   ],
+   "final_sql": "SELECT sum(line_paid_amount) FILTER (WHERE procedure_code='G0480')/sum(line_paid_amount) AS share FROM sem.remit_lines WHERE is_current_adjudication",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0019,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "a_d671e0b995",
+   "answer": [
+    [
+     "blues",
+     "2026-07",
+     93,
+     4,
+     4.3,
+     null
+    ],
+    [
+     "commercial",
+     "2026-07",
+     139,
+     7,
+     5.04,
+     null
+    ],
+    [
+     "medicaid",
+     "2026-07",
+     16,
+     1,
+     6.25,
+     null
+    ],
+    [
+     "medicaid_mco",
+     "2026-07",
+     51,
+     1,
+     1.96,
+     null
+    ],
+    [
+     "medicare",
+     "2026-07",
+     109,
+     4,
+     3.67,
+     null
+    ],
+    [
+     "medicare_advantage",
+     "2026-07",
+     74,
+     1,
+     1.35,
+     null
+    ],
+    [
+     "other",
+     "2026-07",
+     10,
+     3,
+     30.0,
+     null
+    ]
+   ],
+   "final_sql": "SELECT payer_class,mo,n,d,round(r,2),round(r-lag(r) OVER (PARTITION BY payer_class ORDER BY mo),2) FROM (SELECT payer_class,strftime(payment_month,'%Y-%m') mo,count(*) n,sum(is_denied::INT) d,100.0*avg(is_denied::INT) r FROM sem.remit_claims WHERE is_current_adjudication GROUP BY 1,2) ORDER BY 1,2",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0043,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "f_cpt_share_of_line_payments__81479",
+   "answer": [
+    [
+     0.04446547332204136
+    ]
+   ],
+   "final_sql": "SELECT sum(line_paid_amount) FILTER (WHERE procedure_code='81479')/sum(line_paid_amount) AS share FROM sem.remit_lines WHERE is_current_adjudication",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0019,
+   "pass": true,
+   "why": "ok"
+  },
+  {
+   "qid": "q12_referring_provider_denials",
+   "answer": [],
+   "final_sql": "SELECT c.referring_npi,count(*),sum(r.is_denied::INT),avg(r.is_denied::INT) FROM (SELECT DISTINCT claim_key,payer_key,referring_npi FROM sem.claims WHERE payer_responsibility='P') c JOIN sem.remit_claims r USING(claim_key,payer_key) WHERE r.is_current_adjudication GROUP BY 1 HAVING count(*)>=15 ORDER BY 4 DESC,1 LIMIT 5",
+   "sql_execs": 3,
+   "repairs": 0,
+   "seconds": 0.0047,
+   "pass": true,
+   "why": "ok"
+  }
+ ],
+ "accuracy": "28/30",
+ "n": 30,
+ "mean_sql_execs": 3.0,
+ "notes": "Single agent. Explore pass (same 10 probes as listed in H093: state/reversal flags, PLB ranges, payment months only 2026-07, claim_lines paid nulls, units_paid, payer_sequence vs payer_responsibility coverage, PR CARCs, denial flags). Wrote a structured metric spec per question (metric, population, filters, grain, window, ties, rounding; stored in the agent's scratch), then three different SQL translations of the spec, all executed, majority chosen. Repair: none needed (one candidate error on a_1b7e02d0b0 lost the vote; majority of 2 stood). Verifier critic reviewed minority candidates (q25 payer_sequence; q11 835-line CPT; q14 signal-flag variant counting 67; a_921f1bf366 null-vs-0) and kept majorities. Assumptions: primary = claims payer_responsibility='P'; billed CPT = latest-submission claim_lines; share as fraction unrounded. 2/3-agreement: q25_primary_deductible:2/3, q11_cpt_denial_rate:2/3, a_1b7e02d0b0:2/3, a_921f1bf366:2/3, q14_zero_paid_not_denied:2/3, a_ab202d4b23:2/3. Answers committed before scoring. Scored with bench.compare.match after answers were committed. Failures: 2.",
+ "n_pass": 28
+}
