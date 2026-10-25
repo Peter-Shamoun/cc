@@ -64,7 +64,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0124,
-   "trace": "fewshot (TF-IDF, non-dev, other family): f_payer_class_denial_rate__medicare,f_payer_class_denial_rate__commercial,f_cpt_denied_lines__80053; candidates: A=1r, B=1r, C=1r; agree=3; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): f_payer_class_denial_rate__medicare,f_payer_class_denial_rate__commercial,f_cpt_denied_lines__80053; candidates: A=1r, B=1r, C=1r; agree=3; pick=B",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_b853266803",
@@ -118,7 +120,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0138,
-   "trace": "fewshot (TF-IDF, non-dev, other family): a_f786e11aec,q22_days_to_first_remit,a_88c4640755; candidates: A=6r, B=errr, C=6r; agree=2; pick=A"
+   "trace": "fewshot (TF-IDF, non-dev, other family): a_f786e11aec,q22_days_to_first_remit,a_88c4640755; candidates: A=6r, B=errr, C=6r; agree=2; pick=A",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -154,7 +158,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0154,
-   "trace": "fewshot (TF-IDF, non-dev, other family): a_436f690741,a_f494340e13,q08_denial_rate_by_payer; candidates: A=5r, B=5r, C=5r; agree=3; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): a_436f690741,a_f494340e13,q08_denial_rate_by_payer; candidates: A=5r, B=5r, C=5r; agree=3; pick=B",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_a5888f64a4",
@@ -214,7 +220,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.022,
-   "trace": "fewshot (TF-IDF, non-dev, other family): a_436f690741,q22_days_to_first_remit,f_payer_days_to_first_remit__blue-cross-blue-shield-of-north-carolina; candidates: A=7r, B=7r, C=7r; agree=3; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): a_436f690741,q22_days_to_first_remit,f_payer_days_to_first_remit__blue-cross-blue-shield-of-north-carolina; candidates: A=7r, B=7r, C=7r; agree=3; pick=B",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7d45c279a7",
@@ -247,7 +255,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0195,
-   "trace": "fewshot (TF-IDF, non-dev, other family): a_e83408d6a2,q01_claims_submitted,a_436f690741; candidates: A=2r, B=2r, C=2r; agree=3; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): a_e83408d6a2,q01_claims_submitted,a_436f690741; candidates: A=2r, B=2r, C=2r; agree=3; pick=B",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q15_partial_line_denials",
@@ -265,7 +275,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0097,
-   "trace": "fewshot (TF-IDF, non-dev, other family): q07_denial_rate,f_cpt_denied_lines__36415,f_cpt_denied_lines__80053; candidates: A=1r, B=1r, C=1r; agree=3; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): q07_denial_rate,f_cpt_denied_lines__36415,f_cpt_denied_lines__80053; candidates: A=1r, B=1r, C=1r; agree=3; pick=B",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q25_primary_deductible",
@@ -283,7 +295,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0104,
-   "trace": "fewshot (TF-IDF, non-dev, other family): q24_primary_patient_responsibility,a_553c1034d1,a_436f690741; candidates: A=1r, B=1r, C=1r; agree=2; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): q24_primary_patient_responsibility,a_553c1034d1,a_436f690741; candidates: A=1r, B=1r, C=1r; agree=2; pick=B",
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_8663c777cd",
@@ -294,7 +308,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0009,
-   "trace": "fewshot (TF-IDF, non-dev, other family): a_54dd76175a,q04_paid_by_month,a_837ce03435; candidates: A=errr, B=errr, C=errr; agree=0; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): a_54dd76175a,q04_paid_by_month,a_837ce03435; candidates: A=errr, B=errr, C=errr; agree=0; pick=B",
+   "pass": false,
+   "why": "final SQL fails: Parser Error: syntax error at or near \"month\"\n\nLINE 6: SELECT strftime(m,'%Y-%m') month, total total_claims, t5 top5_cla"
   },
   {
    "qid": "f_cpt_share_of_line_payments__87798",
@@ -312,7 +328,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0062,
-   "trace": "fewshot (TF-IDF, non-dev, other family): f_cpt_denied_lines__80053,a_f3c42ce766,a_f494340e13; candidates: A=1r, B=1r, C=1r; agree=3; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): f_cpt_denied_lines__80053,a_f3c42ce766,a_f494340e13; candidates: A=1r, B=1r, C=1r; agree=3; pick=B",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q11_cpt_denial_rate",
@@ -348,7 +366,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0141,
-   "trace": "fewshot (TF-IDF, non-dev, other family): q13_principal_dx_denials,f_cpt_denied_lines__80053,a_a23ce7f1de; candidates: A=3r, B=3r, C=28r; agree=2; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): q13_principal_dx_denials,f_cpt_denied_lines__80053,a_a23ce7f1de; candidates: A=3r, B=3r, C=28r; agree=2; pick=B",
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_a123bba47f",
@@ -388,7 +408,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0139,
-   "trace": "fewshot (TF-IDF, non-dev, other family): a_9a40343e18,a_5059b5e0e6,a_f3c42ce766; candidates: A=3r, B=3r, C=3r; agree=3; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): a_9a40343e18,a_5059b5e0e6,a_f3c42ce766; candidates: A=3r, B=3r, C=3r; agree=3; pick=B",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_9108c7aacb",
@@ -399,7 +421,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0009,
-   "trace": "fewshot (TF-IDF, non-dev, other family): a_b541bf06a1,a_88c4640755,a_f786e11aec; candidates: A=errr, B=errr, C=errr; agree=0; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): a_b541bf06a1,a_88c4640755,a_f786e11aec; candidates: A=errr, B=errr, C=errr; agree=0; pick=B",
+   "pass": false,
+   "why": "final SQL fails: Parser Error: syntax error at or near \"days\"\n\nLINE 4: ...,2) amount, od offset_date, date_diff('day',payment_date,od) da"
   },
   {
    "qid": "a_856b95a70c",
@@ -459,7 +483,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0109,
-   "trace": "fewshot (TF-IDF, non-dev, other family): a_477b034f58,f_payer_paid_in_month__unitedhealthcare_2026-07-01,f_claims_first_submitted_in_month__2026-07-01; candidates: A=7r, B=errr, C=7r; agree=1; pick=A"
+   "trace": "fewshot (TF-IDF, non-dev, other family): a_477b034f58,f_payer_paid_in_month__unitedhealthcare_2026-07-01,f_claims_first_submitted_in_month__2026-07-01; candidates: A=7r, B=errr, C=7r; agree=1; pick=A",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_1b7e02d0b0",
@@ -485,7 +511,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.021,
-   "trace": "fewshot (TF-IDF, non-dev, other family): a_88c4640755,a_fca405b635,q17_resubmitted; candidates: A=1r, B=1r, C=1r; agree=3; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): a_88c4640755,a_fca405b635,q17_resubmitted; candidates: A=1r, B=1r, C=1r; agree=3; pick=B",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_921f1bf366",
@@ -509,7 +537,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0163,
-   "trace": "fewshot (TF-IDF, non-dev, other family): q18_voided,a_f786e11aec,a_f3c42ce766; candidates: A=1r, B=1r, C=1r; agree=3; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): q18_voided,a_f786e11aec,a_f3c42ce766; candidates: A=1r, B=1r, C=1r; agree=3; pick=B",
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "q14_zero_paid_not_denied",
@@ -527,7 +557,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0066,
-   "trace": "fewshot (TF-IDF, non-dev, other family): q09_denials_by_type,f_payer_class_denial_rate__medicare,f_payer_class_denial_rate__commercial; candidates: A=1r, B=1r, C=1r; agree=3; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): q09_denials_by_type,f_payer_class_denial_rate__medicare,f_payer_class_denial_rate__commercial; candidates: A=1r, B=1r, C=1r; agree=3; pick=B",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_dca9da6d52",
@@ -553,7 +585,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0089,
-   "trace": "fewshot (TF-IDF, non-dev, other family): a_88c4640755,a_fca405b635,q17_resubmitted; candidates: A=errr, B=errr, C=1r; agree=1; pick=C"
+   "trace": "fewshot (TF-IDF, non-dev, other family): a_88c4640755,a_fca405b635,q17_resubmitted; candidates: A=errr, B=errr, C=1r; agree=1; pick=C",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q19_reversed_no_correction",
@@ -571,7 +605,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0104,
-   "trace": "fewshot (TF-IDF, non-dev, other family): a_436f690741,a_2149838506,a_88c4640755; candidates: A=1r, B=1r, C=1r; agree=3; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): a_436f690741,a_2149838506,a_88c4640755; candidates: A=1r, B=1r, C=1r; agree=3; pick=B",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__80307",
@@ -589,7 +625,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0075,
-   "trace": "fewshot (TF-IDF, non-dev, other family): f_cpt_denied_lines__80053,a_f3c42ce766,a_f494340e13; candidates: A=1r, B=1r, C=1r; agree=3; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): f_cpt_denied_lines__80053,a_f3c42ce766,a_f494340e13; candidates: A=1r, B=1r, C=1r; agree=3; pick=B",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d383370345",
@@ -649,7 +687,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.025,
-   "trace": "fewshot (TF-IDF, non-dev, other family): a_f786e11aec,q22_days_to_first_remit,a_9a40343e18; candidates: A=7r, B=7r, C=7r; agree=3; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): a_f786e11aec,q22_days_to_first_remit,a_9a40343e18; candidates: A=7r, B=7r, C=7r; agree=3; pick=B",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0482",
@@ -667,7 +707,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0069,
-   "trace": "fewshot (TF-IDF, non-dev, other family): f_payer_class_denial_rate__medicare,f_payer_class_denial_rate__commercial,f_cpt_denied_lines__80053; candidates: A=1r, B=1r, C=1r; agree=3; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): f_payer_class_denial_rate__medicare,f_payer_class_denial_rate__commercial,f_cpt_denied_lines__80053; candidates: A=1r, B=1r, C=1r; agree=3; pick=B",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_0d43f7d4b6",
@@ -689,7 +731,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0232,
-   "trace": "fewshot (TF-IDF, non-dev, other family): a_88c4640755,q17_resubmitted,a_fca405b635; candidates: A=1r, B=1r, C=1r; agree=3; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): a_88c4640755,q17_resubmitted,a_fca405b635; candidates: A=1r, B=1r, C=1r; agree=3; pick=B",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_923951a050",
@@ -709,7 +753,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0104,
-   "trace": "fewshot (TF-IDF, non-dev, other family): a_436f690741,q16_denied_charges_by_payer,a_b541bf06a1; candidates: A=1r, B=1r, C=1r; agree=3; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): a_436f690741,q16_denied_charges_by_payer,a_b541bf06a1; candidates: A=1r, B=1r, C=1r; agree=3; pick=B",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7423e6eb91",
@@ -736,7 +782,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0236,
-   "trace": "fewshot (TF-IDF, non-dev, other family): a_9a40343e18,a_f786e11aec,q22_days_to_first_remit; candidates: A=2r, B=2r, C=2r; agree=3; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): a_9a40343e18,a_f786e11aec,q22_days_to_first_remit; candidates: A=2r, B=2r, C=2r; agree=3; pick=B",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_never_remitted_submitted_in_month__2026-07-01",
@@ -754,7 +802,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0116,
-   "trace": "fewshot (TF-IDF, non-dev, other family): q20_never_remitted,f_claims_first_submitted_in_month__2026-07-01,q01_claims_submitted; candidates: A=1r, B=1r, C=1r; agree=3; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): q20_never_remitted,f_claims_first_submitted_in_month__2026-07-01,q01_claims_submitted; candidates: A=1r, B=1r, C=1r; agree=3; pick=B",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_ab202d4b23",
@@ -966,7 +1016,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0194,
-   "trace": "fewshot (TF-IDF, non-dev, other family): a_a23ce7f1de,a_f494340e13,a_439d7186d8; candidates: A=39r, B=39r, C=39r; agree=3; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): a_a23ce7f1de,a_f494340e13,a_439d7186d8; candidates: A=39r, B=39r, C=39r; agree=3; pick=B",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0480",
@@ -984,7 +1036,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0061,
-   "trace": "fewshot (TF-IDF, non-dev, other family): f_cpt_denied_lines__80053,a_f3c42ce766,a_f494340e13; candidates: A=1r, B=1r, C=1r; agree=3; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): f_cpt_denied_lines__80053,a_f3c42ce766,a_f494340e13; candidates: A=1r, B=1r, C=1r; agree=3; pick=B",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d671e0b995",
@@ -995,7 +1049,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0009,
-   "trace": "fewshot (TF-IDF, non-dev, other family): a_54dd76175a,a_837ce03435,q04_paid_by_month; candidates: A=errr, B=errr, C=errr; agree=0; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): a_54dd76175a,a_837ce03435,q04_paid_by_month; candidates: A=errr, B=errr, C=errr; agree=0; pick=B",
+   "pass": false,
+   "why": "final SQL fails: Parser Error: syntax error at or near \"month\"\n\nLINE 4: SELECT payer_class, strftime(mo,'%Y-%m') month, n current_adjudic"
   },
   {
    "qid": "f_cpt_share_of_line_payments__81479",
@@ -1013,7 +1069,9 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0061,
-   "trace": "fewshot (TF-IDF, non-dev, other family): f_payer_class_denial_rate__medicare,f_payer_class_denial_rate__commercial,f_cpt_denied_lines__80053; candidates: A=1r, B=1r, C=1r; agree=3; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): f_payer_class_denial_rate__medicare,f_payer_class_denial_rate__commercial,f_cpt_denied_lines__80053; candidates: A=1r, B=1r, C=1r; agree=3; pick=B",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q12_referring_provider_denials",
@@ -1029,9 +1087,22 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0121,
-   "trace": "fewshot (TF-IDF, non-dev, other family): q13_principal_dx_denials,a_9a40343e18,a_5059b5e0e6; candidates: A=0r, B=0r, C=0r; agree=0; pick=B"
+   "trace": "fewshot (TF-IDF, non-dev, other family): q13_principal_dx_denials,a_9a40343e18,a_5059b5e0e6; candidates: A=0r, B=0r, C=0r; agree=0; pick=B",
+   "pass": true,
+   "why": "ok"
   }
  ],
  "n": 30,
- "mean_sql_execs": 3.0
+ "mean_sql_execs": 3.0,
+ "accuracy": "24/30",
+ "n_pass": 24,
+ "failures": [
+  "q25_primary_deductible",
+  "a_8663c777cd",
+  "q11_cpt_denial_rate",
+  "a_9108c7aacb",
+  "a_921f1bf366",
+  "a_d671e0b995"
+ ],
+ "notes": "Scored with bench.compare.match (deterministic, gold SQL on snapshot) after answers were committed. Failures: 6."
 }

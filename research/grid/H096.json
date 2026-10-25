@@ -64,7 +64,9 @@
    "sql_execs": 6,
    "repairs": 0,
    "seconds": 0.0173,
-   "trace": "explore: 3 probes; fewshot (TF-IDF, non-dev, other family): f_payer_class_denial_rate__medicare,f_payer_class_denial_rate__commercial,f_cpt_denied_lines__80053; spec: metric/population/filters/grain/time/ties: CPT G0483 accounts for what fraction of total paid dollars across current service lines?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+   "trace": "explore: 3 probes; fewshot (TF-IDF, non-dev, other family): f_payer_class_denial_rate__medicare,f_payer_class_denial_rate__commercial,f_cpt_denied_lines__80053; spec: metric/population/filters/grain/time/ties: CPT G0483 accounts for what fraction of total paid dollars across current service lines?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_b853266803",
@@ -118,7 +120,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0237,
-   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_f786e11aec,q22_days_to_first_remit,a_88c4640755; spec: metric/population/filters/grain/time/ties: Days-to-pay by payer class: for each claim's primary payer (payer_responsibility = 'P'), take the current adjudicatio; candidates: A=6r, B=errr, C=6r; agree=2; pick=C; verifier: ok"
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_f786e11aec,q22_days_to_first_remit,a_88c4640755; spec: metric/population/filters/grain/time/ties: Days-to-pay by payer class: for each claim's primary payer (payer_responsibility = 'P'), take the current adjudicatio; candidates: A=6r, B=errr, C=6r; agree=2; pick=C; verifier: ok",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -154,7 +158,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.022,
-   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_436f690741,a_f494340e13,q08_denial_rate_by_payer; spec: metric/population/filters/grain/time/ties: Which 5 denial reason codes (CARCs) appear on the most denied claims? Only count reviewed denial reasons under group ; candidates: A=5r, B=5r, C=5r; agree=3; pick=C; verifier: ok"
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_436f690741,a_f494340e13,q08_denial_rate_by_payer; spec: metric/population/filters/grain/time/ties: Which 5 denial reason codes (CARCs) appear on the most denied claims? Only count reviewed denial reasons under group ; candidates: A=5r, B=5r, C=5r; agree=3; pick=C; verifier: ok",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_a5888f64a4",
@@ -214,7 +220,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0317,
-   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_436f690741,q22_days_to_first_remit,f_payer_days_to_first_remit__blue-cross-blue-shield-of-north-carolina; spec: metric/population/filters/grain/time/ties: What is our first-pass resolution rate by payer class? Among all claim+payer pairs that have received at least one 83; candidates: A=7r, B=7r, C=7r; agree=3; pick=C; verifier: ok"
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_436f690741,q22_days_to_first_remit,f_payer_days_to_first_remit__blue-cross-blue-shield-of-north-carolina; spec: metric/population/filters/grain/time/ties: What is our first-pass resolution rate by payer class? Among all claim+payer pairs that have received at least one 83; candidates: A=7r, B=7r, C=7r; agree=3; pick=C; verifier: ok",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7d45c279a7",
@@ -247,7 +255,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0275,
-   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_e83408d6a2,q01_claims_submitted,a_436f690741; spec: metric/population/filters/grain/time/ties: Some claims are adjudicated by the same payer across more than one 835 payment (different check/EFT trace numbers). B; candidates: A=2r, B=2r, C=2r; agree=3; pick=C; verifier: ok"
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_e83408d6a2,q01_claims_submitted,a_436f690741; spec: metric/population/filters/grain/time/ties: Some claims are adjudicated by the same payer across more than one 835 payment (different check/EFT trace numbers). B; candidates: A=2r, B=2r, C=2r; agree=3; pick=C; verifier: ok",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q15_partial_line_denials",
@@ -265,7 +275,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0159,
-   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): q07_denial_rate,f_cpt_denied_lines__36415,f_cpt_denied_lines__80053; spec: metric/population/filters/grain/time/ties: How many service lines were denied on claims whose current adjudication is not a denial overall (partial denials)?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): q07_denial_rate,f_cpt_denied_lines__36415,f_cpt_denied_lines__80053; spec: metric/population/filters/grain/time/ties: How many service lines were denied on claims whose current adjudication is not a denial overall (partial denials)?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q25_primary_deductible",
@@ -283,7 +295,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0178,
-   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): q24_primary_patient_responsibility,a_553c1034d1,a_436f690741; spec: metric/population/filters/grain/time/ties: What is the total deductible (adjustment group PR, reason code 1) assigned by primary payers on current adjudications; candidates: A=1r, B=1r, C=1r; agree=2; pick=A; verifier: ok"
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): q24_primary_patient_responsibility,a_553c1034d1,a_436f690741; spec: metric/population/filters/grain/time/ties: What is the total deductible (adjustment group PR, reason code 1) assigned by primary payers on current adjudications; candidates: A=1r, B=1r, C=1r; agree=2; pick=A; verifier: ok",
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_8663c777cd",
@@ -294,7 +308,9 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.01,
-   "trace": "explore: 5 probes; fewshot (TF-IDF, non-dev, other family): a_54dd76175a,q04_paid_by_month,a_837ce03435; spec: metric/population/filters/grain/time/ties: How concentrated is our ordering-provider volume month to month? For each service month from June 2026 onward (servic; candidates: A=errr, B=errr, C=errr; agree=0; pick=C"
+   "trace": "explore: 5 probes; fewshot (TF-IDF, non-dev, other family): a_54dd76175a,q04_paid_by_month,a_837ce03435; spec: metric/population/filters/grain/time/ties: How concentrated is our ordering-provider volume month to month? For each service month from June 2026 onward (servic; candidates: A=errr, B=errr, C=errr; agree=0; pick=C",
+   "pass": false,
+   "why": "final SQL fails: Parser Error: syntax error at or near \"month\"\n\nLINE 1: SELECT strftime(m,'%Y-%m') month, sum(n) total_claims, sum(CASE W"
   },
   {
    "qid": "f_cpt_share_of_line_payments__87798",
@@ -312,7 +328,9 @@
    "sql_execs": 6,
    "repairs": 0,
    "seconds": 0.0135,
-   "trace": "explore: 3 probes; fewshot (TF-IDF, non-dev, other family): f_cpt_denied_lines__80053,a_f3c42ce766,a_f494340e13; spec: metric/population/filters/grain/time/ties: What share of all service-line payments (current adjudications) came from lines billed as CPT 87798?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+   "trace": "explore: 3 probes; fewshot (TF-IDF, non-dev, other family): f_cpt_denied_lines__80053,a_f3c42ce766,a_f494340e13; spec: metric/population/filters/grain/time/ties: What share of all service-line payments (current adjudications) came from lines billed as CPT 87798?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q11_cpt_denial_rate",
@@ -348,7 +366,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0209,
-   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): q13_principal_dx_denials,f_cpt_denied_lines__80053,a_a23ce7f1de; spec: metric/population/filters/grain/time/ties: What is the denial rate by CPT code billed, among CPT codes on at least 20 claim+payer current adjudications? A claim; candidates: A=3r, B=3r, C=28r; agree=2; pick=A; verifier: ok"
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): q13_principal_dx_denials,f_cpt_denied_lines__80053,a_a23ce7f1de; spec: metric/population/filters/grain/time/ties: What is the denial rate by CPT code billed, among CPT codes on at least 20 claim+payer current adjudications? A claim; candidates: A=3r, B=3r, C=28r; agree=2; pick=A; verifier: ok",
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_a123bba47f",
@@ -388,7 +408,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0213,
-   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_9a40343e18,a_5059b5e0e6,a_f3c42ce766; spec: metric/population/filters/grain/time/ties: How does the primary-payer denial rate vary with the number of billed service lines? Bucket claims by line count on t; candidates: A=3r, B=3r, C=3r; agree=3; pick=C; verifier: ok"
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_9a40343e18,a_5059b5e0e6,a_f3c42ce766; spec: metric/population/filters/grain/time/ties: How does the primary-payer denial rate vary with the number of billed service lines? Bucket claims by line count on t; candidates: A=3r, B=3r, C=3r; agree=3; pick=C; verifier: ok",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_9108c7aacb",
@@ -399,7 +421,9 @@
    "sql_execs": 4,
    "repairs": 0,
    "seconds": 0.0021,
-   "trace": "explore: 1 probes; fewshot (TF-IDF, non-dev, other family): a_b541bf06a1,a_88c4640755,a_f786e11aec; spec: metric/population/filters/grain/time/ties: For each forward balance a payer carried forward on an 835 (PLB reason FB with a negative amount), show the FB refere; candidates: A=errr, B=errr, C=errr; agree=0; pick=C"
+   "trace": "explore: 1 probes; fewshot (TF-IDF, non-dev, other family): a_b541bf06a1,a_88c4640755,a_f786e11aec; spec: metric/population/filters/grain/time/ties: For each forward balance a payer carried forward on an 835 (PLB reason FB with a negative amount), show the FB refere; candidates: A=errr, B=errr, C=errr; agree=0; pick=C",
+   "pass": false,
+   "why": "final SQL fails: Parser Error: syntax error at or near \"days\"\n\nLINE 1: ..., o.payment_date offset_date, o.payment_date-f.payment_date day"
   },
   {
    "qid": "a_856b95a70c",
@@ -459,7 +483,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0217,
-   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_477b034f58,f_payer_paid_in_month__unitedhealthcare_2026-07-01,f_claims_first_submitted_in_month__2026-07-01; spec: metric/population/filters/grain/time/ties: How did the payer-class mix of paid dollars shift between July 2026 and August 2026 payment months? Use current adjud; candidates: A=7r, B=errr, C=7r; agree=1; pick=C; verifier: ok"
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_477b034f58,f_payer_paid_in_month__unitedhealthcare_2026-07-01,f_claims_first_submitted_in_month__2026-07-01; spec: metric/population/filters/grain/time/ties: How did the payer-class mix of paid dollars shift between July 2026 and August 2026 payment months? Use current adjud; candidates: A=7r, B=errr, C=7r; agree=1; pick=C; verifier: ok",
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_1b7e02d0b0",
@@ -485,7 +511,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0293,
-   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_88c4640755,a_fca405b635,q17_resubmitted; spec: metric/population/filters/grain/time/ties: Rework cycle time for corrected claims: for claims that were resubmitted to their primary payer (payer_responsibility; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_88c4640755,a_fca405b635,q17_resubmitted; spec: metric/population/filters/grain/time/ties: Rework cycle time for corrected claims: for claims that were resubmitted to their primary payer (payer_responsibility; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_921f1bf366",
@@ -509,7 +537,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0289,
-   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): q18_voided,a_f786e11aec,a_f3c42ce766; spec: metric/population/filters/grain/time/ties: For claims we voided (frequency 8 submissions), return in one row: the number of voided claims, how many had a remit ; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): q18_voided,a_f786e11aec,a_f3c42ce766; spec: metric/population/filters/grain/time/ties: For claims we voided (frequency 8 submissions), return in one row: the number of voided claims, how many had a remit ; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok",
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "q14_zero_paid_not_denied",
@@ -527,7 +557,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0197,
-   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): q09_denials_by_type,f_payer_class_denial_rate__medicare,f_payer_class_denial_rate__commercial; spec: metric/population/filters/grain/time/ties: How many current claim+payer adjudications paid $0 but are NOT denials?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): q09_denials_by_type,f_payer_class_denial_rate__medicare,f_payer_class_denial_rate__commercial; spec: metric/population/filters/grain/time/ties: How many current claim+payer adjudications paid $0 but are NOT denials?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_dca9da6d52",
@@ -553,7 +585,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0186,
-   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_88c4640755,a_fca405b635,q17_resubmitted; spec: metric/population/filters/grain/time/ties: After we sent a corrected replacement claim (frequency 7), how quickly did the payer respond? For each payer class wi; candidates: A=errr, B=errr, C=1r; agree=1; pick=C; verifier: ok"
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_88c4640755,a_fca405b635,q17_resubmitted; spec: metric/population/filters/grain/time/ties: After we sent a corrected replacement claim (frequency 7), how quickly did the payer respond? For each payer class wi; candidates: A=errr, B=errr, C=1r; agree=1; pick=C; verifier: ok",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q19_reversed_no_correction",
@@ -571,7 +605,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0222,
-   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_436f690741,a_2149838506,a_88c4640755; spec: metric/population/filters/grain/time/ties: How many claim+payer pairs were reversed by the payer and have no current adjudication since (no correction)?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_436f690741,a_2149838506,a_88c4640755; spec: metric/population/filters/grain/time/ties: How many claim+payer pairs were reversed by the payer and have no current adjudication since (no correction)?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__80307",
@@ -589,7 +625,9 @@
    "sql_execs": 6,
    "repairs": 0,
    "seconds": 0.0134,
-   "trace": "explore: 3 probes; fewshot (TF-IDF, non-dev, other family): f_cpt_denied_lines__80053,a_f3c42ce766,a_f494340e13; spec: metric/population/filters/grain/time/ties: What share of all service-line payments (current adjudications) came from lines billed as CPT 80307?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+   "trace": "explore: 3 probes; fewshot (TF-IDF, non-dev, other family): f_cpt_denied_lines__80053,a_f3c42ce766,a_f494340e13; spec: metric/population/filters/grain/time/ties: What share of all service-line payments (current adjudications) came from lines billed as CPT 80307?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d383370345",
@@ -649,7 +687,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.031,
-   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_f786e11aec,q22_days_to_first_remit,a_9a40343e18; spec: metric/population/filters/grain/time/ties: Payment velocity for the July 2026 submission cohort: take claims whose first 837 submission to their primary payer (; candidates: A=7r, B=7r, C=7r; agree=3; pick=C; verifier: ok"
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_f786e11aec,q22_days_to_first_remit,a_9a40343e18; spec: metric/population/filters/grain/time/ties: Payment velocity for the July 2026 submission cohort: take claims whose first 837 submission to their primary payer (; candidates: A=7r, B=7r, C=7r; agree=3; pick=C; verifier: ok",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0482",
@@ -667,7 +707,9 @@
    "sql_execs": 6,
    "repairs": 0,
    "seconds": 0.0136,
-   "trace": "explore: 3 probes; fewshot (TF-IDF, non-dev, other family): f_payer_class_denial_rate__medicare,f_payer_class_denial_rate__commercial,f_cpt_denied_lines__80053; spec: metric/population/filters/grain/time/ties: CPT G0482 accounts for what fraction of total paid dollars across current service lines?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+   "trace": "explore: 3 probes; fewshot (TF-IDF, non-dev, other family): f_payer_class_denial_rate__medicare,f_payer_class_denial_rate__commercial,f_cpt_denied_lines__80053; spec: metric/population/filters/grain/time/ties: CPT G0482 accounts for what fraction of total paid dollars across current service lines?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_0d43f7d4b6",
@@ -689,7 +731,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0265,
-   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_88c4640755,q17_resubmitted,a_fca405b635; spec: metric/population/filters/grain/time/ties: Among claims we resubmitted as a corrected replacement claim (frequency 7), consider those where the same payer had s; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_88c4640755,q17_resubmitted,a_fca405b635; spec: metric/population/filters/grain/time/ties: Among claims we resubmitted as a corrected replacement claim (frequency 7), consider those where the same payer had s; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_923951a050",
@@ -709,7 +753,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0177,
-   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_436f690741,q16_denied_charges_by_payer,a_b541bf06a1; spec: metric/population/filters/grain/time/ties: How many denials were overturned? Count the claim+payer pairs that had an earlier, superseded non-reversal adjudicati; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_436f690741,q16_denied_charges_by_payer,a_b541bf06a1; spec: metric/population/filters/grain/time/ties: How many denials were overturned? Count the claim+payer pairs that had an earlier, superseded non-reversal adjudicati; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7423e6eb91",
@@ -736,7 +782,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0311,
-   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_9a40343e18,a_f786e11aec,q22_days_to_first_remit; spec: metric/population/filters/grain/time/ties: Open primary AR aging as of 2026-08-14: which non-voided claims (latest submission is not a void, frequency 8) still ; candidates: A=2r, B=2r, C=2r; agree=3; pick=C; verifier: ok"
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_9a40343e18,a_f786e11aec,q22_days_to_first_remit; spec: metric/population/filters/grain/time/ties: Open primary AR aging as of 2026-08-14: which non-voided claims (latest submission is not a void, frequency 8) still ; candidates: A=2r, B=2r, C=2r; agree=3; pick=C; verifier: ok",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_never_remitted_submitted_in_month__2026-07-01",
@@ -754,7 +802,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0196,
-   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): q20_never_remitted,f_claims_first_submitted_in_month__2026-07-01,q01_claims_submitted; spec: metric/population/filters/grain/time/ties: Of the claims first submitted in July 2026, how many have never received any 835 remittance?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): q20_never_remitted,f_claims_first_submitted_in_month__2026-07-01,q01_claims_submitted; spec: metric/population/filters/grain/time/ties: Of the claims first submitted in July 2026, how many have never received any 835 remittance?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_ab202d4b23",
@@ -966,7 +1016,9 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.0299,
-   "trace": "explore: 5 probes; fewshot (TF-IDF, non-dev, other family): a_a23ce7f1de,a_f494340e13,a_439d7186d8; spec: metric/population/filters/grain/time/ties: For every payer, how many service lines were allowed below that payer's typical allowed amount for the CPT, and what ; candidates: A=39r, B=39r, C=39r; agree=3; pick=C; verifier: ok"
+   "trace": "explore: 5 probes; fewshot (TF-IDF, non-dev, other family): a_a23ce7f1de,a_f494340e13,a_439d7186d8; spec: metric/population/filters/grain/time/ties: For every payer, how many service lines were allowed below that payer's typical allowed amount for the CPT, and what ; candidates: A=39r, B=39r, C=39r; agree=3; pick=C; verifier: ok",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0480",
@@ -984,7 +1036,9 @@
    "sql_execs": 6,
    "repairs": 0,
    "seconds": 0.0133,
-   "trace": "explore: 3 probes; fewshot (TF-IDF, non-dev, other family): f_cpt_denied_lines__80053,a_f3c42ce766,a_f494340e13; spec: metric/population/filters/grain/time/ties: What share of all service-line payments (current adjudications) came from lines billed as CPT G0480?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+   "trace": "explore: 3 probes; fewshot (TF-IDF, non-dev, other family): f_cpt_denied_lines__80053,a_f3c42ce766,a_f494340e13; spec: metric/population/filters/grain/time/ties: What share of all service-line payments (current adjudications) came from lines billed as CPT G0480?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d671e0b995",
@@ -995,7 +1049,9 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.0093,
-   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_54dd76175a,a_837ce03435,q04_paid_by_month; spec: metric/population/filters/grain/time/ties: For each payer class and payment month, what is the denial rate of current adjudications (each claim counted once per; candidates: A=errr, B=errr, C=errr; agree=0; pick=C"
+   "trace": "explore: 4 probes; fewshot (TF-IDF, non-dev, other family): a_54dd76175a,a_837ce03435,q04_paid_by_month; spec: metric/population/filters/grain/time/ties: For each payer class and payment month, what is the denial rate of current adjudications (each claim counted once per; candidates: A=errr, B=errr, C=errr; agree=0; pick=C",
+   "pass": false,
+   "why": "final SQL fails: Parser Error: syntax error at or near \"month\"\n\nLINE 2: FROM (SELECT payer_class, strftime(payment_month,'%Y-%m') month, "
   },
   {
    "qid": "f_cpt_share_of_line_payments__81479",
@@ -1013,7 +1069,9 @@
    "sql_execs": 6,
    "repairs": 0,
    "seconds": 0.0122,
-   "trace": "explore: 3 probes; fewshot (TF-IDF, non-dev, other family): f_payer_class_denial_rate__medicare,f_payer_class_denial_rate__commercial,f_cpt_denied_lines__80053; spec: metric/population/filters/grain/time/ties: CPT 81479 accounts for what fraction of total paid dollars across current service lines?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok"
+   "trace": "explore: 3 probes; fewshot (TF-IDF, non-dev, other family): f_payer_class_denial_rate__medicare,f_payer_class_denial_rate__commercial,f_cpt_denied_lines__80053; spec: metric/population/filters/grain/time/ties: CPT 81479 accounts for what fraction of total paid dollars across current service lines?; candidates: A=1r, B=1r, C=1r; agree=3; pick=C; verifier: ok",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q12_referring_provider_denials",
@@ -1029,9 +1087,23 @@
    "sql_execs": 9,
    "repairs": 0,
    "seconds": 0.0238,
-   "trace": "explore: 5 probes; fewshot (TF-IDF, non-dev, other family): q13_principal_dx_denials,a_9a40343e18,a_5059b5e0e6; spec: metric/population/filters/grain/time/ties: Which 5 ordering (referring) providers, by NPI, have the highest primary-payer denial rate, among providers with at l; candidates: A=0r, B=0r, C=0r; agree=0; pick=C; verifier: flagged empty/null, kept"
+   "trace": "explore: 5 probes; fewshot (TF-IDF, non-dev, other family): q13_principal_dx_denials,a_9a40343e18,a_5059b5e0e6; spec: metric/population/filters/grain/time/ties: Which 5 ordering (referring) providers, by NPI, have the highest primary-payer denial rate, among providers with at l; candidates: A=0r, B=0r, C=0r; agree=0; pick=C; verifier: flagged empty/null, kept",
+   "pass": true,
+   "why": "ok"
   }
  ],
  "n": 30,
- "mean_sql_execs": 6.83
+ "mean_sql_execs": 6.83,
+ "accuracy": "23/30",
+ "n_pass": 23,
+ "failures": [
+  "q25_primary_deductible",
+  "a_8663c777cd",
+  "q11_cpt_denial_rate",
+  "a_9108c7aacb",
+  "a_856b95a70c",
+  "a_921f1bf366",
+  "a_d671e0b995"
+ ],
+ "notes": "Scored with bench.compare.match (deterministic, gold SQL on snapshot) after answers were committed. Failures: 7."
 }
