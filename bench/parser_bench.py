@@ -29,6 +29,7 @@ import argparse
 import hashlib
 import json
 import os
+import resource
 import re
 import shutil
 import subprocess
@@ -192,9 +193,15 @@ def peak_rss_mb() -> float:
     raise RuntimeError("no VmHWM in /proc/self/status")
 
 
-def run_batch(batch_name: str, out_dir: Path, use_tracemalloc: bool = False) -> dict:
+def _cpu_s() -> float:
+    """CPU of this process and of its finished children (the parse workers)."""
+    children = resource.getrusage(resource.RUSAGE_CHILDREN)
+    return time.process_time() + children.ru_utime + children.ru_stime
+
+
+def run_batch(batch_name: str, out_dir: Path, use_tracemalloc: bool = False, workers: int = 1) -> dict:
     """Parse and write one batch exactly as the pipeline does; returns its metrics. Call in a fresh process."""
-    from ccsim.pipeline import SilverBatch, silver_part_files
+    from ccsim.pipeline import silver_part_files
     files = build_corpus()["batches"][batch_name]
     rss_after_imports = peak_rss_mb()
     if use_tracemalloc:
@@ -203,25 +210,43 @@ def run_batch(batch_name: str, out_dir: Path, use_tracemalloc: bool = False) -> 
     out_dir.mkdir(parents=True, exist_ok=True)
     started = datetime(2026, 10, 1, 12)                           # fixed: the reference must not depend on the corpus
     known_sha, raw_bytes, rejected = {}, 0, []
-    cpu0 = time.process_time()
-    batch = SilverBatch(f"run_bench_{batch_name}", started, triggered_by="bench", notes=None)
-    for f in files:
-        body = (CORPUS_DIR / f["path"]).read_bytes()
-        raw_bytes += len(body)
-        meta = _meta(f["path"], body, f["day"])
-        file_id = hashlib.sha1(f"{f['path']}#v1".encode()).hexdigest()[:16]
-        if batch.add_raw_file(body, file_id, CUSTOMER, meta, duplicate_of_file_id=known_sha.get(meta["sha256"])):
-            known_sha.setdefault(meta["sha256"], file_id)
-        else:
-            rejected.append(f["path"])
-        del body
-    cpu1 = time.process_time()
+    cpu0, wall0 = _cpu_s(), time.perf_counter()
+    try:
+        from ccsim.silver_staging import RawFile, SilverBatch, file_id_of
+    except ImportError:                                           # the pre-optimisation code (reference runs)
+        RawFile = None
+    if RawFile is None:
+        from ccsim.pipeline import SilverBatch
+        batch = SilverBatch(f"run_bench_{batch_name}", started, triggered_by="bench", notes=None)
+        for f in files:
+            body = (CORPUS_DIR / f["path"]).read_bytes()
+            raw_bytes += len(body)
+            meta = _meta(f["path"], body, f["day"])
+            file_id = hashlib.sha1(f"{f['path']}#v1".encode()).hexdigest()[:16]
+            if batch.add_raw_file(body, file_id, CUSTOMER, meta, duplicate_of_file_id=known_sha.get(meta["sha256"])):
+                known_sha.setdefault(meta["sha256"], file_id)
+            else:
+                rejected.append(f["path"])
+    else:
+        batch = SilverBatch(f"run_bench_{batch_name}", started, triggered_by="bench", notes=None,
+                            parser_version="ccsim-0.2", workers=workers)
+
+        def raw_files():
+            for f in files:
+                body = (CORPUS_DIR / f["path"]).read_bytes()
+                yield RawFile(f["path"], body, file_id_of(f["path"], "v1"), _meta(f["path"], body, f["day"]))
+
+        for f, was_loaded in batch.add_raw_files(raw_files(), CUSTOMER, known_sha):
+            raw_bytes += len(f.body)
+            if not was_loaded:
+                rejected.append(f.key)
+    cpu1 = _cpu_s()
     con = batch.finish()
     con.execute("UPDATE edi.ingest_run SET finished_at = ?, files_seen = ?, files_loaded = ?, files_rejected = ?",
                 [started + timedelta(minutes=5), len(files), len(files) - len(rejected), len(rejected)])
-    cpu2 = time.process_time()
+    cpu2 = _cpu_s()
     parquet_bytes = {t: p.stat().st_size for t, p in silver_part_files(con, out_dir) if p is not None}
-    cpu3 = time.process_time()
+    cpu3, wall3 = _cpu_s(), time.perf_counter()
     for p in out_dir.glob("*.parquet"):                            # empty tables are not published
         if p.stem not in parquet_bytes:
             p.unlink()
@@ -232,12 +257,14 @@ def run_batch(batch_name: str, out_dir: Path, use_tracemalloc: bool = False) -> 
         tracemalloc.stop()
     return dict(batch=batch_name, files=len(files), rejected=rejected, raw_bytes=raw_bytes,
                 cpu_parse_s=cpu1 - cpu0, cpu_stage_s=cpu2 - cpu1, cpu_write_s=cpu3 - cpu2, cpu_s=cpu3 - cpu0,
+                wall_s=wall3 - wall0, workers=workers,
+                worker_peak_rss_mb=resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss / 1024 if workers > 1 else None,
                 peak_rss_mb=peak_rss_mb(), rss_after_imports_mb=rss_after_imports,
                 traced_peak_mb=traced_peak and traced_peak / 2**20, parquet_bytes=parquet_bytes)
 
 
-def _run_batch_in_subprocess(batch_name: str, out_dir: Path, use_tracemalloc: bool) -> dict:
-    cmd = [sys.executable, "-m", "bench.parser_bench", "_batch", batch_name, str(out_dir)]
+def _run_batch_in_subprocess(batch_name: str, out_dir: Path, use_tracemalloc: bool, workers: int = 1) -> dict:
+    cmd = [sys.executable, "-m", "bench.parser_bench", "_batch", batch_name, str(out_dir), "--workers", str(workers)]
     if use_tracemalloc:
         cmd.append("--tracemalloc")
     done = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
@@ -315,6 +342,7 @@ def _summary(results: list[dict]) -> dict:
     large = [r for r in results if r["batch"].startswith("large_")]
     return dict(raw_mb=round(raw / MB, 1), cpu_s=round(sum(r["cpu_s"] for r in results), 1),
                 cpu_s_per_mb=round(sum(r["cpu_s"] for r in results) / (raw / MB), 4),
+                wall_s_per_mb=round(sum(r.get("wall_s", 0) for r in results) / (raw / MB), 4),
                 volume_cpu_s_per_mb=volume and round(sum(r["cpu_s"] for r in volume) / (sum(r["raw_bytes"] for r in volume) / MB), 4),
                 parse_share=round(sum(r["cpu_parse_s"] for r in results) / sum(r["cpu_s"] for r in results), 3),
                 peak_rss_mb_volume_batch=volume and round(max(r["peak_rss_mb"] for r in volume), 0),
@@ -324,7 +352,7 @@ def _summary(results: list[dict]) -> dict:
 
 
 def cmd_run(label: str, freeze: bool, only: list[str] | None, use_tracemalloc: bool, slim_segment: bool,
-            keep_output: bool, repeat: int = 1) -> dict:
+            keep_output: bool, repeat: int = 1, workers: int = 1) -> dict:
     manifest = build_corpus()
     names = only or sorted(manifest["batches"])
     if freeze and not only:
@@ -335,12 +363,12 @@ def cmd_run(label: str, freeze: bool, only: list[str] | None, use_tracemalloc: b
     results, problems = [], {}
     for name in names:
         shutil.rmtree(out_root / name, ignore_errors=True)
-        r = _run_batch_in_subprocess(name, out_root / name, use_tracemalloc)
+        r = _run_batch_in_subprocess(name, out_root / name, use_tracemalloc, workers)
         for _ in range(repeat - 1):                   # a shared machine only ever adds CPU time: keep the least
-            again = _run_batch_in_subprocess(name, BENCH_DIR / "candidate" / "_repeat", use_tracemalloc)
+            again = _run_batch_in_subprocess(name, BENCH_DIR / "candidate" / "_repeat", use_tracemalloc, workers)
             shutil.rmtree(BENCH_DIR / "candidate" / "_repeat")
             if again["cpu_s"] < r["cpu_s"]:
-                r.update({k: again[k] for k in again if k.startswith("cpu_")})
+                r.update({k: again[k] for k in again if k.startswith(("cpu_", "wall_"))})
         if not freeze:
             found = compare_batch(REFERENCE_DIR / name, out_root / name, slim_segment)
             if decisions(REFERENCE_DIR / name) != decisions(out_root / name):
@@ -351,7 +379,8 @@ def cmd_run(label: str, freeze: bool, only: list[str] | None, use_tracemalloc: b
         results.append(r)
         print(f"{name:28s} {r['raw_bytes'] / MB:7.2f} MB  cpu {r['cpu_s']:7.2f}s = {r['cpu_s'] / max(r['raw_bytes'] / MB, 1e-9):6.3f} s/MB"
               f" (parse {r['cpu_parse_s']:.2f} stage {r['cpu_stage_s']:.2f} write {r['cpu_write_s']:.2f})"
-              f"  rss {r['peak_rss_mb']:6.0f} MB  {'' if freeze else ('IDENTICAL' if name not in problems else 'DIFFERENT')}",
+              f"  wall {r['wall_s']:6.2f}s  rss {r['peak_rss_mb']:5.0f} MB"
+              f"{'' if not r.get('worker_peak_rss_mb') else ' (workers %.0f MB)' % r['worker_peak_rss_mb']}  {'' if freeze else ('IDENTICAL' if name not in problems else 'DIFFERENT')}",
               flush=True)
     if freeze:
         (REFERENCE_DIR / "schemas.json").write_text(json.dumps(
@@ -400,6 +429,7 @@ def main(argv=None):
     run.add_argument("--slim-segment", action="store_true", help="edi.segment without raw_text/elements (step 5)")
     run.add_argument("--keep-output", action="store_true")
     run.add_argument("--repeat", type=int, default=1, help="run each batch N times, report the least CPU")
+    run.add_argument("--workers", type=int, default=1, help="SilverBatch parse workers (PARSE_WORKERS)")
     prof = sub.add_parser("profile")
     prof.add_argument("--batch", required=True)
     prof.add_argument("--cprofile", action="store_true")
@@ -407,6 +437,7 @@ def main(argv=None):
     one.add_argument("batch")
     one.add_argument("out_dir", type=Path)
     one.add_argument("--tracemalloc", action="store_true")
+    one.add_argument("--workers", type=int, default=1)
     a = ap.parse_args(argv)
     if a.cmd == "corpus":
         m = build_corpus()
@@ -414,11 +445,11 @@ def main(argv=None):
     elif a.cmd == "freeze":
         cmd_run("reference", True, a.only, False, False, True)
     elif a.cmd == "run":
-        cmd_run(a.label, False, a.only, a.tracemalloc, a.slim_segment, a.keep_output, a.repeat)
+        cmd_run(a.label, False, a.only, a.tracemalloc, a.slim_segment, a.keep_output, a.repeat, a.workers)
     elif a.cmd == "profile":
         cmd_profile(a.batch, a.cprofile)
     elif a.cmd == "_batch":
-        print(json.dumps(run_batch(a.batch, a.out_dir, a.tracemalloc), default=str))
+        print(json.dumps(run_batch(a.batch, a.out_dir, a.tracemalloc, a.workers), default=str))
 
 
 if __name__ == "__main__":
