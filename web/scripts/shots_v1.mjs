@@ -69,6 +69,13 @@ await pg.waitForTimeout(600);
 await pg.evaluate(() => document.querySelector('main .overflow-y-auto')?.scrollTo(0, 0));
 await shot(pg, '09_branch_version_1of2');
 
+// 3b. Thumbs-down feedback panel (mock)
+await pg.getByRole('button', { name: 'Bad response' }).last().click();
+await pg.getByRole('button', { name: 'Wrong numbers' }).click();
+await pg.waitForTimeout(300);
+await shot(pg, '16_feedback_panel');
+await pg.getByRole('button', { name: 'Close feedback' }).click();
+
 // 4. Search + rename (mock)
 await ask(pg, 'Plot the monthly denial rate trend for our top 3 payers');
 await pg.getByRole('button', { name: 'New chat' }).first().click();
@@ -77,7 +84,7 @@ await pg.getByRole('button', { name: 'Rename chat' }).first().click({ force: tru
 await pg.getByRole('textbox', { name: 'Rename chat' }).fill('Cascade Medicaid CARC drivers');
 await shot(pg, '10_sidebar_rename');
 await pg.keyboard.press('Enter');
-await pg.getByRole('button', { name: /Search chats/ }).click();
+await pg.keyboard.press('Control+k');
 await pg.getByRole('textbox', { name: 'Search chats' }).fill('cascade');
 await shot(pg, '11_sidebar_search');
 
