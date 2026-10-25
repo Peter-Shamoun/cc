@@ -1859,11 +1859,11 @@ class Generator:
         return f"{c.dos:%Y%m%d}{c.pcn}"
 
     def _recoupment_target(self, history: list, day: date):
-        """A payment made 30-365 days ago (median ~3 months): overpayments surface in audits and retro-eligibility
-        reviews long after the check, so recoupments trail payment by months."""
+        """A payment made 30-365 days ago (median ~2 months): overpayments surface in reprocessing, audits and
+        retro-eligibility reviews long after the check, so recoupments trail payment by weeks to months."""
         if not history:
             return None
-        lag = min(365, max(30, round(math.exp(self.rng.gauss(math.log(85), .7)))))
+        lag = min(365, max(30, round(math.exp(self.rng.gauss(math.log(60), .75)))))
         target = (day - timedelta(days=lag)).toordinal()
         i = bisect.bisect_right(history, (target, "\uffff")) - 1
         if i < 0:
