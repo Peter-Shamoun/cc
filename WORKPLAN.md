@@ -29,8 +29,14 @@ Never decide the work is done; when an item finishes, pick the next highest-valu
 - [done] Answer-key DB (bench/truth_db.py) + 16 question families (bench/question_families.py): 99 questions sound on a 45-day sample
 - [done] Opus authoring pipeline (bench/authored_questions.py): author gold+answer-key SQL, independent Opus verifier,
   accept on three-way agreement + non-trivial; prototype 4/4 accepted, selftest sound (103 questions)
-- [running] scaled authoring: 7 focus areas x 5 questions (ar_aging, contract_variance, denial_trends, rework,
-  payer_mix, test_mix, remit_ops)
+- [done] scaled authoring: 35/35 accepted (39 authored total); 5 answer keys later fixed on generator 3.0 data
+  (payer class from adjudications, re-original double count, billed vs paid units)
+- [done] generator 3.0 (calibration engineer) merged; duplicate-claim denials no longer replace the original
+  adjudication (views, generator ledger, answer key agree)
+- [done] realism audit 1 (independent): 5/10, research/edi_realism_audit_1.md
+- [running] realism engineer on audit-1 findings (worktree); then re-audit, loop until >= 8/10
+- [running] Phase 4 screen 1: 2^(7-3) res IV x 36 questions x Haiku (576 sessions) on generator-3.0 snapshot
+  29b42d74ee18; next: effects -> Sonnet screen on the same design -> fold-over/coordinate ascent on the winners
 - [later] Expand families further after calibration lands (target 150+ at full scale)
 - [later] Ambiguity / abstention / multi-turn splits (T20-T22)
 - [later] Screening experiment, then adaptive search over technique permutations
