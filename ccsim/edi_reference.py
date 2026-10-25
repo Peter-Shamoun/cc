@@ -482,17 +482,23 @@ def cpt_fits(code: str, sex: str, age: float) -> bool:
 _FITS_CACHE: dict = {}
 
 
-# Broad panels ordered as part of a general work-up (fatigue, weight change, medication monitoring): those
-# diagnoses justify them too. Targeted tests (PSA, uric acid, a drug level) keep only their own domains.
-GENERAL_WORKUP_TESTS = frozenset("80053 80048 80047 80051 80069 80076 85025 85027 82947 84132 84295 82565 84520 82310 "
-                                 "84460 84450 83735 84100 82040 85014 85018 85048 81001 81003".split())
+# Routine chemistry and hematology are also ordered as part of a general work-up (fatigue, weight change,
+# medication monitoring): those diagnoses justify them too. Targeted tests (PSA, hormones, coagulation, uric acid,
+# drug levels, serology, cultures, molecular) keep only their own domains.
+TARGETED_TESTS = frozenset("84153 84154 84152 G0103 84702 84703 84144 82670 83001 83002 84403 84402 82627 84270 85610 "
+                           "85730 85384 84550 83880 84484 86141 82274 G0328 83655".split())
+
+
+def _general_workup(code: str) -> bool:
+    return code[:2] in ("82", "83", "84", "85") and code not in TARGETED_TESTS or code in (
+        "80053", "80048", "80047", "80051", "80069", "80076", "81001", "81003")
 
 
 def cpt_domains(code: str) -> dict:
     """The clinical domains that justify a test."""
     if code not in _DOMAIN_CACHE:
         domains = dict(CPT_DOMAINS.get(code) or DEFAULT_DOMAINS_BY_FAMILY.get(code[:2], dict(general=1)))
-        if code in GENERAL_WORKUP_TESTS:
+        if _general_workup(code):
             domains.setdefault("general", .6)
             domains.setdefault("meds", .4)
         _DOMAIN_CACHE[code] = domains
