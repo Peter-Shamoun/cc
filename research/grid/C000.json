@@ -1,0 +1,2310 @@
+{
+ "cell": "C000",
+ "model": "Grok 4.7",
+ "config": {
+  "generation": "direct_sql",
+  "fewshot": 0,
+  "explore": 0,
+  "candidates3": 0,
+  "verifier": 0,
+  "repair": 0,
+  "assumptions": 0,
+  "multiagent": 0
+ },
+ "dataset": {
+  "generator": "3.3",
+  "dataset_id": "98e61f03e594",
+  "scenario": {
+   "days": 20,
+   "volume_scale": 0.3,
+   "seed": 5
+  },
+  "build": "bench.dataset.snapshot(Scenario(days=20, volume_scale=0.3, seed=5)) \u2014 the small benchmark config in tests/test_bench.py",
+  "reader": "bench.dataset.open_snapshot(path, escalate=False), SQL passed through bench.guard.guard"
+ },
+ "dev_set": {
+  "rule": "load_cases(snapshot) minus question_set heldout_hard_1 (27) and any grokbot-r1 tag, sorted by sha256(question_id) hex, first 20",
+  "loaded": 128,
+  "excluded_heldout_hard_1": 27,
+  "excluded_grokbot_r1": 0,
+  "dev_pool": 101,
+  "n": 20
+ },
+ "checker": "bench.compare.match (deterministic). LLM judge not called; the matcher accepted every answer.",
+ "accuracy": "20/20",
+ "accuracy_rate": 1.0,
+ "n_pass": 20,
+ "n_questions": 20,
+ "mean_sql_calls": 1.0,
+ "mean_seconds": 0.008,
+ "total_sql_executions": 20,
+ "total_repairs": 0,
+ "failure_modes": [],
+ "questions": [
+  {
+   "question_id": "f_payer_avg_paid_per_paid_claim__medicare-part-b-north-carolina",
+   "sha256": "060954f0a9323f2bcfc618be054d8d627467e164965faab3ac8847257e634842",
+   "question": "On claims Medicare Part B North Carolina actually paid (current adjudication, paid > 0), what is the average payment?",
+   "category": "money",
+   "difficulty": "medium",
+   "family": "payer_avg_paid_per_paid_claim",
+   "answer": {
+    "columns": [
+     "avg_paid"
+    ],
+    "rows": [
+     [
+      111.0
+     ]
+    ]
+   },
+   "sql": "SELECT round(avg(paid_amount), 2) AS avg_paid\nFROM sem.remit_claims\nWHERE is_current_adjudication\n  AND paid_amount > 0\n  AND payer_name = 'Medicare Part B North Carolina'",
+   "sql_executions": 1,
+   "repairs": 0,
+   "seconds": 0.0297,
+   "pass": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok"
+  },
+  {
+   "question_id": "a_f786e11aec",
+   "sha256": "0676df0bff5b6c61a051a673367694d79e2de52aae5328f2f3e6f1e0eabca444",
+   "question": "For each claim, how many days passed between its date of service and its first 837 submission (earliest submission to any payer)? Group claims by the payer class of the claim's primary payer (payer_responsibility = 'P') and show, per payer class: number of claims, average lag in days (rounded to 2 decimals), median lag in days, and the number of claims first submitted more than 90 days after the date of service. Include voided claims. Order by payer class.",
+   "category": "ar_aging",
+   "difficulty": "medium",
+   "family": null,
+   "answer": {
+    "columns": [
+     "payer_class",
+     "claims",
+     "avg_lag_days",
+     "median_lag_days",
+     "submitted_over_90_days"
+    ],
+    "rows": [
+     [
+      "blues",
+      83,
+      4.95,
+      4.0,
+      0
+     ],
+     [
+      "commercial",
+      154,
+      8.6,
+      4.0,
+      1
+     ],
+     [
+      "medicaid",
+      11,
+      11.09,
+      3.0,
+      0
+     ],
+     [
+      "medicaid_mco",
+      53,
+      7.3,
+      3.0,
+      0
+     ],
+     [
+      "medicare",
+      100,
+      12.76,
+      4.0,
+      2
+     ],
+     [
+      "medicare_advantage",
+      73,
+      6.25,
+      4.0,
+      0
+     ],
+     [
+      "other",
+      13,
+      15.46,
+      3.0,
+      1
+     ]
+    ]
+   },
+   "sql": "WITH ranked AS (\n    SELECT claim_key, service_date_from, submission_date, claim_id,\n           row_number() OVER (PARTITION BY claim_key ORDER BY submission_date, claim_id) AS rn\n    FROM sem.claims\n),\nfirst_sub AS (\n    SELECT claim_key, service_date_from AS dos, submission_date AS first_submission\n    FROM ranked\n    WHERE rn = 1\n),\nprimary_class AS (\n    SELECT claim_key, min(payer_class) AS payer_class\n    FROM sem.claims\n    WHERE payer_responsibility = 'P'\n    GROUP BY claim_key\n),\nlags AS (\n    SELECT p.payer_class,\n           date_diff('day', f.dos, f.first_submission) AS lag_days\n    FROM first_sub f\n    JOIN primary_class p USING (claim_key)\n)\nSELECT payer_class,\n       count(*) AS claims,\n       round(avg(lag_days), 2) AS avg_lag_days,\n       median(lag_days) AS median_lag_days,\n       count(*) FILTER (WHERE lag_days > 90) AS submitted_over_90_days\nFROM lags\nGROUP BY payer_class\nORDER BY payer_class",
+   "sql_executions": 1,
+   "repairs": 0,
+   "seconds": 0.0117,
+   "pass": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok"
+  },
+  {
+   "question_id": "f_cpt_share_of_line_payments__g0483",
+   "sha256": "07a0cc59153c189e3f3d9e305df9b1b9f99eb0c187a1ddf59b6bc380aa68baa2",
+   "question": "CPT G0483 accounts for what fraction of total paid dollars across current service lines?",
+   "category": "money",
+   "difficulty": "hard",
+   "family": "cpt_share_of_line_payments",
+   "answer": {
+    "columns": [
+     "share"
+    ],
+    "rows": [
+     [
+      0.041
+     ]
+    ]
+   },
+   "sql": "SELECT round(\n         sum(line_paid_amount) FILTER (WHERE procedure_code = 'G0483')\n         / sum(line_paid_amount),\n         4) AS share\nFROM sem.remit_lines\nWHERE is_current_adjudication",
+   "sql_executions": 1,
+   "repairs": 0,
+   "seconds": 0.0038,
+   "pass": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok"
+  },
+  {
+   "question_id": "a_fca405b635",
+   "sha256": "07ff263c43000fa659269a8a916d215862768c635ff9b52cdb2f2876eee32443",
+   "question": "By submission month of the replacement, how many corrected replacement claims (frequency 7) did we submit, and what was their total billed charge (rounded to 2 decimals)? Order by month.",
+   "category": "rework",
+   "difficulty": "easy",
+   "family": null,
+   "answer": {
+    "columns": [
+     "submission_month",
+     "replacement_claims",
+     "billed_charge"
+    ],
+    "rows": [
+     [
+      "2026-07-01",
+      10,
+      7343.23
+     ]
+    ]
+   },
+   "sql": "SELECT submission_month,\n       count(*) AS replacement_claims,\n       round(sum(charge_amount), 2) AS billed_charge\nFROM sem.claims\nWHERE frequency_code = '7'\nGROUP BY submission_month\nORDER BY submission_month",
+   "sql_executions": 1,
+   "repairs": 0,
+   "seconds": 0.0039,
+   "pass": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok"
+  },
+  {
+   "question_id": "a_b853266803",
+   "sha256": "0ce97f47221ac086234a4ef1d657565b6e046cb174ac1bf8565207986f22fee2",
+   "question": "Days-to-pay by payer class: for each claim's primary payer (payer_responsibility = 'P'), take the current adjudication from that payer and keep only the ones with paid amount > 0. Days to pay = that adjudication's payment date minus the claim's first 837 submission date to that same payer. Per payer class, show the number of paid claims, the median days to pay, and the 90th percentile days to pay (continuous/linear-interpolated percentile), rounding both to 1 decimal. Order by payer class.",
+   "category": "ar_aging",
+   "difficulty": "hard",
+   "family": null,
+   "answer": {
+    "columns": [
+     "payer_class",
+     "paid_claims",
+     "median_days_to_pay",
+     "p90_days_to_pay"
+    ],
+    "rows": [
+     [
+      "blues",
+      12,
+      16.0,
+      19.0
+     ],
+     [
+      "commercial",
+      20,
+      14.0,
+      16.3
+     ],
+     [
+      "medicaid_mco",
+      1,
+      20.0,
+      20.0
+     ],
+     [
+      "medicare",
+      3,
+      18.0,
+      18.8
+     ],
+     [
+      "medicare_advantage",
+      9,
+      14.0,
+      19.2
+     ],
+     [
+      "other",
+      1,
+      -11.0,
+      -11.0
+     ]
+    ]
+   },
+   "sql": "WITH primary_sub AS (\n    SELECT claim_key, payer_key,\n           min(payer_class) AS payer_class,\n           min(submission_date) AS first_submission\n    FROM sem.claims\n    WHERE payer_responsibility = 'P'\n    GROUP BY claim_key, payer_key\n),\npaid AS (\n    SELECT s.payer_class,\n           date_diff('day', s.first_submission, r.payment_date) AS days_to_pay\n    FROM primary_sub s\n    JOIN sem.remit_claims r\n      ON r.claim_key = s.claim_key\n     AND r.payer_key = s.payer_key\n    WHERE r.is_current_adjudication\n      AND r.paid_amount > 0\n)\nSELECT payer_class,\n       count(*) AS paid_claims,\n       round(median(days_to_pay), 1) AS median_days_to_pay,\n       round(quantile_cont(days_to_pay, 0.9), 1) AS p90_days_to_pay\nFROM paid\nGROUP BY payer_class\nORDER BY payer_class",
+   "sql_executions": 1,
+   "repairs": 0,
+   "seconds": 0.0076,
+   "pass": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok"
+  },
+  {
+   "question_id": "q10_top_denial_carcs",
+   "sha256": "0d72fbf051b3b801c2b7f32e0704e9ff057d7c79e752290aca550f27a87f84a8",
+   "question": "Which 5 denial reason codes (CARCs) appear on the most denied claims? Only count reviewed denial reasons under group CO, count each denied claim+payer once per code, and use current adjudications.",
+   "category": "denials",
+   "difficulty": "hard",
+   "family": null,
+   "answer": {
+    "columns": [
+     "carc_code",
+     "denied_claims"
+    ],
+    "rows": [
+     [
+      "18",
+      4
+     ],
+     [
+      "11",
+      2
+     ],
+     [
+      "16",
+      2
+     ],
+     [
+      "22",
+      2
+     ],
+     [
+      "96",
+      2
+     ]
+    ]
+   },
+   "sql": "SELECT a.carc_code,\n       count(DISTINCT r.claim_payer_key) AS denied_claims\nFROM sem.adjustments a\nJOIN sem.remit_claims r ON r.remit_claim_id = a.remit_claim_id\nWHERE r.is_current_adjudication\n  AND r.is_denied\n  AND a.group_code = 'CO'\n  AND a.is_denial_carc\nGROUP BY a.carc_code\nORDER BY denied_claims DESC, a.carc_code\nLIMIT 5",
+   "sql_executions": 1,
+   "repairs": 0,
+   "seconds": 0.0062,
+   "pass": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok"
+  },
+  {
+   "question_id": "f_payer_class_denial_rate__medicaid_mco",
+   "sha256": "0d76cc7903ded31bb39e278ef69961d08dc157c61c89902984fac084148618b9",
+   "question": "What is the denial rate for medicaid mco payers, counting each claim once per payer with its current adjudication?",
+   "category": "denials",
+   "difficulty": "medium",
+   "family": "payer_class_denial_rate",
+   "answer": {
+    "columns": [
+     "denial_rate"
+    ],
+    "rows": [
+     [
+      0.0196
+     ]
+    ]
+   },
+   "sql": "SELECT round(avg(CASE WHEN is_denied THEN 1 ELSE 0 END), 4) AS denial_rate\nFROM sem.remit_claims\nWHERE is_current_adjudication\n  AND payer_class = 'medicaid_mco'",
+   "sql_executions": 1,
+   "repairs": 0,
+   "seconds": 0.0035,
+   "pass": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok"
+  },
+  {
+   "question_id": "a_a5888f64a4",
+   "sha256": "0dd3a559cd2edc04d8baff46e5cc65e3c4407b0e1226ed71b63ebcad051b3d27",
+   "question": "What is our first-pass resolution rate by payer class? Among all claim+payer pairs that have received at least one 835 claim payment, count a pair as resolved on first pass when it has exactly one 835 claim payment event ever (no reversals or re-adjudications) and that event is its current adjudication and not a denial. Return payer class, claim+payer pairs remitted, first-pass resolved pairs, and the rate % rounded to 2 decimals. Order by payer class.",
+   "category": "denial_trends",
+   "difficulty": "hard",
+   "family": null,
+   "answer": {
+    "columns": [
+     "payer_class",
+     "remitted_pairs",
+     "first_pass_pairs",
+     "first_pass_rate_pct"
+    ],
+    "rows": [
+     [
+      "blues",
+      93,
+      85,
+      91.4
+     ],
+     [
+      "commercial",
+      139,
+      130,
+      93.53
+     ],
+     [
+      "medicaid",
+      16,
+      15,
+      93.75
+     ],
+     [
+      "medicaid_mco",
+      51,
+      50,
+      98.04
+     ],
+     [
+      "medicare",
+      110,
+      105,
+      95.45
+     ],
+     [
+      "medicare_advantage",
+      75,
+      73,
+      97.33
+     ],
+     [
+      "other",
+      10,
+      6,
+      60.0
+     ]
+    ]
+   },
+   "sql": "WITH pairs AS (\n    SELECT min(payer_class) AS payer_class,\n           claim_key,\n           payer_key,\n           count(*) AS n_events,\n           count(*) FILTER (WHERE is_current_adjudication AND NOT is_denied) AS current_not_denied\n    FROM sem.remit_claims\n    GROUP BY claim_key, payer_key\n)\nSELECT payer_class,\n       count(*) AS remitted_pairs,\n       count(*) FILTER (WHERE n_events = 1 AND current_not_denied = 1) AS first_pass_pairs,\n       round(100.0 * count(*) FILTER (WHERE n_events = 1 AND current_not_denied = 1) / count(*), 2) AS first_pass_rate_pct\nFROM pairs\nGROUP BY payer_class\nORDER BY payer_class",
+   "sql_executions": 1,
+   "repairs": 0,
+   "seconds": 0.0056,
+   "pass": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok"
+  },
+  {
+   "question_id": "a_436f690741",
+   "sha256": "12ec82817c664437ead33a49e8b4180c54729979543d5fb213cb06ded72664f2",
+   "question": "Among claim+payer pairs whose current adjudication is denied, which contractual-obligation (CO group) denial reason codes (CARCs) appear? For each denial CARC, return the CARC code, the number of distinct denied claim+payer pairs carrying it on their current adjudication (claim- or line-level adjustments), and the total CO adjustment amount under that CARC in dollars, sorted by pair count descending then CARC code.",
+   "category": "denial_management",
+   "difficulty": "medium",
+   "family": null,
+   "answer": {
+    "columns": [
+     "carc_code",
+     "denied_pairs",
+     "co_adjustment_amount"
+    ],
+    "rows": [
+     [
+      "18",
+      4,
+      1931.26
+     ],
+     [
+      "11",
+      2,
+      432.49
+     ],
+     [
+      "16",
+      2,
+      7325.03
+     ],
+     [
+      "22",
+      2,
+      297.06
+     ],
+     [
+      "96",
+      2,
+      330.22
+     ],
+     [
+      "198",
+      1,
+      6872.9
+     ],
+     [
+      "27",
+      1,
+      351.05
+     ],
+     [
+      "288",
+      1,
+      3805.44
+     ],
+     [
+      "29",
+      1,
+      600.1
+     ],
+     [
+      "55",
+      1,
+      135.2
+     ],
+     [
+      "97",
+      1,
+      20.98
+     ],
+     [
+      "B7",
+      1,
+      249.34
+     ]
+    ]
+   },
+   "sql": "SELECT a.carc_code,\n       count(DISTINCT a.claim_key || '|' || a.payer_key) AS denied_pairs,\n       round(sum(a.adjustment_amount), 2) AS co_adjustment_amount\nFROM sem.adjustments a\nJOIN sem.remit_claims r ON r.remit_claim_id = a.remit_claim_id\nWHERE r.is_current_adjudication\n  AND r.is_denied\n  AND a.group_code = 'CO'\n  AND a.is_denial_carc\nGROUP BY a.carc_code\nORDER BY denied_pairs DESC, a.carc_code",
+   "sql_executions": 1,
+   "repairs": 0,
+   "seconds": 0.0078,
+   "pass": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok"
+  },
+  {
+   "question_id": "a_d29f83c935",
+   "sha256": "1327b56cc191975298a4eff7e1fada93687afc73e8dd4552fb36e7e0066d93d5",
+   "question": "For each CPT/HCPCS code we bill, which principal diagnosis code appears most often on the claims carrying that code? Count each claim once at its latest submission (include voided claims). Show the procedure code, the top principal diagnosis code (tie-break: lowest diagnosis code), the number of claims with that code+diagnosis, the total number of claims carrying the procedure code, and the top diagnosis's share of those claims (percent, 1 decimal), ordered by procedure code.",
+   "category": "test_mix",
+   "difficulty": "medium",
+   "family": null,
+   "answer": {
+    "columns": [
+     "procedure_code",
+     "principal_diagnosis_code",
+     "claims_with_top_diagnosis",
+     "total_claims",
+     "top_diagnosis_share_pct"
+    ],
+    "rows": [
+     [
+      "36415",
+      "Z0000",
+      31,
+      224,
+      13.8
+     ],
+     [
+      "80048",
+      "D649",
+      1,
+      5,
+      20.0
+     ],
+     [
+      "80053",
+      "Z0000",
+      34,
+      179,
+      19.0
+     ],
+     [
+      "80055",
+      "R945",
+      1,
+      2,
+      50.0
+     ],
+     [
+      "80061",
+      "Z0000",
+      23,
+      101,
+      22.8
+     ],
+     [
+      "80069",
+      "Z0000",
+      2,
+      11,
+      18.2
+     ],
+     [
+      "80074",
+      "E559",
+      1,
+      3,
+      33.3
+     ],
+     [
+      "80076",
+      "Z0000",
+      3,
+      17,
+      17.6
+     ],
+     [
+      "80081",
+      "Z1159",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "80156",
+      "Z0000",
+      2,
+      5,
+      40.0
+     ],
+     [
+      "80158",
+      "N1830",
+      2,
+      5,
+      40.0
+     ],
+     [
+      "80159",
+      "N1830",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "80162",
+      "E6601",
+      1,
+      2,
+      50.0
+     ],
+     [
+      "80164",
+      "N1831",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "80178",
+      "I10",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "80181",
+      "Z79899",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "80197",
+      "I10",
+      1,
+      3,
+      33.3
+     ],
+     [
+      "80202",
+      "I129",
+      1,
+      2,
+      50.0
+     ],
+     [
+      "80307",
+      "Z79891",
+      42,
+      63,
+      66.7
+     ],
+     [
+      "81001",
+      "N390",
+      10,
+      49,
+      20.4
+     ],
+     [
+      "81003",
+      "N390",
+      7,
+      22,
+      31.8
+     ],
+     [
+      "81005",
+      "Z0000",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "81015",
+      "N390",
+      2,
+      5,
+      40.0
+     ],
+     [
+      "81025",
+      "Z0000",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "81162",
+      "Z803",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "81240",
+      "Z86718",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "81291",
+      "Z86711",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "81479",
+      "C439",
+      1,
+      5,
+      20.0
+     ],
+     [
+      "82040",
+      "D649",
+      1,
+      2,
+      50.0
+     ],
+     [
+      "82043",
+      "N390",
+      3,
+      12,
+      25.0
+     ],
+     [
+      "82085",
+      "E119",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "82104",
+      "I10",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "82150",
+      "I10",
+      1,
+      5,
+      20.0
+     ],
+     [
+      "82160",
+      "Z791",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "82247",
+      "Z0000",
+      1,
+      3,
+      33.3
+     ],
+     [
+      "82248",
+      "Z0000",
+      2,
+      6,
+      33.3
+     ],
+     [
+      "82274",
+      "Z1211",
+      5,
+      5,
+      100.0
+     ],
+     [
+      "82306",
+      "Z0000",
+      7,
+      35,
+      20.0
+     ],
+     [
+      "82308",
+      "I10",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "82310",
+      "D649",
+      3,
+      11,
+      27.3
+     ],
+     [
+      "82330",
+      "I10",
+      3,
+      8,
+      37.5
+     ],
+     [
+      "82373",
+      "Z0000",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "82465",
+      "E119",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "82533",
+      "Z0000",
+      2,
+      8,
+      25.0
+     ],
+     [
+      "82540",
+      "E785",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "82553",
+      "N1830",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "82565",
+      "Z0000",
+      5,
+      27,
+      18.5
+     ],
+     [
+      "82570",
+      "Z79891",
+      9,
+      26,
+      34.6
+     ],
+     [
+      "82575",
+      "D649",
+      1,
+      6,
+      16.7
+     ],
+     [
+      "82607",
+      "E119",
+      4,
+      27,
+      14.8
+     ],
+     [
+      "82627",
+      "D72829",
+      1,
+      5,
+      20.0
+     ],
+     [
+      "82670",
+      "N1830",
+      3,
+      9,
+      33.3
+     ],
+     [
+      "82728",
+      "Z0000",
+      2,
+      13,
+      15.4
+     ],
+     [
+      "82746",
+      "Z0000",
+      3,
+      13,
+      23.1
+     ],
+     [
+      "82785",
+      "E119",
+      3,
+      10,
+      30.0
+     ],
+     [
+      "82943",
+      "Z791",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "82945",
+      "N184",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "82947",
+      "D649",
+      4,
+      35,
+      11.4
+     ],
+     [
+      "82955",
+      "E119",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "82977",
+      "D649",
+      1,
+      5,
+      20.0
+     ],
+     [
+      "83001",
+      "Z0000",
+      5,
+      17,
+      29.4
+     ],
+     [
+      "83002",
+      "I10",
+      3,
+      17,
+      17.6
+     ],
+     [
+      "83036",
+      "Z0000",
+      19,
+      104,
+      18.3
+     ],
+     [
+      "83051",
+      "E876",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "83065",
+      "R5383",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "83491",
+      "E860",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "83521",
+      "E119",
+      1,
+      2,
+      50.0
+     ],
+     [
+      "83525",
+      "Z0000",
+      2,
+      6,
+      33.3
+     ],
+     [
+      "83540",
+      "Z0000",
+      5,
+      18,
+      27.8
+     ],
+     [
+      "83550",
+      "E119",
+      3,
+      13,
+      23.1
+     ],
+     [
+      "83630",
+      "K760",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "83655",
+      "Z00129",
+      2,
+      7,
+      28.6
+     ],
+     [
+      "83690",
+      "Z79899",
+      2,
+      2,
+      100.0
+     ],
+     [
+      "83718",
+      "E119",
+      1,
+      3,
+      33.3
+     ],
+     [
+      "83721",
+      "Z0000",
+      9,
+      34,
+      26.5
+     ],
+     [
+      "83722",
+      "Z79899",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "83735",
+      "I10",
+      3,
+      19,
+      15.8
+     ],
+     [
+      "83880",
+      "E119",
+      3,
+      9,
+      33.3
+     ],
+     [
+      "83921",
+      "E782",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "83930",
+      "D696",
+      1,
+      4,
+      25.0
+     ],
+     [
+      "83970",
+      "Z0000",
+      5,
+      19,
+      26.3
+     ],
+     [
+      "83986",
+      "I129",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "84075",
+      "D696",
+      2,
+      4,
+      50.0
+     ],
+     [
+      "84100",
+      "I10",
+      4,
+      12,
+      33.3
+     ],
+     [
+      "84110",
+      "Z0000",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "84132",
+      "Z0000",
+      4,
+      14,
+      28.6
+     ],
+     [
+      "84153",
+      "N1830",
+      2,
+      8,
+      25.0
+     ],
+     [
+      "84156",
+      "N390",
+      2,
+      5,
+      40.0
+     ],
+     [
+      "84270",
+      "E119",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "84295",
+      "D649",
+      1,
+      3,
+      33.3
+     ],
+     [
+      "84300",
+      "D696",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "84402",
+      "D649",
+      1,
+      10,
+      10.0
+     ],
+     [
+      "84403",
+      "Z0000",
+      4,
+      19,
+      21.1
+     ],
+     [
+      "84436",
+      "Z0000",
+      3,
+      18,
+      16.7
+     ],
+     [
+      "84439",
+      "Z0000",
+      10,
+      35,
+      28.6
+     ],
+     [
+      "84443",
+      "Z0000",
+      21,
+      101,
+      20.8
+     ],
+     [
+      "84450",
+      "D259",
+      1,
+      3,
+      33.3
+     ],
+     [
+      "84460",
+      "D649",
+      1,
+      6,
+      16.7
+     ],
+     [
+      "84466",
+      "R5383",
+      2,
+      6,
+      33.3
+     ],
+     [
+      "84478",
+      "I10",
+      1,
+      4,
+      25.0
+     ],
+     [
+      "84480",
+      "D649",
+      2,
+      12,
+      16.7
+     ],
+     [
+      "84481",
+      "Z79899",
+      2,
+      10,
+      20.0
+     ],
+     [
+      "84484",
+      "D649",
+      1,
+      4,
+      25.0
+     ],
+     [
+      "84512",
+      "Z0001",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "84520",
+      "D509",
+      1,
+      3,
+      33.3
+     ],
+     [
+      "84550",
+      "Z0000",
+      6,
+      35,
+      17.1
+     ],
+     [
+      "84583",
+      "Z0000",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "84702",
+      "R945",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "85025",
+      "Z0000",
+      37,
+      179,
+      20.7
+     ],
+     [
+      "85044",
+      "D649",
+      1,
+      3,
+      33.3
+     ],
+     [
+      "85049",
+      "E785",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "85250",
+      "E119",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "85307",
+      "N1830",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "85335",
+      "Z79899",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "85379",
+      "B349",
+      1,
+      7,
+      14.3
+     ],
+     [
+      "85384",
+      "D649",
+      1,
+      6,
+      16.7
+     ],
+     [
+      "85530",
+      "Z79899",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "85536",
+      "I10",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "85610",
+      "I10",
+      4,
+      24,
+      16.7
+     ],
+     [
+      "85651",
+      "D649",
+      1,
+      2,
+      50.0
+     ],
+     [
+      "85652",
+      "I10",
+      10,
+      66,
+      15.2
+     ],
+     [
+      "85730",
+      "Z79899",
+      4,
+      16,
+      25.0
+     ],
+     [
+      "86015",
+      "E876",
+      1,
+      2,
+      50.0
+     ],
+     [
+      "86038",
+      "Z0000",
+      6,
+      33,
+      18.2
+     ],
+     [
+      "86052",
+      "I119",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "86140",
+      "Z0000",
+      9,
+      64,
+      14.1
+     ],
+     [
+      "86141",
+      "Z0000",
+      4,
+      7,
+      57.1
+     ],
+     [
+      "86200",
+      "Z0000",
+      2,
+      7,
+      28.6
+     ],
+     [
+      "86235",
+      "E119",
+      1,
+      2,
+      50.0
+     ],
+     [
+      "86280",
+      "Z0000",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "86304",
+      "Z79899",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "86334",
+      "N185",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "86341",
+      "E860",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "86359",
+      "E785",
+      1,
+      3,
+      33.3
+     ],
+     [
+      "86364",
+      "E782",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "86376",
+      "E119",
+      2,
+      5,
+      40.0
+     ],
+     [
+      "86430",
+      "I129",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "86431",
+      "E119",
+      2,
+      7,
+      28.6
+     ],
+     [
+      "86592",
+      "Z113",
+      11,
+      22,
+      50.0
+     ],
+     [
+      "86674",
+      "Z79899",
+      4,
+      13,
+      30.8
+     ],
+     [
+      "86677",
+      "E1165",
+      1,
+      5,
+      20.0
+     ],
+     [
+      "86682",
+      "E559",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "86694",
+      "E119",
+      5,
+      22,
+      22.7
+     ],
+     [
+      "86706",
+      "Z79899",
+      2,
+      3,
+      66.7
+     ],
+     [
+      "86708",
+      "R5383",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "86780",
+      "Z0000",
+      3,
+      6,
+      50.0
+     ],
+     [
+      "86787",
+      "I129",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "86803",
+      "Z113",
+      2,
+      7,
+      28.6
+     ],
+     [
+      "86850",
+      "N189",
+      1,
+      2,
+      50.0
+     ],
+     [
+      "86900",
+      "I10",
+      1,
+      2,
+      50.0
+     ],
+     [
+      "86901",
+      "I10",
+      1,
+      2,
+      50.0
+     ],
+     [
+      "87045",
+      "R197",
+      2,
+      2,
+      100.0
+     ],
+     [
+      "87070",
+      "D649",
+      1,
+      5,
+      20.0
+     ],
+     [
+      "87077",
+      "N390",
+      3,
+      6,
+      50.0
+     ],
+     [
+      "87086",
+      "N390",
+      8,
+      31,
+      25.8
+     ],
+     [
+      "87088",
+      "N390",
+      4,
+      8,
+      50.0
+     ],
+     [
+      "87150",
+      "N390",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "87158",
+      "R5383",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "87177",
+      "N390",
+      1,
+      2,
+      50.0
+     ],
+     [
+      "87182",
+      "Z0000",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "87186",
+      "N390",
+      2,
+      8,
+      25.0
+     ],
+     [
+      "87197",
+      "Z0000",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "87205",
+      "I10",
+      1,
+      3,
+      33.3
+     ],
+     [
+      "87332",
+      "E785",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "87338",
+      "N390",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "87340",
+      "D649",
+      1,
+      6,
+      16.7
+     ],
+     [
+      "87389",
+      "Z113",
+      17,
+      18,
+      94.4
+     ],
+     [
+      "87430",
+      "I10",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "87478",
+      "Z79899",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "87481",
+      "N390",
+      1,
+      5,
+      20.0
+     ],
+     [
+      "87491",
+      "Z113",
+      31,
+      34,
+      91.2
+     ],
+     [
+      "87493",
+      "A0472",
+      1,
+      5,
+      20.0
+     ],
+     [
+      "87510",
+      "N390",
+      1,
+      2,
+      50.0
+     ],
+     [
+      "87521",
+      "I1310",
+      1,
+      1,
+      100.0
+     ],
+     [
+      "87522",
+      "Z0000",
+      2,
+      3,
+      66.7
+     ],
+     [
+      "87536",
+      "E1165",
+      1,
+      3,
+      33.3
+     ],
+     [
+      "87591",
+      "Z113",
+      35,
+      41,
+      85.4
+     ],
+     [
+      "87624",
+      "Z113",
+      7,
+      7,
+      100.0
+     ],
+     [
+      "87631",
+      "J069",
+      1,
+      2,
+      50.0
+     ],
+     [
+      "87637",
+      "J069",
+      9,
+      17,
+      52.9
+     ],
+     [
+      "87661",
+      "Z113",
+      12,
+      16,
+      75.0
+     ],
+     [
+      "87798",
+      "N390",
+      12,
+      24,
+      50.0
+     ],
+     [
+      "88305",
+      "K635",
+      3,
+      9,
+      33.3
+     ],
+     [
+      "G0328",
+      "Z1211",
+      7,
+      7,
+      100.0
+     ],
+     [
+      "G0480",
+      "Z79891",
+      4,
+      9,
+      44.4
+     ],
+     [
+      "G0481",
+      "Z79891",
+      12,
+      17,
+      70.6
+     ],
+     [
+      "G0482",
+      "Z79891",
+      7,
+      12,
+      58.3
+     ],
+     [
+      "G0483",
+      "Z79891",
+      13,
+      18,
+      72.2
+     ]
+    ]
+   },
+   "sql": "WITH claim_cpt AS (\n    SELECT DISTINCT c.claim_key, cl.procedure_code, c.principal_diagnosis_code\n    FROM sem.claim_lines cl\n    JOIN sem.claims c ON c.claim_id = cl.claim_id\n    WHERE c.is_latest_submission\n      AND cl.procedure_code IS NOT NULL\n),\ndx_counts AS (\n    SELECT procedure_code, principal_diagnosis_code, count(*) AS n\n    FROM claim_cpt\n    WHERE principal_diagnosis_code IS NOT NULL\n    GROUP BY procedure_code, principal_diagnosis_code\n),\ntotals AS (\n    SELECT procedure_code, count(*) AS total_claims\n    FROM claim_cpt\n    GROUP BY procedure_code\n),\nranked AS (\n    SELECT procedure_code, principal_diagnosis_code, n,\n           row_number() OVER (\n               PARTITION BY procedure_code\n               ORDER BY n DESC, principal_diagnosis_code ASC\n           ) AS rn\n    FROM dx_counts\n)\nSELECT r.procedure_code,\n       r.principal_diagnosis_code,\n       r.n AS claims_with_top_diagnosis,\n       t.total_claims,\n       round(100.0 * r.n / t.total_claims, 1) AS top_diagnosis_share_pct\nFROM ranked r\nJOIN totals t USING (procedure_code)\nWHERE r.rn = 1\nORDER BY r.procedure_code",
+   "sql_executions": 1,
+   "repairs": 0,
+   "seconds": 0.0124,
+   "pass": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok"
+  },
+  {
+   "question_id": "q07_denial_rate",
+   "sha256": "1aa3438a4bf2a80d96d0191d2c40b645b2a8b57e33e67b5f7669805da8a9751a",
+   "question": "What is our overall denial rate? Count each claim once per payer, using its current adjudication.",
+   "category": "denials",
+   "difficulty": "easy",
+   "family": null,
+   "answer": {
+    "columns": [
+     "denial_rate"
+    ],
+    "rows": [
+     [
+      0.0427
+     ]
+    ]
+   },
+   "sql": "SELECT round(avg(CASE WHEN is_denied THEN 1 ELSE 0 END), 4) AS denial_rate\nFROM sem.remit_claims\nWHERE is_current_adjudication",
+   "sql_executions": 1,
+   "repairs": 0,
+   "seconds": 0.0032,
+   "pass": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok"
+  },
+  {
+   "question_id": "a_7d45c279a7",
+   "sha256": "1af0f2549e3b8420661bbdb2f4a686cf7fd57e70e100b53355a74617cb3aabe9",
+   "question": "Some claims are adjudicated by the same payer across more than one 835 payment (different check/EFT trace numbers). By payer class, how many claim+payer pairs have remits spread across two or more distinct trace numbers, how many of those pairs include a reversal, how many have no current adjudication (latest event is a reversal), and what is the total paid on their current adjudications (2 decimals, 0 if none)? Order by payer class.",
+   "category": "remit_ops",
+   "difficulty": "hard",
+   "family": null,
+   "answer": {
+    "columns": [
+     "payer_class",
+     "multi_trace_pairs",
+     "pairs_with_reversal",
+     "pairs_without_current",
+     "current_paid"
+    ],
+    "rows": [
+     [
+      "blues",
+      3,
+      2,
+      0,
+      180.33
+     ],
+     [
+      "commercial",
+      2,
+      0,
+      0,
+      84.34
+     ]
+    ]
+   },
+   "sql": "WITH pairs AS (\n    SELECT min(payer_class) AS payer_class,\n           claim_key,\n           payer_key,\n           count(DISTINCT check_or_eft_number) AS n_traces,\n           bool_or(is_reversal) AS has_reversal,\n           bool_or(is_current_adjudication) AS has_current,\n           coalesce(sum(paid_amount) FILTER (WHERE is_current_adjudication), 0) AS current_paid\n    FROM sem.remit_claims\n    GROUP BY claim_key, payer_key\n    HAVING count(DISTINCT check_or_eft_number) >= 2\n)\nSELECT payer_class,\n       count(*) AS multi_trace_pairs,\n       count(*) FILTER (WHERE has_reversal) AS pairs_with_reversal,\n       count(*) FILTER (WHERE NOT has_current) AS pairs_without_current,\n       round(sum(current_paid), 2) AS current_paid\nFROM pairs\nGROUP BY payer_class\nORDER BY payer_class",
+   "sql_executions": 1,
+   "repairs": 0,
+   "seconds": 0.01,
+   "pass": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok"
+  },
+  {
+   "question_id": "a_f3c42ce766",
+   "sha256": "22756aee1ab4eecc64c5a3ab74105e10573713991b61826d5ff1e20acb4624b9",
+   "question": "What is the distribution of lines per claim? Counting each claim once at its latest submission (include voided claims), show the number of service lines on the claim, how many claims have that many lines, their share of all claims (percent, rounded to 1 decimal) and the average billed charge per claim (rounded to 2 decimals), ordered by line count.",
+   "category": "test_mix",
+   "difficulty": "easy",
+   "family": null,
+   "answer": {
+    "columns": [
+     "line_count",
+     "claims",
+     "share_pct",
+     "avg_billed_charge"
+    ],
+    "rows": [
+     [
+      1,
+      108,
+      21.1,
+      637.5
+     ],
+     [
+      2,
+      72,
+      14.1,
+      543.23
+     ],
+     [
+      3,
+      38,
+      7.4,
+      388.29
+     ],
+     [
+      4,
+      40,
+      7.8,
+      282.54
+     ],
+     [
+      5,
+      43,
+      8.4,
+      341.89
+     ],
+     [
+      6,
+      55,
+      10.7,
+      408.72
+     ],
+     [
+      7,
+      41,
+      8.0,
+      457.48
+     ],
+     [
+      8,
+      41,
+      8.0,
+      554.48
+     ],
+     [
+      9,
+      27,
+      5.3,
+      642.65
+     ],
+     [
+      10,
+      20,
+      3.9,
+      767.55
+     ],
+     [
+      11,
+      13,
+      2.5,
+      784.94
+     ],
+     [
+      12,
+      6,
+      1.2,
+      822.57
+     ],
+     [
+      13,
+      3,
+      0.6,
+      873.65
+     ],
+     [
+      14,
+      1,
+      0.2,
+      1358.77
+     ],
+     [
+      15,
+      2,
+      0.4,
+      938.13
+     ],
+     [
+      16,
+      2,
+      0.4,
+      1164.11
+     ]
+    ]
+   },
+   "sql": "WITH latest AS (\n    SELECT claim_key, line_count, charge_amount\n    FROM sem.claims\n    WHERE is_latest_submission\n),\ntot AS (\n    SELECT count(*) AS n_claims FROM latest\n)\nSELECT l.line_count,\n       count(*) AS claims,\n       round(100.0 * count(*) / max(tot.n_claims), 1) AS share_pct,\n       round(avg(l.charge_amount), 2) AS avg_billed_charge\nFROM latest l\nCROSS JOIN tot\nGROUP BY l.line_count\nORDER BY l.line_count",
+   "sql_executions": 1,
+   "repairs": 0,
+   "seconds": 0.0071,
+   "pass": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok"
+  },
+  {
+   "question_id": "q15_partial_line_denials",
+   "sha256": "251099791cdb3e2cba778b1a129264cf584242a44c3d183da91762abd74f500b",
+   "question": "How many service lines were denied on claims whose current adjudication is not a denial overall (partial denials)?",
+   "category": "lines",
+   "difficulty": "hard",
+   "family": null,
+   "answer": {
+    "columns": [
+     "partial_denial_lines"
+    ],
+    "rows": [
+     [
+      36
+     ]
+    ]
+   },
+   "sql": "SELECT count(*) AS partial_denial_lines\nFROM sem.remit_lines\nWHERE is_current_adjudication\n  AND line_is_denied\n  AND NOT claim_is_denied",
+   "sql_executions": 1,
+   "repairs": 0,
+   "seconds": 0.0035,
+   "pass": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok"
+  },
+  {
+   "question_id": "q25_primary_deductible",
+   "sha256": "2ca6676e42b2ab403eb548febb959759f1d2f5327ce44536a072defc18f38bcc",
+   "question": "What is the total deductible (adjustment group PR, reason code 1) assigned by primary payers on current adjudications?",
+   "category": "patient",
+   "difficulty": "hard",
+   "family": null,
+   "answer": {
+    "columns": [
+     "deductible"
+    ],
+    "rows": [
+     [
+      297.24
+     ]
+    ]
+   },
+   "sql": "WITH primary_pairs AS (\n    SELECT DISTINCT claim_key, payer_key\n    FROM sem.claims\n    WHERE payer_responsibility = 'P'\n)\nSELECT coalesce(round(sum(a.adjustment_amount), 2), 0) AS deductible\nFROM sem.adjustments a\nJOIN primary_pairs p\n  ON p.claim_key = a.claim_key\n AND p.payer_key = a.payer_key\nWHERE a.is_current_adjudication\n  AND a.group_code = 'PR'\n  AND a.carc_code = '1'",
+   "sql_executions": 1,
+   "repairs": 0,
+   "seconds": 0.0082,
+   "pass": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok"
+  },
+  {
+   "question_id": "a_26d4c3f4ca",
+   "sha256": "2cc00cd5401eacc354b140b41b59943a4e0a69e41f5faf9334b245bbe3eb0b35",
+   "question": "By payer class, using current adjudications only (one per claim+payer, so primary and secondary payers both count), show the number of current adjudications, total billed charge, total paid, total patient responsibility, paid as a percent of billed, and patient responsibility as a percent of billed. Treat missing patient responsibility as $0 and round percentages to 1 decimal place.",
+   "category": "payer_mix",
+   "difficulty": "easy",
+   "family": null,
+   "answer": {
+    "columns": [
+     "payer_class",
+     "current_adjudications",
+     "billed_charge",
+     "paid",
+     "patient_responsibility",
+     "paid_pct_of_billed",
+     "patient_responsibility_pct_of_billed"
+    ],
+    "rows": [
+     [
+      "blues",
+      93,
+      54300.18,
+      8913.43,
+      2575.5,
+      16.4,
+      4.7
+     ],
+     [
+      "commercial",
+      139,
+      60892.64,
+      12307.41,
+      3733.54,
+      20.2,
+      6.1
+     ],
+     [
+      "medicaid",
+      16,
+      6291.01,
+      1082.27,
+      0.0,
+      17.2,
+      0.0
+     ],
+     [
+      "medicaid_mco",
+      51,
+      20490.84,
+      3688.22,
+      8.33,
+      18.0,
+      0.0
+     ],
+     [
+      "medicare",
+      109,
+      64149.66,
+      11432.91,
+      2566.05,
+      17.8,
+      4.0
+     ],
+     [
+      "medicare_advantage",
+      74,
+      38297.46,
+      7009.57,
+      206.37,
+      18.3,
+      0.5
+     ],
+     [
+      "other",
+      10,
+      4101.79,
+      837.27,
+      137.24,
+      20.4,
+      3.3
+     ]
+    ]
+   },
+   "sql": "SELECT payer_class,\n       count(*) AS current_adjudications,\n       round(sum(charge_amount), 2) AS billed_charge,\n       round(sum(paid_amount), 2) AS paid,\n       round(sum(coalesce(patient_responsibility_amount, 0)), 2) AS patient_responsibility,\n       round(100.0 * sum(paid_amount) / nullif(sum(charge_amount), 0), 1) AS paid_pct_of_billed,\n       round(100.0 * sum(coalesce(patient_responsibility_amount, 0)) / nullif(sum(charge_amount), 0), 1) AS patient_responsibility_pct_of_billed\nFROM sem.remit_claims\nWHERE is_current_adjudication\nGROUP BY payer_class\nORDER BY payer_class",
+   "sql_executions": 1,
+   "repairs": 0,
+   "seconds": 0.0065,
+   "pass": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok"
+  },
+  {
+   "question_id": "q18_voided",
+   "sha256": "2de85709b8504d68fac27cdb9fbb6d146e51581a061c2ca1eb1188e6c9cb1024",
+   "question": "How many claims did we void (frequency code 8)?",
+   "category": "rework",
+   "difficulty": "easy",
+   "family": null,
+   "answer": {
+    "columns": [
+     "voided_claims"
+    ],
+    "rows": [
+     [
+      0
+     ]
+    ]
+   },
+   "sql": "SELECT count(DISTINCT claim_key) AS voided_claims\nFROM sem.claims\nWHERE frequency_code = '8'",
+   "sql_executions": 1,
+   "repairs": 0,
+   "seconds": 0.0025,
+   "pass": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok"
+  },
+  {
+   "question_id": "f_cpt_denied_lines__36415",
+   "sha256": "3147a0f3e1ef730e57a001297f9b469737d73080c8da4130a2ce9e3f75b2a3ec",
+   "question": "How many 36415 service lines were denied in current adjudications?",
+   "category": "lines",
+   "difficulty": "medium",
+   "family": "cpt_denied_lines",
+   "answer": {
+    "columns": [
+     "denied_lines"
+    ],
+    "rows": [
+     [
+      17
+     ]
+    ]
+   },
+   "sql": "SELECT count(*) AS denied_lines\nFROM sem.remit_lines\nWHERE is_current_adjudication\n  AND line_is_denied\n  AND procedure_code = '36415'",
+   "sql_executions": 1,
+   "repairs": 0,
+   "seconds": 0.0028,
+   "pass": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok"
+  },
+  {
+   "question_id": "a_8663c777cd",
+   "sha256": "319ae62d3ebc81aff83f455e5f2bbdb5db3d61c951e783e71b6523a5383ee2a0",
+   "question": "How concentrated is our ordering-provider volume month to month? For each service month from June 2026 onward (service month = month of the claim's service-from date), counting each claim once at its latest submission (include voided claims), rank referring/ordering provider NPIs by claim count (tie-break: NPI ascending) and show the month, total claims, claims from that month's top 5 referring providers, and the top 5's share of the month's claims (percent, 1 decimal).",
+   "category": "test_mix",
+   "difficulty": "hard",
+   "family": null,
+   "answer": {
+    "columns": [
+     "service_month",
+     "total_claims",
+     "top5_claims",
+     "top5_share_pct"
+    ],
+    "rows": [
+     [
+      "2026-06-01",
+      114,
+      21,
+      18.4
+     ],
+     [
+      "2026-07-01",
+      377,
+      44,
+      11.7
+     ]
+    ]
+   },
+   "sql": "WITH claims AS (\n    SELECT claim_key, service_month, referring_npi\n    FROM sem.claims\n    WHERE is_latest_submission\n      AND service_month >= DATE '2026-06-01'\n),\nby_npi AS (\n    SELECT service_month, referring_npi, count(*) AS n\n    FROM claims\n    WHERE referring_npi IS NOT NULL\n    GROUP BY service_month, referring_npi\n),\nranked AS (\n    SELECT service_month, referring_npi, n,\n           row_number() OVER (\n               PARTITION BY service_month\n               ORDER BY n DESC, referring_npi ASC\n           ) AS rn\n    FROM by_npi\n),\ntotals AS (\n    SELECT service_month, count(*) AS total_claims\n    FROM claims\n    GROUP BY service_month\n)\nSELECT t.service_month,\n       t.total_claims,\n       coalesce(sum(r.n) FILTER (WHERE r.rn <= 5), 0) AS top5_claims,\n       round(100.0 * coalesce(sum(r.n) FILTER (WHERE r.rn <= 5), 0) / t.total_claims, 1) AS top5_share_pct\nFROM totals t\nLEFT JOIN ranked r USING (service_month)\nGROUP BY t.service_month, t.total_claims\nORDER BY t.service_month",
+   "sql_executions": 1,
+   "repairs": 0,
+   "seconds": 0.012,
+   "pass": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok"
+  },
+  {
+   "question_id": "a_9a40343e18",
+   "sha256": "31c81624067d831d4695e2d8c931ac5dd3f47b98f2f479ab4f970cfca15f2d2b",
+   "question": "What is our payer-class mix by primary payer? For each payer class of the claim's primary payer (the payer billed with payer responsibility 'P', taken from the claim's latest primary submission), show the number of claims, the percent of all claims, the billed charge at that latest primary submission, and the percent of total billed charge. Count each claim once and include voided claims. Round percentages to 1 decimal place.",
+   "category": "payer_mix",
+   "difficulty": "medium",
+   "family": null,
+   "answer": {
+    "columns": [
+     "payer_class",
+     "claims",
+     "claim_pct",
+     "billed_charge",
+     "billed_pct"
+    ],
+    "rows": [
+     [
+      "blues",
+      83,
+      17.0,
+      47177.45,
+      18.9
+     ],
+     [
+      "commercial",
+      154,
+      31.6,
+      64272.19,
+      25.7
+     ],
+     [
+      "medicaid",
+      11,
+      2.3,
+      4307.18,
+      1.7
+     ],
+     [
+      "medicaid_mco",
+      53,
+      10.9,
+      23086.51,
+      9.2
+     ],
+     [
+      "medicare",
+      100,
+      20.5,
+      62573.11,
+      25.0
+     ],
+     [
+      "medicare_advantage",
+      73,
+      15.0,
+      42576.88,
+      17.0
+     ],
+     [
+      "other",
+      13,
+      2.7,
+      6089.1,
+      2.4
+     ]
+    ]
+   },
+   "sql": "WITH primary_subs AS (\n    SELECT claim_key, payer_class, charge_amount, submission_date, claim_id\n    FROM sem.claims\n    WHERE payer_responsibility = 'P'\n),\nlatest_primary AS (\n    SELECT claim_key, payer_class, charge_amount\n    FROM (\n        SELECT claim_key, payer_class, charge_amount,\n               row_number() OVER (\n                   PARTITION BY claim_key\n                   ORDER BY submission_date DESC, claim_id DESC\n               ) AS rn\n        FROM primary_subs\n    ) s\n    WHERE rn = 1\n),\ntot AS (\n    SELECT count(*) AS n_claims, sum(charge_amount) AS billed\n    FROM latest_primary\n)\nSELECT l.payer_class,\n       count(*) AS claims,\n       round(100.0 * count(*) / max(tot.n_claims), 1) AS claim_pct,\n       round(sum(l.charge_amount), 2) AS billed_charge,\n       round(100.0 * sum(l.charge_amount) / nullif(max(tot.billed), 0), 1) AS billed_pct\nFROM latest_primary l\nCROSS JOIN tot\nGROUP BY l.payer_class\nORDER BY l.payer_class",
+   "sql_executions": 1,
+   "repairs": 0,
+   "seconds": 0.0125,
+   "pass": true,
+   "checker": "bench.compare.match",
+   "checker_why": "ok"
+  }
+ ]
+}
