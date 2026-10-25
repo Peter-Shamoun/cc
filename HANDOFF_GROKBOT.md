@@ -1,8 +1,8 @@
 # HANDOFF_GROKBOT.md: Grok Bot session, Oct 25 2026, 3:26 to about 4:55 PM PT
 
-**For Claude Code.** While your usage was out, Peter had Grok Bot act as main dev on this repo. This file lists what landed, what is still in flight, what was deliberately left alone, and what to do next on the agent analyzer. Last refreshed: **4:00 PM PT, Oct 25 2026**.
+**For Claude Code.** While your usage was out, Peter had Grok Bot act as main dev on this repo. This file lists what landed, what is still in flight, what was deliberately left alone, and what to do next on the agent analyzer. Last refreshed: **4:02 PM PT, Oct 25 2026**.
 
-Short version: 20 PRs opened against `claude/trusting-heisenberg-8xvazk` (19 merged, 1 open at refresh time). Peter asked for PRs to be **auto-merged**, so a script merged every cleanly mergeable PR into the working branch once a minute until 5 PM PT. Nothing was reviewed by hand. Treat every merged PR as unreviewed, and review it before you build on it.
+Short version: 28 PRs opened against `claude/trusting-heisenberg-8xvazk` (22 merged, 6 open at refresh time). Peter asked for PRs to be **auto-merged**, so a script merged every cleanly mergeable PR into the working branch once a minute until 5 PM PT. Nothing was reviewed by hand. Treat every merged PR as unreviewed, and review it before you build on it.
 
 ## Ground rules that were held
 
@@ -21,15 +21,14 @@ Short version: 20 PRs opened against `claude/trusting-heisenberg-8xvazk` (19 mer
 - **Glossary train/val/test pipeline + power analysis + screen-2 infrastructure**: no PR yet.
 - **Security / HIPAA stress test**: no PR yet.
 - **Chat transcript storage, two competing designs**: no PR yet.
-- **`grokbot-r1` validation questions**: [#19](https://github.com/Peter-Shamoun/cc/pull/19) merged. These landed after the v1 dev set and DEV_HARD_v1 were drawn, so the grid's `grokbot-r1` exclusion was a no-op for both; they are untouched by the grid and usable as fresh validation.
+- **`grokbot-r1` validation questions**: [#19](https://github.com/Peter-Shamoun/cc/pull/19) merged. 50 hard everyday-analyst questions in `bench/questions_grokbot_r1.json` (intended split `validation`, snapshot `e21410ce6805`, 50/50 sound on the self-check). They are deliberately **not** wired into `load_cases`, so the grid's `grokbot-r1` exclusion was a no-op and no grid cell saw them. That makes them clean held-out material for screen 2, once a split manager ingests them.
 
 | PR | Title | Status | Tests / result |
 |---|---|---|---|
 | [#1](https://github.com/Peter-Shamoun/cc/pull/1) | SOTA refresh 2: text-to-SQL agents and screen-2 design | merged | docs only, no tests |
 | [#2](https://github.com/Peter-Shamoun/cc/pull/2) | Analyzer v1: analyst loop over the secure query path | merged | `pytest -q tests/test_analyzer.py tests/test_bench.py -k "not selftest"`: 51 passed; `pytest -q tests/test_analyzer.py`: 12 passed; `pytest -q tests/test_analyzer_sim.py`: 2 passed |
 | [#17](https://github.com/Peter-Shamoun/cc/pull/17) | Add DEV_HARD_v1 question list | merged | n/a (see PR body) |
-| [#19](https://github.com/Peter-Shamoun/cc/pull/19) | Add 50 grokbot-r1 validation questions | merged | n/a (see PR body) |
-| [#20](https://github.com/Peter-Shamoun/cc/pull/20) | Typed metric compiler: spec, date basis, gated SQL fallback | open (auto-merge pending) | n/a (see PR body) |
+| [#19](https://github.com/Peter-Shamoun/cc/pull/19) | Add 50 grokbot-r1 validation questions | merged | 50 of 50 sound (bench/check_question_file.py self-check) |
 
 ### Agent-analyzer approaches A01 to A10
 
@@ -37,13 +36,15 @@ Each approach is self-contained in `analyst/approaches/<id>/`, with a write-up i
 
 - **A01 single-shot**: one SELECT, one execution, no repair. This is the floor. A separate run on question slice 0 scored 17/20 with the cloud agent's model. Misses: a zero-filled empty population, a payment-method definition (checks dropped), and a flag encoded as text instead of a boolean.
 - **A02 tool loop**: explore → draft → repair at most twice on an error, an empty result or a suspicious result. Programmatic checks cover `is_latest_submission`, rates within 0..100, NULL columns and grain. Known risk: a repair can drop the filter that made the result empty.
-- **A03**: no PR yet.
+- **A03**: no PR tagged A03 at refresh time (agent bc-cb92504b); the typed metric compiler below may be its arm, check the agent.
 - **A04 multi-candidate**: 3 prompt-diverse SQLs, all executed. Agreement wins, and one pairwise selector call breaks a three-way split, with abstain allowed (CHASE-SQL-lite).
 - **A05 plan → execute → fresh-context critic**: allows one revision.
 - **A06 explore-first** (ReFoRCE-style templated probes, at most 13 aggregate statements, then one SQL): [#16](https://github.com/Peter-Shamoun/cc/pull/16) merged.
 - **A07 checked CTE decomposition**: population → join → metric → aggregation → ranking. Each step is checked for row count, grain uniqueness and conserved sums. It catches join fan-out, but a wrong population that isn't empty still passes.
 - **A08 self-consistency**: 5 attempts, a normalized vote, and the vote margin used as confidence (4–1 ships, 3–2 cascades, no majority abstains). Correlated errors make it confidently wrong, so publish `unanimous_wrong` and the calibration gap before you keep it.
-- **A09**: no PR yet.
+- **A09**: no PR tagged A09 at refresh time (agent bc-701511ee); context retrieval below may be its arm, check the agent.
+- **Typed metric compiler** (`analyst/variants/typed_metric_compiler/`, write-up `research/variants/typed_metric_compiler.md`): [#20](https://github.com/Peter-Shamoun/cc/pull/20) merged. The model submits a `QuestionSpec` (catalog metrics, dimensions, filters, grain and an explicit date basis), which is compiled through the existing `SemanticAPI` in `claude/schema/04_agent_interface.py`. Free SQL runs only after `cannot_express`. Coverage is only **11.6% of concrete analytic questions** (17.1% with families), and joins, unions and windows dominate the misses. Verdict: keep it as a first lane with free SQL behind it, and score the covered subset and the complement separately.
+- **Context retrieval** (`analyst/variants/context_retrieval/`, write-up `research/variants/context_retrieval.md`): [#22](https://github.com/Peter-Shamoun/cc/pull/22) merged. A tenant value index (payers, CPT/HCPCS, CARC/RARC, dx, with no PHI columns and a tenant-checked `lookup`), a schema linker, and train-only few-shot. Verdict: schema linking and few-shot probably won't help on a 10-view `sem.*`, and the value index is the only arm with a non-zero prior. The primary screen arm is `cr_value` vs `cr0_base`. Its tests are in `tests/test_variant_context_retrieval.py` (7 passed).
 - **A10 dynamic few-shot**: TRAIN-only TF-IDF/BM25 retrieval of 3 examples. Hard leakage guards drop the same family or template, masked-SQL matches, near-duplicate questions, `heldout_hard_1`, and anything that isn't train.
 
 | PR | Title | Status | Tests / result |
@@ -57,6 +58,8 @@ Each approach is self-contained in `analyst/approaches/<id>/`, with a write-up i
 | [#13](https://github.com/Peter-Shamoun/cc/pull/13) | A08 self-consistency: five attempts, normalized vote, margin as confidence | merged | `python -m pytest analyst/approaches/a08_self_consistency/test_self_consistency.py`: 19 passed |
 | [#14](https://github.com/Peter-Shamoun/cc/pull/14) | A02 tool loop: explore schema, draft SQL, repair at most twice | merged | 24 passed |
 | [#16](https://github.com/Peter-Shamoun/cc/pull/16) | A06 explore-first: probe sem.* before writing SQL | merged | 13 passed |
+| [#20](https://github.com/Peter-Shamoun/cc/pull/20) | Typed metric compiler: spec, date basis, gated SQL fallback | merged | n/a (see PR body) |
+| [#22](https://github.com/Peter-Shamoun/cc/pull/22) | Context retrieval: tenant value index, schema linking, train-only few-shot | merged | 7 passed |
 
 ### Parameter grid ("gradient descent" over analyzer settings)
 
@@ -91,6 +94,11 @@ Grid PRs:
 | [#12](https://github.com/Peter-Shamoun/cc/pull/12) | Grid C001: direct SQL on the 20-question dev set (20/20) | merged | accuracy 20/20 (bench.compare.match) |
 | [#15](https://github.com/Peter-Shamoun/cc/pull/15) | C007 grid cell: direct SQL, few-shot, explore, 3 candidates | merged | accuracy 20/20 (bench.compare.match) |
 | [#18](https://github.com/Peter-Shamoun/cc/pull/18) | Grid C011: direct SQL, 3 candidates, 20/20 | merged | accuracy 20/20 (bench.compare.match) |
+| [#23](https://github.com/Peter-Shamoun/cc/pull/23) | Grid C010: decompose_cte + explore + multiagent (20/20) | open (auto-merge pending) | accuracy 20/20 (bench.compare.match) |
+| [#24](https://github.com/Peter-Shamoun/cc/pull/24) | Grid cells C027–C029 on the sha256 dev set | open (auto-merge pending) | accuracy 19/20 (bench.compare.match) |
+| [#25](https://github.com/Peter-Shamoun/cc/pull/25) | C003 direct SQL grid cell (20/20) | open (auto-merge pending) | accuracy 20/20 (bench.compare.match) |
+| [#26](https://github.com/Peter-Shamoun/cc/pull/26) | Grid aggregation: pooled factor effects + SUMMARY.md | open (auto-merge pending) | n/a (see PR body) |
+| [#27](https://github.com/Peter-Shamoun/cc/pull/27) | Grid cell C009: decompose-CTE analyst, 20/20 | open (auto-merge pending) | accuracy 20/20 (bench.compare.match) |
 
 ### Product surface
 
