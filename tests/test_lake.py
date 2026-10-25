@@ -80,10 +80,10 @@ def test_closed_months_are_compacted_and_settled_months_fold_into_quarters(world
         assert len(by_month.get("2026-07", [])) <= 1 and all("/compacted-" in k for k in by_month.get("2026-07", [])), t
     m = read_manifest(store(world), read_current(store(world))[0])
     for rel in pipeline.CLAIM_RELATIONS:
-        assert set(m["relations"][rel]) == {"cohort=2026-Q3", "cohort=2026-08"}, rel
+        assert set(m["relations"][rel]) == {"schema", "cohort=2026-Q3", "cohort=2026-08"}, rel
     for rel in pipeline.APPEND_RELATIONS:
         parts = m["relations"][rel]
-        assert len(parts.get("received=2026-Q3", [])) <= 1 and set(parts) <= {"received=2026-Q3", "received=2026-08", "empty"}, rel
+        assert len(parts.get("received=2026-Q3", [])) <= 1 and set(parts) <= {"schema", "received=2026-Q3", "received=2026-08"}, rel
     assert len(m["relations"]["lossless.c837_claim"]["received=2026-Q3"]) == 1
 
 

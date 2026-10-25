@@ -95,7 +95,7 @@ def _insert(con, table: str, rows: list[dict]):
 #   GOLD_MODE=incremental (default)  recompute only the claims the new batch touched, rewrite only their partitions
 #   GOLD_MODE=full                   rebuild all of gold from all of silver every batch (what a rules change does)
 PARQUET = "FORMAT parquet, COMPRESSION zstd"
-GOLD_LAYOUT = "cohort-tiered-2"
+GOLD_LAYOUT = "cohort-tiered-3"
 OPEN_MONTHS = 3          # newest months kept as their own gold partition; older months fold into one file per quarter
 CLAIM_RELATIONS = [f"sem.{t}" for t in ("remit_claims", "remit_lines", "claims", "claim_lines", "adjustments", "remarks",
                                         "diagnoses")]                    # partitioned by claim cohort, copy-on-write
@@ -426,11 +426,9 @@ def build_gold(env, s3, con, B: str, c: str, kms: str, run_id: str, silver: Silv
             retired += _gold_incremental(con, writer, relations, base, last_month, clock)
             out["touched_claims"] = con.execute("SELECT count(*) FROM touched_claim").fetchone()[0]
             out["touched_cohorts"] = dict(con.execute("SELECT cohort, count(*) FROM cohort GROUP BY 1 ORDER BY 1").fetchall())
-        for rel in RELATIONS:                                    # every relation needs a file for its schema
-            if not any(relations.get(rel, {}).values()):
-                relations[rel] = {"empty": [writer.write(rel, f"SELECT * FROM {_source_sql(rel)} LIMIT 0", "empty")]}
-            elif relations[rel].get("empty") and len(relations[rel]) > 1:
-                retired += relations[rel].pop("empty")
+        for rel in RELATIONS:          # a zero-row file per relation, listed first: binding a view reads only it
+            if "schema" not in relations.setdefault(rel, {}):
+                relations[rel]["schema"] = [writer.write(rel, f"SELECT * FROM {_source_sql(rel)} LIMIT 0", "schema")]
         out["written"], out["written_mb"] = writer.count, round(writer.bytes / 1e6, 1)
     manifest = dict(version=f"v={run_id}", run_id=run_id, previous=version, rules=rules,
                     silver_through=max(silver.committed_runs, default=""), last_month=last_month,
@@ -550,7 +548,7 @@ def _retier(writer: _GoldWriter, relations: dict, last_month: str) -> list:
     for rel in CLAIM_RELATIONS + list(APPEND_RELATIONS):
         groups = {}
         for part, keys in relations[rel].items():
-            if part != "empty":
+            if part != "schema":
                 prefix, period = part.split("=", 1)
                 target = f"{prefix}={period if '-Q' in period else tier(period, last_month)}"
                 groups.setdefault(target, []).append((part, keys))
@@ -590,11 +588,11 @@ def _gold_incremental(con, writer: _GoldWriter, relations: dict, base: dict, las
             relations[rel].setdefault(part, []).extend(keys)
     clock("append_s")
     for rel in SMALL_RELATIONS:
-        old = [k for keys in relations[rel].values() for k in keys]
+        old = relations[rel]["all"]
         sql = _payers_merge_sql(_scan(store, old)) if rel == "sem.payers" else \
             f"SELECT * FROM {_scan(store, old)} UNION ALL BY NAME SELECT * FROM {rel}"
         retired += old
-        relations[rel] = {"all": [writer.write(rel, sql, "all")]}
+        relations[rel]["all"] = [writer.write(rel, sql, "all")]
     clock("small_s")
     return retired
 
