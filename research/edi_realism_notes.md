@@ -265,3 +265,41 @@ Measured on a one-year, 5 MB/business-day run (one tenant, ~3,100 claims per bus
 
 Low-confidence items are typical values and stay tunable (`Scenario`, module constants): denial multipliers by payer
 class, the partial share, commercial lags, cadence, reversal/rework rates, quirk rates, plan designs.
+
+---
+
+## Generator 3.1: fixes for realism audit 1 (2026-10-25)
+
+`research/edi_realism_audit_1.md` scored 3.0 at 5/10. What changed, by finding:
+
+| # | Finding | 3.1 |
+|---|---|---|
+| 1 | Placeholder demographics | `ccsim/edi_reference.py`: the 1,000 most common Census 2010 surnames (Hispanic surnames weighted by the state's share), SSA first names by sex and birth cohort, middle initials, house number + common street + suffix (plus NC/TX highway routes, apartments, PO boxes), real city/ZIP pairs in each lab's referral area, local area codes (lab PER: 336) |
+| 2 | Sex/age-blind tests | the patient is drawn first (clinical sex, age, known chronic conditions); profiles and every code are filtered by sex and age (PSA men 40+, HPV/hCG/obstetric panel women, no lipids or drug screens on toddlers); diagnoses carry sex/age limits. Residue: patients whose insurance gender marker differs (0.4%): KX on Medicare and on half of commercial lines, else CO-16 MA39 / CO-11 M76 |
+| 3 | NCCI pairs paid | the lab's scrubber strips panel components (CMP/BMP/renal/hepatic/lipid/CBC/obstetric/hepatitis panels, urinalysis exclusives); ~0.5% of claims keep one, always denied CO-97 (M80/N20) or CO-236 N20. Remaining bundling is payer policy (36415, reflex cultures, LDL with lipid panel, specimen-validity creatinine with drug tests, 87801 ceiling) |
+| 4 | 64 ICD codes, unrelated pointers | `ccsim/data/icd10cm_lab_dx_2026.csv`: 2,340 FY2026 billable ICD-10-CM codes (every one checked against CMS `icd10cm_codes_2026.txt`) in 50 clinical domains, Zipf within each; tests map to the domains that justify them; each line points at a fitting diagnosis (the patient's known condition when one fits); ~1,500 distinct codes a month at 5 MB/day |
+| 5 | Medicare pays screening | Medicare screening-only orders: GA -> PR-50 M38, GZ -> CO-50 N386, GY -> PR-96/204 N425, no modifier -> CO-50 N386 + REF*0K NCD; covered screening benefits (Z13.6 lipids, Z13.1 glucose, G0103 PSA, G0328 FIT, STI/HIV/HCV) pay; MA applies the NCDs less strictly |
+| 6 | Single-lab codes | 81528, 0037U and all PLA/MAAA codes removed; FIT (82274/G0328), CFTR, F2, F5, MTHFR, JAK2 added |
+| 7 | Cold start | `Scenario.burn_in_days = 90` simulated and not emitted: day 1 has ~33 835 files and Medicare; recoupments target payments 30-365 days old (median ~3 months), 60% partial, sometimes several claims at once (FB carry-forwards follow) |
+| 8 | Placeholder banks / cities | valid-checksum ABA + account per paying company, the lab's receiving account fixed, real claims addresses for national/regional payers (plausible ones for the tail) |
+| 9 | No PER*BL | PER*CX (most payers), PER*BL always, PER*IC with the payer web site |
+| 10 | Envelopes | ISA13 per sender/receiver pair with its own start, ISA10/GS05 send times (lab batch runs, clearinghouse overnight ERAs), 1-5 uneven 837 batches a day, timestamped file names; a re-delivery gets a new name, same bytes |
+| 11 | NPIs / CLIA | NPIs hashed over the issued range (no shared prefixes), billing NPIs checked absent from NPPES; CLIA 34D2187436 checked absent from the CMS CLIA file (34D0655059 was LabCorp Burlington's) |
+| 12 | Cheap wins | CO-253 on MA plans paying Medicare rates, PI-45 on some non-contracted payers, CARCs 119/242/252/288, per-payer PLB03-2 styles, invented tail names from varied patterns, holiday-light and flatter Mon-Thu collection dates |
+
+Measured, one tenant at 5 MB/business day, 30 days from 2026-07-01 (3.0 numbers in brackets; 3.0's 30-day run had a
+cold start, its one-year figures are in the table above): lines/claim 5.1 [5.0]; Medicare 6.3, commercial 4.6;
+initial denial rate 10.0% [10.2%], 72% line-level [72%], bundling 50% of non-duplicate denials; allowed/CLFS Medicare
+1.00, MA 1.00, Medicaid 0.83-0.85, commercial 1.14; 34% of claims with patient share; 4.9 MB a day = ~2,980 claims
+per business day [3.2 MB on a cold start; ~3,130 in a year] (bytes per claim rose: middle names, apartments, more
+diagnoses, PER segments); 33 835 files a day from day 1 [0 on days 1-3]. The 150-day calibration tests
+(`tests/test_edi_calibration.py`) pass unchanged except that they count claims billed inside the window.
+One year at 5 MB/business day (plus the 90-day burn-in): 1,306 MB raw over 250 file days, 3,031 claims per business
+day (base), 9.5 minutes, peak RSS 972 MB (the burn-in starts the window with a full set of claims in flight).
+
+Ledger: a claim billed during the burn-in appears only with what the window delivered (its 835 events and any 837
+resubmission). `bench/truth_db.py` `ledger.claims` holds claims with an 837 in the window (like `sem.claims`), with
+`submitted` = first submission in the window; events hold every 835 event in the window (like `sem.remit_claims`).
+
+Not done: NCD frequency edits (e.g. A1c more often than every 3 months) need per-patient history; the 2-4 month
+tail of WO recoupments means a 45-day benchmark window sees few recoupments of its own payments.
