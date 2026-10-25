@@ -49,7 +49,7 @@
    "sql_execs": 6,
    "repairs": 0,
    "seconds": 0.022,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_denied_lines__83036",
@@ -65,7 +65,7 @@
    "sql_execs": 5,
    "repairs": 0,
    "seconds": 0.015,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_avg_paid_per_paid_claim__medicare-part-b-north-carolina",
@@ -81,7 +81,7 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.018,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_f786e11aec",
@@ -143,7 +143,7 @@
    "sql_execs": 20,
    "repairs": 0,
    "seconds": 0.132,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_denial_rate__unitedhealthcare-community-plan-nc",
@@ -159,7 +159,7 @@
    "sql_execs": 6,
    "repairs": 0,
    "seconds": 0.015,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_monthly_denial_rate__unitedhealthcare",
@@ -180,7 +180,7 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.024,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_denial_rate__unitedhealthcare-medicare-advantage",
@@ -196,7 +196,7 @@
    "sql_execs": 6,
    "repairs": 0,
    "seconds": 0.015,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0483",
@@ -212,7 +212,7 @@
    "sql_execs": 8,
    "repairs": 0,
    "seconds": 0.021,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_fca405b635",
@@ -235,7 +235,7 @@
    "sql_execs": 9,
    "repairs": 0,
    "seconds": 0.024,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_paid_in_month__cigna_2026-08-01",
@@ -251,7 +251,7 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.018,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_patient_responsibility__aetna",
@@ -267,7 +267,7 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.017,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_b853266803",
@@ -322,7 +322,7 @@
    "sql_execs": 26,
    "repairs": 0,
    "seconds": 0.218,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -355,7 +355,7 @@
    "sql_execs": 12,
    "repairs": 0,
    "seconds": 0.055,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_class_denial_rate__medicaid_mco",
@@ -371,7 +371,7 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.018,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_a5888f64a4",
@@ -426,7 +426,7 @@
    "sql_execs": 12,
    "repairs": 0,
    "seconds": 0.054,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_436f690741",
@@ -564,7 +564,7 @@
    "sql_execs": 13,
    "repairs": 0,
    "seconds": 0.057,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_d29f83c935",
@@ -2866,7 +2866,7 @@
    "sql_execs": 18,
    "repairs": 0,
    "seconds": 0.128,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_class_denial_rate__other",
@@ -2882,7 +2882,7 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.019,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_denied_lines__85652",
@@ -2898,7 +2898,7 @@
    "sql_execs": 5,
    "repairs": 0,
    "seconds": 0.014,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q07_denial_rate",
@@ -2914,11 +2914,11 @@
    "sql_execs": 7,
    "repairs": 0,
    "seconds": 0.024,
-   "pass": null
+   "pass": true
   }
  ],
- "accuracy": null,
+ "accuracy": "20/20",
  "n": 20,
  "mean_sql_execs": 9.8,
- "notes": "Planner and SQL writer were separate subagents; the writer saw only the plan. Each query is CTE-decomposed. Intermediate row counts, grain-key uniqueness, and sums were executed before the final result was accepted. A fresh-context critic checked population, units, and invariants and accepted all 20, so the one allowed revision was not used. repair=0. Assumptions are the standard revenue-cycle reading and are stated with each answer. Answers committed before scoring."
+ "notes": "Planner and SQL writer were separate subagents; the writer saw only the plan. Each query is CTE-decomposed. Intermediate row counts, grain-key uniqueness, and sums were executed before the final result was accepted. A fresh-context critic checked population, units, and invariants and accepted all 20, so the one allowed revision was not used. repair=0. Assumptions are the standard revenue-cycle reading and are stated with each answer. Checker bench.compare.match: 20/20."
 }
