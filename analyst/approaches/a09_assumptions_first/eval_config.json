@@ -1,0 +1,17 @@
+{
+  "a09_assumptions_first": {
+    "glossary": "basic",
+    "data_dictionary": false,
+    "data_profile": false,
+    "enable_sql": true,
+    "enable_metrics": false,
+    "enable_lookup": false,
+    "enable_examples": false,
+    "enable_ask": false,
+    "sql_error_hints": false,
+    "result_checks": false,
+    "context_style": "goal",
+    "effort": "low",
+    "max_tool_calls": 12
+  }
+}
