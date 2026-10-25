@@ -49,7 +49,7 @@ def _initial_denials(claims):
 def test_lines_per_claim(ledger):
     _, claims = ledger
     lines = [len(c["cpts"]) for c in claims]
-    assert 4.4 <= sum(lines) / len(lines) <= 5.4                         # spec mean 4.9 (3.5-6.5)
+    assert 4.3 <= sum(lines) / len(lines) <= 5.7                         # spec mean 4.9 (labs range 3.5-6.5)
     assert sum(n == 1 for n in lines) / len(lines) <= .25                 # spec 17% single-line
     assert sum(n >= 9 for n in lines) / len(lines) >= .08                 # spec 13% with 9+
     by = defaultdict(list)
@@ -74,11 +74,35 @@ def test_every_code_is_on_the_2026_clfs(ledger):
 def test_payer_mix(ledger):
     _, claims = ledger
     seg = Counter(c["segment"] for c in claims)
-    for s, share in m.SEGMENT_SHARE.items():
+    for s, share in m.tenant_market("acme_labs").segment_share.items():   # the lab's own market
         assert abs(seg[s] / len(claims) - share) <= max(.02, share * .2), (s, seg[s] / len(claims))
     payers = Counter(c["payers"][0] for c in claims)
     assert .6 <= sum(n for _, n in payers.most_common(10)) / len(claims) <= .82     # spec: top 10 ids ~70%
     assert len(payers) > 150                                              # long tail of payer ids
+
+
+def test_each_lab_has_its_own_market_within_the_spec():
+    """Per-lab payer mix, profiles and menu differ from the national typical values, within plausible bands; the
+    state's Medicaid managed-care penetration decides the fee-for-service share (Texas STAR: under 10%)."""
+    markets = {tc: m.tenant_market(tc) for tc in m.TENANTS}
+    assert markets["acme_labs"].segment_share != markets["acme_diagnostics"].segment_share
+    for tc, mk in markets.items():
+        share = mk.segment_share
+        assert abs(sum(share.values()) - 1) < 1e-9
+        for s, typical in m.SEGMENT_SHARE.items():
+            if not s.startswith("medicaid"):
+                assert .7 <= share[s] / typical <= 1.4, (tc, s, share[s])
+        medicaid = share["medicaid_ffs"] + share["medicaid_mco"]
+        assert .7 <= medicaid / (m.SEGMENT_SHARE["medicaid_ffs"] + m.SEGMENT_SHARE["medicaid_mco"]) <= 1.4
+        assert abs(share["medicaid_ffs"] / medicaid - m.MEDICAID_FFS_SHARE[m.TENANTS[tc].region]) < 1e-9
+        for name, prof in mk.profiles.items():
+            assert .6 <= prof["weight"] / m.PROFILES[name]["weight"] <= 1.6, (tc, name)
+            for k in ("menu", "menu_F", "menu_M"):
+                for code, p in prof.get(k, {}).items():
+                    base = m.PROFILES[name][k][code]
+                    assert p == base if base >= 1 else 0 < p <= .95, (tc, name, code)
+    assert markets["acme_diagnostics"].segment_share["medicaid_ffs"] < .1 * (
+        markets["acme_diagnostics"].segment_share["medicaid_ffs"] + markets["acme_diagnostics"].segment_share["medicaid_mco"])
 
 
 def test_denial_rate_and_reason_mix(ledger):
@@ -89,11 +113,11 @@ def test_denial_rate_and_reason_mix(ledger):
     assert .5 <= sum(d[2] == "partial" for d in real) / len(real) <= .75   # spec: ~60% of denials are line-level
     cats = Counter(d[1] for d in den)
     ranked = [k for k, _ in cats.most_common()]
-    assert ranked[:2] == ["bundling", "duplicate"], cats
-    assert .50 <= cats["bundling"] / len(real) <= .68                     # 59.4% of clinical denials
-    assert .10 <= cats["duplicate"] / len(den) <= .21                     # 15.2%
+    assert ranked[0] == "bundling" and "duplicate" in ranked[1:3], cats   # spec: bundling, then duplicates
+    assert .45 <= cats["bundling"] / len(real) <= .68                     # 59.4% of clinical denials (national)
+    assert .08 <= cats["duplicate"] / len(den) <= .21                     # 15.2% (national)
     for k in ("non_covered", "prior_auth", "modifier", "medical_necessity", "information", "cob"):
-        assert .005 <= cats[k] / len(den) <= .09, (k, cats[k] / len(den))
+        assert .005 <= cats[k] / len(den) <= .12, (k, cats[k] / len(den))   # the lab's own payer and test mix
     rate = defaultdict(lambda: [0, 0])
     for c, a in _primary(claims):
         rate[c["payer_class"]][0] += 1
@@ -168,9 +192,15 @@ def test_commercial_deductibles_match_kff():
 
 def test_calendar_and_remittance_cadence(ledger):
     T, claims = ledger
+    minor = set()
     for f in T["files"]:
         d = date.fromisoformat(f["day"])
-        assert d.weekday() < 5 and d not in m.federal_holidays(d.year), f["name"]
+        assert d.weekday() < 5 and d not in m.lab_holidays(d.year), f["name"]
+        if f["kind"] == "835":
+            assert d not in m.federal_holidays(d.year), f["name"]             # banks closed: no 835 / EFT
+        elif d in m.federal_holidays(d.year):
+            minor.add(d)                                                      # the lab bills on minor holidays
+    assert {date(2026, 2, 16), date(2026, 6, 19)} <= minor
     days_835 = Counter(f["day"] for f in T["files"] if f["kind"] == "835" and f["expect"] == "parsed")
     mac = [f["day"] for f in T["files"] if f["kind"] == "835" and f.get("payer_id") == "11502"]
     assert len(set(mac)) >= .9 * len([d for d in days_835 if d >= min(mac)])    # the MAC remits every business day
