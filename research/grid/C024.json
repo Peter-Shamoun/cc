@@ -45,7 +45,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.031,
-      "pass": null,
+      "pass": true,
       "assumption": "Population is current adjudications for payer_name 'Medicare Part B North Carolina' with paid_amount > 0. Average is round(avg(paid_amount), 2) dollars per adjudication (one row per claim+payer)."
     },
     {
@@ -105,7 +105,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.028,
-      "pass": null,
+      "pass": true,
       "assumption": "One claim_key, voided claims included. Lag is days from the date of service on the earliest 837 (any payer) to that submission's date. Payer class is the class on the claim's latest primary (payer_responsibility = 'P') submission. Average rounded to 2 decimals; median is the statistical median, unrounded. Over-90 is lag_days > 90."
     },
     {
@@ -121,7 +121,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.01,
-      "pass": null,
+      "pass": true,
       "assumption": "Each 837 row with frequency_code '7' is one corrected replacement submission. Count those rows (not distinct claim_key) in their submission_month, and sum charge_amount rounded to 2 decimals. Ordered by month."
     },
     {
@@ -150,7 +150,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.024,
-      "pass": null,
+      "pass": true,
       "assumption": "Primary payer is payer_responsibility = 'P'. Days to pay is the current adjudication payment_date minus the first 837 submission_date to that same payer, only where paid_amount > 0. Median is median(); the 90th percentile is quantile_cont (linear). Both rounded to 1 decimal. Ordered by payer class."
     },
     {
@@ -181,7 +181,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.016,
-      "pass": null,
+      "pass": true,
       "assumption": "Reviewed denial CARCs are is_denial_carc under group CO, on current adjudications that are denied. Each denied claim+payer counts once per CARC. Top 5 by that count, tie-break CARC code ascending."
     },
     {
@@ -234,7 +234,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.016,
-      "pass": null,
+      "pass": true,
       "assumption": "Population is every claim+payer pair with at least one 835 claim-payment row. First-pass means exactly one such event, and that event is the current adjudication and is not a denial. Rate is a percent rounded to 2 decimals. Ordered by payer class."
     },
     {
@@ -275,7 +275,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.019,
-      "pass": null,
+      "pass": true,
       "assumption": "Current adjudications that are denied. CO-group reviewed denial CARCs at claim or line level (both live on sem.adjustments). Pair count is distinct claim_payer_key. CO dollars are the sum of those adjustment amounts, rounded to 2 decimals. Sort by pair count desc, then CARC."
     },
     {
@@ -1427,7 +1427,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.028,
-      "pass": null,
+      "pass": true,
       "assumption": "Latest submission only, voided claims included. A claim counts once per procedure code on its lines. Null principal diagnoses are not a code, so they are excluded from the ranking but stay in the claim total. Tie-break is the lowest diagnosis code. Share is a percent to 1 decimal. Ordered by procedure code."
     },
     {
@@ -1441,7 +1441,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.007,
-      "pass": null,
+      "pass": true,
       "assumption": "Denial rate is the fraction of current adjudications with is_denied, one row per claim+payer, rounded to 4 decimals. The question does not ask for a percentage."
     },
     {
@@ -1451,7 +1451,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.02,
-      "pass": null,
+      "pass": true,
       "assumption": "A claim+payer pair is multi-trace when it has at least two distinct check_or_eft_number values. Reversal means any event is a reversal. No current adjudication means no is_current_adjudication row. Paid is the sum of paid_amount on current adjudications, 0 when none, rounded to 2 decimals. Ordered by payer class."
     },
     {
@@ -1546,7 +1546,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.015,
-      "pass": null,
+      "pass": true,
       "assumption": "Latest submission only, voided claims included, one row per claim_key. Line count is sem.claims.line_count, so claims with zero lines stay in the distribution. Share is a percent to 1 decimal. Average billed charge per claim is round(sum(charge)/count, 2). Ordered by line count."
     },
     {
@@ -1560,7 +1560,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.008,
-      "pass": null,
+      "pass": true,
       "assumption": "A partial denial is an 835 service line on a current adjudication where the line is denied and the claim adjudication is not denied. Count those lines."
     },
     {
@@ -1574,7 +1574,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.019,
-      "pass": null,
+      "pass": true,
       "assumption": "Deductible is adjustment group PR, CARC '1', on current adjudications whose payer is the claim's primary payer (a sem.claims row with the same claim_key and payer_key and payer_responsibility = 'P'). Dollars rounded to 2; 0 when none."
     },
     {
@@ -1648,7 +1648,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.014,
-      "pass": null,
+      "pass": true,
       "assumption": "Current adjudications only, so primary and secondary both count. Missing patient responsibility is 0. Paid percent and patient-responsibility percent are 100 * sum / billed, rounded to 1 decimal. Money rounded to 2 decimals. Ordered by payer class."
     },
     {
@@ -1662,7 +1662,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.006,
-      "pass": null,
+      "pass": true,
       "assumption": "A voided claim is a claim_key that has an 837 with frequency_code '8'. Count distinct claims, not submission rows."
     },
     {
@@ -1676,7 +1676,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.007,
-      "pass": null,
+      "pass": true,
       "assumption": "Count 835 service lines on current adjudications whose submitted procedure code is 36415 and line_is_denied."
     },
     {
@@ -1699,7 +1699,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.021,
-      "pass": null,
+      "pass": true,
       "assumption": "Service months from 2026-06-01 onward, latest submission, voided claims included. Total claims includes null referring NPIs. The top 5 ranking drops null NPIs and tie-breaks by NPI ascending. Share is top-5 claim counts over all claims that month, percent to 1 decimal."
     },
     {
@@ -1759,7 +1759,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.021,
-      "pass": null,
+      "pass": true,
       "assumption": "One row per claim: the latest submission with payer_responsibility = 'P', voided claims included. Mix percents use that primary-payer population as the denominator (shares sum to 100), rounded to 1 decimal. Billed charge is that submission's charge, rounded to 2 decimals."
     },
     {
@@ -1773,7 +1773,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.009,
-      "pass": null,
+      "pass": true,
       "assumption": "Share of service-line paid dollars on current adjudications whose procedure_code is 87798. Returned as a fraction rounded to 4 decimals. Lines on claim-level-only denials are absent from sem.remit_lines and are not in the denominator."
     },
     {
@@ -1787,11 +1787,11 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.006,
-      "pass": null,
+      "pass": true,
       "assumption": "Sum of paid_amount on current adjudications, one row per claim+payer, rounded to 2 decimals. Reversals are not current and are not added."
     }
   ],
-  "accuracy": null,
+  "accuracy": "20/20",
   "n": 20,
   "mean_sql_execs": 3.0,
   "notes": "Dataset is the frozen generator 3.3 snapshot at .ccsim/bench/f22d94791686 built with Scenario(days=15, volume_scale=0.2, seed=3), the smallest snapshot() config used by the agent tests, opened with open_snapshot(escalate=False). Dev ids are the first 20 benchmark questions by sha256(question_id) after dropping question_set heldout_hard_1 and any grokbot-r1 tag. Metric spec then three diverse candidates, executed once each through bench.guard, picked by result agreement. No data probes before those executions. No repair. Assumptions are on each result. Few-shot examples were the 3 nearest non-dev, non-held-out, non-same-family questions by TF-IDF cosine, with their reference SQL.",
