@@ -45,7 +45,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 35,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_denied_lines__83036",
@@ -58,7 +58,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 40,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_avg_paid_per_paid_claim__medicare-part-b-north-carolina",
@@ -71,7 +71,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 45,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_f786e11aec",
@@ -130,7 +130,7 @@
    "sql_execs": 6,
    "repairs": 0,
    "seconds": 180,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_denial_rate__unitedhealthcare-community-plan-nc",
@@ -143,7 +143,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 30,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_monthly_denial_rate__unitedhealthcare",
@@ -161,7 +161,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 50,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_denial_rate__unitedhealthcare-medicare-advantage",
@@ -174,7 +174,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 30,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0483",
@@ -187,7 +187,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 55,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_fca405b635",
@@ -207,7 +207,7 @@
    "sql_execs": 4,
    "repairs": 0,
    "seconds": 70,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_paid_in_month__cigna_2026-08-01",
@@ -220,7 +220,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 35,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_patient_responsibility__aetna",
@@ -233,7 +233,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 35,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_b853266803",
@@ -285,7 +285,7 @@
    "sql_execs": 6,
    "repairs": 0,
    "seconds": 160,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -315,7 +315,7 @@
    "sql_execs": 4,
    "repairs": 0,
    "seconds": 80,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_class_denial_rate__medicaid_mco",
@@ -328,7 +328,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 40,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_a5888f64a4",
@@ -380,7 +380,7 @@
    "sql_execs": 5,
    "repairs": 0,
    "seconds": 150,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_436f690741",
@@ -515,7 +515,7 @@
    "sql_execs": 4,
    "repairs": 0,
    "seconds": 90,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_d29f83c935",
@@ -2814,7 +2814,7 @@
    "sql_execs": 4,
    "repairs": 0,
    "seconds": 140,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_class_denial_rate__other",
@@ -2827,7 +2827,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 35,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_denied_lines__85652",
@@ -2840,7 +2840,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 35,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q07_denial_rate",
@@ -2853,11 +2853,11 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 25,
-   "pass": null
+   "pass": true
   }
  ],
- "accuracy": null,
+ "accuracy": "20/20",
  "n": 20,
  "mean_sql_execs": 3.6,
- "notes": "Dataset is bench.dataset snapshot() default (generator 3.3, days=45, volume_scale=0.6, seed=2026, p_corrupt_file=0.1), dataset id e21410ce6805, read with open_snapshot(escalate=False). Dev set: all benchmark questions except question_set heldout_hard_1 (27) and any grokbot-r1 tag (none), sorted by sha256(question_id) hex, first 20. Few-shot: BM25 (k1=1.5, b=0.75) top 3 from outside the dev set, excluding held-out 27 and the same family. Explore: distinct payer names/classes, months, frequency, null rates, key uniqueness, join cardinalities, and per-question grain checks before the final statement. Generation: each final query is CTE-staged (population, then aggregate). Verifier: fresh-context subagent accepted 19/20; it proposed dropping paid_amount>0 on the Medicare Part B average, which contradicts the question ('paid > 0'), so that revision was not applied. repair=0. Planner spec and SQL execution were separate passes; the verifier was a separate subagent. seconds are approximate analyst time. pass is filled after commit by bench.compare.match."
+ "notes": "Dataset is bench.dataset snapshot() default (generator 3.3, days=45, volume_scale=0.6, seed=2026, p_corrupt_file=0.1), dataset id e21410ce6805, read with open_snapshot(escalate=False). Dev set: all benchmark questions except question_set heldout_hard_1 (27) and any grokbot-r1 tag (none), sorted by sha256(question_id) hex, first 20. Few-shot: BM25 (k1=1.5, b=0.75) top 3 from outside the dev set, excluding held-out 27 and the same family. Explore: distinct payer names/classes, months, frequency, null rates, key uniqueness, join cardinalities, and per-question grain checks before the final statement. Generation: each final query is CTE-staged (population, then aggregate). Verifier: fresh-context subagent accepted 19/20; it proposed dropping paid_amount>0 on the Medicare Part B average, which contradicts the question ('paid > 0'), so that revision was not applied. repair=0. Planner spec and SQL execution were separate passes; the verifier was a separate subagent. seconds are approximate analyst time. Scored after the answer commit with bench.compare.match against gold SQL on the same snapshot: 20/20."
 }
