@@ -1,0 +1,1799 @@
+{
+  "cell": "C024",
+  "config": {
+    "generation": "metric_spec",
+    "fewshot": true,
+    "explore": false,
+    "candidates3": true,
+    "verifier": false,
+    "repair": false,
+    "assumptions": true,
+    "multiagent": false
+  },
+  "model": "Grok 4.7",
+  "dev_ids": [
+    "f_payer_avg_paid_per_paid_claim__medicare-part-b-north-carolina",
+    "a_f786e11aec",
+    "a_fca405b635",
+    "a_b853266803",
+    "q10_top_denial_carcs",
+    "a_a5888f64a4",
+    "a_436f690741",
+    "a_d29f83c935",
+    "q07_denial_rate",
+    "a_7d45c279a7",
+    "a_f3c42ce766",
+    "q15_partial_line_denials",
+    "q25_primary_deductible",
+    "a_26d4c3f4ca",
+    "q18_voided",
+    "f_cpt_denied_lines__36415",
+    "a_8663c777cd",
+    "a_9a40343e18",
+    "f_cpt_share_of_line_payments__87798",
+    "q03_total_paid"
+  ],
+  "results": [
+    {
+      "qid": "f_payer_avg_paid_per_paid_claim__medicare-part-b-north-carolina",
+      "answer": [
+        {
+          "avg_paid": 86.28
+        }
+      ],
+      "final_sql": "SELECT round(avg(paid_amount), 2) AS avg_paid\n               FROM sem.remit_claims\n               WHERE is_current_adjudication AND paid_amount > 0\n                 AND payer_name = 'Medicare Part B North Carolina'",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.031,
+      "pass": null,
+      "assumption": "Population is current adjudications for payer_name 'Medicare Part B North Carolina' with paid_amount > 0. Average is round(avg(paid_amount), 2) dollars per adjudication (one row per claim+payer)."
+    },
+    {
+      "qid": "a_f786e11aec",
+      "answer": [
+        {
+          "payer_class": "blues",
+          "claims": 44,
+          "avg_lag_days": 21.5,
+          "median_lag_days": 4.5,
+          "claims_over_90": 2
+        },
+        {
+          "payer_class": "commercial",
+          "claims": 71,
+          "avg_lag_days": 8.48,
+          "median_lag_days": 4.0,
+          "claims_over_90": 1
+        },
+        {
+          "payer_class": "medicaid",
+          "claims": 12,
+          "avg_lag_days": 3.67,
+          "median_lag_days": 4.0,
+          "claims_over_90": 0
+        },
+        {
+          "payer_class": "medicaid_mco",
+          "claims": 38,
+          "avg_lag_days": 5.53,
+          "median_lag_days": 4.0,
+          "claims_over_90": 0
+        },
+        {
+          "payer_class": "medicare",
+          "claims": 61,
+          "avg_lag_days": 10.64,
+          "median_lag_days": 4.0,
+          "claims_over_90": 1
+        },
+        {
+          "payer_class": "medicare_advantage",
+          "claims": 28,
+          "avg_lag_days": 9.93,
+          "median_lag_days": 4.0,
+          "claims_over_90": 0
+        },
+        {
+          "payer_class": "other",
+          "claims": 7,
+          "avg_lag_days": 12.14,
+          "median_lag_days": 4.0,
+          "claims_over_90": 0
+        }
+      ],
+      "final_sql": "WITH first_sub AS (\n                 SELECT claim_key, submission_date AS first_sub, service_date_from AS dos\n                 FROM (\n                   SELECT claim_key, submission_date, service_date_from,\n                          row_number() OVER (PARTITION BY claim_key ORDER BY submission_date, claim_id) AS rn\n                   FROM sem.claims\n                 ) s WHERE rn = 1\n               ),\n               prim AS (\n                 SELECT claim_key, payer_class FROM (\n                   SELECT claim_key, payer_class,\n                          row_number() OVER (PARTITION BY claim_key ORDER BY submission_date DESC, claim_id DESC) AS rn\n                   FROM sem.claims WHERE payer_responsibility = 'P'\n                 ) p WHERE rn = 1\n               ),\n               lags AS (\n                 SELECT p.payer_class, date_diff('day', f.dos, f.first_sub) AS lag_days\n                 FROM first_sub f JOIN prim p USING (claim_key)\n                 WHERE f.dos IS NOT NULL AND f.first_sub IS NOT NULL\n               )\n               SELECT payer_class, count(*) AS claims, round(avg(lag_days), 2) AS avg_lag_days,\n                      median(lag_days) AS median_lag_days,\n                      count(*) FILTER (WHERE lag_days > 90) AS claims_over_90\n               FROM lags GROUP BY payer_class ORDER BY payer_class",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.028,
+      "pass": null,
+      "assumption": "One claim_key, voided claims included. Lag is days from the date of service on the earliest 837 (any payer) to that submission's date. Payer class is the class on the claim's latest primary (payer_responsibility = 'P') submission. Average rounded to 2 decimals; median is the statistical median, unrounded. Over-90 is lag_days > 90."
+    },
+    {
+      "qid": "a_fca405b635",
+      "answer": [
+        {
+          "submission_month": "2026-07-01",
+          "corrected_claims": 5,
+          "billed": 2205.41
+        }
+      ],
+      "final_sql": "SELECT submission_month, count(*) AS corrected_claims, round(sum(charge_amount), 2) AS billed\n               FROM sem.claims WHERE frequency_code = '7'\n               GROUP BY submission_month ORDER BY submission_month",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.01,
+      "pass": null,
+      "assumption": "Each 837 row with frequency_code '7' is one corrected replacement submission. Count those rows (not distinct claim_key) in their submission_month, and sum charge_amount rounded to 2 decimals. Ordered by month."
+    },
+    {
+      "qid": "a_b853266803",
+      "answer": [
+        {
+          "payer_class": "commercial",
+          "paid_claims": 3,
+          "median_days": 14.0,
+          "p90_days": 14.8
+        },
+        {
+          "payer_class": "medicaid",
+          "paid_claims": 1,
+          "median_days": 15.0,
+          "p90_days": 15.0
+        },
+        {
+          "payer_class": "medicare_advantage",
+          "paid_claims": 1,
+          "median_days": -7.0,
+          "p90_days": -7.0
+        }
+      ],
+      "final_sql": "WITH prim AS (\n                 SELECT claim_key, payer_key, any_value(payer_class) AS payer_class, min(submission_date) AS first_sub\n                 FROM sem.claims WHERE payer_responsibility = 'P'\n                 GROUP BY claim_key, payer_key\n               ),\n               paid AS (\n                 SELECT p.payer_class, date_diff('day', p.first_sub, r.payment_date) AS days\n                 FROM prim p\n                 JOIN sem.remit_claims r\n                   ON r.claim_key = p.claim_key AND r.payer_key = p.payer_key\n                 WHERE r.is_current_adjudication AND r.paid_amount > 0\n                   AND p.first_sub IS NOT NULL AND r.payment_date IS NOT NULL\n               )\n               SELECT payer_class, count(*) AS paid_claims,\n                      round(median(days), 1) AS median_days,\n                      round(quantile_cont(days, 0.9), 1) AS p90_days\n               FROM paid GROUP BY payer_class ORDER BY payer_class",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.024,
+      "pass": null,
+      "assumption": "Primary payer is payer_responsibility = 'P'. Days to pay is the current adjudication payment_date minus the first 837 submission_date to that same payer, only where paid_amount > 0. Median is median(); the 90th percentile is quantile_cont (linear). Both rounded to 1 decimal. Ordered by payer class."
+    },
+    {
+      "qid": "q10_top_denial_carcs",
+      "answer": [
+        {
+          "carc_code": "197",
+          "denied_claims": 4
+        },
+        {
+          "carc_code": "183",
+          "denied_claims": 3
+        },
+        {
+          "carc_code": "18",
+          "denied_claims": 2
+        },
+        {
+          "carc_code": "204",
+          "denied_claims": 1
+        },
+        {
+          "carc_code": "96",
+          "denied_claims": 1
+        }
+      ],
+      "final_sql": "SELECT a.carc_code, count(DISTINCT r.claim_payer_key) AS denied_claims\n               FROM sem.adjustments a\n               JOIN sem.remit_claims r ON r.remit_claim_id = a.remit_claim_id\n               WHERE r.is_current_adjudication AND r.is_denied\n                 AND a.group_code = 'CO' AND a.is_denial_carc\n               GROUP BY a.carc_code\n               ORDER BY denied_claims DESC, a.carc_code\n               LIMIT 5",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.016,
+      "pass": null,
+      "assumption": "Reviewed denial CARCs are is_denial_carc under group CO, on current adjudications that are denied. Each denied claim+payer counts once per CARC. Top 5 by that count, tie-break CARC code ascending."
+    },
+    {
+      "qid": "a_a5888f64a4",
+      "answer": [
+        {
+          "payer_class": "blues",
+          "remitted_pairs": 49,
+          "first_pass": 46,
+          "rate_pct": 93.88
+        },
+        {
+          "payer_class": "commercial",
+          "remitted_pairs": 62,
+          "first_pass": 59,
+          "rate_pct": 95.16
+        },
+        {
+          "payer_class": "medicaid",
+          "remitted_pairs": 12,
+          "first_pass": 12,
+          "rate_pct": 100.0
+        },
+        {
+          "payer_class": "medicaid_mco",
+          "remitted_pairs": 34,
+          "first_pass": 31,
+          "rate_pct": 91.18
+        },
+        {
+          "payer_class": "medicare",
+          "remitted_pairs": 73,
+          "first_pass": 68,
+          "rate_pct": 93.15
+        },
+        {
+          "payer_class": "medicare_advantage",
+          "remitted_pairs": 45,
+          "first_pass": 43,
+          "rate_pct": 95.56
+        },
+        {
+          "payer_class": "other",
+          "remitted_pairs": 5,
+          "first_pass": 5,
+          "rate_pct": 100.0
+        }
+      ],
+      "final_sql": "WITH pairs AS (\n                 SELECT any_value(payer_class) AS payer_class, claim_payer_key,\n                        count(*) AS events,\n                        bool_or(is_current_adjudication AND NOT is_denied AND NOT is_reversal) AS good_current\n                 FROM sem.remit_claims\n                 GROUP BY claim_payer_key\n               )\n               SELECT payer_class, count(*) AS remitted_pairs,\n                      count(*) FILTER (WHERE events = 1 AND good_current) AS first_pass,\n                      round(100.0 * count(*) FILTER (WHERE events = 1 AND good_current) / count(*), 2) AS rate_pct\n               FROM pairs GROUP BY payer_class ORDER BY payer_class",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.016,
+      "pass": null,
+      "assumption": "Population is every claim+payer pair with at least one 835 claim-payment row. First-pass means exactly one such event, and that event is the current adjudication and is not a denial. Rate is a percent rounded to 2 decimals. Ordered by payer class."
+    },
+    {
+      "qid": "a_436f690741",
+      "answer": [
+        {
+          "carc_code": "197",
+          "pairs": 4,
+          "co_amount": 7327.47
+        },
+        {
+          "carc_code": "183",
+          "pairs": 3,
+          "co_amount": 2192.36
+        },
+        {
+          "carc_code": "18",
+          "pairs": 2,
+          "co_amount": 856.18
+        },
+        {
+          "carc_code": "204",
+          "pairs": 1,
+          "co_amount": 414.7
+        },
+        {
+          "carc_code": "96",
+          "pairs": 1,
+          "co_amount": 50.39
+        },
+        {
+          "carc_code": "97",
+          "pairs": 1,
+          "co_amount": 20.98
+        }
+      ],
+      "final_sql": "SELECT a.carc_code,\n                      count(DISTINCT r.claim_payer_key) AS pairs,\n                      round(sum(a.adjustment_amount), 2) AS co_amount\n               FROM sem.remit_claims r\n               JOIN sem.adjustments a ON a.remit_claim_id = r.remit_claim_id\n               WHERE r.is_current_adjudication AND r.is_denied\n                 AND a.group_code = 'CO' AND a.is_denial_carc\n               GROUP BY a.carc_code\n               ORDER BY pairs DESC, a.carc_code",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.019,
+      "pass": null,
+      "assumption": "Current adjudications that are denied. CO-group reviewed denial CARCs at claim or line level (both live on sem.adjustments). Pair count is distinct claim_payer_key. CO dollars are the sum of those adjustment amounts, rounded to 2 decimals. Sort by pair count desc, then CARC."
+    },
+    {
+      "qid": "a_d29f83c935",
+      "answer": [
+        {
+          "procedure_code": "36415",
+          "dx": "Z0000",
+          "n": 31,
+          "total": 145,
+          "share_pct": 21.4
+        },
+        {
+          "procedure_code": "80048",
+          "dx": "Z0000",
+          "n": 3,
+          "total": 7,
+          "share_pct": 42.9
+        },
+        {
+          "procedure_code": "80053",
+          "dx": "Z0000",
+          "n": 30,
+          "total": 120,
+          "share_pct": 25.0
+        },
+        {
+          "procedure_code": "80055",
+          "dx": "N390",
+          "n": 1,
+          "total": 2,
+          "share_pct": 50.0
+        },
+        {
+          "procedure_code": "80061",
+          "dx": "Z0000",
+          "n": 15,
+          "total": 59,
+          "share_pct": 25.4
+        },
+        {
+          "procedure_code": "80069",
+          "dx": "Z0000",
+          "n": 2,
+          "total": 6,
+          "share_pct": 33.3
+        },
+        {
+          "procedure_code": "80074",
+          "dx": "R5383",
+          "n": 1,
+          "total": 2,
+          "share_pct": 50.0
+        },
+        {
+          "procedure_code": "80076",
+          "dx": "Z0000",
+          "n": 5,
+          "total": 27,
+          "share_pct": 18.5
+        },
+        {
+          "procedure_code": "80158",
+          "dx": "D649",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "80162",
+          "dx": "I10",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "80164",
+          "dx": "E119",
+          "n": 1,
+          "total": 3,
+          "share_pct": 33.3
+        },
+        {
+          "procedure_code": "80168",
+          "dx": "I10",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "80175",
+          "dx": "D649",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "80178",
+          "dx": "I10",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "80197",
+          "dx": "D649",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "80285",
+          "dx": "Z0000",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "80307",
+          "dx": "Z79891",
+          "n": 12,
+          "total": 22,
+          "share_pct": 54.5
+        },
+        {
+          "procedure_code": "80422",
+          "dx": "E785",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "81001",
+          "dx": "N390",
+          "n": 8,
+          "total": 25,
+          "share_pct": 32.0
+        },
+        {
+          "procedure_code": "81003",
+          "dx": "E1165",
+          "n": 1,
+          "total": 7,
+          "share_pct": 14.3
+        },
+        {
+          "procedure_code": "81225",
+          "dx": "Z955",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "81226",
+          "dx": "I2510",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "81240",
+          "dx": "Z86718",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "81270",
+          "dx": "D473",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "81479",
+          "dx": "Z803",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "82040",
+          "dx": "K219",
+          "n": 1,
+          "total": 2,
+          "share_pct": 50.0
+        },
+        {
+          "procedure_code": "82043",
+          "dx": "N390",
+          "n": 3,
+          "total": 11,
+          "share_pct": 27.3
+        },
+        {
+          "procedure_code": "82085",
+          "dx": "Z0000",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "82150",
+          "dx": "R5383",
+          "n": 2,
+          "total": 6,
+          "share_pct": 33.3
+        },
+        {
+          "procedure_code": "82248",
+          "dx": "E875",
+          "n": 2,
+          "total": 5,
+          "share_pct": 40.0
+        },
+        {
+          "procedure_code": "82274",
+          "dx": "Z1211",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "82306",
+          "dx": "Z0000",
+          "n": 6,
+          "total": 22,
+          "share_pct": 27.3
+        },
+        {
+          "procedure_code": "82310",
+          "dx": "E785",
+          "n": 1,
+          "total": 4,
+          "share_pct": 25.0
+        },
+        {
+          "procedure_code": "82330",
+          "dx": "N1830",
+          "n": 1,
+          "total": 3,
+          "share_pct": 33.3
+        },
+        {
+          "procedure_code": "82340",
+          "dx": "E860",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "82384",
+          "dx": "K7031",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "82390",
+          "dx": "E1122",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "82465",
+          "dx": "I10",
+          "n": 1,
+          "total": 2,
+          "share_pct": 50.0
+        },
+        {
+          "procedure_code": "82485",
+          "dx": "Z00129",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "82533",
+          "dx": "D509",
+          "n": 1,
+          "total": 5,
+          "share_pct": 20.0
+        },
+        {
+          "procedure_code": "82542",
+          "dx": "R7401",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "82565",
+          "dx": "D649",
+          "n": 2,
+          "total": 12,
+          "share_pct": 16.7
+        },
+        {
+          "procedure_code": "82570",
+          "dx": "Z79891",
+          "n": 5,
+          "total": 11,
+          "share_pct": 45.5
+        },
+        {
+          "procedure_code": "82575",
+          "dx": "N390",
+          "n": 2,
+          "total": 5,
+          "share_pct": 40.0
+        },
+        {
+          "procedure_code": "82607",
+          "dx": "Z0000",
+          "n": 4,
+          "total": 16,
+          "share_pct": 25.0
+        },
+        {
+          "procedure_code": "82627",
+          "dx": "Z0000",
+          "n": 2,
+          "total": 4,
+          "share_pct": 50.0
+        },
+        {
+          "procedure_code": "82634",
+          "dx": "E119",
+          "n": 1,
+          "total": 2,
+          "share_pct": 50.0
+        },
+        {
+          "procedure_code": "82670",
+          "dx": "E785",
+          "n": 1,
+          "total": 3,
+          "share_pct": 33.3
+        },
+        {
+          "procedure_code": "82679",
+          "dx": "Z0000",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "82728",
+          "dx": "Z0000",
+          "n": 7,
+          "total": 17,
+          "share_pct": 41.2
+        },
+        {
+          "procedure_code": "82746",
+          "dx": "D582",
+          "n": 1,
+          "total": 8,
+          "share_pct": 12.5
+        },
+        {
+          "procedure_code": "82785",
+          "dx": "E1165",
+          "n": 1,
+          "total": 5,
+          "share_pct": 20.0
+        },
+        {
+          "procedure_code": "82787",
+          "dx": "K219",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "82947",
+          "dx": "Z0000",
+          "n": 5,
+          "total": 22,
+          "share_pct": 22.7
+        },
+        {
+          "procedure_code": "82955",
+          "dx": "Z0000",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "82977",
+          "dx": "E119",
+          "n": 1,
+          "total": 5,
+          "share_pct": 20.0
+        },
+        {
+          "procedure_code": "83001",
+          "dx": "I10",
+          "n": 2,
+          "total": 13,
+          "share_pct": 15.4
+        },
+        {
+          "procedure_code": "83002",
+          "dx": "I10",
+          "n": 3,
+          "total": 10,
+          "share_pct": 30.0
+        },
+        {
+          "procedure_code": "83036",
+          "dx": "Z0000",
+          "n": 12,
+          "total": 53,
+          "share_pct": 22.6
+        },
+        {
+          "procedure_code": "83525",
+          "dx": "I252",
+          "n": 1,
+          "total": 2,
+          "share_pct": 50.0
+        },
+        {
+          "procedure_code": "83540",
+          "dx": "Z0000",
+          "n": 4,
+          "total": 16,
+          "share_pct": 25.0
+        },
+        {
+          "procedure_code": "83550",
+          "dx": "D649",
+          "n": 1,
+          "total": 10,
+          "share_pct": 10.0
+        },
+        {
+          "procedure_code": "83625",
+          "dx": "R7401",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "83690",
+          "dx": "I10",
+          "n": 1,
+          "total": 3,
+          "share_pct": 33.3
+        },
+        {
+          "procedure_code": "83718",
+          "dx": "D649",
+          "n": 1,
+          "total": 3,
+          "share_pct": 33.3
+        },
+        {
+          "procedure_code": "83721",
+          "dx": "Z0000",
+          "n": 5,
+          "total": 21,
+          "share_pct": 23.8
+        },
+        {
+          "procedure_code": "83735",
+          "dx": "Z0000",
+          "n": 6,
+          "total": 16,
+          "share_pct": 37.5
+        },
+        {
+          "procedure_code": "83872",
+          "dx": "Z00129",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "83880",
+          "dx": "I129",
+          "n": 1,
+          "total": 7,
+          "share_pct": 14.3
+        },
+        {
+          "procedure_code": "83930",
+          "dx": "E119",
+          "n": 1,
+          "total": 2,
+          "share_pct": 50.0
+        },
+        {
+          "procedure_code": "83970",
+          "dx": "N1830",
+          "n": 2,
+          "total": 14,
+          "share_pct": 14.3
+        },
+        {
+          "procedure_code": "84075",
+          "dx": "E785",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "84100",
+          "dx": "E559",
+          "n": 1,
+          "total": 5,
+          "share_pct": 20.0
+        },
+        {
+          "procedure_code": "84132",
+          "dx": "N1830",
+          "n": 2,
+          "total": 10,
+          "share_pct": 20.0
+        },
+        {
+          "procedure_code": "84143",
+          "dx": "Z0000",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "84153",
+          "dx": "I10",
+          "n": 2,
+          "total": 10,
+          "share_pct": 20.0
+        },
+        {
+          "procedure_code": "84156",
+          "dx": "R300",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "84295",
+          "dx": "D649",
+          "n": 1,
+          "total": 3,
+          "share_pct": 33.3
+        },
+        {
+          "procedure_code": "84402",
+          "dx": "N1830",
+          "n": 2,
+          "total": 5,
+          "share_pct": 40.0
+        },
+        {
+          "procedure_code": "84403",
+          "dx": "Z0000",
+          "n": 4,
+          "total": 11,
+          "share_pct": 36.4
+        },
+        {
+          "procedure_code": "84436",
+          "dx": "I10",
+          "n": 3,
+          "total": 8,
+          "share_pct": 37.5
+        },
+        {
+          "procedure_code": "84439",
+          "dx": "Z0000",
+          "n": 7,
+          "total": 20,
+          "share_pct": 35.0
+        },
+        {
+          "procedure_code": "84443",
+          "dx": "Z0000",
+          "n": 13,
+          "total": 61,
+          "share_pct": 21.3
+        },
+        {
+          "procedure_code": "84460",
+          "dx": "Z79899",
+          "n": 2,
+          "total": 4,
+          "share_pct": 50.0
+        },
+        {
+          "procedure_code": "84466",
+          "dx": "I10",
+          "n": 1,
+          "total": 2,
+          "share_pct": 50.0
+        },
+        {
+          "procedure_code": "84478",
+          "dx": "Z0000",
+          "n": 2,
+          "total": 8,
+          "share_pct": 25.0
+        },
+        {
+          "procedure_code": "84480",
+          "dx": "C61",
+          "n": 1,
+          "total": 5,
+          "share_pct": 20.0
+        },
+        {
+          "procedure_code": "84481",
+          "dx": "I10",
+          "n": 2,
+          "total": 10,
+          "share_pct": 20.0
+        },
+        {
+          "procedure_code": "84520",
+          "dx": "D649",
+          "n": 1,
+          "total": 2,
+          "share_pct": 50.0
+        },
+        {
+          "procedure_code": "84550",
+          "dx": "Z0000",
+          "n": 8,
+          "total": 21,
+          "share_pct": 38.1
+        },
+        {
+          "procedure_code": "85014",
+          "dx": "I119",
+          "n": 1,
+          "total": 3,
+          "share_pct": 33.3
+        },
+        {
+          "procedure_code": "85018",
+          "dx": "E1165",
+          "n": 1,
+          "total": 4,
+          "share_pct": 25.0
+        },
+        {
+          "procedure_code": "85025",
+          "dx": "Z0000",
+          "n": 27,
+          "total": 110,
+          "share_pct": 24.5
+        },
+        {
+          "procedure_code": "85049",
+          "dx": "E119",
+          "n": 1,
+          "total": 2,
+          "share_pct": 50.0
+        },
+        {
+          "procedure_code": "85130",
+          "dx": "Z0000",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "85247",
+          "dx": "I10",
+          "n": 2,
+          "total": 2,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "85307",
+          "dx": "N1830",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "85335",
+          "dx": "I129",
+          "n": 1,
+          "total": 3,
+          "share_pct": 33.3
+        },
+        {
+          "procedure_code": "85379",
+          "dx": "D649",
+          "n": 1,
+          "total": 4,
+          "share_pct": 25.0
+        },
+        {
+          "procedure_code": "85384",
+          "dx": "R5383",
+          "n": 1,
+          "total": 3,
+          "share_pct": 33.3
+        },
+        {
+          "procedure_code": "85576",
+          "dx": "D649",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "85610",
+          "dx": "Z0000",
+          "n": 5,
+          "total": 21,
+          "share_pct": 23.8
+        },
+        {
+          "procedure_code": "85651",
+          "dx": "E1122",
+          "n": 1,
+          "total": 3,
+          "share_pct": 33.3
+        },
+        {
+          "procedure_code": "85652",
+          "dx": "I10",
+          "n": 8,
+          "total": 46,
+          "share_pct": 17.4
+        },
+        {
+          "procedure_code": "85730",
+          "dx": "N1830",
+          "n": 2,
+          "total": 8,
+          "share_pct": 25.0
+        },
+        {
+          "procedure_code": "86038",
+          "dx": "I10",
+          "n": 3,
+          "total": 16,
+          "share_pct": 18.8
+        },
+        {
+          "procedure_code": "86140",
+          "dx": "Z0000",
+          "n": 7,
+          "total": 34,
+          "share_pct": 20.6
+        },
+        {
+          "procedure_code": "86141",
+          "dx": "Z79899",
+          "n": 2,
+          "total": 5,
+          "share_pct": 40.0
+        },
+        {
+          "procedure_code": "86200",
+          "dx": "D649",
+          "n": 1,
+          "total": 3,
+          "share_pct": 33.3
+        },
+        {
+          "procedure_code": "86235",
+          "dx": "D649",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "86304",
+          "dx": "I130",
+          "n": 1,
+          "total": 2,
+          "share_pct": 50.0
+        },
+        {
+          "procedure_code": "86325",
+          "dx": "Z00129",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "86344",
+          "dx": "Z0001",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "86359",
+          "dx": "Z0000",
+          "n": 2,
+          "total": 3,
+          "share_pct": 66.7
+        },
+        {
+          "procedure_code": "86376",
+          "dx": "Z0000",
+          "n": 2,
+          "total": 6,
+          "share_pct": 33.3
+        },
+        {
+          "procedure_code": "86431",
+          "dx": "E119",
+          "n": 1,
+          "total": 2,
+          "share_pct": 50.0
+        },
+        {
+          "procedure_code": "86590",
+          "dx": "E119",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "86592",
+          "dx": "Z113",
+          "n": 3,
+          "total": 12,
+          "share_pct": 25.0
+        },
+        {
+          "procedure_code": "86641",
+          "dx": "I129",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "86674",
+          "dx": "I10",
+          "n": 2,
+          "total": 7,
+          "share_pct": 28.6
+        },
+        {
+          "procedure_code": "86677",
+          "dx": "Z0000",
+          "n": 2,
+          "total": 3,
+          "share_pct": 66.7
+        },
+        {
+          "procedure_code": "86694",
+          "dx": "I10",
+          "n": 2,
+          "total": 9,
+          "share_pct": 22.2
+        },
+        {
+          "procedure_code": "86704",
+          "dx": "R7303",
+          "n": 1,
+          "total": 2,
+          "share_pct": 50.0
+        },
+        {
+          "procedure_code": "86708",
+          "dx": "N1831",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "86769",
+          "dx": "Z0000",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "86780",
+          "dx": "E1122",
+          "n": 1,
+          "total": 4,
+          "share_pct": 25.0
+        },
+        {
+          "procedure_code": "86787",
+          "dx": "E039",
+          "n": 1,
+          "total": 3,
+          "share_pct": 33.3
+        },
+        {
+          "procedure_code": "86803",
+          "dx": "Z113",
+          "n": 3,
+          "total": 5,
+          "share_pct": 60.0
+        },
+        {
+          "procedure_code": "86850",
+          "dx": "Z0000",
+          "n": 2,
+          "total": 2,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "86880",
+          "dx": "I10",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "86900",
+          "dx": "E119",
+          "n": 1,
+          "total": 2,
+          "share_pct": 50.0
+        },
+        {
+          "procedure_code": "86901",
+          "dx": "Z79899",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "87070",
+          "dx": "B349",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "87073",
+          "dx": "N1830",
+          "n": 1,
+          "total": 3,
+          "share_pct": 33.3
+        },
+        {
+          "procedure_code": "87077",
+          "dx": "R3121",
+          "n": 1,
+          "total": 3,
+          "share_pct": 33.3
+        },
+        {
+          "procedure_code": "87081",
+          "dx": "E1165",
+          "n": 1,
+          "total": 2,
+          "share_pct": 50.0
+        },
+        {
+          "procedure_code": "87086",
+          "dx": "Z0000",
+          "n": 4,
+          "total": 12,
+          "share_pct": 33.3
+        },
+        {
+          "procedure_code": "87088",
+          "dx": "Z0000",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "87102",
+          "dx": "N1830",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "87116",
+          "dx": "R5383",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "87150",
+          "dx": "R350",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "87186",
+          "dx": "I110",
+          "n": 1,
+          "total": 4,
+          "share_pct": 25.0
+        },
+        {
+          "procedure_code": "87205",
+          "dx": "Z0000",
+          "n": 1,
+          "total": 2,
+          "share_pct": 50.0
+        },
+        {
+          "procedure_code": "87206",
+          "dx": "N1830",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "87340",
+          "dx": "I10",
+          "n": 2,
+          "total": 9,
+          "share_pct": 22.2
+        },
+        {
+          "procedure_code": "87389",
+          "dx": "Z113",
+          "n": 7,
+          "total": 8,
+          "share_pct": 87.5
+        },
+        {
+          "procedure_code": "87481",
+          "dx": "B3732",
+          "n": 1,
+          "total": 3,
+          "share_pct": 33.3
+        },
+        {
+          "procedure_code": "87491",
+          "dx": "Z113",
+          "n": 13,
+          "total": 14,
+          "share_pct": 92.9
+        },
+        {
+          "procedure_code": "87503",
+          "dx": "Z0000",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "87510",
+          "dx": "N760",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "87521",
+          "dx": "D509",
+          "n": 1,
+          "total": 3,
+          "share_pct": 33.3
+        },
+        {
+          "procedure_code": "87522",
+          "dx": "Z0000",
+          "n": 2,
+          "total": 2,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "87591",
+          "dx": "Z113",
+          "n": 13,
+          "total": 16,
+          "share_pct": 81.3
+        },
+        {
+          "procedure_code": "87631",
+          "dx": "J069",
+          "n": 1,
+          "total": 2,
+          "share_pct": 50.0
+        },
+        {
+          "procedure_code": "87637",
+          "dx": "J069",
+          "n": 4,
+          "total": 6,
+          "share_pct": 66.7
+        },
+        {
+          "procedure_code": "87661",
+          "dx": "Z113",
+          "n": 4,
+          "total": 6,
+          "share_pct": 66.7
+        },
+        {
+          "procedure_code": "87798",
+          "dx": "N390",
+          "n": 3,
+          "total": 10,
+          "share_pct": 30.0
+        },
+        {
+          "procedure_code": "88305",
+          "dx": "L989",
+          "n": 2,
+          "total": 4,
+          "share_pct": 50.0
+        },
+        {
+          "procedure_code": "G0328",
+          "dx": "Z1211",
+          "n": 1,
+          "total": 1,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "G0480",
+          "dx": "Z79891",
+          "n": 2,
+          "total": 2,
+          "share_pct": 100.0
+        },
+        {
+          "procedure_code": "G0481",
+          "dx": "Z79891",
+          "n": 4,
+          "total": 6,
+          "share_pct": 66.7
+        },
+        {
+          "procedure_code": "G0482",
+          "dx": "F1120",
+          "n": 2,
+          "total": 6,
+          "share_pct": 33.3
+        },
+        {
+          "procedure_code": "G0483",
+          "dx": "Z79891",
+          "n": 3,
+          "total": 6,
+          "share_pct": 50.0
+        }
+      ],
+      "final_sql": "WITH base AS (\n                 SELECT DISTINCT l.procedure_code, c.claim_key, c.principal_diagnosis_code AS dx\n                 FROM sem.claim_lines l\n                 JOIN sem.claims c ON c.claim_id = l.claim_id\n                 WHERE c.is_latest_submission AND l.procedure_code IS NOT NULL\n               ),\n               counts AS (\n                 SELECT procedure_code, dx, count(*) AS n\n                 FROM base WHERE dx IS NOT NULL\n                 GROUP BY procedure_code, dx\n               ),\n               totals AS (\n                 SELECT procedure_code, count(*) AS total FROM base GROUP BY procedure_code\n               ),\n               ranked AS (\n                 SELECT procedure_code, dx, n,\n                        row_number() OVER (PARTITION BY procedure_code ORDER BY n DESC, dx ASC) AS rn\n                 FROM counts\n               )\n               SELECT r.procedure_code, r.dx, r.n, t.total,\n                      round(100.0 * r.n / t.total, 1) AS share_pct\n               FROM ranked r JOIN totals t USING (procedure_code)\n               WHERE r.rn = 1\n               ORDER BY r.procedure_code",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.028,
+      "pass": null,
+      "assumption": "Latest submission only, voided claims included. A claim counts once per procedure code on its lines. Null principal diagnoses are not a code, so they are excluded from the ranking but stay in the claim total. Tie-break is the lowest diagnosis code. Share is a percent to 1 decimal. Ordered by procedure code."
+    },
+    {
+      "qid": "q07_denial_rate",
+      "answer": [
+        {
+          "denial_rate": 0.0538
+        }
+      ],
+      "final_sql": "SELECT round(avg(is_denied::INT), 4) AS denial_rate\n               FROM sem.remit_claims WHERE is_current_adjudication",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.007,
+      "pass": null,
+      "assumption": "Denial rate is the fraction of current adjudications with is_denied, one row per claim+payer, rounded to 4 decimals. The question does not ask for a percentage."
+    },
+    {
+      "qid": "a_7d45c279a7",
+      "answer": [],
+      "final_sql": "WITH ev AS (\n                 SELECT any_value(payer_class) AS payer_class, claim_payer_key,\n                        count(DISTINCT check_or_eft_number) AS traces,\n                        bool_or(is_reversal) AS has_reversal,\n                        bool_or(is_current_adjudication) AS has_current,\n                        coalesce(sum(paid_amount) FILTER (WHERE is_current_adjudication), 0) AS paid\n                 FROM sem.remit_claims\n                 GROUP BY claim_payer_key\n               )\n               SELECT payer_class, count(*) AS multi_trace_pairs,\n                      count(*) FILTER (WHERE has_reversal) AS with_reversal,\n                      count(*) FILTER (WHERE NOT has_current) AS no_current,\n                      round(sum(paid), 2) AS paid\n               FROM ev WHERE traces >= 2\n               GROUP BY payer_class ORDER BY payer_class",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.02,
+      "pass": null,
+      "assumption": "A claim+payer pair is multi-trace when it has at least two distinct check_or_eft_number values. Reversal means any event is a reversal. No current adjudication means no is_current_adjudication row. Paid is the sum of paid_amount on current adjudications, 0 when none, rounded to 2 decimals. Ordered by payer class."
+    },
+    {
+      "qid": "a_f3c42ce766",
+      "answer": [
+        {
+          "line_count": 1,
+          "claims": 42,
+          "share_pct": 15.7,
+          "avg_billed": 521.05
+        },
+        {
+          "line_count": 2,
+          "claims": 22,
+          "share_pct": 8.2,
+          "avg_billed": 536.7
+        },
+        {
+          "line_count": 3,
+          "claims": 21,
+          "share_pct": 7.9,
+          "avg_billed": 427.73
+        },
+        {
+          "line_count": 4,
+          "claims": 19,
+          "share_pct": 7.1,
+          "avg_billed": 272.64
+        },
+        {
+          "line_count": 5,
+          "claims": 22,
+          "share_pct": 8.2,
+          "avg_billed": 345.7
+        },
+        {
+          "line_count": 6,
+          "claims": 37,
+          "share_pct": 13.9,
+          "avg_billed": 407.54
+        },
+        {
+          "line_count": 7,
+          "claims": 32,
+          "share_pct": 12.0,
+          "avg_billed": 464.8
+        },
+        {
+          "line_count": 8,
+          "claims": 25,
+          "share_pct": 9.4,
+          "avg_billed": 608.14
+        },
+        {
+          "line_count": 9,
+          "claims": 19,
+          "share_pct": 7.1,
+          "avg_billed": 614.17
+        },
+        {
+          "line_count": 10,
+          "claims": 11,
+          "share_pct": 4.1,
+          "avg_billed": 588.57
+        },
+        {
+          "line_count": 11,
+          "claims": 11,
+          "share_pct": 4.1,
+          "avg_billed": 689.67
+        },
+        {
+          "line_count": 12,
+          "claims": 4,
+          "share_pct": 1.5,
+          "avg_billed": 732.93
+        },
+        {
+          "line_count": 13,
+          "claims": 1,
+          "share_pct": 0.4,
+          "avg_billed": 1239.43
+        },
+        {
+          "line_count": 14,
+          "claims": 1,
+          "share_pct": 0.4,
+          "avg_billed": 1235.82
+        }
+      ],
+      "final_sql": "WITH c AS (\n                 SELECT line_count, count(*) AS claims, sum(charge_amount) AS billed\n                 FROM sem.claims WHERE is_latest_submission\n                 GROUP BY line_count\n               ),\n               t AS (SELECT sum(claims) AS n FROM c)\n               SELECT c.line_count, c.claims,\n                      round(100.0 * c.claims / t.n, 1) AS share_pct,\n                      round(c.billed / c.claims, 2) AS avg_billed\n               FROM c, t ORDER BY c.line_count",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.015,
+      "pass": null,
+      "assumption": "Latest submission only, voided claims included, one row per claim_key. Line count is sem.claims.line_count, so claims with zero lines stay in the distribution. Share is a percent to 1 decimal. Average billed charge per claim is round(sum(charge)/count, 2). Ordered by line count."
+    },
+    {
+      "qid": "q15_partial_line_denials",
+      "answer": [
+        {
+          "partial_denied_lines": 27
+        }
+      ],
+      "final_sql": "SELECT count(*) AS partial_denied_lines\n               FROM sem.remit_lines\n               WHERE is_current_adjudication AND line_is_denied AND NOT claim_is_denied",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.008,
+      "pass": null,
+      "assumption": "A partial denial is an 835 service line on a current adjudication where the line is denied and the claim adjudication is not denied. Count those lines."
+    },
+    {
+      "qid": "q25_primary_deductible",
+      "answer": [
+        {
+          "deductible": 0.0
+        }
+      ],
+      "final_sql": "SELECT coalesce(round(sum(a.adjustment_amount), 2), 0) AS deductible\n               FROM sem.adjustments a\n               JOIN sem.remit_claims r ON r.remit_claim_id = a.remit_claim_id\n               WHERE r.is_current_adjudication AND a.group_code = 'PR' AND a.carc_code = '1'\n                 AND EXISTS (\n                   SELECT 1 FROM sem.claims c\n                   WHERE c.claim_key = r.claim_key AND c.payer_key = r.payer_key\n                     AND c.payer_responsibility = 'P')",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.019,
+      "pass": null,
+      "assumption": "Deductible is adjustment group PR, CARC '1', on current adjudications whose payer is the claim's primary payer (a sem.claims row with the same claim_key and payer_key and payer_responsibility = 'P'). Dollars rounded to 2; 0 when none."
+    },
+    {
+      "qid": "a_26d4c3f4ca",
+      "answer": [
+        {
+          "payer_class": "blues",
+          "adjudications": 49,
+          "billed": 28369.77,
+          "paid": 4270.37,
+          "patient_responsibility": 1637.62,
+          "paid_pct": 15.1,
+          "pr_pct": 5.8
+        },
+        {
+          "payer_class": "commercial",
+          "adjudications": 62,
+          "billed": 24644.68,
+          "paid": 5538.26,
+          "patient_responsibility": 725.61,
+          "paid_pct": 22.5,
+          "pr_pct": 2.9
+        },
+        {
+          "payer_class": "medicaid",
+          "adjudications": 12,
+          "billed": 6043.01,
+          "paid": 1386.28,
+          "patient_responsibility": 0.0,
+          "paid_pct": 22.9,
+          "pr_pct": 0.0
+        },
+        {
+          "payer_class": "medicaid_mco",
+          "adjudications": 34,
+          "billed": 15770.77,
+          "paid": 3601.72,
+          "patient_responsibility": 0.0,
+          "paid_pct": 22.8,
+          "pr_pct": 0.0
+        },
+        {
+          "payer_class": "medicare",
+          "adjudications": 72,
+          "billed": 36353.64,
+          "paid": 5694.41,
+          "patient_responsibility": 1323.3,
+          "paid_pct": 15.7,
+          "pr_pct": 3.6
+        },
+        {
+          "payer_class": "medicare_advantage",
+          "adjudications": 45,
+          "billed": 20064.18,
+          "paid": 3010.93,
+          "patient_responsibility": 190.0,
+          "paid_pct": 15.0,
+          "pr_pct": 0.9
+        },
+        {
+          "payer_class": "other",
+          "adjudications": 5,
+          "billed": 2609.79,
+          "paid": 273.82,
+          "patient_responsibility": 170.63,
+          "paid_pct": 10.5,
+          "pr_pct": 6.5
+        }
+      ],
+      "final_sql": "SELECT payer_class, count(*) AS adjudications,\n                      round(sum(charge_amount), 2) AS billed,\n                      round(sum(paid_amount), 2) AS paid,\n                      round(sum(coalesce(patient_responsibility_amount, 0)), 2) AS patient_responsibility,\n                      round(100.0 * sum(paid_amount) / nullif(sum(charge_amount), 0), 1) AS paid_pct,\n                      round(100.0 * sum(coalesce(patient_responsibility_amount, 0)) / nullif(sum(charge_amount), 0), 1) AS pr_pct\n               FROM sem.remit_claims WHERE is_current_adjudication\n               GROUP BY payer_class ORDER BY payer_class",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.014,
+      "pass": null,
+      "assumption": "Current adjudications only, so primary and secondary both count. Missing patient responsibility is 0. Paid percent and patient-responsibility percent are 100 * sum / billed, rounded to 1 decimal. Money rounded to 2 decimals. Ordered by payer class."
+    },
+    {
+      "qid": "q18_voided",
+      "answer": [
+        {
+          "voided_claims": 0
+        }
+      ],
+      "final_sql": "SELECT count(DISTINCT claim_key) AS voided_claims\n               FROM sem.claims WHERE frequency_code = '8'",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.006,
+      "pass": null,
+      "assumption": "A voided claim is a claim_key that has an 837 with frequency_code '8'. Count distinct claims, not submission rows."
+    },
+    {
+      "qid": "f_cpt_denied_lines__36415",
+      "answer": [
+        {
+          "denied_lines": 19
+        }
+      ],
+      "final_sql": "SELECT count(*) AS denied_lines\n               FROM sem.remit_lines\n               WHERE is_current_adjudication AND line_is_denied AND procedure_code = '36415'",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.007,
+      "pass": null,
+      "assumption": "Count 835 service lines on current adjudications whose submitted procedure code is 36415 and line_is_denied."
+    },
+    {
+      "qid": "a_8663c777cd",
+      "answer": [
+        {
+          "service_month": "2026-06-01",
+          "total": 79,
+          "top5_claims": 12,
+          "share_pct": 15.2
+        },
+        {
+          "service_month": "2026-07-01",
+          "total": 172,
+          "top5_claims": 22,
+          "share_pct": 12.8
+        }
+      ],
+      "final_sql": "WITH c AS (\n                 SELECT service_month, claim_key, referring_npi\n                 FROM sem.claims\n                 WHERE is_latest_submission AND service_month >= DATE '2026-06-01'\n               ),\n               by_npi AS (\n                 SELECT service_month, referring_npi, count(*) AS n\n                 FROM c WHERE referring_npi IS NOT NULL\n                 GROUP BY service_month, referring_npi\n               ),\n               ranked AS (\n                 SELECT service_month, n,\n                        row_number() OVER (PARTITION BY service_month ORDER BY n DESC, referring_npi ASC) AS rn\n                 FROM by_npi\n               ),\n               top AS (\n                 SELECT service_month, sum(n) AS top5 FROM ranked WHERE rn <= 5 GROUP BY service_month\n               ),\n               tot AS (\n                 SELECT service_month, count(*) AS total FROM c GROUP BY service_month\n               )\n               SELECT t.service_month, t.total, coalesce(top.top5, 0) AS top5_claims,\n                      round(100.0 * coalesce(top.top5, 0) / t.total, 1) AS share_pct\n               FROM tot t LEFT JOIN top USING (service_month)\n               ORDER BY t.service_month",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.021,
+      "pass": null,
+      "assumption": "Service months from 2026-06-01 onward, latest submission, voided claims included. Total claims includes null referring NPIs. The top 5 ranking drops null NPIs and tie-breaks by NPI ascending. Share is top-5 claim counts over all claims that month, percent to 1 decimal."
+    },
+    {
+      "qid": "a_9a40343e18",
+      "answer": [
+        {
+          "payer_class": "blues",
+          "claims": 44,
+          "claims_pct": 16.9,
+          "billed": 18570.93,
+          "billed_pct": 14.3
+        },
+        {
+          "payer_class": "commercial",
+          "claims": 71,
+          "claims_pct": 27.2,
+          "billed": 30211.48,
+          "billed_pct": 23.3
+        },
+        {
+          "payer_class": "medicaid",
+          "claims": 12,
+          "claims_pct": 4.6,
+          "billed": 6055.37,
+          "billed_pct": 4.7
+        },
+        {
+          "payer_class": "medicaid_mco",
+          "claims": 38,
+          "claims_pct": 14.6,
+          "billed": 17354.94,
+          "billed_pct": 13.4
+        },
+        {
+          "payer_class": "medicare",
+          "claims": 61,
+          "claims_pct": 23.4,
+          "billed": 38840.23,
+          "billed_pct": 30.0
+        },
+        {
+          "payer_class": "medicare_advantage",
+          "claims": 28,
+          "claims_pct": 10.7,
+          "billed": 14302.55,
+          "billed_pct": 11.1
+        },
+        {
+          "payer_class": "other",
+          "claims": 7,
+          "claims_pct": 2.7,
+          "billed": 4083.44,
+          "billed_pct": 3.2
+        }
+      ],
+      "final_sql": "WITH primary_sub AS (\n                 SELECT claim_key, payer_class, charge_amount FROM (\n                   SELECT claim_key, payer_class, charge_amount,\n                          row_number() OVER (PARTITION BY claim_key ORDER BY submission_date DESC, claim_id DESC) AS rn\n                   FROM sem.claims WHERE payer_responsibility = 'P'\n                 ) s WHERE rn = 1\n               ),\n               g AS (\n                 SELECT payer_class, count(*) AS claims, sum(charge_amount) AS billed\n                 FROM primary_sub GROUP BY payer_class\n               ),\n               t AS (SELECT sum(claims) AS n, sum(billed) AS b FROM g)\n               SELECT g.payer_class, g.claims,\n                      round(100.0 * g.claims / t.n, 1) AS claims_pct,\n                      round(g.billed, 2) AS billed,\n                      round(100.0 * g.billed / nullif(t.b, 0), 1) AS billed_pct\n               FROM g, t ORDER BY g.payer_class",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.021,
+      "pass": null,
+      "assumption": "One row per claim: the latest submission with payer_responsibility = 'P', voided claims included. Mix percents use that primary-payer population as the denominator (shares sum to 100), rounded to 1 decimal. Billed charge is that submission's charge, rounded to 2 decimals."
+    },
+    {
+      "qid": "f_cpt_share_of_line_payments__87798",
+      "answer": [
+        {
+          "share": 0.1317
+        }
+      ],
+      "final_sql": "SELECT round(sum(line_paid_amount) FILTER (WHERE procedure_code = '87798')\n                            / nullif(sum(line_paid_amount), 0), 4) AS share\n               FROM sem.remit_lines WHERE is_current_adjudication",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.009,
+      "pass": null,
+      "assumption": "Share of service-line paid dollars on current adjudications whose procedure_code is 87798. Returned as a fraction rounded to 4 decimals. Lines on claim-level-only denials are absent from sem.remit_lines and are not in the denominator."
+    },
+    {
+      "qid": "q03_total_paid",
+      "answer": [
+        {
+          "total_paid": 23775.79
+        }
+      ],
+      "final_sql": "SELECT round(sum(paid_amount), 2) AS total_paid\n               FROM sem.remit_claims WHERE is_current_adjudication",
+      "sql_execs": 3,
+      "repairs": 0,
+      "seconds": 0.006,
+      "pass": null,
+      "assumption": "Sum of paid_amount on current adjudications, one row per claim+payer, rounded to 2 decimals. Reversals are not current and are not added."
+    }
+  ],
+  "accuracy": null,
+  "n": 20,
+  "mean_sql_execs": 3.0,
+  "notes": "Dataset is the frozen generator 3.3 snapshot at .ccsim/bench/f22d94791686 built with Scenario(days=15, volume_scale=0.2, seed=3), the smallest snapshot() config used by the agent tests, opened with open_snapshot(escalate=False). Dev ids are the first 20 benchmark questions by sha256(question_id) after dropping question_set heldout_hard_1 and any grokbot-r1 tag. Metric spec then three diverse candidates, executed once each through bench.guard, picked by result agreement. No data probes before those executions. No repair. Assumptions are on each result. Few-shot examples were the 3 nearest non-dev, non-held-out, non-same-family questions by TF-IDF cosine, with their reference SQL.",
+  "agent_note": "reused A05 builder"
+}
