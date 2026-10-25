@@ -440,3 +440,11 @@ Conflict log from the auto-merge script (PRs that conflicted at some point; chec
 5. **Consolidate.** Fold the winning approaches back into `analyzer/` as config flags, and delete the losing `analyst/approaches/*`.
 6. **Frontend and API**: the round trip already works in demo mode (#78). Next, swap `ScriptedLLM` for the real analyzer cascade behind `allow_paid_api`, pick the transcript store (#50's design), add CSP and no-store headers, and re-check the licence notices before anything ships.
 7. Abstention, ambiguity and multi-turn splits (T20 to T22) are still unbuilt. `agree_or_abstain` and A08's abstain rule are the hooks.
+
+## Conflicted PRs (resolved locally, 4:45 PM PT)
+
+All three were merged locally (`git merge --no-ff` + push, no GitHub merge API). None are left open.
+
+- **#54 glossary splits/learner/screen 2** (bc17fca): WORKPLAN.md kept both sides; `bench/eval_subagents.py` now takes both `--agent cli|analyzer` and `--split/--unseal-test`. Fix: `bench/screen2.session_config` now drops `cascade`/`multi_candidate`, because the analyzer added them to `DEFAULT_TECHNIQUE_CONFIG` and that broke `test_screen2`. Tests: glossary/power/screen2/splits/agent_sandbox/analyzer files, 49 passed after the fix.
+- **#50 chat transcript designs** (09abf26): ccsim/README.md guarantee table keeps both the security rows and the transcript rows. `tests/test_transcripts.py` 6 passed. The wider aws/lake/backend_e2e/security run showed no failures but hit the 7-minute timeout before it finished, so re-run it.
+- **#31 multi-candidate exec/select variant** (5986081): add/add conflict on the `analyst/variants/__init__.py` docstring only. `tests/test_analyst_multi_candidate.py` 21 passed.
