@@ -1,10 +1,12 @@
 """Reference tables behind the mock EDI: who the patients are, where they live, what their tests are for.
 
-  names       the ~1,000 most common US surnames in Census 2010 rank order, and first names by sex and birth cohort
-              (SSA top names per era), with Zipf-shaped frequencies fitted to the published shares; Hispanic surnames
-              are weighted by the tenant's state, and most Hispanic-surnamed patients get a Spanish first name
+  names       ccsim/data/census2010_surnames.csv: the 10,000 most common surnames of the 2010 Census with their
+              counts and Hispanic share (weighted by the tenant state's Hispanic share);
+              ccsim/data/ssa_first_names.csv: the 400 most common SSA first names per sex and birth decade, with
+              counts. Draws follow the real frequencies, so a month of claims shows thousands of distinct names.
   places      city / ZIP pairs inside each lab's referral area (plus a few border towns), weighted by population,
-              with the area codes in use there
+              with the area codes in use there; streets are named after common stems and surnames, each stem with
+              the suffixes it really takes (MAIN ST, COUNTRY CLUB RD, CREEKSIDE DR)
   diagnoses   ccsim/data/icd10cm_lab_dx_2026.csv: CMS FY2026 billable ICD-10-CM codes grouped into clinical domains
               (built from icd10cm_codes_2026.txt; every code was checked against that file), each with sex and age
               limits; tests map to the domains that justify them, so a line pointer always names a fitting diagnosis
@@ -20,160 +22,52 @@ from dataclasses import dataclass
 from itertools import accumulate
 from pathlib import Path
 
+DATA = Path(__file__).with_name("data")
+
+
+def _rows(name: str):
+    with open(DATA / name) as fh:
+        yield from csv.DictReader(line for line in fh if not line.startswith("#"))
+
+
 # --- surnames ---------------------------------------------------------------------------------------
-# Census 2010 surname list, rank order (top ~1,000). Share per 100k for the first ranks as published (rounded);
-# the rest follows the fitted power law share(r) = 361 * (r / 10) ** -0.82 per 100k.
-_SURNAMES = """
-SMITH JOHNSON WILLIAMS BROWN JONES GARCIA MILLER DAVIS RODRIGUEZ MARTINEZ HERNANDEZ LOPEZ GONZALEZ WILSON ANDERSON
-THOMAS TAYLOR MOORE JACKSON MARTIN LEE PEREZ THOMPSON WHITE HARRIS SANCHEZ CLARK RAMIREZ LEWIS ROBINSON WALKER YOUNG
-ALLEN KING WRIGHT SCOTT TORRES NGUYEN HILL FLORES GREEN ADAMS NELSON BAKER HALL RIVERA CAMPBELL MITCHELL CARTER
-ROBERTS GOMEZ PHILLIPS EVANS TURNER DIAZ PARKER CRUZ EDWARDS COLLINS REYES STEWART MORRIS MORALES MURPHY COOK ROGERS
-GUTIERREZ ORTIZ MORGAN COOPER PETERSON BAILEY REED KELLY HOWARD RAMOS KIM COX WARD RICHARDSON WATSON BROOKS CHAVEZ
-WOOD JAMES BENNETT GRAY MENDOZA RUIZ HUGHES PRICE ALVAREZ CASTILLO SANDERS PATEL MYERS LONG ROSS FOSTER JIMENEZ
-POWELL JENKINS PERRY RUSSELL SULLIVAN BELL COLEMAN BUTLER HENDERSON BARNES GONZALES FISHER VASQUEZ SIMMONS ROMERO
-JORDAN PATTERSON ALEXANDER HAMILTON GRAHAM REYNOLDS GRIFFIN WALLACE MORENO WEST COLE HAYES BRYANT HERRERA GIBSON
-ELLIS TRAN MEDINA AGUILAR STEVENS MURRAY FORD CASTRO MARSHALL OWENS HARRISON FERNANDEZ MCDONALD WOODS WASHINGTON
-KENNEDY WELLS VARGAS HENRY CHEN FREEMAN WEBB TUCKER GUZMAN BURNS CRAWFORD OLSON SIMPSON PORTER HUNTER GORDON MENDEZ
-SILVA SHAW SNYDER MASON DIXON MUNOZ HUNT HICKS HOLMES PALMER WAGNER BLACK ROBERTSON BOYD ROSE STONE SALAZAR FOX
-WARREN MILLS MEYER RICE SCHMIDT GARZA DANIELS FERGUSON NICHOLS STEPHENS SOTO WEAVER RYAN GARDNER PAYNE GRANT DUNN
-KELLEY SPENCER HAWKINS ARNOLD PIERCE VAZQUEZ HANSEN PETERS SANTOS HART BRADLEY KNIGHT ELLIOTT CUNNINGHAM DUNCAN
-ARMSTRONG HUDSON CARROLL LANE RILEY ANDREWS ALVARADO RAY DELGADO BERRY PERKINS HOFFMAN JOHNSTON MATTHEWS PENA
-RICHARDS CONTRERAS WILLIS CARPENTER LAWRENCE SANDOVAL GUERRERO GEORGE CHAPMAN RIOS ESTRADA ORTEGA WATKINS GREENE
-NUNEZ WHEELER VALDEZ HARPER BURKE LARSON SANTIAGO MALDONADO MORRISON FRANKLIN CARLSON AUSTIN DOMINGUEZ CARR LAWSON
-JACOBS OBRIEN LYNCH SINGH VEGA BISHOP MONTGOMERY OLIVER JENSEN HARVEY WILLIAMSON GILBERT DEAN SIMS ESPINOZA HOWELL
-LI WONG REID HANSON LE MCCOY GARRETT BURTON FULLER WANG WEBER WELCH ROJAS LUCAS MARQUEZ FIELDS PARK YANG LITTLE BANKS
-PADILLA DAY WALSH BOWMAN SCHULTZ LUNA FOWLER MEJIA DAVIDSON ACOSTA BREWER MAY HOLLAND JUAREZ NEWMAN PEARSON CURTIS
-CORTEZ DOUGLAS SCHNEIDER JOSEPH BARRETT NAVARRO FIGUEROA KELLER AVILA WADE MOLINA STANLEY HOPKINS CAMPOS BARNETT
-BATES CHAMBERS CALDWELL BECK LAMBERT MIRANDA BYRD CRAIG AYALA LOWE FRAZIER POWERS NEAL LEONARD GREGORY CARRILLO
-SUTTON FLEMING RHODES SHELTON SCHWARTZ NORRIS JENNINGS WATTS DURAN WALTERS COHEN MCDANIEL MORAN PARKS STEELE VAUGHN
-BECKER HOLT DELEON BARKER TERRY HALE LEON BENSON HAYNES HORTON MILES LYONS PHAM GRAVES BUSH THORNTON WOLFE WARNER
-CABRERA MCKINNEY MANN ZIMMERMAN DAWSON LARA FLETCHER PAGE MCCARTHY LOVE ROBLES CERVANTES SOLIS ERICKSON REEVES CHANG
-KLEIN SALINAS FUENTES BALDWIN DANIEL SIMON VELASQUEZ HARDY HIGGINS AGUIRRE LIN CUMMINGS CHANDLER SHARP BARBER BOWEN
-OCHOA DENNIS ROBBINS LIU RAMSEY FRANCIS GRIFFITH PAUL BLAIR OCONNOR CARDENAS PACHECO CROSS CALDERON QUINN MOSS
-SWANSON CHAN RIVAS KHAN RODGERS SERRANO FITZGERALD ROSALES STEVENSON CHRISTENSEN MANNING GILL CURRY MCLAUGHLIN HARMON
-MCGEE GROSS DOYLE GARNER NEWTON BURGESS REESE WALTON BLAKE TRUJILLO ADKINS BRADY GOODMAN ROMAN WEBSTER GOODWIN
-FISCHER HUANG POTTER DELACRUZ MONTOYA TODD WU HINES MULLINS CASTANEDA MALONE CANNON TATE MACK SHERMAN HUBBARD HODGES
-ZHANG GUERRA WOLF VALENCIA SAUNDERS FRANCO ROWE GALLAGHER FARMER HAMMOND HAMPTON TOWNSEND INGRAM WISE GALLEGOS CLARKE
-BARTON SCHROEDER MAXWELL WATERS LOGAN CAMACHO STRICKLAND NORMAN PERSON COLON PARSONS FRANK HARRINGTON GLOVER OSBORNE
-BUCHANAN CASEY FLOYD PATTON IBARRA BALL TYLER SUAREZ BOWERS OROZCO SALAS COBB GIBBS ANDRADE BAUER CONNER MOODY
-ESCOBAR MCGUIRE LLOYD MUELLER HARTMAN FRENCH KRAMER MCBRIDE POPE LINDSEY VELAZQUEZ NORTON MCCORMICK SPARKS FLYNN
-YATES HOGAN MARSH MACIAS VILLANUEVA ZAMORA PRATT STOKES OWEN BALLARD LANG BROCK VILLARREAL CHARLES DRAKE BARRERA CAIN
-PATRICK PINEDA BURNETT MERCADO SANTANA SHEPHERD BAUTISTA ALI SHAFFER LAMB TREVINO MCKENZIE HESS OLSEN COCHRAN MORTON
-NASH WILKINS PETERSEN BRIGGS SHAH ROTH NICHOLSON HOLLOWAY LOZANO RANGEL FLOWERS HOOVER SHORT ARIAS MORA VALENZUELA
-BRYAN MEYERS WEISS UNDERWOOD BASS GREER SUMMERS HOUSTON CARSON MORROW CLAYTON WHITAKER DECKER YODER COLLIER ZUNIGA
-CAREY WILCOX MELENDEZ POOLE ROBERSON LARSEN CONLEY DAVENPORT COPELAND MASSEY LAM HUFF ROCHA CAMERON JEFFERSON HOOD
-MONROE ANTHONY PITTMAN HUYNH RANDALL SINGLETON KIRK COMBS MATHIS CHRISTIAN SKINNER BRADFORD RICHARD GALVAN WALL BOONE
-KIRBY WILKINSON BRIDGES BRUCE ATKINSON VELEZ MEZA ROY VINCENT YORK HODGE VILLA ABBOTT ALLISON TAPIA GATES CHASE SOSA
-SWEENEY FARRELL WYATT DALTON HORN BARRON PHELPS YU DICKERSON HEATH FOLEY ATKINS MATHEWS BONILLA ACEVEDO BENITEZ
-ZAVALA HENSLEY GLENN CISNEROS HARRELL SHIELDS RUBIO HUFFMAN CHOI BOYER GARRISON ARROYO BOND KANE HANCOCK CALLAHAN
-DILLON CLINE WIGGINS GRIMES ARELLANO MELTON ONEILL SAVAGE HO BELTRAN PITTS PARRISH PONCE RICH BOOTH KOCH GOLDEN WARE
-BRENNAN MCDOWELL MARKS CANTU HUMPHREY BAXTER SAWYER CLAY TANNER HUTCHINSON KAUR BERG WILEY GILMORE RUSSO VILLEGAS
-HOBBS KEITH WILKERSON AHMED BEARD MCCLAIN MONTES MATA ROSARIO VANG WALTER HENSON ONEAL MOSLEY MCCLURE BEASLEY
-STEPHENSON SNOW HUERTA PRESTON VANCE BARRY JOHNS EATON BLACKWELL DYER PRINCE MACDONALD SOLOMON GUEVARA STAFFORD
-ENGLISH HURST WOODARD CORTES SHANNON KEMP NOLAN MCCULLOUGH MERRITT MURILLO MOON SALGADO STRONG KLINE CORDOVA BARAJAS
-ROACH ROSAS WINTERS JACOBSON LESTER KNOX BULLOCK KERR LEACH MEADOWS DAVILA ORR WHITEHEAD PRUITT KENT CONWAY MCKEE
-BARR DAVID DEJESUS MARIN BERGER MCINTYRE BLANKENSHIP GAINES PALACIOS CUEVAS BARTLETT DURHAM DORSEY MCCALL ODONNELL
-STEIN BROWNING STOUT LOWERY SLOAN MCLEAN HENDRICKS CALHOUN SEXTON CHUNG GENTRY HULL DUARTE ELLISON NIELSEN GILLESPIE
-BUCK MIDDLETON SELLERS LEBLANC ESPARZA HARDIN BRADSHAW MCINTOSH HOWE LIVINGSTON FROST GLASS MORSE KNAPP HERMAN STARK
-BRAVO NOBLE SPEARS WEEKS CORONA FREDERICK BUCKLEY MCFARLAND HEBERT ENRIQUEZ HICKMAN QUINTERO RANDOLPH SCHAEFER
-WALLS TREJO HOUSE REILLY PENNINGTON MICHAEL CONRAD GILES BENJAMIN CROSBY FITZPATRICK DONOVAN MAYS MAHONEY VALENTINE
-RAYMOND MEDRANO HAHN MCMILLAN SMALL BENTLEY FELIX PECK LUCERO BOYLE HANNA PACE RUSH HURLEY HARDING MCCONNELL BERNAL
-NAVA AYERS EVERETT VENTURA AVERY PUGH MAYER BENDER SHEPARD MCMAHON LANDRY CASE SAMPSON MOSES MAGANA BLACKBURN DUNLAP
-GOULD DUFFY VAUGHAN HERRING MCKAY ESPINOSA RIVERS FARLEY BERNARD ASHLEY FRIEDMAN POTTS TRUONG COSTA CORREA BLEVINS
-NIXON CLEMENTS FRY DELAROSA BEST BENTON LUGO PORTILLO DOUGHERTY CRANE HALEY PHAN VILLALOBOS BLANCHARD HORNE FINLEY
-QUINTANA LYNN ESQUIVEL BEAN DODSON MULLEN XIONG HAYDEN CANO LEVY HUBER RICHMOND MOYER LIM FRYE SHEPPARD MCCARTY
-AVALOS BOOKER WALLER PARRA WOODWARD JARAMILLO KRUEGER RASMUSSEN BRANDT PERALTA DONALDSON STUART FAULKNER MAYNARD
-GALINDO COFFEY ESTES SANFORD BURCH MADDOX VO OCONNELL VU ANDERSEN SPENCE MCPHERSON CHURCH SCHMITT STANTON LEAL
-CHERRY COMPTON DUDLEY SIERRA POLLARD ALFARO HESTER PROCTOR LU HINTON NOVAK GOOD MADDEN MCCANN TERRELL JARVIS DICKSON
-REYNA CANTRELL MAYO BRANCH HENDRIX ROLLINS ROWLAND WHITNEY DUKE ODOM DAUGHERTY TRAVIS TANG ARCHER MERRILL LOWRY
-""".split()
-# Hispanic surnames in the list (Census 2010: >70% of bearers Hispanic); weighted by the tenant state's share.
-HISPANIC_SURNAMES = frozenset("""
-GARCIA RODRIGUEZ MARTINEZ HERNANDEZ LOPEZ GONZALEZ PEREZ SANCHEZ RAMIREZ TORRES FLORES RIVERA GOMEZ DIAZ CRUZ REYES
-MORALES GUTIERREZ ORTIZ RAMOS CHAVEZ MENDOZA RUIZ ALVAREZ CASTILLO JIMENEZ GONZALES VASQUEZ ROMERO MORENO HERRERA
-MEDINA AGUILAR CASTRO FERNANDEZ VARGAS GUZMAN MENDEZ MUNOZ SALAZAR GARZA SOTO VAZQUEZ SANTOS ALVARADO DELGADO PENA
-CONTRERAS SANDOVAL GUERRERO RIOS ESTRADA ORTEGA NUNEZ VALDEZ SANTIAGO MALDONADO DOMINGUEZ VEGA ESPINOZA ROJAS MARQUEZ
-PADILLA LUNA MEJIA ACOSTA JUAREZ CORTEZ NAVARRO FIGUEROA AVILA MOLINA CAMPOS MIRANDA AYALA CARRILLO DURAN DELEON LEON
-CABRERA LARA ROBLES CERVANTES SOLIS SALINAS FUENTES VELASQUEZ AGUIRRE OCHOA CARDENAS PACHECO CALDERON RIVAS SERRANO
-ROSALES TRUJILLO ROMAN DELACRUZ MONTOYA CASTANEDA GUERRA VALENCIA FRANCO GALLEGOS CAMACHO COLON IBARRA SUAREZ OROZCO
-SALAS ANDRADE ESCOBAR VELAZQUEZ MACIAS VILLANUEVA ZAMORA VILLARREAL BARRERA PINEDA MERCADO SANTANA BAUTISTA TREVINO
-LOZANO RANGEL ARIAS MORA VALENZUELA ZUNIGA MELENDEZ ROCHA GALVAN VELEZ MEZA VILLA TAPIA SOSA BONILLA ACEVEDO BENITEZ
-ZAVALA CISNEROS RUBIO ARROYO ARELLANO BELTRAN PONCE CANTU VILLEGAS MONTES MATA ROSARIO HUERTA GUEVARA CORTES MURILLO
-SALGADO CORDOVA BARAJAS ROSAS DAVILA DEJESUS MARIN PALACIOS CUEVAS DUARTE ESPARZA BRAVO CORONA ENRIQUEZ QUINTERO TREJO
-MEDRANO LUCERO BERNAL NAVA VENTURA MAGANA ESPINOSA CORREA DELAROSA LUGO PORTILLO VILLALOBOS QUINTANA ESQUIVEL CANO
-AVALOS PARRA JARAMILLO PERALTA GALINDO LEAL SIERRA ALFARO REYNA
-""".split())
 HISPANIC_SHARE_BY_STATE = {"NC": .11, "TX": .40}          # Census 2020 share of residents
 US_HISPANIC_SHARE = .19
+# real surnames that read as test data in a claim file: left out
+_NOT_USED = {"MOCK", "TEST", "SAMPLE", "FAKE", "DUMMY", "BOGUS", "NULL", "BLANK", "SPAM"}
+_SURNAME_ROWS = [(r["name"], int(r["count"]), float(r["pct_hispanic"]) / 100) for r in _rows("census2010_surnames.csv")
+                 if r["name"] not in _NOT_USED]
+SURNAMES = [n for n, _, _ in _SURNAME_ROWS]
+SURNAME_HISPANIC = {n: h for n, _, h in _SURNAME_ROWS}
+assert len(set(SURNAMES)) == len(SURNAMES), "duplicate surname"
 
 
-def _surname_weights() -> list[float]:
-    head = [828, 655, 550, 488, 483, 395, 394, 381, 369, 361, 360, 342, 342, 337, 304, 296, 289, 274, 268, 260]
-    return [head[r] if r < len(head) else 361 * ((r + 1) / 10) ** -.82 for r in range(len(_SURNAMES))]
-
-
-SURNAMES = list(dict.fromkeys(_SURNAMES))
-assert len(SURNAMES) == len(_SURNAMES), "duplicate surname in the rank list"
+def _state_ratios(state: str) -> tuple[float, float]:
+    share = HISPANIC_SHARE_BY_STATE.get(state, US_HISPANIC_SHARE)
+    return share / US_HISPANIC_SHARE, (1 - share) / (1 - US_HISPANIC_SHARE)
 
 
 def surname_table(state: str) -> list[float]:
-    """Cumulative weights over SURNAMES for patients in this state."""
-    boost = HISPANIC_SHARE_BY_STATE.get(state, US_HISPANIC_SHARE) / US_HISPANIC_SHARE
-    other = (1 - HISPANIC_SHARE_BY_STATE.get(state, US_HISPANIC_SHARE)) / (1 - US_HISPANIC_SHARE)
-    return list(accumulate(w * (boost if s in HISPANIC_SURNAMES else other) for s, w in zip(SURNAMES, _surname_weights())))
+    """Cumulative weights over SURNAMES for patients in this state (Hispanic bearers re-weighted to its share)."""
+    bh, bo = _state_ratios(state)
+    return list(accumulate(c * (h * bh + (1 - h) * bo) for _, c, h in _SURNAME_ROWS))
 
 
-# --- first names: SSA most popular names by decade of birth, rank order -------------------------------
-FIRST_NAMES = {  # (sex, birth years up to and including) -> names
-    ("F", 1949): """MARY DOROTHY HELEN BETTY MARGARET RUTH VIRGINIA DORIS MILDRED FRANCES ELIZABETH EVELYN ANNA MARIE ALICE
-        JEAN SHIRLEY BARBARA IRENE MARJORIE FLORENCE LOIS MARTHA ROSE LILLIAN LOUISE CATHERINE RUBY ELEANOR PATRICIA GLADYS
-        ANNIE JOSEPHINE THELMA EDNA NORMA PAULINE LUCILLE EDITH ETHEL GLORIA JUNE JOAN GRACE JOYCE WANDA PEGGY BEVERLY
-        CAROL NANCY JUANITA PHYLLIS ELSIE HAZEL BERNICE IDA VERA BEATRICE GERALDINE JUDITH""",
-    ("M", 1949): """JAMES ROBERT JOHN WILLIAM RICHARD CHARLES DONALD GEORGE THOMAS JOSEPH DAVID EDWARD RONALD PAUL KENNETH
-        FRANK RAYMOND JACK HAROLD BILLY GERALD WALTER JERRY JOE EUGENE HENRY CARL ARTHUR RALPH LARRY CLARENCE ROY ALBERT
-        FRED HOWARD EARL ERNEST FRANCIS LOUIS ROGER WAYNE BOBBY JIMMY LEROY HERBERT MELVIN LLOYD NORMAN GLENN WILLIE ALLEN
-        LEONARD DALE RUSSELL PHILIP VERNON CECIL FLOYD""",
-    ("F", 1969): """MARY LINDA PATRICIA SUSAN DEBORAH BARBARA DEBRA KAREN NANCY DONNA CYNTHIA SANDRA PAMELA SHARON KATHLEEN
-        CAROL DIANE BRENDA CHERYL JANET ELIZABETH KATHY MARGARET JANICE CAROLYN DENISE JUDY ROSE TERESA LORI CONNIE GLORIA
-        THERESA BEVERLY JUDITH LISA JOYCE SHIRLEY BONNIE RITA ANN ANNA JULIE PEGGY VICKIE TAMMY DIANA KATHRYN VALERIE
-        WANDA SHERRY JACQUELINE MARTHA ROBIN PAULA CATHY LAURA DARLENE SHEILA GAIL""",
-    ("M", 1969): """JAMES MICHAEL ROBERT JOHN DAVID WILLIAM RICHARD THOMAS MARK CHARLES STEVEN GARY JOSEPH DONALD RONALD
-        KENNETH PAUL LARRY DANIEL STEPHEN DENNIS TIMOTHY EDWARD JEFFREY GEORGE GREGORY KEVIN DOUGLAS TERRY ANTHONY JERRY
-        BRUCE RANDY BRIAN FRANK SCOTT ROGER RAYMOND PETER PATRICK KEITH LAWRENCE WAYNE DANNY ALAN GERALD RICKY CARL
-        CHRISTOPHER DALE WALTER CRAIG WILLIE JOHNNY ARTHUR STEVE JOE RANDALL RUSSELL JACK""",
-    ("F", 1989): """JENNIFER JESSICA AMANDA MELISSA SARAH HEATHER NICOLE AMY ELIZABETH MICHELLE KIMBERLY ANGELA STEPHANIE
-        TIFFANY CHRISTINA LISA REBECCA CRYSTAL KELLY ERIN LAURA AMBER RACHEL JAMIE APRIL MARY SARA ANDREA SHANNON DANIELLE
-        KATHERINE EMILY MEGAN STACY TONYA MARIA CHRISTINE HOLLY DAWN TARA JULIE WENDY KRISTEN TRACY MISTY MONICA CARRIE
-        PATRICIA SANDRA KRISTIN VERONICA NATALIE ERICA BRANDY LESLIE KATIE TINA DENISE ALICIA""",
-    ("M", 1989): """MICHAEL CHRISTOPHER JASON DAVID JAMES JOHN ROBERT BRIAN WILLIAM MATTHEW JOSEPH DANIEL KEVIN ERIC
-        JEFFREY RICHARD SCOTT MARK STEVEN THOMAS TIMOTHY ANTHONY CHARLES JOSHUA RYAN JEREMY PAUL ANDREW GREGORY CHAD
-        KENNETH JONATHAN STEPHEN SHAWN AARON ADAM PATRICK JUSTIN SEAN EDWARD TODD DONALD RONALD BENJAMIN NICHOLAS TRAVIS
-        BRANDON NATHAN COREY GARY DUSTIN DEREK SHANE BRADLEY KEITH JOEL CRAIG JAMIE MARCUS""",
-    ("F", 2009): """JESSICA ASHLEY EMILY SARAH SAMANTHA BRITTANY AMANDA ELIZABETH TAYLOR MEGAN HANNAH KAYLA LAUREN
-        STEPHANIE RACHEL JENNIFER NICOLE ALEXIS VICTORIA AMBER ALYSSA COURTNEY DANIELLE REBECCA JASMINE BRIANNA KATHERINE
-        ALEXANDRA MADISON MORGAN MELISSA HALEY ABIGAIL OLIVIA KAITLYN ANNA SYDNEY DESTINY ISABELLA EMMA CHLOE GRACE
-        NATALIE MIA SAVANNAH SOPHIA ALLISON MARIA GABRIELLE ANDREA ERIN SHELBY KIMBERLY AMY CHELSEA MICHELLE VANESSA
-        JORDAN PAIGE""",
-    ("M", 2009): """MICHAEL CHRISTOPHER MATTHEW JOSHUA JACOB NICHOLAS ANDREW DANIEL TYLER JOSEPH BRANDON DAVID JAMES
-        RYAN JOHN ZACHARY JUSTIN WILLIAM ANTHONY ROBERT JONATHAN KYLE AUSTIN ALEXANDER KEVIN CODY THOMAS JORDAN ETHAN
-        AARON BENJAMIN CHRISTIAN NOAH DYLAN SAMUEL STEVEN ERIC JOSE NATHAN TREVOR LOGAN HUNTER CALEB ADAM CAMERON SEAN
-        LUKE CONNOR GABRIEL JUAN ISAIAH ELIJAH EVAN JACKSON LUIS CHARLES PATRICK MASON AIDAN TIMOTHY""",
-    ("F", 2099): """EMMA OLIVIA SOPHIA ISABELLA AVA MIA ABIGAIL EMILY CHARLOTTE MADISON HARPER ELIZABETH AMELIA EVELYN
-        ELLA CHLOE AVERY SOFIA ADDISON GRACE LILY AUBREY ZOEY NATALIE HANNAH SCARLETT VICTORIA BRIANNA SAMANTHA LEAH
-        LAYLA NORA RILEY ZOE ARIA PENELOPE CAMILA ALLISON SAVANNAH ELLIE AALIYAH STELLA PAISLEY CLAIRE SKYLAR LUNA HAZEL
-        MILA ANNA MAYA VIOLET AURORA KENNEDY ARIANA NAOMI GABRIELLA LILLIAN ADALYN ALEXA BELLA""",
-    ("M", 2099): """NOAH LIAM MASON JACOB WILLIAM ETHAN JAMES ALEXANDER MICHAEL BENJAMIN ELIJAH DANIEL AIDEN LOGAN
-        MATTHEW LUCAS JACKSON DAVID OLIVER JAYDEN JOSEPH GABRIEL SAMUEL CARTER ANTHONY JOHN DYLAN LUKE HENRY ANDREW ISAAC
-        CHRISTOPHER JOSHUA WYATT SEBASTIAN OWEN CALEB NATHAN RYAN JACK HUNTER LEVI CHRISTIAN JAXON JULIAN LANDON GRAYSON
-        JONATHAN ISAIAH CHARLES THOMAS AARON ELI CONNOR JEREMIAH CAMERON JOSIAH ADRIAN COLTON JORDAN""",
-}
+def is_hispanic(r, surname: str, state: str) -> bool:
+    """Whether this bearer of the surname is of Hispanic origin, given the state."""
+    h = SURNAME_HISPANIC.get(surname, 0.0)
+    bh, bo = _state_ratios(state)
+    return r.random() < h * bh / (h * bh + (1 - h) * bo) if h else False
+
+
+# --- first names --------------------------------------------------------------------------------------
 HISPANIC_FIRST_NAMES = {
     "F": """MARIA GUADALUPE ROSA ANA JUANA CARMEN MARTHA LETICIA VERONICA ALEJANDRA GABRIELA ELENA YOLANDA PATRICIA LAURA
         ADRIANA SILVIA BLANCA CLAUDIA ESPERANZA SOFIA CAMILA VALERIA XIMENA DANIELA LUCIA MARISOL IRMA OFELIA ALMA""",
     "M": """JOSE JUAN LUIS CARLOS JESUS MIGUEL ANTONIO FRANCISCO JORGE PEDRO ALEJANDRO RICARDO MANUEL RAMON JAVIER RAUL
         FERNANDO ROBERTO MARIO ARTURO EDUARDO SERGIO HECTOR OSCAR RAFAEL ARMANDO ENRIQUE ALFREDO SANTIAGO MATEO""",
 }
-P_SPANISH_FIRST_NAME = .55                 # Hispanic-surnamed patients with a Spanish given name
+P_SPANISH_FIRST_NAME = .4                  # Hispanic patients given a traditional Spanish name (else the SSA mix)
 MIDDLE_INITIALS = "AJMLERDKSCBTGNWHPFVO"   # rough frequency order of middle initials
 P_MIDDLE_INITIAL = .45                     # share of 837 patient names with NM105
 
@@ -188,19 +82,30 @@ class WeightedList:
         items = tuple(dict.fromkeys(items))
         return cls(items, tuple(accumulate(1 / (i + 1) ** s for i in range(len(items)))))
 
+    @classmethod
+    def counts(cls, pairs) -> "WeightedList":
+        pairs = list(pairs)
+        return cls(tuple(n for n, _ in pairs), tuple(accumulate(c for _, c in pairs)))
+
     def pick(self, r) -> str:
         return self.items[bisect.bisect_left(self.cum, r.random() * self.cum[-1])]
 
 
-_FIRST = {k: WeightedList.zipf(v.split()) for k, v in FIRST_NAMES.items()}
+def _first_names() -> dict:
+    by = {}
+    for row in _rows("ssa_first_names.csv"):
+        by.setdefault((row["sex"], int(row["decade"])), []).append((row["name"], int(row["count"])))
+    return {k: WeightedList.counts(v) for k, v in by.items()}
+
+
+_FIRST = _first_names()
 _SPANISH_FIRST = {k: WeightedList.zipf(v.split(), .7) for k, v in HISPANIC_FIRST_NAMES.items()}
 
 
 def first_name(r, sex: str, birth_year: int, hispanic: bool) -> str:
     if hispanic and r.random() < P_SPANISH_FIRST_NAME:
         return _SPANISH_FIRST[sex].pick(r)
-    cohort = next(y for y in (1949, 1969, 1989, 2009, 2099) if birth_year <= y)
-    return _FIRST[(sex, cohort)].pick(r)
+    return _FIRST[(sex, min(max(birth_year // 10 * 10, 1920), 2010))].pick(r)
 
 
 # --- places -----------------------------------------------------------------------------------------
@@ -318,10 +223,53 @@ CREEKSIDE|STONEWALL|HERITAGE|PLANTATION|OLD MILL|TWIN OAKS|FOXCROFT|WILDWOOD|HUN
 SOUTHERN PINES|FIELDSTONE|AUTUMN|SPRINGWOOD|SILVER LAKE|CROSS CREEK|INDIAN TRAIL|VILLAGE|PRESTON|WOODRIDGE|HAWTHORNE|
 COVENTRY|ASHLEY|BROOKSIDE|MANOR|HARVEST|LAKEVIEW|RIVERSIDE|BAYBERRY"""
 STREET_NAMES = WeightedList.zipf(_STREETS.replace("\n", "").split("|"), .6)
-STREET_TYPES = (("ST", 22), ("DR", 20), ("RD", 17), ("AVE", 10), ("LN", 10), ("CT", 8), ("WAY", 4), ("CIR", 3),
-                ("PL", 2), ("TRL", 2), ("BLVD", 1), ("PKWY", 1))
-_TYPE_CUM = list(accumulate(w for _, w in STREET_TYPES))
 ROUTES = {"NC": ("NC HIGHWAY {n}", "US HIGHWAY {n}", "OLD {name} RD"), "TX": ("FM {n}", "COUNTY ROAD {n}", "RANCH ROAD {n}")}
+# Which suffixes a street stem takes. A downtown name is a street, a country name a road, a subdivision name a drive
+# or court; trees, birds and people vary. Each stem gets its own stable mix, so MAIN is nearly always MAIN ST.
+_SUFFIX_MIX = {
+    "downtown": (("ST", 75), ("AVE", 18), ("BLVD", 4), ("PL", 3)),
+    "country": (("RD", 70), ("DR", 12), ("LN", 10), ("TRL", 5), ("WAY", 3)),
+    "subdivision": (("DR", 40), ("CT", 20), ("LN", 14), ("WAY", 10), ("CIR", 10), ("PL", 6)),
+    "person": (("ST", 40), ("AVE", 22), ("RD", 22), ("DR", 12), ("LN", 4)),
+    "nature": (("ST", 25), ("DR", 25), ("LN", 18), ("AVE", 12), ("CT", 10), ("RD", 6), ("CIR", 4)),
+}
+_STEM_KIND = {}
+for _kind, _stems in (("downtown", "MAIN MARKET CHURCH WATER HIGH BROAD KING BRIDGE SCHOOL UNION CENTER COLLEGE ACADEMY "
+                                    "PROSPECT PLEASANT SUMMIT GROVE PARK"),
+                      ("country", "MILL RIVER LAKE SPRING CREEK VALLEY FARM RIDGE COUNTRY_CLUB OLD_MILL PLANTATION HOLLOW "
+                                  "STONEWALL FOREST MEADOW ORCHARD TIMBER HARVEST INDIAN_TRAIL CROSS_CREEK"),
+                      ("subdivision", "CREEKSIDE BRIARWOOD MEADOWBROOK FOXCROFT WILDWOOD ROLLING_HILLS TWIN_OAKS "
+                                      "SOUTHERN_PINES FIELDSTONE SPRINGWOOD SILVER_LAKE WOODRIDGE HAWTHORNE COVENTRY "
+                                      "BROOKSIDE LAKEVIEW BAYBERRY KENSINGTON WINDSOR BRISTOL CAMBRIDGE PINEHURST "
+                                      "HUNTINGTON WESTOVER EASTWOOD NORTHWOOD GLENWOOD HERITAGE LANDING HARBOR VILLAGE "
+                                      "MANOR ASHLEY PRESTON OXFORD HAMPTON AUTUMN WOODLAND FAIRVIEW SUNSET HIGHLAND"),
+                      ("person", "WASHINGTON LINCOLN JEFFERSON MADISON JACKSON FRANKLIN MONROE ADAMS DUKE UNIVERSITY "
+                                 "CHAPEL")):
+    for _s in _stems.split():
+        _STEM_KIND[_s.replace("_", " ")] = _kind
+
+
+def _stable(*parts) -> int:
+    import hashlib
+    return int(hashlib.sha256("|".join(map(str, parts)).encode()).hexdigest()[:12], 16)
+
+
+_SUFFIX_CACHE: dict = {}
+
+
+def _suffixes(stem: str, kind: str) -> WeightedList:
+    """The stem's own suffix mix: its kind's mix, with one suffix (stable per stem) taking most of the weight."""
+    if stem not in _SUFFIX_CACHE:
+        mix = _SUFFIX_MIX[kind]
+        favored = _stable("suffix", stem) % len(mix) if kind in ("nature", "person") else 0
+        _SUFFIX_CACHE[stem] = WeightedList(tuple(x for x, _ in mix),
+                                           tuple(accumulate(w * (6 if i == favored else 1) if kind in ("nature", "person")
+                                                            else w for i, (_, w) in enumerate(mix))))
+    return _SUFFIX_CACHE[stem]
+
+
+_STREET_SURNAME_CUM = list(accumulate(c for _, c, _ in _SURNAME_ROWS[:3000]))
+_NC_ROAD_NAMES = ("MILL", "CHAPEL", "FARM", "STORE", "BRIDGE", "DAIRY", "SCHOOL", "CHURCH")
 
 
 def street_address(r, state: str) -> tuple[str, str | None]:
@@ -329,7 +277,7 @@ def street_address(r, state: str) -> tuple[str, str | None]:
     u = r.random()
     if u < .06:
         line1 = f"PO BOX {r.randint(1, 4999)}"
-    elif u < .14:
+    elif u < .13:
         pattern = r.choice(ROUTES.get(state, ROUTES["NC"]))
         line1 = f"{r.randint(100, 9999)} " + pattern.format(n=r.choice([10, 22, 49, 54, 61, 62, 70, 87, 150, 158, 421,
                                                                           620, 685, 973, 1431, 1626, 2222]),
@@ -337,12 +285,21 @@ def street_address(r, state: str) -> tuple[str, str | None]:
     else:
         number = r.choice([r.randint(1, 99), r.randint(100, 999), r.randint(100, 999), r.randint(1000, 9999),
                            r.randint(1000, 9999), r.randint(10000, 19999)])
-        name = STREET_NAMES.pick(r)
-        if r.random() < .05:
-            name = r.choice(["1ST", "2ND", "3RD", "4TH", "5TH", "6TH", "7TH", "8TH", "9TH", "10TH", "12TH", "14TH"])
+        v = r.random()
+        if v < .35:                                       # named after a family: HARRIS RD, PATTERSON MILL RD
+            stem = SURNAMES[bisect.bisect_left(_STREET_SURNAME_CUM, r.random() * _STREET_SURNAME_CUM[-1])]
+            if r.random() < .25:
+                stem, kind = f"{stem} {r.choice(_NC_ROAD_NAMES)}", "country"
+            else:
+                kind = "person"
+        elif v < .40:
+            stem, kind = r.choice(["1ST", "2ND", "3RD", "4TH", "5TH", "6TH", "7TH", "8TH", "9TH", "10TH", "12TH",
+                                   "14TH"]), "downtown"
+        else:
+            stem = STREET_NAMES.pick(r)
+            kind = _STEM_KIND.get(stem, "nature")
         prefix = f"{r.choice('NSEW')} " if r.random() < .12 else ""
-        kind = STREET_TYPES[bisect.bisect_left(_TYPE_CUM, r.random() * _TYPE_CUM[-1])][0]
-        line1 = f"{number} {prefix}{name} {kind}"
+        line1 = f"{number} {prefix}{stem} {_suffixes(stem, kind).pick(r)}"
     line2 = None
     if not line1.startswith("PO BOX") and r.random() < .14:
         line2 = r.choice([f"APT {r.randint(1, 40)}{r.choice('ABCD')}", f"APT {r.randint(101, 1420)}",
@@ -372,7 +329,18 @@ def _load_dx() -> dict[str, list]:
 
 
 DX_DOMAINS = _load_dx()
-DX_BY_CODE = {dx.code: dx for v in DX_DOMAINS.values() for dx in v}
+def _dx_by_code() -> dict:
+    """A code's widest limits across the domains it is listed in."""
+    out = {}
+    for v in DX_DOMAINS.values():
+        for dx in v:
+            old = out.get(dx.code)
+            out[dx.code] = dx if old is None else Dx(dx.code, old.sex if old.sex == dx.sex else "",
+                                                     min(old.min_age, dx.min_age), max(old.max_age, dx.max_age))
+    return out
+
+
+DX_BY_CODE = _dx_by_code()
 DX_ZIPF = 2.0          # within a domain: the head codes carry most claims, a long tail carries the rest
 
 
@@ -458,7 +426,9 @@ _domains("82533 82088", endocrine=4)
 _domains("82627", endocrine=2, gyn=2)
 _domains("83001 83002 82670", endocrine=1, infertility=1)
 _domains("84403 84402", male=2, gyn=1, endocrine=1)
-_domains("86618 87070 87081", infect=4)
+_domains("87070 87081", infect=4)
+_domains("86618", general=3, rheum=1, infect=.3)            # Lyme serology: fatigue, joint pain; Lyme itself is rare in NC
+_domains("84550", gout=3, ckd=2)
 _domains("87045 87177 87493", gi_infect=4)
 _domains("80178", psych=5)
 _domains("80164 80156", neuro=4, psych=1)
@@ -467,9 +437,9 @@ _domains("80197", transplant=5)
 _domains("80202", infect=5)
 _domains("83655", peds=1)
 _domains("G0103", male=1)
-DEFAULT_DOMAINS_BY_FAMILY = {"80": dict(meds=3, psych=1, neuro=1), "82": dict(general=2, electrolytes=1, nutrition=1, endocrine=1),
-                             "83": dict(general=2, endocrine=1, nutrition=1, meds=1), "84": dict(general=2, endocrine=1, ckd=1),
-                             "85": dict(anemia=2, heme=2, anticoag=1), "86": dict(rheum=2, infect=2, allergy=1, hepatitis=1),
+DEFAULT_DOMAINS_BY_FAMILY = {"80": dict(meds=3, psych=1, neuro=1), "82": dict(general=2, electrolytes=1, nutrition=1),
+                             "83": dict(general=2, nutrition=1, meds=1), "84": dict(general=2, ckd=1, electrolytes=1),
+                             "85": dict(anemia=2, heme=2, anticoag=1), "86": dict(infect=3, general=1),
                              "87": dict(infect=3, uti=1, gi_infect=1, resp=1), "81": dict(uti=2, proteinuria=1)}
 # Screening codes a test is covered by (first-listed on screening orders). General exams cover any routine test.
 SCREENING_BY_CPT = {"80061": ("Z13220", "Z136"), "82465": ("Z13220", "Z136"), "83718": ("Z13220", "Z136"),
@@ -511,15 +481,17 @@ def cpt_fits(code: str, sex: str, age: float) -> bool:
 _FITS_CACHE: dict = {}
 
 
-_GENERAL_WORKUP_FAMILIES = ("82", "83", "84", "85")
+# Broad panels ordered as part of a general work-up (fatigue, weight change, medication monitoring): those
+# diagnoses justify them too. Targeted tests (PSA, uric acid, a drug level) keep only their own domains.
+GENERAL_WORKUP_TESTS = frozenset("80053 80048 80047 80051 80069 80076 85025 85027 82947 84132 84295 82565 84520 82310 "
+                                 "84460 84450 83735 84100 82040 85014 85018 85048 81001 81003".split())
 
 
 def cpt_domains(code: str) -> dict:
-    """The clinical domains that justify a test. Routine chemistry and hematology are also ordered as part of a
-    general work-up (fatigue, weight change, medication monitoring), so those count for them too."""
+    """The clinical domains that justify a test."""
     if code not in _DOMAIN_CACHE:
         domains = dict(CPT_DOMAINS.get(code) or DEFAULT_DOMAINS_BY_FAMILY.get(code[:2], dict(general=1)))
-        if code[:2] in _GENERAL_WORKUP_FAMILIES or code in ("80053", "80048", "80051", "80069", "80076"):
+        if code in GENERAL_WORKUP_TESTS:
             domains.setdefault("general", .6)
             domains.setdefault("meds", .4)
         _DOMAIN_CACHE[code] = domains
@@ -535,7 +507,7 @@ CHRONIC = {"htn": (.01, .12, .38, .62), "lipid": (.01, .10, .35, .52), "dm": (.0
            "thyroid": (.01, .06, .10, .16), "ckd": (0, .01, .06, .22), "anemia": (.04, .06, .06, .12),
            "anticoag": (0, .003, .02, .10), "nutrition": (.08, .18, .22, .18), "psych": (.03, .12, .12, .08),
            "cardio": (0, .005, .05, .18), "rheum": (0, .01, .03, .06), "liver": (0, .02, .04, .03),
-           "meds": (.02, .08, .16, .28)}
+           "meds": (0, .08, .16, .28), "gout": (0, .005, .03, .06)}
 CHRONIC_FEMALE_MULT = {"thyroid": 2.2, "anemia": 1.6, "rheum": 1.4}
 
 
