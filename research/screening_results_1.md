@@ -22,7 +22,7 @@ question-level bootstrap resamples (python -m bench.eval_subagents effects RUN -
 | s0111010 | 86.1% | 97.2% |
 | s1000101 | 77.8% | 88.9% |
 | s1001110 | 75.0% | 100.0% |
-| s1010010 | 75.0% | 86.1% |
+| s1010010 | 77.8% | 86.1% |
 | s1011001 | 83.3% | 91.7% |
 | s1100011 | 94.4% | 97.2% |
 | s1101000 | 91.7% | 97.2% |
@@ -33,17 +33,17 @@ question-level bootstrap resamples (python -m bench.eval_subagents effects RUN -
 
 | factor | Haiku | Sonnet |
 |---|---|---|
-| A semantic layer (typed metrics + lookup) | +2.8 [-2.1, +8.3] | -1.0 [-3.1, +1.0] |
-| **B glossary: basic -> + invariants and pitfalls** | **+16.0 [+5.2, +27.1]** | **+5.9 [+0.4, +12.9]** |
-| C data dictionary + data profile | +2.1 [-1.7, +7.3] | -1.0 [-4.2, +2.8] |
-| D dynamic few-shot examples (k=3, own family excluded) | 0.0 [-2.4, +2.8] | +1.7 [-0.4, +4.2] |
-| E SQL error hints + programmatic result checks | 0.0 [-2.8, +2.8] | +1.7 [-1.0, +4.5] |
-| F reasoning effort low -> high | -2.8 [-8.7, +2.4] | +1.7 [-3.1, +6.3] |
-| **G context style: goal -> procedural steps** | **+4.9 [+0.7, +9.4]** | +1.7 [-0.7, +4.2] |
+| A semantic layer (typed metrics + lookup) | +3.1 [-1.7, +8.7] | -1.0 [-3.1, +1.0] |
+| **B glossary: basic -> + invariants and pitfalls** | **+15.6 [+5.2, +26.7]** | **+5.9 [+0.4, +12.9]** |
+| C data dictionary + data profile | +2.4 [-1.7, +7.6] | -1.0 [-4.2, +2.8] |
+| D dynamic few-shot examples (k=3, own family excluded) | -0.3 [-3.1, +2.4] | +1.7 [-0.4, +4.2] |
+| E SQL error hints + programmatic result checks | -0.3 [-3.1, +2.4] | +1.7 [-1.0, +4.5] |
+| F reasoning effort low -> high | -2.4 [-8.3, +2.4] | +1.7 [-3.1, +6.3] |
+| **G context style: goal -> procedural steps** | **+4.5 [+0.4, +9.0]** | +1.7 [-0.7, +4.2] |
 
 ## Findings
 
-1. Domain knowledge written as invariants and traps is the dominant lever: +16 pts on Haiku, +6 on Sonnet. With
+1. Domain knowledge written as invariants and traps is the dominant lever: +16 pts on Haiku (15.6), +6 on Sonnet. With
    it, Haiku (86-97%) reaches Sonnet's range (86-100%) on this question set.
 2. Procedural working steps help Haiku (+5) and do not hurt Sonnet.
 3. On this set the semantic layer, dictionary/profile, examples, result checks and higher effort have no
