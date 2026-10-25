@@ -20,6 +20,7 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
+import duckdb
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -33,12 +34,18 @@ from bench.ledger import answer as ledger_answer  # noqa: E402
 CASES = Path(__file__).with_name("questions.yaml")
 
 
-def load_cases(only: str | None = None) -> list[dict]:
+def load_cases(only: str | None = None, snapshot_path: Path | None = None) -> list[dict]:
+    """Hand-written questions (questions.yaml) plus, when a snapshot is given, the questions generated for that
+    dataset from bench/question_families.py (stored in the snapshot as generated_questions.json)."""
     cases = yaml.safe_load(CASES.read_text())
+    generated = Path(snapshot_path) / "generated_questions.json" if snapshot_path else None
+    if generated and generated.exists():
+        cases += json.loads(generated.read_text())
     ids = [c["id"] for c in cases]
     assert len(ids) == len(set(ids)), "duplicate question ids"
     if only:
-        cases = [c for c in cases if only in (c["id"], c["category"], c["difficulty"])]
+        cases = [c for c in cases if only in (c["id"], c["category"], c["difficulty"], c.get("family"),
+                                              "generated" if c.get("family") else "handwritten")]
     return cases
 
 
@@ -58,8 +65,10 @@ def selftest(path: Path, strict: bool = True) -> dict:
       - (strict) every wrong_sql is rejected, and no gold answer is empty or all zeros unless allow_trivial;
         otherwise the question does not discriminate on this dataset."""
     truth = load_truth(path)
+    answer_key = duckdb.connect(str(Path(path) / "answer_key.duckdb"), read_only=True) \
+        if (Path(path) / "answer_key.duckdb").exists() else None
     report = dict(ledger_mismatch=[], alt_rejected=[], wrong_accepted=[], trivial=[], checked=0)
-    for c in load_cases():
+    for c in load_cases(snapshot_path=path):
         if c.get("expect_refusal"):
             continue
         con = open_snapshot(path, escalate=c.get("escalate", False))
@@ -68,8 +77,9 @@ def selftest(path: Path, strict: bool = True) -> dict:
         if not c.get("allow_trivial") and (not gold or all(all((_v or 0) == 0 for _v in r if not isinstance(_v, str))
                                                             for r in gold)):
             report["trivial"].append(c["id"])
-        if c.get("ledger"):
-            want = ledger_answer(c["ledger"], truth["tenant"], truth)
+        if c.get("ledger") or c.get("answer_key_sql"):
+            want = ledger_answer(c["ledger"], truth["tenant"], truth) if c.get("ledger") else \
+                answer_key.execute(c["answer_key_sql"]).fetchall()
             spec = {k: v for k, v in _spec(c).items() if k not in ("order", "n", "metric_col", "optional_cols",
                                                                      "percent_cols", "sign_cols")}
             ok, why = match(want, gold, spec)
@@ -93,7 +103,7 @@ def selftest(path: Path, strict: bool = True) -> dict:
 
 def run(agent_name: str, path: Path, repeats: int = 1, use_judge: bool = False, only: str | None = None) -> dict:
     from bench.judge import judge
-    cases = load_cases(only)
+    cases = load_cases(only, snapshot_path=path)
     agent = A.load(agent_name, cases)
     rows = []
     for c in cases:
@@ -170,7 +180,7 @@ def write(result: dict) -> Path:
 def calibrate(path: Path) -> dict:
     from bench.judge import judge
     stats = dict(alt_total=0, alt_accepted=0, wrong_total=0, wrong_rejected=0, disagreements=[])
-    for c in load_cases():
+    for c in load_cases(snapshot_path=path):
         if c.get("expect_refusal"):
             continue
         con = open_snapshot(path, escalate=c.get("escalate", False))

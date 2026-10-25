@@ -53,7 +53,7 @@ FAMILIES = [
             "What was {payer_title}'s total paid amount for {month_words} (current adjudications, by payment date)?"),
            "SELECT coalesce(round(sum(paid_amount), 2), 0) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = '{payer_title_sql}' AND payment_month = DATE '{month}'",
            "SELECT coalesce(round(sum(e.paid), 2), 0) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = '{payer_sql}' AND date_trunc('month', e.event_date::DATE) = DATE '{month}'",
-           "SELECT a.payer, strftime(date_trunc('month', e.event_date::DATE), '%Y-%m-%d') AS month FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current GROUP BY 1, 2 HAVING count(*) >= 30 ORDER BY 1, 2",
+           "SELECT a.payer, strftime(date_trunc('month', e.event_date::DATE), '%Y-%m-%d') AS month FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current GROUP BY 1, 2 HAVING count(*) >= 30 AND sum(e.paid) > 0 ORDER BY 1, 2",
            {"tol": 0.01}),
     Family("cpt_denied_lines", "lines", "medium",
            ("How many {cpt} service lines were denied in current adjudications?",
