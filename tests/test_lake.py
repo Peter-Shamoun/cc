@@ -23,6 +23,8 @@ CRASH_DAY = "2026-07-22"
 
 @pytest.fixture(scope="module")
 def world(tmp_path_factory):
+    open_months = pipeline.OPEN_MONTHS
+    pipeline.OPEN_MONTHS = 1                       # so July folds into the 2026 year file when August opens
     w = build_world(tmp_path_factory.mktemp("lake"), SCENARIO, customers=(C,), users={"ana@xifin.example": C},
                     deliver=False)
     real_build_gold = pipeline.build_gold
@@ -37,6 +39,7 @@ def world(tmp_path_factory):
             pipeline.build_gold = real_build_gold
     yield w
     w.aws.shutdown()
+    pipeline.OPEN_MONTHS = open_months
 
 
 def parser_env(w):
@@ -70,14 +73,18 @@ def test_batches_ran_incrementally_and_the_crashed_one_was_caught_up(world):
     assert m["silver_through"] == max(silver_state(store(world)).committed_runs)
 
 
-def test_closed_months_are_compacted(world):
+def test_closed_months_are_compacted_and_settled_months_fold_into_years(world):
     s = silver_state(store(world))
     assert {m for by_month in s.live.values() for m in by_month} == {"2026-07", "2026-08"}
     for t, by_month in s.live.items():
         assert len(by_month.get("2026-07", [])) <= 1 and all("/compacted-" in k for k in by_month.get("2026-07", [])), t
     m = read_manifest(store(world), read_current(store(world))[0])
+    for rel in pipeline.CLAIM_RELATIONS:
+        assert set(m["relations"][rel]) == {"cohort=2026", "cohort=2026-08"}, rel
     for rel in pipeline.APPEND_RELATIONS:
-        assert len(m["relations"][rel].get("received_month=2026-07", [])) <= 1, rel
+        parts = m["relations"][rel]
+        assert len(parts.get("received=2026", [])) <= 1 and set(parts) <= {"received=2026", "received=2026-08", "empty"}, rel
+    assert len(m["relations"]["lossless.c837_claim"]["received=2026"]) == 1
 
 
 def test_incremental_gold_equals_full_rebuild(world):
