@@ -59,7 +59,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.003,
-   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)"
+   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_b853266803",
@@ -105,7 +107,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.011,
-   "assumptions": "primary = any submission with payer_responsibility P; first submission = earliest 837 to that payer_key; negative days kept as-is"
+   "assumptions": "primary = any submission with payer_responsibility P; first submission = earliest 837 to that payer_key; negative days kept as-is",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -135,7 +139,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.005,
-   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)"
+   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_a5888f64a4",
@@ -187,7 +193,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.006,
-   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)"
+   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7d45c279a7",
@@ -211,7 +219,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.007,
-   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)"
+   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q15_partial_line_denials",
@@ -224,7 +234,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.002,
-   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)"
+   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q25_primary_deductible",
@@ -237,7 +249,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.005,
-   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)"
+   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_8663c777cd",
@@ -259,7 +273,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.008,
-   "assumptions": "null referring NPIs excluded from ranking but kept in month total"
+   "assumptions": "null referring NPIs excluded from ranking but kept in month total",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__87798",
@@ -272,7 +288,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.002,
-   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)"
+   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q11_cpt_denial_rate",
@@ -450,7 +468,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.008,
-   "assumptions": "billed CPTs = 837 lines for that claim+payer plus current 835 lines (covers pre-data claims)"
+   "assumptions": "billed CPTs = 837 lines for that claim+payer plus current 835 lines (covers pre-data claims)",
+   "pass": false,
+   "why": "expected 3 rows, got 28"
   },
   {
    "qid": "a_a123bba47f",
@@ -481,7 +501,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.009,
-   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)"
+   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_9108c7aacb",
@@ -526,7 +548,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.007,
-   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)"
+   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_856b95a70c",
@@ -578,7 +602,9 @@
    "sql_execs": 2,
    "repairs": 1,
    "seconds": 0.01,
-   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)"
+   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_1b7e02d0b0",
@@ -595,7 +621,9 @@
    "sql_execs": 2,
    "repairs": 1,
    "seconds": 0.02,
-   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)"
+   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_921f1bf366",
@@ -611,7 +639,9 @@
    "sql_execs": 2,
    "repairs": 1,
    "seconds": 0.018,
-   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)"
+   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)",
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "q14_zero_paid_not_denied",
@@ -624,7 +654,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.003,
-   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)"
+   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_dca9da6d52",
@@ -641,7 +673,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.008,
-   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)"
+   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q19_reversed_no_correction",
@@ -654,7 +688,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.003,
-   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)"
+   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__80307",
@@ -667,7 +703,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.003,
-   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)"
+   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d383370345",
@@ -719,7 +757,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.013,
-   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)"
+   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0482",
@@ -732,7 +772,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.003,
-   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)"
+   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_0d43f7d4b6",
@@ -747,7 +789,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.014,
-   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)"
+   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_923951a050",
@@ -761,7 +805,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.008,
-   "assumptions": "duplicate-claim (CARC 18) denials of resends are not superseded adjudications"
+   "assumptions": "duplicate-claim (CARC 18) denials of resends are not superseded adjudications",
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_7423e6eb91",
@@ -781,7 +827,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.012,
-   "assumptions": "only claims first submitted on/before 2026-08-14"
+   "assumptions": "only claims first submitted on/before 2026-08-14",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_never_remitted_submitted_in_month__2026-07-01",
@@ -794,7 +842,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.005,
-   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)"
+   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_ab202d4b23",
@@ -999,7 +1049,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.01,
-   "assumptions": "payers listed = those with eligible lines; billed procedure_code"
+   "assumptions": "payers listed = those with eligible lines; billed procedure_code",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0480",
@@ -1012,7 +1064,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.003,
-   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)"
+   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d671e0b995",
@@ -1078,7 +1132,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.006,
-   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)"
+   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__81479",
@@ -1091,7 +1147,9 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.003,
-   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)"
+   "assumptions": "standard semantic-layer definitions (current adjudication, is_denied, primary = payer_responsibility P)",
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q12_referring_provider_denials",
@@ -1100,12 +1158,15 @@
    "sql_execs": 3,
    "repairs": 2,
    "seconds": 0.021,
-   "assumptions": "referring NPI from the latest primary-payer submission"
+   "assumptions": "referring NPI from the latest primary-payer submission",
+   "pass": true,
+   "why": "ok"
   }
  ],
- "accuracy": null,
+ "accuracy": "27/30",
  "n": 30,
  "mean_sql_execs": 1.17,
  "explore_probes": 0,
- "n_pass": null
+ "n_pass": 27,
+ "notes": "All five cells were run by one Grok Bot analyst in one context (l4): base drafts, alternative candidates and repairs were written once and reused across cells according to each config, so cells are not independent samples. multiagent was simulated as sequential planner/writer passes in the same context (not isolated). Answers for all 5 cells were committed (28d3fe0) before any scoring; scoring = bench.compare.match vs gold rows. Snapshot 98e61f03e594 is small (July-only payments, no void claims), so several questions have degenerate answers."
 }
