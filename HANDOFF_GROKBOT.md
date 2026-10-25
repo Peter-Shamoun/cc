@@ -1,8 +1,8 @@
 # HANDOFF_GROKBOT.md: Grok Bot session, Oct 25 2026, 3:26 to about 4:55 PM PT
 
-**For Claude Code.** While your usage was out, Peter had Grok Bot act as main dev on this repo. This file lists what landed, what is still in flight, what was deliberately left alone, and what to do next on the agent analyzer. Last refreshed: **4:20 PM PT, Oct 25 2026**.
+**For Claude Code.** While your usage was out, Peter had Grok Bot act as main dev on this repo. This file lists what landed, what is still in flight, what was deliberately left alone, and what to do next on the agent analyzer. Last refreshed: **4:22 PM PT, Oct 25 2026**.
 
-Short version: 82 PRs opened against `claude/trusting-heisenberg-8xvazk` (79 merged, 3 open at refresh time). Peter asked for PRs to be **auto-merged**, so a script merged every cleanly mergeable PR into the working branch once a minute until 5 PM PT. Nothing was reviewed by hand. Treat every merged PR as unreviewed, and review it before you build on it.
+Short version: 85 PRs opened against `claude/trusting-heisenberg-8xvazk` (81 merged, 4 open at refresh time). Peter asked for PRs to be **auto-merged**, so a script merged every cleanly mergeable PR into the working branch once a minute until 5 PM PT. Nothing was reviewed by hand. Treat every merged PR as unreviewed, and review it before you build on it.
 
 ## Ground rules that were held
 
@@ -10,11 +10,11 @@ Short version: 82 PRs opened against `claude/trusting-heisenberg-8xvazk` (79 mer
 - **Parser, silver, scale runs and audit 4 left alone.** That is your uncommitted work in your own environment. No PR touches `ccsim/parser.py`, `ccsim/edi_mock.py`, silver compaction, the scale-run scripts, or the realism audits. **One exception you must know about:** the security stress test ([#34](https://github.com/Peter-Shamoun/cc/pull/34)) made small hardening edits to `ccsim/pipeline.py` (+4/−3, a locked-down reader temp dir and memory cap), `ccsim/query.py` (+57/−1, agent SQL audit log and the guard), `bench/guard.py`, `ccsim/aws/cloudtrail.py` (hash chain) and `claude/schema/04_agent_interface.py`. If your uncommitted silver or pipeline work touches `ccsim/pipeline.py`, expect a small rebase conflict there. #34 reports `pytest -q tests/` green at 386 passed.
 - **No paid API calls.** Every new LLM client raises `PaidAPIDisabled` unless `allow_paid_api=True`. Tests use scripted backends. The grid "analyst" was the cloud agent's own model (see the caveats).
 - **Disjoint paths.** Each agent was told to write only its own files (`analyst/approaches/<id>/`, `analyst/variants/<name>/`, `research/approaches/<id>.md`, `research/grid/<cell>.*`, and so on). A few late PRs still conflicted. They're listed under the caveats.
+- `main` is stale. All work targets `claude/trusting-heisenberg-8xvazk`.
 
 Path audit at refresh time: these merged PRs touch guarded paths. Review them first:
 
 - [#34](https://github.com/Peter-Shamoun/cc/pull/34): `ccsim/pipeline.py`, `ccsim/query.py`
-- `main` is stale. All work targets `claude/trusting-heisenberg-8xvazk`.
 
 ## What was built
 
@@ -37,9 +37,10 @@ Path audit at refresh time: these merged PRs touch guarded paths. Review them fi
 | [#34](https://github.com/Peter-Shamoun/cc/pull/34) | Stress-test agent SQL: guard, PHI, and audit | merged | `pytest -q tests/`: 386 passed |
 | [#37](https://github.com/Peter-Shamoun/cc/pull/37) | api: FastAPI SSE bridge between the analyzer and the web chat | merged | `PYTHONPATH=. pytest api/tests -q`: 22 passed |
 | [#50](https://github.com/Peter-Shamoun/cc/pull/50) | Chat transcripts: ephemeral default and persisted design behind a mode switch | open, **conflicting** (auto-merge skips it) | 244 passed |
-| [#52](https://github.com/Peter-Shamoun/cc/pull/52) | web: ClaimClarity chat frontend v0 | merged | docs only, no tests |
+| [#52](https://github.com/Peter-Shamoun/cc/pull/52) | web: ClaimClarity chat frontend v0 | merged | 18 vitest tests passed (scripted) |
 | [#54](https://github.com/Peter-Shamoun/cc/pull/54) | Seal glossary learning into train, validation, and test | open, **conflicting** (auto-merge skips it) | n/a (see PR body) |
-| [#78](https://github.com/Peter-Shamoun/cc/pull/78) | web v1: Streamdown, live api/ round-trip, edit-and-branch, mobile drawer, search/rename, virtualized tables | merged | n/a (see PR body) |
+| [#78](https://github.com/Peter-Shamoun/cc/pull/78) | web v1: Streamdown, live api/ round-trip, edit-and-branch, mobile drawer, search/rename, virtualized tables | merged | 23/23 pass |
+| [#84](https://github.com/Peter-Shamoun/cc/pull/84) | web v1.1: thumbs-down feedback panel, Ctrl/Cmd+K search, Ctrl/Cmd+Shift+O new chat | merged | n/a (see PR body) |
 
 ### Agent-analyzer approaches A01 to A10
 
@@ -47,13 +48,13 @@ Each approach is self-contained in `analyst/approaches/<id>/`, with a write-up i
 
 - **A01 single-shot**: one SELECT, one execution, no repair. This is the floor. A separate run on question slice 0 scored 17/20 with the cloud agent's model. Misses: a zero-filled empty population, a payment-method definition (checks dropped), and a flag encoded as text instead of a boolean.
 - **A02 tool loop**: explore → draft → repair at most twice on an error, an empty result or a suspicious result. Programmatic checks cover `is_latest_submission`, rates within 0..100, NULL columns and grain. Known risk: a repair can drop the filter that made the result empty.
-- **A03**: [#33](https://github.com/Peter-Shamoun/cc/pull/33) merged.
+- **A03 metric-spec compiler** (the text-to-metrics arm, `analyst/approaches/a03_metric_spec/`): [#33](https://github.com/Peter-Shamoun/cc/pull/33) merged.
 - **A04 multi-candidate**: 3 prompt-diverse SQLs, all executed. Agreement wins, and one pairwise selector call breaks a three-way split, with abstain allowed (CHASE-SQL-lite).
 - **A05 plan → execute → fresh-context critic**: allows one revision.
 - **A06 explore-first** (ReFoRCE-style templated probes, at most 13 aggregate statements, then one SQL): [#16](https://github.com/Peter-Shamoun/cc/pull/16) merged.
 - **A07 checked CTE decomposition**: population → join → metric → aggregation → ranking. Each step is checked for row count, grain uniqueness and conserved sums. It catches join fan-out, but a wrong population that isn't empty still passes.
 - **A08 self-consistency**: 5 attempts, a normalized vote, and the vote margin used as confidence (4–1 ships, 3–2 cascades, no majority abstains). Correlated errors make it confidently wrong, so publish `unanimous_wrong` and the calibration gap before you keep it.
-- **A09**: [#30](https://github.com/Peter-Shamoun/cc/pull/30) merged.
+- **A09 assumptions-first** (lock the reading of the question, then query): [#30](https://github.com/Peter-Shamoun/cc/pull/30) merged.
 - **Typed metric compiler** (`analyst/variants/typed_metric_compiler/`, write-up `research/variants/typed_metric_compiler.md`): [#20](https://github.com/Peter-Shamoun/cc/pull/20) merged. The model submits a `QuestionSpec` (catalog metrics, dimensions, filters, grain and an explicit date basis), which is compiled through the existing `SemanticAPI` in `claude/schema/04_agent_interface.py`. Free SQL runs only after `cannot_express`. Coverage is only **11.6% of concrete analytic questions** (17.1% with families), and joins, unions and windows dominate the misses. Verdict: keep it as a first lane with free SQL behind it, and score the covered subset and the complement separately.
 - **Context retrieval** (`analyst/variants/context_retrieval/`, write-up `research/variants/context_retrieval.md`): [#22](https://github.com/Peter-Shamoun/cc/pull/22) merged. A tenant value index (payers, CPT/HCPCS, CARC/RARC, dx, with no PHI columns and a tenant-checked `lookup`), a schema linker, and train-only few-shot. Verdict: schema linking and few-shot probably won't help on a 10-view `sem.*`, and the value index is the only arm with a non-zero prior. The primary screen arm is `cr_value` vs `cr0_base`. Its tests are in `tests/test_variant_context_retrieval.py` (7 passed).
 - **A10 dynamic few-shot**: TRAIN-only TF-IDF/BM25 retrieval of 3 examples. Hard leakage guards drop the same family or template, masked-SQL matches, near-duplicate questions, `heldout_hard_1`, and anything that isn't train.
@@ -83,26 +84,70 @@ Peter wanted a factorial search over analyzer parameters, where "off" counts as 
 - **Ceiling finding**: the v1 dev set (the first 20 non-held-out questions by sha256) hit **ceiling**. 22 of the 27 v1 cells on the branch scored 20/20, including all-off direct SQL and all-on, so v1 can't separate the factors. The remaining v1 cells (C030 to C099) were abandoned, and the grid moved to **DEV_HARD_v1** under [`research/grid/GRID_PROTOCOL_V2_ADDENDUM.md`](research/grid/GRID_PROTOCOL_V2_ADDENDUM.md), as the H-series (H000+), with the same design order.
 - **DEV_HARD_v1** is on the branch (`research/grid/DEV_HARD_v1.json`). Screen 1 publishes only config-level accuracy, so the builder fell back to `difficulty == hard`, taking the first 30 of 42 by sha256. That is **not** a measured-hardness set. The dataset is the 20-day bench-test snapshot `98e61f03e594`, because the 45-day world wasn't on disk.
 - H-series cells on the branch at refresh time: 95. **DEV_HARD_v1 is also near ceiling for this model** (see the raw marginals below, at about 90% pooled, with several 30/30 cells). Factor differences are a point or two, which is within noise at n=30 per cell. A tag-based "hard" set isn't hard enough for a strong model.
+- **DEV_HARD_v2 proposal** ([#82](https://github.com/Peter-Shamoun/cc/pull/82) merged): `research/grid/DEV_HARD_v2_PROPOSAL.md`. It moves to the 45-day bench default world (`cbb77dba2ad6`, rebuilt locally and not committed because it contains the answer key), where data traps actually occur. For example, August payments go from 0 to 122. `research/grid/INDEPENDENCE_NOTES.md` gives **weight 0** to the explicit-reuse cells (H018–20, H022–24, H026–28, H030–32, H034–36, H038–40, H066–69) in the primary analysis.
 
-**Grid headlines**, quoted from [`research/grid/SUMMARY.md`](research/grid/SUMMARY.md) Generated by `research/grid/aggregate.py` at 2026-10-25 16:01 PDT. Re-run it to refresh; do not hand-edit. Read the file for the ranking and per-cell tables.
+**Grid headlines**, quoted from [`research/grid/SUMMARY.md`](research/grid/SUMMARY.md) Generated by `research/grid/aggregate.py` at 2026-10-25 16:20 PDT. Re-run it to refresh; do not hand-edit. Read the file for the ranking and per-cell tables.
 
 ### Status
 
-- Cells found: **7** (7 valid, 0 rejected by schema/design checks).
-- C-series (v1 dev set - at ceiling): 7 cells, 140/140 question-passes (100.0%).
-- Sources: open PRs, working branch.
-- Contamination-flagged cells: 4 (C000, C007, C010, C011).
+- Cells found: **122** (117 valid, 5 rejected by schema/design checks).
+- H-series (DEV_HARD_v1, protocol v2 - the series that matters): 90 cells, 2428/2700 question-passes (89.9%).
+- C-series (v1 dev set - at ceiling): 27 cells, 529/540 question-passes (98.0%).
+- Sources: working branch.
+- Contamination-flagged cells: 44 (C000, C003, C006, C007, C008, C010, C011, C021, C022, C024, C025, C026, H000, H001, H004, H008, H015, H016, H018, H022, H026, H027, H028, H029, H030, H038, H039, H040, H047, H050, H051, H052, H056, H057, H058, H059, H060, H061, H062, H063, H064, H072, H075, H078).
 
 ### Headline
 
-- No identified H-series effects yet (0 H cells pooled). no cells
-- C-series (v1 dev set): all 7 cells scored 100% - ceiling, no factor information.
+- Largest H-series effects: candidates3 +1.9 pp [-1.9, +5.6]; repair +1.8 pp [-1.8, +5.5]; gen:decompose_cte -1.5 pp [-6.5, +3.4].
+- CIs excluding zero: none yet.
+- Best predicted combination: 020 (metric_spec, flags 0110100) at 92.7% with ~2.8 SQL execs/question.
 
 ### Main effects: H-series (primary)
 
-Linear probability model, pass ~ generation (ref = direct_sql) + 7 flags + question fixed effects; cluster-robust SEs by cell, t(0) CIs. 0 cells, 0 questions, 0 questions dropped as constant across cells (all-pass/all-fail carry no information under question FE), 0 informative observations.
+Linear probability model, pass ~ generation (ref = direct_sql) + 7 flags + question fixed effects; cluster-robust SEs by cell, t(89) CIs. 90 cells, 30 questions, 7 questions dropped as constant across cells (all-pass/all-fail carry no information under question FE), 2070 informative observations.
 
-> no cells
+| term | effect (pp) | 95% CI (pp) | identified | ridge-logit log-odds [95% CI] |
+|---|---|---|---|---|
+| gen:metric_spec | +0.9 | [-2.9, +4.7] | yes | +0.42 [+0.06, +0.78] |
+| gen:decompose_cte | -1.5 | [-6.5, +3.4] | yes | +0.14 [-0.21, +0.49] |
+| fewshot | -0.5 | [-4.2, +3.3] | yes | +0.11 [-0.19, +0.41] |
+| explore | +0.3 | [-3.2, +3.8] | yes | +0.27 [-0.04, +0.57] |
+| candidates3 | +1.9 | [-1.9, +5.6] | yes | +0.52 [+0.23, +0.82] |
+| verifier | -1.4 | [-5.3, +2.5] | yes | -0.00 [-0.31, +0.30] |
+| repair | +1.8 | [-1.8, +5.5] | yes | +0.55 [+0.26, +0.84] |
+| assumptions | +0.2 | [-3.8, +4.1] | yes | +0.30 [+0.01, +0.60] |
+| multiagent | -0.1 | [-3.9, +3.7] | yes | +0.15 [-0.16, +0.46] |
+
+Top two-way interactions (each added alone to the main-effects model):
+
+| interaction | est (pp) | 95% CI (pp) | t | cells with both on |
+|---|---|---|---|---|
+| fewshot x assumptions | +10.1 | [+2.3, +17.9] | +2.56 | 24 |
+| fewshot x verifier | +6.2 | [-1.8, +14.2] | +1.53 | 20 |
+| repair x assumptions | +5.9 | [-2.1, +13.9] | +1.47 | 22 |
+| explore x assumptions | -5.2 | [-12.5, +2.1] | -1.42 | 25 |
+| verifier x multiagent | +4.0 | [-3.8, +11.8] | +1.02 | 16 |
+
+### Main effects: H-series, contamination-flagged cells excluded
+
+Linear probability model, pass ~ generation (ref = direct_sql) + 7 flags + question fixed effects; cluster-robust SEs by cell, t(57) CIs. 58 cells, 30 questions, 9 questions dropped as constant across cells (all-pass/all-fail carry no information under question FE), 1218 informative observations.
+
+| term | effect (pp) | 95% CI (pp) | identified | ridge-logit log-odds [95% CI] |
+|---|---|---|---|---|
+| gen:metric_spec | +1.8 | [-4.1, +7.7] | yes | +0.47 [+0.04, +0.91] |
+| gen:decompose_cte | -3.5 | [-10.8, +3.8] | yes | -0.10 [-0.57, +0.37] |
+| fewshot | -1.6 | [-7.7, +4.5] | yes | -0.12 [-0.50, +0.26] |
+| explore | -1.9 | [-6.9, +3.0] | yes | +0.10 [-0.27, +0.46] |
+| candidates3 | +2.4 | [-3.7, +8.4] | yes | +0.62 [+0.26, +0.98] |
+| verifier | -0.4 | [-6.6, +5.9] | yes | +0.17 [-0.20, +0.53] |
+| repair | +1.8 | [-3.5, +7.0] | yes | +0.59 [+0.25, +0.93] |
+| assumptions | -0.8 | [-7.0, +5.3] | yes | +0.21 [-0.14, +0.56] |
+| multiagent | -0.9 | [-6.5, +4.7] | yes | +0.16 [-0.24, +0.55] |
+
+Top two-way interactions (each added alone to the main-effects model):
+
+| interaction | est (pp) | 95% CI (pp) | t | cells with both on |
+|---|---|---|---|---|
 
 #### Quick raw marginals (computed by this handoff from the cell JSONs)
 
@@ -310,10 +355,11 @@ Grid PRs:
 | [#80](https://github.com/Peter-Shamoun/cc/pull/80) | Grid H011–H013 on DEV_HARD_v1 | merged | accuracy 28/30 (bench.compare.match) |
 | [#81](https://github.com/Peter-Shamoun/cc/pull/81) | Grid cells H041–H043 on DEV_HARD_v1 | merged | accuracy 28/30 (bench.compare.match) |
 | [#82](https://github.com/Peter-Shamoun/cc/pull/82) | grid: DEV_HARD_v2 proposal (45-day default snapshot cbb77dba2ad6) + independence notes | merged | n/a (see PR body) |
+| [#83](https://github.com/Peter-Shamoun/cc/pull/83) | Grid SUMMARY refresh (1620) | merged | n/a (see PR body) |
 
 ### Product surface
 
-- **React chat frontend in `web/`** (Vite + React + TypeScript, built by local Grok Bot workers): present on the branch. PRs: [#52](https://github.com/Peter-Shamoun/cc/pull/52) merged, [#78](https://github.com/Peter-Shamoun/cc/pull/78) merged. Spec: `docs/frontend-spec.md`. Architecture, the contract, the PHI rules and the to-do list: `docs/frontend.md`. It looks and behaves like ChatGPT (layout, pill composer, density) and has a Claude-style resizable artifact panel. It was built clean-room from observation, with no ChatGPT, Claude or vercel/chatbot code copied. Streamdown (Vercel, Apache-2.0) renders the markdown, and its notice is in `web/THIRD_PARTY_NOTICES.md`. It isn't a vercel/chatbot fork, and `docs/frontend.md` says what a full fork would take.
+- **React chat frontend in `web/`** (Vite + React + TypeScript, built by local Grok Bot workers): present on the branch. PRs: [#52](https://github.com/Peter-Shamoun/cc/pull/52) merged, [#78](https://github.com/Peter-Shamoun/cc/pull/78) merged, [#84](https://github.com/Peter-Shamoun/cc/pull/84) merged. Spec: `docs/frontend-spec.md`. Architecture, the contract, the PHI rules and the to-do list: `docs/frontend.md`. It looks and behaves like ChatGPT (layout, pill composer, density) and has a Claude-style resizable artifact panel. It was built clean-room from observation, with no ChatGPT, Claude or vercel/chatbot code copied. Streamdown (Vercel, Apache-2.0) renders the markdown, and its notice is in `web/THIRD_PARTY_NOTICES.md`. It isn't a vercel/chatbot fork, and `docs/frontend.md` says what a full fork would take.
   - **Typed contract** (`web/src/lib/contract.ts`): a `Part` union and a `StreamEvent` union with a pure reducer. Parts: GFM markdown, sortable and virtualized tables (copy as TSV, download CSV, PHI masking), CSV file chips, images with a lightbox, Vega-Lite charts, Shiki code, a collapsed SQL disclosure, callouts (assumptions, caveats, PHI), "Thought for N s", tool-call rows and artifact cards.
   - **Themes:** Neutral (ChatGPT-like) and Paper (Claude-like), each in light and dark. It also has edit-and-branch, a mobile drawer, and chat search and rename.
   - **Run and test:** `cd web && npm install && npm test && npm run build`. #78 reports 23 vitest tests passing. A mock adapter runs offline, and `VITE_ANALYST_BASE` points it at `api/`.
@@ -371,7 +417,7 @@ Conflict log from the auto-merge script (PRs that conflicted at some point; chec
 
 1. **Review and test what was auto-merged.** Run `pytest -q tests/` plus each `analyst/approaches/*/test_*.py`. Consider adding `analyst/` to `testpaths`.
 2. **Read `research/grid/SUMMARY.md`.** Use it to pick the factors that matter for a strong model on DEV_HARD_v1, then finish the remaining H cells. The full 384 can be run as the remaining 284 cells if the main effects are unclear.
-3. **Replace DEV_HARD_v1 with real hardness.** It is near ceiling for a strong model too. Re-run screen 1 with per-question pass/fail logging and take the questions Haiku actually fails, or author the Opus multi-step hard set. The 50 `grokbot-r1` questions (#19) are unseen by every grid cell and can seed VAL once a split manager ingests them. Aim for about 120 VAL questions (the floor is 80) so that a 10-point effect is detectable, per `sota_refresh_2.md`. Treat grid factor effects as provisional until then.
+3. **Replace DEV_HARD_v1 with real hardness.** It is near ceiling for a strong model too. Re-run screen 1 with per-question pass/fail logging and take the questions Haiku actually fails, or adopt `research/grid/DEV_HARD_v2_PROPOSAL.md` (45-day world), or author the Opus multi-step hard set. The 50 `grokbot-r1` questions (#19) are unseen by every grid cell and can seed VAL once a split manager ingests them. Aim for about 120 VAL questions (the floor is 80) so that a 10-point effect is detectable, per `sota_refresh_2.md`. Treat grid factor effects as provisional until then.
 4. **Transfer test on Haiku and Sonnet** once there is an API budget: `eval_subagents prepare --agent analyzer` on the held-out set, comparing analyzer v1 with the top 2 or 3 grid configs and the A04/A08 voting arms. Accept a factor only if the paired-bootstrap interval is above 0 for each model.
 5. **Consolidate.** Fold the winning approaches back into `analyzer/` as config flags, and delete the losing `analyst/approaches/*`.
 6. **Frontend and API**: the round trip already works in demo mode (#78). Next, swap `ScriptedLLM` for the real analyzer cascade behind `allow_paid_api`, pick the transcript store (#50's design), add CSP and no-store headers, and re-check the licence notices before anything ships.
