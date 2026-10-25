@@ -10,17 +10,19 @@ Silver, s3://<bucket>/<customer>/parquet/<table>/received_month=YYYY-MM/
 Gold, s3://<bucket>/<customer>/semantic_layer/
     CURRENT                                   "v=<run>"; compare-and-set, only ever forward
     v=<run>/manifest.json                     one gold version: every data file of every relation + build state
-    <relation>/<partition>/part-<run>.parquet immutable data files, shared by versions until a version replaces them
-  Readers open CURRENT, then that version's manifest, and read exactly the files it lists. A data file is deleted
-  only after two newer versions stopped referencing it, so a reader that opened the previous version still works.
+    <relation>/<partition>/part-<run>-<n>.parquet  immutable data files (key unique per write), shared by versions
+  Readers open CURRENT, then that version's manifest, and read exactly the files it lists. A file a version stops
+  listing is retired with a timestamp and deleted only after a reader session's lifetime, so a reader on any recent
+  version keeps working.
 
-Batch lock, s3://<bucket>/<customer>/staging/LOCK: created with If-None-Match (one holder), released by delete,
-and taken over with If-Match once its lease has expired (a crashed task). It serialises one customer's batches.
+Batch lock, s3://<bucket>/<customer>/staging/LOCK: a lease changed only by conditional writes (BatchLock). It
+serialises one customer's batches; a task re-checks it before every shared write and stops if it was taken over.
 """
 from __future__ import annotations
 
 import json
 import time
+import uuid
 from dataclasses import dataclass, field
 
 from botocore.exceptions import ClientError
@@ -82,33 +84,64 @@ class Store:
 
 
 # --- batch lock ------------------------------------------------------------------------------------------------
-def acquire_lock(store: Store, holder: str, clock, wait_seconds: float = LOCK_WAIT_SECONDS) -> str:
-    """Take the customer's batch lock (S3 conditional writes as a lease). Returns the key to release."""
-    key = f"{store.root}staging/LOCK"
-    deadline = time.monotonic() + wait_seconds
-    while True:
-        body = json.dumps({"holder": holder, "expires": clock() + LOCK_LEASE_SECONDS}).encode()
-        try:
-            store.put(key, body, IfNoneMatch="*")
-            return key
-        except ClientError as err:
-            if err.response["Error"]["Code"] != "PreconditionFailed":
-                raise
-        cur = store.get(key)
-        if cur is not None and json.loads(cur[0])["expires"] < clock():
-            try:                                                  # the holder crashed: take its lease over
-                store.put(key, body, IfMatch=cur[1])
-                return key
+class LockLost(RuntimeError):
+    """Another task took the batch lock over (this one overran its lease): stop before writing anything shared."""
+
+
+class BatchLock:
+    """The customer's batch lock: a lease in one S3 object, changed only by conditional writes.
+
+    acquire: create with If-None-Match, or take an expired lease over with If-Match on its ETag.
+    renew:   rewrite with If-Match on our own ETag; fails (LockLost) if anyone else has written it since. The task
+             renews before every write other batches depend on (the silver commit record, CURRENT), so a task that
+             overran its lease never commits after the lease moved on.
+    release: overwrite with an already-expired lease, again with If-Match; never removes another holder's lease.
+    """
+
+    def __init__(self, store: Store, holder: str, clock):
+        self.store, self.holder, self.clock = store, holder, clock
+        self.key = f"{store.root}staging/LOCK"
+        self.etag: str | None = None
+
+    def _body(self, expires: float) -> bytes:                # the nonce makes every write's ETag unique
+        return json.dumps({"holder": self.holder, "expires": expires, "nonce": uuid.uuid4().hex}).encode()
+
+    def acquire(self, wait_seconds: float = LOCK_WAIT_SECONDS) -> "BatchLock":
+        deadline = time.monotonic() + wait_seconds
+        while True:
+            try:
+                self.etag = self.store.put(self.key, self._body(self.clock() + LOCK_LEASE_SECONDS), IfNoneMatch="*")["ETag"]
+                return self
             except ClientError as err:
-                if err.response["Error"]["Code"] not in ("PreconditionFailed", "NoSuchKey"):
+                if err.response["Error"]["Code"] != "PreconditionFailed":
                     raise
-        if time.monotonic() > deadline:
-            raise TimeoutError(f"batch lock {key} is held by {cur and json.loads(cur[0])['holder']}")
-        time.sleep(1)
+            cur = self.store.get(self.key)
+            if cur is not None and json.loads(cur[0])["expires"] < self.clock():
+                try:                                              # released, or the holder crashed: take it over
+                    self.etag = self.store.put(self.key, self._body(self.clock() + LOCK_LEASE_SECONDS),
+                                               IfMatch=cur[1])["ETag"]
+                    return self
+                except ClientError as err:
+                    if err.response["Error"]["Code"] not in ("PreconditionFailed", "NoSuchKey"):
+                        raise
+            if time.monotonic() > deadline:
+                raise TimeoutError(f"batch lock {self.key} is held by {cur and json.loads(cur[0])['holder']}")
+            time.sleep(1)
 
+    def renew(self):
+        try:
+            self.etag = self.store.put(self.key, self._body(self.clock() + LOCK_LEASE_SECONDS), IfMatch=self.etag)["ETag"]
+        except ClientError as err:
+            if err.response["Error"]["Code"] in ("PreconditionFailed", "NoSuchKey"):
+                raise LockLost(f"{self.holder} lost the batch lock {self.key}") from None
+            raise
 
-def release_lock(store: Store, key: str):
-    store.s3.delete_object(Bucket=store.bucket, Key=key)
+    def release(self):
+        try:
+            self.store.put(self.key, self._body(0), IfMatch=self.etag)
+        except ClientError as err:
+            if err.response["Error"]["Code"] not in ("PreconditionFailed", "NoSuchKey"):
+                raise                                             # lost it already: someone else holds it now
 
 
 # --- silver ----------------------------------------------------------------------------------------------------
@@ -195,6 +228,16 @@ def manifest_files(manifest: dict | None) -> set[str]:
     if not manifest:
         return set()
     return {k for parts in manifest["relations"].values() for keys in parts.values() for k in keys}
+
+
+def check_manifest(store: Store, manifest: dict):
+    """Fail before publishing a version that lists a file that does not exist, or a file it also retires."""
+    live = manifest_files(manifest)
+    both = live & {k for k, _ in manifest["retired"]}
+    missing = live - {k for k, _ in store.list(f"{store.root}semantic_layer/")}
+    if both or missing:
+        raise RuntimeError(f"gold manifest {manifest['version']} is inconsistent: retired and live {sorted(both)[:3]}, "
+                           f"missing {sorted(missing)[:3]}")
 
 
 def publish(store: Store, manifest: dict, base_etag: str | None) -> bool:
