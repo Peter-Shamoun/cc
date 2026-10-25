@@ -63,7 +63,7 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0025,
-   "pass": null,
+   "pass": true,
    "assumption": "Share is a fraction of current service-line paid dollars. Procedure codes are compared case-insensitively.",
    "metric_spec": {
     "metric": "Share is a fraction of current service-line paid dollars",
@@ -124,7 +124,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null,
+   "pass": true,
    "assumption": "Primary payer is payer_responsibility P. Days are payment date minus the first 837 to that payer, and can be negative when the 835 precedes the first in-window 837. Median and 90th percentile are continuous quantiles rounded to 1 decimal.",
    "metric_spec": {
     "metric": "Primary payer is payer_responsibility P",
@@ -167,7 +167,7 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0229,
-   "pass": null,
+   "pass": true,
    "assumption": "Reviewed denial reason means is_denial_carc. Count distinct current denied claim+payer per CO code. Tie-break for the top 5 is carc code ascending.",
    "metric_spec": {
     "metric": "Reviewed denial reason means is_denial_carc",
@@ -234,7 +234,7 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0042,
-   "pass": null,
+   "pass": true,
    "assumption": "A pair is first-pass resolved when it has exactly one 835 event and that event is the current adjudication and is not a denial.",
    "metric_spec": {
     "metric": "A pair is first-pass resolved when it has exactly one 835 event and that event is the current adjudication and is not a denial",
@@ -274,7 +274,7 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0053,
-   "pass": null,
+   "pass": true,
    "assumption": "Trace number is check_or_eft_number. Pairs need two or more distinct traces. No current adjudication means the latest event is a reversal. Current paid is 0 when none exists.",
    "metric_spec": {
     "metric": "Trace number is check_or_eft_number",
@@ -299,7 +299,7 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0023,
-   "pass": null,
+   "pass": true,
    "assumption": "line_is_denied on a current service line whose claim adjudication is not denied.",
    "metric_spec": {
     "metric": "line_is_denied on a current service line whose claim adjudication is not denied",
@@ -324,7 +324,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0045,
-   "pass": null,
+   "pass": true,
    "assumption": "Primary means an 837 submission with payer_responsibility P for that claim and payer. Sum of current PR reason 1 adjustments, claim and line level. Remit payer_sequence is not used.",
    "metric_spec": {
     "metric": "Primary means an 837 submission with payer_responsibility P for that claim and payer",
@@ -361,7 +361,7 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0063,
-   "pass": null,
+   "pass": true,
    "assumption": "Latest submission, including voids, service month June 2026 or later. Rank is claim count then NPI ascending. Null referring NPIs stay in the month total and are not ranked.",
    "metric_spec": {
     "metric": "Latest submission, including voids, service month June 2026 or later",
@@ -386,7 +386,7 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0023,
-   "pass": null,
+   "pass": true,
    "assumption": "Share is a fraction of current service-line paid dollars.",
    "metric_spec": {
     "metric": "Share is a fraction of current service-line paid dollars",
@@ -579,7 +579,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0226,
-   "pass": null,
+   "pass": false,
    "assumption": "CPT billed is the remit line procedure code (billed code when the payer changed it). A current claim+payer counts once per distinct CPT. Rate is a fraction, not a percent. Minimum 20 claim+payer pairs. Few-shot q13 rounds a primary-payer denial rate to 4 decimals and orders by the rate. Empty groups are not how those examples aggregate, so this rate is rounded to 4 and ordered by rate then CPT.",
    "metric_spec": {
     "metric": "CPT billed is the remit line procedure code (billed code when the payer changed it)",
@@ -626,7 +626,7 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0094,
-   "pass": null,
+   "pass": true,
    "assumption": "Primary adjudication requires an 837 with payer_responsibility P for that claim and payer. Line-count buckets use the latest submission. Empty buckets are still returned. Denied charge is 0 when nothing was denied.",
    "metric_spec": {
     "metric": "Primary adjudication requires an 837 with payer_responsibility P for that claim and payer",
@@ -687,7 +687,7 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0058,
-   "pass": null,
+   "pass": true,
    "assumption": "A carry-forward is an FB provider adjustment with a negative amount. The offset is the earliest later FB from the same payer and reference with the opposite amount. Days are null when nothing offsets it.",
    "metric_spec": {
     "metric": "A carry-forward is an FB provider adjustment with a negative amount",
@@ -754,7 +754,7 @@
    "sql_execs": 2,
    "repairs": 1,
    "seconds": 0.0097,
-   "pass": null,
+   "pass": true,
    "assumption": "Shares are percents of current paid dollars. August 2026 has no payments, so the August share and the change are null rather than zero. The change would be computed from unrounded shares.",
    "metric_spec": {
     "metric": "Shares are percents of current paid dollars",
@@ -787,7 +787,7 @@
    "sql_execs": 2,
    "repairs": 1,
    "seconds": 0.008,
-   "pass": null,
+   "pass": true,
    "assumption": "Every frequency-7 submission to payer_responsibility P counts. None of those claim+payer pairs also have a frequency-1 submission in the extract, so both day averages are null. Paid dollars are still summed for current adjudications on or after the replacement date.",
    "metric_spec": {
     "metric": "Every frequency-7 submission to payer_responsibility P counts",
@@ -818,7 +818,7 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0085,
-   "pass": null,
+   "pass": false,
    "assumption": "A void is a latest submission with frequency 8. This extract has none, so the single row is zeros.",
    "metric_spec": {
     "metric": "A void is a latest submission with frequency 8",
@@ -843,7 +843,7 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0022,
-   "pass": null,
+   "pass": true,
    "assumption": "Paid amount 0 and is_denied false on current claim+payer adjudications. A zero payment alone is not a denial.",
    "metric_spec": {
     "metric": "Paid amount 0 and is_denied false on current claim+payer adjudications",
@@ -876,7 +876,7 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0063,
-   "pass": null,
+   "pass": true,
    "assumption": "Response is the first 835 from the same payer with payment date on or after the frequency-7 submission. Classes with no such response are omitted. n is the number of responding claim+payer pairs.",
    "metric_spec": {
     "metric": "Response is the first 835 from the same payer with payment date on or after the frequency-7 submission",
@@ -901,7 +901,7 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0026,
-   "pass": null,
+   "pass": true,
    "assumption": "Claim+payer pairs with a reversal and no current adjudication.",
    "metric_spec": {
     "metric": "Claim+payer pairs with a reversal and no current adjudication",
@@ -926,7 +926,7 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0025,
-   "pass": null,
+   "pass": true,
    "assumption": "Share is a fraction of current service-line paid dollars.",
    "metric_spec": {
     "metric": "Share is a fraction of current service-line paid dollars",
@@ -993,7 +993,7 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0074,
-   "pass": null,
+   "pass": true,
    "assumption": "Cohort is the first primary 837 in July 2026. First remit is the earliest 835 event from that payer, reversals included. No remit is not within 14 days. Share is a percent rounded to 1 decimal.",
    "metric_spec": {
     "metric": "Cohort is the first primary 837 in July 2026",
@@ -1018,7 +1018,7 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0024,
-   "pass": null,
+   "pass": true,
    "assumption": "Share is a fraction of current service-line paid dollars. Procedure codes are compared case-insensitively.",
    "metric_spec": {
     "metric": "Share is a fraction of current service-line paid dollars",
@@ -1047,7 +1047,7 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0119,
-   "pass": null,
+   "pass": true,
    "assumption": "Eligible replacements are frequency 7 submissions whose payer sent claim status 4 with a payment date before the replacement. Overturned requires a later remit and a current non-denial. Denied again is any other case with a remit on or after the correction. The three named outcomes are all returned. Few-shot aggregates omit empty groups. Outcomes with no claims are omitted. The classification rule is unchanged.",
    "metric_spec": {
     "metric": "Eligible replacements are frequency 7 submissions whose payer sent claim status 4 with a payment date before the replacement",
@@ -1074,7 +1074,7 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0051,
-   "pass": null,
+   "pass": false,
    "assumption": "Overturned means a current non-denied adjudication and an earlier non-reversal denied event for the same claim+payer, excluding duplicate-claim denials, with payment date on or before the current payment date.",
    "metric_spec": {
     "metric": "Overturned means a current non-denied adjudication and an earlier non-reversal denied event for the same claim+payer, excluding duplicate-claim denials, with payment date on or before the current payment date",
@@ -1108,7 +1108,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null,
+   "pass": true,
    "assumption": "Open means no current adjudication from the primary (P) payer. Age is 2026-08-14 minus the first primary 837 date. Charge is the latest submission charge. All three named buckets are returned, including a zero 0-14 bucket. No frequency-8 void exists in this extract. Few-shot aggregates group only the buckets that occur. The defined 0-14 bucket has no claims, so it is omitted. Age and charge rules are unchanged.",
    "metric_spec": {
     "metric": "Open means no current adjudication from the primary (P) payer",
@@ -1133,7 +1133,7 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0051,
-   "pass": null,
+   "pass": true,
    "assumption": "First submission is the earliest 837 for the claim key. Never remitted means no 835 event for that claim key, from any payer.",
    "metric_spec": {
     "metric": "First submission is the earliest 837 for the claim key",
@@ -1352,7 +1352,7 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0083,
-   "pass": null,
+   "pass": true,
    "assumption": "Population is current 835 lines, not line-denied, exactly 1 unit paid, allowed > 0. Typical allowed is the modal allowed amount for that payer and CPT, and the higher amount wins a tie. Shortfall is 0 when no line is below typical. Payers with no qualifying line are omitted.",
    "metric_spec": {
     "metric": "Population is current 835 lines, not line-denied, exactly 1 unit paid, allowed > 0",
@@ -1377,7 +1377,7 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0023,
-   "pass": null,
+   "pass": true,
    "assumption": "Share is a fraction of current service-line paid dollars. Procedure codes are compared case-insensitively.",
    "metric_spec": {
     "metric": "Share is a fraction of current service-line paid dollars",
@@ -1460,7 +1460,7 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0053,
-   "pass": null,
+   "pass": true,
    "assumption": "One current adjudication per claim+payer. Month is the current payment month. The rate change in percentage points uses unrounded rates and is null for the first month. This extract has only July 2026 payments.",
    "metric_spec": {
     "metric": "One current adjudication per claim+payer",
@@ -1485,7 +1485,7 @@
    "sql_execs": 1,
    "repairs": 0,
    "seconds": 0.0026,
-   "pass": null,
+   "pass": true,
    "assumption": "Share is a fraction of current service-line paid dollars.",
    "metric_spec": {
     "metric": "Share is a fraction of current service-line paid dollars",
@@ -1509,7 +1509,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.0075,
-   "pass": null,
+   "pass": true,
    "assumption": "Primary payer is an 837 with payer_responsibility P, not remit payer_sequence. Referring NPI comes from the latest primary submission. No provider has 15 such current adjudications (maximum is 4), so the top 5 is empty.",
    "metric_spec": {
     "metric": "Primary payer is an 837 with payer_responsibility P, not remit payer_sequence",
@@ -1519,8 +1519,8 @@
    }
   }
  ],
- "accuracy": null,
+ "accuracy": "27/30",
  "n": 30,
  "mean_sql_execs": 1.3,
- "notes": "Dataset 98e61f03e594, generator 3.3, non-escalated sem.* reader. Same shared A06-style profile as H048, not allocated into sql_execs. Multi-agent split: a planner pass wrote a metric spec (metric, population, grain, rounding) from the question plus three BM25 neighbors selected with the A10 leakage guard; a writer pass turned that spec into SQL and did not see the planner's scratch. Neighbors use payer_responsibility P for primary, round rates to 4 decimals when the question does not ask for a percent, and group by only the keys that occur. Those conventions change q11, a_7423e6eb91, and a_0d43f7d4b6 relative to H048. sql_execs counts final, repair, and question-specific probe statements. The spec pass is not a SQL execution; the three rewritten statements were executed once. Answers committed before scoring."
+ "notes": "Dataset 98e61f03e594, generator 3.3, non-escalated sem.* reader. Same shared A06-style profile as H048, not allocated into sql_execs. Multi-agent split: a planner pass wrote a metric spec (metric, population, grain, rounding) from the question plus three BM25 neighbors selected with the A10 leakage guard; a writer pass turned that spec into SQL and did not see the planner's scratch. Neighbors use payer_responsibility P for primary, round rates to 4 decimals when the question does not ask for a percent, and group by only the keys that occur. Those conventions change q11, a_7423e6eb91, and a_0d43f7d4b6 relative to H048. sql_execs counts final, repair, and question-specific probe statements. The spec pass is not a SQL execution; the three rewritten statements were executed once. Answers committed before scoring. Scored with bench.compare.match after the answer commit: 27/30."
 }
