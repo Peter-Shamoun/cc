@@ -55,7 +55,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.009,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_b853266803",
@@ -64,7 +64,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.023,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q10_top_denial_carcs",
@@ -73,7 +73,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.04,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_a5888f64a4",
@@ -82,7 +82,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.015,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_7d45c279a7",
@@ -91,7 +91,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.019,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q15_partial_line_denials",
@@ -100,7 +100,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.013,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q25_primary_deductible",
@@ -109,7 +109,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.014,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_8663c777cd",
@@ -118,7 +118,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.027,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_cpt_share_of_line_payments__87798",
@@ -127,7 +127,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.009,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q11_cpt_denial_rate",
@@ -136,7 +136,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.033,
-      "pass": null
+      "pass": false
     },
     {
       "qid": "a_a123bba47f",
@@ -145,7 +145,7 @@
       "sql_execs": 4,
       "repairs": 1,
       "seconds": 0.034,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_9108c7aacb",
@@ -154,7 +154,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.017,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_856b95a70c",
@@ -163,7 +163,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.022,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_1b7e02d0b0",
@@ -172,7 +172,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.025,
-      "pass": null
+      "pass": false
     },
     {
       "qid": "a_921f1bf366",
@@ -181,7 +181,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.033,
-      "pass": null
+      "pass": false
     },
     {
       "qid": "q14_zero_paid_not_denied",
@@ -190,7 +190,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.007,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_dca9da6d52",
@@ -199,7 +199,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.023,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q19_reversed_no_correction",
@@ -208,7 +208,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.015,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_cpt_share_of_line_payments__80307",
@@ -217,7 +217,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.009,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_d383370345",
@@ -226,7 +226,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.028,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_cpt_share_of_line_payments__g0482",
@@ -235,7 +235,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.009,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_0d43f7d4b6",
@@ -244,7 +244,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.033,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_923951a050",
@@ -253,7 +253,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.015,
-      "pass": null
+      "pass": false
     },
     {
       "qid": "a_7423e6eb91",
@@ -262,7 +262,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.039,
-      "pass": null
+      "pass": false
     },
     {
       "qid": "f_never_remitted_submitted_in_month__2026-07-01",
@@ -271,7 +271,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.013,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_ab202d4b23",
@@ -280,7 +280,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.025,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_cpt_share_of_line_payments__g0480",
@@ -289,7 +289,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.009,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "a_d671e0b995",
@@ -298,7 +298,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.015,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "f_cpt_share_of_line_payments__81479",
@@ -307,7 +307,7 @@
       "sql_execs": 3,
       "repairs": 0,
       "seconds": 0.009,
-      "pass": null
+      "pass": true
     },
     {
       "qid": "q12_referring_provider_denials",
@@ -316,10 +316,10 @@
       "sql_execs": 4,
       "repairs": 1,
       "seconds": 0.054,
-      "pass": null
+      "pass": true
     }
   ],
-  "accuracy": null,
+  "accuracy": "25/30",
   "n": 30,
   "mean_sql_execs": 3.0667,
   "notes": "Multiagent: planner specs and SQL writers were separate subagents. Three candidates agreed on every question. explore and fewshot were off. repair=true: q12 was empty, so one repair kept the latest primary submission that has a non-null referring NPI; it was still empty (sql_execs 4). a_a123bba47f looked small (51 claims), so one repair bucketed by the claim's latest submission while taking the denial from the primary payer's current adjudication; the rows were unchanged (sql_execs 4). No second repair on either. Other questions kept candidate a. August payer-class shares stay null because that payment month has no current-adjudication paid dollars on this 20-day snapshot."
