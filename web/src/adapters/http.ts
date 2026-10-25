@@ -9,15 +9,31 @@ import type { AnalystAdapter } from './types';
  */
 export class HttpAnalystAdapter implements AnalystAdapter {
   readonly name = 'http';
-  constructor(private base = '') {}
+  private current: string | null = null;
+  /**
+   * `token` is only for the backend's demo mode (`Bearer demo:<customer>:<user>`, synthetic data).
+   * Real deployments leave it unset and authenticate with the httpOnly `cc_session` cookie.
+   */
+  constructor(private base = '', private token?: string) {}
+
+  private headers(extra: Record<string, string> = {}): Record<string, string> {
+    return this.token ? { ...extra, authorization: `Bearer ${this.token}` } : extra;
+  }
+
+  /** Server-side cancel (POST /api/chat/{messageId}/stop); the fetch abort alone only drops the socket. */
+  async stop(): Promise<void> {
+    if (!this.current) return;
+    await fetch(`${this.base}/api/chat/${encodeURIComponent(this.current)}/stop`, { method: 'POST', credentials: 'same-origin', headers: this.headers() }).catch(() => undefined);
+  }
 
   async *streamTurn({ conversationId, messages, signal }: Parameters<AnalystAdapter['streamTurn']>[0]): AsyncIterable<StreamEvent> {
     const res = await fetch(`${this.base}/api/chat`, {
       method: 'POST',
       credentials: 'same-origin',
       cache: 'no-store',
-      headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
-      body: JSON.stringify({ conversationId, messages }),
+      headers: this.headers({ 'content-type': 'application/json', accept: 'text/event-stream' }),
+      // The server takes user turns only; prior assistant prose is reconstructed server-side.
+      body: JSON.stringify({ conversationId, messages: messages.filter((m) => m.role === 'user').map(({ id, role, text }) => ({ id, role, text })) }),
       signal,
     });
     if (!res.ok || !res.body) {
@@ -25,11 +41,22 @@ export class HttpAnalystAdapter implements AnalystAdapter {
       yield { type: 'message.end', messageId: '', finishReason: 'error' };
       return;
     }
-    yield* parseSse(res.body);
+    const onAbort = () => void this.stop();
+    signal.addEventListener('abort', onAbort, { once: true });
+    try {
+      for await (const ev of parseSse(res.body)) {
+        if ((ev as { type: string }).type === 'heartbeat') continue;
+        if (ev.type === 'message.start') this.current = ev.messageId;
+        yield ev;
+      }
+    } finally {
+      signal.removeEventListener('abort', onAbort);
+      this.current = null;
+    }
   }
 
   async fetchBlob(id: string): Promise<Blob> {
-    const res = await fetch(`${this.base}/api/blobs/${encodeURIComponent(id)}`, { credentials: 'same-origin', cache: 'no-store' });
+    const res = await fetch(`${this.base}/api/download/${encodeURIComponent(id)}`, { credentials: 'same-origin', cache: 'no-store', headers: this.headers() });
     if (!res.ok) throw new Error(`blob ${res.status}`);
     return res.blob();
   }

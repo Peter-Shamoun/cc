@@ -21,5 +21,9 @@ export interface TranscriptStore {
   /** Replace the last assistant message (regenerate). */
   truncateAfter(conversationId: ID, messageId: ID): Promise<void>;
   deleteConversation(id: ID): Promise<void>;
+  /** Rename a thread (user-chosen titles are the user's responsibility; generated ones are scrubbed). */
+  renameConversation(id: ID, title: string): Promise<void>;
+  /** Replace the whole thread (edit-and-branch switches the visible branch). */
+  replaceMessages(conversationId: ID, msgs: (UserMessage | AssistantMessage)[]): Promise<void>;
   setRetention(policy: { days: number }): Promise<void>;
 }

@@ -30,5 +30,13 @@ export class MemoryTranscriptStore implements TranscriptStore {
   async deleteConversation(id: ID) {
     this.convs.delete(id);
   }
+  async renameConversation(id: ID, title: string) {
+    const c = this.convs.get(id);
+    if (c && title.trim()) c.title = title.trim().slice(0, 120);
+  }
+  async replaceMessages(conversationId: ID, msgs: Message[]) {
+    const c = this.convs.get(conversationId);
+    if (c) c.messages = structuredClone(msgs);
+  }
   async setRetention() {}
 }
