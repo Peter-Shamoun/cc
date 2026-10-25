@@ -58,6 +58,9 @@ class _Sink:
 
 
 def build_truth_db(generator_out_dir: Path, tenant: str, db_path: Path) -> Path:
+    """db_path must not be named ledger.* (the file name becomes a catalog that would shadow schema `ledger`)."""
+    if Path(db_path).stem == "ledger":
+        raise ValueError("name the answer-key database something other than ledger.duckdb")
     generator_out_dir, db_path = Path(generator_out_dir), Path(db_path)
     db_path.unlink(missing_ok=True)
     index = json.loads((generator_out_dir / "truth.json").read_text())
