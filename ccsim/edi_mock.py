@@ -1539,7 +1539,8 @@ class Generator:
                                           co_carcs=sorted({k for g_, k, _ in e["claim_cas"] if g_ == "CO"} |
                                                           {k for ln in e["lines"] for g_, k, _ in ln["cas"] if g_ == "CO"}),
                                           lines=[dict(cpt=ln["cpt"], adjudicated_cpt=ln["adjudicated_cpt"],
-                                                      units=ln["units"], paid=ln["paid"], allowed=ln["allowed"],
+                                                      units=ln["units"], units_paid=ln["units_paid"],
+                                                      paid=ln["paid"], allowed=ln["allowed"],
                                                       co_carcs=sorted({k for g_, k, _ in ln["cas"] if g_ == "CO"}))
                                                  for ln in ([] if e["claim_level_only"] else e["lines"])]))
         ctl = self._next_ctl() if r.random() >= DELIVERY_NOISE["isa13_reused"] else max(101, self.ctl - r.randint(50, 500))
