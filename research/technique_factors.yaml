@@ -1,0 +1,608 @@
+# Experimental factors for the ClaimClarity data-agent harness.
+# Companion to research/sota-techniques-catalog-2026.md (section numbers T01..T27 match).
+# Effect notation: "+x pp" = absolute percentage-point change in execution accuracy unless stated.
+# expected_effect.direction: positive | negative | neutral | mixed | unknown  (for OUR setting, Sonnet/Haiku 5.5)
+# cost_impact: tokens/latency relative to the current ClaudeSQLAgent baseline.
+# levels: proposed ablation levels; the first is the baseline/off level.
+# fixed: true = always-on constraint (not ablated), listed for completeness.
+version: 1
+date: 2026-10-25
+models_in_scope: [claude-sonnet-5-5, claude-haiku-5-5]
+harness: bench/eval.py + claude/schema/04_agent_interface.py
+api_constraints_2026:
+  - "temperature/top_p/top_k return 400 on all models since 2026-10-21: no sampling-based self-consistency"
+  - "Sonnet 5.5: thinking always on (between_tools disables), forced tool_choice any/tool returns 400; use auto + strict tools or output_config.format"
+  - "Reasoning budget = output_config.effort (low|medium|high|xhigh|max); budget_tokens rejected"
+  - "Prompt cache: reads 0.1x input, writes 1.25x (5m) / 2x (1h), 512-token minimum, max 4 breakpoints; caches are per model"
+  - "Mid-conversation role:system messages supported on Sonnet 5.5 / Haiku 5.5 (append without breaking cached prefix)"
+harness_prerequisites:
+  - id: P0_max_tokens
+    description: "Raise ClaudeSQLAgent max_tokens from 2000 (thinking is on by default) to >=16000; treat stop_reason=max_tokens as harness error"
+  - id: P1_splits
+    description: "Split questions into train/dev/test; examples, pitfalls, tool-description tuning never use test"
+  - id: P2_scale
+    description: "Grow to ~150 in-scope questions + ambiguous (~30) + out-of-scope/look-alike (~40) + multi-turn (~15) + injection (~5) splits"
+  - id: P3_metrics
+    description: "Add RS(c) reliability score, wrong-but-executed rate, over-refusal, cache tokens and $ per completed task; paired McNemar + Holm; clustered bootstrap CIs"
+
+factors:
+
+  - id: T01_glossary
+    name: Business glossary and definition injection
+    description: Governed business definitions (claim, current adjudication, denial, primary payer, date bases, columns not to use) in the system prompt.
+    levels: [none, glossary, glossary+invariants, glossary+invariants+pitfalls]
+    implementation: >
+      bench/agents.py GLOSSARY and claude/schema/05_agent_system_prompt.md exist. 'invariants' adds the
+      "definitions you must not reinterpret" block and 835/837 facts from claude/schema/README.md;
+      'pitfalls' adds a common-mistakes list distilled from TRAIN-split failure traces (never test wrong_sql).
+      Place in cached system prefix.
+    sources:
+      - https://arxiv.org/abs/2305.03111
+      - https://arxiv.org/abs/2604.25149
+      - https://openai.com/index/inside-our-in-house-data-agent/
+    expected_effect:
+      direction: positive
+      magnitude: "large on sql_only lane (+10 to +20 pp); small (+0 to +5 pp) under typed interface"
+      evidence: "BIRD evidence GPT-4 34.88->54.89 (+20 pp); Cube 2026 Sonnet 4.6 46.5->68.7 (+22.2 pp, 2.2k-token doc); Bayer JAMIA GPT-4 8.3->78.3"
+    cost_impact: "+2-5k input tokens, ~free with caching; Cube: +1.8 s latency on Sonnet"
+    depends_on: [T26_prompt_caching]
+    conflicts_with: []
+    interacts_with: [T08_semantic_layer, T25_model_tier, T06_context_style]
+    risks: [over-prescriptive prompts, stale definitions, test leakage via pitfalls]
+
+  - id: T02_data_dictionary
+    name: Column descriptions, grain, keys, derivations
+    description: Per-view grain, per-column descriptions, keys/join paths, and one-line SQL lineage ("meaning lives in code").
+    levels: [types_only, descriptions+grain, descriptions+grain+derivation]
+    implementation: >
+      Extend Tools.describe() (currently 'name type') from 03_semantic_model.yaml views: and
+      02_semantic_layer_views.sql; generate, don't hand-write, to avoid drift.
+    sources:
+      - https://arxiv.org/abs/2308.15363
+      - https://www.zenml.io/llmops-database/building-an-ai-data-agent-for-enterprise-scale-analytics
+    expected_effect:
+      direction: positive
+      magnitude: "+2 to +6 pp on SQL lanes; ~0 under typed interface"
+      evidence: "DAIL-SQL: FK info significantly improves EX (Spider); Pinterest table retrieval 40%->~90% with docs; Genie plateau at 54% with metadata alone"
+    cost_impact: "+1-4k cached tokens"
+    depends_on: [T26_prompt_caching]
+    conflicts_with: []
+    interacts_with: [T01_glossary, T08_semantic_layer, T06_context_style]
+    risks: [context bloat, description drift]
+
+  - id: T03_data_profile
+    name: Data profiles and sample values
+    description: Null rates, distinct counts, top-k values, ranges per column; low-cardinality enums inline.
+    levels: [none, enums, full_profile]
+    implementation: >
+      Compute DuckDB SUMMARIZE per sem view at snapshot build; store profile.json keyed by dataset id.
+      Enums: claim_status, frequency codes, CARC groups, payer_responsibility. Payer names stay behind lookup_values.
+      Never profile free-text or identifier columns.
+    sources:
+      - https://arxiv.org/abs/2505.19988
+      - https://arxiv.org/abs/2410.01943
+    expected_effect:
+      direction: positive
+      magnitude: "+1 to +4 pp on SQL lanes"
+      evidence: "Profiling-only metadata reached #1 BIRD (GPT-4o, 2025); CHASE-SQL w/o value retrieval -2.92 pp"
+    cost_impact: "+1-3k cached tokens; offline build cost; cache invalidated once per snapshot"
+    depends_on: [T26_prompt_caching]
+    conflicts_with: []
+    interacts_with: [T04_value_resolution, T24_injection_hygiene, T23_phi_guardrails]
+    risks: [PHI exposure if profiling wrong columns, injection channel]
+
+  - id: T04_value_resolution
+    name: Value/entity resolution tool
+    description: Resolve user wording to stored literals (payer, CPT, CARC) before filtering.
+    levels: [off, on, on+mandatory]
+    implementation: >
+      lookup_values exists. 'mandatory' = compiler rejects free-text filter values that are not an exact
+      lookup hit, returning an actionable error with candidates.
+    sources:
+      - https://arxiv.org/abs/2410.01943
+      - research/conversational-analytics-agents-sota-2026-full-report.md
+    expected_effect:
+      direction: positive
+      magnitude: "+2 to +5 pp on payer/code-filtered questions"
+      evidence: "CHASE-SQL value retrieval ablation -2.92 pp (BIRD dev); Snowflake: wrong literals a common failure"
+    cost_impact: "+1 tool call per free-text entity (~0.5-1.5 s)"
+    depends_on: []
+    conflicts_with: []
+    interacts_with: [T20_clarification, T15_self_correction, T11_tool_design]
+    risks: [silent wrong fuzzy match]
+
+  - id: T05_schema_pruning
+    name: Schema linking / pruning / compression
+    description: Show a subset or compressed form of the schema.
+    levels: [full_sem, full_sem+full_lossless, full_sem+lossless_on_demand, full_sem+lossless_compressed]
+    implementation: >
+      Never prune sem.* (10 views). For escalation, compare exposing all 41 lossless tables vs a
+      describe_lossless(topic) tool vs table summaries + retrieved columns.
+    sources:
+      - https://arxiv.org/abs/2408.07702
+      - https://arxiv.org/abs/2606.29733
+      - https://arxiv.org/abs/2502.00675
+      - https://arxiv.org/abs/2405.16755
+    expected_effect:
+      direction: mixed
+      magnitude: "sem.*: 0 to -5 pp if pruned; lossless lane: +0 to +4 pp from compression/on-demand"
+      evidence: "Filtering -2.7 to -11.6 pp for strong models (BIRD subset); lexical linking -4.24 pp Llama-70B, n.s. elsewhere (2026); ReFoRCE w/o compression -3.65 pp (Spider 2.0, context overflow); CHESS +2 pp, 5x fewer tokens"
+    cost_impact: "saves 15-80% schema tokens; adds retrieval step"
+    depends_on: []
+    conflicts_with: [T26_prompt_caching]
+    interacts_with: [T08_semantic_layer, T09_tiered_lanes, T25_model_tier]
+    risks: [recall loss -> confident wrong SQL, cache misses]
+
+  - id: T06_context_style
+    name: Context structure (goal vs procedural, size)
+    description: How the system prompt is written; mandated step order vs goal + definitions + affordances.
+    levels: [procedural, goal, procedural_minimal]
+    implementation: >
+      05_agent_system_prompt.md is a 6-step procedure. 'goal' rewrites it as outcomes + definitions;
+      must-do steps (lookup before filter) move into compiler enforcement.
+    sources:
+      - https://www.zenml.io/llmops-database/building-an-ai-data-agent-for-enterprise-scale-analytics
+      - https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
+    expected_effect:
+      direction: unknown
+      magnitude: "hypothesis: +0 to +3 pp for goal style on Sonnet; possibly negative on Haiku"
+      evidence: "OpenAI: prescriptive prompting degraded results (qualitative, no numbers)"
+    cost_impact: neutral or fewer tokens
+    depends_on: []
+    conflicts_with: []
+    interacts_with: [T01_glossary, T11_tool_design, T19_effort, T25_model_tier]
+    risks: [dropped must-do steps]
+
+  - id: T07_offline_learning
+    name: Memory / offline learning (pitfalls, new verified requests)
+    description: Distill failures on a train split into a pitfalls section and new verified examples/templates; human-reviewed.
+    levels: [off, pitfalls_only, pitfalls+new_verified_requests]
+    implementation: >
+      Run train split with Sonnet, cluster failures, have a reviewer model write <=40-line pitfalls and
+      candidate verified_requests; human review; evaluate on held-out test.
+    sources:
+      - https://huggingface.co/blog/nvidia/nemo-agent-toolkit-data-explorer-dabstep-1st-place
+      - https://arxiv.org/abs/2509.21825
+      - https://arxiv.org/abs/2608.29345
+    expected_effect:
+      direction: positive
+      magnitude: "+3 to +10 pp, largest for Haiku"
+      evidence: "NVIDIA DABstep: Haiku 4.5 + distilled helpers/pitfalls 89.95 hard vs Claude Code+Opus 4.5 66.93 (vendor, no ablation); DS-STAR w/o data analyzer hard 45.24->26.98"
+    cost_impact: "offline only; +0.5-1k cached prompt tokens online"
+    depends_on: [P1_splits, T01_glossary, T13_examples]
+    conflicts_with: []
+    interacts_with: [T10_trusted_templates, T25_model_tier]
+    risks: [overfitting to train, wrong memories]
+
+  - id: T08_semantic_layer
+    name: Semantic layer / metric compiler (typed tasks)
+    description: Model selects metrics/dimensions/filters by name; compiler owns joins, grain, reversals, min group size.
+    levels: [sql_only, typed_only, typed+sem_sql, typed+sem_sql+lossless]
+    implementation: >
+      Wrap SemanticLayer.dispatch + TOOLS from claude/schema/04_agent_interface.py as a bench agent;
+      final answer = compiled SQL + result. sql_only = current ClaudeSQLAgent.
+    sources:
+      - https://docs.getdbt.com/blog/semantic-layer-vs-text-to-sql-2026
+      - https://arxiv.org/abs/2608.16663
+      - https://arxiv.org/abs/2604.25149
+      - https://arxiv.org/abs/2311.07509
+    expected_effect:
+      direction: positive
+      magnitude: "+5 to +15 pp on governed metrics; wrong-but-executed down sharply; out-of-scope -> refusals"
+      evidence: "dbt 2026 Sonnet 4.6 90.0->98.2; bounded planning 55.3->97.4 with wrong-but-executed 29->0; data.world 16.7->54.2; AtScale 20->92.5 (vendor)"
+    cost_impact: "fewer turns/tokens than SQL exploration; compiler ~ms"
+    depends_on: []
+    conflicts_with: []
+    interacts_with: [T05_schema_pruning, T14_plan_execute, T15_self_correction, T17_multi_candidate, T21_abstention, T09_tiered_lanes, T13_examples]
+    risks: [coverage cliff, systematic compiler bugs, catalog-name mismatch with question wording]
+
+  - id: T09_tiered_lanes
+    name: Tiered lanes and explicit escalation
+    description: Template -> typed -> guarded sem SQL -> guarded lossless SQL -> human-approved request; answers labeled by lane.
+    levels: [model_decides, gated, shadow]
+    implementation: >
+      'gated' hides run_semantic_sql until query_metrics returns cannot_express or the model calls
+      request_escalation(reason); 'shadow' runs SQL lane for scoring only. Record lane, per-lane accuracy and wrong-but-executed.
+    sources:
+      - https://arxiv.org/abs/2503.22402
+      - research/conversational-analytics-agents-sota-2026-full-report.md
+    expected_effect:
+      direction: positive
+      magnitude: "gated vs model_decides: +0 to +5 pp, mainly fewer wrong-but-executed"
+      evidence: "No controlled study of routing policy; EllieSQL routing -40% tokens at equal accuracy (BIRD)"
+    cost_impact: "escalated questions 2-5x turns"
+    depends_on: [T08_semantic_layer]
+    conflicts_with: []
+    interacts_with: [T21_abstention, T05_schema_pruning, T23_phi_guardrails]
+    risks: [model skips compiler, over-eager escalation]
+
+  - id: T10_trusted_templates
+    name: Trusted parameterized templates
+    description: Pre-verified parameterized queries the model only fills; answer badged trusted.
+    levels: [off, on]
+    implementation: >
+      Promote the 13 verified_requests in 03_semantic_model.yaml to run_verified_request(id, params) with
+      parameter validation; measure hit rate and accuracy on hits vs misses.
+    sources:
+      - https://docs.databricks.com/aws/en/genie/concepts
+    expected_effect:
+      direction: positive
+      magnitude: "small overall (+0 to +3 pp); ~100% on hits"
+      evidence: "Genie trusted assets (no public numbers)"
+    cost_impact: lowest-cost lane
+    depends_on: [T08_semantic_layer]
+    conflicts_with: []
+    interacts_with: [T13_examples, T07_offline_learning]
+    risks: [wrong-template match on near-miss questions]
+
+  - id: T11_tool_design
+    name: Tool surface design (errors, response format, descriptions)
+    description: Actionable errors with suggestions, concise result digests, rewritten descriptions.
+    levels:
+      error_style: [raw, actionable]
+      result_format: [full, digest]
+      descriptions: [current, rewritten_after_transcript_review]
+    implementation: >
+      _suggest() exists in 04_agent_interface.py; bench Tools.sql returns raw DuckDB errors.
+      Digest = <=20 rows + row_count + column stats. Description rewrites tuned on train/dev only.
+    sources:
+      - https://www.anthropic.com/engineering/writing-tools-for-agents
+      - https://www.anthropic.com/engineering/advanced-tool-use
+    expected_effect:
+      direction: positive
+      magnitude: "+1 to +4 pp; ~3x fewer result tokens with concise format"
+      evidence: "Anthropic: concise responses ~1/3 tokens; readable IDs significantly improved precision; tool search Opus 4 49->74% (large tool sets, not our case); OpenAI: overlapping tools confuse agents"
+    cost_impact: neutral to savings
+    depends_on: []
+    conflicts_with: []
+    interacts_with: [T15_self_correction, T16_result_checks, T23_phi_guardrails]
+    risks: [digest hides evidence, overfitting descriptions]
+
+  - id: T12_structured_answer
+    name: Structured final answer with bound numbers
+    description: Final answer object (sql, result_ref, assumptions, lane); prose numbers bound from results.
+    levels: [free_prose, bound_placeholders]
+    implementation: >
+      Add strict:true final_answer schema (forced tool_choice is a 400 on Sonnet 5.5); add a bench check
+      that every number in answer text appears in result rows.
+    sources:
+      - https://arxiv.org/abs/2604.25149
+      - research/conversational-analytics-agents-sota-2026-full-report.md
+    expected_effect:
+      direction: positive
+      magnitude: "eliminates prose-number errors (currently unmeasured); ~0 pp on SQL-scored accuracy"
+      evidence: "Rumiantsau 2024 (via Cube): combined structured strategies -> 1.52% hallucination (vendor)"
+    cost_impact: neutral
+    depends_on: []
+    conflicts_with: []
+    interacts_with: [T16_result_checks, T20_clarification]
+    risks: [stilted prose, placeholder misuse]
+
+  - id: T13_examples
+    name: Retrieved similar solved questions (dynamic few-shot)
+    description: Insert top-k similar verified question -> tool-call/SQL pairs per question.
+    levels:
+      k: [0, 3, 5]
+      selector: [lexical, embedding, skeleton_aware]
+      format: [tool_call_json, sql, both]
+    implementation: >
+      similar_verified_requests(k=3, Jaccard) exists. Grow library 13 -> ~60 disjoint from test (id + similarity
+      threshold). Put examples in user turn or mid-conversation system message, after the cache breakpoint.
+    sources:
+      - https://arxiv.org/abs/2308.15363
+      - https://www.anthropic.com/engineering/advanced-tool-use
+      - https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-analyst-evaluations
+    expected_effect:
+      direction: positive
+      magnitude: "+3 to +10 pp (larger on Haiku / sql_only)"
+      evidence: "DAIL-SQL GPT-4 Spider 72.3 (0-shot) -> 82.4 (5-shot similar), +2.9 pp over random; LinkedIn table recall +16%, field recall +14%; Anthropic tool-use examples 72->90% (internal)"
+    cost_impact: "+0.5-2k uncached tokens per question"
+    depends_on: [P1_splits]
+    conflicts_with: []
+    interacts_with: [T08_semantic_layer, T26_prompt_caching, T17_multi_candidate, T01_glossary]
+    risks: [near-duplicate leakage, copying wrong examples]
+
+  - id: T14_plan_execute
+    name: Plan-then-execute / decomposition
+    description: Explicit structured plan (intent, metrics, grain, date basis, filters, assumptions, lane) before tool calls.
+    levels: [none, structured_plan, plan+replan_on_failure]
+    implementation: >
+      submit_plan tool (strict schema) as first call; score plan against expected task plan; replan on
+      compile error or verifier flag.
+    sources:
+      - https://arxiv.org/abs/2410.01943
+      - https://arxiv.org/abs/2312.11242
+      - https://arxiv.org/abs/2509.21825
+    expected_effect:
+      direction: mixed
+      magnitude: "Sonnet high effort: ~0 to +2 pp; Haiku/low effort: +2 to +6 pp"
+      evidence: "CHASE-SQL DC CoT +6.17, QP CoT +5.87 (Gemini 1.5, BIRD); MAC-SQL w/o decomposer -3.85 (GPT-4); DS-STAR w/o router -5.3 hard (DABStep)"
+    cost_impact: "+1 call or +300-800 output tokens per question"
+    depends_on: []
+    conflicts_with: []
+    interacts_with: [T19_effort, T20_clarification, T22_multiturn_state, T08_semantic_layer]
+    risks: [rigid plans, latency on easy questions]
+
+  - id: T15_self_correction
+    name: Execution-feedback self-correction loop
+    description: Feed compile/DB errors (and suspicious-result signals) back for bounded retries.
+    levels:
+      mode: [none, errors_only, errors+actionable_hints, errors+result_signals]
+      max_repairs: [1, 2, 4]
+    implementation: >
+      Baseline already returns 'ERROR: ...'. Add hint text (T11) and result signals (T16); cap repairs.
+      Log repaired-then-wrong separately.
+    sources:
+      - https://arxiv.org/abs/2606.29733
+      - https://arxiv.org/abs/2410.01943
+      - https://arxiv.org/abs/2312.11242
+    expected_effect:
+      direction: positive
+      magnitude: "+1 to +4 pp on sql_only; ~0 to +1 under typed"
+      evidence: "2026 corrected study: +1.0 to +4.4 pp, the only consistent component (n.s. on strongest model); CHASE w/o fixer -3.78; MAC w/o refiner -4.63; LinkedIn hallucination -14%"
+    cost_impact: "1.1-1.5x tokens, only on errors"
+    depends_on: []
+    conflicts_with: []
+    interacts_with: [T11_tool_design, T16_result_checks, T08_semantic_layer, T27_loop_budgets]
+    risks: [repairs that drop needed filters -> wrong-but-executed]
+
+  - id: T16_result_checks
+    name: Result verification and sanity checks
+    description: Programmatic invariants (zero rows, rates in [0,1], num<=den, fan-out, 835 balancing, grain) and optional LLM verifier.
+    levels: [off, programmatic, programmatic+llm_verifier_haiku]
+    implementation: >
+      checks.py run after every SQL/compile result; warnings returned as tool-result annotations.
+      Derive invariants from domain facts (README 835/837 section), not test wrong_sql. Measure false-alarm rate on gold.
+    sources:
+      - https://www.zenml.io/llmops-database/building-an-ai-data-agent-for-enterprise-scale-analytics
+      - https://arxiv.org/abs/2509.21825
+      - https://arxiv.org/abs/2604.25149
+      - https://arxiv.org/abs/2605.12319
+    expected_effect:
+      direction: positive
+      magnitude: "+2 to +6 pp on sql_only and lower wrong-but-executed; ~0 under typed"
+      evidence: "OpenAI zero-row heuristic (qualitative); DS-STAR verifier/router loop +5.3 hard; post-hoc detectors catch 69-83% of silent errors; NL2SQL-Bugs detection 75.16%"
+    cost_impact: "programmatic ~0; LLM verifier +1 Haiku call"
+    depends_on: []
+    conflicts_with: []
+    interacts_with: [T15_self_correction, T21_abstention, T20_clarification, T11_tool_design, T12_structured_answer]
+    risks: [false alarms -> needless retries/refusals, tuning to test]
+
+  - id: T17_multi_candidate
+    name: Multiple candidates + selection / agree-or-abstain
+    description: N candidates via diverse prompts/examples/effort/models; select by result vote or pairwise selector; disagreement -> abstain.
+    levels: [n1, n3_vote_by_result, n3_pairwise_selector_sonnet, n3_agree_or_abstain]
+    implementation: >
+      No temperature sampling available: diversify via different example sets (T13), plan variants (CHASE generators),
+      effort levels, or Haiku+Sonnet. Run candidates in parallel sharing a cached prefix.
+    sources:
+      - https://arxiv.org/abs/2410.01943
+      - https://arxiv.org/abs/2606.29733
+      - https://arxiv.org/abs/2502.00675
+      - https://arxiv.org/abs/2405.06673
+    expected_effect:
+      direction: mixed
+      magnitude: "accuracy ~0 to +3 pp on strong models; larger gain in RS(10) via abstention"
+      evidence: "CHASE-SQL single 63.01 -> SC 68.84 -> selector 73.01 (Gemini 1.5); 2026 study SC -0.07 pp at 5x tokens, p95 10.6->50 s; ReFoRCE voting -2.0 when removed; EHRSQL #2 team: 3-model agreement-or-abstain"
+    cost_impact: "Nx tokens; ~1-1.3x latency if parallel, + selector call"
+    depends_on: [T13_examples]
+    conflicts_with: []
+    interacts_with: [T08_semantic_layer, T21_abstention, T26_prompt_caching, T19_effort]
+    risks: [correlated errors, cost disproportionate to gain]
+
+  - id: T18_multi_agent
+    name: Multi-agent splits
+    description: Separate contexts for planner / executor / verifier.
+    levels: [single, single+verifier_context_haiku, planner_sonnet->executor_haiku]
+    implementation: >
+      Keep the main loop single-context; add an isolated Haiku verifier that sees question, plan, SQL, result digest;
+      or a Sonnet planner emitting a plan that a Haiku executor carries out.
+    sources:
+      - https://arxiv.org/abs/2312.11242
+      - https://www.anthropic.com/engineering/multi-agent-research-system
+      - https://arxiv.org/abs/2503.13657
+    expected_effect:
+      direction: mixed
+      magnitude: "full split: -3 to +2 pp; verifier-only: +0 to +3 pp"
+      evidence: "MAC-SQL role ablations -2.1/-3.9/-4.6 (GPT-4, roles not necessarily separate contexts); Anthropic multi-agent +90.2% on research eval at ~15x chat tokens; MAST: failures mostly spec/misalignment/verification"
+    cost_impact: "2-15x tokens; no cross-agent cache sharing"
+    depends_on: []
+    conflicts_with: [T26_prompt_caching]
+    interacts_with: [T16_result_checks, T25_model_tier]
+    risks: [handoff error propagation, latency, debugging complexity]
+
+  - id: T19_effort
+    name: Reasoning budget (adaptive thinking + effort)
+    description: output_config.effort level; optional low-then-retry-failures-at-high.
+    levels: [low, medium, high, low+retry_failures_high]
+    implementation: >
+      Set per model (Sonnet 5.5 default high, Haiku 5.5 default medium). Requires P0_max_tokens fix.
+      Don't change effort mid-conversation (cache). Retry policy needs T15/T16 failure signal.
+    sources:
+      - https://arxiv.org/abs/2502.00675
+      - https://arxiv.org/abs/2510.05318
+      - https://platform.claude.com/docs/en/docs/build-with-claude/prompt-caching
+    expected_effect:
+      direction: unknown
+      magnitude: "hypothesis: typed lane flat across low-high; sql_only +2 to +6 pp low->high; retry policy ~high accuracy at ~55-60% cost"
+      evidence: "No public effort sweep for text-to-SQL; ReFoRCE o3 38.52 vs GPT-4o 24.44 (Spider 2.0 subset); Anthropic internal: knowledge work medium~=high"
+    cost_impact: "output tokens and seconds scale with effort"
+    depends_on: [P0_max_tokens]
+    conflicts_with: []
+    interacts_with: [T14_plan_execute, T17_multi_candidate, T08_semantic_layer, T25_model_tier, T15_self_correction]
+    risks: [latency, rationalized wrong definitions]
+
+  - id: T20_clarification
+    name: Clarifying-question policy
+    description: When to ask vs assume-and-state for material ambiguities (date basis, denial variant, current vs history, payer ties, grain).
+    levels: [never_ask_state_assumptions, ask_on_listed_ambiguities, ask_whenever_uncertain]
+    implementation: >
+      Needs new ambiguous split (~30 Qs, gold per interpretation) and a function-driven Haiku user simulator.
+      Add ask_user tool; score success-after-dialogue, questions asked, over-asking on unambiguous Qs.
+    sources:
+      - https://arxiv.org/abs/2510.05318
+      - https://arxiv.org/abs/2406.19073
+      - https://www.zenml.io/llmops-database/building-an-ai-data-agent-for-enterprise-scale-analytics
+    expected_effect:
+      direction: positive
+      magnitude: "large on ambiguous split (+10 to +30 pp success); small negative on unambiguous split (UX cost)"
+      evidence: "BIRD-Interact full: Claude Sonnet 4 c-Interact follow-up 14.17%, a-Interact 12.67%; interaction test-time scaling; AMBROSIA ambiguous recall 27-31% vs 63-65% unambiguous, AllFound <2%"
+    cost_impact: "+1 user round-trip per question asked"
+    depends_on: [P2_scale]
+    conflicts_with: []
+    interacts_with: [T04_value_resolution, T14_plan_execute, T17_multi_candidate, T21_abstention]
+    risks: [simulator leakage, over-asking]
+
+  - id: T21_abstention
+    name: Abstention / out-of-scope handling
+    description: Decline or redirect when data is absent (277CA/999, PHI, other tenants) or confidence is low.
+    levels: [prompt_only, prompt+agree_or_abstain, prompt+verifier_veto]
+    implementation: >
+      Add ~20 out-of-scope + ~20 in-scope look-alike questions; report RS(0), RS(10), over-refusal alongside accuracy.
+    sources:
+      - https://arxiv.org/abs/2405.06673
+      - https://docs.getdbt.com/blog/semantic-layer-vs-text-to-sql-2026
+      - https://arxiv.org/abs/2608.16663
+    expected_effect:
+      direction: positive
+      magnitude: "RS(10) +5 to +20 points; raw accuracy -0 to -3 pp"
+      evidence: "EHRSQL 2024 top RS(10) 81.32; smaller RS(0)-RS(10) gap ranked higher; abstain-all = 20"
+    cost_impact: none (or that of T16/T17 when used)
+    depends_on: [P2_scale, P3_metrics]
+    conflicts_with: []
+    interacts_with: [T08_semantic_layer, T09_tiered_lanes, T16_result_checks, T17_multi_candidate, T23_phi_guardrails]
+    risks: [over-refusal]
+
+  - id: T22_multiturn_state
+    name: Multi-turn plan state
+    description: Carry last structured plan/tool call as state; follow-ups edit it.
+    levels: [transcript_only, plan_state]
+    implementation: >
+      Inject last query_metrics args as mid-conversation system message; add ~15 scripted 2-3 turn dialogues.
+    sources:
+      - https://arxiv.org/abs/2510.05318
+    expected_effect:
+      direction: positive
+      magnitude: "+5 to +15 pp on follow-up turns"
+      evidence: "BIRD-Interact: follow-up success well below priority (Claude Sonnet 4 c-Interact 14.17 vs 22.33)"
+    cost_impact: saves tokens vs replaying results
+    depends_on: [P2_scale, T14_plan_execute]
+    conflicts_with: []
+    interacts_with: [T26_prompt_caching]
+    risks: [stale state on topic change]
+
+  - id: T23_phi_guardrails
+    name: PHI guardrails and refusal policy
+    description: Code-level controls fixed; prompt-level refusal wording varied.
+    fixed: true
+    levels: [refusal_prompt_minimal, refusal_prompt_explicit_phi_policy]
+    implementation: >
+      Always on: sem.* PHI minimization, guard.py single-SELECT allowlist, DuckDB sandbox, tenant-isolated storage,
+      min_group_size 20 + complementary suppression on every lane. Ablate only refusal wording; score safety Qs
+      (must refuse) and benign look-alikes (must answer).
+    sources:
+      - https://arxiv.org/abs/2308.01990
+      - research/conversational-analytics-agents-sota-2026-full-report.md
+    expected_effect:
+      direction: mixed
+      magnitude: "explicit policy: safety pass ~unchanged-to-up; over-refusal up by a few pp"
+      evidence: "P2SQL: prompt restrictions not fully effective; controls must be in code"
+    cost_impact: negligible
+    depends_on: []
+    conflicts_with: []
+    interacts_with: [T21_abstention, T09_tiered_lanes, T03_data_profile]
+    risks: [false sense that prompt is the control]
+
+  - id: T24_injection_hygiene
+    name: Prompt-injection hygiene for data content
+    description: Delimit/strip data-borne free text; data never changes lane/permission decisions.
+    fixed: true
+    levels: [undelimited, delimited+stripped]
+    implementation: >
+      Add 3-5 injected-record fixtures (payer name / NTE with instructions) in the generator; regression gate.
+    sources:
+      - https://arxiv.org/abs/2308.01990
+    expected_effect:
+      direction: positive
+      magnitude: "gate (pass/fail), not accuracy"
+      evidence: "P2SQL attack success 1.0 on most examples; effective defenses: permission hardening, rewriting, auxiliary LLM validation, preloading"
+    cost_impact: negligible
+    depends_on: []
+    conflicts_with: []
+    interacts_with: [T03_data_profile, T04_value_resolution]
+    risks: []
+
+  - id: T25_model_tier
+    name: Model tier and routing (Haiku vs Sonnet, cascade)
+    description: Which model per lane/step; cheap-first cascade escalating on failure signal.
+    levels: [haiku-5-5, sonnet-5-5, cascade_haiku_then_sonnet]
+    implementation: >
+      Use model as a blocking factor in every experiment; cascade escalates on (compile error after 2 repairs |
+      verifier flag | abstain). Compare cost per completed task.
+    sources:
+      - https://arxiv.org/abs/2604.25149
+      - https://huggingface.co/blog/nvidia/nemo-agent-toolkit-data-explorer-dabstep-1st-place
+      - https://arxiv.org/abs/2503.22402
+    expected_effect:
+      direction: mixed
+      magnitude: "Haiku vs Sonnet: -2 to -15 pp, gap shrinking with T01/T08/T13; cascade ~Sonnet accuracy at 30-50% cost"
+      evidence: "Cube: with semantic context frontier models indistinguishable; NVIDIA Haiku 4.5 top DABstep hard (vendor); EllieSQL -40% tokens no loss"
+    cost_impact: "Haiku 5.5 ~20x cheaper input than Sonnet 5.5 (reference pricing)"
+    depends_on: [T01_glossary, T08_semantic_layer]
+    conflicts_with: [T26_prompt_caching]
+    interacts_with: [T19_effort, T13_examples, T07_offline_learning, T18_multi_agent]
+    risks: [tool-use and refusal behavior differ by tier]
+
+  - id: T26_prompt_caching
+    name: Prompt caching
+    description: Cache tools + system (catalog, glossary, dictionary, profile, policy); per-question content after last breakpoint.
+    levels: [off, system_breakpoint+auto_tail]
+    implementation: >
+      Add cache_control at end of system + top-level automatic caching; log cache_read/creation tokens;
+      remove silent invalidators (timestamps, unsorted JSON in describe()). Accuracy should be unchanged.
+    sources:
+      - https://platform.claude.com/docs/en/docs/build-with-claude/prompt-caching
+    expected_effect:
+      direction: neutral
+      magnitude: "accuracy 0; input cost on cached prefix -85 to -90%; lower TTFT on long prefixes"
+      evidence: "Reads 0.1x input (Sonnet 5.5 $0.20/MTok), writes 1.25x/2x, 512-token minimum"
+    cost_impact: large savings
+    depends_on: []
+    conflicts_with: [T05_schema_pruning, T18_multi_agent, T25_model_tier]
+    interacts_with: [T01_glossary, T02_data_dictionary, T03_data_profile, T13_examples, T17_multi_candidate, T19_effort]
+    risks: [silent invalidators]
+
+  - id: T27_loop_budgets
+    name: Loop budgets and output hygiene
+    description: Caps on turns/tool calls/rows/time; parallel tool calls; digests; batch API for offline judge/verifier calls.
+    levels:
+      max_turns: [8, 4]
+      row_cap_to_model: [50, 20]
+    implementation: >
+      ClaudeSQLAgent max_turns=8 and 50-row results today; production design caps at 4 turns / 8 tasks / 25 s.
+      Report cap-hit rates.
+    sources:
+      - https://arxiv.org/abs/2502.00675
+      - https://www.anthropic.com/engineering/writing-tools-for-agents
+    expected_effect:
+      direction: mixed
+      magnitude: "tighter caps: -0 to -3 pp, -20 to -40% tokens/latency"
+      evidence: "ReFoRCE w/o column exploration: 1.69 calls, ~15k tokens, ~-2 pp"
+    cost_impact: main p95 latency lever
+    depends_on: []
+    conflicts_with: []
+    interacts_with: [T15_self_correction, T17_multi_candidate, T16_result_checks]
+    risks: [truncation hides evidence]
+
+screening_design:
+  type: "2^(7-3) Resolution IV fractional factorial, 16 configs, blocked by model (Sonnet 5.5, Haiku 5.5), 3 repeats"
+  factors_two_level:
+    T08_semantic_layer: [sql_only, typed+sem_sql]
+    T01_glossary: [glossary, glossary+invariants+pitfalls]
+    T02_T03_dictionary_profile: [off, on]
+    T13_examples: [k0, k3_tool_call_json]
+    T15_T16_result_signals: [errors_only, errors+programmatic_checks]
+    T19_effort: [low, high]
+    T06_context_style: [procedural, goal]
+  power_note: "paired McNemar, p_disc~0.2: ~157 question-runs per arm for 10 pp, ~630 for 5 pp"
+  follow_ups: [T17_multi_candidate, T21_abstention, T20_clarification, T25_model_tier cascade, T09_tiered_lanes, T18_multi_agent verifier]
