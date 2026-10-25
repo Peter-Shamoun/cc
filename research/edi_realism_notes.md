@@ -294,6 +294,8 @@ initial denial rate 10.0% [10.2%], 72% line-level [72%], bundling 50% of non-dup
 per business day [3.2 MB on a cold start; ~3,130 in a year] (bytes per claim rose: middle names, apartments, more
 diagnoses, PER segments); 33 835 files a day from day 1 [0 on days 1-3]. The 150-day calibration tests
 (`tests/test_edi_calibration.py`) pass unchanged except that they count claims billed inside the window.
+One year at 5 MB/business day (plus the 90-day burn-in): 1,306 MB raw over 250 file days, 3,031 claims per business
+day (base), 9.5 minutes, peak RSS 972 MB (the burn-in starts the window with a full set of claims in flight).
 
 Ledger: a claim billed during the burn-in appears only with what the window delivered (its 835 events and any 837
 resubmission). `bench/truth_db.py` `ledger.claims` holds claims with an 837 in the window (like `sem.claims`), with
