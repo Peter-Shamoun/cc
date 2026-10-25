@@ -397,42 +397,22 @@ class SemanticAPI:
 
 
 # ---------------------------------------------------------------------------
-# SQL guard for the escape hatch: one SELECT, only sem.* relations, no file/
-# network table functions, row cap enforced. Requires `sqlglot`.
+# SQL guard for the escape hatch. The rules live in bench.guard (one SELECT,
+# sem.* only, no file / network / setting functions). This wrapper keeps the
+# model-facing SemanticError the tool dispatcher already catches.
 # ---------------------------------------------------------------------------
-_BANNED_FUNCS = {"read_parquet", "read_csv", "read_csv_auto", "read_json", "read_json_auto", "parquet_scan",
-                 "read_text", "read_blob", "glob", "httpfs", "attach", "copy", "query_table", "query", "sniff_csv"}
-
-
 def guard_semantic_sql(sql: str, limit: int = 200) -> str:
-    import sqlglot
-    from sqlglot import exp
-
+    import sys
+    from pathlib import Path
     try:
-        stmts = sqlglot.parse(sql, read="duckdb")
-    except sqlglot.errors.ParseError as e:
-        raise SemanticError(f"SQL did not parse: {e}")
-    if len(stmts) != 1 or stmts[0] is None:
-        raise SemanticError("Exactly one statement is allowed.")
-    tree = stmts[0]
-    if not isinstance(tree, (exp.Select, exp.Union, exp.Intersect, exp.Except)):
-        raise SemanticError("Only SELECT queries are allowed.")
-    cte_names = {c.alias_or_name.lower() for c in tree.find_all(exp.CTE)}
-    for t in tree.find_all(exp.Table):
-        name = t.name.lower()
-        schema = (t.db or "").lower()
-        if not schema and name in cte_names:
-            continue
-        if schema != "sem":
-            raise SemanticError(f"Table '{t.sql()}' is not allowed. Use only sem.* views "
-                                "(remit_claims, remit_lines, claims, claim_lines, adjustments, remarks, payments, "
-                                "provider_adjustments, diagnoses, payers).")
-    for fn in tree.find_all(exp.Func):
-        fname = (fn.sql_name() if hasattr(fn, "sql_name") else type(fn).__name__).lower()
-        anon = fn.name.lower() if isinstance(fn, exp.Anonymous) else ""
-        if fname in _BANNED_FUNCS or anon in _BANNED_FUNCS:
-            raise SemanticError(f"Function '{fname or anon}' is not allowed.")
-    return f"SELECT * FROM ({tree.sql(dialect='duckdb')}) AS q LIMIT {int(limit)}"
+        from bench.guard import GuardError, guard
+    except ImportError:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+        from bench.guard import GuardError, guard
+    try:
+        return guard(sql, row_limit=int(limit), escalate=False)
+    except GuardError as e:
+        raise SemanticError(str(e)) from None
 
 
 def _jsonable(v: Any) -> Any:
