@@ -256,7 +256,7 @@ class SilverBatch(TableRows):
             insert_arrow(self.con, t, data)
         for table, column, parent, parent_column in STAGING_FOREIGN_KEYS:
             orphans = self.con.execute(f"SELECT count(*) FROM {table} WHERE {column} NOT IN "
-                                       f"(SELECT {parent_column} FROM {parent})").fetchone()[0]
+                                       f"(SELECT {parent_column} FROM {parent})").fetchall()[0][0]
             if orphans:
                 raise RuntimeError(f"{orphans} rows of {table} reference no {parent}.{parent_column}")
         return self.con
