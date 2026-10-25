@@ -102,7 +102,7 @@ export function AssistantTurn({ msg, isLast, onOpen, onRegenerate, onEdit }: { m
           <IconButton label="Good response" aria-pressed={vote === 'up'} onClick={() => setVote(vote === 'up' ? null : 'up')}><ThumbsUp size={16} fill={vote === 'up' ? 'currentColor' : 'none'} /></IconButton>
           <IconButton label="Bad response" aria-pressed={vote === 'down'} onClick={() => setVote(vote === 'down' ? null : 'down')}><ThumbsDown size={16} fill={vote === 'down' ? 'currentColor' : 'none'} /></IconButton>
           {isLast && <IconButton label="Regenerate" onClick={onRegenerate}><RefreshCw size={16} /></IconButton>}
-          {msg.usage && <span className="ml-2 font-sans text-xs text-fg-subtle">{msg.usage.queries} {msg.usage.queries === 1 ? 'query' : 'queries'} · {(msg.usage.elapsedMs / 1000).toFixed(1)} s</span>}
+          {msg.usage && msg.usage.queries > 0 && <span className="ml-2 font-sans text-xs text-fg-subtle">{msg.usage.queries} {msg.usage.queries === 1 ? 'query' : 'queries'} · {(msg.usage.elapsedMs / 1000).toFixed(1)} s</span>}
           {msg.finishReason === 'aborted' && <span className="ml-2 font-sans text-xs text-fg-subtle">Stopped</span>}
         </div>
       )}
