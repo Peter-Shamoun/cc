@@ -64,7 +64,9 @@
     "f_cpt_denied_lines__80053",
     "f_payer_class_denial_rate__medicare",
     "f_payer_class_denial_rate__commercial"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_b853266803",
@@ -115,7 +117,9 @@
     "a_f786e11aec",
     "q22_days_to_first_remit",
     "a_88c4640755"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -150,7 +154,9 @@
     "a_436f690741",
     "q08_denial_rate_by_payer",
     "a_f494340e13"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_a5888f64a4",
@@ -207,7 +213,9 @@
     "q08_denial_rate_by_payer",
     "a_2149838506",
     "a_dccab5ccfe"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7d45c279a7",
@@ -236,7 +244,9 @@
     "a_e83408d6a2",
     "q01_claims_submitted",
     "a_9a40343e18"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q15_partial_line_denials",
@@ -254,7 +264,9 @@
     "q07_denial_rate",
     "f_cpt_denied_lines__36415",
     "a_f494340e13"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q25_primary_deductible",
@@ -272,7 +284,9 @@
     "q24_primary_patient_responsibility",
     "a_553c1034d1",
     "a_82bacc820b"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_8663c777cd",
@@ -299,7 +313,9 @@
     "a_54dd76175a",
     "q04_paid_by_month",
     "a_fca405b635"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__87798",
@@ -317,7 +333,9 @@
     "f_cpt_denied_lines__80053",
     "a_f494340e13",
     "a_f3c42ce766"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q11_cpt_denial_rate",
@@ -500,7 +518,9 @@
     "f_cpt_denied_lines__80053",
     "a_a23ce7f1de",
     "q08_denial_rate_by_payer"
-   ]
+   ],
+   "pass": false,
+   "why": "expected 3 rows, got 28"
   },
   {
    "qid": "a_a123bba47f",
@@ -536,7 +556,9 @@
     "a_9a40343e18",
     "a_5059b5e0e6",
     "q16_denied_charges_by_payer"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_9108c7aacb",
@@ -586,7 +608,9 @@
     "a_b541bf06a1",
     "a_2149838506",
     "a_f786e11aec"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_856b95a70c",
@@ -643,7 +667,9 @@
     "a_477b034f58",
     "f_payer_paid_in_month__medicare-part-b-north-carolina_2026-07-01",
     "f_payer_paid_in_month__unitedhealthcare_2026-07-01"
-   ]
+   ],
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_1b7e02d0b0",
@@ -665,7 +691,9 @@
     "a_88c4640755",
     "q17_resubmitted",
     "a_fca405b635"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_921f1bf366",
@@ -686,7 +714,9 @@
     "q18_voided",
     "q02_total_billed",
     "a_f786e11aec"
-   ]
+   ],
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "q14_zero_paid_not_denied",
@@ -704,7 +734,9 @@
     "q09_denials_by_type",
     "f_payer_class_denial_rate__medicare",
     "f_payer_class_denial_rate__commercial"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_dca9da6d52",
@@ -726,7 +758,9 @@
     "a_88c4640755",
     "a_fca405b635",
     "q17_resubmitted"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q19_reversed_no_correction",
@@ -744,7 +778,9 @@
     "q08_denial_rate_by_payer",
     "q16_denied_charges_by_payer",
     "a_436f690741"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__80307",
@@ -762,7 +798,9 @@
     "f_cpt_denied_lines__80053",
     "a_f494340e13",
     "a_f3c42ce766"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d383370345",
@@ -819,7 +857,9 @@
     "a_f786e11aec",
     "a_9a40343e18",
     "q22_days_to_first_remit"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0482",
@@ -837,7 +877,9 @@
     "f_cpt_denied_lines__80053",
     "f_payer_class_denial_rate__medicare",
     "f_payer_class_denial_rate__commercial"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_0d43f7d4b6",
@@ -857,7 +899,9 @@
     "a_88c4640755",
     "q17_resubmitted",
     "q16_denied_charges_by_payer"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_923951a050",
@@ -876,7 +920,9 @@
     "q16_denied_charges_by_payer",
     "q08_denial_rate_by_payer",
     "q03_total_paid"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7423e6eb91",
@@ -901,7 +947,9 @@
     "a_9a40343e18",
     "q02_total_billed",
     "a_f786e11aec"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_never_remitted_submitted_in_month__2026-07-01",
@@ -919,7 +967,9 @@
     "q20_never_remitted",
     "f_claims_first_submitted_in_month__2026-07-01",
     "f_payer_paid_in_month__medicare-part-b-north-carolina_2026-07-01"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_ab202d4b23",
@@ -1129,7 +1179,9 @@
     "a_a23ce7f1de",
     "a_f494340e13",
     "f_cpt_denied_lines__80053"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0480",
@@ -1147,7 +1199,9 @@
     "f_cpt_denied_lines__80053",
     "a_f494340e13",
     "a_f3c42ce766"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d671e0b995",
@@ -1218,7 +1272,9 @@
     "a_54dd76175a",
     "a_837ce03435",
     "q04_paid_by_month"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__81479",
@@ -1236,7 +1292,9 @@
     "f_cpt_denied_lines__80053",
     "f_payer_class_denial_rate__medicare",
     "f_payer_class_denial_rate__commercial"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q12_referring_provider_denials",
@@ -1250,12 +1308,15 @@
     "q13_principal_dx_denials",
     "q08_denial_rate_by_payer",
     "a_9a40343e18"
-   ]
+   ],
+   "pass": true,
+   "why": "ok"
   }
  ],
- "accuracy": null,
+ "accuracy": "27/30",
  "n": 30,
  "mean_sql_execs": 3.23,
  "explore_probes": 7,
- "n_pass": null
+ "n_pass": 27,
+ "notes": "All five cells were run by one Grok Bot analyst in one context (l4): base drafts, alternative candidates and repairs were written once and reused across cells according to each config, so cells are not independent samples. multiagent was simulated as sequential planner/writer passes in the same context (not isolated). Answers for all 5 cells were committed (28d3fe0) before any scoring; scoring = bench.compare.match vs gold rows. Snapshot 98e61f03e594 is small (July-only payments, no void claims), so several questions have degenerate answers."
 }
