@@ -2,8 +2,9 @@
 
     Cognito id token -> app server verifies it -> STS AssumeRoleWithWebIdentity into that customer's reader
     role (the trust policy re-checks the customer tag) -> 15-minute credentials -> CURRENT -> that version's
-    manifest -> fresh in-memory DuckDB whose only S3 secret is scoped to s3://claimclarity-prod/<customer>/semantic_layer/,
-    with allowed_directories set to that prefix, external access otherwise off, and the configuration locked.
+    manifest -> fresh in-memory DuckDB over s3://claimclarity-prod/<customer>/semantic_layer/,
+    with secrets and allowed_directories limited to the prefixes of the relations it may read (sem.*, plus
+    lossless.* when escalating), external access otherwise off, and the configuration locked.
     Each view reads exactly the files the manifest lists (no LIST requests, no files of another version).
 
 Four independent layers stop agent SQL from reaching another customer's data or PHI: the IAM role, the
@@ -52,9 +53,15 @@ def open_session(aws, dep: Deployment, id_token: str, escalate: bool = False, re
     # first file under 2 MB whole (at every session open, for every view)
     files = lambda rel: [f"s3://{BUCKET}/{k}" for part in sorted(manifest["relations"][rel], key=lambda p: (p != "schema", p))
                          for k in manifest["relations"][rel][part]]
+    # Only the relations this session may use are reachable: sem.* always, lossless.* only when escalating. Each
+    # relation's prefix gets its own secret and allowed directory, so a non-escalated session cannot open a
+    # lossless.* file even with SQL that gets past the guard.
+    relations = [f"sem.{t}" for t in SEM_TABLES] + (list(APPEND_RELATIONS) if escalate else [])
+    prefixes = [f"{gold}{rel}/" for rel in relations]
     con = duckdb.connect(config={"autoinstall_known_extensions": False, "autoload_known_extensions": False})
     con.execute("LOAD httpfs")
-    con.execute(aws.duckdb_secret_sql(creds, gold if scope_secret else "s3://"))
+    for i, prefix in enumerate(prefixes if scope_secret else ["s3://"]):
+        con.execute(aws.duckdb_secret_sql(creds, prefix, name=f"s3_gold_{i}"))
     con.execute("CREATE SCHEMA sem")
     for t in SEM_TABLES:
         con.execute(f"CREATE VIEW sem.{t} AS SELECT * FROM read_parquet({files(f'sem.{t}')!r}, hive_partitioning=false)")
@@ -63,7 +70,7 @@ def open_session(aws, dep: Deployment, id_token: str, escalate: bool = False, re
         for rel in APPEND_RELATIONS:
             con.execute(f"CREATE VIEW {rel} AS SELECT * FROM read_parquet({files(rel)!r}, hive_partitioning=false)")
     if enforce_allowed_directories:
-        con.execute("SET allowed_directories = ?", [[gold]])
+        con.execute("SET allowed_directories = ?", [prefixes])
         con.execute("SET enable_external_access = false")
     con.execute("SET lock_configuration = true")
     return QuerySession(customer, claims.get("email", claims["sub"]), version, con, creds, gold)
