@@ -184,6 +184,9 @@ def _proc(composite, comp) -> list:
     return [p or None for p in parts[:8]]
 
 
+_ENVELOPE_SEGMENTS = frozenset(("ISA", "IEA", "GS", "GE", "ST", "SE"))
+
+
 class _State:
     def __init__(self):
         self.ic = self.gp = self.tx = self.kind = self.loop = None
@@ -224,7 +227,14 @@ def _parse(data, file_id, tenant, s3, ingest_run_id, ingested_at, sink: TableRow
             sid = e[0].strip()
             u = f"{file_id}:{so}"
             interchange_uid, group_uid, txn_uid = st.ic, st.gp, st.tx
-            if sid == "ISA":
+            if txn_uid is not None and sid not in _ENVELOPE_SEGMENTS:     # the common case first
+                if st.kind == "837":
+                    _seg_837(st, add, e, sid, so, u, file_id, comp)
+                elif st.kind == "835":
+                    _seg_835(st, add, e, sid, so, u, file_id, comp)
+                else:
+                    raise ParseError(f"unsupported transaction set {st.kind}")
+            elif sid == "ISA":
                 if len(e) != 17:
                     raise ParseError(f"ISA has {len(e) - 1} elements")
                 st.ic = interchange_uid = u
@@ -280,14 +290,8 @@ def _parse(data, file_id, tenant, s3, ingest_run_id, ingested_at, sink: TableRow
                 st.tx_row.update(seg_ord_end=so, se01_segment_count=int(e[1]), se02_control_number=e[2],
                                  count_check_ok=int(e[1]) == so - st.st_ord + 1)
                 st.tx = st.kind = st.loop = None
-            elif st.tx is None:
-                raise ParseError(f"segment {sid} outside a transaction set")
-            elif st.kind == "837":
-                _seg_837(st, add, e, sid, so, u, file_id, comp)
-            elif st.kind == "835":
-                _seg_835(st, add, e, sid, so, u, file_id, comp)
             else:
-                raise ParseError(f"unsupported transaction set {st.kind}")
+                raise ParseError(f"segment {sid} outside a transaction set")
             add_segment((file_id, so, interchange_uid, group_uid, txn_uid, sid, st.loop, raw, offset, el_sep,
                          json.dumps(e[1:]) if json_elements else None))
             so += 1

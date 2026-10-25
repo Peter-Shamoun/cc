@@ -12,6 +12,7 @@ deleted again.
 """
 from __future__ import annotations
 
+import gc
 import hashlib
 import multiprocessing
 import re
@@ -124,6 +125,7 @@ class _FileToArrow(TableRows):
 
 def _parse_in_worker(body: bytes, file_id: str, customer: str, meta: dict, run_id: str, started: datetime):
     """(Arrow tables per table, the edi.source_file row) for a file that parsed, or the rejection message."""
+    gc.disable()                                               # as in SilverBatch.add_raw_files; a worker only parses
     sink = _FileToArrow()
     try:
         parse_file(body, file_id, customer, meta, run_id, started, sink=sink)
@@ -157,7 +159,19 @@ class SilverBatch(TableRows):
     def add_raw_files(self, files: Iterable[RawFile], customer: str,
                       known_sha: dict[str, str]) -> Iterator[tuple[RawFile, bool]]:
         """Parse files into the batch in order; yields each with whether it was loaded (False: rejected, recorded).
-        known_sha (sha256 -> file_id of loaded files) marks byte-identical re-deliveries and is updated."""
+        known_sha (sha256 -> file_id of loaded files) marks byte-identical re-deliveries and is updated.
+
+        The cyclic garbage collector is paused meanwhile: parsing allocates millions of short-lived, acyclic rows,
+        and its scans of them cost ~7% of the batch's CPU."""
+        collecting = gc.isenabled()
+        gc.disable()
+        try:
+            yield from self._add_raw_files(files, customer, known_sha)
+        finally:
+            if collecting:
+                gc.enable()
+
+    def _add_raw_files(self, files: Iterable[RawFile], customer: str, known_sha: dict[str, str]):
         for f, outcome in self._parse_all(files, customer):
             sha = f.meta["sha256"]
             duplicate_of = known_sha.get(sha)
