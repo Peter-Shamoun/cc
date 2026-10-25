@@ -321,6 +321,13 @@ def test_gold_has_no_direct_patient_identifiers(world):
                 assert hits == 0, f"patient name or member id in {rel}.{c}"
 
 
+def test_escalation_references_carry_only_non_phi_qualifiers(world):
+    from ccsim.pipeline import NON_PHI_REFERENCE_QUALIFIERS
+    s = session(world, escalate=True)
+    qualifiers = {r[0] for r in q(s, "SELECT DISTINCT qualifier FROM lossless.edi_reference")}
+    assert qualifiers and qualifiers <= set(NON_PHI_REFERENCE_QUALIFIERS), qualifiers - set(NON_PHI_REFERENCE_QUALIFIERS)
+
+
 def test_policy_export_is_valid_json(tmp_path):
     import json
     files = export(tmp_path)
