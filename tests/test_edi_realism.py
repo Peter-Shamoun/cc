@@ -1,4 +1,4 @@
-"""Realism invariants from EDI realism audit 1 (research/edi_realism_audit_1.md): who the patients are, whether the
+"""Realism invariants from EDI realism audits 1-3 (research/edi_realism_audit_*.md): who the patients are, whether the
 tests fit them, what a claim scrubber would have caught, how Medicare treats screening orders, and what the files
 and envelopes look like. Each test reads the raw files the way an auditor would, or the ledger."""
 import re
@@ -330,15 +330,27 @@ def test_member_ids_and_claim_numbers_follow_each_payers_format(run):
 
 
 def test_tail_payers_are_geographically_coherent():
-    stems = Counter()
-    for p in m.TAIL_PAYERS:
-        for place, states in m._TAIL_PLACES.items():
-            if p.name.startswith(place + " "):
-                assert p.remit_address[2] in states.split(), (p.name, p.remit_address)
-                stems[place] += 1
-    assert max(stems.values()) <= m.MAX_PAYERS_PER_STEM
-    boxes = Counter(len(p.remit_address[0].split()[-1]) for p in m.TAIL_PAYERS if p.remit_address[0].startswith("PO BOX"))
-    assert len(boxes) >= 4 and max(boxes.values()) < .5 * sum(boxes.values())
+    """Each lab's tail is its own market: places in the lab's state and its neighbours, offices there (a TPA may sit
+    at a national hub); no payer serves two markets."""
+    all_tail = [p for payers in m.TAIL_PAYERS.values() for p in payers]
+    assert len({p.payer_id for p in all_tail}) == len({p.name for p in all_tail}) == len(all_tail)
+    assert not any("WORKERS COMP" in p.name for p in m.PAYERS)
+    for region, payers in m.TAIL_PAYERS.items():
+        market = {region, *m.NEIGHBOR_STATES[region]}
+        stems = Counter()
+        for p in payers:
+            assert p.remit_address[2] in market | set(m.TPA_HUB_STATES), (region, p.name, p.remit_address)
+            for place, states in m._TAIL_PLACES.items():
+                if p.name.startswith(place + " "):
+                    assert p.remit_address[2] in set(states.split()) & market, (p.name, p.remit_address)
+                    stems[place] += 1
+        assert max(stems.values()) <= m.MAX_PAYERS_PER_STEM
+        weight = Counter()
+        for p in payers:
+            weight[p.remit_address[2]] += p.weight
+        assert weight[region] / sum(weight.values()) >= .6, (region, weight)
+        boxes = Counter(len(p.remit_address[0].split()[-1]) for p in payers if p.remit_address[0].startswith("PO BOX"))
+        assert len(boxes) >= 4 and max(boxes.values()) < .5 * sum(boxes.values())
 
 
 def test_every_diagnosis_fits_the_patients_age_and_add_ons_have_parents(run):
@@ -389,3 +401,163 @@ def test_crossovers_ordering_providers_facilities_and_plb_periods(run):
     assert npis.most_common(1)[0][1] <= .03 * sum(npis.values())
     rows = [c for c in _claim_rows_837(files) if c["facility"]]
     assert rows and not any(c.get("facility_street") == m.TENANTS["acme_labs"].address[0] for c in rows)
+
+
+# --- audit 3: file-set level -------------------------------------------------------------------------
+def _patients(tc, step=4):
+    sim = m._TenantRun(Scenario(), tc, m.TENANTS[tc].claims_per_day * 10)
+    for lo, size, seg, rep in sim.pools:
+        for i in range(0, size, step):
+            yield sim._patient(lo + i)
+
+
+def test_coordination_of_benefits_follows_the_order_rules():
+    """NAIC order: own employer plan before a spouse's, children by the birthday rule, Medicare second behind a
+    working-aged employee's plan, Medicaid and TRICARE last; second plans from the lab's market; few Blues plans
+    behind a Blues primary; home-Blues members from other states' plans (BlueCard prefixes)."""
+    ref = date(2026, 7, 1)
+    for tc, t in m.TENANTS.items():
+        segments = m.segments_for(t.region)
+        local = {p.payer_id for payers in segments.values() for p in payers}
+        home_blues = segments["blues"][0]
+        comm = aged = blues_sec = blues_blues = home = bluecard = 0
+        for p in _patients(tc):
+            prim = p.coverages[0]
+            cls = prim.payer.payer_class
+            comm += cls in ("commercial", "blues")
+            if prim.payer is home_blues:
+                home += 1
+                bluecard += prim.member_id[:3] not in m.blues_prefixes(home_blues)
+            assert len(p.coverages) <= 2
+            if len(p.coverages) == 1:
+                continue
+            sec = p.coverages[1]
+            assert cls in ("commercial", "blues"), (tc, prim.payer.name)   # TRICARE, VA, Medicaid: never ahead
+            assert sec.payer.payer_id in local, (tc, sec.payer.name)
+            if sec.payer.is_medicare:
+                aged += 1
+                assert p.age(ref) >= 64.99 and prim.relationship == sec.relationship == "18"
+            elif sec.payer.payer_class in ("commercial", "blues"):
+                if prim.relationship == "18":
+                    assert sec.relationship == "01"                       # employer rule: the spouse's plan second
+                else:
+                    assert prim.relationship == sec.relationship == "19"  # birthday rule
+                    a, b = prim.subscriber.dob, sec.subscriber.dob
+                    assert (a.month, a.day) <= (b.month, b.day)
+                if cls == "blues":
+                    blues_sec += 1
+                    blues_blues += sec.payer.payer_class == "blues"
+            else:
+                assert sec.payer.payer_class in ("medicaid", "medicaid_mco") or sec.payer.payer_id == "TREST"
+        assert blues_blues <= .12 * blues_sec, (tc, blues_blues, blues_sec)
+        assert .03 <= aged / comm <= .09, (tc, aged / comm)
+        assert .06 <= bluecard / home <= .18, (tc, bluecard / home)
+
+
+def test_deductibles_are_mostly_met_by_the_fourth_quarter():
+    paces = [p.deductible_pace for p in _patients("acme_labs", 9) if p.deductible > 0]
+    october = date(2026, 10, 15).timetuple().tm_yday / 365
+    assert .05 <= sum(pace > october for pace in paces) / len(paces) <= .16   # deductible still open in October
+    assert sum(pace > .25 for pace in paces) / len(paces) >= .8               # but rarely met by March
+
+
+def test_diagnoses_and_modifiers_at_volume(run):
+    """No diagnosis dominates out of its clinical place (hyperprolactinemia, antibody-response exams, chronic
+    hepatitis B); electrolyte disorders are adult codes; modifier 90 marks exactly the lab's send-out list and an
+    accredited high-complexity lab bills no QW."""
+    _, files = run
+    claims = _claims_837(files)
+    slots = Counter(d for c in claims for d in c["dx"])
+    total = sum(slots.values())
+    assert slots["E221"] / total < .003 and slots["Z0184"] / total < .01 and slots["B182"] / total < .005
+    assert all(dx.min_age >= 18 for dx in R.DX_DOMAINS["electrolytes"] if dx.code != "E860")
+    send_outs = m.send_out_codes("acme_labs")
+    lines = [l for c in claims for l in c["lines"]]
+    assert not any("QW" in mods for _, mods, _ in lines)
+    assert all(("90" in mods) == (code in send_outs) for code, mods, _ in lines)
+    assert 0 < sum("90" in mods for _, mods, _ in lines) < .03 * len(lines)
+
+
+def test_billing_system_constants_service_centers_and_msp(run):
+    """One billing system: 2420E and REF*D9 on every claim or on none; patient service centers are suites billed
+    under the lab's NPI, the busiest far busier than the quietest; no frequency-8 voids to the MAC; Medicare
+    as secondary carries SBR05 = 12 (working aged); 81479 carries the test's own name."""
+    _, files = run
+    t = m.TENANTS["acme_labs"]
+    n_clm = n_dk = n_d9 = msp = 0
+    sites = Counter()
+    for f, body in files:
+        if f["kind"] != "837" or f["expect"] != "parsed":
+            continue
+        sbr = payer = site = None
+        dk_this = False
+        for e in _segments(body):
+            if e[0] == "SBR":
+                sbr, payer = e, None
+            elif e[0] == "NM1" and e[1] == "PR" and payer is None:
+                payer = e[9]
+                if sbr[1] == "S" and payer == "11502":
+                    assert sbr[5] == "12"
+                    msp += 1
+            elif e[0] == "CLM":
+                n_clm += 1
+                assert not (payer == "11502" and e[5].endswith("8")), e[1]
+                dk_this = False
+            elif e[0] == "REF" and e[1] == "D9":
+                n_d9 += 1
+            elif e[0] == "NM1" and e[1] == "DK" and not dk_this:
+                n_dk += 1
+                dk_this = True
+            elif e[0] == "NM1" and e[1] == "77":
+                assert e[9] == m.npi(t.npi_seed)
+                site = e[3]
+            elif e[0] == "N3" and site:
+                assert " STE " in e[1]
+                sites[(site, e[1])] += 1
+                site = None
+            elif e[0] == "NTE":
+                assert e[2] in m.UNLISTED_MOLECULAR_TESTS
+            elif e[0] == "SV1" and re.split("[:>]", e[1])[1] == "81479":
+                desc = re.split("[:>]", e[1])[6]
+                assert desc in m.UNLISTED_MOLECULAR_TESTS or desc.startswith("Z")
+    assert n_dk in (0, n_clm) and n_d9 in (0, n_clm)
+    assert msp > 0
+    counts = [n for _, n in sites.most_common()]
+    assert len(counts) >= 8 and counts[0] > 3 * counts[-1]
+
+
+def test_duplicate_denials_and_medicare_corrections(run):
+    """CARC 18 carries one group code per payer; N522 (crossover duplicate) only on crossover claims; no N130 with
+    a duplicate; a MAC's corrections never re-price the CLFS."""
+    T, files = run
+    groups = defaultdict(set)
+    for f, body in files:
+        if f["kind"] != "835" or f["expect"] != "parsed":
+            continue
+        payer, clp = None, None
+        for e in _segments(body):
+            if e[0] == "N1" and e[1] == "PR":
+                payer = e[2]
+            elif e[0] == "CLP":
+                clp = dict(tt=False, carc18=False)
+            elif clp is None:
+                continue
+            elif e[0] == "NM1" and e[1] == "TT":
+                clp["tt"] = True
+            elif e[0] == "CAS" and "18" in e[2::3]:
+                groups[payer].add(e[1])
+                clp["carc18"] = True
+            elif e[0] == "MOA":
+                assert not (clp["carc18"] and "N130" in e)
+                assert "N522" not in e or clp["tt"]
+            elif e[0] == "LQ" and e[2] == "N522":
+                assert clp["tt"]
+    assert groups and all(len(g) == 1 for g in groups.values()), groups
+    for c in T["claims"].values():
+        a = c["adjudications"].get("11502")
+        if not a or c["payers"][0] != "11502":
+            continue
+        paid = [e for e in a["events"] if e["status"] in ("1", "19") and e["paid"] > 0]
+        for i in range(len(c["cpts"])):
+            allowed = {e["lines"][i]["allowed"] for e in paid if len(e["lines"]) > i and e["lines"][i]["allowed"] > 0}
+            assert len(allowed) <= 1, (c["pcn"], allowed)
