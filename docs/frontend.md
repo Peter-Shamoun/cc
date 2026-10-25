@@ -1,4 +1,4 @@
-# CC web chat (v0)
+# CC web chat (v1)
 
 A React chat UI for the CC analyst under `web/`. It follows the research spec in [`frontend-spec.md`](frontend-spec.md): ChatGPT's layout and density, plus Claude's artifact side panel. It runs fully offline against a mock adapter that replays synthetic fixtures. There are no network calls and no paid APIs.
 
@@ -13,13 +13,39 @@ npm run build      # tsc + vite build
 npm run shots      # Playwright screenshots of the running dev server -> ../../shots (needs Chrome; set CHROME_PATH)
 ```
 
-To point at a real backend, set `VITE_ANALYST_BASE=http://127.0.0.1:8000` (any non-empty value). The UI then uses `HttpAnalystAdapter`. Empty or unset means the mock.
+To point at a real backend, set `VITE_ANALYST_BASE`. Empty or unset means the offline mock; `/` means same origin (the Vite dev server proxies `/api` to `CC_API_URL`, default `http://127.0.0.1:8787`); anything else is an absolute base URL. The UI then uses `HttpAnalystAdapter`.
+
+### Live round-trip against `api/` (v1)
+
+```bash
+pip install -e . && pip install -r api/requirements.txt
+uvicorn api.app:app --port 8787                       # demo mode: scripted model, synthetic DuckDB, no paid APIs
+cd web
+VITE_ANALYST_BASE=/ VITE_ANALYST_DEMO_TOKEN=demo:acme_labs:peter npx vite --port 5174
+node scripts/shots_v1.mjs http://127.0.0.1:5174/ http://127.0.0.1:5175/ /workspace/cc_web/shots   # second URL = a mock-mode dev server
+```
+
+`VITE_ANALYST_DEMO_TOKEN` is only for the backend's demo bearer (`demo:<customer>:<user>`, synthetic data). Production leaves it unset and authenticates with the httpOnly `cc_session` cookie. The adapter:
+
+- `POST /api/chat` with user turns only (`{conversationId, messages: [{id, role: 'user', text}]}`), reads the SSE stream, drops `heartbeat` events, remembers `messageId` from `message.start`.
+- Stop: aborting the fetch also calls `POST /api/chat/{messageId}/stop` so the server drops the rest of the run.
+- Download CSV: `GET /api/download/{csvFileId}` (opaque id, principal-bound, audited, 15 min). Falls back to client-side CSV of the preview only if that fails.
+- The v1 Playwright run proves it: `POST /api/chat` and `GET /api/download/f_…` hit the FastAPI server, the CSV header was `payer_name,denial_rate,claims`, and the page logged no row data.
+
+## v1 changes
+
+- **Streamdown** (Vercel, Apache-2.0) replaces react-markdown for assistant prose: unfinished-markdown repair while streaming (an open `**`, half a table or code fence renders as if closed), per-block memoization, and its default rehype-harden/sanitize pipeline. We keep our own `code`/`pre`/`img`/`a`/`table` components (Shiki code blocks, no remote images). Notices: `web/THIRD_PARTY_NOTICES.md`; license texts ship in `node_modules/streamdown/LICENSE` and `node_modules/remend/LICENSE`.
+- **Edit-and-branch**: the pencil under a user message edits it in place (Enter sends, Esc cancels, like ChatGPT/Claude). The old tail is kept as a version and `‹ 1/2 ›` arrows switch between versions. Branches live in memory with the thread (`TranscriptStore.replaceMessages`). Simplification: a branch nested inside a non-visible version is flattened when you switch away.
+- **Mobile drawer**: below 768 px the sidebar is a modal drawer with a scrim; choosing a chat or New chat closes it. The header keeps sidebar + new-chat buttons, and `main` no longer forces 400 px min width.
+- **Search and rename**: "Search chats" filters thread titles client-side (titles never leave the page); the pencil or a double-click renames inline (`TranscriptStore.renameConversation`).
+- **Table virtualization**: tables over 200 rows render a TanStack Virtual window (spacer rows keep native `<table>` semantics, sticky header, sorting and filtering still work on all rows).
+- Tests: 23 (was 18), adding the HTTP adapter contract, Streamdown repair, virtualization, store rename/replace and an edit-and-branch + search flow.
 
 ## Stack
 
-Vite, React 18, TypeScript, Tailwind CSS v4, react-markdown + remark-gfm, Shiki, TanStack Table v8, vega-embed (Vega-Lite), lucide-react. All are MIT, BSD or ISC licensed.
+Vite, React 18, TypeScript, Tailwind CSS v4, Streamdown (Apache-2.0, v1), Shiki, TanStack Table v8 + TanStack Virtual, vega-embed (Vega-Lite), lucide-react. Everything except Streamdown/remend is MIT, BSD or ISC.
 
-The spec recommends forking vercel/chatbot (Apache-2.0) with Streamdown. For v0 we built a clean Vite app instead, because the fork (Next.js, auth, Postgres, Blob) was too heavy to strip and get building in the time box. **No code from vercel/chatbot, ChatGPT or Claude is included**, so no third-party notice is needed yet. If we later copy anything from vercel/chatbot, add its `LICENSE` and a `NOTICE` under `web/`. ChatGPT and Claude were observed only, from screenshots. No CSS, JS, fonts or icons were taken from them.
+The spec recommends forking vercel/chatbot (Apache-2.0) with Streamdown. For v0 we built a clean Vite app instead, because the fork (Next.js, auth, Postgres, Blob) was too heavy to strip and get building in the time box. **No code from vercel/chatbot, ChatGPT or Claude is included.** v1 depends on Streamdown as a package (not copied), and its notice is in `web/THIRD_PARTY_NOTICES.md`. If we later copy anything from vercel/chatbot, add its `LICENSE` and a `NOTICE` under `web/`. ChatGPT and Claude were observed only, from screenshots. No CSS, JS, fonts or icons were taken from them.
 
 ## Layout
 
@@ -61,7 +87,7 @@ Part types and how they render:
 
 Opens from any table, chart, code or image (and artifact cards). It's resizable by dragging or with the arrow keys (double-click resets to 50%, min 360 px, max 75%). It has segmented tabs (Table | SQL, Chart | Spec | Data, Code, Preview), Copy, Download, Full screen and Close (Esc). Opening it collapses the sidebar on screens narrower than 1400 px.
 
-## PHI rules implemented in v0
+## PHI rules implemented
 
 - **No PHI in URLs.** The app has a single route. Prompts go in POST bodies. Downloads use short-lived `blob:` URLs revoked after 60 s.
 - **No browser persistence of data.** Only `cc.pref.theme` and `cc.pref.palette` are written, through `prefs.ts` (allowlist plus a length cap). Transcripts sit behind `TranscriptStore`. The default is `ephemeral` (memory only), and the sidebar shows "History off".
@@ -69,12 +95,43 @@ Opens from any table, chart, code or image (and artifact cards). It's resizable 
 - **Masking.** Columns with `phi: true` render as `•••• 56`, can't be sorted, and are dropped from TSV copy, CSV export and message copy.
 - **Rendering safety.** No raw HTML in markdown. Remote markdown images are replaced by their alt text. Links get `noopener noreferrer nofollow`. Vega specs lose any `data.url`.
 
+## How close is this to vercel/chatbot, and what would a full fork take?
+
+vercel/chatbot today (checked 2026-10-25 via the GitHub tree): Next.js 16 App Router, React 19, AI SDK 7 (`ai`, `@ai-sdk/react` `useChat`), Streamdown via its `components/ai-elements/*`, shadcn/ui, Auth.js (`next-auth` 5 beta) with guest users, Drizzle + Postgres for chats/messages/votes/documents, Vercel Blob for uploads, resumable streams (`api/chat/[id]/stream`).
+
+| vercel/chatbot | CC `web/` | Match |
+|---|---|---|
+| `components/chat/messages.tsx`, `message.tsx`, `message-actions.tsx` | `App.tsx` thread + `components/Message.tsx` (copy, vote, regenerate) | Same split, same responsibilities |
+| `components/chat/message-editor.tsx` (edit user message, then regenerate) | `UserBubble` inline editor | Same UX; we add `‹ n/m ›` branch versions, which the template does not keep |
+| `components/chat/multimodal-input.tsx`, `submit-button.tsx`, `suggested-actions.tsx` | `Composer.tsx`, empty-state suggestion chips | Close (no file upload: PHI) |
+| `components/chat/app-sidebar.tsx`, `sidebar-history.tsx`, `sidebar-history-item.tsx` | `Sidebar.tsx` (date buckets, rename, delete, search, mobile drawer) | Close; theirs is shadcn `Sidebar`, ours hand-rolled |
+| `components/chat/artifact*.tsx`, `version-footer.tsx`, `artifacts/{code,sheet,image,text}` | `ArtifactPanel.tsx` (table/chart/SQL/image tabs, version label) | Same concept; theirs edits documents server-side with diffs, ours is read-only result views |
+| `components/ai-elements/{tool,reasoning,code-block,shimmer}.tsx` | `parts/misc.tsx` (`ToolGroup`, `ReasoningView`), `parts/CodeBlock.tsx`, `.shimmer` | Same parts |
+| Streamdown | Streamdown (v1) | Same library |
+| `useChat` + AI SDK UI message stream protocol | `lib/useChat.ts` + spec §5 `StreamEvent` reducer over SSE | Different protocol: ours carries typed `table`/`chart`/`callout`/`file` parts with PHI flags |
+| `app/(chat)/api/chat/route.ts` (model calls in Next) | FastAPI `api/` (analyzer, DuckDB, Cognito/STS) | Deliberately different: the backend must stay in Python next to the data path |
+| Drizzle/Postgres history, votes, documents | `TranscriptStore` interface, `ephemeral` in memory | Different by design (no chat text at rest, see PR #50 Design A) |
+| Auth.js, guest users, Blob uploads | httpOnly `cc_session` from Cognito, no uploads | Not applicable |
+
+So the component structure is roughly 1:1 for the chat shell (thread, message, actions, editor, input, sidebar, artifact, tool/reasoning parts, Streamdown); the differences are below the UI.
+
+**A full fork would take**, roughly 1.5–3 engineer-days:
+1. Fork vercel/chatbot into `web/` with its `LICENSE` (Apache-2.0) and a `NOTICE`; mark modified files.
+2. Delete the parts we cannot use: `app/(auth)` + `next-auth` (replace with the `cc_session` cookie check in middleware), Drizzle/Postgres + `lib/db` (replace with our `TranscriptStore`), Vercel Blob uploads, `api/document`, `api/suggestions`, weather demo, model selector and the AI Gateway/provider wiring.
+3. Replace `app/(chat)/api/chat/route.ts` with a proxy to FastAPI, and either (a) make `api/` emit the AI SDK UI message stream (data parts `data-table`, `data-chart`, `data-callout` …) so the template's `useChat` works unchanged, or (b) keep our `StreamEvent` SSE and swap `useChat` for ours. (a) is the more "template-native" path; (b) keeps the spec §5 contract and is less work.
+4. Port our part renderers (`DataTable`, `ChartView`, callouts, `FileCard`, PHI masking, CSV via `/api/download/{id}`) into `components/chat/message.tsx`, and our artifact kinds (table, chart, SQL) into `artifacts/`.
+5. Re-theme shadcn tokens to our Neutral/Paper palettes, re-add the PHI rules (no row data in storage/console/URL; the template's `localStorage` input persistence and URL-based chat ids need review), CSP headers, and port the 23 tests to its Playwright setup.
+6. Hosting moves from static files to a Node server (Next.js), which the HIPAA hosting plan has to cover.
+
+Recommendation: keep the Vite app (structure already mirrors the template, smaller attack surface, static hosting) unless we want the template's server-side features (resumable streams, document artifacts with diffs). If we do, step 3(a) is the piece worth doing first, since it would also let `api/` serve any AI SDK client.
+
 ## Not done yet (next steps)
 
-- Streamdown (or a remend-style repair) for unterminated markdown mid-stream; KaTeX; rehype-sanitize explicitly.
-- Fork vercel/chatbot pieces if wanted (version picker and diff), react-resizable-panels, TanStack Virtual for big tables, column resize and visibility, and cell-selection "Ask about selection".
-- Edit-and-branch for user messages (Edit currently prefills the composer), the regenerate strategy menu, and the thumbs-down feedback popover.
-- Search chats, rename, ⌘K, mobile drawer sidebar, and the full-screen sheet below lg.
+- KaTeX (Streamdown math plugin), explicit rehype-sanitize allowlist review.
+- react-resizable-panels for the artifact panel, column resize and visibility, and cell-selection "Ask about selection".
+- Nested branch trees (v1 keeps one level of versions per edited message), the regenerate strategy menu, and the thumbs-down feedback popover.
+- Full-text chat search (v1 searches titles), ⌘K palette, and the full-screen artifact sheet below lg.
+- Live tool steps: `api/` emits tool_call parts after the analyzer loop finishes, so the UI shows "Analyzing" until then.
 - CSP and `Cache-Control: no-store` headers (server side), vega-interpreter for a CSP without `unsafe-eval`, self-hosted Inter and Source Serif 4 fonts, idle timeout, PHI unmask flow, and download confirmation for `limited` and `phi` sensitivity.
 - An ESLint rule banning direct `localStorage` use outside `prefs.ts`, and axe-core checks.
 - Shiki currently ships its full language bundle as lazy chunks. Switch to `shiki/core` with only sql, python, json and bash.
