@@ -41,7 +41,7 @@
    "sql_execs": 6,
    "repairs": 0,
    "seconds": 0.014,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_denied_lines__83036",
@@ -50,7 +50,7 @@
    "sql_execs": 5,
    "repairs": 0,
    "seconds": 0.012,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_avg_paid_per_paid_claim__medicare-part-b-north-carolina",
@@ -59,7 +59,7 @@
    "sql_execs": 5,
    "repairs": 0,
    "seconds": 0.011,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_f786e11aec",
@@ -68,7 +68,7 @@
    "sql_execs": 10,
    "repairs": 0,
    "seconds": 0.031,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_denial_rate__unitedhealthcare-community-plan-nc",
@@ -77,7 +77,7 @@
    "sql_execs": 6,
    "repairs": 0,
    "seconds": 0.009,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_monthly_denial_rate__unitedhealthcare",
@@ -86,7 +86,7 @@
    "sql_execs": 5,
    "repairs": 0,
    "seconds": 0.012,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_denial_rate__unitedhealthcare-medicare-advantage",
@@ -95,7 +95,7 @@
    "sql_execs": 6,
    "repairs": 0,
    "seconds": 0.009,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0483",
@@ -104,7 +104,7 @@
    "sql_execs": 5,
    "repairs": 0,
    "seconds": 0.012,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_fca405b635",
@@ -113,7 +113,7 @@
    "sql_execs": 6,
    "repairs": 0,
    "seconds": 0.012,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_paid_in_month__cigna_2026-08-01",
@@ -122,7 +122,7 @@
    "sql_execs": 6,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_patient_responsibility__aetna",
@@ -131,7 +131,7 @@
    "sql_execs": 5,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_b853266803",
@@ -140,7 +140,7 @@
    "sql_execs": 6,
    "repairs": 0,
    "seconds": 0.023,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -149,7 +149,7 @@
    "sql_execs": 5,
    "repairs": 0,
    "seconds": 0.021,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_class_denial_rate__medicaid_mco",
@@ -158,7 +158,7 @@
    "sql_execs": 5,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_a5888f64a4",
@@ -167,7 +167,7 @@
    "sql_execs": 6,
    "repairs": 0,
    "seconds": 0.015,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_436f690741",
@@ -176,7 +176,7 @@
    "sql_execs": 5,
    "repairs": 0,
    "seconds": 0.027,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_d29f83c935",
@@ -185,7 +185,7 @@
    "sql_execs": 10,
    "repairs": 0,
    "seconds": 0.04,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_class_denial_rate__other",
@@ -194,7 +194,7 @@
    "sql_execs": 5,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_denied_lines__85652",
@@ -203,7 +203,7 @@
    "sql_execs": 5,
    "repairs": 0,
    "seconds": 0.013,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q07_denial_rate",
@@ -212,11 +212,11 @@
    "sql_execs": 5,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true
   }
  ],
- "accuracy": null,
+ "accuracy": "20/20",
  "n": 20,
  "mean_sql_execs": 5.85,
- "notes": "Generator 3.3 snapshot via bench.dataset.snapshot() default (days=45, volume_scale=0.6, seed=2026, p_corrupt_file=0.1), dataset id e21410ce6805. Non-escalated open_snapshot. Dev set is load_cases minus heldout_hard_1 and grokbot-r1 (the 50 g1_* validation questions are not in load_cases; none of the 173 eligible ids are tagged grokbot-r1), sorted by sha256(question_id), first 20. Each question was explored, written as checked CTEs, executed as three candidates, and revised once by a critic that dropped extra numeric columns and kept the agreed population. repair=0, so no error-repair loop. sql_execs counts that question's explore probes, three candidates, and the verifier execution. seconds are SQL runtime for the three candidates plus the verifier execution. pass and accuracy are filled by bench.compare.match after this file is committed."
+ "notes": "Generator 3.3 snapshot via bench.dataset.snapshot() default (days=45, volume_scale=0.6, seed=2026, p_corrupt_file=0.1), dataset id e21410ce6805. Non-escalated open_snapshot. Dev set is load_cases minus heldout_hard_1 and grokbot-r1 (the 50 g1_* validation questions are not in load_cases; none of the 173 eligible ids are tagged grokbot-r1), sorted by sha256(question_id), first 20. Each question was explored, written as checked CTEs, executed as three candidates, and revised once by a critic that dropped extra numeric columns and kept the agreed population. repair=0, so no error-repair loop. sql_execs counts that question's explore probes, three candidates, and the verifier execution. seconds are SQL runtime for the three candidates plus the verifier execution. Scored with bench.compare.match after the answer commit: 20/20."
 }
