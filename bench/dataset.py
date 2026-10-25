@@ -2,9 +2,10 @@
 
 A dataset id hashes everything that determines the data: scenario, generator version, parser, view SQL and
 ref seeds. `snapshot()` builds the world (SFTP -> EventBridge -> Fargate parser -> gold) and copies the
-reader's view of gold (sem.* plus the PHI-stripped lossless.* tables) to local Parquet, with truth.json.
+reader's view of gold (sem.* plus the PHI-stripped lossless.* tables) to local Parquet, with the ledger.
 Agent sessions then open a sandboxed DuckDB on that snapshot: the same views, the same restrictions
-(allowed_directories, no external access, locked config), with no HTTP in the timing.
+(allowed_directories, no external access, locked config), with no HTTP in the timing. The answer key
+(truth.json + truth/<customer>/claims.jsonl, read with `load_truth`) sits outside data/.
 """
 from __future__ import annotations
 
@@ -25,7 +26,7 @@ def dataset_id(scenario) -> str:
     from ccsim import edi_mock
     h = hashlib.sha256()
     h.update(json.dumps({k: str(v) for k, v in asdict(scenario).items()}, sort_keys=True).encode())
-    h.update(edi_mock.GENERATOR_VERSION.encode() + b"layout-2")
+    h.update(edi_mock.GENERATOR_VERSION.encode() + b"layout-3")
     for f in ("ccsim/edi_mock.py", "ccsim/parser.py", "ccsim/pipeline.py", "claude/schema/01_lossless_edi_schema.sql",
               "claude/schema/02_semantic_layer_views.sql"):
         h.update((ROOT / f).read_bytes())
@@ -52,12 +53,12 @@ def snapshot(scenario=None, customer_user="ana@xifin.example", rebuild=False, ca
     s = open_session(w.aws, w.dep, login(w.aws, customer_user), escalate=True)
     rels = [f"sem.{t}" for t in SEM_TABLES] + [f"lossless.{t.replace('.', '_')}" for t in ESCALATION]
     import pyarrow.parquet as pq
-    for rel in rels:                       # data/<schema>/<rel>.parquet; truth.json and meta.json stay outside data/
+    for rel in rels:                       # data/<schema>/<rel>.parquet; the ledger and meta.json stay outside data/
         d = out / "data" / rel.split(".")[0]
         d.mkdir(parents=True, exist_ok=True)
         pq.write_table(s.con.sql(f"SELECT * FROM {rel}").to_arrow_table(), d / f"{rel}.parquet")
-    (out / "truth.json").write_text(json.dumps({"denial_carcs": w.truth["denial_carcs"], "customer": s.customer,
-                                                "tenant": w.truth["tenants"][s.customer]}, default=str))
+    from ccsim.edi_mock import write_truth  # truth.json + truth/<customer>/claims.jsonl
+    write_truth(out, dict(w.truth, customer=s.customer, tenants={s.customer: w.truth["tenants"][s.customer]}))
     (out / "meta.json").write_text(json.dumps({"dataset_id": did, "customer": s.customer, "scenario": {
         k: str(v) for k, v in asdict(scenario).items()}, "gold_version": s.version, "relations": rels}, indent=1))
     w.aws.shutdown()
@@ -67,7 +68,7 @@ def snapshot(scenario=None, customer_user="ana@xifin.example", rebuild=False, ca
 
 def open_snapshot(path: Path, escalate: bool = False) -> duckdb.DuckDBPyConnection:
     """Sandboxed connection: only data/sem/ (and data/lossless/ when escalating) is readable; the answer key
-    (truth.json) and meta.json sit outside every allowed directory."""
+    (truth.json, truth/) and meta.json sit outside every allowed directory."""
     meta = json.loads((path / "meta.json").read_text())
     con = duckdb.connect(config={"autoinstall_known_extensions": False, "autoload_known_extensions": False})
     schemas = ("sem", "lossless") if escalate else ("sem",)
@@ -83,4 +84,7 @@ def open_snapshot(path: Path, escalate: bool = False) -> duckdb.DuckDBPyConnecti
 
 
 def load_truth(path: Path) -> dict:
-    return json.loads((path / "truth.json").read_text())
+    """The snapshot's answer key: {denial_carcs, customer, tenant: that customer's ledger}."""
+    from ccsim import edi_mock
+    t = edi_mock.load_truth(path)
+    return {"denial_carcs": t["denial_carcs"], "customer": t["customer"], "tenant": t["tenants"][t["customer"]]}

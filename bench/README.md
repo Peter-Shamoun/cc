@@ -23,8 +23,8 @@ python -m bench.eval calibrate                       # LLM-judge agreement on kn
    (`allowed_directories`, no external access, locked config) plus `guard.py`, which accepts exactly one
    read-only SELECT over the allowed schemas.
 2. **Expected answer.** Each question has gold SQL, and most also have a `ledger` function. The ledger
-   function computes the answer from the generator's own decisions (`truth.json`), with no parser or SQL
-   involved.
+   function computes the answer from the generator's own decisions (the ledger: `truth.json` +
+   `truth/<customer>/claims.jsonl`), with no parser or SQL involved.
 3. **Deterministic match** (`compare.py`), done first:
    - Columns match by value, not by name. Every numeric column the agent returns must correspond to an
      expected column, so an answer that lists several alternative numbers fails. Extra label columns are fine.
@@ -55,8 +55,8 @@ CPT rates", "filter `payer_sequence = 'primary'`".
 
 A gold-vs-ledger mismatch is a data-layer finding, not an agent error. A failure in strict mode means the
 dataset is too small or too uniform for that question to tell right from wrong. Agents never see the
-answer key: `truth.json` sits outside the directories their DuckDB session can read, and `lossless.*` is
-readable only on escalation questions.
+answer key: `truth.json` and `truth/` sit outside the directories their DuckDB session can read, and
+`lossless.*` is readable only on escalation questions.
 
 ### Reported numbers
 
