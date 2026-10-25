@@ -1,0 +1,57 @@
+[
+ {
+  "id": "a_54dd76175a",
+  "category": "denial_management",
+  "difficulty": "medium",
+  "question": "For each 835 payment month (month of the payment date of the current adjudication), what is our denial rate? Count each claim once per payer using current adjudications only, and return the month, the number of current adjudications, the number denied, and the denial rate as a percentage rounded to 1 decimal place, ordered by month.",
+  "gold_sql": "select payment_month, count(*) as current_adjudications, sum(case when is_denied then 1 else 0 end) as denied, round(100.0*sum(case when is_denied then 1 else 0 end)/count(*),1) as denial_rate_pct from sem.remit_claims where is_current_adjudication group by 1 order by 1",
+  "answer_key_sql": "select date_trunc('month', e.event_date::DATE)::DATE as payment_month, count(*) as current_adjudications, sum(case when a.denied then 1 else 0 end) as denied, round(100.0*sum(case when a.denied then 1 else 0 end)/count(*),1) as denial_rate_pct from ledger.adjudications a join ledger.events e on e.pcn=a.pcn and e.payer_id=a.payer_id and e.is_current where a.remitted_current group by 1 order by 1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain is claim+payer current adjudication; time basis is the current adjudication's payment date month. Denied uses the business definition (recorded status 4 or signal v3). Expected: 2026-07: 642, 135, 21.0; 2026-08: 737, 198, 26.9."
+ },
+ {
+  "id": "a_436f690741",
+  "category": "denial_management",
+  "difficulty": "medium",
+  "question": "Among claim+payer pairs whose current adjudication is denied, which contractual-obligation (CO group) denial reason codes (CARCs) appear? For each denial CARC, return the CARC code, the number of distinct denied claim+payer pairs carrying it on their current adjudication (claim- or line-level adjustments), and the total CO adjustment amount under that CARC in dollars, sorted by pair count descending then CARC code.",
+  "gold_sql": "select a.carc_code, count(distinct a.claim_key||'|'||a.payer_key) as denied_claim_payers, sum(a.adjustment_amount) as co_amount from sem.adjustments a join sem.remit_claims r on r.remit_claim_id=a.remit_claim_id where a.is_current_adjudication and r.is_denied and a.group_code='CO' and a.is_denial_carc group by 1 order by 2 desc, 1",
+  "answer_key_sql": "select x.carc, count(distinct x.pcn||'|'||x.payer_id) as denied_claim_payers, round(sum(x.amount),2) as co_amount from ledger.event_adjustments x join ledger.events e using(pcn,payer_id,event_number) join ledger.adjudications a using(pcn,payer_id) where e.is_current and a.denied and x.group_code='CO' and x.carc in (select carc from ledger.denial_carcs) group by 1 order by 2 desc, 1",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Population: current adjudications flagged denied; adjustments restricted to CO group and the reviewed denial CARC list, both levels summed. Expected top: CARC 50 (117 pairs, $51,276), 16 (81, $10,065), 197 (58, $51,235), then 167, 109, 4, 204, 29, 11, 96."
+ },
+ {
+  "id": "a_f494340e13",
+  "category": "denial_management",
+  "difficulty": "medium",
+  "question": "Which billed CPT/HCPCS codes are denied most often at the 835 service-line level? Using only lines on current adjudications (claim-level-only denials with no 835 lines are excluded), return the top 10 procedure codes by number of denied lines, with the denied line count and the total billed charge of those denied lines, sorted by denied line count descending then procedure code.",
+  "gold_sql": "select procedure_code, count(*) as denied_lines, sum(line_charge_amount) as denied_line_charges from sem.remit_lines where is_current_adjudication and line_is_denied group by 1 order by 2 desc, 1 ",
+  "answer_key_sql": "select l.cpt as procedure_code, count(*) as denied_lines, sum(c.charge) as denied_line_charges from ledger.event_lines l join ledger.events e using(pcn,payer_id,event_number) left join ledger.claim_lines c on c.pcn=l.pcn and c.line_number=l.line_number where e.is_current and l.denied group by 1 order by 2 desc, 1 ",
+  "compare": {
+   "tol": 0.01,
+   "order": "topn",
+   "n": 10,
+   "metric_col": 1
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain is the 835 service line on current adjudications; procedure code is the billed code. Expected: 36415 (111, $888), 80061 (62, $3,596), 85025 (60, $1,920), 80053 (55, $3,520), 83036 (52, $2,392), 87798 (47, $17,578), G0480 (41, $10,209), 80307 (31, $3,038), 81479 (31, $66,650), 84443 (30, $2,130)."
+ },
+ {
+  "id": "a_923951a050",
+  "category": "denial_rework",
+  "difficulty": "hard",
+  "question": "How many denials were overturned? Count the claim+payer pairs that had an earlier, superseded non-reversal adjudication that was denied and whose current adjudication is not denied, and give the total paid amount on those current adjudications in dollars. Return the overturned claim+payer count and the total current paid amount.",
+  "gold_sql": "with prior as (select distinct claim_key, payer_key from sem.remit_claims where adjudication_state='superseded' and is_denied) select count(*) as overturned_claim_payers, sum(r.paid_amount) as current_paid_amount from sem.remit_claims r join prior p using(claim_key,payer_key) where r.is_current_adjudication and not r.is_denied",
+  "answer_key_sql": "with ed as (select e.*, (e.status='4' or (e.paid=0 and e.status<>'22' and exists(select 1 from ledger.event_adjustments a where a.pcn=e.pcn and a.payer_id=e.payer_id and a.event_number=e.event_number and a.group_code='CO' and a.carc in (select carc from ledger.denial_carcs)))) as den from ledger.events e), prior as (select distinct pcn,payer_id from ed where not is_current and status<>'22' and den) select count(*) as overturned_claim_payers, round(sum(a.paid_current),2) as current_paid_amount from ledger.adjudications a join prior using(pcn,payer_id) where a.remitted_current and not a.denied",
+  "compare": {
+   "tol": 0.01
+  },
+  "source": "opus-authored, verified by independent answer key",
+  "interpretation": "Grain is claim+payer. A prior denial is a superseded (non-current, non-reversal) adjudication meeting the denial definition (status 4 or $0 paid with a CO denial CARC); overturned means the current adjudication is not denied. Expected: 19 pairs, $70.40 paid (all commercial)."
+ }
+]
