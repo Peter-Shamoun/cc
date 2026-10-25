@@ -55,7 +55,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.033,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_f786e11aec",
@@ -114,7 +114,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.015,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0483",
@@ -127,7 +127,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_fca405b635",
@@ -142,7 +142,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_b853266803",
@@ -188,7 +188,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.028,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -218,7 +218,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.011,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_payer_class_denial_rate__medicaid_mco",
@@ -231,7 +231,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.007,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_a5888f64a4",
@@ -283,7 +283,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.012,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_436f690741",
@@ -353,7 +353,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.016,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_d29f83c935",
@@ -1679,7 +1679,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.019,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q07_denial_rate",
@@ -1692,7 +1692,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.006,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_7d45c279a7",
@@ -1716,7 +1716,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.013,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_f3c42ce766",
@@ -1822,7 +1822,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q15_partial_line_denials",
@@ -1835,7 +1835,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q25_primary_deductible",
@@ -1848,7 +1848,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.015,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_26d4c3f4ca",
@@ -1921,7 +1921,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.012,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "q18_voided",
@@ -1934,7 +1934,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.005,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "f_cpt_denied_lines__36415",
@@ -1947,7 +1947,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.008,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_8663c777cd",
@@ -1969,7 +1969,7 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true
   },
   {
    "qid": "a_9a40343e18",
@@ -2028,11 +2028,11 @@
    "sql_execs": 2,
    "repairs": 0,
    "seconds": 0.01,
-   "pass": null
+   "pass": true
   }
  ],
- "accuracy": null,
+ "accuracy": "20/20",
  "n": 20,
  "mean_sql_execs": 2.0,
- "notes": "Answers committed before scoring. sql_execs counts one CTE grain/uniqueness/sum check plus one final execution per question. 53 shared explore queries (distinct values, ranges, null rates, join cardinalities) ran once before those checks and are not included in sql_execs. repairs=0. Planner and SQL writer were separate subagents; the writer saw only the plan."
+ "notes": "Scored after the answer commit with bench.compare.match, re-executing final_sql through bench.guard (LIMIT 1000) the way bench.agent_session.score_session does. Dataset is generator 3.3, Scenario(days=20, volume_scale=0.3, seed=5), snapshot 98e61f03e594, non-escalated sem.* reader. Dev set is every benchmark question except question_set heldout_hard_1 (27) and anything tagged grokbot-r1 (none), ordered by sha256(question_id), first 20. sql_execs is one CTE grain/uniqueness/sum check plus one final execution. 53 shared explore queries ran once and are not included. repairs=0. Planner and SQL writer were separate subagents; the writer received only the plan. Contamination: before dev ids were fixed, questions.yaml through q07, the question-family templates, the first two authored questions, and the pitfalls block in bench/agent_cli.py had already been read. Those texts were not given to the planner or SQL writer. Six dev questions overlap that read: q07_denial_rate, a_436f690741, and families payer_avg_paid_per_paid_claim, cpt_share_of_line_payments, payer_class_denial_rate, cpt_denied_lines."
 }
