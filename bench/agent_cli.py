@@ -52,10 +52,22 @@ DEFAULT_TECHNIQUE_CONFIG = {
     "context_style": "goal",         # goal | procedural (numbered working steps in the briefing)
     "effort": "default",             # default | low | high: reasoning effort, applied by the orchestrator
     "max_tool_calls": 12,
+    # Analyzer loop (ignored by the Claude Code CLI path; stored so a session can carry them).
+    "candidates": 1,                 # in-process analyzer: how many SQL candidates to execute and vote
+    "candidate_selection": "execution_vote",  # execution_vote | first_passing | agree_or_abstain
+    "cascade": "off",                # off | haiku_then_sonnet, in-process analyzer only
+    "self_correct": "errors_only",   # none | errors_only | errors+result_signals
+    "verify": False,                 # bounce a final answer that fails a blocking result check
+    "max_turns": 8,
+    "max_repairs": 2,
+    "time_limit_seconds": 25,
+    "prompt_cache": False,
+    "refusal_prompt": "explicit",    # explicit | minimal
 }
 
 
-INVESTIGATIVE_COMMANDS = ("sql", "metrics", "lookup", "examples")
+INVESTIGATIVE_COMMANDS = ("sql", "metrics", "lookup", "examples", "list", "describe", "sample", "profile",
+                          "dictionary", "glossary", "escalate")
 
 
 class CliError(Exception):
