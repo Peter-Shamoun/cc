@@ -59,7 +59,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0056,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_b853266803",
@@ -105,7 +106,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0064,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q10_top_denial_carcs",
@@ -135,7 +137,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0048,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_a5888f64a4",
@@ -187,7 +190,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0043,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7d45c279a7",
@@ -211,7 +215,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0063,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q15_partial_line_denials",
@@ -224,7 +229,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0019,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q25_primary_deductible",
@@ -237,7 +243,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0041,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_8663c777cd",
@@ -259,7 +266,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0041,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__87798",
@@ -272,7 +280,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.002,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q11_cpt_denial_rate",
@@ -300,7 +309,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0058,
-   "pass": null
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "a_a123bba47f",
@@ -331,7 +341,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0053,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_9108c7aacb",
@@ -376,7 +387,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0043,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_856b95a70c",
@@ -428,7 +440,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0045,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_1b7e02d0b0",
@@ -445,7 +458,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0056,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_921f1bf366",
@@ -461,7 +475,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0053,
-   "pass": null
+   "pass": false,
+   "why": "values differ (or extra / missing columns)"
   },
   {
    "qid": "q14_zero_paid_not_denied",
@@ -474,7 +489,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0019,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_dca9da6d52",
@@ -491,7 +507,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0067,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q19_reversed_no_correction",
@@ -504,7 +521,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0025,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__80307",
@@ -517,7 +535,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0022,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d383370345",
@@ -569,7 +588,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0084,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0482",
@@ -582,7 +602,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0023,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_0d43f7d4b6",
@@ -597,7 +618,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0072,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_923951a050",
@@ -611,7 +633,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0027,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_7423e6eb91",
@@ -631,7 +654,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0107,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_never_remitted_submitted_in_month__2026-07-01",
@@ -644,7 +668,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0059,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_ab202d4b23",
@@ -849,7 +874,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0074,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__g0480",
@@ -862,7 +888,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0019,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "a_d671e0b995",
@@ -928,7 +955,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0043,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "f_cpt_share_of_line_payments__81479",
@@ -941,7 +969,8 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0019,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   },
   {
    "qid": "q12_referring_provider_denials",
@@ -950,12 +979,13 @@
    "sql_execs": 3,
    "repairs": 0,
    "seconds": 0.0047,
-   "pass": null
+   "pass": true,
+   "why": "ok"
   }
  ],
- "accuracy": null,
+ "accuracy": "28/30",
  "n": 30,
  "mean_sql_execs": 3.0,
- "notes": "Single agent. Explore pass (same 10 probes as listed in H093: state/reversal flags, PLB ranges, payment months only 2026-07, claim_lines paid nulls, units_paid, payer_sequence vs payer_responsibility coverage, PR CARCs, denial flags). Wrote a structured metric spec per question (metric, population, filters, grain, window, ties, rounding; stored in the agent's scratch), then three different SQL translations of the spec, all executed, majority chosen. Repair: none needed (one candidate error on a_1b7e02d0b0 lost the vote; majority of 2 stood). Verifier critic reviewed minority candidates (q25 payer_sequence; q11 835-line CPT; q14 signal-flag variant counting 67; a_921f1bf366 null-vs-0) and kept majorities. Assumptions: primary = claims payer_responsibility='P'; billed CPT = latest-submission claim_lines; share as fraction unrounded. 2/3-agreement: q25_primary_deductible:2/3, q11_cpt_denial_rate:2/3, a_1b7e02d0b0:2/3, a_921f1bf366:2/3, q14_zero_paid_not_denied:2/3, a_ab202d4b23:2/3. Answers committed before scoring.",
- "n_pass": null
+ "notes": "Single agent. Explore pass (same 10 probes as listed in H093: state/reversal flags, PLB ranges, payment months only 2026-07, claim_lines paid nulls, units_paid, payer_sequence vs payer_responsibility coverage, PR CARCs, denial flags). Wrote a structured metric spec per question (metric, population, filters, grain, window, ties, rounding; stored in the agent's scratch), then three different SQL translations of the spec, all executed, majority chosen. Repair: none needed (one candidate error on a_1b7e02d0b0 lost the vote; majority of 2 stood). Verifier critic reviewed minority candidates (q25 payer_sequence; q11 835-line CPT; q14 signal-flag variant counting 67; a_921f1bf366 null-vs-0) and kept majorities. Assumptions: primary = claims payer_responsibility='P'; billed CPT = latest-submission claim_lines; share as fraction unrounded. 2/3-agreement: q25_primary_deductible:2/3, q11_cpt_denial_rate:2/3, a_1b7e02d0b0:2/3, a_921f1bf366:2/3, q14_zero_paid_not_denied:2/3, a_ab202d4b23:2/3. Answers committed before scoring. Scored with bench.compare.match after answers were committed. Failures: 2.",
+ "n_pass": 28
 }
