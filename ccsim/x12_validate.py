@@ -7,20 +7,25 @@ clearinghouse or a payer's front end would apply:
              ST02 = SE02; SE01 = segment count ST..SE; IEA01 = # of GS
   837P       HL ids sequential, parents exist; CLM02 = sum of SV102; LX numbered from 1; HI present;
              billing NPI (NM1*85*XX) passes Luhn; every date is a real CCYYMMDD
+             REF*X4 (CLIA certificate number, NNDNNNNNNN) on every claim
   835        BPR02 = sum(CLP04) - sum(PLB amounts); BPR01 = H iff BPR02 = 0; per CLP:
              CLP03 = CLP04 + sum(CAS, claim and lines); per SVC: SVC02 = SVC03 + sum(line CAS);
-             AMT*B6 (allowed) = SVC03 + line PR adjustments; CLP05 = sum(PR CAS) unless reversal; payee NPI Luhn
+             AMT*B6 (allowed) = SVC03 + line PR + CO-253 sequestration, and CO-253 = 2% of (allowed - PR);
+             SVC05 (units paid) <= SVC07 (units billed); CLP05 = sum(PR CAS) unless reversal; payee NPI Luhn;
+             interest: sum(claim AMT*I) = -sum(PLB L6); Medicare (CLP06 = MB): no claim-level CAS, no PI group
 
     python -m ccsim.x12_validate FILE...     # exit 1 if any file has errors
 """
 from __future__ import annotations
 
+import re
 import sys
 from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
 
 CENT = Decimal("0.01")
+_CLIA = re.compile(r"^\d{2}D\d{7}$")
 
 
 def _dec(v: str) -> Decimal:
@@ -140,7 +145,7 @@ def _check_interchange(segs, comp) -> list[str]:
 def _check_837(tx, comp) -> list[str]:
     errs, ids = [], set()
     hl_rows = []
-    clm, line_sum, lx_expected, has_hi = None, Decimal(0), 1, False
+    clm, line_sum, lx_expected, has_hi, has_clia = None, Decimal(0), 1, False, False
     in_claim = False
     sv1 = None
     svd_paid, svd_cas = defaultdict(Decimal), defaultdict(Decimal)   # per other-payer id, current line
@@ -165,6 +170,8 @@ def _check_837(tx, comp) -> list[str]:
                 errs.append(f"CLM {clm[1]}: CLM02 {clm[2]} != sum(SV102) {line_sum}")
             if not has_hi:
                 errs.append(f"CLM {clm[1]}: no HI segment")
+            if not has_clia:
+                errs.append(f"CLM {clm[1]}: no CLIA number (REF*X4); a lab claim is rejected without it")
             if lx_expected == 1:
                 errs.append(f"CLM {clm[1]}: no service lines")
             for pid, amt in amt_d.items():
@@ -185,7 +192,7 @@ def _check_837(tx, comp) -> list[str]:
             hl_rows.append(s)
         elif sid == "CLM":
             close()
-            clm, line_sum, lx_expected, has_hi, in_claim = s, Decimal(0), 1, False, True
+            clm, line_sum, lx_expected, has_hi, has_clia, in_claim = s, Decimal(0), 1, False, False, True
             amt_d, svd_total, last_op = {}, defaultdict(Decimal), None
             if len(s[5].split(comp)) != 3:
                 errs.append(f"CLM {s[1]}: CLM05 must be POS:B:frequency")
@@ -201,6 +208,10 @@ def _check_837(tx, comp) -> list[str]:
                 amt_d[last_op] = pending_amt
         elif sid == "HI":
             has_hi = True
+        elif sid == "REF" and s[1] == "X4" and in_claim:
+            has_clia = True
+            if not _CLIA.match(s[2] if len(s) > 2 else ""):
+                errs.append(f"CLM {clm[1]}: CLIA number {s[2] if len(s) > 2 else ''} is not NNDNNNNNNN")
         elif sid == "LX":
             close_line()
             if int(s[1]) != lx_expected:
@@ -237,21 +248,26 @@ def _check_835(tx, comp) -> list[str]:
     bpr = next((s for s in tx if s[0] == "BPR"), None)
     if bpr is None:
         return ["835 without BPR"]
-    clp_paid, plb_total = Decimal(0), Decimal(0)
+    clp_paid, plb_total, interest_total, plb_l6 = Decimal(0), Decimal(0), Decimal(0), Decimal(0)
     clp = None
     svc = None
     claim_cas = line_cas_total = pr_total = Decimal(0)
-    line_cas = line_pr = Decimal(0)
+    line_cas = line_pr = line_seq = Decimal(0)
     amt_b6 = None
 
     def close_svc():
-        nonlocal svc, line_cas, line_pr, amt_b6
+        nonlocal svc, line_cas, line_pr, line_seq, amt_b6
         if svc is not None:
             if _dec(svc[2]) != _dec(svc[3]) + line_cas:
                 errs.append(f"CLP {clp[1]} SVC {svc[1]}: SVC02 {svc[2]} != SVC03 {svc[3]} + CAS {line_cas}")
-            if amt_b6 is not None and amt_b6 != _dec(svc[3]) + line_pr:
-                errs.append(f"CLP {clp[1]} SVC {svc[1]}: AMT*B6 {amt_b6} != paid + PR {_dec(svc[3]) + line_pr}")
-        svc, line_cas, line_pr, amt_b6 = None, Decimal(0), Decimal(0), None
+            if amt_b6 is not None and amt_b6 != _dec(svc[3]) + line_pr + line_seq:
+                errs.append(f"CLP {clp[1]} SVC {svc[1]}: AMT*B6 {amt_b6} != paid + PR + sequestration "
+                            f"{_dec(svc[3]) + line_pr + line_seq}")
+            if line_seq and amt_b6 is not None and abs(line_seq - (Decimal("0.02") * (amt_b6 - line_pr)).quantize(CENT)) > CENT:
+                errs.append(f"CLP {clp[1]} SVC {svc[1]}: CO-253 {line_seq} is not 2% of allowed - PR")
+            if len(svc) > 7 and svc[7] and svc[5] and _dec(svc[5]) > _dec(svc[7]):
+                errs.append(f"CLP {clp[1]} SVC {svc[1]}: SVC05 units paid {svc[5]} > SVC07 units billed {svc[7]}")
+        svc, line_cas, line_pr, line_seq, amt_b6 = None, Decimal(0), Decimal(0), Decimal(0), None
 
     def close_clp():
         nonlocal clp, claim_cas, line_cas_total, pr_total
@@ -279,18 +295,28 @@ def _check_835(tx, comp) -> list[str]:
         elif sid == "CAS":
             amt = sum((_dec(s[k]) for k in range(3, len(s), 3)), Decimal(0))
             pr = amt if s[1] == "PR" else Decimal(0)
+            medicare = clp is not None and len(clp) > 6 and clp[6] == "MB"
+            if medicare and s[1] == "PI":
+                errs.append(f"CLP {clp[1]}: group PI is never used by Medicare")
             if svc is not None:
                 line_cas += amt
                 line_cas_total += amt
                 line_pr += pr
+                if s[1] == "CO":
+                    line_seq += sum((_dec(s[k]) for k in range(3, len(s), 3) if s[k - 1] == "253"), Decimal(0))
             else:
                 claim_cas += amt
+                if medicare:
+                    errs.append(f"CLP {clp[1]}: claim-level CAS on a Medicare Part B claim (carriers report lines)")
             pr_total += pr
         elif sid == "AMT" and s[1] == "B6" and svc is not None:
             amt_b6 = _dec(s[2])
+        elif sid == "AMT" and s[1] == "I" and svc is None and clp is not None:
+            interest_total += _dec(s[2])
         elif sid == "PLB":
             close_clp()
             plb_total += sum((_dec(s[k]) for k in range(4, len(s), 2)), Decimal(0))
+            plb_l6 += sum((_dec(s[k]) for k in range(4, len(s), 2) if s[k - 1].split(comp)[0] == "L6"), Decimal(0))
         elif sid == "N1" and s[1] == "PE" and (len(s) < 5 or s[3] != "XX" or not _luhn_npi(s[4])):
             errs.append("payee NPI missing or fails Luhn")
         elif sid == "DTM" and not _date_ok(s[2]):
@@ -298,6 +324,8 @@ def _check_835(tx, comp) -> list[str]:
         elif sid in ("SE",):
             close_clp()
     close_clp()
+    if interest_total != -plb_l6:
+        errs.append(f"claim interest AMT*I {interest_total} != -PLB L6 {plb_l6}")
     total = _dec(bpr[2])
     if total != clp_paid - plb_total:
         errs.append(f"BPR02 {total} != sum(CLP04) {clp_paid} - sum(PLB) {plb_total}")
@@ -313,7 +341,7 @@ def _check_835(tx, comp) -> list[str]:
 if __name__ == "__main__":
     bad = 0
     for path in sys.argv[1:]:
-        e = validate(open(path, encoding="ascii", errors="replace").read())
+        e = validate(open(path, encoding="utf-8", errors="replace").read())
         if e:
             bad += 1
             print(path, *e, sep="\n  ")
