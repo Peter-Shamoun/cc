@@ -19,20 +19,38 @@ payment day (sometimes several ST transactions per file). The output models:
   delivery       byte-identical re-deliveries, multi-ST files, three delimiter styles, payer names that
                  differ between 837 and 835, corrupt deliveries (truncated / not X12) that must be quarantined
 
-The ledger (truth.json) comes from the generator's own decisions, not from parsing the files, so it can check
+The ledger comes from the generator's own decisions, not from parsing the files, so it can check
 both the parser and the SQL views. All knobs are on Scenario; `Scenario.stress()` turns the awkward
 cases up. `ccsim/x12_validate.py` independently checks every emitted file (envelopes, counts, balancing).
+
+Volume and streaming. `Scenario.target_mb_per_day` sets each tenant's claims per day from measured bytes per
+claim (`bytes_per_day_model`); `volume_scale` still works when it is unset. A run steps one calendar day at a
+time and writes each day's files as soon as the day is final, so memory stays flat over multi-year runs. On disk:
+
+  <out>/<tenant>/raw/received_date=<day>/{837,835}/*.x12
+  <out>/truth.json                    index: scenario, files, file days, PLB log per tenant
+  <out>/truth/<tenant>/claims.jsonl   one finalized ledger row per claim (.jsonl.gz with truth_gzip)
+
+`load_truth(out)` returns the classic one-dict ledger (what `generate` returns); `iter_claims` streams rows.
+`generate_days` (and `python -m ccsim.edi_mock OUT --mb-per-day 5 --days 365 --each CMD`) hands over one day
+directory at a time, so a pipeline can ingest and delete day N before day N+1 is generated. Each tenant has its
+own random stream; workers > 1 runs tenants in parallel processes with byte-identical output.
 """
 from __future__ import annotations
 
+import gc
+import gzip
 import hashlib
 import json
 import random
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, replace
 from datetime import date, timedelta
+from itertools import accumulate
 from pathlib import Path
+from typing import Iterator, NamedTuple
 
-GENERATOR_VERSION = "2.0"
+GENERATOR_VERSION = "2.1"
+RECOUP_WINDOW = 5000            # paid ICNs per payer a PLB recoupment may point back to
 DENIAL_CARCS = ["4", "11", "16", "18", "27", "29", "50", "96", "109", "167", "197", "204"]  # placeholder for the reviewed 23
 CARC_DESCRIPTIONS = {
     "1": "Deductible", "2": "Coinsurance", "3": "Copay", "4": "Procedure code inconsistent with modifier",
@@ -126,6 +144,9 @@ ORDERS = {  # order type: (weight, panel choices, dx choices, screening share)
     "molecular": (10, [["81479"], ["81528"]], ["Z1211", "C189", "Z8000", "D126"], .5),
     "drug": (20, [["G0480"], ["80307"], ["80307", "G0480"]], ["Z79899", "F1120", "F1110"], .3),
 }
+_ORDER_TYPES = list(ORDERS)
+_ORDER_CUM = list(accumulate(o[0] for o in ORDERS.values()))
+_PAYER_CUM = list(accumulate(PAYER_MIX))
 SCREENING_DX = {"Z0000", "Z0001", "Z113", "Z1211", "Z8000", "Z79899"}
 FIRST = ["AVERY", "JORDAN", "TAYLOR", "MORGAN", "CASEY", "RILEY", "QUINN", "JAMIE", "SKYLER", "PARKER", "ROWAN", "DREW",
          "SAGE", "EMERY", "HARPER", "LOGAN", "REESE", "BLAKE", "DAKOTA", "FINLEY", "MARLOWE", "ELLIS", "ARDEN", "KAI"]
@@ -187,6 +208,7 @@ class Scenario:
     days: int = 30
     seed: int = 7
     volume_scale: float = 1.0
+    target_mb_per_day: float | None = None  # raw EDI MB per file day per tenant; overrides claims_per_day * volume_scale
     p_never_remitted: float = .04         # payer never responds within the window
     p_zero_pay_fee_schedule: float = .02  # allowed $0 under the fee schedule: CO-45, NOT a denial
     p_partial_line_denial: float = .06    # one line denied, others paid
@@ -278,21 +300,31 @@ def money(x: float) -> str:
 
 
 class X12:
+    """Segments are joined as they are added (one string per segment, without terminator)."""
+    __slots__ = ("el", "comp", "rep", "term", "nl", "segs")
+
     def __init__(self, style: str):
         self.el, self.comp, self.rep, self.term, self.nl = DELIMS[style]
-        self.segs: list[list[str]] = []
+        self.segs: list[str] = []
 
     def s(self, *elements):
-        els = ["" if e is None else str(e) for e in elements]
-        while len(els) > 1 and els[-1] == "":
-            els.pop()
-        self.segs.append(els)
+        """Trailing empty elements are dropped (no element ever ends with a delimiter)."""
+        el = self.el
+        try:
+            self.segs.append(el.join(elements).rstrip(el))
+        except TypeError:                                     # an int or None: convert (hot paths pass str)
+            self.segs.append(el.join([_x12str(e) for e in elements]).rstrip(el))
 
     def c(self, *parts) -> str:
-        parts = ["" if p is None else str(p) for p in parts]
-        while parts and parts[-1] == "":
-            parts.pop()
-        return self.comp.join(parts)
+        comp = self.comp
+        try:
+            return comp.join(parts).rstrip(comp)
+        except TypeError:
+            return comp.join([_x12str(p) for p in parts]).rstrip(comp)
+
+
+def _x12str(e) -> str:
+    return e if e.__class__ is str else ("" if e is None else str(e))
 
 
 def interchange(style: str, sender: str, receiver: str, d: date, ctl: int, gs_code: str, impl: str,
@@ -304,10 +336,10 @@ def interchange(style: str, sender: str, receiver: str, d: date, ctl: int, gs_co
     for i, t in enumerate(transactions, 1):
         stn = f"{i:04d}"
         out.append(el.join(["ST", st_id, stn, impl]))
-        out += [el.join(s) for s in t.segs]
+        out += t.segs
         out.append(el.join(["SE", str(len(t.segs) + 2), stn]))
     out += [el.join(["GE", str(len(transactions)), str(ctl)]), el.join(["IEA", "1", f"{ctl:09d}"])]
-    return "".join(s + term + nl for s in out)
+    return (term + nl).join(out) + term + nl
 
 
 def cas_segments(cas: list) -> list[list]:
@@ -350,36 +382,40 @@ class Generator:
     def __init__(self, sc: Scenario, tenants=None):
         self.sc = sc
         self.rng = random.Random(sc.seed)
+        self._prng = random.Random()                              # reseeded per patient
+        self._pbase: dict[str, int] = {}
         self.tenant_codes = list(tenants or TENANTS)
         self.ctl = 100
         self.plb_log: dict = {}
         self.paid_history: dict = {}                              # (tenant, payer) -> ICNs paid in earlier 835s
 
     # people and providers
-    def _person(self) -> Person:
-        r = self.rng
+    def _person(self, r: random.Random | None = None) -> Person:
+        r = r or self.rng
         return Person(r.choice(FIRST), r.choice(LAST), date(1940, 1, 1) + timedelta(days=r.randint(0, 29500)),
                       r.choice("MF"), f"{r.randint(1, 9999)} {r.choice(['TEST', 'SAMPLE', 'MOCK'])} ST", r.choice(CITIES))
 
-    def _patients(self, n: int) -> list[Patient]:
-        r, out = self.rng, []
-        for i in range(n):
-            pat = self._person()
-            primary = r.choices(PAYERS, weights=PAYER_MIX)[0]
-            if r.random() < self.sc.p_dependent and pat.dob.year > 1985:
-                sub, rel = self._person(), r.choice(["01", "19", "19"])
-                sub.last = pat.last
-            else:
-                sub, rel = pat, "18"
-            covs = [Coverage(primary, f"{primary.payer_id[:2]}{r.randint(10**8, 10**9 - 1)}", f"G{r.randint(1000, 9999)}",
-                             sub, rel)]
-            if [p for p in SECONDARY_FOR[primary.plan] if p != primary.payer_id] and r.random() < self.sc.p_secondary_coverage:
-                choices = [p for p in SECONDARY_FOR[primary.plan] if p != primary.payer_id]
-                sp = PAYER_BY_ID[r.choice(choices)]
-                covs.append(Coverage(sp, f"{sp.payer_id[:2]}{r.randint(10**8, 10**9 - 1)}", f"G{r.randint(1000, 9999)}",
-                                     pat, "18"))
-            out.append(Patient(i, pat, covs))
-        return out
+    def _patient(self, tc: str, pid: int) -> Patient:
+        """Patient `pid` of tenant `tc`, rebuilt on demand from its own seed: the patient pool costs no memory, and a
+        patient is the same person (same coverage) on every claim."""
+        r = self._prng
+        base = self._pbase.get(tc) or self._pbase.setdefault(tc, _derive_seed(self.sc.seed, tc, "patient") << 40)
+        r.seed(base + pid)
+        pat = self._person(r)
+        primary = r.choices(PAYERS, cum_weights=_PAYER_CUM)[0]
+        if r.random() < self.sc.p_dependent and pat.dob.year > 1985:
+            sub, rel = self._person(r), r.choice(["01", "19", "19"])
+            sub.last = pat.last
+        else:
+            sub, rel = pat, "18"
+        covs = [Coverage(primary, f"{primary.payer_id[:2]}{r.randint(10**8, 10**9 - 1)}", f"G{r.randint(1000, 9999)}",
+                         sub, rel)]
+        if [p for p in SECONDARY_FOR[primary.plan] if p != primary.payer_id] and r.random() < self.sc.p_secondary_coverage:
+            choices = [p for p in SECONDARY_FOR[primary.plan] if p != primary.payer_id]
+            sp = PAYER_BY_ID[r.choice(choices)]
+            covs.append(Coverage(sp, f"{sp.payer_id[:2]}{r.randint(10**8, 10**9 - 1)}", f"G{r.randint(1000, 9999)}",
+                                 pat, "18"))
+        return Patient(pid, pat, covs)
 
     def _providers(self, seed: int) -> list[Provider]:
         r = self.rng
@@ -405,7 +441,7 @@ class Generator:
         hl[0] += 1
         sub_hl = hl[0]
         dependent = cov.relationship != "18"
-        x.s("HL", sub_hl, "1", "22", "1" if dependent else "0")
+        x.s("HL", str(sub_hl), "1", "22", "1" if dependent else "0")
         x.s("SBR", "S" if seq else "P", "" if dependent else "18", cov.group, "", "", "", "", "", cov.payer.sbr09)
         s = cov.subscriber
         x.s("NM1", "IL", "1", s.last, s.first, "", "", "", "MI", cov.member_id)
@@ -415,7 +451,7 @@ class Generator:
         x.s("NM1", "PR", "2", cov.payer.name, "", "", "", "", "PI", cov.payer.payer_id)
         if dependent:
             hl[0] += 1
-            x.s("HL", hl[0], sub_hl, "23", "0")
+            x.s("HL", str(hl[0]), str(sub_hl), "23", "0")
             x.s("PAT", cov.relationship)
             x.s("NM1", "QC", "1", pat.last, pat.first)
             x.s("N3", pat.addr)
@@ -438,14 +474,14 @@ class Generator:
             x.s("NM1", "IL", "1", pcov.subscriber.last, pcov.subscriber.first, "", "", "", "MI", pcov.member_id)
             x.s("NM1", "PR", "2", pcov.payer.name, "", "", "", "", "PI", pcov.payer.payer_id)
         for i, l in enumerate(c.lines, 1):
-            x.s("LX", i)
-            x.s("SV1", x.c("HC", l.cpt, *l.modifiers), money(l.charge), "UN", l.units, "", "", "1")
+            x.s("LX", str(i))
+            x.s("SV1", x.c("HC", l.cpt, *l.modifiers), money(l.charge), "UN", str(l.units), "", "", "1")
             x.s("DTP", "472", "D8", f"{c.dos:%Y%m%d}")
             x.s("REF", "6R", f"{c.pcn}-{i}")
             if prior:
                 pl = prior["lines"][i - 1]
                 x.s("SVD", c.patient.coverages[0].payer.payer_id, money(pl["paid"]), x.c("HC", l.cpt, *l.modifiers), "",
-                    l.units)
+                    str(l.units))
                 for seg in cas_segments(pl["cas"]):
                     x.s(*seg)
                 x.s("DTP", "573", "D8", f"{prior['date']:%Y%m%d}")
@@ -474,8 +510,9 @@ class Generator:
         cov = c.patient.coverages[seq]
         payer = cov.payer
         deductible, coins, copay = PLANS[payer.plan]
-        acc_key = (c.patient.pid, payer.payer_id, c.dos.year)
-        ded_left = accum.setdefault(acc_key, deductible)
+        acc_year = accum.setdefault(c.dos.year, {}) if deductible else None   # {year: {(pid, payer): left}}
+        acc_key = (c.patient.pid, payer.payer_id)
+        ded_left = acc_year.get(acc_key, deductible) if deductible else 0
         lines, copay_left = [], copay
         deny_line = r.randrange(len(c.lines)) if outcome == "partial" else None
         for i, l in enumerate(c.lines):
@@ -517,7 +554,8 @@ class Generator:
                 cas += [("PR", code, a) for code, a in pr_parts]
             lines.append(dict(cpt=l.cpt, adjudicated_cpt=l.cpt, units=l.units, modifiers=l.modifiers, charge=l.charge,
                               paid=paid, allowed=allowed, cas=cas, rarc=rarc))
-        accum[acc_key] = ded_left
+        if deductible:
+            acc_year[acc_key] = ded_left
         e = dict(pcn=c.pcn, payer_id=payer.payer_id, seq=seq, lines=lines, claim_cas=[],
                  icn=f"{payer.payer_id[:3]}{_stable_unit(c.pcn, payer.payer_id, 'icn') * 1e10:010.0f}",
                  claim_level_only=outcome == "claim_level_denied", status=None)
@@ -599,7 +637,7 @@ class Generator:
             for i, ln in enumerate(e["lines"], 1):
                 billed = x.c("HC", ln["cpt"], *ln["modifiers"])
                 adjud = x.c("HC", ln["adjudicated_cpt"], *ln["modifiers"])
-                x.s("SVC", adjud, money(ln["charge"]), money(ln["paid"]), "", ln["units"],
+                x.s("SVC", adjud, money(ln["charge"]), money(ln["paid"]), "", str(ln["units"]),
                     billed if ln["adjudicated_cpt"] != ln["cpt"] else "")
                 x.s("DTM", "472", f"{c.dos:%Y%m%d}")
                 for seg in cas_segments(ln["cas"]):
@@ -614,77 +652,23 @@ class Generator:
             x.s("PLB", npi(t.npi_seed), f"{d.year}1231", x.c(code, ref) if ref else code, money(amt))
         return total
 
-    def run(self, out_dir: str | Path) -> dict:
-        sc, r = self.sc, self.rng
-        out = Path(out_dir)
-        truth = {"generator_version": GENERATOR_VERSION, "scenario": {k: str(v) for k, v in asdict(sc).items()},
-                 "denial_carcs": DENIAL_CARCS, "tenants": {}}
-        end = sc.start + timedelta(days=sc.days)
-        for tc in self.tenant_codes:
-            t = TENANTS[tc]
-            n_pat = max(50, int(t.claims_per_day * sc.volume_scale * sc.days * .35))
-            patients, providers = self._patients(n_pat), self._providers(t.npi_seed)
-            accum: dict = {}
-            outbox: dict[date, list] = {}                         # day -> 837 items
-            pending: dict[tuple, list] = {}                       # (pay_day, payer_id) -> events
-            claims: dict[str, dict] = {}
-            n = 0
+    def run(self, out_dir: str | Path, workers: int = 1, return_claims: bool = True, truth_gzip: bool = False) -> dict:
+        """Generate every tenant into out_dir. Each day's files are written as soon as the day is final, and the
+        ledger streams to truth/<tenant>/claims.jsonl with a small truth.json index (see `load_truth`).
 
-            def schedule(e, day):
-                day = _next_business_day(day)
-                # DTM*050: the payer received the claim a business day after it was sent
-                e["received"] = e.get("received") or _next_business_day(e["claim"].submitted + timedelta(days=1))
-                pending.setdefault((day, e["payer_id"]), []).append(e)
+        Returns the ledger in the classic in-memory shape. Pass return_claims=False for big runs: a year of claims
+        is several GB as Python dicts; read them back with `iter_claims` instead."""
+        run = _Run(out_dir, self.sc, self.tenant_codes, workers=workers, truth_gzip=truth_gzip,
+                   keep_claims=return_claims and workers <= 1, backpressure=False)
+        for _ in run:
+            pass
+        if return_claims and workers > 1:
+            return load_truth(out_dir)
+        return run.truth
 
-            d = sc.start
-            while d < end:
-                if sc.skip_weekends and d.weekday() >= 5:
-                    d += timedelta(days=1)
-                    continue
-                factor = {0: 1.3, 4: .9}.get(d.weekday(), 1.0) * r.uniform(.8, 1.2)
-                for _ in range(max(1, round(t.claims_per_day * sc.volume_scale * factor))):
-                    n += 1
-                    c = self._new_claim(t, n, d, patients, providers)
-                    claims[c.pcn] = self._ledger_claim(c)
-                    outbox.setdefault(d, []).append((c, 0, "1", None, None))
-                    self._plan(c, d, schedule, outbox, claims, accum)
-                d += timedelta(days=1)
-
-            files: list[dict] = []
-            fwd: dict[str, float] = {}                            # payer -> forward balance owed back
-            days = sorted({k[0] for k in pending} | set(outbox))
-            for day in days:
-                if day >= end:
-                    continue
-                if day in outbox:
-                    items = outbox[day]
-                    for c, seq, freq, prior, orig in items:
-                        led = claims[c.pcn]
-                        led["submissions"].append(dict(date=str(day), payer_id=c.patient.coverages[seq].payer.payer_id,
-                                                       seq=seq, frequency=freq))
-                    files.append(dict(day=day, kind="837", name=f"{tc}_837P_{day:%Y%m%d}.x12",
-                                      body=self._file_837(t, day, items), expect="parsed"))
-                for payer in PAYERS:
-                    evs = pending.get((day, payer.payer_id))
-                    if not evs:
-                        continue
-                    files += self._files_835(t, payer, day, evs, fwd, claims)
-                if r.random() < sc.p_corrupt_file and files:
-                    files.append(self._corrupt(r.choice([f for f in files if f["day"] == day] or files), day))
-            for f in files:
-                p = out / tc / "raw" / f"received_date={f['day']}" / f["kind"] / f["name"]
-                p.parent.mkdir(parents=True, exist_ok=True)
-                p.write_bytes(f["body"] if isinstance(f["body"], bytes) else f["body"].encode("ascii"))
-            truth["tenants"][tc] = {"claims": _finalize(claims), "files": [
-                {k: (str(v) if k == "day" else v) for k, v in f.items() if k != "body"} for f in files],
-                "file_days": sorted({str(f["day"]) for f in files}), "plb": self.plb_log.get(tc, [])}
-            for led in claims.values():
-                led.pop("_claim", None)
-        return truth
-
-    def _new_claim(self, t: Tenant, n: int, d: date, patients, providers) -> Claim:
+    def _new_claim(self, t: Tenant, n: int, d: date, n_patients: int, providers) -> Claim:
         r = self.rng
-        otype = r.choices(list(ORDERS), weights=[o[0] for o in ORDERS.values()])[0]
+        otype = r.choices(_ORDER_TYPES, cum_weights=_ORDER_CUM)[0]
         _, panels, dxs, screen_share = ORDERS[otype]
         codes = r.choice(panels)
         lines = []
@@ -701,8 +685,8 @@ class Generator:
         dos = d - timedelta(days=r.randint(1, 5))
         if r.random() < self.sc.p_late_submission:
             dos = d - timedelta(days=r.randint(120, 400))
-        return Claim(f"{t.code[:2].upper()}{d:%y%m%d}{n:06d}", t.code, r.choice(patients), r.choice(providers), dos,
-                     lines, dx, d, otype)
+        return Claim(f"{t.code[:2].upper()}{d:%y%m%d}{n:06d}", t.code, self._patient(t.code, r.randrange(n_patients)),
+                     r.choice(providers), dos, lines, dx, d, otype)
 
     def _ledger_claim(self, c: Claim) -> dict:
         return dict(pcn=c.pcn, dos=str(c.dos), submitted=str(c.submitted), order_type=c.order_type,
@@ -711,11 +695,11 @@ class Generator:
                     line_charges=[l.charge for l in c.lines], charge=round(sum(l.charge for l in c.lines), 2),
                     dx=c.dx, principal_dx=c.dx[0], referring_npi=c.referring.npi, risky_provider=c.referring.risky,
                     dependent=c.patient.coverages[0].relationship != "18",
-                    payers=[cv.payer.payer_id for cv in c.patient.coverages], submissions=[], adjudications={},
-                    _claim=c)
+                    payers=[cv.payer.payer_id for cv in c.patient.coverages], submissions=[], adjudications={})
 
     def _plan(self, c: Claim, d: date, schedule, outbox, claims, accum):
-        """Decide this claim's whole life now; events are scheduled for later days."""
+        """Decide this claim's whole life now; events are scheduled for later days. `schedule(event, day)` queues an
+        835 event, `outbox(day, item)` an 837 submission."""
         sc, r = self.sc, self.rng
         payer = c.patient.coverages[0].payer
         if r.random() < sc.p_never_remitted:
@@ -758,7 +742,7 @@ class Generator:
         if name == "void":
             e = add(self._adjudicate(c, 0, "paid", None, accum, pay_day), pay_day, "1")
             void_day = _next_business_day(pay_day + timedelta(days=r.randint(3, 10)))
-            outbox.setdefault(void_day, []).append((c, 0, "8", None, e["icn"]))
+            outbox(void_day, (c, 0, "8", None, e["icn"]))
             rv = self._reverse(e)
             rv["freq"] = "8"
             add(rv, void_day + timedelta(days=r.randint(3, 12)), "22")
@@ -779,7 +763,7 @@ class Generator:
             e = add(self._adjudicate(c, 0, level, carc, accum, pay_day), pay_day, status)
             if carc == "16" and r.random() < sc.p_resubmit_after_co16:
                 rs = _next_business_day(pay_day + timedelta(days=r.randint(3, 10)))
-                outbox.setdefault(rs, []).append((c, 0, "7", None, e["icn"]))
+                outbox(rs, (c, 0, "7", None, e["icn"]))
                 fixed = self._adjudicate(c, 0, "paid", None, accum, rs)
                 fixed["icn"] = e["icn"] + "R"
                 fixed["received"] = _next_business_day(rs + timedelta(days=1))
@@ -789,7 +773,7 @@ class Generator:
         e = add(self._adjudicate(c, 0, "paid", None, accum, pay_day), pay_day, "1")
         if r.random() < sc.p_duplicate_submission:
             dup_day = _next_business_day(d + timedelta(days=r.randint(2, 6)))
-            outbox.setdefault(dup_day, []).append((c, 0, "1", None, None))
+            outbox(dup_day, (c, 0, "1", None, None))
             dup = self._adjudicate(c, 0, "denied", "18", accum, dup_day)
             dup["icn"], dup["received"], dup["duplicate_denial"] = e["icn"] + "D", dup_day, True
             add(dup, max(_next_business_day(pay_day) + timedelta(days=r.randint(1, 10)),
@@ -805,7 +789,7 @@ class Generator:
         bill_day = _next_business_day(pay_day + timedelta(days=r.randint(2, 6)))
         prior = dict(paid=primary_event["paid"], date=pay_day, claim_cas=primary_event["claim_cas"],
                      lines=[dict(paid=ln["paid"], cas=ln["cas"]) for ln in primary_event["lines"]])
-        outbox.setdefault(bill_day, []).append((c, 1, "1", prior, None))
+        outbox(bill_day, (c, 1, "1", prior, None))
         e = self._adjudicate(c, 1, "paid", None, accum, bill_day, prior)
         e["received"] = _next_business_day(bill_day + timedelta(days=1))
         e = dict(e, status="2", claim=c)
@@ -847,8 +831,10 @@ class Generator:
                 dict(day=str(day), payer_id=payer.payer_id, trn=trn, code=code, reference=ref, amount=amt)
                 for code, ref, amt in plbs)
             txs.append((x, bpr, trn))
-            self.paid_history.setdefault((t.code, payer.payer_id), []).extend(
-                (e["icn"], e["paid"]) for e in g if e["status"] in ("1", "2") and e["paid"] > 0)
+            hist = self.paid_history.setdefault((t.code, payer.payer_id), [])
+            hist.extend((e["icn"], e["paid"]) for e in g if e["status"] in ("1", "2") and e["paid"] > 0)
+            if len(hist) > 2 * RECOUP_WINDOW:                      # recoupments target recent payments; bounded memory
+                del hist[:-RECOUP_WINDOW]
             for e in g:
                 led = claims[e["pcn"]]["adjudications"].setdefault(e["payer_id"], dict(
                     payer_id=e["payer_id"], payer=PAYER_BY_ID[e["payer_id"]].name, seq=e["seq"],
@@ -890,60 +876,477 @@ class Generator:
                     expect="rejected", corruption=kind)
 
 
-def _finalize(claims: dict) -> dict:
-    """Current state per claim and payer, from the events actually delivered.
+def _finalize_claim(led: dict) -> dict:
+    """Current state of one claim per payer, from the events actually delivered.
 
     Mirrors the business rule, not the SQL: the latest event per (claim, payer) is current unless it is a
     reversal. denied = recorded (status 4) or signal v3 ($0 paid, not a reversal, CO with a reviewed CARC).
     Exact-duplicate denials (CO-18 on an accidental resend) do not replace the real adjudication.
     """
-    out = {}
-    for pcn, led in claims.items():
-        led = {k: v for k, v in led.items() if k != "_claim"}
-        for pid, a in led["adjudications"].items():
-            evs = [e for e in a["events"] if not e["duplicate_denial"]]
-            cur = evs[-1] if evs else None
-            remitted = cur is not None and cur["status"] != "22"
-            recorded = remitted and cur["status"] == "4"
-            signal = remitted and cur["paid"] == 0 and any(k in DENIAL_CARCS for k in cur["co_carcs"])
-            if cur:                                               # line rule: $0, not a reversal, and a reviewed
-                for ln in cur["lines"]:                           # CO CARC on the line or a denied claim
-                    ln["denied"] = (remitted and ln["paid"] == 0 and
-                                    (any(k in DENIAL_CARCS for k in ln["co_carcs"]) or recorded or signal))
-            a.update(remitted_current=remitted, denied=recorded or signal, denied_recorded=recorded,
-                     denied_signal_v3=signal and not recorded, paid_current=cur["paid"] if remitted else 0.0,
-                     status_current=cur["status"] if cur else None, ever_reversed=any(e["status"] == "22" for e in evs),
-                     claim_level_only=bool(cur and cur["claim_level_only"]),
-                     has_duplicate_denial=any(e["duplicate_denial"] for e in a["events"]))
-        prim = led["adjudications"].get(led["payers"][0])
-        led.update(remitted=bool(led["adjudications"]), primary=prim and {k: prim[k] for k in (
-            "remitted_current", "denied", "paid_current", "status_current")},
-            resubmitted=any(s["frequency"] == "7" for s in led["submissions"]),
-            voided=any(s["frequency"] == "8" for s in led["submissions"]))
-        out[pcn] = led
-    return out
+    led = {k: v for k, v in led.items() if k != "_claim"}
+    for pid, a in led["adjudications"].items():
+        evs = [e for e in a["events"] if not e["duplicate_denial"]]
+        cur = evs[-1] if evs else None
+        remitted = cur is not None and cur["status"] != "22"
+        recorded = remitted and cur["status"] == "4"
+        signal = remitted and cur["paid"] == 0 and any(k in DENIAL_CARCS for k in cur["co_carcs"])
+        if cur:                                               # line rule: $0, not a reversal, and a reviewed
+            for ln in cur["lines"]:                           # CO CARC on the line or a denied claim
+                ln["denied"] = (remitted and ln["paid"] == 0 and
+                                (any(k in DENIAL_CARCS for k in ln["co_carcs"]) or recorded or signal))
+        a.update(remitted_current=remitted, denied=recorded or signal, denied_recorded=recorded,
+                 denied_signal_v3=signal and not recorded, paid_current=cur["paid"] if remitted else 0.0,
+                 status_current=cur["status"] if cur else None, ever_reversed=any(e["status"] == "22" for e in evs),
+                 claim_level_only=bool(cur and cur["claim_level_only"]),
+                 has_duplicate_denial=any(e["duplicate_denial"] for e in a["events"]))
+    prim = led["adjudications"].get(led["payers"][0])
+    led.update(remitted=bool(led["adjudications"]), primary=prim and {k: prim[k] for k in (
+        "remitted_current", "denied", "paid_current", "status_current")},
+        resubmitted=any(s["frequency"] == "7" for s in led["submissions"]),
+        voided=any(s["frequency"] == "8" for s in led["submissions"]))
+    return led
 
 
-def generate(out_dir: str | Path, scenario: Scenario | None = None, tenants=None) -> dict:
-    g = Generator(scenario or Scenario(), tenants)
-    truth = g.run(out_dir)
-    Path(out_dir).mkdir(parents=True, exist_ok=True)
-    (Path(out_dir) / "truth.json").write_text(json.dumps(truth, indent=1, default=str))
+def _finalize(claims: dict) -> dict:
+    return {pcn: _finalize_claim(led) for pcn, led in claims.items()}
+
+
+def _derive_seed(*parts) -> int:
+    """64-bit seed from labels; independent of PYTHONHASHSEED, process and worker layout."""
+    return int.from_bytes(hashlib.blake2b("/".join(map(str, parts)).encode(), digest_size=8).digest(), "big")
+
+
+def _creation_order(pcn: str) -> int:
+    return int(pcn[8:])                                       # PCN = 2-letter tenant + yymmdd + running claim number
+
+
+# --- streaming run ---------------------------------------------------------------------------------
+class _TenantRun(Generator):
+    """One tenant's simulation, advanced one calendar day at a time.
+
+    Every claim's life is planned the day it is submitted, and no event is ever scheduled for an earlier day, so
+    once `step(d)` has planned day d's claims, day d is final. Only what later days need is kept: claims that
+    still have a submission or remit to come, the events queued for later days, deductible accumulators for the
+    plan years still being billed, and a bounded window of paid ICNs for recoupments. The tenant has its own
+    random stream, so its output does not depend on which other tenants run, or where.
+    """
+
+    def __init__(self, sc: Scenario, tc: str, claims_per_day: float, keep_claims: bool = False):
+        super().__init__(sc, [tc])
+        self.rng = random.Random(_derive_seed(sc.seed, tc))
+        self.tc, self.t, self.cpd = tc, TENANTS[tc], claims_per_day
+        self.end = sc.start + timedelta(days=sc.days)
+        self.n_patients = max(50, int(claims_per_day * sc.days * .35))
+        self.providers = self._providers(self.t.npi_seed)
+        self.accum: dict = {}                                 # plan year -> {(pid, payer): deductible left}
+        self.outbox: dict[date, list] = {}                    # day -> 837 items
+        self.pending: dict[tuple, list] = {}                  # (pay_day, payer_id) -> 835 events
+        self.claims: dict[str, dict] = {}                     # ledger of claims still in flight
+        self.open: dict[str, int] = {}                        # pcn -> deliveries still to come
+        self.fwd: dict[str, float] = {}                       # payer -> forward balance owed back
+        self.done: dict | None = {} if keep_claims else None
+        self.n = 0
+        self.noise = True                                     # day-to-day volume noise (off for calibration)
+
+    def _schedule(self, e: dict, day: date):
+        day = _next_business_day(day)
+        if day >= self.end:                                   # after the window: never delivered
+            return
+        # DTM*050: the payer received the claim a business day after it was sent
+        e["received"] = e.get("received") or _next_business_day(e["claim"].submitted + timedelta(days=1))
+        self.pending.setdefault((day, e["payer_id"]), []).append(e)
+        self.open[e["pcn"]] += 1
+
+    def _bill(self, day: date, item: tuple):
+        if day >= self.end:
+            return
+        self.outbox.setdefault(day, []).append(item)
+        self.open[item[0].pcn] += 1
+
+    def step(self, d: date) -> tuple[list[dict], list[dict]]:
+        """Plan day d's new claims, then deliver day d. Returns (files with bodies, ledger rows of claims that
+        have nothing left to deliver)."""
+        sc, r, t = self.sc, self.rng, self.t
+        if not (sc.skip_weekends and d.weekday() >= 5):
+            stale = (d - timedelta(days=10)).year             # service dates trail submission by <= 5 days
+            for y in [y for y in self.accum if y < stale]:
+                del self.accum[y]
+            factor = {0: 1.3, 4: .9}.get(d.weekday(), 1.0) * (r.uniform(.8, 1.2) if self.noise else 1.0)
+            for _ in range(max(1, round(self.cpd * factor))):
+                self.n += 1
+                c = self._new_claim(t, self.n, d, self.n_patients, self.providers)
+                self.claims[c.pcn] = self._ledger_claim(c)
+                self.open[c.pcn] = 0
+                self._bill(d, (c, 0, "1", None, None))
+                self._plan(c, d, self._schedule, self._bill, self.claims, self.accum)
+
+        files: list[dict] = []
+        touched: list[str] = []
+        items = self.outbox.pop(d, None)
+        if items:
+            for c, seq, freq, prior, orig in items:
+                self.claims[c.pcn]["submissions"].append(dict(
+                    date=str(d), payer_id=c.patient.coverages[seq].payer.payer_id, seq=seq, frequency=freq))
+                touched.append(c.pcn)
+            files.append(dict(day=d, kind="837", name=f"{self.tc}_837P_{d:%Y%m%d}.x12",
+                              body=self._file_837(t, d, items), expect="parsed"))
+        for payer in PAYERS:
+            evs = self.pending.pop((d, payer.payer_id), None)
+            if evs:
+                files += self._files_835(t, payer, d, evs, self.fwd, self.claims)
+                touched += [e["pcn"] for e in evs]
+        if files and r.random() < sc.p_corrupt_file:
+            files.append(self._corrupt(r.choice(files), d))
+        done = []
+        for pcn in touched:
+            k = self.open[pcn] - 1
+            if k:
+                self.open[pcn] = k
+            else:
+                del self.open[pcn]
+                done.append(self._close(pcn))
+        return files, done
+
+    def _close(self, pcn: str) -> dict:
+        led = _finalize_claim(self.claims.pop(pcn))
+        if self.done is not None:
+            self.done[pcn] = led
+        return led
+
+    def finish(self) -> list[dict]:
+        """Claims still open at the end of the window (their later deliveries fall outside it)."""
+        out = [self._close(pcn) for pcn in list(self.claims)]
+        self.open.clear()
+        self.outbox.clear()
+        self.pending.clear()
+        return out
+
+
+class DayDir(NamedTuple):
+    tenant: str
+    day: date
+    path: Path                  # <out>/<tenant>/raw/received_date=<day>, as IT's SFTP copy expects it
+    files: list                 # ledger metadata of the files written there (name, kind, expect, ...)
+    bytes: int
+
+
+LEDGER_LAYOUT = "claims-jsonl-1"
+
+
+class _TenantWriter:
+    def __init__(self, out: Path, tc: str, gz: bool):
+        self.out, self.tc = Path(out), tc
+        (self.out / "truth" / tc).mkdir(parents=True, exist_ok=True)
+        self.rel = f"truth/{tc}/claims.jsonl" + (".gz" if gz else "")
+        self.fh = gzip.open(self.out / self.rel, "wt", compresslevel=1) if gz else open(self.out / self.rel, "w")
+        self.n, self.files, self.bytes = 0, [], 0
+        self._dumps = json.JSONEncoder(separators=(",", ":"), default=str).encode
+
+    def claims(self, rows: list[dict]):
+        if rows:
+            enc = self._dumps
+            self.fh.write("\n".join(enc(r) for r in rows) + "\n")
+            self.n += len(rows)
+
+    def day(self, d: date, files: list[dict]) -> DayDir:
+        base = self.out / self.tc / "raw" / f"received_date={d}"
+        meta, nbytes = [], 0
+        made = set()
+        for f in files:
+            body = f["body"] if isinstance(f["body"], bytes) else f["body"].encode("ascii")
+            folder = base / f["kind"]
+            if folder not in made:
+                folder.mkdir(parents=True, exist_ok=True)
+                made.add(folder)
+            (folder / f["name"]).write_bytes(body)
+            nbytes += len(body)
+            meta.append({k: (str(v) if k == "day" else v) for k, v in f.items() if k != "body"})
+        self.files += meta
+        self.bytes += nbytes
+        return DayDir(self.tc, d, base, meta, nbytes)
+
+    def close(self, sim: _TenantRun) -> dict:
+        self.fh.close()
+        idx = dict(files=self.files, file_days=sorted({f["day"] for f in self.files}), plb=sim.plb_log.get(self.tc, []),
+                   claims_file=self.rel, n_claims=self.n, claims_per_day=round(sim.cpd, 3), raw_bytes=self.bytes)
+        if sim.done is not None:
+            idx["claims"] = dict(sorted(sim.done.items(), key=lambda kv: _creation_order(kv[0])))
+        return idx
+
+
+def _calendar(sc: Scenario):
+    return [sc.start + timedelta(days=i) for i in range(sc.days)]
+
+
+def _tenant_days(sc: Scenario, cpds: dict, out: Path, gz: bool, keep_claims: bool, sem=None):
+    """Run these tenants day by day (day-major, tenant order within a day). Yields ("day", DayDir) as each
+    tenant-day is written, then ("done", {tenant: ledger index})."""
+    sims = {tc: _TenantRun(sc, tc, cpd, keep_claims) for tc, cpd in cpds.items()}
+    writers = {tc: _TenantWriter(out, tc, gz) for tc in cpds}
+    gc_was = gc.get_threshold()
+    gc.set_threshold(max(gc_was[0], 100_000), 50, 1000)       # ~10^6 long-lived objects: default GC costs ~25%
+    try:
+        for d in _calendar(sc):
+            for tc, sim in sims.items():
+                files, done = sim.step(d)
+                writers[tc].claims(done)
+                if files:
+                    if sem is not None:
+                        sem.acquire()                             # at most `lookahead` undelivered days on disk
+                    yield "day", writers[tc].day(d, files)
+        idx = {}
+        for tc, sim in sims.items():
+            writers[tc].claims(sim.finish())
+            idx[tc] = writers[tc].close(sim)
+        yield "done", idx
+    finally:
+        gc.set_threshold(*gc_was)
+        for w in writers.values():
+            w.fh.close()
+
+
+def _worker(sc, cpds, out, gz, q, sem):
+    try:
+        for msg in _tenant_days(sc, cpds, Path(out), gz, False, sem):
+            q.put(msg)
+    except BaseException:
+        import traceback
+        q.put(("error", traceback.format_exc()))
+
+
+class _Run:
+    """Iterates DayDirs in (day, tenant) order and writes truth.json when exhausted. With workers > 1, tenants
+    are split across processes; every tenant has its own random stream, so the bytes do not depend on the
+    worker count."""
+
+    def __init__(self, out_dir, sc: Scenario, tenants, workers: int = 1, truth_gzip: bool = False,
+                 keep_claims: bool = False, backpressure: bool = True, lookahead: int = 2):
+        self.out, self.sc, self.tenants = Path(out_dir), sc, list(tenants or TENANTS)
+        self.workers = max(1, min(workers, len(self.tenants)))
+        self.gz, self.keep, self.backpressure, self.lookahead = truth_gzip, keep_claims, backpressure, lookahead
+        self.cpds = {tc: claims_per_day(sc, tc) for tc in self.tenants}
+        self.truth: dict | None = None
+
+    def __iter__(self):
+        self.out.mkdir(parents=True, exist_ok=True)
+        if self.workers == 1:
+            stream = _tenant_days(self.sc, self.cpds, self.out, self.gz, self.keep)
+            idx = yield from self._days(stream)
+        else:
+            idx = yield from self._parallel()
+        order = {tc: i for i, tc in enumerate(self.tenants)}
+        self.truth = {"generator_version": GENERATOR_VERSION, "layout": LEDGER_LAYOUT,
+                      "scenario": {k: str(v) for k, v in asdict(self.sc).items()}, "denial_carcs": DENIAL_CARCS,
+                      "tenants": dict(sorted(idx.items(), key=lambda kv: order[kv[0]]))}
+        index = dict(self.truth, tenants={tc: {k: v for k, v in T.items() if k != "claims"}
+                                          for tc, T in self.truth["tenants"].items()})
+        (self.out / "truth.json").write_text(json.dumps(index, indent=1, default=str))
+
+    @staticmethod
+    def _days(stream):
+        for kind, val in stream:
+            if kind == "done":
+                return val
+            yield val
+
+    def _parallel(self):
+        import multiprocessing as mp
+        ctx = mp.get_context("spawn")
+        groups = [self.tenants[i::self.workers] for i in range(self.workers)]
+        qs = [ctx.Queue() for _ in groups]
+        sems = [ctx.Semaphore(self.lookahead) if self.backpressure else None for _ in groups]
+        procs = [ctx.Process(target=_worker, daemon=True, name=f"edi_mock-{'+'.join(g)}",
+                             args=(self.sc, {tc: self.cpds[tc] for tc in g}, str(self.out), self.gz, q, s))
+                 for g, q, s in zip(groups, qs, sems)]
+        for p in procs:
+            p.start()
+        order = {tc: i for i, tc in enumerate(self.tenants)}
+        heads: dict[int, DayDir] = {}
+        idx: dict = {}
+        finished: set[int] = set()
+        try:
+            while True:
+                for i, q in enumerate(qs):
+                    if i in finished or i in heads:
+                        continue
+                    kind, val = q.get()
+                    if kind == "error":
+                        raise RuntimeError(f"generator worker {procs[i].name} failed:\n{val}")
+                    if kind == "done":
+                        idx.update(val)
+                        finished.add(i)
+                    else:
+                        heads[i] = val
+                if not heads:
+                    break
+                i = min(heads, key=lambda k: (heads[k].day, order[heads[k].tenant]))
+                yield heads.pop(i)
+                if sems[i] is not None:
+                    sems[i].release()
+            for p in procs:
+                p.join()
+        finally:
+            for p in procs:
+                if p.is_alive():
+                    p.terminate()
+                    p.join()
+        return idx
+
+
+# --- volume calibration ----------------------------------------------------------------------------
+CAL_START = date(2026, 1, 5)                                  # a Monday: whole weeks in the window
+CAL_WARMUP_DAYS, CAL_WINDOW_DAYS, CAL_POINTS = 56, 28, (40, 160)
+_CAL_CACHE: dict = {}
+
+
+def bytes_per_day_model(sc: Scenario, tc: str) -> tuple[float, float]:
+    """Raw bytes per file day for tenant tc as (fixed, per_claim): bytes = fixed + per_claim * claims_per_day.
+
+    Measured, not guessed: two short noise-free runs (fixed calendar and seed, so the answer is deterministic and
+    the same for every seed) at two volumes; each is measured over 4 whole weeks after an 8-week warm-up, once
+    remits for earlier claims arrive at the steady-state rate. Depends on the scenario's probabilities (stress
+    data has more reversals, re-deliveries and corrupt files) and on the tenant (delimiters, price levels)."""
+    knobs = {k: v for k, v in asdict(sc).items() if k not in ("start", "days", "seed", "volume_scale", "target_mb_per_day")}
+    key = (tc, GENERATOR_VERSION, tuple(sorted(knobs.items())))
+    if key not in _CAL_CACHE:
+        cal = replace(sc, start=CAL_START, days=CAL_WARMUP_DAYS + CAL_WINDOW_DAYS, seed=0, target_mb_per_day=None)
+        pts = []
+        for cpd in CAL_POINTS:
+            sim = _TenantRun(cal, tc, cpd)
+            sim.noise = False
+            total = n_days = 0
+            for d in _calendar(cal):
+                files, _ = sim.step(d)
+                if d >= CAL_START + timedelta(days=CAL_WARMUP_DAYS) and files:
+                    total += sum(len(f["body"]) for f in files)
+                    n_days += 1
+            pts.append((cpd, total / n_days))
+        (c1, b1), (c2, b2) = pts
+        k = (b2 - b1) / (c2 - c1)
+        _CAL_CACHE[key] = (b1 - k * c1, k)
+    return _CAL_CACHE[key]
+
+
+def claims_per_day(sc: Scenario, tc: str) -> float:
+    """Base claims per business day for a tenant (before the weekday pattern and daily noise)."""
+    if sc.target_mb_per_day is None:
+        return TENANTS[tc].claims_per_day * sc.volume_scale
+    fixed, per_claim = bytes_per_day_model(sc, tc)
+    return max(1.0, (sc.target_mb_per_day * 1e6 - fixed) / per_claim)
+
+
+# --- public API ------------------------------------------------------------------------------------
+def generate(out_dir: str | Path, scenario: Scenario | None = None, tenants=None, workers: int = 1,
+             return_claims: bool = True, truth_gzip: bool = False) -> dict:
+    """Generate the whole window into out_dir (files + ledger) and return the ledger (see Generator.run)."""
+    return Generator(scenario or Scenario(), tenants).run(out_dir, workers=workers, return_claims=return_claims,
+                                                          truth_gzip=truth_gzip)
+
+
+def generate_days(out_dir: str | Path, scenario: Scenario | None = None, tenants=None, workers: int = 1,
+                  lookahead: int = 2, truth_gzip: bool = False) -> Iterator[DayDir]:
+    """Yield each tenant's day directory as soon as it is written, in (day, tenant) order.
+
+    Generation pauses while the caller handles a day, so the caller can ingest day N and delete its local copy
+    (the SFTP drop) before day N+1 is generated; with workers > 1 each worker runs at most `lookahead` days
+    ahead. The ledger keeps growing under out_dir/truth/ and truth.json is written once the iterator is
+    exhausted. Output is identical to `generate` for the same scenario."""
+    yield from _Run(out_dir, scenario or Scenario(), tenants, workers=workers, truth_gzip=truth_gzip,
+                    keep_claims=False, backpressure=True, lookahead=lookahead)
+
+
+def iter_claims(out_dir: str | Path, tenant: str, index: dict | None = None) -> Iterator[dict]:
+    """Stream one tenant's finalized ledger rows (in the order claims were closed, not submitted)."""
+    out = Path(out_dir)
+    index = index or json.loads((out / "truth.json").read_text())
+    rel = index["tenants"][tenant]["claims_file"]
+    with (gzip.open(out / rel, "rt") if rel.endswith(".gz") else open(out / rel)) as fh:
+        for line in fh:
+            if line.strip():
+                yield json.loads(line)
+
+
+def load_truth(out_dir: str | Path, tenants=None) -> dict:
+    """The ledger as one dict: {generator_version, scenario, denial_carcs, tenants: {tc: {claims: {pcn: ...},
+    files, file_days, plb, ...}}}, claims in submission order. This is what `generate` returns; it reads both the
+    JSONL layout and an old single-file truth.json. Mind the size: ~5 KB of Python objects per claim."""
+    out = Path(out_dir)
+    truth = json.loads((out / "truth.json").read_text())
+    if tenants is not None:
+        truth["tenants"] = {tc: T for tc, T in truth["tenants"].items() if tc in set(tenants)}
+    for tc, T in truth["tenants"].items():
+        if "claims" not in T:
+            T["claims"] = {c["pcn"]: c for c in sorted(iter_claims(out, tc, truth), key=lambda c: _creation_order(c["pcn"]))}
     return truth
 
 
-if __name__ == "__main__":
+def write_truth(out_dir: str | Path, truth: dict, truth_gzip: bool = False) -> Path:
+    """Write an in-memory ledger (e.g. a subset of load_truth's) in the on-disk layout load_truth reads."""
+    out = Path(out_dir)
+    index = dict(truth, layout=LEDGER_LAYOUT, tenants={})
+    for tc, T in truth["tenants"].items():
+        rel = f"truth/{tc}/claims.jsonl" + (".gz" if truth_gzip else "")
+        (out / rel).parent.mkdir(parents=True, exist_ok=True)
+        with (gzip.open(out / rel, "wt", compresslevel=1) if truth_gzip else open(out / rel, "w")) as fh:
+            for c in T["claims"].values():
+                fh.write(json.dumps(c, separators=(",", ":"), default=str) + "\n")
+        index["tenants"][tc] = dict({k: v for k, v in T.items() if k != "claims"}, claims_file=rel,
+                                    n_claims=len(T["claims"]))
+    (out / "truth.json").write_text(json.dumps(index, indent=1, default=str))
+    return out / "truth.json"
+
+
+def main(argv=None):
     import argparse
+    import shlex
+    import subprocess
+    import time
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("out")
-    ap.add_argument("--days", type=int, default=30)
-    ap.add_argument("--scale", type=float, default=1.0)
+    ap.add_argument("--days", type=int, default=30, help="calendar days")
+    ap.add_argument("--start", type=date.fromisoformat, default=Scenario.start)
+    ap.add_argument("--scale", type=float, default=1.0, help="volume_scale (ignored with --mb-per-day)")
+    ap.add_argument("--mb-per-day", type=float, default=None, help="raw EDI MB per business day per tenant")
+    ap.add_argument("--tenants", default=",".join(TENANTS), help="comma-separated tenant codes")
+    ap.add_argument("--workers", type=int, default=1, help="processes (tenants are split across them)")
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--stress", action="store_true")
-    a = ap.parse_args()
-    sc = Scenario.stress(days=a.days, volume_scale=a.scale, seed=a.seed) if a.stress else \
-        Scenario(days=a.days, volume_scale=a.scale, seed=a.seed)
-    t = generate(a.out, sc)
-    for tc, v in t["tenants"].items():
-        print(f"{tc}: {len(v['claims'])} claims, {len(v['files'])} files over {len(v['file_days'])} days, "
-              f"{sum(f['expect'] == 'rejected' for f in v['files'])} corrupt")
+    ap.add_argument("--gzip-truth", action="store_true", help="write truth/<tenant>/claims.jsonl.gz")
+    ap.add_argument("--each", metavar="CMD", help="shell command run after each day directory is written, before "
+                    "the next is generated; {dir} {day} {tenant} are substituted (e.g. ingest, then rm -r {dir})")
+    a = ap.parse_args(argv)
+    kw = dict(start=a.start, days=a.days, volume_scale=a.scale, seed=a.seed, target_mb_per_day=a.mb_per_day)
+    sc = Scenario.stress(**kw) if a.stress else Scenario(**kw)
+    tenants = [t for t in a.tenants.split(",") if t]
+    t0, total, n_days = time.perf_counter(), 0, 0
+    for dd in generate_days(a.out, sc, tenants, workers=a.workers, truth_gzip=a.gzip_truth):
+        total += dd.bytes
+        n_days += 1
+        if a.each:
+            cmd = a.each.format(dir=shlex.quote(str(dd.path)), day=dd.day, tenant=dd.tenant)
+            subprocess.run(cmd, shell=True, check=True)
+        if n_days % 20 == 0:
+            el = time.perf_counter() - t0
+            print(f"{dd.day} {dd.tenant}: {total / 1e6:,.0f} MB in {el:,.0f}s ({total / 1e6 / el:.2f} MB/s, "
+                  f"rss {_rss_mb():,.0f} MB)", flush=True)
+    el = time.perf_counter() - t0
+    idx = json.loads((Path(a.out) / "truth.json").read_text())
+    for tc, v in idx["tenants"].items():
+        print(f"{tc}: {v['n_claims']:,} claims ({v['claims_per_day']:,.0f}/day base), {len(v['files']):,} files over "
+              f"{len(v['file_days'])} days, {sum(f['expect'] == 'rejected' for f in v['files'])} corrupt, "
+              f"{v['raw_bytes'] / 1e6:,.1f} MB raw")
+    import resource
+    peak = max(resource.getrusage(w).ru_maxrss for w in (resource.RUSAGE_SELF, resource.RUSAGE_CHILDREN)) / 1024
+    print(f"total {total / 1e6:,.1f} MB raw in {el:,.1f}s = {total / 1e6 / el:.2f} MB/s; peak rss {peak:,.0f} MB per process")
+
+
+def _rss_mb() -> float:
+    try:
+        with open("/proc/self/statm") as fh:
+            return int(fh.read().split()[1]) * __import__("os").sysconf("SC_PAGE_SIZE") / 2**20
+    except (OSError, ValueError):
+        return float("nan")
+
+
+if __name__ == "__main__":
+    main()
