@@ -1,0 +1,17 @@
+{
+ "a02_tool_loop": {
+  "glossary": "basic",
+  "data_dictionary": false,
+  "data_profile": false,
+  "enable_sql": true,
+  "enable_metrics": false,
+  "enable_lookup": false,
+  "enable_examples": false,
+  "enable_ask": false,
+  "sql_error_hints": true,
+  "result_checks": true,
+  "context_style": "goal",
+  "effort": "low",
+  "max_tool_calls": 8
+ }
+}
