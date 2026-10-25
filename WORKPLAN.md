@@ -25,7 +25,9 @@ Never decide the work is done; when an item finishes, pick the next highest-valu
 - [running] Lake baseline + optimization (worktree agent)
 - [next] Independent realism audit of calibrated data (stats vs spec, X12 vs TR3, "would a biller believe it")
 - [next] Generate full datasets (2x1y, 1x3y) through the winning lake; record sizes/timings
-- [next] Phase-4 sandbox: bench/agent_cli.py (logged CLI = the only tools an evaluated subagent may use)
-- [later] Expand bench to 150+ questions (templated families x parameters, ledger-verified; Opus-derived for the rest)
+- [done] Phase-4 sandbox: bench/agent_cli.py + agent_session.py + eval_subagents.py; pilot 12 Haiku runs OK
+- [done] Answer-key DB (bench/truth_db.py) + 16 question families (bench/question_families.py): 99 questions sound on a 45-day sample
+- [next] Opus-derived free-form questions (dual-Opus agreement) for what families cannot express
+- [later] Expand families further after calibration lands (target 150+ at full scale)
 - [later] Ambiguity / abstention / multi-turn splits (T20-T22)
 - [later] Screening experiment, then adaptive search over technique permutations
