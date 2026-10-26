@@ -84,6 +84,10 @@ def check_options(options: dict, customer: str | None = None) -> str | None:
     """None if ``options.strategy`` / ``options.model`` are known, compatible and enabled for the org."""
     strategy = options.get("strategy", DEFAULT_STRATEGY)
     model = options.get("model", DEFAULT_MODEL)
+    if not isinstance(strategy, str):  # a list/object would raise TypeError on the set lookup below (a 500)
+        return "Unknown strategy."
+    if not isinstance(model, str):
+        return "Unknown model."
     if strategy not in STRATEGY_IDS:
         return "Unknown strategy."
     if model not in MODEL_IDS:

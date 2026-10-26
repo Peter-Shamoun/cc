@@ -6,6 +6,7 @@ passed to ``create_app(auth=SimAuth(world.aws, world.dep))``.
 from __future__ import annotations
 
 import asyncio
+from collections import deque
 from contextlib import asynccontextmanager
 import json
 import logging
@@ -58,9 +59,11 @@ _SAFE_KEY = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,40}")
 NO_STORE = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
 
 
-_ID = r"^[A-Za-z0-9_:.-]{1,128}$"  # pydantic (Rust regex): `$` is the true end of the string
+#: pydantic (Rust regex): `$` is the true end of the string. Starts alphanumeric: "." / ".." would be path
+#: segments in the run-event object keys.
+_ID = r"^[A-Za-z0-9][A-Za-z0-9_:.-]{0,127}$"
 #: Python `re`: `$` also matches before a trailing "\n", so plain-re checks use fullmatch (1.19.0 edge fix)
-_SAFE_ID = re.compile(r"[A-Za-z0-9_:.-]{1,128}")
+_SAFE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_:.-]{0,127}")
 
 
 class RenameIn(BaseModel):
@@ -207,6 +210,10 @@ class Settings:
         "candidates": 1, "cascade": "off"})
 
 
+#: AuditLog keeps only this many recent events in memory (tests read them); the durable record is the log line
+AUDIT_EVENTS_KEPT_IN_MEMORY = 1000
+
+
 class AuditLog:
     """Structured audit events. Field allowlist: no SQL text, no row values, no question text."""
 
@@ -215,7 +222,7 @@ class AuditLog:
                "pinned", "archived", "rules", "temporary"}
 
     def __init__(self):
-        self.events: list[dict] = []
+        self.events: deque[dict] = deque(maxlen=AUDIT_EVENTS_KEPT_IN_MEMORY)
         self._lock = threading.Lock()
 
     def __call__(self, event: str, **detail):
@@ -239,6 +246,8 @@ class _Run:
     conversation_id: str | None = None
     #: set when the conversation is deleted mid-run: the worker must not write it back (no resurrection)
     discarded: threading.Event = field(default_factory=threading.Event)
+    #: held while a run-event chunk is written and while ``discarded`` is set, so no chunk lands after a delete
+    run_event_chunk_lock: threading.Lock = field(default_factory=threading.Lock)
     #: events not yet in a stored chunk, chunks written, when the last one was written (RUN_EVENT_CHUNK_*)
     unstored_events: list = field(default_factory=list)
     stored_chunks: int = 0
@@ -309,6 +318,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
     temp_chats = TemporaryChats(settings.temporary_ttl_seconds)  # 1.20.0: never persisted (api/temporary.py)
     downloads = DownloadRegistry()
     runs: dict[str, _Run] = {}
+    #: the per-user cap check and the run's registration happen under this lock (chat runs on the thread pool)
+    runs_registration_lock = threading.Lock()
     purge_lock = threading.Lock()  # a delete and a run's final transcript write never interleave
 
     @asynccontextmanager
@@ -381,7 +392,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         the next gc. Also drops pending clarifications (they hold the question text) and revokes CSV downloads."""
         for run in list(runs.values()):
             if run.principal == principal and (conversation_id is None or run.conversation_id == conversation_id):
-                run.discarded.set()
+                with run.run_event_chunk_lock:  # a chunk write in progress finishes first; later ones see discarded
+                    run.discarded.set()
                 run.cancelled.set()
         for key, pending in list(clarifications.items()):
             if pending["principal"] == principal and (conversation_id is None
@@ -394,9 +406,9 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
 
     def gc_runs():
         now = time.time()
-        for key in [k for k, r in runs.items() if r.finished_at and (
+        for key in [k for k, r in list(runs.items()) if r.finished_at and (
                 r.discarded.is_set() or now - r.finished_at > settings.resume_seconds)]:
-            del runs[key]
+            runs.pop(key, None)
 
     @app.get("/api/health")
     def health():
@@ -456,7 +468,17 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         return JSONResponse({"error": error}, status, headers=NO_STORE)
 
     @app.post("/api/chat")
-    async def chat(body: ChatRequest, request: Request):
+    def chat(body: ChatRequest, request: Request):
+        """A plain ``def``: FastAPI runs it on the thread pool, so the blocking store calls (S3 reads and conditional
+        writes, their retry backoff) never stall the event loop. The stream itself is async (``_stream``)."""
+        runs_reserved_by_this_request: list[_Run] = []
+        try:
+            return start_chat(body, request, runs_reserved_by_this_request)
+        finally:
+            for reserved_run in runs_reserved_by_this_request:  # the request ended before its worker started
+                runs.pop(reserved_run.message_id, None)
+
+    def start_chat(body: ChatRequest, request: Request, runs_reserved_by_this_request: list):
         gc_runs()
         last_event = request.headers.get("last-event-id")
         if last_event and ":" in last_event:
@@ -466,7 +488,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 ctx = authed(request, new_id("r"))
             except AuthError:
                 return unauthorized()
-            after = int(seq) if seq.isascii() and seq.isdigit() else -1
+            after = _last_event_sequence_number(seq)
             if run is None and stored_run_events(ctx.principal, mid):
                 return _stream_stored(ctx.principal, mid, after, request)
             if run is None or run.principal != ctx.principal:
@@ -518,14 +540,22 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 headers={**NO_STORE, "Retry-After": "3"},
             )
         # One user can't pin the analyzer threads: at most max_concurrent_runs unfinished runs per principal.
-        active = sum(1 for r in list(runs.values()) if r.principal == ctx.principal and not r.done)
-        if active >= settings.max_concurrent_runs:
-            audit("chat_rate_limited", customer=ctx.principal.customer, user=ctx.principal.user, reason="concurrent_runs")
-            return JSONResponse(
-                {"error": {"code": "rate_limited", "message": "Too many answers in progress. Wait for one to finish."}},
-                429,
-                headers={**NO_STORE, "Retry-After": "3"},
-            )
+        # The run is registered with the check, before the user message is saved: a second tab can't count past it,
+        # and a delete of the conversation from here on discards it (its final write can't resurrect the chat).
+        with runs_registration_lock:
+            active = sum(1 for r in list(runs.values()) if r.principal == ctx.principal and not r.done)
+            if active >= settings.max_concurrent_runs:
+                audit("chat_rate_limited", customer=ctx.principal.customer, user=ctx.principal.user,
+                      reason="concurrent_runs")
+                return JSONResponse(
+                    {"error": {"code": "rate_limited",
+                               "message": "Too many answers in progress. Wait for one to finish."}},
+                    429,
+                    headers={**NO_STORE, "Retry-After": "3"},
+                )
+            run = _Run(message_id, ctx.principal, conversation_id=conversation_id)
+            runs[message_id] = run
+            runs_reserved_by_this_request.append(run)
         start_extra: dict = {}
         scenario_hint = body.scenario if demo else None
         if body.regenerate:
@@ -609,8 +639,6 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 return shredded()
             prior = prior_artifacts((conv or {}).get("messages", []), user_msg.get("parentId"), user_msg.get("id"))
         legacy_tools = bool(body.options.get("legacyToolParts"))
-        run = _Run(message_id, ctx.principal, conversation_id=conversation_id)
-        runs[message_id] = run
         started = time.perf_counter()
         sql_policy = settings.sql_literal_masking if settings.sql_literal_masking in SQL_MASK_POLICIES else "phi"
         marks: dict = {}
@@ -751,7 +779,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             try:
                 with purge_lock:
                     if not run.discarded.is_set():
-                        cstore.append_message(ctx.principal, conversation_id, record)
+                        # never creates: a delete on another API task must not be undone by this answer
+                        cstore.append_message(ctx.principal, conversation_id, record, create_if_missing=False)
             except Exception as exc:  # noqa: BLE001 - a history write must not hang the stream
                 log.warning("transcript append failed: %s", type(exc).__name__)
             audit("chat_message", customer=ctx.principal.customer, user=ctx.principal.user,
@@ -769,6 +798,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             run.notify()
 
         threading.Thread(target=work, name=f"chat-{message_id}", daemon=True).start()
+        runs_reserved_by_this_request.clear()  # the worker owns the run now
 
         return _stream(run, -1, request)
 
@@ -779,14 +809,17 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         run.unstored_events.append(event)
         due = (event["type"] == "message.end" or len(run.unstored_events) >= RUN_EVENT_CHUNK_EVENTS
                or time.monotonic() - run.last_chunk_at >= RUN_EVENT_CHUNK_SECONDS)
-        if not due or run.discarded.is_set():
+        if not due:
             return
-        try:
-            store.put_run_events(run.principal, run.conversation_id, run.message_id, run.stored_chunks,
-                                 run.unstored_events)
-        except Exception as exc:  # noqa: BLE001 - replay from another task is best effort; this one still streams
-            log.warning("run event chunk write failed: %s", type(exc).__name__)
-            return
+        with run.run_event_chunk_lock:  # forget() sets discarded under it: no chunk is written after a delete
+            if run.discarded.is_set():
+                return
+            try:
+                store.put_run_events(run.principal, run.conversation_id, run.message_id, run.stored_chunks,
+                                     run.unstored_events)
+            except Exception as exc:  # noqa: BLE001 - replay from another task is best effort; this one still streams
+                log.warning("run event chunk write failed: %s", type(exc).__name__)
+                return
         run.stored_chunks += 1
         run.unstored_events = []
         run.last_chunk_at = time.monotonic()
@@ -887,7 +920,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         run = runs.get(message_id)
         last_event = request.headers.get("last-event-id") or ""
         mid, _, seq = last_event.rpartition(":")
-        after = int(seq) if mid == message_id and seq.isascii() and seq.isdigit() else -1
+        after = _last_event_sequence_number(seq) if mid == message_id else -1
         if run is None and stored_run_events(ctx.principal, message_id):
             return _stream_stored(ctx.principal, message_id, after, request)
         if run is None or run.principal != ctx.principal:
@@ -988,9 +1021,9 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         except AuthError:
             return unauthorized()
         with purge_lock:
+            forget(ctx.principal, None)  # first: in-flight runs stop writing chunks before the objects go
             count = store.delete_all(ctx.principal)
             temp_chats.delete_all(ctx.principal)  # 1.20.0: "Delete all chats" ends temporary ones too (not counted)
-            forget(ctx.principal, None)
         return JSONResponse({"deleted": count}, headers=NO_STORE)
 
     @app.get("/api/conversations/{conversation_id}")
@@ -1106,11 +1139,12 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         except AuthError:
             return unauthorized()
         with purge_lock:
+            # First: in-flight runs stop writing run-event chunks before the objects go, so none survives the delete.
+            # Harmless when nothing is deleted below: the principal has no such conversation to run against.
+            forget(ctx.principal, conversation_id)
             # 1.20.0: discarding a temporary chat (the client's "close") drops its in-process history and CSVs
             ok = temp_chats.delete_conversation(ctx.principal, conversation_id) \
                 or store.delete_conversation(ctx.principal, conversation_id)
-            if ok:
-                forget(ctx.principal, conversation_id)
         if not ok:  # 1.13.0: keep `deleted: false` and add the standard envelope
             return JSONResponse({"deleted": False, "error": {"code": "not_found", "message": "Not found."}}, 404,
                                 headers=NO_STORE)
@@ -1126,6 +1160,17 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
 def _error(code: str, title: str, message: str, retryable: bool) -> dict:
     return {"type": "error", "id": new_id("p_"), "code": code, "title": title, "message": message,
             "retryable": retryable}
+
+
+#: a Last-Event-ID sequence number longer than this is invalid (int() refuses > 4300 digits with a ValueError)
+MAX_LAST_EVENT_SEQUENCE_DIGITS = 18
+
+
+def _last_event_sequence_number(text: str) -> int:
+    """The ``seq`` part of a ``Last-Event-ID`` (``{messageId}:{seq}``), or -1 (replay everything) when invalid."""
+    if text.isascii() and text.isdigit() and len(text) <= MAX_LAST_EVENT_SEQUENCE_DIGITS:
+        return int(text)
+    return -1
 
 
 def _sse(event_id: str | None, payload: dict) -> str:

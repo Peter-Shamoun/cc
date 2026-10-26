@@ -34,8 +34,13 @@ CASES = [  # (sql, phi-masked, all-masked)
     ("SELECT 1 FROM c WHERE note = 'call 555-123-4567 re 123-45-6789'", "SELECT 1 FROM c WHERE note = ?", None),
     ("SELECT 1 FROM c WHERE \"Member_ID\" = 'XYZ123456789' AND x = 'it''s'",
      "SELECT 1 FROM c WHERE \"Member_ID\" = ? AND x = 'it''s'", "SELECT 1 FROM c WHERE \"Member_ID\" = ? AND x = ?"),
-    ("SELECT 1 FROM c WHERE claim_id = 'CLM-0004411' -- 'Testperson' in a comment stays a comment",
-     "SELECT 1 FROM c WHERE claim_id = ? -- 'Testperson' in a comment stays a comment", None),
+    ("SELECT 1 FROM c WHERE claim_id = 'CLM-0004411' -- 'Testperson' in a comment is hidden too",
+     "SELECT 1 FROM c WHERE claim_id = ? -- ?", None),
+    ("SELECT 1 /* patient 123-45-6789 */ FROM c", "SELECT 1 /* ? */ FROM c", "SELECT 1 /* ? */ FROM c"),
+    # DuckDB dollar-quoted strings are string literals like '…'
+    ("SELECT 1 FROM c WHERE patient_last_name = $$Testperson$$", "SELECT 1 FROM c WHERE patient_last_name = ?", None),
+    ("SELECT 1 FROM c WHERE note = $t$123-45-6789$t$ AND status = $$paid$$",
+     "SELECT 1 FROM c WHERE note = ? AND status = $$paid$$", "SELECT 1 FROM c WHERE note = ? AND status = ?"),
     ("SELECT 1 FROM c WHERE amount > 100 AND quarter = '2026-Q1'",
      "SELECT 1 FROM c WHERE amount > 100 AND quarter = '2026-Q1'", "SELECT 1 FROM c WHERE amount > ? AND quarter = ?"),
 ]
@@ -54,6 +59,7 @@ def test_policies(sql, phi, all_):
 
 def test_unparseable_sql_fails_closed():
     assert mask_sql("SELECT 1 WHERE mrn = '00123456", "phi") == (UNPARSEABLE, 1)
+    assert mask_sql("SELECT 1 WHERE last_name = $$Testperson", "phi") == (UNPARSEABLE, 1)  # unterminated $$
     assert mask_sql("SELECT 1 WHERE mrn = '00123456", "off")[1] == 0
 
 

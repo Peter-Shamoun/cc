@@ -9,6 +9,9 @@ simulator agree):
   ``{customer}/transcripts/users/{user_hash}/meta/{conversation}.json``   no text: ids, times, counts
   ``{customer}/transcripts/users/{user_hash}/content/{conversation}.bin`` AES-GCM(title + messages)
   ``{customer}/transcripts/users/{user_hash}/dek.bin``                   per-user data key, wrapped
+  ``transcripts/conversation-owners/{conversation}.json``                 owning user hash (no text): claimed with
+                                                                          If-None-Match when a conversation is created,
+                                                                          so a conversation id has one owner bucket-wide
 
   The data key is wrapped by the customer's transcript key (``Keyring``; in production the KMS CMK
   ``alias/cc/{customer}/transcripts``, here a local stand-in). Each AES-GCM seal binds
@@ -51,7 +54,11 @@ from api.store import (DEFAULT_TITLE, InMemoryTranscriptStore, Principal, _iso, 
 TRANSCRIPT_RETENTION_DAYS = 90
 CONDITIONAL_WRITE_ATTEMPTS = 8
 CONDITIONAL_WRITE_BACKOFF_SECONDS = 0.02
-_SAFE = re.compile(r"[A-Za-z0-9_:.-]{1,128}")  # always fullmatch: `$` would accept a trailing "\n"
+#: always fullmatch (`$` would accept a trailing "\n"). Starts alphanumeric: "." / ".." would be path segments.
+_SAFE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_:.-]{0,127}")
+CONVERSATION_OWNERS_PREFIX = "transcripts/conversation-owners/"
+#: how long a process trusts its cached copy of a user's retention setting (another API task may change it)
+RETENTION_CACHE_SECONDS = 60.0
 _USER_PREFIX = re.compile(r"^[A-Za-z0-9_:.-]{1,128}/transcripts/users/[0-9a-f]{32}/")
 
 
@@ -87,6 +94,10 @@ class PreconditionFailed(Exception):
 
 class ConcurrentUpdateConflict(RuntimeError):
     """A conversation kept changing under every retry of a conditional write."""
+
+
+class ConversationMissing(LookupError):
+    """The conversation is gone (deleted or expired): nothing may be written under it any more."""
 
 
 def etag_of(body: bytes) -> str:
@@ -265,16 +276,25 @@ class Keyring:
             if customer in self._disabled or (self._file(customer) and self._file(customer).with_suffix(".disabled").exists()):
                 raise CustomerKeyDisabled(customer)
             if customer not in self._keys:
-                path = self._file(customer)
-                if path and path.exists():
-                    self._keys[customer] = path.read_bytes()
-                else:
-                    self._keys[customer] = AESGCM.generate_key(256)
-                    if path:
-                        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-                        with os.fdopen(fd, "wb") as fh:
-                            fh.write(self._keys[customer])
+                self._keys[customer] = self._load_or_create(customer)
             return self._keys[customer]
+
+    def _load_or_create(self, customer: str) -> bytes:
+        """The key file wins: a new key is cached only once it is the one on disk (another process may have
+        created the file first, and caching a key that lost that race would seal data nobody else can open)."""
+        path = self._file(customer)
+        if path is None:
+            return AESGCM.generate_key(256)
+        if path.exists():
+            return path.read_bytes()
+        new_key = AESGCM.generate_key(256)
+        try:
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError:
+            return path.read_bytes()
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(new_key)
+        return new_key
 
     def disable(self, customer: str) -> None:
         with self._lock:
@@ -308,7 +328,7 @@ class SealedTranscriptStore:
         self.default_retention_days = default_retention_days
         self._audit = audit or (lambda event, **kw: None)
         self._lock = threading.RLock()
-        self._retention: dict[Principal, int] = {}
+        self._retention: dict[Principal, tuple[int, float]] = {}  # (days, time.monotonic() when read)
 
     # ---- interface -------------------------------------------------------------------------------
     def list_conversations(self, principal, cursor=None, query=None, archived="include"):
@@ -325,10 +345,10 @@ class SealedTranscriptStore:
         return {"id": conv["id"], "title": conv["title"], "updatedAt": _iso(conv["updatedAt"]), **flags(conv),
                 "messages": conv["messages"]}
 
-    def append_message(self, principal, conversation_id, message):
+    def append_message(self, principal, conversation_id, message, *, create_if_missing=True):
+        """Creating a conversation claims its id (``_claim_conversation_id``); ``create_if_missing=False`` (a run's
+        final answer) skips a conversation deleted meanwhile, so the answer can't resurrect it."""
         _check_id(conversation_id)
-        if self.owned_by_other(principal, conversation_id):
-            raise PermissionError("conversation belongs to another principal")
 
         def append(conv):
             unarchive_on_user_message(conv, message)
@@ -336,7 +356,7 @@ class SealedTranscriptStore:
             conv["updatedAt"] = time.time()
             return None, True
 
-        self._change(principal, conversation_id, append, create=True)
+        self._change(principal, conversation_id, append, create=create_if_missing)
 
     def rename_conversation(self, principal, conversation_id, title):
         return self.update_conversation(principal, conversation_id, title=title)
@@ -386,6 +406,9 @@ class SealedTranscriptStore:
             for key in keys:
                 if key != f"{prefix}retention.json":  # the user's setting, not chat data: keep it
                     self.blobs.delete(key)
+            for key in keys:
+                if key.startswith(f"{prefix}meta/") and key.endswith(".json"):
+                    self._release_conversation_id(principal, key[len(f"{prefix}meta/"):-5])
         self._audit("conversations_deleted", customer=principal.customer, user=principal.user, row_count=count)
         return count
 
@@ -394,15 +417,18 @@ class SealedTranscriptStore:
             raise ValueError("days must be >= 0")
         days = min(days, self.default_retention_days)
         with self._lock:
-            self._retention[principal] = days
+            self._retention[principal] = (days, time.monotonic())
             # Persisted beside the user's objects so it survives restarts and the sweep can read it. Days only.
             self.blobs.put(f"{self._prefix(principal)}retention.json", json.dumps({"days": days}).encode())
         self._expire(principal)
 
     def retention_days(self, principal):
-        if principal not in self._retention:
-            self._retention[principal] = self._stored_days(self._prefix(principal))
-        return self._retention[principal]
+        """The stored setting, re-read after RETENTION_CACHE_SECONDS so a change made on another task applies."""
+        cached = self._retention.get(principal)
+        if cached is None or time.monotonic() - cached[1] > RETENTION_CACHE_SECONDS:
+            cached = (self._stored_days(self._prefix(principal)), time.monotonic())
+            self._retention[principal] = cached
+        return cached[0]
 
     def purge_expired(self, now: float | None = None) -> int:
         """Sweep every user under every customer, not just the ones who come back. Deletes expired meta and
@@ -422,10 +448,14 @@ class SealedTranscriptStore:
         return None
 
     def owned_by_other(self, principal, conversation_id) -> bool:
+        """One GET of the conversation's owner record (no bucket listing). A conversation of this principal saved
+        before owner records existed stays theirs even if another user has claimed the id since."""
         if not _SAFE.fullmatch(conversation_id or ""):
             return False
-        mine = f"{self._prefix(principal)}meta/{conversation_id}.json"
-        return any(k.endswith(f"/meta/{conversation_id}.json") and k != mine for k in self.blobs.list(""))
+        owner = self._conversation_owner(conversation_id)
+        if owner is None or owner == self._user_hash(principal):
+            return False
+        return self.blobs.get(f"{self._prefix(principal)}meta/{conversation_id}.json") is None
 
     def crypto_shred_customer(self, customer: str) -> None:
         self.keyring.disable(customer)
@@ -436,6 +466,8 @@ class SealedTranscriptStore:
         """Chunk ``chunk_number`` of a run's events. Write-once: a second writer of the same chunk is an error."""
         _check_id(conversation_id)
         _check_id(message_id)
+        if self.blobs.get(f"{self._prefix(principal)}meta/{conversation_id}.json") is None:
+            raise ConversationMissing("conversation deleted: its run events are not kept")
         key = f"{self._prefix(principal)}runs/{conversation_id}/{message_id}/{chunk_number:06d}.bin"
         body = json.dumps(events, separators=(",", ":"), default=str).encode()
         sealed = _seal(self._dek(principal, create=True), body, self._aad(principal, f"run:{message_id}:{chunk_number}"))
@@ -487,6 +519,29 @@ class SealedTranscriptStore:
             self.blobs.delete(key)
         self.blobs.delete(f"{prefix}content/{conversation_id}.bin")
         self.blobs.delete(f"{prefix}meta/{conversation_id}.json")
+        self._release_conversation_id_of_user_hash(prefix.rstrip("/").rsplit("/", 1)[-1], conversation_id)
+
+    def _release_conversation_id(self, principal, conversation_id: str) -> None:
+        self._release_conversation_id_of_user_hash(self._user_hash(principal), conversation_id)
+
+    def _release_conversation_id_of_user_hash(self, user_hash: str, conversation_id: str) -> None:
+        """Delete the owner record, unless another user holds it (a conversation saved before owner records)."""
+        if self._conversation_owner(conversation_id) == user_hash:
+            self.blobs.delete(f"{CONVERSATION_OWNERS_PREFIX}{conversation_id}.json")
+
+    def _conversation_owner(self, conversation_id: str) -> str | None:
+        raw = self.blobs.get(f"{CONVERSATION_OWNERS_PREFIX}{conversation_id}.json")
+        return json.loads(raw)["owner"] if raw else None
+
+    def _claim_conversation_id(self, principal, conversation_id: str) -> None:
+        """Create the owner record (If-None-Match); one that names another user means the id is taken."""
+        mine = self._user_hash(principal)
+        try:
+            self.blobs.put(f"{CONVERSATION_OWNERS_PREFIX}{conversation_id}.json",
+                           json.dumps({"owner": mine}).encode(), if_none_match=True)
+        except PreconditionFailed:
+            if self._conversation_owner(conversation_id) != mine:
+                raise PermissionError("conversation belongs to another principal") from None
 
     @staticmethod
     def _user_hash(principal) -> str:
@@ -513,7 +568,10 @@ class SealedTranscriptStore:
         if not create:
             return None
         dek = AESGCM.generate_key(256)
-        self.blobs.put(key, _seal(kek, dek, self._aad(principal, "transcript-dek")))
+        try:
+            self.blobs.put(key, _seal(kek, dek, self._aad(principal, "transcript-dek")), if_none_match=True)
+        except PreconditionFailed:  # another task created it first: use that one, never overwrite it
+            return _open(kek, self.blobs.get(key), self._aad(principal, "transcript-dek"))
         return dek
 
     def _save(self, principal, conv: dict, etag: str | None) -> None:
@@ -523,6 +581,8 @@ class SealedTranscriptStore:
         sealed.update({k: conv[k] for k in ("pinned", "pinnedAt", "archived") if conv.get(k)})  # 1.17.0, sealed too
         body = json.dumps(sealed, separators=(",", ":"), default=str).encode()
         prefix = self._prefix(principal)
+        if etag is None:
+            self._claim_conversation_id(principal, conv["id"])
         self.blobs.put(f"{prefix}content/{conv['id']}.bin",
                        _seal(dek, body, self._aad(principal, f"content:{conv['id']}")),
                        if_match=etag, if_none_match=etag is None)

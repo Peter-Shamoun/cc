@@ -29,19 +29,20 @@ def test_two_tabs_share_one_cap():
     assert ask(tab_b, "How many claims?")[1][-1]["type"] == "message.end"
 
 
-def _chat_fn() -> ast.AsyncFunctionDef:
+def _chat_fn() -> ast.FunctionDef:
     tree = ast.parse(textwrap.dedent(inspect.getsource(app_module.create_app)))
-    return next(n for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef) and n.name == "chat")
+    return next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "start_chat")
 
 
 def test_cap_check_and_run_registration_are_atomic():
+    """chat runs on the thread pool (blocking store calls stay off the event loop), so the per-user cap check and
+    the run's registration share one ``with runs_registration_lock`` block: a second tab can't count the same runs."""
     fn = _chat_fn()
-    check = next(n.lineno for n in ast.walk(fn) if isinstance(n, ast.Assign)
-                 and any(isinstance(t, ast.Name) and t.id == "active" for t in n.targets))
-    register = next(n.lineno for n in ast.walk(fn) if isinstance(n, ast.Assign) and any(
-        isinstance(t, ast.Subscript) and isinstance(t.value, ast.Name) and t.value.id == "runs" for t in n.targets))
-    assert check < register
-    awaits = [n.lineno for n in ast.walk(fn) if isinstance(n, (ast.Await, ast.AsyncFor, ast.AsyncWith))
-              and check <= n.lineno <= register]
-    # An await here would let a second tab's request count the same runs before this one registers.
-    assert awaits == [], f"await between cap check and run registration at lines {awaits}"
+    lock_block = next(n for n in ast.walk(fn) if isinstance(n, ast.With) and any(
+        isinstance(item.context_expr, ast.Name) and item.context_expr.id == "runs_registration_lock" for item in n.items))
+    inside = list(ast.walk(lock_block))
+    assert any(isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "active" for t in n.targets)
+               for n in inside)
+    assert any(isinstance(n, ast.Assign) and any(isinstance(t, ast.Subscript) and isinstance(t.value, ast.Name)
+                                                 and t.value.id == "runs" for t in n.targets) for n in inside)
+    assert not any(isinstance(n, (ast.Await, ast.AsyncFor, ast.AsyncWith)) for n in ast.walk(fn))

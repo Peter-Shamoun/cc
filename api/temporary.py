@@ -25,8 +25,8 @@ class TemporaryChats(InMemoryTranscriptStore):
         self.ttl_seconds = ttl_seconds
         self.max_per_user = max_per_user
 
-    def append_message(self, principal, conversation_id, message):
-        super().append_message(principal, conversation_id, message)
+    def append_message(self, principal, conversation_id, message, *, create_if_missing=True):
+        super().append_message(principal, conversation_id, message, create_if_missing=create_if_missing)
         with self._lock:
             mine = sorted((cid for cid, owner in self._owners.items() if owner == principal),
                           key=lambda cid: self._items[cid]["updatedAt"])

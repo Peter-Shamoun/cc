@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from analyzer.llm import ToolCall
 
 from api.ids import new_id
+from api.sql_mask import PHI_VALUE
 
 # USD per million tokens (input, output). Static estimate table; demo mode never bills anything.
 PRICES = {"haiku": (1.0, 5.0), "sonnet": (3.0, 15.0), "opus": (15.0, 75.0)}
@@ -52,6 +53,13 @@ def scrub(text: str, limit: int = 300) -> str:
     text = re.sub(r"\b(?=[A-Za-z0-9]*[A-Za-z])(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{6,}\b", "…", text)
     text = re.sub(r"\d{4,}", "…", text)
     return text[:limit]
+
+
+def masked_explore_target(text: str, limit: int = 120) -> str:
+    """A model-chosen lookup argument (relation, glossary term, example query) as shown and persisted: quoted strings
+    and identifier-like values (SSN, e-mail, phone, long or mixed ids; sql_mask.PHI_VALUE) become "…"."""
+    text = re.sub(r"'[^']*'", "'…'", str(text or ""))
+    return PHI_VALUE.sub("…", text)[:limit]
 
 
 def _error_code(message: str) -> str:
@@ -338,7 +346,7 @@ class LiveTap:
             summary = "Done"
         ev = {"type": "step.explore", "stepId": pend.step_id, "probe": probe, "summary": summary, "elapsedMs": elapsed}
         if target:
-            ev["target"] = str(target)[:120]
+            ev["target"] = masked_explore_target(target)
         self._step(ev)
 
     # -- after Analyzer.answer() returns
