@@ -1,13 +1,13 @@
 """Retention sweep and deletion that honours the transcript encryption design (docs/frontend_transcripts.md).
 Synthetic data only."""
 import json
-import time
 
 from fastapi.testclient import TestClient
 
 from api.app import Settings, _Run, create_app
 from api.store import DownloadRegistry, InMemoryTranscriptStore, Principal
 from api.tests.conftest import LABS, ask
+from api.tests.timing import wait_until
 from api.transcripts import Keyring, MemoryBlobs, SealedTranscriptStore
 
 A = Principal("acme_labs", "ana@xifin.example")
@@ -136,9 +136,7 @@ def test_delete_mid_stream_does_not_resurrect_the_conversation():
         assert client.delete(f"/api/conversations/{cid}", headers=LABS).json() == {"deleted": True}
         for _ in lines:
             pass
-    deadline = time.time() + 5
-    while any(not run.done for run in app.state.runs.values()) and time.time() < deadline:
-        time.sleep(0.02)
+    wait_until(lambda: all(run.done for run in app.state.runs.values()), 5)
     assert client.get(f"/api/conversations/{cid}", headers=LABS).status_code == 404
     assert client.get("/api/conversations", headers=LABS).json()["items"] == []
 

@@ -66,6 +66,33 @@ def _approx_tokens(obj) -> int:
     return max(1, len(json.dumps(obj, default=str)) // 4)
 
 
+
+def partition_ms(stages: dict, total_ms: int) -> dict:
+    """Whole-ms stages that sum to exactly ``total_ms`` (CONTRACT.md §7), however loaded the machine is.
+
+    The tap's clock starts after the run's (request parsing, history) and is read again after ``totalMs`` was taken,
+    so the raw wall-clock stages differ from ``totalMs`` by a few ms, more under load. Time before the tap started is
+    planning, so a shortfall goes to ``plan``; an excess is taken from the largest stages. Rounding uses largest
+    remainders, so no stage moves by more than the drift plus 1 ms, and none goes negative."""
+    raw = {k: max(0.0, float(stages.get(k, 0.0))) for k in STAGES}
+    total_ms = max(0, int(total_ms))
+    drift = total_ms - sum(raw.values())
+    if drift > 0:
+        raw["plan"] += drift
+    elif drift < 0:
+        excess = -drift
+        for k in sorted(raw, key=raw.get, reverse=True):
+            take = min(raw[k], excess)
+            raw[k] -= take
+            excess -= take
+            if excess <= 0:
+                break
+    out = {k: int(v) for k, v in raw.items()}
+    short = total_ms - sum(out.values())
+    for k in sorted(raw, key=lambda k: raw[k] - out[k], reverse=True)[:max(0, short)]:
+        out[k] += 1
+    return out
+
 @dataclass
 class _Pending:
     step_id: str
@@ -386,7 +413,7 @@ class LiveTap:
             cost += c
         self.enter(self._stage)
         latency = {"totalMs": elapsed_ms, "modelMs": int(self.stats.model_ms), "sqlMs": int(self.stats.sql_ms),
-                   "stages": {k: int(round(self.stats.stages[k])) for k in STAGES}}
+                   "stages": partition_ms(self.stats.stages, elapsed_ms)}
         if first_event_ms is not None:
             latency["firstEventMs"] = first_event_ms
         if self.stats.first_step_ms is not None:
