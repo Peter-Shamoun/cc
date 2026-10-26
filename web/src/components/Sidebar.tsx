@@ -137,7 +137,7 @@ function ThreadRow({ t, active, tabStop, renaming, setRenaming, onSelect, onRena
           onBlur={(e) => { onRename(t.id, e.currentTarget.value); setRenaming(null); }}
           onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { e.currentTarget.value = t.title; setRenaming(null); } }} />
       ) : (
-        <button type="button" data-thread-link tabIndex={tabStop ? 0 : -1} aria-current={active ? 'page' : undefined} onClick={() => onSelect(t.id)} onDoubleClick={() => setRenaming(t.id)}
+        <button type="button" data-thread-link={t.id} tabIndex={tabStop ? 0 : -1} aria-current={active ? 'page' : undefined} onClick={() => onSelect(t.id)} onDoubleClick={() => setRenaming(t.id)}
           onKeyDown={(e) => { if (e.key === 'F2') { e.preventDefault(); setRenaming(t.id); } if (e.key === 'Delete') { e.preventDefault(); onDelete(t.id); } }}
           className="min-w-0 flex-1 truncate py-2 pl-2.5 pr-8 text-left [mask-image:linear-gradient(to_right,black_85%,transparent)] group-hover:[mask-image:linear-gradient(to_right,black_70%,transparent)]" title={t.title}>
           {t.pinned && <Pin size={12} className="mr-1.5 inline -translate-y-px text-fg-subtle" aria-label="Pinned" />}
