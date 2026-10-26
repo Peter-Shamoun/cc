@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
-import { LIVE, open, ask, composer, sendBtn, stopBtn, lastAssistant, waitIdle, sse, contractExample, gap, type Ev } from './helpers';
+import { LIVE, open, ask, composer, sendBtn, stopBtn, lastAssistant, waitIdle, sse, contractExample, type Ev } from './helpers';
 
 // Chaos pass (PETER DIRECTIVE: every edge case). Faults at every stream event, malformed and odd streams, HTTP failures,
 // reload at every stage, multi-tab, 200% zoom / 320px reflow, RTL, and a seeded monkey. Desktop project only (@chaos is
