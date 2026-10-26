@@ -6,8 +6,22 @@
  * owner can revoke it at any time. Open a `ShareLink.url` (`/shared/<shareId>`) in the app, which loads
  * `GET /api/shared/<shareId>`.
  * Never log the share id or put row data in the URL. The share id is a capability inside the org.
+ *
+ * 1.15.0: links expire (`expiresInDays` 7 | 30 | 90, default 30; an expired link is a plain 404), and turning
+ * `includeData` on issues a NEW id and revokes the old one (`ShareLink.rotated`), so show the new link. With data
+ * off, SQL is withheld too (`SharedConversation.sqlWithheld`).
  */
-import type { ShareLink, SharedConversation } from './v1.gen';
+import type { ShareExpiryDays, ShareLink, SharedConversation } from './v1.gen';
+
+export const SHARE_EXPIRY_DAYS: readonly ShareExpiryDays[] = [7, 30, 90];
+export const DEFAULT_SHARE_EXPIRY_DAYS: ShareExpiryDays = 30;
+
+/** Whole days left before `expiresAt` (0 once expired), or null when the link has no expiry (pre-1.15 server). */
+export function shareDaysLeft(link: Pick<ShareLink, 'expiresAt'>, now: number = Date.now()): number | null {
+  if (!link.expiresAt) return null;
+  const ms = Date.parse(link.expiresAt) - now;
+  return Number.isFinite(ms) ? Math.max(0, Math.ceil(ms / 86_400_000)) : null;
+}
 
 type Opts = { base?: string; init?: RequestInit; fetchImpl?: typeof fetch };
 
@@ -39,11 +53,17 @@ export function getShare(conversationId: string, o: Opts = {}): Promise<ShareLin
   return call<ShareLink | null>(shareUrl(conversationId, base), { ...init, method: 'GET' }, fetchImpl, null);
 }
 
-/** Create the share, or update `includeData` on the existing one. Rejects on 404 (not your conversation). */
-export async function setShare(conversationId: string, includeData = false, o: Opts = {}): Promise<ShareLink> {
+/**
+ * Create the share, or update `includeData` on the existing one. Rejects on 404 (not your conversation).
+ * `expiresInDays` (1.15.0) restarts the lifetime from now; omit it to keep the current expiry. When the result has
+ * `rotated: true`, the old link no longer works.
+ */
+export async function setShare(conversationId: string, includeData = false,
+  o: Opts & { expiresInDays?: ShareExpiryDays } = {}): Promise<ShareLink> {
   const { base, init, fetchImpl } = defaults(o);
+  const body = o.expiresInDays === undefined ? { includeData } : { includeData, expiresInDays: o.expiresInDays };
   const link = await call<ShareLink | null>(shareUrl(conversationId, base),
-    { ...init, method: 'PUT', headers: headers(init), body: JSON.stringify({ includeData }) }, fetchImpl, null);
+    { ...init, method: 'PUT', headers: headers(init), body: JSON.stringify(body) }, fetchImpl, null);
   if (!link) throw new Error('share request failed: 404');
   return link;
 }
