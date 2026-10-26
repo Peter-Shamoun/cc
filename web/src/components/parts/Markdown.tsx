@@ -1,3 +1,4 @@
+import { onceOk } from '../../lib/onceOk';
 import { memo, useEffect, useState } from 'react';
 import clsx from 'clsx';
 
@@ -13,11 +14,8 @@ export { displayMath, loadMath, mayContainMath } from './markdownText';
  */
 type Impl = typeof import('./MarkdownImpl');
 let impl: Impl | null = null;
-let loading: Promise<Impl> | null = null;
-export function preloadMarkdown(): Promise<Impl> {
-  loading ??= import('./MarkdownImpl').then((m) => (impl = m));
-  return loading;
-}
+// A failed load (offline at idle-prefetch time) is retried on next use (lib/onceOk), not cached.
+export const preloadMarkdown: () => Promise<Impl> = onceOk(() => import('./MarkdownImpl').then((m) => (impl = m)));
 
 function useImpl(): Impl | null {
   const [m, setM] = useState<Impl | null>(impl);
