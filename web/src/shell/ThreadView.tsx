@@ -1,17 +1,19 @@
 import { memo, useRef, type CSSProperties, type MutableRefObject, type RefObject } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { AssistantTurn, REFINE_PROMPT, UserBubble, messageMarkdown, type Artifact } from '../components/Message';
+import { AssistantTurn, UserBubble, messageMarkdown, type Artifact } from '../components/Message';
 import type { ViewMessage } from '../lib/useChat';
 import type { AnyView } from '../components/answer/normalize';
 import type { OnReply } from '../components/answer/States';
 
 /** Callbacks for the thread rows. Held in a ref so rows can be memoised by message identity (QA-S7). */
+import type { RegenerateStyle } from '../api/contract';
 export interface ThreadActions {
   editAt: (i: number, text: string) => void;
   switchVersion: (i: number, k: number) => void;
-  versionOf: (i: number) => { current: number; total: number } | undefined;
+  versionOf: (i: number) => { current: number; total: number; answersOnly?: boolean } | undefined;
   openArtifact: (a: Artifact) => void;
-  regenerate: () => void;
+  /** Re-run the last answer in place as a new version; `style` = contract 1.10.0 regenerate style. */
+  regenerate: (style?: RegenerateStyle) => void;
   editIntoComposer: (t: string) => void;
   send: (t: string) => void;
   /** Clarify/abstain replies (answer team: set this to resume-aware send once useChat takes {resume}). */
@@ -57,7 +59,9 @@ const Row = memo(function Row({ msg, index, isLast, reserve, lazy, busy, vCur, v
       <AssistantTurn msg={msg as AnyView} isLast={isLast} onOpen={(x) => actions.current.openArtifact(x)} onRegenerate={() => actions.current.regenerate()}
         onEdit={(t) => actions.current.editIntoComposer(t)} onSend={(t) => actions.current.send(t)}
         onReply={a.reply ? (t, r) => actions.current.reply?.(t, r) : undefined}
-        onRefine={isLast ? (style) => actions.current.send(REFINE_PROMPT[style]) : undefined} />
+        version={vCur !== undefined && vTotal !== undefined ? { current: vCur, total: vTotal } : undefined} versionBusy={busy}
+        onVersion={(k) => actions.current.switchVersion(index - 1, k)}
+        onRefine={isLast ? (style) => actions.current.regenerate(style) : undefined} />
     </div>
   );
 });
@@ -140,11 +144,13 @@ export function ThreadView({ messages, busy, actions, scrollRef, scrollToIndexRe
   auditVisit(virtual ? items.length : n);
 
   const row = (m: ViewMessage, i: number) => {
-    const v = m.role === 'user' ? actions.versionOf(i) : undefined;
+    // QA-A18: regenerations are versions of the answer (arrows under it); edits are versions of the question.
+    const q = m.role === 'user' ? actions.versionOf(i) : messages[i - 1]?.role === 'user' ? actions.versionOf(i - 1) : undefined;
+    const v = q && (m.role === 'user' ? !q.answersOnly : q.answersOnly) ? q : undefined;
     const isLast = i === n - 1;
     return (
       <Row key={('uiKey' in m && m.uiKey) || m.id} msg={m} index={i} isLast={isLast} reserve={isLast && m.role === 'assistant'} lazy={!virtual && i < n - LIVE_TAIL}
-        busy={m.role === 'user' ? busy : false} vCur={v?.current} vTotal={v?.total} actions={ref} />
+        busy={m.role === 'user' || v ? busy : false} vCur={v?.current} vTotal={v?.total} actions={ref} />
     );
   };
 
