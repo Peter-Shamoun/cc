@@ -40,7 +40,7 @@ _TOOL_LABELS = {
     "refuse": "Declined",
 }
 _TOOL_KIND = {"list_relations": "list_views", "describe_relation": "describe_view", "lookup_examples": "search_examples"}
-_MONEY = re.compile(r"(amount|amt|paid|charge|billed|allowed|balance|revenue|payment|_usd$)", re.I)
+_MONEY = re.compile(r"(amount|amt|paid|charge|billed|allowed|balance|revenue|payment|_usd\Z)", re.I)
 _PCT = re.compile(r"(rate|pct|percent|share|ratio)", re.I)
 _TIME = re.compile(r"(date|month|week|day|year|quarter|period)", re.I)
 
@@ -151,7 +151,7 @@ def chart_for(columns: list[dict], rows: list) -> dict | None:
     """Vega-Lite for a time series (line) or a categorical breakdown (bar). ``None`` otherwise."""
     if not rows or len(rows) < 2 or len(rows) > CHART_MAX_ROWS or len(columns) < 2:
         return None
-    if any(re.search(r"(_key|_id|_number)$", c["key"]) for c in columns):
+    if any(re.search(r"(_key|_id|_number)\Z", c["key"]) for c in columns):
         return None  # row-level listing, not an aggregate
     usable = [c for c in columns if not c.get("phi")]
     measures = [c for c in usable if c["type"] in ("integer", "number", "currency", "percent")]
@@ -312,16 +312,57 @@ def _scrub(text: str) -> str:
     return text[:300]
 
 
-def report_artifacts(parts: list[dict]) -> list[dict]:
+def prior_artifacts(messages: list[dict], parent_id: str | None, before_id: str | None = None) -> dict[str, dict]:
+    """The latest artifact of each kind on the branch a new answer continues (contract 1.19.0, §16, QA-C1).
+
+    Follows ``parentId`` up from ``parent_id`` (so an edit or a regenerate only sees its own branch); without one
+    (a pre-1.2 client) every stored message before ``before_id`` (the user turn) counts. Returns ``{kind: {"artifactId", "version"}}``, nearest wins."""
+    by_id = {m.get("id"): m for m in messages if isinstance(m, dict)}
+    if parent_id:
+        chain, seen, cur = [], set(), by_id.get(parent_id)
+        while cur is not None and cur.get("id") not in seen:
+            seen.add(cur.get("id"))
+            chain.append(cur)
+            cur = by_id.get(cur.get("parentId"))
+    else:
+        flat = [m for m in messages if isinstance(m, dict)]
+        cut = next((i for i, m in enumerate(flat) if before_id and m.get("id") == before_id), len(flat))
+        chain = list(reversed(flat[:cut]))
+    out: dict[str, dict] = {}
+    for msg in chain:  # nearest first
+        if msg.get("role") != "assistant":
+            continue
+        for part in reversed(msg.get("parts") or []):
+            if not isinstance(part, dict) or part.get("type") != "artifact" or part.get("kind") in out:
+                continue
+            aid, ver = part.get("artifactId"), part.get("version")
+            if isinstance(aid, str) and isinstance(ver, int) and not isinstance(ver, bool) and ver >= 1:
+                out[part["kind"]] = {"artifactId": aid,
+                                     "version": max(p.get("version", 0) for p in msg["parts"] if isinstance(p, dict)
+                                                    and p.get("artifactId") == aid and isinstance(p.get("version"), int))}
+    return out
+
+
+def report_artifacts(parts: list[dict], prior: dict[str, dict] | None = None) -> list[dict]:
     """Demo ``report`` scenario (contract 1.9.0, §16): the chart becomes a ``chart`` artifact and a short ``report``
-    artifact (markdown) summarises the table. Only aggregate values from the result preview, like the table itself."""
+    artifact (markdown) summarises the table. Only aggregate values from the result preview, like the table itself.
+
+    ``prior`` (from :func:`prior_artifacts`, 1.19.0): a follow-up on a branch that already has an artifact of that
+    kind revises it in place, so it keeps the ``artifactId`` and gets ``version + 1``, like Claude's artifacts and
+    ChatGPT's canvas."""
+    prior = prior or {}
+
+    def ident(kind: str) -> dict:
+        if kind in prior:
+            return {"artifactId": prior[kind]["artifactId"], "version": prior[kind]["version"] + 1}
+        return {"artifactId": new_id("af_"), "version": 1}
     out: list[dict] = []
     table = next((p for p in parts if p.get("type") == "table"), None)
     for part in parts:
         if part.get("type") != "chart":
             out.append(part)
             continue
-        out.append({"type": "artifact", "id": new_id("p_"), "artifactId": new_id("af_"), "version": 1, "kind": "chart",
+        out.append({"type": "artifact", "id": new_id("p_"), **ident("chart"), "kind": "chart",
                     "title": part.get("title") or "Chart", "content": part, "autoOpen": False})
     if table and table.get("rows"):
         cols = table["columns"]
@@ -335,7 +376,7 @@ def report_artifacts(parts: list[dict]) -> list[dict]:
         markdown = "\n".join([f"# {title}", "", f"{n} row{'' if n == 1 else 's'} from {views}.", "",
                                *_key_figures(table), "## Data", "", head, rule, *body,
                                *([""] + [f"_Showing the first 12 of {n} rows._"] if n > 12 else [])])
-        out.append({"type": "artifact", "id": new_id("p_"), "artifactId": new_id("af_"), "version": 1, "kind": "report",
+        out.append({"type": "artifact", "id": new_id("p_"), **ident("report"), "kind": "report",
                     "title": title, "content": {"markdown": markdown}, "autoOpen": True})
     return out
 
