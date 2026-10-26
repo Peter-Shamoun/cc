@@ -117,3 +117,18 @@ describe('useChat plumbing', () => {
     expect((result.current.messages[1] as AssistantViewV1).usage?.queries).toBeGreaterThanOrEqual(1);
   });
 });
+
+describe('useChat run ownership and batching', () => {
+  it('a run aborted by opening another chat never overwrites the newly shown chat', async () => {
+    const store = new MemoryTranscriptStore();
+    const { result } = renderHook(() => useChat(new MockAnalystAdapter(2), store));
+    const prov = V1_FIXTURES.find((f) => f.id === 'v1-providers-repair')!;
+    let done!: Promise<void>;
+    act(() => { done = result.current.send(prov.prompt); });
+    await waitFor(() => expect(result.current.messages.length).toBe(2));
+    await act(async () => { result.current.newChat(); await done; });
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.busy).toBe(false);
+  });
+
+});
