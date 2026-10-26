@@ -41,13 +41,16 @@ interface RowProps {
   vCur?: number;
   vTotal?: number;
   actions: React.MutableRefObject<ThreadActions>;
+  /** A question that follows an answer (starts a new exchange). */
+  afterAnswer?: boolean;
 }
 
-const Row = memo(function Row({ msg, index, isLast, reserve, lazy, busy, vCur, vTotal, actions }: RowProps) {
+const Row = memo(function Row({ msg, index, isLast, reserve, lazy, busy, vCur, vTotal, actions, afterAnswer }: RowProps) {
   const a = actions.current;
   if (msg.role === 'user') {
     return (
-      <div data-message-id={msg.id} style={lazy ? offscreen : undefined}>
+      // Claude/ChatGPT leave more air between exchanges than within one: 24px question→answer, 40px answer→next question.
+      <div data-message-id={msg.id} className={afterAnswer ? 'pt-4' : undefined} data-after-answer={afterAnswer || undefined} style={lazy ? offscreen : undefined}>
         <UserBubble msg={msg} disabled={busy} onEdit={(t) => actions.current.editAt(index, t)}
           version={vCur !== undefined && vTotal !== undefined ? { current: vCur, total: vTotal } : undefined}
           onVersion={(k) => actions.current.switchVersion(index, k)} />
@@ -150,7 +153,8 @@ export function ThreadView({ messages, busy, actions, scrollRef, scrollToIndexRe
     const isLast = i === n - 1;
     return (
       <Row key={('uiKey' in m && m.uiKey) || m.id} msg={m} index={i} isLast={isLast} reserve={isLast && m.role === 'assistant'} lazy={!virtual && i < n - LIVE_TAIL}
-        busy={m.role === 'user' || v ? busy : false} vCur={v?.current} vTotal={v?.total} actions={ref} />
+        busy={m.role === 'user' || v ? busy : false} vCur={v?.current} vTotal={v?.total} actions={ref}
+        afterAnswer={m.role === 'user' && messages[i - 1]?.role === 'assistant'} />
     );
   };
 
