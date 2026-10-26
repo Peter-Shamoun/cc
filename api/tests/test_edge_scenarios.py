@@ -41,7 +41,7 @@ def test_every_new_scenario_is_in_the_schema_and_has_an_example():
     assert set(NEW_IN_116) <= set(SCENARIOS)
     assert {v[1] for v in EDGE.values()} == set(NEW_IN_116)
     assert set(CANCEL_AT) == {s for s in NEW_IN_116 if s.startswith("cancel_")}
-    assert CONTRACT_VERSION == "1.16.0"
+    assert tuple(map(int, CONTRACT_VERSION.split("."))) >= (1, 16, 0)
 
 
 @pytest.mark.parametrize("name", sorted(EDGE))

@@ -1,4 +1,4 @@
-{"type":"message.start","messageId":"m_1","conversationId":"c_1","contractVersion":"1.16.0","model":"scripted","parentId":"u_1","strategy":"tool_loop","seq":0}
+{"type":"message.start","messageId":"m_1","conversationId":"c_1","contractVersion":"1.17.0","model":"scripted","parentId":"u_1","strategy":"tool_loop","seq":0}
 {"type":"status","label":"Thinking","seq":1}
 {"type":"reasoning.delta","partId":"p_1","delta":"Checking the claims view.","seq":2}
 {"type":"status","label":"Exploring sem.claims","seq":3}
@@ -7,4 +7,4 @@
 {"type":"status","label":null,"seq":6}
 {"type":"part","part":{"type":"error","id":"p_2","code":"internal","title":"Something went wrong","message":"The analysis failed. Try again.","retryable":true},"seq":7}
 {"type":"status","label":null,"seq":8}
-{"type":"message.end","messageId":"m_1","finishReason":"error","usage":{"queries":0,"elapsedMs":705,"latency":{"totalMs":705,"modelMs":350,"sqlMs":0,"stages":{"plan":705,"sql":0,"repair":0,"checks":0,"render":0},"firstEventMs":0,"firstStepMs":354},"costIsEstimate":true,"costUsd":0.000974,"tokens":{"input":874,"output":20},"models":[{"model":"claude-haiku-5-5","role":"analyst","inputTokens":874,"outputTokens":20,"costUsd":0.000974,"calls":1}]},"sources":[{"id":"src_1","kind":"view","name":"sem.claims","label":"Claims","role":"explored","description":"One row per claim submission with billed, allowed and paid amounts, payer and status.","stepIds":["s_1"]}],"seq":9}
+{"type":"message.end","messageId":"m_1","finishReason":"error","usage":{"queries":0,"elapsedMs":706,"latency":{"totalMs":706,"modelMs":350,"sqlMs":0,"stages":{"plan":706,"sql":0,"repair":0,"checks":0,"render":0},"firstEventMs":0,"firstStepMs":355},"costIsEstimate":true,"costUsd":0.000974,"tokens":{"input":874,"output":20},"models":[{"model":"claude-haiku-5-5","role":"analyst","inputTokens":874,"outputTokens":20,"costUsd":0.000974,"calls":1}]},"sources":[{"id":"src_1","kind":"view","name":"sem.claims","label":"Claims","role":"explored","description":"One row per claim submission with billed, allowed and paid amounts, payer and status.","stepIds":["s_1"]}],"seq":9}
