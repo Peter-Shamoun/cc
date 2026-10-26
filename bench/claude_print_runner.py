@@ -39,7 +39,8 @@ def worker_command(session: str, model: str, effort: str) -> list[str]:
     prompt = ("Run this command with the Bash tool and follow the instructions it prints exactly:\n"
               f"python3 -m analyzer.cli --session {session} briefing")
     command = ["claude", "-p", prompt, "--model", model, "--permission-mode", "dontAsk",
-               "--allowedTools", "Bash(python3 -m analyzer.cli:*)", "Bash(cd:*)", "--disallowedTools", *DISALLOWED_TOOLS,
+               "--allowedTools", "Bash(python3 -m analyzer.cli:*)", "Bash(cd:*)", "--add-dir", "/tmp", str(ROOT),   # cd outside the start directory needs the directory added
+               "--disallowedTools", *DISALLOWED_TOOLS,
                "--output-format", "json"]
     if effort and effort != "default":
         command += ["--effort", effort]
