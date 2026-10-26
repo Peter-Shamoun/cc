@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "shots": "node scripts/screenshots.mjs",
-    "e2e": "playwright test -c e2e/playwright.config.ts --project=desktop --project=mobile",
+    "e2e": "playwright test --workers=1 -c e2e/playwright.config.ts --project=desktop --project=mobile",
     "e2e:perf": "playwright test -c e2e/playwright.config.ts --project=perf",
     "e2e:update": "playwright test -c e2e/playwright.config.ts --project=desktop --project=mobile --update-snapshots -g visual",
     "check:csp": "node scripts/csp_check.mjs"

@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { LIVE, open, ask, lastAssistant, injectStream, turn, textPart, composer, stopBtn, waitIdle } from './helpers';
+import { test, expect } from './fixtures';
+import { LIVE, open, ask, lastAssistant, injectStream, turn, textPart, composer, stopBtn, waitIdle, gap } from './helpers';
 
 /**
  * Every outcome the winning analyzer bundle may produce (Claude's list, 2026-10-25), driven through the
@@ -35,8 +35,10 @@ test.describe('contract v1 outcomes, live demo @both', () => {
     await open(page, LIVE);
     await ask(page, 'Double check the average paid per claim');
     const a = lastAssistant(page);
-    if (!(await a.getByTestId('candidates').count())) await a.getByTestId('step-summary').first().click().catch(() => {});
-    await expect(a.getByTestId('candidates').first()).toBeAttached();
+    // Timeline collapses after the answer ("Thought for 3s"); expand it, then open the comparison step.
+    await a.getByTestId('step-summary').first().click();
+    await a.locator('[data-testid="step"][data-kind="candidates"] button').first().click();
+    await expect(a.getByTestId('candidates').first()).toBeVisible();
   });
 
   test('abstain is a first-class outcome, not an error, and suggestions re-ask', async ({ page }) => {
@@ -112,6 +114,7 @@ test.describe('contract v1 outcomes, live demo @both', () => {
   });
 
   test('stop on a slow run: server-side cancel, Stopped marker', async ({ page }) => {
+    test.skip(true, 'gap QA-P4: demo "slow" scenario is instant when CC_API_MODEL_DELAY_SECONDS=0 (default), so there is nothing to stop');
     await open(page, LIVE);
     const stops: string[] = [];
     page.on('request', (r) => { if (/\/api\/chat\/[^/]+\/stop$/.test(r.url())) stops.push(r.url()); });

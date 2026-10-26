@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { MOCK, open, ask, lastAssistant, composer, stopBtn, waitIdle } from './helpers';
 
 // Offline fixture adapter: deterministic, used for UI behaviour that does not need the API.
