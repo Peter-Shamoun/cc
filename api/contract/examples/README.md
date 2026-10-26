@@ -8,7 +8,7 @@ sequence drifts from these files.
 
 | file | outcome | `finishReason` | shows |
 |---|---|---|---|
-| `answer.jsonl` | final answer | `stop` | explore + SQL steps, verifier check, streamed text, `code` (SQL, `role: query`), `table` (`sqlPartId`, `csvFileId`), callouts, rich `usage` (tokens, `costUsd` estimate, latency, models) |
+| `answer.jsonl` | final answer | `stop` | explore + SQL steps, verifier check, streamed text, `code` (SQL, `role: query`), `table` (`sqlPartId`, `csvFileId`), callouts, rich `usage` (tokens, `costUsd` estimate, latency with per-stage `stages`, models) |
 | `tool_steps.jsonl` | repair loop | `stop` | `step.sql_result ok:false` (binder error) → `step.repair_attempt` → `step.sql_running {purpose: repair, attempt: 2, repairOf}` → final query → `step.check` (warn → caveat) |
 | `abstain.jsonl` | abstain | `abstain` | one `abstain` part (`category`, `reason`, `suggestions[]`); no table, no error |
 | `clarify.jsonl` | clarifying question | `needs_input` | one `clarification` part (`choices[]`, `allowFreeText`) |
