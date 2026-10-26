@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://claimclarity.local/api/contract/v1.schema.json",
   "title": "ClaimClarity chat stream contract",
-  "version": "1.18.0",
+  "version": "1.19.0",
   "description": "One JSON object per SSE data: line. See api/CONTRACT.md. Validate an event against #/$defs/StreamEvent.",
   "$ref": "#/$defs/StreamEvent",
   "$defs": {
@@ -11,7 +11,7 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 128,
-      "pattern": "^[A-Za-z0-9_:.-]+$"
+      "pattern": "^[A-Za-z0-9_:.-]+(?![\\s\\S])"
     },
     "Timestamp": {
       "type": "string",
@@ -1471,7 +1471,7 @@
         },
         "contractVersion": {
           "type": "string",
-          "pattern": "^1\\.\\d+\\.\\d+$"
+          "pattern": "^1\\.[0-9]+\\.[0-9]+(?![\\s\\S])"
         },
         "model": {
           "type": "string",
@@ -3347,7 +3347,7 @@
         },
         "url": {
           "type": "string",
-          "pattern": "^/shared/[A-Za-z0-9_-]+$",
+          "pattern": "^/shared/[A-Za-z0-9_-]+(?![\\s\\S])",
           "description": "App-relative path. The viewer must be signed in to the same organization."
         },
         "scope": {

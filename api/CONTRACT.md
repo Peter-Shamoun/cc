@@ -1,6 +1,6 @@
 # ClaimClarity chat API — stream contract
 
-**Version: 1.18.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.19.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -583,6 +583,8 @@ re-encode a chart (bar ↔ line, sort) locally from `data.values`; that is a vie
   `artifact.delta {partId, delta}`, ignorable under §3.
 * Demo: the `report` scenario returns the table, a `chart` artifact (`autoOpen: false`) and a `report` artifact
   (markdown summary, `autoOpen: true`). Example: `examples/report.jsonl`.
+* Demo follow-ups (1.19.0): a `report` turn whose branch (its `parentId` chain) already holds an artifact of that kind
+  revises it: same `artifactId`, `version + 1`, new part id. Example: `examples/report_v2.jsonl`.
 
 ### 16.1 Strict plot spec (1.18.0)
 
@@ -669,6 +671,14 @@ must be signed in to the same organization (customer). A conversation has at mos
 
 ## Changelog
 
+* **1.19.0** (2026-10-25) — Edge fixes, no new fields. (1) **No id or pattern accepts a trailing newline.**
+  Python's `re` `$` also matches before a final `\n` (and `\d` matches any Unicode digit), so `ID`,
+  `contractVersion` and `ShareLink.url` now anchor with `(?![\s\S])` and use `[0-9]`, like the 1.18 plot patterns;
+  plain-`re` id checks in `api/` use `fullmatch`. `api/contract/pattern_cases.json` is run by Python (jsonschema) and
+  TS (RegExp) and must have a trailing-newline case for every schema pattern. (2) **A follow-up report is v2**
+  (QA-C1, §16): in the demo `report` scenario, a follow-up on the same branch keeps each artifact's `artifactId` and
+  bumps `version`; an edit or regenerate only sees its own branch (it follows `parentId`). Example:
+  `examples/report_v2.jsonl`.
 * **1.18.0** (2026-10-25) — Strict plot spec and progressive charts, additive. `ChartPart.plot` (`PlotSpec`, closed,
   versioned, hard caps; §16.1) with shared validation cases (`plot_cases.json`) run by Python and TS. The server
   validates before emitting, drops an invalid chart and falls back to a table (§16.2, audit `chart_dropped`). New
