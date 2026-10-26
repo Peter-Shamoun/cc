@@ -199,7 +199,7 @@ function ThreadRow({ t, active, tabStop, renaming, setRenaming, onSelect, onRena
   return (
     // QA-S38: touch has no hover, so rows stay plain titles (only the open chat shows "…"); a long-press opens
     // any row's options, as ChatGPT/Claude mobile do. Right-click does the same on desktop.
-    <li className={clsx('group relative flex items-center rounded-lg', active ? 'bg-hover' : 'hover:bg-hover', menu.anchor && 'bg-hover')} data-testid="thread-item">
+    <li className={clsx('group relative flex items-center rounded-lg', active ? 'bg-active font-medium text-fg' : clsx('hover:bg-hover', menu.anchor && 'bg-hover'))} data-testid="thread-item">
       {renaming ? (
         <input ref={input} defaultValue={t.title} aria-label="Rename chat" className="m-0.5 min-w-0 flex-1 rounded-md border border-[var(--focus)] bg-bg px-2 py-1.5 outline-none"
           onBlur={(e) => { onRename(t.id, e.currentTarget.value); setRenaming(null); }}

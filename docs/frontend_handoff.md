@@ -399,7 +399,6 @@ on gradients, glass/blur, glow, heavy shadows and similar.
 - Account identity is a demo constant (`ACCOUNT` in Sidebar); production should read it from the session (`/api/me`).
 - The `+` attach button adds text files to the question as context; files are not queryable data (see §8 "File upload").
 - Strategy / model in the product menu are validated and echoed by the API but don't change the scripted run (§10).
-- The header's "Data: Live API / Demo data" row is informational only.
 - Settings is a modal, not a full page.
 
 <!-- SECTION: answer (§9.2). Answer team: answer rendering (timeline, text, table, chart, clarify, errors), print, copy. -->
@@ -529,11 +528,7 @@ S37, BF1, sharing removal). So 8.71 is a lower bound for the handed-off build.
 | Scope picker removed (QA-BF1) | No data-source/scope control (guard in `e2e/backend-fit.spec.ts`). |
 | Dead code / TODOs | No `ShareDialog`/`SharedView`/`ScopePopover`/`readOnly`/`sqlWithheld` code left (removed in #302/#305/#312). No TODOs point at removed features. |
 
-**Open deviations** (none P1; each `gap()` is a ratchet that turns red when the fix lands, so remove it then):
-- **QA-BF2 (P2, shell)**: the header product menu still has a display-only, no-op `Data: Demo data · scripted runs` /
-  `Data: Live API` menu item (`web/src/shell/Header.tsx`). The invented Scope row is gone. Make it a non-interactive
-  caption or drop it. Ratchet: `gap('QA-BF2')` in `e2e/backend-fit.spec.ts`.
-- **QA-S33 (P3, shell)**: active and hovered sidebar rows use the same fill. Ratchet: `gap('QA-S33')` in `e2e/fidelity.spec.ts`.
+**Open deviations** (none P1 or P2; each `gap()` is a ratchet that turns red when the fix lands, so remove it then):
 - P3, last recorded open and not re-verified at finalize:
   - QA-S13/S24: browser Ctrl+F in off-screen turns of a long virtualized thread, unverified on Firefox/WebKit.
   - QA-S17: theme radios are one Tab stop each.

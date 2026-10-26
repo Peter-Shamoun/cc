@@ -1,10 +1,10 @@
 import { test, expect } from './fixtures';
-import { LIVE, open, composer, gap } from './helpers';
+import { LIVE, open, composer } from './helpers';
 
 /**
  * Peter 11:57 PM directive: build to the backend design. The user never picks a database, lake, schema or view:
  * the session (Cognito → ccsim.query.open_session) fixes tenant + allowed relations, the analyzer discovers sem.*
- * itself (list_relations) and escalation mounts lossless views automatically. Each gap() flips red when it lands.
+ * itself (list_relations) and escalation mounts lossless views automatically.
  */
 test.describe('backend fit @both', () => {
   test('composer has no data-source / scope selector (QA-BF1)', async ({ page }) => {
@@ -21,7 +21,6 @@ test.describe('backend fit @both', () => {
     await page.getByRole('button', { name: /^CC Analyst/ }).first().click();
     const menu = page.getByRole('menu').last();
     await expect(menu).toBeVisible();
-    gap('QA-BF2');
     await expect(menu.locator('[role^="menuitem"]').filter({ hasText: /^Scope:|claims lake|^Data:/i })).toHaveCount(0);
   });
 });
