@@ -42,7 +42,7 @@ export function ShareDialog(p: ShareDialogProps) {
   return (
     <Dialog title="Share chat" onClose={p.onClose} testId="share-dialog" className="max-w-[520px]">
       <div className="space-y-5 px-5 pb-5 pt-3 text-sm">
-        <div className="rounded-xl border border-line bg-bg p-4" data-testid="share-preview">
+        <div className="px-1" data-testid="share-preview">
           <div className="truncate font-medium">{p.title}</div>
           {p.firstQuestion && <div className="mt-1 line-clamp-2 text-fg-muted">{p.firstQuestion}</div>}
           <div className="mt-2 text-xs text-fg-subtle">{p.messageCount} {p.messageCount === 1 ? 'message' : 'messages'} · de-identified demo data</div>
@@ -67,7 +67,7 @@ export function ShareDialog(p: ShareDialogProps) {
 
         <section aria-labelledby="share-export-h">
           <h3 id="share-export-h" className="mb-2 text-sm font-medium text-fg-muted">Export</h3>
-          <div className="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
+          <div className="-mx-2 flex flex-col" data-testid="share-export-list">
             <Action icon={<Copy size={16} />} label="Copy as Markdown" onClick={p.onCopyMarkdown} />
             <Action icon={<FileText size={16} />} label="Download Markdown" hint=".md" onClick={p.onDownloadMarkdown} />
             {p.onDownloadJson && <Action icon={<Braces size={16} />} label="Download JSON" hint="Full transcript" disabled={busy} onClick={run(p.onDownloadJson)} />}
@@ -82,7 +82,7 @@ export function ShareDialog(p: ShareDialogProps) {
 function Action({ icon, label, hint, onClick, disabled }: { icon: ReactNode; label: string; hint?: string; onClick: () => void; disabled?: boolean }) {
   return (
     <button type="button" onClick={onClick} disabled={disabled}
-      className="flex items-center gap-2.5 rounded-xl border border-line px-3 py-2.5 text-left hover:bg-hover disabled:opacity-60">
+      className="flex items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-hover disabled:opacity-60" data-testid="share-export-row">
       <span aria-hidden className="shrink-0 text-fg-muted">{icon}</span>
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {hint && <span aria-hidden className="shrink-0 text-xs text-fg-subtle">{hint}</span>}
