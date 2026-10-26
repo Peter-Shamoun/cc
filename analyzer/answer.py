@@ -30,6 +30,7 @@ class AnalyzerAnswer:
     audit: list = field(default_factory=list)
     selection: dict | None = None
     candidate_results: list | None = None
+    questions: list = field(default_factory=list)   # clarification: contract-ready questions (tools.clarification_request)
 
     def for_judge(self) -> dict:
         """Arguments that line up with ``bench.judge.judge``'s candidate side.
@@ -49,7 +50,7 @@ class AnalyzerAnswer:
         if self.kind == "refusal":
             return {"kind": "refusal", "text": self.text}
         if self.kind == "clarification":
-            return {"kind": "clarification", "text": self.text}
+            return {"kind": "clarification", "text": self.text, **({"questions": self.questions} if self.questions else {})}
         if self.kind == "abstain":
             return {"kind": "abstain", "text": self.text}
         if self.kind != "answer":

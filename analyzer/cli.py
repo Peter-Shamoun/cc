@@ -41,7 +41,7 @@ from analyzer.protocols import (
     required_interpretation_parts,
     validate_interpretation,
 )
-from analyzer.tools import ToolError, ToolLayer
+from analyzer.tools import ToolError, ToolLayer, clarification_request
 
 UNCHARGED_COMMANDS = ("probe",)
 
@@ -357,9 +357,23 @@ def _run(session_dir: Path, command: str, argument: dict):
     if command == "ask":
         if not tools.config.enable_ask:
             raise ToolError("ask is not enabled in this session")
-        _record_final(session_dir, {"kind": "clarification", "text": argument["question"]})
-        return {"recorded": True}
+        if (session_dir / "final.json").exists():
+            raise ToolError("an answer was already submitted")
+        _record_final(session_dir, {"kind": "clarification", "text": argument["question"],
+                                    **({"questions": argument["questions"]} if argument["questions"] else {})})
+        return {"recorded": True, "questions": len(argument["questions"])}
     raise ToolError(f"unknown command {command}")
+
+
+def _clarification_argument(argument: dict) -> dict:
+    questions = argument.get("questions")
+    if isinstance(questions, str):
+        try:
+            questions = json.loads(questions)
+        except json.JSONDecodeError as exc:
+            raise ToolError(f"--questions is not valid JSON: {exc.msg}") from exc
+    request = clarification_request({"question": argument.get("question"), "questions": questions})
+    return {"question": request["text"], "questions": request["questions"]}
 
 
 def _summary(command: str, result) -> object:
@@ -415,8 +429,11 @@ def build_parser() -> argparse.ArgumentParser:
     answer.add_argument("--confidence")
     refuse = sub.add_parser("refuse")
     refuse.add_argument("reason")
-    ask = sub.add_parser("ask")
-    ask.add_argument("question")
+    ask = sub.add_parser("ask", description="One plain question, or --questions with up to 4 form questions "
+                                            "(the positional question is then an optional lead-in).")
+    ask.add_argument("question", nargs="?")
+    ask.add_argument("--questions", help='JSON list: [{"header": "<=12 chars", "question": "...", '
+                                         '"options": [{"label": "...", "description": "..."}], "multiSelect": false}]')
     verdict = sub.add_parser("verdict")
     verdict.add_argument("verdict_json")
     select = sub.add_parser("select")
@@ -441,6 +458,8 @@ def main(argv=None) -> int:
     if args.command in {"sql", "probe"}:
         argument = {"sql": args.query}
     try:
+        if args.command == "ask":   # calls.jsonl keeps the parsed questions: the API maps them to the clarify form
+            argument = _clarification_argument(argument)
         result = _run(session_dir, args.command, argument)
     except (ToolError, GuardError, json.JSONDecodeError) as exc:
         _log(session_dir, args.command, argument, False, str(exc)[:300],

@@ -188,6 +188,25 @@ def confidence_block() -> str:
             "model.\n")
 
 
+def clarify_block() -> str:
+    """#21 clarification: when to ask instead of answering (general principles, worded from TRAIN-style questions)."""
+    return (
+        "When to ask instead of answering: most questions are clear, so answer them. Ask only when (a) the question "
+        "has two materially different readings that would give different numbers and neither the definitions nor "
+        "the playbook settle which one, for example claim count versus dollars, or which date a month refers to "
+        "when the question names no date, or which of several matching payers or payer classes is meant; or (b) "
+        "it leaves out something the answer cannot be computed without, such as which measure to rank by or what "
+        "to compare. A question that names its measure, population and time basis is clear even if it is long. If "
+        "a reasonable default exists and the readings would barely differ, answer and state the assumption in the "
+        "answer text. If the data cannot answer it at all, refuse and say what is missing. When you ask, ask "
+        "everything at once in one ask command: up to 4 questions, each with a header of at most 12 characters "
+        "and 2-4 options naming the concrete readings (label plus a one-line description). The user can also "
+        "type an answer or skip. Keep the JSON in single quotes with no apostrophes inside it.\n"
+        "If the user question ends with a line \"Clarification: Header: choice; ...\", that is the user's reply "
+        "to your earlier questions: apply it and answer, and do not ask again about those points. \"no "
+        "preference\" means use the most common reading and state it.\n")
+
+
 def examples_block(examples: list) -> str:
     """#6: A10's example block over TRAIN-split questions retrieved by analyzer.examples."""
     return render_examples(examples)
