@@ -42,7 +42,8 @@ _TOOL_LABELS = {
 }
 _TOOL_KIND = {"list_relations": "list_views", "describe_relation": "describe_view", "lookup_examples": "search_examples"}
 _MONEY = re.compile(r"(amount|amt|paid|charge|billed|allowed|balance|revenue|payment|_usd\Z)", re.I)
-_PCT = re.compile(r"(rate|pct|percent|share|ratio)", re.I)
+#: A whole name word, so ``payment_to_charge_pct`` is a percentage but ``generated_revenue`` is not.
+_PCT = re.compile(r"(?:\A|_)(rate|pct|percent|percentage|share|ratio)(?:_|\Z)", re.I)
 _TIME = re.compile(r"(date|month|week|day|year|quarter|period)", re.I)
 
 
@@ -55,12 +56,17 @@ def column_type(name: str, values: list) -> str:
     if isinstance(sample, _dt.date):
         return "date"
     if isinstance(sample, int):
-        return "currency" if _MONEY.search(name) else "integer"
+        return "currency" if _MONEY.search(name) and not _PCT.search(name) else "integer"
     if isinstance(sample, (float, Decimal)):
-        if _MONEY.search(name):
-            return "currency"
+        numbers = [v for v in values if isinstance(v, (int, float, Decimal)) and not isinstance(v, bool)]
+        is_fraction = all(abs(v) <= 1 for v in numbers)
+        # A ratio-named column is never money, even when it names money (``paid_to_billed_ratio``). The client
+        # formats ``percent`` as a 0..1 fraction, so one already in percentage points (17.46) stays a plain number.
         if _PCT.search(name):
-            return "percent"
+            return "percent" if is_fraction else "number"
+        # Fractional values under a money word are a ratio the SQL left unnamed (``paid / billed``), not dollars.
+        if _MONEY.search(name) and not (is_fraction and any(v != int(v) for v in numbers)):
+            return "currency"
         return "number"
     if isinstance(sample, str):
         if _TIME.search(name) and re.fullmatch(r"\d{4}-\d{2}(-\d{2})?", sample):
