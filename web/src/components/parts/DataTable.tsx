@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { flexRender, getCoreRowModel, getFilteredRowModel, getSortedRowModel, useReactTable, type ColumnDef, type SortingState } from '@tanstack/react-table';
 import { ArrowDown, ArrowUp, Download, Maximize2, ShieldAlert } from 'lucide-react';
@@ -70,6 +70,24 @@ export function DataTable({ part, onOpen, full }: { part: TablePart; onOpen?: ()
     // Paint a window before the scrollport is measured, so the first frame is not blank.
     initialRect: { width: 800, height: full ? 600 : 400 },
   });
+  // QA-A4: fade the edge that has more columns hidden behind it, so a cut-off column reads as "scroll me".
+  const [edges, setEdges] = useState({ left: false, right: false });
+  const measureEdges = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const left = el.scrollLeft > 1;
+    const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+    setEdges((e) => (e.left === left && e.right === right ? e : { left, right }));
+  }, []);
+  useEffect(() => {
+    measureEdges();
+    const el = scrollRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measureEdges);
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    return () => ro.disconnect();
+  }, [measureEdges, part.columns.length]);
   const items = virtual ? rv.getVirtualItems() : [];
   const padTop = virtual && items.length ? items[0].start : 0;
   const padBottom = virtual && items.length ? rv.getTotalSize() - items[items.length - 1].end : 0;
@@ -91,7 +109,7 @@ export function DataTable({ part, onOpen, full }: { part: TablePart; onOpen?: ()
     <div className={clsx('group/table overflow-hidden rounded-xl border border-line bg-elev', !full && 'my-4')} data-testid="data-table" tabIndex={-1}>
       <div className="flex items-center justify-between gap-2 px-3 pt-2 pb-1">
         <div className="min-w-0 truncate text-[13px] font-medium text-fg-muted">{part.title}</div>
-        <div className={clsx('flex shrink-0 items-center gap-0.5', !full && 'opacity-0 transition-opacity group-hover/table:opacity-100 group-focus-within/table:opacity-100')}>
+        <div className={clsx('flex shrink-0 items-center gap-0.5', !full && 'opacity-0 transition-opacity group-hover/table:opacity-100 group-focus-within/table:opacity-100 [@media(hover:none)]:opacity-100')}>
           {full && (
             <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter rows" aria-label="Filter rows" className="mr-1 h-7 rounded-md border border-line bg-bg px-2 text-xs outline-none" />
           )}
@@ -106,9 +124,11 @@ export function DataTable({ part, onOpen, full }: { part: TablePart; onOpen?: ()
           )}
         </div>
       </div>
+      <div className="relative">
       <div
         ref={scrollRef}
-        className={clsx('overflow-auto', full ? 'max-h-[calc(100vh-170px)]' : 'max-h-[400px]')}
+        onScroll={measureEdges}
+        className={clsx('overflow-auto overscroll-x-contain', full ? 'max-h-[calc(100vh-170px)]' : 'max-h-[400px]')}
         style={virtual ? { height: full ? 'calc(100vh - 170px)' : 400 } : undefined}
         data-virtual={virtual || undefined}
       >
@@ -153,6 +173,11 @@ export function DataTable({ part, onOpen, full }: { part: TablePart; onOpen?: ()
             )}
           </tbody>
         </table>
+      </div>
+        <div aria-hidden data-testid="table-fade-left" data-on={edges.left || undefined}
+          className={clsx('pointer-events-none absolute inset-y-0 left-0 z-[2] w-6 bg-gradient-to-r from-elev to-transparent transition-opacity', edges.left ? 'opacity-100' : 'opacity-0')} />
+        <div aria-hidden data-testid="table-fade-right" data-on={edges.right || undefined}
+          className={clsx('pointer-events-none absolute inset-y-0 right-0 z-[2] w-8 bg-gradient-to-l from-elev to-transparent transition-opacity', edges.right ? 'opacity-100' : 'opacity-0')} />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-xs text-fg-subtle">
         <span>
