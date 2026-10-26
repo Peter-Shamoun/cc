@@ -116,7 +116,10 @@ export function useMenu() {
 }
 
 // ---------- Toasts ----------
-type Toast = { id: number; text: string; action?: { label: string; run: () => void }; onExpire?: () => void; ms: number };
+type Toast = { id: number; text: string; action?: { label: string; run: () => void }; onExpire?: () => void; ms: number; leaving?: boolean };
+/** Exit animation length; 0 when the user prefers reduced motion (the toast just goes). */
+const TOAST_EXIT_MS = 160;
+const reducedMotion = () => typeof window.matchMedia !== 'function' || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const ToastCtx = createContext<(t: Omit<Toast, 'id' | 'ms'> & { ms?: number }) => void>(() => {});
 export const useToast = () => useContext(ToastCtx);
 
@@ -127,13 +130,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   // toast must not vanish while someone is reading it or reaching for the button).
   const timers = useRef(new Map<number, { handle?: number; left: number; since: number }>());
   const paused = useRef(false);
+  const toastsRef = useRef(toasts);
+  toastsRef.current = toasts;
   const resumeRef = useRef(() => {});
   const dismiss = useCallback((id: number, expired: boolean) => {
-    setToasts((ts) => {
-      const t = ts.find((x) => x.id === id);
-      if (t && expired) t.onExpire?.();
-      return ts.filter((x) => x.id !== id);
-    });
+    const t = toastsRef.current.find((x) => x.id === id);
+    if (!t || t.leaving) return;
+    if (expired) t.onExpire?.();
+    const remove = () => setToasts((ts) => ts.filter((x) => x.id !== id));
+    if (reducedMotion()) remove();
+    else { setToasts((ts) => ts.map((x) => (x.id === id ? { ...x, leaving: true } : x))); window.setTimeout(remove, TOAST_EXIT_MS); }
     window.clearTimeout(timers.current.get(id)?.handle);
     timers.current.delete(id);
     // The hovered toast can vanish (Undo/Dismiss clicked) without a mouseleave: don't leave the rest frozen.
@@ -169,7 +175,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div className="pointer-events-none fixed inset-x-0 top-3 z-[70] flex flex-col items-center gap-2 px-3 font-sans" role="status" aria-live="polite" data-testid="toasts">
         {toasts.map((t) => (
-          <div key={t.id} className="pointer-events-auto flex items-center gap-3 rounded-xl bg-fg px-4 py-2.5 text-sm text-bg shadow-lg motion-safe:animate-[cc-drop_180ms_ease-out]" data-testid="toast"
+          <div key={t.id} aria-hidden={t.leaving || undefined} data-leaving={t.leaving || undefined}
+            className={clsx('flex items-center gap-3 rounded-xl bg-fg px-4 py-2.5 text-sm text-bg shadow-lg', t.leaving ? 'pointer-events-none motion-safe:animate-[cc-lift_160ms_ease-in_forwards]' : 'pointer-events-auto motion-safe:animate-[cc-drop_180ms_ease-out]')} data-testid="toast"
             onMouseEnter={pause} onMouseLeave={resume} onFocus={pause} onBlur={(e) => { if (!e.currentTarget.parentElement?.contains(e.relatedTarget as Node)) resume(); }}>
             <span>{t.text}</span>
             {t.action && (
