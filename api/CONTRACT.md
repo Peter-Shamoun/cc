@@ -1,6 +1,6 @@
 # CC chat API — stream contract
 
-**Version: 1.3.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.4.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -231,7 +231,36 @@ PHI column, a non-identifier, or any word outside a fixed analytics vocabulary m
 wins and is never overwritten. Clients show `conversationTitle` right away and can keep their own local title only
 while the server title is still the generic one.
 
+## 12. Capabilities: strategies and models (`GET /api/capabilities`)
+
+A picker reads what the server can run. The body is `Capabilities` (no user data, `no-store`, fetch once per session):
+
+```json
+{"contractVersion": "1.4.0", "demo": true, "defaults": {"strategy": "tool_loop", "model": "auto"},
+ "strategies": [{"id": "tool_loop", "label": "Standard", "description": "…", "default": true, "costTier": "low",
+                 "latencyTier": "fast", "models": ["auto", "claude-haiku-5-5", "claude-sonnet-5-5"], "available": true}, …],
+ "models": [{"id": "auto", "label": "Auto", "default": true, "costTier": "low"},
+            {"id": "claude-haiku-5-5", "label": "Haiku", "tier": "small", "provider": "anthropic", "costTier": "low", "default": false}, …]}
+```
+
+* Send the choice as `ChatRequest.options.strategy` / `options.model`. Omit them for the defaults. An unknown id, or a
+  model that is not in the strategy's `models`, is a 422 `validation` before anything runs. `message.start.strategy`
+  echoes the strategy; `message.start.model` stays the model that actually ran.
+* `costTier` (`low|medium|high`) and `latencyTier` (`fast|medium|slow`) are relative badges, not prices; the real cost
+  of an answer is `message.end.usage.costUsd` (§7). `available: false` means show it disabled.
+* Demo strategies (`api/capabilities.py`): `tool_loop` (Standard), `cascade` (Escalate when stuck: Haiku, then Sonnet),
+  `candidates` (Cross-check: 3 candidate queries, execution vote). Each maps onto real `AnalyzerConfig` overrides, so
+  the real analyzer plugs in by reading that table. With the scripted demo LLM (`demo: true`) the choice is validated
+  and echoed, but the demo scenario (§9) still drives the run.
+* Offline / mock mode: `web/src/contract/capabilities.ts` has `loadCapabilities()` (falls back to `DEMO_CAPABILITIES`,
+  kept equal to `api/contract/examples/capabilities.json` by a test), `modelsFor()`, `defaultStrategy()` and
+  `runOptions()` (builds `options`, omitting defaults).
+
 ## Changelog
+
+* **1.4.0** (2026-10-25) — `GET /api/capabilities` (`Capabilities`, `StrategyOption`, `ModelOption`, `CostTier`) and
+  typed `ChatRequest.options.{strategy, model}` with 422 validation (§12). Additive; requests without options are
+  unchanged.
 
 * **1.3.0** (2026-10-25) — `message.end.conversationTitle` (PHI-free server title, §11); conversation REST shapes as
   schema `$defs` (`ConversationSummary`, `ConversationPage`, `Conversation`, `StoredMessage`, `TranscriptsInfo`,
