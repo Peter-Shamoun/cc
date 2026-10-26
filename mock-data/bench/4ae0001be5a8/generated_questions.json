@@ -1,0 +1,1263 @@
+[
+ {
+  "id": "f_payer_denial_rate__aetna",
+  "family": "payer_denial_rate",
+  "category": "denials",
+  "difficulty": "easy",
+  "question": "What is the denial rate for Aetna? Count each claim once, using its current adjudication.",
+  "gold_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Aetna'",
+  "answer_key_sql": "SELECT round(avg(denied::INT), 4) FROM ledger.adjudications WHERE remitted_current AND payer = 'AETNA'",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_payer_denial_rate__aetna-medicare",
+  "family": "payer_denial_rate",
+  "category": "denials",
+  "difficulty": "easy",
+  "question": "Using current adjudications, what share of claims did Aetna Medicare deny?",
+  "gold_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Aetna Medicare'",
+  "answer_key_sql": "SELECT round(avg(denied::INT), 4) FROM ledger.adjudications WHERE remitted_current AND payer = 'AETNA MEDICARE'",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_payer_denial_rate__blue-cross-blue-shield-of-north-carolina",
+  "family": "payer_denial_rate",
+  "category": "denials",
+  "difficulty": "easy",
+  "question": "What is the denial rate for Blue Cross Blue Shield Of North Carolina? Count each claim once, using its current adjudication.",
+  "gold_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Blue Cross Blue Shield Of North Carolina'",
+  "answer_key_sql": "SELECT round(avg(denied::INT), 4) FROM ledger.adjudications WHERE remitted_current AND payer = 'BLUE CROSS BLUE SHIELD OF NORTH CAROLINA'",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_payer_denial_rate__cigna",
+  "family": "payer_denial_rate",
+  "category": "denials",
+  "difficulty": "easy",
+  "question": "Using current adjudications, what share of claims did Cigna deny?",
+  "gold_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Cigna'",
+  "answer_key_sql": "SELECT round(avg(denied::INT), 4) FROM ledger.adjudications WHERE remitted_current AND payer = 'CIGNA'",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_payer_denial_rate__healthy-blue-north-carolina",
+  "family": "payer_denial_rate",
+  "category": "denials",
+  "difficulty": "easy",
+  "question": "What is the denial rate for Healthy Blue North Carolina? Count each claim once, using its current adjudication.",
+  "gold_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Healthy Blue North Carolina'",
+  "answer_key_sql": "SELECT round(avg(denied::INT), 4) FROM ledger.adjudications WHERE remitted_current AND payer = 'HEALTHY BLUE NORTH CAROLINA'",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_payer_denial_rate__humana-medicare-advantage",
+  "family": "payer_denial_rate",
+  "category": "denials",
+  "difficulty": "easy",
+  "question": "Using current adjudications, what share of claims did Humana Medicare Advantage deny?",
+  "gold_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Humana Medicare Advantage'",
+  "answer_key_sql": "SELECT round(avg(denied::INT), 4) FROM ledger.adjudications WHERE remitted_current AND payer = 'HUMANA MEDICARE ADVANTAGE'",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_payer_denial_rate__medicare-part-b-north-carolina",
+  "family": "payer_denial_rate",
+  "category": "denials",
+  "difficulty": "easy",
+  "question": "What is the denial rate for Medicare Part B North Carolina? Count each claim once, using its current adjudication.",
+  "gold_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Medicare Part B North Carolina'",
+  "answer_key_sql": "SELECT round(avg(denied::INT), 4) FROM ledger.adjudications WHERE remitted_current AND payer = 'MEDICARE PART B NORTH CAROLINA'",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_payer_denial_rate__nc-medicaid",
+  "family": "payer_denial_rate",
+  "category": "denials",
+  "difficulty": "easy",
+  "question": "Using current adjudications, what share of claims did Nc Medicaid deny?",
+  "gold_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Nc Medicaid'",
+  "answer_key_sql": "SELECT round(avg(denied::INT), 4) FROM ledger.adjudications WHERE remitted_current AND payer = 'NC MEDICAID'",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_payer_denial_rate__unitedhealthcare",
+  "family": "payer_denial_rate",
+  "category": "denials",
+  "difficulty": "easy",
+  "question": "What is the denial rate for Unitedhealthcare? Count each claim once, using its current adjudication.",
+  "gold_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Unitedhealthcare'",
+  "answer_key_sql": "SELECT round(avg(denied::INT), 4) FROM ledger.adjudications WHERE remitted_current AND payer = 'UNITEDHEALTHCARE'",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_payer_denial_rate__unitedhealthcare-community-plan-nc",
+  "family": "payer_denial_rate",
+  "category": "denials",
+  "difficulty": "easy",
+  "question": "Using current adjudications, what share of claims did Unitedhealthcare Community Plan Nc deny?",
+  "gold_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Unitedhealthcare Community Plan Nc'",
+  "answer_key_sql": "SELECT round(avg(denied::INT), 4) FROM ledger.adjudications WHERE remitted_current AND payer = 'UNITEDHEALTHCARE COMMUNITY PLAN NC'",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_payer_denial_rate__unitedhealthcare-medicare-advantage",
+  "family": "payer_denial_rate",
+  "category": "denials",
+  "difficulty": "easy",
+  "question": "What is the denial rate for Unitedhealthcare Medicare Advantage? Count each claim once, using its current adjudication.",
+  "gold_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Unitedhealthcare Medicare Advantage'",
+  "answer_key_sql": "SELECT round(avg(denied::INT), 4) FROM ledger.adjudications WHERE remitted_current AND payer = 'UNITEDHEALTHCARE MEDICARE ADVANTAGE'",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_payer_denial_rate__wellcare-of-north-carolina",
+  "family": "payer_denial_rate",
+  "category": "denials",
+  "difficulty": "easy",
+  "question": "Using current adjudications, what share of claims did Wellcare Of North Carolina deny?",
+  "gold_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Wellcare Of North Carolina'",
+  "answer_key_sql": "SELECT round(avg(denied::INT), 4) FROM ledger.adjudications WHERE remitted_current AND payer = 'WELLCARE OF NORTH CAROLINA'",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_payer_class_denial_rate__blues",
+  "family": "payer_class_denial_rate",
+  "category": "denials",
+  "difficulty": "medium",
+  "question": "What is the denial rate for blues payers, counting each claim once per payer with its current adjudication?",
+  "gold_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_class = 'blues'",
+  "answer_key_sql": "SELECT round(avg(denied::INT), 4) FROM ledger.adjudications WHERE remitted_current AND payer_class = 'blues'",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_payer_class_denial_rate__commercial",
+  "family": "payer_class_denial_rate",
+  "category": "denials",
+  "difficulty": "medium",
+  "question": "Across all commercial payers, what fraction of current claim adjudications are denials?",
+  "gold_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_class = 'commercial'",
+  "answer_key_sql": "SELECT round(avg(denied::INT), 4) FROM ledger.adjudications WHERE remitted_current AND payer_class = 'commercial'",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_payer_class_denial_rate__medicaid",
+  "family": "payer_class_denial_rate",
+  "category": "denials",
+  "difficulty": "medium",
+  "question": "What is the denial rate for medicaid payers, counting each claim once per payer with its current adjudication?",
+  "gold_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_class = 'medicaid'",
+  "answer_key_sql": "SELECT round(avg(denied::INT), 4) FROM ledger.adjudications WHERE remitted_current AND payer_class = 'medicaid'",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_payer_class_denial_rate__medicaid_mco",
+  "family": "payer_class_denial_rate",
+  "category": "denials",
+  "difficulty": "medium",
+  "question": "Across all medicaid mco payers, what fraction of current claim adjudications are denials?",
+  "gold_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_class = 'medicaid_mco'",
+  "answer_key_sql": "SELECT round(avg(denied::INT), 4) FROM ledger.adjudications WHERE remitted_current AND payer_class = 'medicaid_mco'",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_payer_class_denial_rate__medicare",
+  "family": "payer_class_denial_rate",
+  "category": "denials",
+  "difficulty": "medium",
+  "question": "What is the denial rate for medicare payers, counting each claim once per payer with its current adjudication?",
+  "gold_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_class = 'medicare'",
+  "answer_key_sql": "SELECT round(avg(denied::INT), 4) FROM ledger.adjudications WHERE remitted_current AND payer_class = 'medicare'",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_payer_class_denial_rate__medicare_advantage",
+  "family": "payer_class_denial_rate",
+  "category": "denials",
+  "difficulty": "medium",
+  "question": "Across all medicare advantage payers, what fraction of current claim adjudications are denials?",
+  "gold_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_class = 'medicare_advantage'",
+  "answer_key_sql": "SELECT round(avg(denied::INT), 4) FROM ledger.adjudications WHERE remitted_current AND payer_class = 'medicare_advantage'",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_payer_class_denial_rate__other",
+  "family": "payer_class_denial_rate",
+  "category": "denials",
+  "difficulty": "medium",
+  "question": "What is the denial rate for other payers, counting each claim once per payer with its current adjudication?",
+  "gold_sql": "SELECT round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_class = 'other'",
+  "answer_key_sql": "SELECT round(avg(denied::INT), 4) FROM ledger.adjudications WHERE remitted_current AND payer_class = 'other'",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_payer_paid_in_month__aetna_2026-07-01",
+  "family": "payer_paid_in_month",
+  "category": "money",
+  "difficulty": "medium",
+  "question": "How much did Aetna pay us in July 2026, based on current adjudications with a payment date in that month?",
+  "gold_sql": "SELECT coalesce(round(sum(paid_amount), 2), 0) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Aetna' AND payment_month = DATE '2026-07-01'",
+  "answer_key_sql": "SELECT coalesce(round(sum(e.paid), 2), 0) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'AETNA' AND date_trunc('month', e.event_date::DATE) = DATE '2026-07-01'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_paid_in_month__aetna_2026-08-01",
+  "family": "payer_paid_in_month",
+  "category": "money",
+  "difficulty": "medium",
+  "question": "What was Aetna's total paid amount for August 2026 (current adjudications, by payment date)?",
+  "gold_sql": "SELECT coalesce(round(sum(paid_amount), 2), 0) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Aetna' AND payment_month = DATE '2026-08-01'",
+  "answer_key_sql": "SELECT coalesce(round(sum(e.paid), 2), 0) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'AETNA' AND date_trunc('month', e.event_date::DATE) = DATE '2026-08-01'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_paid_in_month__aetna-medicare_2026-07-01",
+  "family": "payer_paid_in_month",
+  "category": "money",
+  "difficulty": "medium",
+  "question": "How much did Aetna Medicare pay us in July 2026, based on current adjudications with a payment date in that month?",
+  "gold_sql": "SELECT coalesce(round(sum(paid_amount), 2), 0) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Aetna Medicare' AND payment_month = DATE '2026-07-01'",
+  "answer_key_sql": "SELECT coalesce(round(sum(e.paid), 2), 0) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'AETNA MEDICARE' AND date_trunc('month', e.event_date::DATE) = DATE '2026-07-01'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_paid_in_month__amerihealth-caritas-north-carolina_2026-07-01",
+  "family": "payer_paid_in_month",
+  "category": "money",
+  "difficulty": "medium",
+  "question": "What was Amerihealth Caritas North Carolina's total paid amount for July 2026 (current adjudications, by payment date)?",
+  "gold_sql": "SELECT coalesce(round(sum(paid_amount), 2), 0) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Amerihealth Caritas North Carolina' AND payment_month = DATE '2026-07-01'",
+  "answer_key_sql": "SELECT coalesce(round(sum(e.paid), 2), 0) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'AMERIHEALTH CARITAS NORTH CAROLINA' AND date_trunc('month', e.event_date::DATE) = DATE '2026-07-01'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_paid_in_month__bcbs-federal-employee-program-nc_2026-07-01",
+  "family": "payer_paid_in_month",
+  "category": "money",
+  "difficulty": "medium",
+  "question": "How much did Bcbs Federal Employee Program Nc pay us in July 2026, based on current adjudications with a payment date in that month?",
+  "gold_sql": "SELECT coalesce(round(sum(paid_amount), 2), 0) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Bcbs Federal Employee Program Nc' AND payment_month = DATE '2026-07-01'",
+  "answer_key_sql": "SELECT coalesce(round(sum(e.paid), 2), 0) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'BCBS FEDERAL EMPLOYEE PROGRAM NC' AND date_trunc('month', e.event_date::DATE) = DATE '2026-07-01'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_paid_in_month__blue-cross-blue-shield-of-north-carolina_2026-07-01",
+  "family": "payer_paid_in_month",
+  "category": "money",
+  "difficulty": "medium",
+  "question": "What was Blue Cross Blue Shield Of North Carolina's total paid amount for July 2026 (current adjudications, by payment date)?",
+  "gold_sql": "SELECT coalesce(round(sum(paid_amount), 2), 0) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Blue Cross Blue Shield Of North Carolina' AND payment_month = DATE '2026-07-01'",
+  "answer_key_sql": "SELECT coalesce(round(sum(e.paid), 2), 0) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'BLUE CROSS BLUE SHIELD OF NORTH CAROLINA' AND date_trunc('month', e.event_date::DATE) = DATE '2026-07-01'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_paid_in_month__blue-cross-blue-shield-of-north-carolina_2026-08-01",
+  "family": "payer_paid_in_month",
+  "category": "money",
+  "difficulty": "medium",
+  "question": "How much did Blue Cross Blue Shield Of North Carolina pay us in August 2026, based on current adjudications with a payment date in that month?",
+  "gold_sql": "SELECT coalesce(round(sum(paid_amount), 2), 0) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Blue Cross Blue Shield Of North Carolina' AND payment_month = DATE '2026-08-01'",
+  "answer_key_sql": "SELECT coalesce(round(sum(e.paid), 2), 0) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'BLUE CROSS BLUE SHIELD OF NORTH CAROLINA' AND date_trunc('month', e.event_date::DATE) = DATE '2026-08-01'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_paid_in_month__cigna_2026-07-01",
+  "family": "payer_paid_in_month",
+  "category": "money",
+  "difficulty": "medium",
+  "question": "What was Cigna's total paid amount for July 2026 (current adjudications, by payment date)?",
+  "gold_sql": "SELECT coalesce(round(sum(paid_amount), 2), 0) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Cigna' AND payment_month = DATE '2026-07-01'",
+  "answer_key_sql": "SELECT coalesce(round(sum(e.paid), 2), 0) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'CIGNA' AND date_trunc('month', e.event_date::DATE) = DATE '2026-07-01'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_paid_in_month__cigna_2026-08-01",
+  "family": "payer_paid_in_month",
+  "category": "money",
+  "difficulty": "medium",
+  "question": "How much did Cigna pay us in August 2026, based on current adjudications with a payment date in that month?",
+  "gold_sql": "SELECT coalesce(round(sum(paid_amount), 2), 0) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Cigna' AND payment_month = DATE '2026-08-01'",
+  "answer_key_sql": "SELECT coalesce(round(sum(e.paid), 2), 0) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'CIGNA' AND date_trunc('month', e.event_date::DATE) = DATE '2026-08-01'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_paid_in_month__healthy-blue-north-carolina_2026-07-01",
+  "family": "payer_paid_in_month",
+  "category": "money",
+  "difficulty": "medium",
+  "question": "What was Healthy Blue North Carolina's total paid amount for July 2026 (current adjudications, by payment date)?",
+  "gold_sql": "SELECT coalesce(round(sum(paid_amount), 2), 0) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Healthy Blue North Carolina' AND payment_month = DATE '2026-07-01'",
+  "answer_key_sql": "SELECT coalesce(round(sum(e.paid), 2), 0) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'HEALTHY BLUE NORTH CAROLINA' AND date_trunc('month', e.event_date::DATE) = DATE '2026-07-01'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_paid_in_month__humana-medicare-advantage_2026-07-01",
+  "family": "payer_paid_in_month",
+  "category": "money",
+  "difficulty": "medium",
+  "question": "How much did Humana Medicare Advantage pay us in July 2026, based on current adjudications with a payment date in that month?",
+  "gold_sql": "SELECT coalesce(round(sum(paid_amount), 2), 0) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Humana Medicare Advantage' AND payment_month = DATE '2026-07-01'",
+  "answer_key_sql": "SELECT coalesce(round(sum(e.paid), 2), 0) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'HUMANA MEDICARE ADVANTAGE' AND date_trunc('month', e.event_date::DATE) = DATE '2026-07-01'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_paid_in_month__medicare-part-b-north-carolina_2026-07-01",
+  "family": "payer_paid_in_month",
+  "category": "money",
+  "difficulty": "medium",
+  "question": "What was Medicare Part B North Carolina's total paid amount for July 2026 (current adjudications, by payment date)?",
+  "gold_sql": "SELECT coalesce(round(sum(paid_amount), 2), 0) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Medicare Part B North Carolina' AND payment_month = DATE '2026-07-01'",
+  "answer_key_sql": "SELECT coalesce(round(sum(e.paid), 2), 0) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'MEDICARE PART B NORTH CAROLINA' AND date_trunc('month', e.event_date::DATE) = DATE '2026-07-01'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_cpt_denied_lines__36415",
+  "family": "cpt_denied_lines",
+  "category": "lines",
+  "difficulty": "medium",
+  "question": "How many 36415 service lines were denied in current adjudications?",
+  "gold_sql": "SELECT count(*) FROM sem.remit_lines WHERE is_current_adjudication AND line_is_denied AND procedure_code = '36415'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) WHERE e.is_current AND l.denied AND l.cpt = '36415'",
+  "compare": {}
+ },
+ {
+  "id": "f_cpt_denied_lines__80307",
+  "family": "cpt_denied_lines",
+  "category": "lines",
+  "difficulty": "medium",
+  "question": "Count the denied service lines billed as CPT 80307, using each claim's current adjudication.",
+  "gold_sql": "SELECT count(*) FROM sem.remit_lines WHERE is_current_adjudication AND line_is_denied AND procedure_code = '80307'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) WHERE e.is_current AND l.denied AND l.cpt = '80307'",
+  "compare": {}
+ },
+ {
+  "id": "f_cpt_denied_lines__80053",
+  "family": "cpt_denied_lines",
+  "category": "lines",
+  "difficulty": "medium",
+  "question": "How many 80053 service lines were denied in current adjudications?",
+  "gold_sql": "SELECT count(*) FROM sem.remit_lines WHERE is_current_adjudication AND line_is_denied AND procedure_code = '80053'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) WHERE e.is_current AND l.denied AND l.cpt = '80053'",
+  "compare": {}
+ },
+ {
+  "id": "f_cpt_denied_lines__85025",
+  "family": "cpt_denied_lines",
+  "category": "lines",
+  "difficulty": "medium",
+  "question": "Count the denied service lines billed as CPT 85025, using each claim's current adjudication.",
+  "gold_sql": "SELECT count(*) FROM sem.remit_lines WHERE is_current_adjudication AND line_is_denied AND procedure_code = '85025'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) WHERE e.is_current AND l.denied AND l.cpt = '85025'",
+  "compare": {}
+ },
+ {
+  "id": "f_cpt_denied_lines__84443",
+  "family": "cpt_denied_lines",
+  "category": "lines",
+  "difficulty": "medium",
+  "question": "How many 84443 service lines were denied in current adjudications?",
+  "gold_sql": "SELECT count(*) FROM sem.remit_lines WHERE is_current_adjudication AND line_is_denied AND procedure_code = '84443'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) WHERE e.is_current AND l.denied AND l.cpt = '84443'",
+  "compare": {}
+ },
+ {
+  "id": "f_cpt_denied_lines__80061",
+  "family": "cpt_denied_lines",
+  "category": "lines",
+  "difficulty": "medium",
+  "question": "Count the denied service lines billed as CPT 80061, using each claim's current adjudication.",
+  "gold_sql": "SELECT count(*) FROM sem.remit_lines WHERE is_current_adjudication AND line_is_denied AND procedure_code = '80061'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) WHERE e.is_current AND l.denied AND l.cpt = '80061'",
+  "compare": {}
+ },
+ {
+  "id": "f_cpt_denied_lines__87591",
+  "family": "cpt_denied_lines",
+  "category": "lines",
+  "difficulty": "medium",
+  "question": "How many 87591 service lines were denied in current adjudications?",
+  "gold_sql": "SELECT count(*) FROM sem.remit_lines WHERE is_current_adjudication AND line_is_denied AND procedure_code = '87591'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) WHERE e.is_current AND l.denied AND l.cpt = '87591'",
+  "compare": {}
+ },
+ {
+  "id": "f_cpt_denied_lines__83036",
+  "family": "cpt_denied_lines",
+  "category": "lines",
+  "difficulty": "medium",
+  "question": "Count the denied service lines billed as CPT 83036, using each claim's current adjudication.",
+  "gold_sql": "SELECT count(*) FROM sem.remit_lines WHERE is_current_adjudication AND line_is_denied AND procedure_code = '83036'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) WHERE e.is_current AND l.denied AND l.cpt = '83036'",
+  "compare": {}
+ },
+ {
+  "id": "f_cpt_denied_lines__83540",
+  "family": "cpt_denied_lines",
+  "category": "lines",
+  "difficulty": "medium",
+  "question": "How many 83540 service lines were denied in current adjudications?",
+  "gold_sql": "SELECT count(*) FROM sem.remit_lines WHERE is_current_adjudication AND line_is_denied AND procedure_code = '83540'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) WHERE e.is_current AND l.denied AND l.cpt = '83540'",
+  "compare": {}
+ },
+ {
+  "id": "f_cpt_denied_lines__85652",
+  "family": "cpt_denied_lines",
+  "category": "lines",
+  "difficulty": "medium",
+  "question": "Count the denied service lines billed as CPT 85652, using each claim's current adjudication.",
+  "gold_sql": "SELECT count(*) FROM sem.remit_lines WHERE is_current_adjudication AND line_is_denied AND procedure_code = '85652'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) WHERE e.is_current AND l.denied AND l.cpt = '85652'",
+  "compare": {}
+ },
+ {
+  "id": "f_claims_first_submitted_in_month__2026-07-01",
+  "family": "claims_first_submitted_in_month",
+  "category": "volume",
+  "difficulty": "medium",
+  "question": "How many claims did we first submit in July 2026?",
+  "gold_sql": "SELECT count(*) FROM (SELECT claim_key, min(submission_date) AS first_submission FROM sem.claims GROUP BY 1) WHERE date_trunc('month', first_submission) = DATE '2026-07-01'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.claims WHERE date_trunc('month', submitted::DATE) = DATE '2026-07-01'",
+  "compare": {}
+ },
+ {
+  "id": "f_claims_first_submitted_in_month__2026-08-01",
+  "family": "claims_first_submitted_in_month",
+  "category": "volume",
+  "difficulty": "medium",
+  "question": "In August 2026, how many new claims (by first submission date) went out?",
+  "gold_sql": "SELECT count(*) FROM (SELECT claim_key, min(submission_date) AS first_submission FROM sem.claims GROUP BY 1) WHERE date_trunc('month', first_submission) = DATE '2026-08-01'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.claims WHERE date_trunc('month', submitted::DATE) = DATE '2026-08-01'",
+  "compare": {}
+ },
+ {
+  "id": "f_denials_with_carc__197",
+  "family": "denials_with_carc",
+  "category": "denials",
+  "difficulty": "hard",
+  "question": "How many current claim+payer adjudications are denied with reason code 197 under group CO?",
+  "gold_sql": "SELECT count(DISTINCT r.remit_claim_id) FROM sem.remit_claims r JOIN sem.adjustments a ON a.remit_claim_id = r.remit_claim_id WHERE r.is_current_adjudication AND r.is_denied AND a.group_code = 'CO' AND a.carc_code = '197'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.adjudications a WHERE a.remitted_current AND a.denied AND EXISTS (SELECT 1 FROM ledger.event_adjustments x JOIN ledger.events e USING (pcn, payer_id, event_number) WHERE e.is_current AND x.pcn = a.pcn AND x.payer_id = a.payer_id AND x.group_code = 'CO' AND x.carc = '197')",
+  "compare": {}
+ },
+ {
+  "id": "f_denials_with_carc__16",
+  "family": "denials_with_carc",
+  "category": "denials",
+  "difficulty": "hard",
+  "question": "Using current adjudications, count the denied claims (per payer) that carry a CO-16 adjustment.",
+  "gold_sql": "SELECT count(DISTINCT r.remit_claim_id) FROM sem.remit_claims r JOIN sem.adjustments a ON a.remit_claim_id = r.remit_claim_id WHERE r.is_current_adjudication AND r.is_denied AND a.group_code = 'CO' AND a.carc_code = '16'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.adjudications a WHERE a.remitted_current AND a.denied AND EXISTS (SELECT 1 FROM ledger.event_adjustments x JOIN ledger.events e USING (pcn, payer_id, event_number) WHERE e.is_current AND x.pcn = a.pcn AND x.payer_id = a.payer_id AND x.group_code = 'CO' AND x.carc = '16')",
+  "compare": {}
+ },
+ {
+  "id": "f_payer_avg_paid_per_paid_claim__aetna",
+  "family": "payer_avg_paid_per_paid_claim",
+  "category": "money",
+  "difficulty": "medium",
+  "question": "What is the average amount Aetna paid per claim, counting only current adjudications that paid more than $0?",
+  "gold_sql": "SELECT round(avg(paid_amount), 2) FROM sem.remit_claims WHERE is_current_adjudication AND paid_amount > 0 AND payer_name = 'Aetna'",
+  "answer_key_sql": "SELECT round(avg(paid_current), 2) FROM ledger.adjudications WHERE remitted_current AND paid_current > 0 AND payer = 'AETNA'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_avg_paid_per_paid_claim__blue-cross-blue-shield-of-north-carolina",
+  "family": "payer_avg_paid_per_paid_claim",
+  "category": "money",
+  "difficulty": "medium",
+  "question": "On claims Blue Cross Blue Shield Of North Carolina actually paid (current adjudication, paid > 0), what is the average payment?",
+  "gold_sql": "SELECT round(avg(paid_amount), 2) FROM sem.remit_claims WHERE is_current_adjudication AND paid_amount > 0 AND payer_name = 'Blue Cross Blue Shield Of North Carolina'",
+  "answer_key_sql": "SELECT round(avg(paid_current), 2) FROM ledger.adjudications WHERE remitted_current AND paid_current > 0 AND payer = 'BLUE CROSS BLUE SHIELD OF NORTH CAROLINA'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_avg_paid_per_paid_claim__cigna",
+  "family": "payer_avg_paid_per_paid_claim",
+  "category": "money",
+  "difficulty": "medium",
+  "question": "What is the average amount Cigna paid per claim, counting only current adjudications that paid more than $0?",
+  "gold_sql": "SELECT round(avg(paid_amount), 2) FROM sem.remit_claims WHERE is_current_adjudication AND paid_amount > 0 AND payer_name = 'Cigna'",
+  "answer_key_sql": "SELECT round(avg(paid_current), 2) FROM ledger.adjudications WHERE remitted_current AND paid_current > 0 AND payer = 'CIGNA'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_avg_paid_per_paid_claim__healthy-blue-north-carolina",
+  "family": "payer_avg_paid_per_paid_claim",
+  "category": "money",
+  "difficulty": "medium",
+  "question": "On claims Healthy Blue North Carolina actually paid (current adjudication, paid > 0), what is the average payment?",
+  "gold_sql": "SELECT round(avg(paid_amount), 2) FROM sem.remit_claims WHERE is_current_adjudication AND paid_amount > 0 AND payer_name = 'Healthy Blue North Carolina'",
+  "answer_key_sql": "SELECT round(avg(paid_current), 2) FROM ledger.adjudications WHERE remitted_current AND paid_current > 0 AND payer = 'HEALTHY BLUE NORTH CAROLINA'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_avg_paid_per_paid_claim__humana-medicare-advantage",
+  "family": "payer_avg_paid_per_paid_claim",
+  "category": "money",
+  "difficulty": "medium",
+  "question": "What is the average amount Humana Medicare Advantage paid per claim, counting only current adjudications that paid more than $0?",
+  "gold_sql": "SELECT round(avg(paid_amount), 2) FROM sem.remit_claims WHERE is_current_adjudication AND paid_amount > 0 AND payer_name = 'Humana Medicare Advantage'",
+  "answer_key_sql": "SELECT round(avg(paid_current), 2) FROM ledger.adjudications WHERE remitted_current AND paid_current > 0 AND payer = 'HUMANA MEDICARE ADVANTAGE'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_avg_paid_per_paid_claim__medicare-part-b-north-carolina",
+  "family": "payer_avg_paid_per_paid_claim",
+  "category": "money",
+  "difficulty": "medium",
+  "question": "On claims Medicare Part B North Carolina actually paid (current adjudication, paid > 0), what is the average payment?",
+  "gold_sql": "SELECT round(avg(paid_amount), 2) FROM sem.remit_claims WHERE is_current_adjudication AND paid_amount > 0 AND payer_name = 'Medicare Part B North Carolina'",
+  "answer_key_sql": "SELECT round(avg(paid_current), 2) FROM ledger.adjudications WHERE remitted_current AND paid_current > 0 AND payer = 'MEDICARE PART B NORTH CAROLINA'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_avg_paid_per_paid_claim__nc-medicaid",
+  "family": "payer_avg_paid_per_paid_claim",
+  "category": "money",
+  "difficulty": "medium",
+  "question": "What is the average amount Nc Medicaid paid per claim, counting only current adjudications that paid more than $0?",
+  "gold_sql": "SELECT round(avg(paid_amount), 2) FROM sem.remit_claims WHERE is_current_adjudication AND paid_amount > 0 AND payer_name = 'Nc Medicaid'",
+  "answer_key_sql": "SELECT round(avg(paid_current), 2) FROM ledger.adjudications WHERE remitted_current AND paid_current > 0 AND payer = 'NC MEDICAID'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_avg_paid_per_paid_claim__unitedhealthcare",
+  "family": "payer_avg_paid_per_paid_claim",
+  "category": "money",
+  "difficulty": "medium",
+  "question": "On claims Unitedhealthcare actually paid (current adjudication, paid > 0), what is the average payment?",
+  "gold_sql": "SELECT round(avg(paid_amount), 2) FROM sem.remit_claims WHERE is_current_adjudication AND paid_amount > 0 AND payer_name = 'Unitedhealthcare'",
+  "answer_key_sql": "SELECT round(avg(paid_current), 2) FROM ledger.adjudications WHERE remitted_current AND paid_current > 0 AND payer = 'UNITEDHEALTHCARE'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_avg_paid_per_paid_claim__unitedhealthcare-community-plan-nc",
+  "family": "payer_avg_paid_per_paid_claim",
+  "category": "money",
+  "difficulty": "medium",
+  "question": "What is the average amount Unitedhealthcare Community Plan Nc paid per claim, counting only current adjudications that paid more than $0?",
+  "gold_sql": "SELECT round(avg(paid_amount), 2) FROM sem.remit_claims WHERE is_current_adjudication AND paid_amount > 0 AND payer_name = 'Unitedhealthcare Community Plan Nc'",
+  "answer_key_sql": "SELECT round(avg(paid_current), 2) FROM ledger.adjudications WHERE remitted_current AND paid_current > 0 AND payer = 'UNITEDHEALTHCARE COMMUNITY PLAN NC'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_avg_paid_per_paid_claim__unitedhealthcare-medicare-advantage",
+  "family": "payer_avg_paid_per_paid_claim",
+  "category": "money",
+  "difficulty": "medium",
+  "question": "On claims Unitedhealthcare Medicare Advantage actually paid (current adjudication, paid > 0), what is the average payment?",
+  "gold_sql": "SELECT round(avg(paid_amount), 2) FROM sem.remit_claims WHERE is_current_adjudication AND paid_amount > 0 AND payer_name = 'Unitedhealthcare Medicare Advantage'",
+  "answer_key_sql": "SELECT round(avg(paid_current), 2) FROM ledger.adjudications WHERE remitted_current AND paid_current > 0 AND payer = 'UNITEDHEALTHCARE MEDICARE ADVANTAGE'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_avg_paid_per_paid_claim__wellcare-of-north-carolina",
+  "family": "payer_avg_paid_per_paid_claim",
+  "category": "money",
+  "difficulty": "medium",
+  "question": "What is the average amount Wellcare Of North Carolina paid per claim, counting only current adjudications that paid more than $0?",
+  "gold_sql": "SELECT round(avg(paid_amount), 2) FROM sem.remit_claims WHERE is_current_adjudication AND paid_amount > 0 AND payer_name = 'Wellcare Of North Carolina'",
+  "answer_key_sql": "SELECT round(avg(paid_current), 2) FROM ledger.adjudications WHERE remitted_current AND paid_current > 0 AND payer = 'WELLCARE OF NORTH CAROLINA'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_reversals_in_month__2026-07-01",
+  "family": "reversals_in_month",
+  "category": "rework",
+  "difficulty": "medium",
+  "question": "How many claim reversals (claim status 22) did payers send us in July 2026, by payment date?",
+  "gold_sql": "SELECT count(*) FROM sem.remit_claims WHERE is_reversal AND payment_month = DATE '2026-07-01'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.events WHERE status = '22' AND date_trunc('month', event_date::DATE) = DATE '2026-07-01'",
+  "compare": {}
+ },
+ {
+  "id": "f_reversals_in_month__2026-08-01",
+  "family": "reversals_in_month",
+  "category": "rework",
+  "difficulty": "medium",
+  "question": "Count the 835 reversal events dated in August 2026.",
+  "gold_sql": "SELECT count(*) FROM sem.remit_claims WHERE is_reversal AND payment_month = DATE '2026-08-01'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.events WHERE status = '22' AND date_trunc('month', event_date::DATE) = DATE '2026-08-01'",
+  "compare": {}
+ },
+ {
+  "id": "f_payer_patient_responsibility__aetna",
+  "family": "payer_patient_responsibility",
+  "category": "patient",
+  "difficulty": "medium",
+  "question": "How much patient responsibility did Aetna assign on its current adjudications?",
+  "gold_sql": "SELECT coalesce(round(sum(patient_responsibility_amount), 2), 0) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Aetna'",
+  "answer_key_sql": "SELECT coalesce(round(sum(e.patient_responsibility), 2), 0) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'AETNA'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_patient_responsibility__blue-cross-blue-shield-of-north-carolina",
+  "family": "payer_patient_responsibility",
+  "category": "patient",
+  "difficulty": "medium",
+  "question": "What is the total patient responsibility amount on Blue Cross Blue Shield Of North Carolina's current claim adjudications?",
+  "gold_sql": "SELECT coalesce(round(sum(patient_responsibility_amount), 2), 0) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Blue Cross Blue Shield Of North Carolina'",
+  "answer_key_sql": "SELECT coalesce(round(sum(e.patient_responsibility), 2), 0) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'BLUE CROSS BLUE SHIELD OF NORTH CAROLINA'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_patient_responsibility__cigna",
+  "family": "payer_patient_responsibility",
+  "category": "patient",
+  "difficulty": "medium",
+  "question": "How much patient responsibility did Cigna assign on its current adjudications?",
+  "gold_sql": "SELECT coalesce(round(sum(patient_responsibility_amount), 2), 0) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Cigna'",
+  "answer_key_sql": "SELECT coalesce(round(sum(e.patient_responsibility), 2), 0) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'CIGNA'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_patient_responsibility__medicare-part-b-north-carolina",
+  "family": "payer_patient_responsibility",
+  "category": "patient",
+  "difficulty": "medium",
+  "question": "What is the total patient responsibility amount on Medicare Part B North Carolina's current claim adjudications?",
+  "gold_sql": "SELECT coalesce(round(sum(patient_responsibility_amount), 2), 0) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Medicare Part B North Carolina'",
+  "answer_key_sql": "SELECT coalesce(round(sum(e.patient_responsibility), 2), 0) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'MEDICARE PART B NORTH CAROLINA'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_patient_responsibility__pamlico-teachers-health-fund",
+  "family": "payer_patient_responsibility",
+  "category": "patient",
+  "difficulty": "medium",
+  "question": "How much patient responsibility did Pamlico Teachers Health Fund assign on its current adjudications?",
+  "gold_sql": "SELECT coalesce(round(sum(patient_responsibility_amount), 2), 0) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Pamlico Teachers Health Fund'",
+  "answer_key_sql": "SELECT coalesce(round(sum(e.patient_responsibility), 2), 0) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'PAMLICO TEACHERS HEALTH FUND'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_patient_responsibility__tricare-east-region",
+  "family": "payer_patient_responsibility",
+  "category": "patient",
+  "difficulty": "medium",
+  "question": "What is the total patient responsibility amount on Tricare East Region's current claim adjudications?",
+  "gold_sql": "SELECT coalesce(round(sum(patient_responsibility_amount), 2), 0) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Tricare East Region'",
+  "answer_key_sql": "SELECT coalesce(round(sum(e.patient_responsibility), 2), 0) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'TRICARE EAST REGION'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_payer_patient_responsibility__unitedhealthcare",
+  "family": "payer_patient_responsibility",
+  "category": "patient",
+  "difficulty": "medium",
+  "question": "How much patient responsibility did Unitedhealthcare assign on its current adjudications?",
+  "gold_sql": "SELECT coalesce(round(sum(patient_responsibility_amount), 2), 0) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Unitedhealthcare'",
+  "answer_key_sql": "SELECT coalesce(round(sum(e.patient_responsibility), 2), 0) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'UNITEDHEALTHCARE'",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_never_remitted_submitted_in_month__2026-07-01",
+  "family": "never_remitted_submitted_in_month",
+  "category": "rework",
+  "difficulty": "hard",
+  "question": "Of the claims first submitted in July 2026, how many have never received any 835 remittance?",
+  "gold_sql": "SELECT count(*) FROM (SELECT claim_key, min(submission_date) AS first_submission, bool_or(has_remit) AS remitted FROM sem.claims GROUP BY 1) WHERE NOT remitted AND date_trunc('month', first_submission) = DATE '2026-07-01'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.claims WHERE NOT has_any_remit AND date_trunc('month', submitted::DATE) = DATE '2026-07-01'",
+  "compare": {}
+ },
+ {
+  "id": "f_never_remitted_submitted_in_month__2026-08-01",
+  "family": "never_remitted_submitted_in_month",
+  "category": "rework",
+  "difficulty": "hard",
+  "question": "How many claims we first sent in August 2026 still have no remittance at all?",
+  "gold_sql": "SELECT count(*) FROM (SELECT claim_key, min(submission_date) AS first_submission, bool_or(has_remit) AS remitted FROM sem.claims GROUP BY 1) WHERE NOT remitted AND date_trunc('month', first_submission) = DATE '2026-08-01'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.claims WHERE NOT has_any_remit AND date_trunc('month', submitted::DATE) = DATE '2026-08-01'",
+  "compare": {}
+ },
+ {
+  "id": "f_payer_monthly_denial_rate__aetna",
+  "family": "payer_monthly_denial_rate",
+  "category": "denials",
+  "difficulty": "medium",
+  "question": "Show Aetna's denial rate by payment month, using current adjudications.",
+  "gold_sql": "SELECT payment_month, round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Aetna' GROUP BY 1 ORDER BY 1",
+  "answer_key_sql": "SELECT date_trunc('month', e.event_date::DATE)::DATE, round(avg(a.denied::INT), 4) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'AETNA' GROUP BY 1 ORDER BY 1",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    1
+   ]
+  }
+ },
+ {
+  "id": "f_payer_monthly_denial_rate__blue-cross-blue-shield-of-north-carolina",
+  "family": "payer_monthly_denial_rate",
+  "category": "denials",
+  "difficulty": "medium",
+  "question": "Month by month (by payment date), what share of Blue Cross Blue Shield Of North Carolina's current claim adjudications were denials?",
+  "gold_sql": "SELECT payment_month, round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Blue Cross Blue Shield Of North Carolina' GROUP BY 1 ORDER BY 1",
+  "answer_key_sql": "SELECT date_trunc('month', e.event_date::DATE)::DATE, round(avg(a.denied::INT), 4) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'BLUE CROSS BLUE SHIELD OF NORTH CAROLINA' GROUP BY 1 ORDER BY 1",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    1
+   ]
+  }
+ },
+ {
+  "id": "f_payer_monthly_denial_rate__cigna",
+  "family": "payer_monthly_denial_rate",
+  "category": "denials",
+  "difficulty": "medium",
+  "question": "Show Cigna's denial rate by payment month, using current adjudications.",
+  "gold_sql": "SELECT payment_month, round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Cigna' GROUP BY 1 ORDER BY 1",
+  "answer_key_sql": "SELECT date_trunc('month', e.event_date::DATE)::DATE, round(avg(a.denied::INT), 4) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'CIGNA' GROUP BY 1 ORDER BY 1",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    1
+   ]
+  }
+ },
+ {
+  "id": "f_payer_monthly_denial_rate__medicare-part-b-north-carolina",
+  "family": "payer_monthly_denial_rate",
+  "category": "denials",
+  "difficulty": "medium",
+  "question": "Month by month (by payment date), what share of Medicare Part B North Carolina's current claim adjudications were denials?",
+  "gold_sql": "SELECT payment_month, round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Medicare Part B North Carolina' GROUP BY 1 ORDER BY 1",
+  "answer_key_sql": "SELECT date_trunc('month', e.event_date::DATE)::DATE, round(avg(a.denied::INT), 4) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'MEDICARE PART B NORTH CAROLINA' GROUP BY 1 ORDER BY 1",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    1
+   ]
+  }
+ },
+ {
+  "id": "f_payer_monthly_denial_rate__unitedhealthcare",
+  "family": "payer_monthly_denial_rate",
+  "category": "denials",
+  "difficulty": "medium",
+  "question": "Show Unitedhealthcare's denial rate by payment month, using current adjudications.",
+  "gold_sql": "SELECT payment_month, round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Unitedhealthcare' GROUP BY 1 ORDER BY 1",
+  "answer_key_sql": "SELECT date_trunc('month', e.event_date::DATE)::DATE, round(avg(a.denied::INT), 4) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'UNITEDHEALTHCARE' GROUP BY 1 ORDER BY 1",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    1
+   ]
+  }
+ },
+ {
+  "id": "f_payer_monthly_denial_rate__unitedhealthcare-medicare-advantage",
+  "family": "payer_monthly_denial_rate",
+  "category": "denials",
+  "difficulty": "medium",
+  "question": "Month by month (by payment date), what share of Unitedhealthcare Medicare Advantage's current claim adjudications were denials?",
+  "gold_sql": "SELECT payment_month, round(avg(is_denied::INT), 4) FROM sem.remit_claims WHERE is_current_adjudication AND payer_name = 'Unitedhealthcare Medicare Advantage' GROUP BY 1 ORDER BY 1",
+  "answer_key_sql": "SELECT date_trunc('month', e.event_date::DATE)::DATE, round(avg(a.denied::INT), 4) FROM ledger.events e JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND a.payer = 'UNITEDHEALTHCARE MEDICARE ADVANTAGE' GROUP BY 1 ORDER BY 1",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    1
+   ]
+  }
+ },
+ {
+  "id": "f_payer_days_to_first_remit__aetna",
+  "family": "payer_days_to_first_remit",
+  "category": "payers",
+  "difficulty": "hard",
+  "question": "On average, how many days pass between a claim's first submission to Aetna as primary payer and the first 835 from Aetna for that claim (any status)? Round to one decimal.",
+  "gold_sql": "WITH s AS (SELECT claim_key, payer_key, min(submission_date) AS first_sub FROM sem.claims WHERE payer_responsibility = 'P' GROUP BY 1, 2), r AS (SELECT claim_key, payer_key, payer_name, min(payment_date) AS first_remit FROM sem.remit_claims GROUP BY 1, 2, 3) SELECT round(avg(date_diff('day', s.first_sub, r.first_remit)), 1) FROM s JOIN r USING (claim_key, payer_key) WHERE r.payer_name = 'Aetna'",
+  "answer_key_sql": "WITH s AS (SELECT pcn, payer_id, min(submission_date::DATE) AS first_sub FROM ledger.submissions WHERE payer_sequence = 0 GROUP BY 1, 2), r AS (SELECT pcn, payer_id, min(event_date::DATE) AS first_remit FROM ledger.events GROUP BY 1, 2) SELECT round(avg(date_diff('day', s.first_sub, r.first_remit)), 1) FROM s JOIN r USING (pcn, payer_id) JOIN (SELECT DISTINCT pcn, payer_id, payer FROM ledger.adjudications) a USING (pcn, payer_id) WHERE a.payer = 'AETNA'",
+  "compare": {
+   "tol": 0.05
+  }
+ },
+ {
+  "id": "f_payer_days_to_first_remit__aetna-medicare",
+  "family": "payer_days_to_first_remit",
+  "category": "payers",
+  "difficulty": "hard",
+  "question": "For claims billed to Aetna Medicare as the primary payer, what is the average number of days from first submission to Aetna Medicare's first remittance? One decimal.",
+  "gold_sql": "WITH s AS (SELECT claim_key, payer_key, min(submission_date) AS first_sub FROM sem.claims WHERE payer_responsibility = 'P' GROUP BY 1, 2), r AS (SELECT claim_key, payer_key, payer_name, min(payment_date) AS first_remit FROM sem.remit_claims GROUP BY 1, 2, 3) SELECT round(avg(date_diff('day', s.first_sub, r.first_remit)), 1) FROM s JOIN r USING (claim_key, payer_key) WHERE r.payer_name = 'Aetna Medicare'",
+  "answer_key_sql": "WITH s AS (SELECT pcn, payer_id, min(submission_date::DATE) AS first_sub FROM ledger.submissions WHERE payer_sequence = 0 GROUP BY 1, 2), r AS (SELECT pcn, payer_id, min(event_date::DATE) AS first_remit FROM ledger.events GROUP BY 1, 2) SELECT round(avg(date_diff('day', s.first_sub, r.first_remit)), 1) FROM s JOIN r USING (pcn, payer_id) JOIN (SELECT DISTINCT pcn, payer_id, payer FROM ledger.adjudications) a USING (pcn, payer_id) WHERE a.payer = 'AETNA MEDICARE'",
+  "compare": {
+   "tol": 0.05
+  }
+ },
+ {
+  "id": "f_payer_days_to_first_remit__blue-cross-blue-shield-of-north-carolina",
+  "family": "payer_days_to_first_remit",
+  "category": "payers",
+  "difficulty": "hard",
+  "question": "On average, how many days pass between a claim's first submission to Blue Cross Blue Shield Of North Carolina as primary payer and the first 835 from Blue Cross Blue Shield Of North Carolina for that claim (any status)? Round to one decimal.",
+  "gold_sql": "WITH s AS (SELECT claim_key, payer_key, min(submission_date) AS first_sub FROM sem.claims WHERE payer_responsibility = 'P' GROUP BY 1, 2), r AS (SELECT claim_key, payer_key, payer_name, min(payment_date) AS first_remit FROM sem.remit_claims GROUP BY 1, 2, 3) SELECT round(avg(date_diff('day', s.first_sub, r.first_remit)), 1) FROM s JOIN r USING (claim_key, payer_key) WHERE r.payer_name = 'Blue Cross Blue Shield Of North Carolina'",
+  "answer_key_sql": "WITH s AS (SELECT pcn, payer_id, min(submission_date::DATE) AS first_sub FROM ledger.submissions WHERE payer_sequence = 0 GROUP BY 1, 2), r AS (SELECT pcn, payer_id, min(event_date::DATE) AS first_remit FROM ledger.events GROUP BY 1, 2) SELECT round(avg(date_diff('day', s.first_sub, r.first_remit)), 1) FROM s JOIN r USING (pcn, payer_id) JOIN (SELECT DISTINCT pcn, payer_id, payer FROM ledger.adjudications) a USING (pcn, payer_id) WHERE a.payer = 'BLUE CROSS BLUE SHIELD OF NORTH CAROLINA'",
+  "compare": {
+   "tol": 0.05
+  }
+ },
+ {
+  "id": "f_payer_days_to_first_remit__cigna",
+  "family": "payer_days_to_first_remit",
+  "category": "payers",
+  "difficulty": "hard",
+  "question": "For claims billed to Cigna as the primary payer, what is the average number of days from first submission to Cigna's first remittance? One decimal.",
+  "gold_sql": "WITH s AS (SELECT claim_key, payer_key, min(submission_date) AS first_sub FROM sem.claims WHERE payer_responsibility = 'P' GROUP BY 1, 2), r AS (SELECT claim_key, payer_key, payer_name, min(payment_date) AS first_remit FROM sem.remit_claims GROUP BY 1, 2, 3) SELECT round(avg(date_diff('day', s.first_sub, r.first_remit)), 1) FROM s JOIN r USING (claim_key, payer_key) WHERE r.payer_name = 'Cigna'",
+  "answer_key_sql": "WITH s AS (SELECT pcn, payer_id, min(submission_date::DATE) AS first_sub FROM ledger.submissions WHERE payer_sequence = 0 GROUP BY 1, 2), r AS (SELECT pcn, payer_id, min(event_date::DATE) AS first_remit FROM ledger.events GROUP BY 1, 2) SELECT round(avg(date_diff('day', s.first_sub, r.first_remit)), 1) FROM s JOIN r USING (pcn, payer_id) JOIN (SELECT DISTINCT pcn, payer_id, payer FROM ledger.adjudications) a USING (pcn, payer_id) WHERE a.payer = 'CIGNA'",
+  "compare": {
+   "tol": 0.05
+  }
+ },
+ {
+  "id": "f_payer_days_to_first_remit__healthy-blue-north-carolina",
+  "family": "payer_days_to_first_remit",
+  "category": "payers",
+  "difficulty": "hard",
+  "question": "On average, how many days pass between a claim's first submission to Healthy Blue North Carolina as primary payer and the first 835 from Healthy Blue North Carolina for that claim (any status)? Round to one decimal.",
+  "gold_sql": "WITH s AS (SELECT claim_key, payer_key, min(submission_date) AS first_sub FROM sem.claims WHERE payer_responsibility = 'P' GROUP BY 1, 2), r AS (SELECT claim_key, payer_key, payer_name, min(payment_date) AS first_remit FROM sem.remit_claims GROUP BY 1, 2, 3) SELECT round(avg(date_diff('day', s.first_sub, r.first_remit)), 1) FROM s JOIN r USING (claim_key, payer_key) WHERE r.payer_name = 'Healthy Blue North Carolina'",
+  "answer_key_sql": "WITH s AS (SELECT pcn, payer_id, min(submission_date::DATE) AS first_sub FROM ledger.submissions WHERE payer_sequence = 0 GROUP BY 1, 2), r AS (SELECT pcn, payer_id, min(event_date::DATE) AS first_remit FROM ledger.events GROUP BY 1, 2) SELECT round(avg(date_diff('day', s.first_sub, r.first_remit)), 1) FROM s JOIN r USING (pcn, payer_id) JOIN (SELECT DISTINCT pcn, payer_id, payer FROM ledger.adjudications) a USING (pcn, payer_id) WHERE a.payer = 'HEALTHY BLUE NORTH CAROLINA'",
+  "compare": {
+   "tol": 0.05
+  }
+ },
+ {
+  "id": "f_payer_days_to_first_remit__humana-medicare-advantage",
+  "family": "payer_days_to_first_remit",
+  "category": "payers",
+  "difficulty": "hard",
+  "question": "For claims billed to Humana Medicare Advantage as the primary payer, what is the average number of days from first submission to Humana Medicare Advantage's first remittance? One decimal.",
+  "gold_sql": "WITH s AS (SELECT claim_key, payer_key, min(submission_date) AS first_sub FROM sem.claims WHERE payer_responsibility = 'P' GROUP BY 1, 2), r AS (SELECT claim_key, payer_key, payer_name, min(payment_date) AS first_remit FROM sem.remit_claims GROUP BY 1, 2, 3) SELECT round(avg(date_diff('day', s.first_sub, r.first_remit)), 1) FROM s JOIN r USING (claim_key, payer_key) WHERE r.payer_name = 'Humana Medicare Advantage'",
+  "answer_key_sql": "WITH s AS (SELECT pcn, payer_id, min(submission_date::DATE) AS first_sub FROM ledger.submissions WHERE payer_sequence = 0 GROUP BY 1, 2), r AS (SELECT pcn, payer_id, min(event_date::DATE) AS first_remit FROM ledger.events GROUP BY 1, 2) SELECT round(avg(date_diff('day', s.first_sub, r.first_remit)), 1) FROM s JOIN r USING (pcn, payer_id) JOIN (SELECT DISTINCT pcn, payer_id, payer FROM ledger.adjudications) a USING (pcn, payer_id) WHERE a.payer = 'HUMANA MEDICARE ADVANTAGE'",
+  "compare": {
+   "tol": 0.05
+  }
+ },
+ {
+  "id": "f_payer_days_to_first_remit__medicare-part-b-north-carolina",
+  "family": "payer_days_to_first_remit",
+  "category": "payers",
+  "difficulty": "hard",
+  "question": "On average, how many days pass between a claim's first submission to Medicare Part B North Carolina as primary payer and the first 835 from Medicare Part B North Carolina for that claim (any status)? Round to one decimal.",
+  "gold_sql": "WITH s AS (SELECT claim_key, payer_key, min(submission_date) AS first_sub FROM sem.claims WHERE payer_responsibility = 'P' GROUP BY 1, 2), r AS (SELECT claim_key, payer_key, payer_name, min(payment_date) AS first_remit FROM sem.remit_claims GROUP BY 1, 2, 3) SELECT round(avg(date_diff('day', s.first_sub, r.first_remit)), 1) FROM s JOIN r USING (claim_key, payer_key) WHERE r.payer_name = 'Medicare Part B North Carolina'",
+  "answer_key_sql": "WITH s AS (SELECT pcn, payer_id, min(submission_date::DATE) AS first_sub FROM ledger.submissions WHERE payer_sequence = 0 GROUP BY 1, 2), r AS (SELECT pcn, payer_id, min(event_date::DATE) AS first_remit FROM ledger.events GROUP BY 1, 2) SELECT round(avg(date_diff('day', s.first_sub, r.first_remit)), 1) FROM s JOIN r USING (pcn, payer_id) JOIN (SELECT DISTINCT pcn, payer_id, payer FROM ledger.adjudications) a USING (pcn, payer_id) WHERE a.payer = 'MEDICARE PART B NORTH CAROLINA'",
+  "compare": {
+   "tol": 0.05
+  }
+ },
+ {
+  "id": "f_payer_days_to_first_remit__nc-medicaid",
+  "family": "payer_days_to_first_remit",
+  "category": "payers",
+  "difficulty": "hard",
+  "question": "For claims billed to Nc Medicaid as the primary payer, what is the average number of days from first submission to Nc Medicaid's first remittance? One decimal.",
+  "gold_sql": "WITH s AS (SELECT claim_key, payer_key, min(submission_date) AS first_sub FROM sem.claims WHERE payer_responsibility = 'P' GROUP BY 1, 2), r AS (SELECT claim_key, payer_key, payer_name, min(payment_date) AS first_remit FROM sem.remit_claims GROUP BY 1, 2, 3) SELECT round(avg(date_diff('day', s.first_sub, r.first_remit)), 1) FROM s JOIN r USING (claim_key, payer_key) WHERE r.payer_name = 'Nc Medicaid'",
+  "answer_key_sql": "WITH s AS (SELECT pcn, payer_id, min(submission_date::DATE) AS first_sub FROM ledger.submissions WHERE payer_sequence = 0 GROUP BY 1, 2), r AS (SELECT pcn, payer_id, min(event_date::DATE) AS first_remit FROM ledger.events GROUP BY 1, 2) SELECT round(avg(date_diff('day', s.first_sub, r.first_remit)), 1) FROM s JOIN r USING (pcn, payer_id) JOIN (SELECT DISTINCT pcn, payer_id, payer FROM ledger.adjudications) a USING (pcn, payer_id) WHERE a.payer = 'NC MEDICAID'",
+  "compare": {
+   "tol": 0.05
+  }
+ },
+ {
+  "id": "f_payer_days_to_first_remit__unitedhealthcare",
+  "family": "payer_days_to_first_remit",
+  "category": "payers",
+  "difficulty": "hard",
+  "question": "On average, how many days pass between a claim's first submission to Unitedhealthcare as primary payer and the first 835 from Unitedhealthcare for that claim (any status)? Round to one decimal.",
+  "gold_sql": "WITH s AS (SELECT claim_key, payer_key, min(submission_date) AS first_sub FROM sem.claims WHERE payer_responsibility = 'P' GROUP BY 1, 2), r AS (SELECT claim_key, payer_key, payer_name, min(payment_date) AS first_remit FROM sem.remit_claims GROUP BY 1, 2, 3) SELECT round(avg(date_diff('day', s.first_sub, r.first_remit)), 1) FROM s JOIN r USING (claim_key, payer_key) WHERE r.payer_name = 'Unitedhealthcare'",
+  "answer_key_sql": "WITH s AS (SELECT pcn, payer_id, min(submission_date::DATE) AS first_sub FROM ledger.submissions WHERE payer_sequence = 0 GROUP BY 1, 2), r AS (SELECT pcn, payer_id, min(event_date::DATE) AS first_remit FROM ledger.events GROUP BY 1, 2) SELECT round(avg(date_diff('day', s.first_sub, r.first_remit)), 1) FROM s JOIN r USING (pcn, payer_id) JOIN (SELECT DISTINCT pcn, payer_id, payer FROM ledger.adjudications) a USING (pcn, payer_id) WHERE a.payer = 'UNITEDHEALTHCARE'",
+  "compare": {
+   "tol": 0.05
+  }
+ },
+ {
+  "id": "f_payer_days_to_first_remit__unitedhealthcare-community-plan-nc",
+  "family": "payer_days_to_first_remit",
+  "category": "payers",
+  "difficulty": "hard",
+  "question": "For claims billed to Unitedhealthcare Community Plan Nc as the primary payer, what is the average number of days from first submission to Unitedhealthcare Community Plan Nc's first remittance? One decimal.",
+  "gold_sql": "WITH s AS (SELECT claim_key, payer_key, min(submission_date) AS first_sub FROM sem.claims WHERE payer_responsibility = 'P' GROUP BY 1, 2), r AS (SELECT claim_key, payer_key, payer_name, min(payment_date) AS first_remit FROM sem.remit_claims GROUP BY 1, 2, 3) SELECT round(avg(date_diff('day', s.first_sub, r.first_remit)), 1) FROM s JOIN r USING (claim_key, payer_key) WHERE r.payer_name = 'Unitedhealthcare Community Plan Nc'",
+  "answer_key_sql": "WITH s AS (SELECT pcn, payer_id, min(submission_date::DATE) AS first_sub FROM ledger.submissions WHERE payer_sequence = 0 GROUP BY 1, 2), r AS (SELECT pcn, payer_id, min(event_date::DATE) AS first_remit FROM ledger.events GROUP BY 1, 2) SELECT round(avg(date_diff('day', s.first_sub, r.first_remit)), 1) FROM s JOIN r USING (pcn, payer_id) JOIN (SELECT DISTINCT pcn, payer_id, payer FROM ledger.adjudications) a USING (pcn, payer_id) WHERE a.payer = 'UNITEDHEALTHCARE COMMUNITY PLAN NC'",
+  "compare": {
+   "tol": 0.05
+  }
+ },
+ {
+  "id": "f_payer_days_to_first_remit__unitedhealthcare-medicare-advantage",
+  "family": "payer_days_to_first_remit",
+  "category": "payers",
+  "difficulty": "hard",
+  "question": "On average, how many days pass between a claim's first submission to Unitedhealthcare Medicare Advantage as primary payer and the first 835 from Unitedhealthcare Medicare Advantage for that claim (any status)? Round to one decimal.",
+  "gold_sql": "WITH s AS (SELECT claim_key, payer_key, min(submission_date) AS first_sub FROM sem.claims WHERE payer_responsibility = 'P' GROUP BY 1, 2), r AS (SELECT claim_key, payer_key, payer_name, min(payment_date) AS first_remit FROM sem.remit_claims GROUP BY 1, 2, 3) SELECT round(avg(date_diff('day', s.first_sub, r.first_remit)), 1) FROM s JOIN r USING (claim_key, payer_key) WHERE r.payer_name = 'Unitedhealthcare Medicare Advantage'",
+  "answer_key_sql": "WITH s AS (SELECT pcn, payer_id, min(submission_date::DATE) AS first_sub FROM ledger.submissions WHERE payer_sequence = 0 GROUP BY 1, 2), r AS (SELECT pcn, payer_id, min(event_date::DATE) AS first_remit FROM ledger.events GROUP BY 1, 2) SELECT round(avg(date_diff('day', s.first_sub, r.first_remit)), 1) FROM s JOIN r USING (pcn, payer_id) JOIN (SELECT DISTINCT pcn, payer_id, payer FROM ledger.adjudications) a USING (pcn, payer_id) WHERE a.payer = 'UNITEDHEALTHCARE MEDICARE ADVANTAGE'",
+  "compare": {
+   "tol": 0.05
+  }
+ },
+ {
+  "id": "f_payer_days_to_first_remit__wellcare-of-north-carolina",
+  "family": "payer_days_to_first_remit",
+  "category": "payers",
+  "difficulty": "hard",
+  "question": "For claims billed to Wellcare Of North Carolina as the primary payer, what is the average number of days from first submission to Wellcare Of North Carolina's first remittance? One decimal.",
+  "gold_sql": "WITH s AS (SELECT claim_key, payer_key, min(submission_date) AS first_sub FROM sem.claims WHERE payer_responsibility = 'P' GROUP BY 1, 2), r AS (SELECT claim_key, payer_key, payer_name, min(payment_date) AS first_remit FROM sem.remit_claims GROUP BY 1, 2, 3) SELECT round(avg(date_diff('day', s.first_sub, r.first_remit)), 1) FROM s JOIN r USING (claim_key, payer_key) WHERE r.payer_name = 'Wellcare Of North Carolina'",
+  "answer_key_sql": "WITH s AS (SELECT pcn, payer_id, min(submission_date::DATE) AS first_sub FROM ledger.submissions WHERE payer_sequence = 0 GROUP BY 1, 2), r AS (SELECT pcn, payer_id, min(event_date::DATE) AS first_remit FROM ledger.events GROUP BY 1, 2) SELECT round(avg(date_diff('day', s.first_sub, r.first_remit)), 1) FROM s JOIN r USING (pcn, payer_id) JOIN (SELECT DISTINCT pcn, payer_id, payer FROM ledger.adjudications) a USING (pcn, payer_id) WHERE a.payer = 'WELLCARE OF NORTH CAROLINA'",
+  "compare": {
+   "tol": 0.05
+  }
+ },
+ {
+  "id": "f_payer_partial_line_denials__blue-cross-blue-shield-of-north-carolina",
+  "family": "payer_partial_line_denials",
+  "category": "lines",
+  "difficulty": "hard",
+  "question": "How many service lines did Blue Cross Blue Shield Of North Carolina deny on claims whose current adjudication is not a denial overall (partial denials)?",
+  "gold_sql": "SELECT count(*) FROM sem.remit_lines WHERE is_current_adjudication AND line_is_denied AND NOT claim_is_denied AND payer_name = 'Blue Cross Blue Shield Of North Carolina'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND l.denied AND NOT a.denied AND a.payer = 'BLUE CROSS BLUE SHIELD OF NORTH CAROLINA'",
+  "compare": {}
+ },
+ {
+  "id": "f_payer_partial_line_denials__humana-medicare-advantage",
+  "family": "payer_partial_line_denials",
+  "category": "lines",
+  "difficulty": "hard",
+  "question": "Count Humana Medicare Advantage's denied service lines on otherwise-paid claims (current adjudication not denied).",
+  "gold_sql": "SELECT count(*) FROM sem.remit_lines WHERE is_current_adjudication AND line_is_denied AND NOT claim_is_denied AND payer_name = 'Humana Medicare Advantage'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND l.denied AND NOT a.denied AND a.payer = 'HUMANA MEDICARE ADVANTAGE'",
+  "compare": {}
+ },
+ {
+  "id": "f_payer_partial_line_denials__medicare-part-b-north-carolina",
+  "family": "payer_partial_line_denials",
+  "category": "lines",
+  "difficulty": "hard",
+  "question": "How many service lines did Medicare Part B North Carolina deny on claims whose current adjudication is not a denial overall (partial denials)?",
+  "gold_sql": "SELECT count(*) FROM sem.remit_lines WHERE is_current_adjudication AND line_is_denied AND NOT claim_is_denied AND payer_name = 'Medicare Part B North Carolina'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND l.denied AND NOT a.denied AND a.payer = 'MEDICARE PART B NORTH CAROLINA'",
+  "compare": {}
+ },
+ {
+  "id": "f_payer_partial_line_denials__unitedhealthcare",
+  "family": "payer_partial_line_denials",
+  "category": "lines",
+  "difficulty": "hard",
+  "question": "Count Unitedhealthcare's denied service lines on otherwise-paid claims (current adjudication not denied).",
+  "gold_sql": "SELECT count(*) FROM sem.remit_lines WHERE is_current_adjudication AND line_is_denied AND NOT claim_is_denied AND payer_name = 'Unitedhealthcare'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND l.denied AND NOT a.denied AND a.payer = 'UNITEDHEALTHCARE'",
+  "compare": {}
+ },
+ {
+  "id": "f_payer_partial_line_denials__unitedhealthcare-community-plan-nc",
+  "family": "payer_partial_line_denials",
+  "category": "lines",
+  "difficulty": "hard",
+  "question": "How many service lines did Unitedhealthcare Community Plan Nc deny on claims whose current adjudication is not a denial overall (partial denials)?",
+  "gold_sql": "SELECT count(*) FROM sem.remit_lines WHERE is_current_adjudication AND line_is_denied AND NOT claim_is_denied AND payer_name = 'Unitedhealthcare Community Plan Nc'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND l.denied AND NOT a.denied AND a.payer = 'UNITEDHEALTHCARE COMMUNITY PLAN NC'",
+  "compare": {}
+ },
+ {
+  "id": "f_payer_partial_line_denials__unitedhealthcare-medicare-advantage",
+  "family": "payer_partial_line_denials",
+  "category": "lines",
+  "difficulty": "hard",
+  "question": "Count Unitedhealthcare Medicare Advantage's denied service lines on otherwise-paid claims (current adjudication not denied).",
+  "gold_sql": "SELECT count(*) FROM sem.remit_lines WHERE is_current_adjudication AND line_is_denied AND NOT claim_is_denied AND payer_name = 'Unitedhealthcare Medicare Advantage'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND l.denied AND NOT a.denied AND a.payer = 'UNITEDHEALTHCARE MEDICARE ADVANTAGE'",
+  "compare": {}
+ },
+ {
+  "id": "f_payer_partial_line_denials__wellcare-of-north-carolina",
+  "family": "payer_partial_line_denials",
+  "category": "lines",
+  "difficulty": "hard",
+  "question": "How many service lines did Wellcare Of North Carolina deny on claims whose current adjudication is not a denial overall (partial denials)?",
+  "gold_sql": "SELECT count(*) FROM sem.remit_lines WHERE is_current_adjudication AND line_is_denied AND NOT claim_is_denied AND payer_name = 'Wellcare Of North Carolina'",
+  "answer_key_sql": "SELECT count(*) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) JOIN ledger.adjudications a USING (pcn, payer_id) WHERE e.is_current AND l.denied AND NOT a.denied AND a.payer = 'WELLCARE OF NORTH CAROLINA'",
+  "compare": {}
+ },
+ {
+  "id": "f_secondary_paid_for_primary__blue-cross-blue-shield-of-north-carolina",
+  "family": "secondary_paid_for_primary",
+  "category": "cob",
+  "difficulty": "hard",
+  "question": "How much did secondary payers pay, on current adjudications, for claims whose primary payer is Blue Cross Blue Shield Of North Carolina?",
+  "gold_sql": "WITH p AS (SELECT DISTINCT claim_key FROM sem.claims WHERE payer_responsibility = 'P' AND payer_name = 'Blue Cross Blue Shield Of North Carolina') SELECT coalesce(round(sum(r.paid_amount), 2), 0) FROM sem.remit_claims r JOIN p USING (claim_key) WHERE r.is_current_adjudication AND r.payer_sequence = 'secondary'",
+  "answer_key_sql": "WITH names AS (SELECT DISTINCT payer_id, payer FROM ledger.adjudications), p AS (SELECT DISTINCT s.pcn FROM ledger.submissions s JOIN names USING (payer_id) WHERE s.payer_sequence = 0 AND names.payer = 'BLUE CROSS BLUE SHIELD OF NORTH CAROLINA') SELECT coalesce(round(sum(a.paid_current), 2), 0) FROM ledger.adjudications a JOIN p USING (pcn) WHERE a.remitted_current AND a.payer_sequence = 1",
+  "compare": {
+   "tol": 0.01
+  }
+ },
+ {
+  "id": "f_cpt_share_of_line_payments__87798",
+  "family": "cpt_share_of_line_payments",
+  "category": "money",
+  "difficulty": "hard",
+  "question": "What share of all service-line payments (current adjudications) came from lines billed as CPT 87798?",
+  "gold_sql": "SELECT round(sum(line_paid_amount) FILTER (WHERE procedure_code = '87798') / sum(line_paid_amount), 4) FROM sem.remit_lines WHERE is_current_adjudication",
+  "answer_key_sql": "SELECT round(sum(l.paid) FILTER (WHERE l.cpt = '87798') / sum(l.paid), 4) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) WHERE e.is_current",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_cpt_share_of_line_payments__80307",
+  "family": "cpt_share_of_line_payments",
+  "category": "money",
+  "difficulty": "hard",
+  "question": "CPT 80307 accounts for what fraction of total paid dollars across current service lines?",
+  "gold_sql": "SELECT round(sum(line_paid_amount) FILTER (WHERE procedure_code = '80307') / sum(line_paid_amount), 4) FROM sem.remit_lines WHERE is_current_adjudication",
+  "answer_key_sql": "SELECT round(sum(l.paid) FILTER (WHERE l.cpt = '80307') / sum(l.paid), 4) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) WHERE e.is_current",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_cpt_share_of_line_payments__81479",
+  "family": "cpt_share_of_line_payments",
+  "category": "money",
+  "difficulty": "hard",
+  "question": "What share of all service-line payments (current adjudications) came from lines billed as CPT 81479?",
+  "gold_sql": "SELECT round(sum(line_paid_amount) FILTER (WHERE procedure_code = '81479') / sum(line_paid_amount), 4) FROM sem.remit_lines WHERE is_current_adjudication",
+  "answer_key_sql": "SELECT round(sum(l.paid) FILTER (WHERE l.cpt = '81479') / sum(l.paid), 4) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) WHERE e.is_current",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_cpt_share_of_line_payments__g0483",
+  "family": "cpt_share_of_line_payments",
+  "category": "money",
+  "difficulty": "hard",
+  "question": "CPT G0483 accounts for what fraction of total paid dollars across current service lines?",
+  "gold_sql": "SELECT round(sum(line_paid_amount) FILTER (WHERE procedure_code = 'G0483') / sum(line_paid_amount), 4) FROM sem.remit_lines WHERE is_current_adjudication",
+  "answer_key_sql": "SELECT round(sum(l.paid) FILTER (WHERE l.cpt = 'G0483') / sum(l.paid), 4) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) WHERE e.is_current",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_cpt_share_of_line_payments__g0482",
+  "family": "cpt_share_of_line_payments",
+  "category": "money",
+  "difficulty": "hard",
+  "question": "What share of all service-line payments (current adjudications) came from lines billed as CPT G0482?",
+  "gold_sql": "SELECT round(sum(line_paid_amount) FILTER (WHERE procedure_code = 'G0482') / sum(line_paid_amount), 4) FROM sem.remit_lines WHERE is_current_adjudication",
+  "answer_key_sql": "SELECT round(sum(l.paid) FILTER (WHERE l.cpt = 'G0482') / sum(l.paid), 4) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) WHERE e.is_current",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_cpt_share_of_line_payments__80053",
+  "family": "cpt_share_of_line_payments",
+  "category": "money",
+  "difficulty": "hard",
+  "question": "CPT 80053 accounts for what fraction of total paid dollars across current service lines?",
+  "gold_sql": "SELECT round(sum(line_paid_amount) FILTER (WHERE procedure_code = '80053') / sum(line_paid_amount), 4) FROM sem.remit_lines WHERE is_current_adjudication",
+  "answer_key_sql": "SELECT round(sum(l.paid) FILTER (WHERE l.cpt = '80053') / sum(l.paid), 4) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) WHERE e.is_current",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_cpt_share_of_line_payments__g0481",
+  "family": "cpt_share_of_line_payments",
+  "category": "money",
+  "difficulty": "hard",
+  "question": "What share of all service-line payments (current adjudications) came from lines billed as CPT G0481?",
+  "gold_sql": "SELECT round(sum(line_paid_amount) FILTER (WHERE procedure_code = 'G0481') / sum(line_paid_amount), 4) FROM sem.remit_lines WHERE is_current_adjudication",
+  "answer_key_sql": "SELECT round(sum(l.paid) FILTER (WHERE l.cpt = 'G0481') / sum(l.paid), 4) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) WHERE e.is_current",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ },
+ {
+  "id": "f_cpt_share_of_line_payments__36415",
+  "family": "cpt_share_of_line_payments",
+  "category": "money",
+  "difficulty": "hard",
+  "question": "CPT 36415 accounts for what fraction of total paid dollars across current service lines?",
+  "gold_sql": "SELECT round(sum(line_paid_amount) FILTER (WHERE procedure_code = '36415') / sum(line_paid_amount), 4) FROM sem.remit_lines WHERE is_current_adjudication",
+  "answer_key_sql": "SELECT round(sum(l.paid) FILTER (WHERE l.cpt = '36415') / sum(l.paid), 4) FROM ledger.event_lines l JOIN ledger.events e USING (pcn, payer_id, event_number) WHERE e.is_current",
+  "compare": {
+   "tol": 0.0005,
+   "percent_cols": [
+    0
+   ]
+  }
+ }
+]

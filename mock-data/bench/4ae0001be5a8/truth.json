@@ -1,0 +1,6362 @@
+{
+ "generator_version": "3.3",
+ "layout": "claims-jsonl-1",
+ "scenario": {
+  "start": "2026-07-01",
+  "days": "45",
+  "seed": "2026",
+  "volume_scale": "0.6",
+  "target_mb_per_day": "None",
+  "denial_rate_scale": "1.0",
+  "p_never_remitted": "0.01",
+  "p_pended_tail": "0.05",
+  "p_zero_pay_fee_schedule": "0.01",
+  "p_reversal_no_correction": "0.004",
+  "p_reversal_correction": "0.01",
+  "p_split_reversal_correction": "0.3",
+  "p_void": "0.002",
+  "p_rework_routine": "0.35",
+  "p_rework_molecular": "0.85",
+  "p_signal_v3_vs_recorded": "0.45",
+  "p_late_submission": "0.005",
+  "p_dependent": "0.22",
+  "p_secondary_coverage": "0.14",
+  "p_medicare_crossover": "0.2",
+  "p_risky_provider": "0.08",
+  "p_duplicate_835_file": "0.02",
+  "p_corrupt_file": "0.1",
+  "p_plb_recoupment": "0.06",
+  "p_duplicate_submission": "0.018",
+  "p_repeat_patient_claims": "0.1",
+  "mac_mass_adjustment_waves_per_year": "2",
+  "skip_weekends": "True",
+  "skip_federal_holidays": "True",
+  "burn_in_days": "90"
+ },
+ "denial_carcs": [
+  "4",
+  "11",
+  "15",
+  "16",
+  "18",
+  "22",
+  "24",
+  "27",
+  "29",
+  "50",
+  "55",
+  "96",
+  "97",
+  "109",
+  "119",
+  "151",
+  "167",
+  "183",
+  "197",
+  "198",
+  "204",
+  "234",
+  "236",
+  "242",
+  "252",
+  "288",
+  "B1",
+  "B7",
+  "B15"
+ ],
+ "tenants": {
+  "acme_labs": {
+   "files": [
+    {
+     "day": "2026-07-01",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260701020719.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-01",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260701113111.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-01",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260701142157.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-01",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260701165136.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-01",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260701224022.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-01",
+     "kind": "835",
+     "name": "ERA_NCMCD_ACMELABS_20260701043012.x12",
+     "expect": "parsed",
+     "payer_id": "NCMCD",
+     "trns": [
+      "940783830000010"
+     ],
+     "totals": [
+      1776.07
+     ]
+    },
+    {
+     "day": "2026-07-01",
+     "kind": "835",
+     "name": "ERA_61102_ACMELABS_20260701035529.x12",
+     "expect": "parsed",
+     "payer_id": "61102",
+     "trns": [
+      "928221590000011"
+     ],
+     "totals": [
+      646.66
+     ]
+    },
+    {
+     "day": "2026-07-01",
+     "kind": "835",
+     "name": "ERA_UHCNC_ACMELABS_20260701032525.x12",
+     "expect": "parsed",
+     "payer_id": "UHCNC",
+     "trns": [
+      "745701630000011"
+     ],
+     "totals": [
+      1284.32
+     ]
+    },
+    {
+     "day": "2026-07-01",
+     "kind": "835",
+     "name": "ERA_VACCN_ACMELABS_20260701055436.x12",
+     "expect": "parsed",
+     "payer_id": "VACCN",
+     "trns": [
+      "790227000000007"
+     ],
+     "totals": [
+      415.84
+     ]
+    },
+    {
+     "day": "2026-07-01",
+     "kind": "835",
+     "name": "ERA_TREST_ACMELABS_20260701064155.x12",
+     "expect": "parsed",
+     "payer_id": "TREST",
+     "trns": [
+      "174754440000010"
+     ],
+     "totals": [
+      487.2
+     ]
+    },
+    {
+     "day": "2026-07-01",
+     "kind": "835",
+     "name": "ERA_87972_ACMELABS_20260701025452.x12",
+     "expect": "parsed",
+     "payer_id": "87972",
+     "trns": [
+      "7938000002"
+     ],
+     "totals": [
+      0.0
+     ]
+    },
+    {
+     "day": "2026-07-01",
+     "kind": "835",
+     "name": "ERA_60054_ACMELABS_20260701053401.x12",
+     "expect": "parsed",
+     "payer_id": "60054",
+     "trns": [
+      "943466010000034"
+     ],
+     "totals": [
+      415.59
+     ]
+    },
+    {
+     "day": "2026-07-01",
+     "kind": "835",
+     "name": "ERA_61101_ACMELABS_20260701033104.x12",
+     "expect": "parsed",
+     "payer_id": "61101",
+     "trns": [
+      "790828550000011"
+     ],
+     "totals": [
+      255.83
+     ]
+    },
+    {
+     "day": "2026-07-01",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260701055541.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000052"
+     ],
+     "totals": [
+      1325.11
+     ]
+    },
+    {
+     "day": "2026-07-01",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260701034812.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000050"
+     ],
+     "totals": [
+      64.33
+     ]
+    },
+    {
+     "day": "2026-07-01",
+     "kind": "835",
+     "name": "ERA_60055_ACMELABS_20260701041956.x12",
+     "expect": "parsed",
+     "payer_id": "60055",
+     "trns": [
+      "579786940000030"
+     ],
+     "totals": [
+      132.16
+     ]
+    },
+    {
+     "day": "2026-07-01",
+     "kind": "835",
+     "name": "ERA_88976_ACMELABS_20260701033105.x12",
+     "expect": "parsed",
+     "payer_id": "88976",
+     "trns": [
+      "1761000001"
+     ],
+     "totals": [
+      76.35
+     ]
+    },
+    {
+     "day": "2026-07-01",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260701051932.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000065"
+     ],
+     "totals": [
+      47.03
+     ]
+    },
+    {
+     "day": "2026-07-02",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260702055228.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-02",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260702091705.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-02",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260702113301.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-02",
+     "kind": "835",
+     "name": "ERA_41124_ACMELABS_20260702020933.x12",
+     "expect": "parsed",
+     "payer_id": "41124",
+     "trns": [
+      "3930000011"
+     ],
+     "totals": [
+      749.21
+     ]
+    },
+    {
+     "day": "2026-07-02",
+     "kind": "835",
+     "name": "ERA_81671_ACMELABS_20260702023150.x12",
+     "expect": "parsed",
+     "payer_id": "81671",
+     "trns": [
+      "937655880000010"
+     ],
+     "totals": [
+      1068.56
+     ]
+    },
+    {
+     "day": "2026-07-02",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260702050017.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000066"
+     ],
+     "totals": [
+      221.2
+     ]
+    },
+    {
+     "day": "2026-07-02",
+     "kind": "835",
+     "name": "ERA_HBNC1_ACMELABS_20260702050521.x12",
+     "expect": "parsed",
+     "payer_id": "HBNC1",
+     "trns": [
+      "858143660000021"
+     ],
+     "totals": [
+      175.42
+     ]
+    },
+    {
+     "day": "2026-07-02",
+     "kind": "835",
+     "name": "ERA_61473_ACMELABS_20260702160218.x12",
+     "expect": "parsed",
+     "payer_id": "61473",
+     "trns": [
+      "031566070000029",
+      "031566070000030"
+     ],
+     "totals": [
+      521.83,
+      2274.81
+     ]
+    },
+    {
+     "day": "2026-07-02",
+     "kind": "835",
+     "name": "ERA_92504_ACMELABS_20260702165942.x12",
+     "expect": "parsed",
+     "payer_id": "92504",
+     "trns": [
+      "2622000009"
+     ],
+     "totals": [
+      1283.92
+     ]
+    },
+    {
+     "day": "2026-07-02",
+     "kind": "835",
+     "name": "ERA_A4855_ACMELABS_20260702034419.x12",
+     "expect": "parsed",
+     "payer_id": "A4855",
+     "trns": [
+      "1478000005"
+     ],
+     "totals": [
+      193.92
+     ]
+    },
+    {
+     "day": "2026-07-02",
+     "kind": "835",
+     "name": "ERA_C1823_ACMELABS_20260702133302.x12",
+     "expect": "parsed",
+     "payer_id": "C1823",
+     "trns": [
+      "860654010000004"
+     ],
+     "totals": [
+      452.63
+     ]
+    },
+    {
+     "day": "2026-07-02",
+     "kind": "835",
+     "name": "ERA_39026_ACMELABS_20260702161649.x12",
+     "expect": "parsed",
+     "payer_id": "39026",
+     "trns": [
+      "458818440000012"
+     ],
+     "totals": [
+      414.33
+     ]
+    },
+    {
+     "day": "2026-07-02",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260702035058.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000051"
+     ],
+     "totals": [
+      250.0
+     ]
+    },
+    {
+     "day": "2026-07-02",
+     "kind": "835",
+     "name": "ERA_N7737_ACMELABS_20260702021338.x12",
+     "expect": "parsed",
+     "payer_id": "N7737",
+     "trns": [
+      "181216230000006"
+     ],
+     "totals": [
+      67.94
+     ]
+    },
+    {
+     "day": "2026-07-02",
+     "kind": "835",
+     "name": "ERA_14163_ACMELABS_20260702125717.x12",
+     "expect": "parsed",
+     "payer_id": "14163",
+     "trns": [
+      "201037770000018"
+     ],
+     "totals": [
+      258.77
+     ]
+    },
+    {
+     "day": "2026-07-02",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260702055945.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000053"
+     ],
+     "totals": [
+      1217.49
+     ]
+    },
+    {
+     "day": "2026-07-02",
+     "kind": "835",
+     "name": "ERA_CCHPC_ACMELABS_20260702160552.x12",
+     "expect": "parsed",
+     "payer_id": "CCHPC",
+     "trns": [
+      "412763910000011"
+     ],
+     "totals": [
+      822.67
+     ]
+    },
+    {
+     "day": "2026-07-02",
+     "kind": "835",
+     "name": "ERA_DEV01_ACMELABS_20260702030539.x12",
+     "expect": "parsed",
+     "payer_id": "DEV01",
+     "trns": [
+      "678930920000009"
+     ],
+     "totals": [
+      60.3
+     ]
+    },
+    {
+     "day": "2026-07-02",
+     "kind": "835",
+     "name": "ERA_FEPNC_ACMELABS_20260702025842.x12",
+     "expect": "parsed",
+     "payer_id": "FEPNC",
+     "trns": [
+      "429807470000022"
+     ],
+     "totals": [
+      243.36
+     ]
+    },
+    {
+     "day": "2026-07-02",
+     "kind": "835",
+     "name": "ERA_63092_ACMELABS_20260702031834.x12",
+     "expect": "parsed",
+     "payer_id": "63092",
+     "trns": [
+      "296953120000015"
+     ],
+     "totals": [
+      61.55
+     ]
+    },
+    {
+     "day": "2026-07-02",
+     "kind": "835",
+     "name": "ERA_OSCAR_ACMELABS_20260702031316.x12",
+     "expect": "parsed",
+     "payer_id": "OSCAR",
+     "trns": [
+      "619261980000015"
+     ],
+     "totals": [
+      16.52
+     ]
+    },
+    {
+     "day": "2026-07-06",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260706091620.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-06",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260706142058.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-06",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260706165139.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-06",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260706193953.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-06",
+     "kind": "835",
+     "name": "ERA_61473_ACMELABS_20260706160401.x12",
+     "expect": "parsed",
+     "payer_id": "61473",
+     "trns": [
+      "031566070000031"
+     ],
+     "totals": [
+      1886.85
+     ]
+    },
+    {
+     "day": "2026-07-06",
+     "kind": "835",
+     "name": "ERA_HBNC1_ACMELABS_20260706054112.x12",
+     "expect": "parsed",
+     "payer_id": "HBNC1",
+     "trns": [
+      "858143660000022"
+     ],
+     "totals": [
+      449.56
+     ]
+    },
+    {
+     "day": "2026-07-06",
+     "kind": "835",
+     "name": "ERA_68068_ACMELABS_20260706045205.x12",
+     "expect": "parsed",
+     "payer_id": "68068",
+     "trns": [
+      "755688630000009"
+     ],
+     "totals": [
+      398.58
+     ]
+    },
+    {
+     "day": "2026-07-06",
+     "kind": "835",
+     "name": "ERA_CLOVR_ACMELABS_20260706030108.x12",
+     "expect": "parsed",
+     "payer_id": "CLOVR",
+     "trns": [
+      "868646510000010"
+     ],
+     "totals": [
+      660.27
+     ]
+    },
+    {
+     "day": "2026-07-06",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260706050337.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000067"
+     ],
+     "totals": [
+      1758.87
+     ]
+    },
+    {
+     "day": "2026-07-06",
+     "kind": "835",
+     "name": "ERA_60055_ACMELABS_20260706042951.x12",
+     "expect": "parsed",
+     "payer_id": "60055",
+     "trns": [
+      "579786940000031"
+     ],
+     "totals": [
+      902.48
+     ]
+    },
+    {
+     "day": "2026-07-06",
+     "kind": "835",
+     "name": "ERA_60054_ACMELABS_20260706053807.x12",
+     "expect": "parsed",
+     "payer_id": "60054",
+     "trns": [
+      "943466010000035"
+     ],
+     "totals": [
+      920.26
+     ]
+    },
+    {
+     "day": "2026-07-06",
+     "kind": "835",
+     "name": "ERA_67323_ACMELABS_20260706033541.x12",
+     "expect": "parsed",
+     "payer_id": "67323",
+     "trns": [
+      "254578650000001"
+     ],
+     "totals": [
+      262.19
+     ]
+    },
+    {
+     "day": "2026-07-06",
+     "kind": "835",
+     "name": "ERA_ACMELABS_20260706041724.x12",
+     "expect": "parsed",
+     "payer_id": "11502+FEPNC",
+     "trns": [
+      "872121820000054",
+      "429807470000023"
+     ],
+     "totals": [
+      3629.79,
+      322.84
+     ]
+    },
+    {
+     "day": "2026-07-06",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260706034245.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000052"
+     ],
+     "totals": [
+      996.68
+     ]
+    },
+    {
+     "day": "2026-07-06",
+     "kind": "835",
+     "name": "ERA_62308_ACMELABS_20260706014319.x12",
+     "expect": "parsed",
+     "payer_id": "62308",
+     "trns": [
+      "716093220000023"
+     ],
+     "totals": [
+      240.9
+     ]
+    },
+    {
+     "day": "2026-07-06",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260706020153.x12",
+     "expect": "rejected",
+     "corruption": "not_x12"
+    },
+    {
+     "day": "2026-07-07",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260707113429.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-07",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260707141009.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-07",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260707225230.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-07",
+     "kind": "835",
+     "name": "ERA_68069_ACMELABS_20260707164144.x12",
+     "expect": "parsed",
+     "payer_id": "68069",
+     "trns": [
+      "894465420000011"
+     ],
+     "totals": [
+      1034.9
+     ]
+    },
+    {
+     "day": "2026-07-07",
+     "kind": "835",
+     "name": "ERA_76314_ACMELABS_20260707140313.x12",
+     "expect": "parsed",
+     "payer_id": "76314",
+     "trns": [
+      "5567000005"
+     ],
+     "totals": [
+      63.15
+     ]
+    },
+    {
+     "day": "2026-07-07",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260707060600.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000055"
+     ],
+     "totals": [
+      1014.36
+     ]
+    },
+    {
+     "day": "2026-07-07",
+     "kind": "835",
+     "name": "ERA_50044_ACMELABS_20260707040630.x12",
+     "expect": "parsed",
+     "payer_id": "50044",
+     "trns": [
+      "960105010000001"
+     ],
+     "totals": [
+      198.23
+     ]
+    },
+    {
+     "day": "2026-07-07",
+     "kind": "835",
+     "name": "ERA_33251_ACMELABS_20260707064421.x12",
+     "expect": "parsed",
+     "payer_id": "33251",
+     "trns": [
+      "517989060000004"
+     ],
+     "totals": [
+      146.51
+     ]
+    },
+    {
+     "day": "2026-07-07",
+     "kind": "835",
+     "name": "ERA_14163_ACMELABS_20260707132252.x12",
+     "expect": "parsed",
+     "payer_id": "14163",
+     "trns": [
+      "201037770000019"
+     ],
+     "totals": [
+      306.35
+     ]
+    },
+    {
+     "day": "2026-07-07",
+     "kind": "835",
+     "name": "ERA_63092_ACMELABS_20260707032054.x12",
+     "expect": "parsed",
+     "payer_id": "63092",
+     "trns": [
+      "296953120000016"
+     ],
+     "totals": [
+      112.49
+     ]
+    },
+    {
+     "day": "2026-07-07",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260707031757.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000053"
+     ],
+     "totals": [
+      65.21
+     ]
+    },
+    {
+     "day": "2026-07-07",
+     "kind": "835",
+     "name": "ERA_62308_ACMELABS_20260707013037.x12",
+     "expect": "parsed",
+     "payer_id": "62308",
+     "trns": [
+      "716093220000024"
+     ],
+     "totals": [
+      742.49
+     ]
+    },
+    {
+     "day": "2026-07-08",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260708092350.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-08",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260708141404.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-08",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260708165832.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-08",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260708193505.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-08",
+     "kind": "835",
+     "name": "ERA_61102_ACMELABS_20260708042448.x12",
+     "expect": "parsed",
+     "payer_id": "61102",
+     "trns": [
+      "928221590000012"
+     ],
+     "totals": [
+      1043.98
+     ]
+    },
+    {
+     "day": "2026-07-08",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260708060204.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000056"
+     ],
+     "totals": [
+      1970.04
+     ]
+    },
+    {
+     "day": "2026-07-08",
+     "kind": "835",
+     "name": "ERA_61101_ACMELABS_20260708032804.x12",
+     "expect": "parsed",
+     "payer_id": "61101",
+     "trns": [
+      "790828550000012"
+     ],
+     "totals": [
+      688.61
+     ]
+    },
+    {
+     "day": "2026-07-08",
+     "kind": "835",
+     "name": "ERA_UHCNC_ACMELABS_20260708031424.x12",
+     "expect": "parsed",
+     "payer_id": "UHCNC",
+     "trns": [
+      "745701630000012"
+     ],
+     "totals": [
+      1224.53
+     ]
+    },
+    {
+     "day": "2026-07-08",
+     "kind": "835",
+     "name": "ERA_NCMCD_ACMELABS_20260708041113.x12",
+     "expect": "parsed",
+     "payer_id": "NCMCD",
+     "trns": [
+      "940783830000011"
+     ],
+     "totals": [
+      1611.08
+     ]
+    },
+    {
+     "day": "2026-07-08",
+     "kind": "835",
+     "name": "ERA_60054_ACMELABS_20260708052332.x12",
+     "expect": "parsed",
+     "payer_id": "60054",
+     "trns": [
+      "943466010000036"
+     ],
+     "totals": [
+      426.42
+     ]
+    },
+    {
+     "day": "2026-07-08",
+     "kind": "835",
+     "name": "ERA_TREST_ACMELABS_20260708061213.x12",
+     "expect": "parsed",
+     "payer_id": "TREST",
+     "trns": [
+      "174754440000011"
+     ],
+     "totals": [
+      238.47
+     ]
+    },
+    {
+     "day": "2026-07-08",
+     "kind": "835",
+     "name": "ERA_VACCN_ACMELABS_20260708054054.x12",
+     "expect": "parsed",
+     "payer_id": "VACCN",
+     "trns": [
+      "790227000000008"
+     ],
+     "totals": [
+      124.89
+     ]
+    },
+    {
+     "day": "2026-07-08",
+     "kind": "835",
+     "name": "ERA_17656_ACMELABS_20260708065438.x12",
+     "expect": "parsed",
+     "payer_id": "17656",
+     "trns": [
+      "417437390000001"
+     ],
+     "totals": [
+      231.67
+     ]
+    },
+    {
+     "day": "2026-07-08",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260708050204.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000068"
+     ],
+     "totals": [
+      115.73
+     ]
+    },
+    {
+     "day": "2026-07-08",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260708031326.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000054"
+     ],
+     "totals": [
+      258.07
+     ]
+    },
+    {
+     "day": "2026-07-08",
+     "kind": "835",
+     "name": "ERA_60055_ACMELABS_20260708042856.x12",
+     "expect": "parsed",
+     "payer_id": "60055",
+     "trns": [
+      "579786940000032"
+     ],
+     "totals": [
+      86.95
+     ]
+    },
+    {
+     "day": "2026-07-09",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260709092842.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-09",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260709141123.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-09",
+     "kind": "835",
+     "name": "ERA_HBNC1_ACMELABS_20260709051509.x12",
+     "expect": "parsed",
+     "payer_id": "HBNC1",
+     "trns": [
+      "858143660000023"
+     ],
+     "totals": [
+      165.55
+     ]
+    },
+    {
+     "day": "2026-07-09",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260709045857.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000069"
+     ],
+     "totals": [
+      281.23
+     ]
+    },
+    {
+     "day": "2026-07-09",
+     "kind": "835",
+     "name": "ERA_61473_ACMELABS_20260709163327.x12",
+     "expect": "parsed",
+     "payer_id": "61473",
+     "trns": [
+      "031566070000032"
+     ],
+     "totals": [
+      1995.63
+     ]
+    },
+    {
+     "day": "2026-07-09",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260709032647.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000055"
+     ],
+     "totals": [
+      575.72
+     ]
+    },
+    {
+     "day": "2026-07-09",
+     "kind": "835",
+     "name": "ERA_92504_ACMELABS_20260709171615.x12",
+     "expect": "parsed",
+     "payer_id": "92504",
+     "trns": [
+      "2622000010"
+     ],
+     "totals": [
+      31.06
+     ]
+    },
+    {
+     "day": "2026-07-09",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260709055843.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000057"
+     ],
+     "totals": [
+      1392.76
+     ]
+    },
+    {
+     "day": "2026-07-09",
+     "kind": "835",
+     "name": "ERA_A4855_ACMELABS_20260709040318.x12",
+     "expect": "parsed",
+     "payer_id": "A4855",
+     "trns": [
+      "1478000006"
+     ],
+     "totals": [
+      588.76
+     ]
+    },
+    {
+     "day": "2026-07-09",
+     "kind": "835",
+     "name": "ERA_CCHPC_ACMELABS_20260709163238.x12",
+     "expect": "parsed",
+     "payer_id": "CCHPC",
+     "trns": [
+      "412763910000012"
+     ],
+     "totals": [
+      128.46
+     ]
+    },
+    {
+     "day": "2026-07-09",
+     "kind": "835",
+     "name": "ERA_81671_ACMELABS_20260709022954.x12",
+     "expect": "parsed",
+     "payer_id": "81671",
+     "trns": [
+      "937655880000011"
+     ],
+     "totals": [
+      159.63
+     ]
+    },
+    {
+     "day": "2026-07-09",
+     "kind": "835",
+     "name": "ERA_FEPNC_ACMELABS_20260709023743.x12",
+     "expect": "parsed",
+     "payer_id": "FEPNC",
+     "trns": [
+      "429807470000024"
+     ],
+     "totals": [
+      233.24
+     ]
+    },
+    {
+     "day": "2026-07-09",
+     "kind": "835",
+     "name": "ERA_J4696_ACMELABS_20260709022113.x12",
+     "expect": "parsed",
+     "payer_id": "J4696",
+     "trns": [
+      "012729880000003"
+     ],
+     "totals": [
+      127.08
+     ]
+    },
+    {
+     "day": "2026-07-09",
+     "kind": "835",
+     "name": "ERA_DEV01_ACMELABS_20260709024838.x12",
+     "expect": "parsed",
+     "payer_id": "DEV01",
+     "trns": [
+      "678930920000010"
+     ],
+     "totals": [
+      421.58
+     ]
+    },
+    {
+     "day": "2026-07-09",
+     "kind": "835",
+     "name": "ERA_39026_ACMELABS_20260709155425.x12",
+     "expect": "parsed",
+     "payer_id": "39026",
+     "trns": [
+      "458818440000013"
+     ],
+     "totals": [
+      594.33
+     ]
+    },
+    {
+     "day": "2026-07-09",
+     "kind": "835",
+     "name": "ERA_14163_ACMELABS_20260709131838.x12",
+     "expect": "parsed",
+     "payer_id": "14163",
+     "trns": [
+      "201037770000020"
+     ],
+     "totals": [
+      0.0
+     ]
+    },
+    {
+     "day": "2026-07-09",
+     "kind": "835",
+     "name": "ERA_63092_ACMELABS_20260709031721.x12",
+     "expect": "parsed",
+     "payer_id": "63092",
+     "trns": [
+      "296953120000017"
+     ],
+     "totals": [
+      25.26
+     ]
+    },
+    {
+     "day": "2026-07-09",
+     "kind": "835",
+     "name": "ERA_OSCAR_ACMELABS_20260709023532.x12",
+     "expect": "parsed",
+     "payer_id": "OSCAR",
+     "trns": [
+      "619261980000016"
+     ],
+     "totals": [
+      335.98
+     ]
+    },
+    {
+     "day": "2026-07-09",
+     "kind": "835",
+     "name": "ERA_41124_ACMELABS_20260709023726.x12",
+     "expect": "parsed",
+     "payer_id": "41124",
+     "trns": [
+      "3930000012"
+     ],
+     "totals": [
+      145.4
+     ]
+    },
+    {
+     "day": "2026-07-10",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260710021141.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-10",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260710091947.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-10",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260710114051.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-10",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260710170434.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-10",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260710224816.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-10",
+     "kind": "835",
+     "name": "ERA_CLOVR_ACMELABS_20260710025107.x12",
+     "expect": "parsed",
+     "payer_id": "CLOVR",
+     "trns": [
+      "868646510000011"
+     ],
+     "totals": [
+      873.49
+     ]
+    },
+    {
+     "day": "2026-07-10",
+     "kind": "835",
+     "name": "ERA_53347_ACMELABS_20260710160629.x12",
+     "expect": "parsed",
+     "payer_id": "53347",
+     "trns": [
+      "5528000001"
+     ],
+     "totals": [
+      545.34
+     ]
+    },
+    {
+     "day": "2026-07-10",
+     "kind": "835",
+     "name": "ERA_62308_ACMELABS_20260710013829.x12",
+     "expect": "parsed",
+     "payer_id": "62308",
+     "trns": [
+      "716093220000025"
+     ],
+     "totals": [
+      1088.16
+     ]
+    },
+    {
+     "day": "2026-07-10",
+     "kind": "835",
+     "name": "ERA_68068_ACMELABS_20260710043757.x12",
+     "expect": "parsed",
+     "payer_id": "68068",
+     "trns": [
+      "755688630000010"
+     ],
+     "totals": [
+      106.23
+     ]
+    },
+    {
+     "day": "2026-07-10",
+     "kind": "835",
+     "name": "ERA_J5772_ACMELABS_20260710035950.x12",
+     "expect": "parsed",
+     "payer_id": "J5772",
+     "trns": [
+      "1303000001"
+     ],
+     "totals": [
+      59.41
+     ]
+    },
+    {
+     "day": "2026-07-10",
+     "kind": "835",
+     "name": "ERA_60054_ACMELABS_20260710051418.x12",
+     "expect": "parsed",
+     "payer_id": "60054",
+     "trns": [
+      "943466010000037"
+     ],
+     "totals": [
+      325.49
+     ]
+    },
+    {
+     "day": "2026-07-10",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260710045406.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000070"
+     ],
+     "totals": [
+      355.92
+     ]
+    },
+    {
+     "day": "2026-07-10",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260710061540.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000058"
+     ],
+     "totals": [
+      3932.52
+     ]
+    },
+    {
+     "day": "2026-07-13",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260713170443.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-13",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260713193107.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-13",
+     "kind": "835",
+     "name": "ERA_HBNC1_ACMELABS_20260713053413.x12",
+     "expect": "parsed",
+     "payer_id": "HBNC1",
+     "trns": [
+      "858143660000024"
+     ],
+     "totals": [
+      459.75
+     ]
+    },
+    {
+     "day": "2026-07-13",
+     "kind": "835",
+     "name": "ERA_61473_ACMELABS_20260713161026.x12",
+     "expect": "parsed",
+     "payer_id": "61473",
+     "trns": [
+      "031566070000033"
+     ],
+     "totals": [
+      4222.94
+     ]
+    },
+    {
+     "day": "2026-07-13",
+     "kind": "835",
+     "name": "ERA_60055_ACMELABS_20260713042714.x12",
+     "expect": "parsed",
+     "payer_id": "60055",
+     "trns": [
+      "579786940000033"
+     ],
+     "totals": [
+      144.9
+     ]
+    },
+    {
+     "day": "2026-07-13",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260713050229.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000071"
+     ],
+     "totals": [
+      625.35
+     ]
+    },
+    {
+     "day": "2026-07-13",
+     "kind": "835",
+     "name": "ERA_C5795_ACMELABS_20260713022649.x12",
+     "expect": "parsed",
+     "payer_id": "C5795",
+     "trns": [
+      "490558990000001"
+     ],
+     "totals": [
+      468.96
+     ]
+    },
+    {
+     "day": "2026-07-13",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260713054547.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000059"
+     ],
+     "totals": [
+      1699.25
+     ]
+    },
+    {
+     "day": "2026-07-13",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260713031327.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000056"
+     ],
+     "totals": [
+      256.58
+     ]
+    },
+    {
+     "day": "2026-07-13",
+     "kind": "835",
+     "name": "ERA_60054_ACMELABS_20260713052934.x12",
+     "expect": "parsed",
+     "payer_id": "60054",
+     "trns": [
+      "943466010000038"
+     ],
+     "totals": [
+      529.74
+     ]
+    },
+    {
+     "day": "2026-07-13",
+     "kind": "835",
+     "name": "ERA_D9026_ACMELABS_20260713063144.x12",
+     "expect": "parsed",
+     "payer_id": "D9026",
+     "trns": [
+      "790099830000002"
+     ],
+     "totals": [
+      138.94
+     ]
+    },
+    {
+     "day": "2026-07-13",
+     "kind": "835",
+     "name": "ERA_FEPNC_ACMELABS_20260713025041.x12",
+     "expect": "parsed",
+     "payer_id": "FEPNC",
+     "trns": [
+      "429807470000025"
+     ],
+     "totals": [
+      155.25
+     ]
+    },
+    {
+     "day": "2026-07-13",
+     "kind": "835",
+     "name": "ERA_OSCAR_ACMELABS_20260713030603.x12",
+     "expect": "parsed",
+     "payer_id": "OSCAR",
+     "trns": [
+      "619261980000017"
+     ],
+     "totals": [
+      0.0
+     ]
+    },
+    {
+     "day": "2026-07-14",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260714054224.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-14",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260714165737.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-14",
+     "kind": "835",
+     "name": "ERA_63092_ACMELABS_20260714025835.x12",
+     "expect": "parsed",
+     "payer_id": "63092",
+     "trns": [
+      "296953120000018"
+     ],
+     "totals": [
+      230.6
+     ]
+    },
+    {
+     "day": "2026-07-14",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260714050818.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000072"
+     ],
+     "totals": [
+      793.22
+     ]
+    },
+    {
+     "day": "2026-07-14",
+     "kind": "835",
+     "name": "ERA_62308_ACMELABS_20260714020106.x12",
+     "expect": "parsed",
+     "payer_id": "62308",
+     "trns": [
+      "716093220000026"
+     ],
+     "totals": [
+      692.45
+     ]
+    },
+    {
+     "day": "2026-07-14",
+     "kind": "835",
+     "name": "ERA_62147_ACMELABS_20260714045105.x12",
+     "expect": "parsed",
+     "payer_id": "62147",
+     "trns": [
+      "729706130000002"
+     ],
+     "totals": [
+      305.79
+     ]
+    },
+    {
+     "day": "2026-07-14",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260714061514.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000060"
+     ],
+     "totals": [
+      1217.34
+     ]
+    },
+    {
+     "day": "2026-07-14",
+     "kind": "835",
+     "name": "ERA_L7799_ACMELABS_20260714032526.x12",
+     "expect": "parsed",
+     "payer_id": "L7799",
+     "trns": [
+      "055110580000005"
+     ],
+     "totals": [
+      225.9
+     ]
+    },
+    {
+     "day": "2026-07-14",
+     "kind": "835",
+     "name": "ERA_14163_ACMELABS_20260714133147.x12",
+     "expect": "parsed",
+     "payer_id": "14163",
+     "trns": [
+      "201037770000021"
+     ],
+     "totals": [
+      229.56
+     ]
+    },
+    {
+     "day": "2026-07-14",
+     "kind": "835",
+     "name": "ERA_S3217_ACMELABS_20260714024351.x12",
+     "expect": "parsed",
+     "payer_id": "S3217",
+     "trns": [
+      "469425000000004"
+     ],
+     "totals": [
+      81.28
+     ]
+    },
+    {
+     "day": "2026-07-14",
+     "kind": "835",
+     "name": "ERA_68069_ACMELABS_20260714163421.x12",
+     "expect": "parsed",
+     "payer_id": "68069",
+     "trns": [
+      "894465420000012"
+     ],
+     "totals": [
+      608.28
+     ]
+    },
+    {
+     "day": "2026-07-14",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260714032610.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000057"
+     ],
+     "totals": [
+      329.54
+     ]
+    },
+    {
+     "day": "2026-07-15",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260715021130.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-15",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260715054856.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-15",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260715091616.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-15",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260715113136.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-15",
+     "kind": "835",
+     "name": "ERA_61101_ACMELABS_20260715034802.x12",
+     "expect": "parsed",
+     "payer_id": "61101",
+     "trns": [
+      "790828550000013"
+     ],
+     "totals": [
+      732.27
+     ]
+    },
+    {
+     "day": "2026-07-15",
+     "kind": "835",
+     "name": "ERA_TREST_ACMELABS_20260715063002.x12",
+     "expect": "parsed",
+     "payer_id": "TREST",
+     "trns": [
+      "174754440000012"
+     ],
+     "totals": [
+      498.66
+     ]
+    },
+    {
+     "day": "2026-07-15",
+     "kind": "835",
+     "name": "ERA_60055_ACMELABS_20260715040359.x12",
+     "expect": "parsed",
+     "payer_id": "60055",
+     "trns": [
+      "579786940000034"
+     ],
+     "totals": [
+      472.96
+     ]
+    },
+    {
+     "day": "2026-07-15",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260715050417.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000073"
+     ],
+     "totals": [
+      391.74
+     ]
+    },
+    {
+     "day": "2026-07-15",
+     "kind": "835",
+     "name": "ERA_NCMCD_ACMELABS_20260715044133.x12",
+     "expect": "parsed",
+     "payer_id": "NCMCD",
+     "trns": [
+      "940783830000012"
+     ],
+     "totals": [
+      726.69
+     ]
+    },
+    {
+     "day": "2026-07-15",
+     "kind": "835",
+     "name": "ERA_VACCN_ACMELABS_20260715053840.x12",
+     "expect": "parsed",
+     "payer_id": "VACCN",
+     "trns": [
+      "790227000000009"
+     ],
+     "totals": [
+      165.92
+     ]
+    },
+    {
+     "day": "2026-07-15",
+     "kind": "835",
+     "name": "ERA_61102_ACMELABS_20260715035704.x12",
+     "expect": "parsed",
+     "payer_id": "61102",
+     "trns": [
+      "928221590000013"
+     ],
+     "totals": [
+      886.07
+     ]
+    },
+    {
+     "day": "2026-07-15",
+     "kind": "835",
+     "name": "ERA_UHCNC_ACMELABS_20260715031100.x12",
+     "expect": "parsed",
+     "payer_id": "UHCNC",
+     "trns": [
+      "745701630000013"
+     ],
+     "totals": [
+      500.52
+     ]
+    },
+    {
+     "day": "2026-07-15",
+     "kind": "835",
+     "name": "ERA_UHCNC_ACMELABS_20260715124256.x12",
+     "expect": "duplicate",
+     "payer_id": "UHCNC",
+     "trns": [
+      "745701630000013"
+     ],
+     "totals": [
+      500.52
+     ],
+     "redelivery_of": "ERA_UHCNC_ACMELABS_20260715031100.x12"
+    },
+    {
+     "day": "2026-07-15",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260715055809.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000061"
+     ],
+     "totals": [
+      308.63
+     ]
+    },
+    {
+     "day": "2026-07-15",
+     "kind": "835",
+     "name": "ERA_76796_ACMELABS_20260715044834.x12",
+     "expect": "parsed",
+     "payer_id": "76796",
+     "trns": [
+      "5674000005"
+     ],
+     "totals": [
+      0.0
+     ]
+    },
+    {
+     "day": "2026-07-15",
+     "kind": "835",
+     "name": "ERA_60054_ACMELABS_20260715052945.x12",
+     "expect": "parsed",
+     "payer_id": "60054",
+     "trns": [
+      "943466010000039"
+     ],
+     "totals": [
+      150.54
+     ]
+    },
+    {
+     "day": "2026-07-16",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260716021223.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-16",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260716091535.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-16",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260716141205.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-16",
+     "kind": "835",
+     "name": "ERA_61473_ACMELABS_20260716161902.x12",
+     "expect": "parsed",
+     "payer_id": "61473",
+     "trns": [
+      "031566070000034"
+     ],
+     "totals": [
+      1557.92
+     ]
+    },
+    {
+     "day": "2026-07-16",
+     "kind": "835",
+     "name": "ERA_92504_ACMELABS_20260716163836.x12",
+     "expect": "parsed",
+     "payer_id": "92504",
+     "trns": [
+      "2622000011"
+     ],
+     "totals": [
+      1332.2
+     ]
+    },
+    {
+     "day": "2026-07-16",
+     "kind": "835",
+     "name": "ERA_C1823_ACMELABS_20260716133949.x12",
+     "expect": "parsed",
+     "payer_id": "C1823",
+     "trns": [
+      "860654010000005"
+     ],
+     "totals": [
+      380.21
+     ]
+    },
+    {
+     "day": "2026-07-16",
+     "kind": "835",
+     "name": "ERA_HBNC1_ACMELABS_20260716053759.x12",
+     "expect": "parsed",
+     "payer_id": "HBNC1",
+     "trns": [
+      "858143660000025"
+     ],
+     "totals": [
+      312.08
+     ]
+    },
+    {
+     "day": "2026-07-16",
+     "kind": "835",
+     "name": "ERA_39026_ACMELABS_20260716161857.x12",
+     "expect": "parsed",
+     "payer_id": "39026",
+     "trns": [
+      "458818440000014"
+     ],
+     "totals": [
+      188.59
+     ]
+    },
+    {
+     "day": "2026-07-16",
+     "kind": "835",
+     "name": "ERA_FEPNC_ACMELABS_20260716022217.x12",
+     "expect": "parsed",
+     "payer_id": "FEPNC",
+     "trns": [
+      "429807470000026"
+     ],
+     "totals": [
+      96.83
+     ]
+    },
+    {
+     "day": "2026-07-16",
+     "kind": "835",
+     "name": "ERA_DEV01_ACMELABS_20260716032118.x12",
+     "expect": "parsed",
+     "payer_id": "DEV01",
+     "trns": [
+      "678930920000011"
+     ],
+     "totals": [
+      69.33
+     ]
+    },
+    {
+     "day": "2026-07-16",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260716055315.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000062"
+     ],
+     "totals": [
+      1496.51
+     ]
+    },
+    {
+     "day": "2026-07-16",
+     "kind": "835",
+     "name": "ERA_N7737_ACMELABS_20260716020500.x12",
+     "expect": "parsed",
+     "payer_id": "N7737",
+     "trns": [
+      "181216230000007"
+     ],
+     "totals": [
+      0.0
+     ]
+    },
+    {
+     "day": "2026-07-16",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260716033130.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000058"
+     ],
+     "totals": [
+      399.07
+     ]
+    },
+    {
+     "day": "2026-07-16",
+     "kind": "835",
+     "name": "ERA_81671_ACMELABS_20260716022944.x12",
+     "expect": "parsed",
+     "payer_id": "81671",
+     "trns": [
+      "937655880000012"
+     ],
+     "totals": [
+      232.97
+     ]
+    },
+    {
+     "day": "2026-07-16",
+     "kind": "835",
+     "name": "ERA_A4855_ACMELABS_20260716033000.x12",
+     "expect": "parsed",
+     "payer_id": "A4855",
+     "trns": [
+      "1478000007"
+     ],
+     "totals": [
+      227.66
+     ]
+    },
+    {
+     "day": "2026-07-16",
+     "kind": "835",
+     "name": "ERA_CCHPC_ACMELABS_20260716161751.x12",
+     "expect": "parsed",
+     "payer_id": "CCHPC",
+     "trns": [
+      "412763910000013"
+     ],
+     "totals": [
+      906.69
+     ]
+    },
+    {
+     "day": "2026-07-16",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260716044710.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000074"
+     ],
+     "totals": [
+      207.15
+     ]
+    },
+    {
+     "day": "2026-07-16",
+     "kind": "835",
+     "name": "ERA_14163_ACMELABS_20260716131101.x12",
+     "expect": "parsed",
+     "payer_id": "14163",
+     "trns": [
+      "201037770000022"
+     ],
+     "totals": [
+      135.71
+     ]
+    },
+    {
+     "day": "2026-07-16",
+     "kind": "835",
+     "name": "ERA_41124_ACMELABS_20260716022326.x12",
+     "expect": "parsed",
+     "payer_id": "41124",
+     "trns": [
+      "3930000013"
+     ],
+     "totals": [
+      43.41
+     ]
+    },
+    {
+     "day": "2026-07-16",
+     "kind": "835",
+     "name": "ERA_63092_ACMELABS_20260716030525.x12",
+     "expect": "parsed",
+     "payer_id": "63092",
+     "trns": [
+      "296953120000019"
+     ],
+     "totals": [
+      73.52
+     ]
+    },
+    {
+     "day": "2026-07-16",
+     "kind": "835",
+     "name": "ERA_OSCAR_ACMELABS_20260716025242.x12",
+     "expect": "parsed",
+     "payer_id": "OSCAR",
+     "trns": [
+      "619261980000018"
+     ],
+     "totals": [
+      69.18
+     ]
+    },
+    {
+     "day": "2026-07-17",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260717021823.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-17",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260717054431.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-17",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260717092628.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-17",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260717165947.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-17",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260717224429.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-17",
+     "kind": "835",
+     "name": "ERA_60054_ACMELABS_20260717054007.x12",
+     "expect": "parsed",
+     "payer_id": "60054",
+     "trns": [
+      "943466010000040"
+     ],
+     "totals": [
+      969.96
+     ]
+    },
+    {
+     "day": "2026-07-17",
+     "kind": "835",
+     "name": "ERA_CLOVR_ACMELABS_20260717024313.x12",
+     "expect": "parsed",
+     "payer_id": "CLOVR",
+     "trns": [
+      "868646510000012"
+     ],
+     "totals": [
+      809.17
+     ]
+    },
+    {
+     "day": "2026-07-17",
+     "kind": "835",
+     "name": "ERA_83311_ACMELABS_20260717032855.x12",
+     "expect": "parsed",
+     "payer_id": "83311",
+     "trns": [
+      "941292380000001"
+     ],
+     "totals": [
+      252.51
+     ]
+    },
+    {
+     "day": "2026-07-17",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260717060230.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000063"
+     ],
+     "totals": [
+      1300.3
+     ]
+    },
+    {
+     "day": "2026-07-17",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260717034122.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000059"
+     ],
+     "totals": [
+      399.22
+     ]
+    },
+    {
+     "day": "2026-07-17",
+     "kind": "835",
+     "name": "ERA_60055_ACMELABS_20260717043749.x12",
+     "expect": "parsed",
+     "payer_id": "60055",
+     "trns": [
+      "579786940000035"
+     ],
+     "totals": [
+      504.16
+     ]
+    },
+    {
+     "day": "2026-07-17",
+     "kind": "835",
+     "name": "ERA_J3454_ACMELABS_20260717025243.x12",
+     "expect": "parsed",
+     "payer_id": "J3454",
+     "trns": [
+      "3595000001"
+     ],
+     "totals": [
+      112.49
+     ]
+    },
+    {
+     "day": "2026-07-17",
+     "kind": "835",
+     "name": "ERA_J5772_ACMELABS_20260717035956.x12",
+     "expect": "parsed",
+     "payer_id": "J5772",
+     "trns": [
+      "1303000002"
+     ],
+     "totals": [
+      0.0
+     ]
+    },
+    {
+     "day": "2026-07-17",
+     "kind": "835",
+     "name": "ERA_62308_ACMELABS_20260717014920.x12",
+     "expect": "parsed",
+     "payer_id": "62308",
+     "trns": [
+      "716093220000027"
+     ],
+     "totals": [
+      568.42
+     ]
+    },
+    {
+     "day": "2026-07-17",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260717045757.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000075"
+     ],
+     "totals": [
+      58.34
+     ]
+    },
+    {
+     "day": "2026-07-20",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260720021157.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-20",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260720165912.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-20",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260720225019.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-20",
+     "kind": "835",
+     "name": "ERA_61473_ACMELABS_20260720160452.x12",
+     "expect": "parsed",
+     "payer_id": "61473",
+     "trns": [
+      "031566070000035"
+     ],
+     "totals": [
+      3127.38
+     ]
+    },
+    {
+     "day": "2026-07-20",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260720051350.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000076"
+     ],
+     "totals": [
+      1193.01
+     ]
+    },
+    {
+     "day": "2026-07-20",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260720031507.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000060"
+     ],
+     "totals": [
+      1646.07
+     ]
+    },
+    {
+     "day": "2026-07-20",
+     "kind": "835",
+     "name": "ERA_60054_ACMELABS_20260720051811.x12",
+     "expect": "parsed",
+     "payer_id": "60054",
+     "trns": [
+      "943466010000041"
+     ],
+     "totals": [
+      618.5
+     ]
+    },
+    {
+     "day": "2026-07-20",
+     "kind": "835",
+     "name": "ERA_HBNC1_ACMELABS_20260720050824.x12",
+     "expect": "parsed",
+     "payer_id": "HBNC1",
+     "trns": [
+      "858143660000026"
+     ],
+     "totals": [
+      837.8
+     ]
+    },
+    {
+     "day": "2026-07-20",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260720054608.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000064"
+     ],
+     "totals": [
+      1753.23
+     ]
+    },
+    {
+     "day": "2026-07-20",
+     "kind": "835",
+     "name": "ERA_60055_ACMELABS_20260720043315.x12",
+     "expect": "parsed",
+     "payer_id": "60055",
+     "trns": [
+      "579786940000036"
+     ],
+     "totals": [
+      129.67
+     ]
+    },
+    {
+     "day": "2026-07-20",
+     "kind": "835",
+     "name": "ERA_FEPNC_ACMELABS_20260720023640.x12",
+     "expect": "parsed",
+     "payer_id": "FEPNC",
+     "trns": [
+      "429807470000027"
+     ],
+     "totals": [
+      97.31
+     ]
+    },
+    {
+     "day": "2026-07-20",
+     "kind": "835",
+     "name": "ERA_C8613_ACMELABS_20260720043534.x12",
+     "expect": "parsed",
+     "payer_id": "C8613",
+     "trns": [
+      "2739000001"
+     ],
+     "totals": [
+      197.32
+     ]
+    },
+    {
+     "day": "2026-07-20",
+     "kind": "835",
+     "name": "ERA_C8613_ACMELABS_20260720202031.x12",
+     "expect": "rejected",
+     "corruption": "bad_envelope"
+    },
+    {
+     "day": "2026-07-21",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260721092033.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-21",
+     "kind": "835",
+     "name": "ERA_68069_ACMELABS_20260721163019.x12",
+     "expect": "parsed",
+     "payer_id": "68069",
+     "trns": [
+      "894465420000013"
+     ],
+     "totals": [
+      819.14
+     ]
+    },
+    {
+     "day": "2026-07-21",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260721055027.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000065"
+     ],
+     "totals": [
+      1065.84
+     ]
+    },
+    {
+     "day": "2026-07-21",
+     "kind": "835",
+     "name": "ERA_76314_ACMELABS_20260721134927.x12",
+     "expect": "parsed",
+     "payer_id": "76314",
+     "trns": [
+      "5567000006"
+     ],
+     "totals": [
+      310.84
+     ]
+    },
+    {
+     "day": "2026-07-21",
+     "kind": "835",
+     "name": "ERA_L7108_ACMELABS_20260721131042.x12",
+     "expect": "parsed",
+     "payer_id": "L7108",
+     "trns": [
+      "5120000001"
+     ],
+     "totals": [
+      477.98
+     ]
+    },
+    {
+     "day": "2026-07-21",
+     "kind": "835",
+     "name": "ERA_33251_ACMELABS_20260721070332.x12",
+     "expect": "parsed",
+     "payer_id": "33251",
+     "trns": [
+      "517989060000005"
+     ],
+     "totals": [
+      132.89
+     ]
+    },
+    {
+     "day": "2026-07-21",
+     "kind": "835",
+     "name": "ERA_72775_ACMELABS_20260721070216.x12",
+     "expect": "parsed",
+     "payer_id": "72775",
+     "trns": [
+      "126422290000002"
+     ],
+     "totals": [
+      131.77
+     ]
+    },
+    {
+     "day": "2026-07-21",
+     "kind": "835",
+     "name": "ERA_L5643_ACMELABS_20260721024641.x12",
+     "expect": "parsed",
+     "payer_id": "L5643",
+     "trns": [
+      "479602190000003"
+     ],
+     "totals": [
+      42.77
+     ]
+    },
+    {
+     "day": "2026-07-21",
+     "kind": "835",
+     "name": "ERA_62308_ACMELABS_20260721012924.x12",
+     "expect": "parsed",
+     "payer_id": "62308",
+     "trns": [
+      "716093220000028"
+     ],
+     "totals": [
+      1154.9
+     ]
+    },
+    {
+     "day": "2026-07-21",
+     "kind": "835",
+     "name": "ERA_63092_ACMELABS_20260721031148.x12",
+     "expect": "parsed",
+     "payer_id": "63092",
+     "trns": [
+      "296953120000020"
+     ],
+     "totals": [
+      226.37
+     ]
+    },
+    {
+     "day": "2026-07-21",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260721031729.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000061"
+     ],
+     "totals": [
+      333.78
+     ]
+    },
+    {
+     "day": "2026-07-21",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260721052001.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000077"
+     ],
+     "totals": [
+      338.33
+     ]
+    },
+    {
+     "day": "2026-07-21",
+     "kind": "835",
+     "name": "ERA_14163_ACMELABS_20260721130007.x12",
+     "expect": "parsed",
+     "payer_id": "14163",
+     "trns": [
+      "201037770000023"
+     ],
+     "totals": [
+      191.33
+     ]
+    },
+    {
+     "day": "2026-07-22",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260722141423.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-22",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260722193020.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-22",
+     "kind": "835",
+     "name": "ERA_VACCN_ACMELABS_20260722055230.x12",
+     "expect": "parsed",
+     "payer_id": "VACCN",
+     "trns": [
+      "790227000000010"
+     ],
+     "totals": [
+      0.0
+     ]
+    },
+    {
+     "day": "2026-07-22",
+     "kind": "835",
+     "name": "ERA_61102_ACMELABS_20260722040119.x12",
+     "expect": "parsed",
+     "payer_id": "61102",
+     "trns": [
+      "928221590000014"
+     ],
+     "totals": [
+      1423.86
+     ]
+    },
+    {
+     "day": "2026-07-22",
+     "kind": "835",
+     "name": "ERA_60054_ACMELABS_20260722052742.x12",
+     "expect": "parsed",
+     "payer_id": "60054",
+     "trns": [
+      "943466010000042"
+     ],
+     "totals": [
+      847.69
+     ]
+    },
+    {
+     "day": "2026-07-22",
+     "kind": "835",
+     "name": "ERA_UHCNC_ACMELABS_20260722032958.x12",
+     "expect": "parsed",
+     "payer_id": "UHCNC",
+     "trns": [
+      "745701630000014"
+     ],
+     "totals": [
+      571.95
+     ]
+    },
+    {
+     "day": "2026-07-22",
+     "kind": "835",
+     "name": "ERA_61101_ACMELABS_20260722033853.x12",
+     "expect": "parsed",
+     "payer_id": "61101",
+     "trns": [
+      "790828550000014"
+     ],
+     "totals": [
+      156.39
+     ]
+    },
+    {
+     "day": "2026-07-22",
+     "kind": "835",
+     "name": "ERA_NCMCD_ACMELABS_20260722042603.x12",
+     "expect": "parsed",
+     "payer_id": "NCMCD",
+     "trns": [
+      "940783830000013"
+     ],
+     "totals": [
+      174.52
+     ]
+    },
+    {
+     "day": "2026-07-22",
+     "kind": "835",
+     "name": "ERA_TREST_ACMELABS_20260722061520.x12",
+     "expect": "parsed",
+     "payer_id": "TREST",
+     "trns": [
+      "174754440000013"
+     ],
+     "totals": [
+      220.04
+     ]
+    },
+    {
+     "day": "2026-07-22",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260722062108.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000066"
+     ],
+     "totals": [
+      1193.1
+     ]
+    },
+    {
+     "day": "2026-07-22",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260722033954.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000062"
+     ],
+     "totals": [
+      65.82
+     ]
+    },
+    {
+     "day": "2026-07-22",
+     "kind": "835",
+     "name": "ERA_60055_ACMELABS_20260722041939.x12",
+     "expect": "parsed",
+     "payer_id": "60055",
+     "trns": [
+      "579786940000037"
+     ],
+     "totals": [
+      80.38
+     ]
+    },
+    {
+     "day": "2026-07-22",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260722051610.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000078"
+     ],
+     "totals": [
+      1001.58
+     ]
+    },
+    {
+     "day": "2026-07-23",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260723021253.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-23",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260723142054.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-23",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260723170325.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-23",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260723192500.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-23",
+     "kind": "835",
+     "name": "ERA_81671_ACMELABS_20260723023817.x12",
+     "expect": "parsed",
+     "payer_id": "81671",
+     "trns": [
+      "937655880000013"
+     ],
+     "totals": [
+      478.99
+     ]
+    },
+    {
+     "day": "2026-07-23",
+     "kind": "835",
+     "name": "ERA_39026_ACMELABS_20260723161821.x12",
+     "expect": "parsed",
+     "payer_id": "39026",
+     "trns": [
+      "458818440000015"
+     ],
+     "totals": [
+      712.51
+     ]
+    },
+    {
+     "day": "2026-07-23",
+     "kind": "835",
+     "name": "ERA_61473_ACMELABS_20260723161103.x12",
+     "expect": "parsed",
+     "payer_id": "61473",
+     "trns": [
+      "031566070000036"
+     ],
+     "totals": [
+      3207.3
+     ]
+    },
+    {
+     "day": "2026-07-23",
+     "kind": "835",
+     "name": "ERA_DEV01_ACMELABS_20260723024858.x12",
+     "expect": "parsed",
+     "payer_id": "DEV01",
+     "trns": [
+      "678930920000012"
+     ],
+     "totals": [
+      343.18
+     ]
+    },
+    {
+     "day": "2026-07-23",
+     "kind": "835",
+     "name": "ERA_HBNC1_ACMELABS_20260723053951.x12",
+     "expect": "parsed",
+     "payer_id": "HBNC1",
+     "trns": [
+      "858143660000027"
+     ],
+     "totals": [
+      98.57
+     ]
+    },
+    {
+     "day": "2026-07-23",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260723055211.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000067"
+     ],
+     "totals": [
+      1113.01
+     ]
+    },
+    {
+     "day": "2026-07-23",
+     "kind": "835",
+     "name": "ERA_92504_ACMELABS_20260723165807.x12",
+     "expect": "parsed",
+     "payer_id": "92504",
+     "trns": [
+      "2622000012"
+     ],
+     "totals": [
+      331.59
+     ]
+    },
+    {
+     "day": "2026-07-23",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260723032108.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000063"
+     ],
+     "totals": [
+      339.29
+     ]
+    },
+    {
+     "day": "2026-07-23",
+     "kind": "835",
+     "name": "ERA_11478_ACMELABS_20260723171008.x12",
+     "expect": "parsed",
+     "payer_id": "11478",
+     "trns": [
+      "6010000002"
+     ],
+     "totals": [
+      0.0
+     ]
+    },
+    {
+     "day": "2026-07-23",
+     "kind": "835",
+     "name": "ERA_A4855_ACMELABS_20260723034459.x12",
+     "expect": "parsed",
+     "payer_id": "A4855",
+     "trns": [
+      "1478000008"
+     ],
+     "totals": [
+      428.82
+     ]
+    },
+    {
+     "day": "2026-07-23",
+     "kind": "835",
+     "name": "ERA_CCHPC_ACMELABS_20260723163841.x12",
+     "expect": "parsed",
+     "payer_id": "CCHPC",
+     "trns": [
+      "412763910000014"
+     ],
+     "totals": [
+      460.56
+     ]
+    },
+    {
+     "day": "2026-07-23",
+     "kind": "835",
+     "name": "ERA_M9966_ACMELABS_20260723050111.x12",
+     "expect": "parsed",
+     "payer_id": "M9966",
+     "trns": [
+      "8981000001"
+     ],
+     "totals": [
+      98.74
+     ]
+    },
+    {
+     "day": "2026-07-23",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260723045346.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000079"
+     ],
+     "totals": [
+      864.35
+     ]
+    },
+    {
+     "day": "2026-07-23",
+     "kind": "835",
+     "name": "ERA_41124_ACMELABS_20260723024532.x12",
+     "expect": "parsed",
+     "payer_id": "41124",
+     "trns": [
+      "3930000014"
+     ],
+     "totals": [
+      0.0
+     ]
+    },
+    {
+     "day": "2026-07-23",
+     "kind": "835",
+     "name": "ERA_ACMELABS_20260723041219.x12",
+     "expect": "parsed",
+     "payer_id": "FEPNC+OSCAR",
+     "trns": [
+      "429807470000028",
+      "619261980000019"
+     ],
+     "totals": [
+      200.15,
+      45.69
+     ]
+    },
+    {
+     "day": "2026-07-24",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260724141036.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-24",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260724165400.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-24",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260724193433.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-24",
+     "kind": "835",
+     "name": "ERA_68369_ACMELABS_20260724021348.x12",
+     "expect": "parsed",
+     "payer_id": "68369",
+     "trns": [
+      "3684000002"
+     ],
+     "totals": [
+      413.99
+     ]
+    },
+    {
+     "day": "2026-07-24",
+     "kind": "835",
+     "name": "ERA_62308_ACMELABS_20260724012504.x12",
+     "expect": "parsed",
+     "payer_id": "62308",
+     "trns": [
+      "716093220000029"
+     ],
+     "totals": [
+      1618.78
+     ]
+    },
+    {
+     "day": "2026-07-24",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260724044421.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000080"
+     ],
+     "totals": [
+      248.87
+     ]
+    },
+    {
+     "day": "2026-07-24",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260724054109.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000068"
+     ],
+     "totals": [
+      1408.17
+     ]
+    },
+    {
+     "day": "2026-07-24",
+     "kind": "835",
+     "name": "ERA_D7640_ACMELABS_20260724021119.x12",
+     "expect": "parsed",
+     "payer_id": "D7640",
+     "trns": [
+      "364051730000001"
+     ],
+     "totals": [
+      298.33
+     ]
+    },
+    {
+     "day": "2026-07-24",
+     "kind": "835",
+     "name": "ERA_M9991_ACMELABS_20260724015709.x12",
+     "expect": "parsed",
+     "payer_id": "M9991",
+     "trns": [
+      "4324000003"
+     ],
+     "totals": [
+      72.44
+     ]
+    },
+    {
+     "day": "2026-07-24",
+     "kind": "835",
+     "name": "ERA_60055_ACMELABS_20260724043847.x12",
+     "expect": "parsed",
+     "payer_id": "60055",
+     "trns": [
+      "579786940000038"
+     ],
+     "totals": [
+      141.22
+     ]
+    },
+    {
+     "day": "2026-07-24",
+     "kind": "835",
+     "name": "ERA_68068_ACMELABS_20260724044926.x12",
+     "expect": "parsed",
+     "payer_id": "68068",
+     "trns": [
+      "755688630000011"
+     ],
+     "totals": [
+      106.25
+     ]
+    },
+    {
+     "day": "2026-07-24",
+     "kind": "835",
+     "name": "ERA_CLOVR_ACMELABS_20260724025411.x12",
+     "expect": "parsed",
+     "payer_id": "CLOVR",
+     "trns": [
+      "868646510000013"
+     ],
+     "totals": [
+      60.51
+     ]
+    },
+    {
+     "day": "2026-07-24",
+     "kind": "835",
+     "name": "ERA_60054_ACMELABS_20260724051530.x12",
+     "expect": "parsed",
+     "payer_id": "60054",
+     "trns": [
+      "943466010000043"
+     ],
+     "totals": [
+      624.68
+     ]
+    },
+    {
+     "day": "2026-07-24",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260724031152.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000064"
+     ],
+     "totals": [
+      208.67
+     ]
+    },
+    {
+     "day": "2026-07-27",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260727092944.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-27",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260727113750.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-27",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260727141356.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-27",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260727193135.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-27",
+     "kind": "835",
+     "name": "ERA_61473_ACMELABS_20260727160601.x12",
+     "expect": "parsed",
+     "payer_id": "61473",
+     "trns": [
+      "031566070000037"
+     ],
+     "totals": [
+      2473.92
+     ]
+    },
+    {
+     "day": "2026-07-27",
+     "kind": "835",
+     "name": "ERA_H1818_ACMELABS_20260727050159.x12",
+     "expect": "parsed",
+     "payer_id": "H1818",
+     "trns": [
+      "3187000009"
+     ],
+     "totals": [
+      392.63
+     ]
+    },
+    {
+     "day": "2026-07-27",
+     "kind": "835",
+     "name": "ERA_OSCAR_ACMELABS_20260727031342.x12",
+     "expect": "parsed",
+     "payer_id": "OSCAR",
+     "trns": [
+      "619261980000020"
+     ],
+     "totals": [
+      322.04
+     ]
+    },
+    {
+     "day": "2026-07-27",
+     "kind": "835",
+     "name": "ERA_60054_ACMELABS_20260727052356.x12",
+     "expect": "parsed",
+     "payer_id": "60054",
+     "trns": [
+      "943466010000044"
+     ],
+     "totals": [
+      600.34
+     ]
+    },
+    {
+     "day": "2026-07-27",
+     "kind": "835",
+     "name": "ERA_FEPNC_ACMELABS_20260727024305.x12",
+     "expect": "parsed",
+     "payer_id": "FEPNC",
+     "trns": [
+      "429807470000029"
+     ],
+     "totals": [
+      764.75
+     ]
+    },
+    {
+     "day": "2026-07-27",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260727050623.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000081"
+     ],
+     "totals": [
+      1394.68
+     ]
+    },
+    {
+     "day": "2026-07-27",
+     "kind": "835",
+     "name": "ERA_HBNC1_ACMELABS_20260727050919.x12",
+     "expect": "parsed",
+     "payer_id": "HBNC1",
+     "trns": [
+      "858143660000028"
+     ],
+     "totals": [
+      851.99
+     ]
+    },
+    {
+     "day": "2026-07-27",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260727054807.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000069"
+     ],
+     "totals": [
+      2095.97
+     ]
+    },
+    {
+     "day": "2026-07-27",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260727032709.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000065"
+     ],
+     "totals": [
+      1293.82
+     ]
+    },
+    {
+     "day": "2026-07-27",
+     "kind": "835",
+     "name": "ERA_60055_ACMELABS_20260727040151.x12",
+     "expect": "parsed",
+     "payer_id": "60055",
+     "trns": [
+      "579786940000039"
+     ],
+     "totals": [
+      124.29
+     ]
+    },
+    {
+     "day": "2026-07-28",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260728021245.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-28",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260728092355.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-28",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260728192823.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-28",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260728224052.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-28",
+     "kind": "835",
+     "name": "ERA_68069_ACMELABS_20260728170904.x12",
+     "expect": "parsed",
+     "payer_id": "68069",
+     "trns": [
+      "894465420000014"
+     ],
+     "totals": [
+      862.12
+     ]
+    },
+    {
+     "day": "2026-07-28",
+     "kind": "835",
+     "name": "ERA_62308_ACMELABS_20260728015537.x12",
+     "expect": "parsed",
+     "payer_id": "62308",
+     "trns": [
+      "716093220000030"
+     ],
+     "totals": [
+      710.91
+     ]
+    },
+    {
+     "day": "2026-07-28",
+     "kind": "835",
+     "name": "ERA_S3217_ACMELABS_20260728025624.x12",
+     "expect": "parsed",
+     "payer_id": "S3217",
+     "trns": [
+      "469425000000005"
+     ],
+     "totals": [
+      198.58
+     ]
+    },
+    {
+     "day": "2026-07-28",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260728061355.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000070"
+     ],
+     "totals": [
+      1369.73
+     ]
+    },
+    {
+     "day": "2026-07-28",
+     "kind": "835",
+     "name": "ERA_L7799_ACMELABS_20260728031225.x12",
+     "expect": "parsed",
+     "payer_id": "L7799",
+     "trns": [
+      "055110580000006"
+     ],
+     "totals": [
+      2219.39
+     ]
+    },
+    {
+     "day": "2026-07-28",
+     "kind": "835",
+     "name": "ERA_51701_ACMELABS_20260728045607.x12",
+     "expect": "parsed",
+     "payer_id": "51701",
+     "trns": [
+      "4486000003"
+     ],
+     "totals": [
+      0.0
+     ]
+    },
+    {
+     "day": "2026-07-28",
+     "kind": "835",
+     "name": "ERA_N7145_ACMELABS_20260728030806.x12",
+     "expect": "parsed",
+     "payer_id": "N7145",
+     "trns": [
+      "3262000001"
+     ],
+     "totals": [
+      23.8
+     ]
+    },
+    {
+     "day": "2026-07-28",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260728034108.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000066"
+     ],
+     "totals": [
+      439.86
+     ]
+    },
+    {
+     "day": "2026-07-28",
+     "kind": "835",
+     "name": "ERA_L5643_ACMELABS_20260728022146.x12",
+     "expect": "parsed",
+     "payer_id": "L5643",
+     "trns": [
+      "479602190000004"
+     ],
+     "totals": [
+      97.03
+     ]
+    },
+    {
+     "day": "2026-07-28",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260728051510.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000082"
+     ],
+     "totals": [
+      102.05
+     ]
+    },
+    {
+     "day": "2026-07-28",
+     "kind": "835",
+     "name": "ERA_14163_ACMELABS_20260728131456.x12",
+     "expect": "parsed",
+     "payer_id": "14163",
+     "trns": [
+      "201037770000024"
+     ],
+     "totals": [
+      409.22
+     ]
+    },
+    {
+     "day": "2026-07-29",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260729114051.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-29",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260729142239.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-29",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260729170015.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-29",
+     "kind": "835",
+     "name": "ERA_UHCNC_ACMELABS_20260729025413.x12",
+     "expect": "parsed",
+     "payer_id": "UHCNC",
+     "trns": [
+      "745701630000015"
+     ],
+     "totals": [
+      631.68
+     ]
+    },
+    {
+     "day": "2026-07-29",
+     "kind": "835",
+     "name": "ERA_61101_ACMELABS_20260729031857.x12",
+     "expect": "parsed",
+     "payer_id": "61101",
+     "trns": [
+      "790828550000015"
+     ],
+     "totals": [
+      200.62
+     ]
+    },
+    {
+     "day": "2026-07-29",
+     "kind": "835",
+     "name": "ERA_VACCN_ACMELABS_20260729055818.x12",
+     "expect": "parsed",
+     "payer_id": "VACCN",
+     "trns": [
+      "790227000000011"
+     ],
+     "totals": [
+      100.23
+     ]
+    },
+    {
+     "day": "2026-07-29",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260729061904.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000071"
+     ],
+     "totals": [
+      1018.27
+     ]
+    },
+    {
+     "day": "2026-07-29",
+     "kind": "835",
+     "name": "ERA_61102_ACMELABS_20260729035305.x12",
+     "expect": "parsed",
+     "payer_id": "61102",
+     "trns": [
+      "928221590000015"
+     ],
+     "totals": [
+      3546.67
+     ]
+    },
+    {
+     "day": "2026-07-29",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260729044959.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000083"
+     ],
+     "totals": [
+      361.76
+     ]
+    },
+    {
+     "day": "2026-07-29",
+     "kind": "835",
+     "name": "ERA_NCMCD_ACMELABS_20260729043813.x12",
+     "expect": "parsed",
+     "payer_id": "NCMCD",
+     "trns": [
+      "940783830000014"
+     ],
+     "totals": [
+      395.07
+     ]
+    },
+    {
+     "day": "2026-07-29",
+     "kind": "835",
+     "name": "ERA_NCMCD_ACMELABS_20260729123344.x12",
+     "expect": "duplicate",
+     "payer_id": "NCMCD",
+     "trns": [
+      "940783830000014"
+     ],
+     "totals": [
+      395.07
+     ],
+     "redelivery_of": "ERA_NCMCD_ACMELABS_20260729043813.x12"
+    },
+    {
+     "day": "2026-07-29",
+     "kind": "835",
+     "name": "ERA_60054_ACMELABS_20260729053125.x12",
+     "expect": "parsed",
+     "payer_id": "60054",
+     "trns": [
+      "943466010000045"
+     ],
+     "totals": [
+      400.95
+     ]
+    },
+    {
+     "day": "2026-07-29",
+     "kind": "835",
+     "name": "ERA_TREST_ACMELABS_20260729061531.x12",
+     "expect": "parsed",
+     "payer_id": "TREST",
+     "trns": [
+      "174754440000014"
+     ],
+     "totals": [
+      81.49
+     ]
+    },
+    {
+     "day": "2026-07-29",
+     "kind": "835",
+     "name": "ERA_60055_ACMELABS_20260729040756.x12",
+     "expect": "parsed",
+     "payer_id": "60055",
+     "trns": [
+      "579786940000040"
+     ],
+     "totals": [
+      124.76
+     ]
+    },
+    {
+     "day": "2026-07-29",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260729032153.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000067"
+     ],
+     "totals": [
+      396.11
+     ]
+    },
+    {
+     "day": "2026-07-30",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260730021738.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-30",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260730165946.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-30",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260730192606.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-30",
+     "kind": "835",
+     "name": "ERA_14163_ACMELABS_20260730132842.x12",
+     "expect": "parsed",
+     "payer_id": "14163",
+     "trns": [
+      "201037770000025"
+     ],
+     "totals": [
+      208.85
+     ]
+    },
+    {
+     "day": "2026-07-30",
+     "kind": "835",
+     "name": "ERA_92504_ACMELABS_20260730170208.x12",
+     "expect": "parsed",
+     "payer_id": "92504",
+     "trns": [
+      "2622000013"
+     ],
+     "totals": [
+      347.86
+     ]
+    },
+    {
+     "day": "2026-07-30",
+     "kind": "835",
+     "name": "ERA_81671_ACMELABS_20260730021647.x12",
+     "expect": "parsed",
+     "payer_id": "81671",
+     "trns": [
+      "937655880000014"
+     ],
+     "totals": [
+      1559.06
+     ]
+    },
+    {
+     "day": "2026-07-30",
+     "kind": "835",
+     "name": "ERA_OSCAR_ACMELABS_20260730023536.x12",
+     "expect": "parsed",
+     "payer_id": "OSCAR",
+     "trns": [
+      "619261980000021"
+     ],
+     "totals": [
+      12.2
+     ]
+    },
+    {
+     "day": "2026-07-30",
+     "kind": "835",
+     "name": "ERA_39026_ACMELABS_20260730155037.x12",
+     "expect": "parsed",
+     "payer_id": "39026",
+     "trns": [
+      "458818440000016"
+     ],
+     "totals": [
+      13.13
+     ]
+    },
+    {
+     "day": "2026-07-30",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260730045332.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000084"
+     ],
+     "totals": [
+      177.55
+     ]
+    },
+    {
+     "day": "2026-07-30",
+     "kind": "835",
+     "name": "ERA_HBNC1_ACMELABS_20260730052702.x12",
+     "expect": "parsed",
+     "payer_id": "HBNC1",
+     "trns": [
+      "858143660000029"
+     ],
+     "totals": [
+      534.96
+     ]
+    },
+    {
+     "day": "2026-07-30",
+     "kind": "835",
+     "name": "ERA_C1823_ACMELABS_20260730132000.x12",
+     "expect": "parsed",
+     "payer_id": "C1823",
+     "trns": [
+      "860654010000006"
+     ],
+     "totals": [
+      379.31
+     ]
+    },
+    {
+     "day": "2026-07-30",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260730055335.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000072"
+     ],
+     "totals": [
+      1227.93
+     ]
+    },
+    {
+     "day": "2026-07-30",
+     "kind": "835",
+     "name": "ERA_CCHPC_ACMELABS_20260730161918.x12",
+     "expect": "parsed",
+     "payer_id": "CCHPC",
+     "trns": [
+      "412763910000015"
+     ],
+     "totals": [
+      119.83
+     ]
+    },
+    {
+     "day": "2026-07-30",
+     "kind": "835",
+     "name": "ERA_N7737_ACMELABS_20260730015553.x12",
+     "expect": "parsed",
+     "payer_id": "N7737",
+     "trns": [
+      "181216230000008"
+     ],
+     "totals": [
+      0.0
+     ]
+    },
+    {
+     "day": "2026-07-30",
+     "kind": "835",
+     "name": "ERA_A4855_ACMELABS_20260730035115.x12",
+     "expect": "parsed",
+     "payer_id": "A4855",
+     "trns": [
+      "1478000009"
+     ],
+     "totals": [
+      296.93
+     ]
+    },
+    {
+     "day": "2026-07-30",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260730031716.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000068"
+     ],
+     "totals": [
+      236.87
+     ]
+    },
+    {
+     "day": "2026-07-30",
+     "kind": "835",
+     "name": "ERA_63092_ACMELABS_20260730031056.x12",
+     "expect": "parsed",
+     "payer_id": "63092",
+     "trns": [
+      "296953120000021"
+     ],
+     "totals": [
+      244.78
+     ]
+    },
+    {
+     "day": "2026-07-30",
+     "kind": "835",
+     "name": "ERA_41124_ACMELABS_20260730021442.x12",
+     "expect": "parsed",
+     "payer_id": "41124",
+     "trns": [
+      "3930000015"
+     ],
+     "totals": [
+      355.55
+     ]
+    },
+    {
+     "day": "2026-07-30",
+     "kind": "835",
+     "name": "ERA_DEV01_ACMELABS_20260730032551.x12",
+     "expect": "parsed",
+     "payer_id": "DEV01",
+     "trns": [
+      "678930920000013"
+     ],
+     "totals": [
+      355.44
+     ]
+    },
+    {
+     "day": "2026-07-30",
+     "kind": "835",
+     "name": "ERA_61473_ACMELABS_20260730163044.x12",
+     "expect": "parsed",
+     "payer_id": "61473",
+     "trns": [
+      "031566070000038"
+     ],
+     "totals": [
+      1565.32
+     ]
+    },
+    {
+     "day": "2026-07-31",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260731055030.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-07-31",
+     "kind": "835",
+     "name": "ERA_62308_ACMELABS_20260731014433.x12",
+     "expect": "parsed",
+     "payer_id": "62308",
+     "trns": [
+      "716093220000031"
+     ],
+     "totals": [
+      936.94
+     ]
+    },
+    {
+     "day": "2026-07-31",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260731055357.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000073"
+     ],
+     "totals": [
+      2688.47
+     ]
+    },
+    {
+     "day": "2026-07-31",
+     "kind": "835",
+     "name": "ERA_68068_ACMELABS_20260731041234.x12",
+     "expect": "parsed",
+     "payer_id": "68068",
+     "trns": [
+      "755688630000012"
+     ],
+     "totals": [
+      10.79
+     ]
+    },
+    {
+     "day": "2026-07-31",
+     "kind": "835",
+     "name": "ERA_60054_ACMELABS_20260731053911.x12",
+     "expect": "parsed",
+     "payer_id": "60054",
+     "trns": [
+      "943466010000046"
+     ],
+     "totals": [
+      582.24
+     ]
+    },
+    {
+     "day": "2026-07-31",
+     "kind": "835",
+     "name": "ERA_CLOVR_ACMELABS_20260731024731.x12",
+     "expect": "parsed",
+     "payer_id": "CLOVR",
+     "trns": [
+      "868646510000014"
+     ],
+     "totals": [
+      344.05
+     ]
+    },
+    {
+     "day": "2026-07-31",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260731032728.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000069"
+     ],
+     "totals": [
+      156.32
+     ]
+    },
+    {
+     "day": "2026-07-31",
+     "kind": "835",
+     "name": "ERA_60055_ACMELABS_20260731042357.x12",
+     "expect": "parsed",
+     "payer_id": "60055",
+     "trns": [
+      "579786940000041"
+     ],
+     "totals": [
+      144.49
+     ]
+    },
+    {
+     "day": "2026-07-31",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260731051345.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000085"
+     ],
+     "totals": [
+      68.39
+     ]
+    },
+    {
+     "day": "2026-08-03",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260803055225.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-03",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260803091827.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-03",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260803142250.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-03",
+     "kind": "835",
+     "name": "ERA_HBNC1_ACMELABS_20260803050151.x12",
+     "expect": "parsed",
+     "payer_id": "HBNC1",
+     "trns": [
+      "858143660000030"
+     ],
+     "totals": [
+      566.44
+     ]
+    },
+    {
+     "day": "2026-08-03",
+     "kind": "835",
+     "name": "ERA_61473_ACMELABS_20260803161843.x12",
+     "expect": "parsed",
+     "payer_id": "61473",
+     "trns": [
+      "031566070000039",
+      "031566070000040"
+     ],
+     "totals": [
+      1091.02,
+      1642.88
+     ]
+    },
+    {
+     "day": "2026-08-03",
+     "kind": "835",
+     "name": "ERA_60054_ACMELABS_20260803052451.x12",
+     "expect": "parsed",
+     "payer_id": "60054",
+     "trns": [
+      "943466010000047"
+     ],
+     "totals": [
+      903.15
+     ]
+    },
+    {
+     "day": "2026-08-03",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260803055526.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000074"
+     ],
+     "totals": [
+      2961.66
+     ]
+    },
+    {
+     "day": "2026-08-03",
+     "kind": "835",
+     "name": "ERA_60055_ACMELABS_20260803040641.x12",
+     "expect": "parsed",
+     "payer_id": "60055",
+     "trns": [
+      "579786940000042"
+     ],
+     "totals": [
+      552.39
+     ]
+    },
+    {
+     "day": "2026-08-03",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260803044414.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000086"
+     ],
+     "totals": [
+      1002.98
+     ]
+    },
+    {
+     "day": "2026-08-03",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260803032723.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000070"
+     ],
+     "totals": [
+      611.93
+     ]
+    },
+    {
+     "day": "2026-08-03",
+     "kind": "835",
+     "name": "ERA_H1818_ACMELABS_20260803042911.x12",
+     "expect": "parsed",
+     "payer_id": "H1818",
+     "trns": [
+      "3187000010"
+     ],
+     "totals": [
+      0.0
+     ]
+    },
+    {
+     "day": "2026-08-03",
+     "kind": "835",
+     "name": "ERA_OSCAR_ACMELABS_20260803025346.x12",
+     "expect": "parsed",
+     "payer_id": "OSCAR",
+     "trns": [
+      "619261980000022"
+     ],
+     "totals": [
+      67.68
+     ]
+    },
+    {
+     "day": "2026-08-03",
+     "kind": "835",
+     "name": "ERA_FEPNC_ACMELABS_20260803022119.x12",
+     "expect": "parsed",
+     "payer_id": "FEPNC",
+     "trns": [
+      "429807470000030"
+     ],
+     "totals": [
+      75.09
+     ]
+    },
+    {
+     "day": "2026-08-04",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260804020628.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-04",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260804193621.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-04",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260804224105.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-04",
+     "kind": "835",
+     "name": "ERA_14163_ACMELABS_20260804130225.x12",
+     "expect": "parsed",
+     "payer_id": "14163",
+     "trns": [
+      "201037770000026"
+     ],
+     "totals": [
+      298.73
+     ]
+    },
+    {
+     "day": "2026-08-04",
+     "kind": "835",
+     "name": "ERA_76314_ACMELABS_20260804141037.x12",
+     "expect": "parsed",
+     "payer_id": "76314",
+     "trns": [
+      "5567000007"
+     ],
+     "totals": [
+      152.38
+     ]
+    },
+    {
+     "day": "2026-08-04",
+     "kind": "835",
+     "name": "ERA_72775_ACMELABS_20260804064337.x12",
+     "expect": "parsed",
+     "payer_id": "72775",
+     "trns": [
+      "126422290000003"
+     ],
+     "totals": [
+      32.74
+     ]
+    },
+    {
+     "day": "2026-08-04",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260804055220.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000075"
+     ],
+     "totals": [
+      1070.7
+     ]
+    },
+    {
+     "day": "2026-08-04",
+     "kind": "835",
+     "name": "ERA_62308_ACMELABS_20260804015807.x12",
+     "expect": "parsed",
+     "payer_id": "62308",
+     "trns": [
+      "716093220000032"
+     ],
+     "totals": [
+      1152.64
+     ]
+    },
+    {
+     "day": "2026-08-04",
+     "kind": "835",
+     "name": "ERA_68069_ACMELABS_20260804163953.x12",
+     "expect": "parsed",
+     "payer_id": "68069",
+     "trns": [
+      "894465420000015"
+     ],
+     "totals": [
+      774.73
+     ]
+    },
+    {
+     "day": "2026-08-04",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260804032655.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000071"
+     ],
+     "totals": [
+      67.43
+     ]
+    },
+    {
+     "day": "2026-08-04",
+     "kind": "835",
+     "name": "ERA_63092_ACMELABS_20260804030951.x12",
+     "expect": "parsed",
+     "payer_id": "63092",
+     "trns": [
+      "296953120000022"
+     ],
+     "totals": [
+      260.92
+     ]
+    },
+    {
+     "day": "2026-08-04",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260804044921.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000087",
+      "957149190000088"
+     ],
+     "totals": [
+      125.06,
+      276.44
+     ]
+    },
+    {
+     "day": "2026-08-05",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260805020938.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-05",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260805091747.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-05",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260805113241.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-05",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260805193352.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-05",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260805224050.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-05",
+     "kind": "835",
+     "name": "ERA_NCMCD_ACMELABS_20260805044247.x12",
+     "expect": "parsed",
+     "payer_id": "NCMCD",
+     "trns": [
+      "940783830000015"
+     ],
+     "totals": [
+      631.47
+     ]
+    },
+    {
+     "day": "2026-08-05",
+     "kind": "835",
+     "name": "ERA_TREST_ACMELABS_20260805062756.x12",
+     "expect": "parsed",
+     "payer_id": "TREST",
+     "trns": [
+      "174754440000015"
+     ],
+     "totals": [
+      177.74
+     ]
+    },
+    {
+     "day": "2026-08-05",
+     "kind": "835",
+     "name": "ERA_VACCN_ACMELABS_20260805055702.x12",
+     "expect": "parsed",
+     "payer_id": "VACCN",
+     "trns": [
+      "790227000000012"
+     ],
+     "totals": [
+      0.0
+     ]
+    },
+    {
+     "day": "2026-08-05",
+     "kind": "835",
+     "name": "ERA_UHCNC_ACMELABS_20260805030623.x12",
+     "expect": "parsed",
+     "payer_id": "UHCNC",
+     "trns": [
+      "745701630000016"
+     ],
+     "totals": [
+      704.54
+     ]
+    },
+    {
+     "day": "2026-08-05",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260805055833.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000076"
+     ],
+     "totals": [
+      1695.46
+     ]
+    },
+    {
+     "day": "2026-08-05",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260805044930.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000089"
+     ],
+     "totals": [
+      254.14
+     ]
+    },
+    {
+     "day": "2026-08-05",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260805032252.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000072"
+     ],
+     "totals": [
+      759.82
+     ]
+    },
+    {
+     "day": "2026-08-05",
+     "kind": "835",
+     "name": "ERA_60055_ACMELABS_20260805040501.x12",
+     "expect": "parsed",
+     "payer_id": "60055",
+     "trns": [
+      "579786940000043"
+     ],
+     "totals": [
+      84.78
+     ]
+    },
+    {
+     "day": "2026-08-05",
+     "kind": "835",
+     "name": "ERA_61101_ACMELABS_20260805031941.x12",
+     "expect": "parsed",
+     "payer_id": "61101",
+     "trns": [
+      "790828550000016"
+     ],
+     "totals": [
+      146.69
+     ]
+    },
+    {
+     "day": "2026-08-05",
+     "kind": "835",
+     "name": "ERA_60054_ACMELABS_20260805052156.x12",
+     "expect": "parsed",
+     "payer_id": "60054",
+     "trns": [
+      "943466010000048"
+     ],
+     "totals": [
+      150.54
+     ]
+    },
+    {
+     "day": "2026-08-05",
+     "kind": "835",
+     "name": "ERA_61102_ACMELABS_20260805041856.x12",
+     "expect": "parsed",
+     "payer_id": "61102",
+     "trns": [
+      "928221590000016"
+     ],
+     "totals": [
+      824.22
+     ]
+    },
+    {
+     "day": "2026-08-06",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260806021335.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-06",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260806165828.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-06",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260806225110.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-06",
+     "kind": "835",
+     "name": "ERA_A4855_ACMELABS_20260806035745.x12",
+     "expect": "parsed",
+     "payer_id": "A4855",
+     "trns": [
+      "1478000010"
+     ],
+     "totals": [
+      553.1
+     ]
+    },
+    {
+     "day": "2026-08-06",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260806032304.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000073"
+     ],
+     "totals": [
+      64.69
+     ]
+    },
+    {
+     "day": "2026-08-06",
+     "kind": "835",
+     "name": "ERA_61473_ACMELABS_20260806160959.x12",
+     "expect": "parsed",
+     "payer_id": "61473",
+     "trns": [
+      "031566070000041"
+     ],
+     "totals": [
+      2633.58
+     ]
+    },
+    {
+     "day": "2026-08-06",
+     "kind": "835",
+     "name": "ERA_92504_ACMELABS_20260806165733.x12",
+     "expect": "parsed",
+     "payer_id": "92504",
+     "trns": [
+      "2622000014"
+     ],
+     "totals": [
+      629.04
+     ]
+    },
+    {
+     "day": "2026-08-06",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260806044330.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000090"
+     ],
+     "totals": [
+      316.62
+     ]
+    },
+    {
+     "day": "2026-08-06",
+     "kind": "835",
+     "name": "ERA_N7737_ACMELABS_20260806022052.x12",
+     "expect": "parsed",
+     "payer_id": "N7737",
+     "trns": [
+      "181216230000009"
+     ],
+     "totals": [
+      0.0
+     ]
+    },
+    {
+     "day": "2026-08-06",
+     "kind": "835",
+     "name": "ERA_81671_ACMELABS_20260806022843.x12",
+     "expect": "parsed",
+     "payer_id": "81671",
+     "trns": [
+      "937655880000015"
+     ],
+     "totals": [
+      318.61
+     ]
+    },
+    {
+     "day": "2026-08-06",
+     "kind": "835",
+     "name": "ERA_HBNC1_ACMELABS_20260806051016.x12",
+     "expect": "parsed",
+     "payer_id": "HBNC1",
+     "trns": [
+      "858143660000031"
+     ],
+     "totals": [
+      658.74
+     ]
+    },
+    {
+     "day": "2026-08-06",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260806060259.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000077"
+     ],
+     "totals": [
+      1652.14
+     ]
+    },
+    {
+     "day": "2026-08-06",
+     "kind": "835",
+     "name": "ERA_CCHPC_ACMELABS_20260806163149.x12",
+     "expect": "parsed",
+     "payer_id": "CCHPC",
+     "trns": [
+      "412763910000016"
+     ],
+     "totals": [
+      0.0
+     ]
+    },
+    {
+     "day": "2026-08-06",
+     "kind": "835",
+     "name": "ERA_OSCAR_ACMELABS_20260806030426.x12",
+     "expect": "parsed",
+     "payer_id": "OSCAR",
+     "trns": [
+      "619261980000023"
+     ],
+     "totals": [
+      96.74
+     ]
+    },
+    {
+     "day": "2026-08-06",
+     "kind": "835",
+     "name": "ERA_14163_ACMELABS_20260806130140.x12",
+     "expect": "parsed",
+     "payer_id": "14163",
+     "trns": [
+      "201037770000027"
+     ],
+     "totals": [
+      603.25
+     ]
+    },
+    {
+     "day": "2026-08-06",
+     "kind": "835",
+     "name": "ERA_39026_ACMELABS_20260806162313.x12",
+     "expect": "parsed",
+     "payer_id": "39026",
+     "trns": [
+      "458818440000017"
+     ],
+     "totals": [
+      279.47
+     ]
+    },
+    {
+     "day": "2026-08-06",
+     "kind": "835",
+     "name": "ERA_41124_ACMELABS_20260806023520.x12",
+     "expect": "parsed",
+     "payer_id": "41124",
+     "trns": [
+      "3930000016"
+     ],
+     "totals": [
+      -0.0
+     ]
+    },
+    {
+     "day": "2026-08-07",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260807054215.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-07",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260807113257.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-07",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260807142351.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-07",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260807225034.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-07",
+     "kind": "835",
+     "name": "ERA_62308_ACMELABS_20260807015044.x12",
+     "expect": "parsed",
+     "payer_id": "62308",
+     "trns": [
+      "716093220000033"
+     ],
+     "totals": [
+      320.94
+     ]
+    },
+    {
+     "day": "2026-08-07",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260807050618.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000091"
+     ],
+     "totals": [
+      263.08
+     ]
+    },
+    {
+     "day": "2026-08-07",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260807054403.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000078"
+     ],
+     "totals": [
+      1240.55
+     ]
+    },
+    {
+     "day": "2026-08-07",
+     "kind": "835",
+     "name": "ERA_53347_ACMELABS_20260807162031.x12",
+     "expect": "parsed",
+     "payer_id": "53347",
+     "trns": [
+      "5528000002"
+     ],
+     "totals": [
+      230.31
+     ]
+    },
+    {
+     "day": "2026-08-07",
+     "kind": "835",
+     "name": "ERA_60054_ACMELABS_20260807055024.x12",
+     "expect": "parsed",
+     "payer_id": "60054",
+     "trns": [
+      "943466010000049"
+     ],
+     "totals": [
+      539.15
+     ]
+    },
+    {
+     "day": "2026-08-07",
+     "kind": "835",
+     "name": "ERA_CLOVR_ACMELABS_20260807023234.x12",
+     "expect": "parsed",
+     "payer_id": "CLOVR",
+     "trns": [
+      "868646510000015"
+     ],
+     "totals": [
+      111.89
+     ]
+    },
+    {
+     "day": "2026-08-07",
+     "kind": "835",
+     "name": "ERA_68068_ACMELABS_20260807043423.x12",
+     "expect": "parsed",
+     "payer_id": "68068",
+     "trns": [
+      "755688630000013"
+     ],
+     "totals": [
+      254.36
+     ]
+    },
+    {
+     "day": "2026-08-07",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260807031853.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000074"
+     ],
+     "totals": [
+      1002.5
+     ]
+    },
+    {
+     "day": "2026-08-07",
+     "kind": "835",
+     "name": "ERA_60055_ACMELABS_20260807043228.x12",
+     "expect": "parsed",
+     "payer_id": "60055",
+     "trns": [
+      "579786940000044"
+     ],
+     "totals": [
+      103.52
+     ]
+    },
+    {
+     "day": "2026-08-10",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260810055132.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-10",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260810225310.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-10",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260810044509.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000092"
+     ],
+     "totals": [
+      758.22
+     ]
+    },
+    {
+     "day": "2026-08-10",
+     "kind": "835",
+     "name": "ERA_61473_ACMELABS_20260810155829.x12",
+     "expect": "parsed",
+     "payer_id": "61473",
+     "trns": [
+      "031566070000042",
+      "031566070000043"
+     ],
+     "totals": [
+      2927.96,
+      1460.25
+     ]
+    },
+    {
+     "day": "2026-08-10",
+     "kind": "835",
+     "name": "ERA_60054_ACMELABS_20260810052054.x12",
+     "expect": "parsed",
+     "payer_id": "60054",
+     "trns": [
+      "943466010000050"
+     ],
+     "totals": [
+      1272.93
+     ]
+    },
+    {
+     "day": "2026-08-10",
+     "kind": "835",
+     "name": "ERA_FEPNC_ACMELABS_20260810022309.x12",
+     "expect": "parsed",
+     "payer_id": "FEPNC",
+     "trns": [
+      "429807470000031"
+     ],
+     "totals": [
+      589.89
+     ]
+    },
+    {
+     "day": "2026-08-10",
+     "kind": "835",
+     "name": "ERA_FEPNC_ACMELABS_20260810080658.x12",
+     "expect": "duplicate",
+     "payer_id": "FEPNC",
+     "trns": [
+      "429807470000031"
+     ],
+     "totals": [
+      589.89
+     ],
+     "redelivery_of": "ERA_FEPNC_ACMELABS_20260810022309.x12"
+    },
+    {
+     "day": "2026-08-10",
+     "kind": "835",
+     "name": "ERA_R3254_ACMELABS_20260810053303.x12",
+     "expect": "parsed",
+     "payer_id": "R3254",
+     "trns": [
+      "9983000003"
+     ],
+     "totals": [
+      0.0
+     ]
+    },
+    {
+     "day": "2026-08-10",
+     "kind": "835",
+     "name": "ERA_HBNC1_ACMELABS_20260810051436.x12",
+     "expect": "parsed",
+     "payer_id": "HBNC1",
+     "trns": [
+      "858143660000032"
+     ],
+     "totals": [
+      320.67
+     ]
+    },
+    {
+     "day": "2026-08-10",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260810034959.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000075"
+     ],
+     "totals": [
+      814.5
+     ]
+    },
+    {
+     "day": "2026-08-10",
+     "kind": "835",
+     "name": "ERA_H1818_ACMELABS_20260810044846.x12",
+     "expect": "parsed",
+     "payer_id": "H1818",
+     "trns": [
+      "3187000011"
+     ],
+     "totals": [
+      554.84
+     ]
+    },
+    {
+     "day": "2026-08-10",
+     "kind": "835",
+     "name": "ERA_60055_ACMELABS_20260810042831.x12",
+     "expect": "parsed",
+     "payer_id": "60055",
+     "trns": [
+      "579786940000045"
+     ],
+     "totals": [
+      97.72
+     ]
+    },
+    {
+     "day": "2026-08-10",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260810060810.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000079"
+     ],
+     "totals": [
+      2950.55
+     ]
+    },
+    {
+     "day": "2026-08-11",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260811020755.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-11",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260811092341.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-11",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260811170343.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-11",
+     "kind": "835",
+     "name": "ERA_68069_ACMELABS_20260811170051.x12",
+     "expect": "parsed",
+     "payer_id": "68069",
+     "trns": [
+      "894465420000016"
+     ],
+     "totals": [
+      738.83
+     ]
+    },
+    {
+     "day": "2026-08-11",
+     "kind": "835",
+     "name": "ERA_L7799_ACMELABS_20260811033251.x12",
+     "expect": "parsed",
+     "payer_id": "L7799",
+     "trns": [
+      "055110580000007"
+     ],
+     "totals": [
+      1084.91
+     ]
+    },
+    {
+     "day": "2026-08-11",
+     "kind": "835",
+     "name": "ERA_62308_ACMELABS_20260811015236.x12",
+     "expect": "parsed",
+     "payer_id": "62308",
+     "trns": [
+      "716093220000034"
+     ],
+     "totals": [
+      1427.49
+     ]
+    },
+    {
+     "day": "2026-08-11",
+     "kind": "835",
+     "name": "ERA_14163_ACMELABS_20260811132953.x12",
+     "expect": "parsed",
+     "payer_id": "14163",
+     "trns": [
+      "201037770000028"
+     ],
+     "totals": [
+      907.41
+     ]
+    },
+    {
+     "day": "2026-08-11",
+     "kind": "835",
+     "name": "ERA_63092_ACMELABS_20260811032815.x12",
+     "expect": "parsed",
+     "payer_id": "63092",
+     "trns": [
+      "296953120000023"
+     ],
+     "totals": [
+      66.82
+     ]
+    },
+    {
+     "day": "2026-08-11",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260811055628.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000080"
+     ],
+     "totals": [
+      258.36
+     ]
+    },
+    {
+     "day": "2026-08-11",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260811051839.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000093"
+     ],
+     "totals": [
+      76.51
+     ]
+    },
+    {
+     "day": "2026-08-11",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260811031842.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000076"
+     ],
+     "totals": [
+      218.05
+     ]
+    },
+    {
+     "day": "2026-08-12",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260812020852.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-12",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260812054339.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-12",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260812113007.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-12",
+     "kind": "835",
+     "name": "ERA_NCMCD_ACMELABS_20260812043735.x12",
+     "expect": "parsed",
+     "payer_id": "NCMCD",
+     "trns": [
+      "940783830000016"
+     ],
+     "totals": [
+      888.34
+     ]
+    },
+    {
+     "day": "2026-08-12",
+     "kind": "835",
+     "name": "ERA_TREST_ACMELABS_20260812061615.x12",
+     "expect": "parsed",
+     "payer_id": "TREST",
+     "trns": [
+      "174754440000016"
+     ],
+     "totals": [
+      614.53
+     ]
+    },
+    {
+     "day": "2026-08-12",
+     "kind": "835",
+     "name": "ERA_61101_ACMELABS_20260812033843.x12",
+     "expect": "parsed",
+     "payer_id": "61101",
+     "trns": [
+      "790828550000017"
+     ],
+     "totals": [
+      589.48
+     ]
+    },
+    {
+     "day": "2026-08-12",
+     "kind": "835",
+     "name": "ERA_61102_ACMELABS_20260812041141.x12",
+     "expect": "parsed",
+     "payer_id": "61102",
+     "trns": [
+      "928221590000017"
+     ],
+     "totals": [
+      1380.55
+     ]
+    },
+    {
+     "day": "2026-08-12",
+     "kind": "835",
+     "name": "ERA_VACCN_ACMELABS_20260812061532.x12",
+     "expect": "parsed",
+     "payer_id": "VACCN",
+     "trns": [
+      "790227000000013"
+     ],
+     "totals": [
+      123.77
+     ]
+    },
+    {
+     "day": "2026-08-12",
+     "kind": "835",
+     "name": "ERA_76796_ACMELABS_20260812045236.x12",
+     "expect": "parsed",
+     "payer_id": "76796",
+     "trns": [
+      "5674000006"
+     ],
+     "totals": [
+      141.51
+     ]
+    },
+    {
+     "day": "2026-08-12",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260812054502.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000081"
+     ],
+     "totals": [
+      604.86
+     ]
+    },
+    {
+     "day": "2026-08-12",
+     "kind": "835",
+     "name": "ERA_60055_ACMELABS_20260812042333.x12",
+     "expect": "parsed",
+     "payer_id": "60055",
+     "trns": [
+      "579786940000046"
+     ],
+     "totals": [
+      287.53
+     ]
+    },
+    {
+     "day": "2026-08-12",
+     "kind": "835",
+     "name": "ERA_H5353_ACMELABS_20260812051539.x12",
+     "expect": "parsed",
+     "payer_id": "H5353",
+     "trns": [
+      "5224000004"
+     ],
+     "totals": [
+      184.48
+     ]
+    },
+    {
+     "day": "2026-08-12",
+     "kind": "835",
+     "name": "ERA_60054_ACMELABS_20260812051337.x12",
+     "expect": "parsed",
+     "payer_id": "60054",
+     "trns": [
+      "943466010000051"
+     ],
+     "totals": [
+      3316.18
+     ]
+    },
+    {
+     "day": "2026-08-12",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260812033901.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000077"
+     ],
+     "totals": [
+      32.92
+     ]
+    },
+    {
+     "day": "2026-08-12",
+     "kind": "835",
+     "name": "ERA_16633_ACMELABS_20260812015732.x12",
+     "expect": "parsed",
+     "payer_id": "16633",
+     "trns": [
+      "4378000001"
+     ],
+     "totals": [
+      57.28
+     ]
+    },
+    {
+     "day": "2026-08-12",
+     "kind": "835",
+     "name": "ERA_ACMELABS_20260812043236.x12",
+     "expect": "parsed",
+     "payer_id": "UHCNC+87726",
+     "trns": [
+      "745701630000017",
+      "957149190000094"
+     ],
+     "totals": [
+      779.02,
+      310.94
+     ]
+    },
+    {
+     "day": "2026-08-13",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260813055029.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-13",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260813091955.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-13",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260813114140.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-13",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260813141525.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-13",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260813224840.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-13",
+     "kind": "835",
+     "name": "ERA_A4855_ACMELABS_20260813035010.x12",
+     "expect": "parsed",
+     "payer_id": "A4855",
+     "trns": [
+      "1478000011"
+     ],
+     "totals": [
+      383.13
+     ]
+    },
+    {
+     "day": "2026-08-13",
+     "kind": "835",
+     "name": "ERA_81671_ACMELABS_20260813022951.x12",
+     "expect": "parsed",
+     "payer_id": "81671",
+     "trns": [
+      "937655880000016"
+     ],
+     "totals": [
+      181.36
+     ]
+    },
+    {
+     "day": "2026-08-13",
+     "kind": "835",
+     "name": "ERA_HBNC1_ACMELABS_20260813052027.x12",
+     "expect": "parsed",
+     "payer_id": "HBNC1",
+     "trns": [
+      "858143660000033"
+     ],
+     "totals": [
+      285.81
+     ]
+    },
+    {
+     "day": "2026-08-13",
+     "kind": "835",
+     "name": "ERA_CCHPC_ACMELABS_20260813161033.x12",
+     "expect": "parsed",
+     "payer_id": "CCHPC",
+     "trns": [
+      "412763910000017"
+     ],
+     "totals": [
+      140.91
+     ]
+    },
+    {
+     "day": "2026-08-13",
+     "kind": "835",
+     "name": "ERA_41124_ACMELABS_20260813020758.x12",
+     "expect": "parsed",
+     "payer_id": "41124",
+     "trns": [
+      "3930000017"
+     ],
+     "totals": [
+      739.82
+     ]
+    },
+    {
+     "day": "2026-08-13",
+     "kind": "835",
+     "name": "ERA_DEV01_ACMELABS_20260813031053.x12",
+     "expect": "parsed",
+     "payer_id": "DEV01",
+     "trns": [
+      "678930920000014"
+     ],
+     "totals": [
+      358.99
+     ]
+    },
+    {
+     "day": "2026-08-13",
+     "kind": "835",
+     "name": "ERA_39026_ACMELABS_20260813161649.x12",
+     "expect": "parsed",
+     "payer_id": "39026",
+     "trns": [
+      "458818440000018"
+     ],
+     "totals": [
+      484.72
+     ]
+    },
+    {
+     "day": "2026-08-13",
+     "kind": "835",
+     "name": "ERA_92504_ACMELABS_20260813165055.x12",
+     "expect": "parsed",
+     "payer_id": "92504",
+     "trns": [
+      "2622000015"
+     ],
+     "totals": [
+      123.32
+     ]
+    },
+    {
+     "day": "2026-08-13",
+     "kind": "835",
+     "name": "ERA_61473_ACMELABS_20260813163300.x12",
+     "expect": "parsed",
+     "payer_id": "61473",
+     "trns": [
+      "031566070000044",
+      "031566070000045"
+     ],
+     "totals": [
+      959.74,
+      1446.11
+     ]
+    },
+    {
+     "day": "2026-08-13",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260813060421.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000082"
+     ],
+     "totals": [
+      958.68
+     ]
+    },
+    {
+     "day": "2026-08-13",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260813050410.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000095",
+      "957149190000096"
+     ],
+     "totals": [
+      -0.0,
+      187.85
+     ]
+    },
+    {
+     "day": "2026-08-13",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260813033813.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000078"
+     ],
+     "totals": [
+      513.84
+     ]
+    },
+    {
+     "day": "2026-08-13",
+     "kind": "835",
+     "name": "ERA_C1823_ACMELABS_20260813134446.x12",
+     "expect": "parsed",
+     "payer_id": "C1823",
+     "trns": [
+      "860654010000007"
+     ],
+     "totals": [
+      3.19
+     ]
+    },
+    {
+     "day": "2026-08-13",
+     "kind": "835",
+     "name": "ERA_67952_ACMELABS_20260813044817.x12",
+     "expect": "parsed",
+     "payer_id": "67952",
+     "trns": [
+      "8818000002"
+     ],
+     "totals": [
+      0.0
+     ]
+    },
+    {
+     "day": "2026-08-13",
+     "kind": "835",
+     "name": "ERA_N7737_ACMELABS_20260813021839.x12",
+     "expect": "parsed",
+     "payer_id": "N7737",
+     "trns": [
+      "181216230000010"
+     ],
+     "totals": [
+      -0.0
+     ]
+    },
+    {
+     "day": "2026-08-13",
+     "kind": "835",
+     "name": "ERA_FEPNC_ACMELABS_20260813024247.x12",
+     "expect": "parsed",
+     "payer_id": "FEPNC",
+     "trns": [
+      "429807470000032"
+     ],
+     "totals": [
+      99.62
+     ]
+    },
+    {
+     "day": "2026-08-13",
+     "kind": "835",
+     "name": "ERA_OSCAR_ACMELABS_20260813025827.x12",
+     "expect": "parsed",
+     "payer_id": "OSCAR",
+     "trns": [
+      "619261980000024"
+     ],
+     "totals": [
+      6.07
+     ]
+    },
+    {
+     "day": "2026-08-14",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260814091825.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-14",
+     "kind": "837",
+     "name": "ACMELABS_837P_20260814170447.x12",
+     "expect": "parsed"
+    },
+    {
+     "day": "2026-08-14",
+     "kind": "835",
+     "name": "ERA_62308_ACMELABS_20260814012846.x12",
+     "expect": "parsed",
+     "payer_id": "62308",
+     "trns": [
+      "716093220000035"
+     ],
+     "totals": [
+      405.88
+     ]
+    },
+    {
+     "day": "2026-08-14",
+     "kind": "835",
+     "name": "ERA_60054_ACMELABS_20260814054116.x12",
+     "expect": "parsed",
+     "payer_id": "60054",
+     "trns": [
+      "943466010000052"
+     ],
+     "totals": [
+      304.73
+     ]
+    },
+    {
+     "day": "2026-08-14",
+     "kind": "835",
+     "name": "ERA_87726_ACMELABS_20260814045833.x12",
+     "expect": "parsed",
+     "payer_id": "87726",
+     "trns": [
+      "957149190000097"
+     ],
+     "totals": [
+      935.19
+     ]
+    },
+    {
+     "day": "2026-08-14",
+     "kind": "835",
+     "name": "ERA_11502_ACMELABS_20260814055959.x12",
+     "expect": "parsed",
+     "payer_id": "11502",
+     "trns": [
+      "872121820000083"
+     ],
+     "totals": [
+      4437.96
+     ]
+    },
+    {
+     "day": "2026-08-14",
+     "kind": "835",
+     "name": "ERA_CLOVR_ACMELABS_20260814025827.x12",
+     "expect": "parsed",
+     "payer_id": "CLOVR",
+     "trns": [
+      "868646510000016"
+     ],
+     "totals": [
+      183.73
+     ]
+    },
+    {
+     "day": "2026-08-14",
+     "kind": "835",
+     "name": "ERA_68068_ACMELABS_20260814043858.x12",
+     "expect": "parsed",
+     "payer_id": "68068",
+     "trns": [
+      "755688630000014"
+     ],
+     "totals": [
+      92.72
+     ]
+    },
+    {
+     "day": "2026-08-14",
+     "kind": "835",
+     "name": "ERA_87727_ACMELABS_20260814032741.x12",
+     "expect": "parsed",
+     "payer_id": "87727",
+     "trns": [
+      "007138800000079"
+     ],
+     "totals": [
+      59.29
+     ]
+    },
+    {
+     "day": "2026-08-14",
+     "kind": "835",
+     "name": "ERA_60055_ACMELABS_20260814040845.x12",
+     "expect": "parsed",
+     "payer_id": "60055",
+     "trns": [
+      "579786940000047"
+     ],
+     "totals": [
+      74.33
+     ]
+    }
+   ],
+   "file_days": [
+    "2026-07-01",
+    "2026-07-02",
+    "2026-07-06",
+    "2026-07-07",
+    "2026-07-08",
+    "2026-07-09",
+    "2026-07-10",
+    "2026-07-13",
+    "2026-07-14",
+    "2026-07-15",
+    "2026-07-16",
+    "2026-07-17",
+    "2026-07-20",
+    "2026-07-21",
+    "2026-07-22",
+    "2026-07-23",
+    "2026-07-24",
+    "2026-07-27",
+    "2026-07-28",
+    "2026-07-29",
+    "2026-07-30",
+    "2026-07-31",
+    "2026-08-03",
+    "2026-08-04",
+    "2026-08-05",
+    "2026-08-06",
+    "2026-08-07",
+    "2026-08-10",
+    "2026-08-11",
+    "2026-08-12",
+    "2026-08-13",
+    "2026-08-14"
+   ],
+   "plb": [
+    {
+     "day": "2026-07-01",
+     "payment_date": "2026-07-02",
+     "payer_id": "NCMCD",
+     "trn": "940783830000010",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.04,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-01",
+     "payment_date": "2026-07-06",
+     "payer_id": "60054",
+     "trn": "943466010000034",
+     "code": "WO",
+     "reference": "L85239727156",
+     "amount": -2616.8,
+     "target_pcn": "LB260529003057"
+    },
+    {
+     "day": "2026-07-02",
+     "payment_date": "2026-07-06",
+     "payer_id": "81671",
+     "trn": "937655880000010",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.11,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-02",
+     "payment_date": "2026-07-06",
+     "payer_id": "61473",
+     "trn": "031566070000029",
+     "code": "WO",
+     "reference": "643710269408413",
+     "amount": -14.22,
+     "target_pcn": "LB260519002491"
+    },
+    {
+     "day": "2026-07-02",
+     "payment_date": "2026-07-06",
+     "payer_id": "N7737",
+     "trn": "181216230000006",
+     "code": "WO",
+     "reference": "LB260403000118",
+     "amount": 292.89,
+     "target_pcn": "LB260403000118"
+    },
+    {
+     "day": "2026-07-02",
+     "payment_date": "2026-07-06",
+     "payer_id": "N7737",
+     "trn": "181216230000006",
+     "code": "72",
+     "reference": "LB260403000118",
+     "amount": -292.89,
+     "target_pcn": "LB260403000118"
+    },
+    {
+     "day": "2026-07-06",
+     "payment_date": "2026-07-07",
+     "payer_id": "61473",
+     "trn": "031566070000031",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.13,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-06",
+     "payment_date": "2026-07-06",
+     "payer_id": "11502",
+     "trn": "872121820000054",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.03,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-07",
+     "payment_date": "2026-07-08",
+     "payer_id": "62308",
+     "trn": "716093220000024",
+     "code": "WO",
+     "reference": "9622323956025 LB260427001255",
+     "amount": 66.12,
+     "target_pcn": "LB260427001255"
+    },
+    {
+     "day": "2026-07-07",
+     "payment_date": "2026-07-08",
+     "payer_id": "62308",
+     "trn": "716093220000024",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.34,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-07",
+     "payment_date": "2026-07-08",
+     "payer_id": "68069",
+     "trn": "894465420000011",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.4,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-08",
+     "payment_date": "2026-07-10",
+     "payer_id": "61101",
+     "trn": "790828550000012",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.33,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-08",
+     "payment_date": "2026-07-09",
+     "payer_id": "UHCNC",
+     "trn": "745701630000012",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.07,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-08",
+     "payment_date": "2026-07-09",
+     "payer_id": "NCMCD",
+     "trn": "940783830000011",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.17,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-08",
+     "payment_date": "2026-07-10",
+     "payer_id": "60054",
+     "trn": "943466010000036",
+     "code": "WO",
+     "reference": "L85239727156",
+     "amount": 2616.8,
+     "target_pcn": "LB260529003057"
+    },
+    {
+     "day": "2026-07-08",
+     "payment_date": "2026-07-09",
+     "payer_id": "60055",
+     "trn": "579786940000032",
+     "code": "WO",
+     "reference": "D76539726353",
+     "amount": 23.85,
+     "target_pcn": "LB260417000805"
+    },
+    {
+     "day": "2026-07-08",
+     "payment_date": "2026-07-09",
+     "payer_id": "60055",
+     "trn": "579786940000032",
+     "code": "72",
+     "reference": "D76539726353",
+     "amount": -23.85,
+     "target_pcn": "LB260417000805"
+    },
+    {
+     "day": "2026-07-09",
+     "payment_date": "2026-07-10",
+     "payer_id": "61473",
+     "trn": "031566070000032",
+     "code": "WO",
+     "reference": "643710269408413",
+     "amount": 14.22,
+     "target_pcn": "LB260519002491"
+    },
+    {
+     "day": "2026-07-09",
+     "payment_date": "2026-07-10",
+     "payer_id": "61473",
+     "trn": "031566070000032",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.02,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-10",
+     "payment_date": "2026-07-13",
+     "payer_id": "53347",
+     "trn": "5528000001",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.79,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-13",
+     "payment_date": "2026-07-14",
+     "payer_id": "HBNC1",
+     "trn": "858143660000024",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.04,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-13",
+     "payment_date": "2026-07-14",
+     "payer_id": "87727",
+     "trn": "007138800000056",
+     "code": "WO",
+     "reference": "UC89074925",
+     "amount": 28.48,
+     "target_pcn": "LB260406000223"
+    },
+    {
+     "day": "2026-07-13",
+     "payment_date": "2026-07-14",
+     "payer_id": "FEPNC",
+     "trn": "429807470000025",
+     "code": "WO",
+     "reference": "173198901739379",
+     "amount": 1.51,
+     "target_pcn": "LB260504001647"
+    },
+    {
+     "day": "2026-07-13",
+     "payment_date": "2026-07-14",
+     "payer_id": "FEPNC",
+     "trn": "429807470000025",
+     "code": "WO",
+     "reference": "610561819046403",
+     "amount": 194.26,
+     "target_pcn": "LB260413000543"
+    },
+    {
+     "day": "2026-07-13",
+     "payment_date": "2026-07-14",
+     "payer_id": "FEPNC",
+     "trn": "429807470000025",
+     "code": "WO",
+     "reference": "294267782996342",
+     "amount": 30.63,
+     "target_pcn": "LB260507001890"
+    },
+    {
+     "day": "2026-07-14",
+     "payment_date": "2026-07-15",
+     "payer_id": "63092",
+     "trn": "296953120000018",
+     "code": "WO",
+     "reference": "7465947091267 LB260422001078",
+     "amount": 85.25,
+     "target_pcn": "LB260422001078"
+    },
+    {
+     "day": "2026-07-14",
+     "payment_date": "2026-07-15",
+     "payer_id": "68069",
+     "trn": "894465420000012",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.16,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-15",
+     "payment_date": "2026-07-16",
+     "payer_id": "NCMCD",
+     "trn": "940783830000012",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.07,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-16",
+     "payment_date": "2026-07-17",
+     "payer_id": "39026",
+     "trn": "458818440000014",
+     "code": "WO",
+     "reference": "37071076835",
+     "amount": 2.67,
+     "target_pcn": "LB260507001901"
+    },
+    {
+     "day": "2026-07-16",
+     "payment_date": "2026-07-17",
+     "payer_id": "39026",
+     "trn": "458818440000014",
+     "code": "WO",
+     "reference": "56985951520",
+     "amount": 35.1,
+     "target_pcn": "LB260406000201"
+    },
+    {
+     "day": "2026-07-16",
+     "payment_date": "2026-07-17",
+     "payer_id": "39026",
+     "trn": "458818440000014",
+     "code": "WO",
+     "reference": "94781638697",
+     "amount": 142.57,
+     "target_pcn": "LB260501001608"
+    },
+    {
+     "day": "2026-07-16",
+     "payment_date": "2026-07-17",
+     "payer_id": "FEPNC",
+     "trn": "429807470000026",
+     "code": "WO",
+     "reference": "610561819046403",
+     "amount": 194.26,
+     "target_pcn": "LB260413000543"
+    },
+    {
+     "day": "2026-07-16",
+     "payment_date": "2026-07-17",
+     "payer_id": "FEPNC",
+     "trn": "429807470000026",
+     "code": "WO",
+     "reference": "307939347652722",
+     "amount": 4.94,
+     "target_pcn": "LB260428001372"
+    },
+    {
+     "day": "2026-07-17",
+     "payment_date": "2026-07-20",
+     "payer_id": "83311",
+     "trn": "941292380000001",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.88,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-20",
+     "payment_date": "2026-07-21",
+     "payer_id": "61473",
+     "trn": "031566070000035",
+     "code": "WO",
+     "reference": "049187549032731",
+     "amount": -48.01,
+     "target_pcn": "LB260529003003"
+    },
+    {
+     "day": "2026-07-20",
+     "payment_date": "2026-07-21",
+     "payer_id": "87727",
+     "trn": "007138800000060",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.48,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-20",
+     "payment_date": "2026-07-21",
+     "payer_id": "HBNC1",
+     "trn": "858143660000026",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.01,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-20",
+     "payment_date": "2026-07-20",
+     "payer_id": "11502",
+     "trn": "872121820000064",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.15,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-21",
+     "payment_date": "2026-07-22",
+     "payer_id": "87726",
+     "trn": "957149190000077",
+     "code": "WO",
+     "reference": "20260525LB260527002884",
+     "amount": 34.09,
+     "target_pcn": "LB260527002884"
+    },
+    {
+     "day": "2026-07-22",
+     "payment_date": "2026-07-23",
+     "payer_id": "VACCN",
+     "trn": "790227000000010",
+     "code": "FB",
+     "reference": "790227000000010",
+     "amount": -2.38,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-22",
+     "payment_date": "2026-07-23",
+     "payer_id": "NCMCD",
+     "trn": "940783830000013",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.13,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-23",
+     "payment_date": "2026-07-24",
+     "payer_id": "92504",
+     "trn": "2622000012",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.07,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-27",
+     "payment_date": "2026-07-28",
+     "payer_id": "61473",
+     "trn": "031566070000037",
+     "code": "WO",
+     "reference": "049187549032731",
+     "amount": 48.01,
+     "target_pcn": "LB260529003003"
+    },
+    {
+     "day": "2026-07-27",
+     "payment_date": "2026-07-28",
+     "payer_id": "61473",
+     "trn": "031566070000037",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.11,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-27",
+     "payment_date": "2026-07-28",
+     "payer_id": "87726",
+     "trn": "957149190000081",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.15,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-27",
+     "payment_date": "2026-07-28",
+     "payer_id": "HBNC1",
+     "trn": "858143660000028",
+     "code": "WO",
+     "reference": "7596827865",
+     "amount": 140.04,
+     "target_pcn": "LB260526002837"
+    },
+    {
+     "day": "2026-07-27",
+     "payment_date": "2026-07-28",
+     "payer_id": "HBNC1",
+     "trn": "858143660000028",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.33,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-27",
+     "payment_date": "2026-07-27",
+     "payer_id": "11502",
+     "trn": "872121820000069",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.01,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-28",
+     "payment_date": "2026-07-29",
+     "payer_id": "68069",
+     "trn": "894465420000014",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.51,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-28",
+     "payment_date": "2026-07-28",
+     "payer_id": "11502",
+     "trn": "872121820000070",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.04,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-28",
+     "payment_date": "2026-07-29",
+     "payer_id": "L5643",
+     "trn": "479602190000004",
+     "code": "J1",
+     "reference": null,
+     "amount": 0.21,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-29",
+     "payment_date": "2026-07-30",
+     "payer_id": "VACCN",
+     "trn": "790227000000011",
+     "code": "FB",
+     "reference": "790227000000010",
+     "amount": 2.38,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-30",
+     "payment_date": "2026-07-31",
+     "payer_id": "OSCAR",
+     "trn": "619261980000021",
+     "code": "IR",
+     "reference": null,
+     "amount": 107.25,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-07-30",
+     "payment_date": "2026-07-31",
+     "payer_id": "39026",
+     "trn": "458818440000016",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.03,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-08-04",
+     "payment_date": "2026-08-05",
+     "payer_id": "76314",
+     "trn": "5567000007",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.29,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-08-05",
+     "payment_date": "2026-08-06",
+     "payer_id": "UHCNC",
+     "trn": "745701630000016",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.12,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-08-06",
+     "payment_date": "2026-08-07",
+     "payer_id": "A4855",
+     "trn": "1478000010",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.2,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-08-06",
+     "payment_date": "2026-08-07",
+     "payer_id": "92504",
+     "trn": "2622000014",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.06,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-08-06",
+     "payment_date": "2026-08-07",
+     "payer_id": "N7737",
+     "trn": "181216230000009",
+     "code": "WO",
+     "reference": "LB260403000118",
+     "amount": 197.59,
+     "target_pcn": "LB260403000118"
+    },
+    {
+     "day": "2026-08-06",
+     "payment_date": "2026-08-07",
+     "payer_id": "N7737",
+     "trn": "181216230000009",
+     "code": "FB",
+     "reference": "181216230000009",
+     "amount": -197.59,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-08-06",
+     "payment_date": "2026-08-07",
+     "payer_id": "41124",
+     "trn": "3930000016",
+     "code": "WO",
+     "reference": "LB260520002596",
+     "amount": 127.78,
+     "target_pcn": "LB260520002596"
+    },
+    {
+     "day": "2026-08-06",
+     "payment_date": "2026-08-07",
+     "payer_id": "41124",
+     "trn": "3930000016",
+     "code": "FB",
+     "reference": "3930000016",
+     "amount": -107.88,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-08-07",
+     "payment_date": "2026-08-10",
+     "payer_id": "53347",
+     "trn": "5528000002",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.55,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-08-10",
+     "payment_date": "2026-08-11",
+     "payer_id": "61473",
+     "trn": "031566070000043",
+     "code": "WO",
+     "reference": "755989583129425",
+     "amount": 75.54,
+     "target_pcn": "LB260629004447"
+    },
+    {
+     "day": "2026-08-11",
+     "payment_date": "2026-08-12",
+     "payer_id": "L7799",
+     "trn": "055110580000007",
+     "code": "WO",
+     "reference": "3150085700R LB260402000060",
+     "amount": 377.84,
+     "target_pcn": "LB260402000060"
+    },
+    {
+     "day": "2026-08-11",
+     "payment_date": "2026-08-12",
+     "payer_id": "L7799",
+     "trn": "055110580000007",
+     "code": "L6",
+     "reference": null,
+     "amount": -0.09,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-08-13",
+     "payment_date": "2026-08-14",
+     "payer_id": "41124",
+     "trn": "3930000017",
+     "code": "FB",
+     "reference": "3930000016",
+     "amount": 107.88,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-08-13",
+     "payment_date": "2026-08-14",
+     "payer_id": "87726",
+     "trn": "957149190000095",
+     "code": "WO",
+     "reference": "20260606LB260608003406",
+     "amount": 124.76,
+     "target_pcn": "LB260608003406"
+    },
+    {
+     "day": "2026-08-13",
+     "payment_date": "2026-08-14",
+     "payer_id": "87726",
+     "trn": "957149190000095",
+     "code": "FB",
+     "reference": "957149190000095",
+     "amount": -16.38,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-08-13",
+     "payment_date": "2026-08-14",
+     "payer_id": "87726",
+     "trn": "957149190000096",
+     "code": "FB",
+     "reference": "957149190000095",
+     "amount": 16.38,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-08-13",
+     "payment_date": "2026-08-14",
+     "payer_id": "N7737",
+     "trn": "181216230000010",
+     "code": "FB",
+     "reference": "181216230000009",
+     "amount": 197.59,
+     "target_pcn": null
+    },
+    {
+     "day": "2026-08-13",
+     "payment_date": "2026-08-14",
+     "payer_id": "N7737",
+     "trn": "181216230000010",
+     "code": "FB",
+     "reference": "181216230000010",
+     "amount": -176.29,
+     "target_pcn": null
+    }
+   ],
+   "claims_file": "truth/acme_labs/claims.jsonl",
+   "n_claims": 3448,
+   "claims_per_day": 72.0,
+   "raw_bytes": 3931525
+  }
+ },
+ "customer": "acme_labs"
+}
