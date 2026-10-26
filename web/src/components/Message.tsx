@@ -13,6 +13,8 @@ import { StepTimeline } from './answer/StepTimeline';
 import { queriesOf, queryForTable, SqlInspector, SqlWithheldNote, TableSql } from './answer/SqlInspector';
 import { AbstainCard, ClarifyCard, EscalationNote, StoppedNote, TableSkeleton } from './answer/States';
 import { ClarifyForm, isMultiClarification } from './answer/ClarifyForm';
+import { FollowUps, isFollowUps } from './answer/FollowUps';
+import { ChangeResponse } from './answer/ChangeResponse';
 import { AnswerMeta } from './answer/AnswerMeta';
 import { SourcesChip, consulted } from './answer/Sources';
 import { escalationsOf, partsOf, stepsOf, usageOf, type AnyView } from './answer/normalize';
@@ -218,6 +220,7 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [sqlOpen, setSqlOpen] = useState(false);
+  const [changing, setChanging] = useState(false);
   const open = (part: Artifact['part'], title?: string, version?: number) => onOpen({ part, title: title ?? ((('title' in part && part.title) || (part.type === 'image' ? part.alt : 'Artifact')) as string), version, related: parts as typeof msg.parts });
 
   // All steps (v1 step.* events and legacy tool_call parts) render as one live timeline (Claude/ChatGPT).
@@ -256,6 +259,7 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
     if (p.type !== 'reasoning' && p.type !== 'status') placeTimeline();
     if (p.type === 'reasoning' && timeline) continue; // shown inside the timeline
     if (p.type === 'code' && p.role === 'query' && linkedSql.has(p.id)) continue; // shown under its table
+    if (isFollowUps(p as { type: string })) continue; // rendered once, under the action row
     if (p.type === 'abstain') { blocks.push(<AbstainCard key={p.id} part={p} onReply={readOnly ? undefined : reply} />); continue; }
     if (p.type === 'clarification') { const C = isMultiClarification(p) ? ClarifyForm : ClarifyCard; blocks.push(<C key={p.id} part={p as never} onReply={readOnly ? undefined : reply} active={!readOnly && isLast && !msg.streaming} />); continue; }
     blocks.push(<PartView key={p.id} part={p as Part} msg={msg} liveTurn={liveTurn} open={open} openArtifact={onOpen} onRetry={readOnly ? undefined : onRegenerate} onEdit={readOnly ? undefined : onEdit} />);
@@ -307,12 +311,15 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
           {feedbackSent && <span className="ml-2 font-sans text-xs text-fg-subtle">Thanks for the feedback</span>}
         </div>
       )}
+      {changing && isLast && !readOnly && !msg.streaming && onSend && <ChangeResponse onSubmit={onSend} onClose={(cancelled) => { setChanging(false); if (cancelled) rootRef.current?.querySelector<HTMLElement>('[data-testid="regenerate-menu-button"]')?.focus(); }} />}
+      {isLast && !readOnly && !msg.streaming && onSend && (() => { const f = (parts as { type: string }[]).find(isFollowUps); return f ? <FollowUps part={f} onSend={onSend} /> : null; })()}
       {regen.anchor && onRefine && (
         <Menu anchor={regen.anchor} onClose={regen.close} label="Regenerate" items={[
           { label: 'Try again', icon: <RefreshCw size={15} />, onSelect: onRegenerate },
           'sep',
           { label: 'More concise', icon: <Minimize2 size={15} />, onSelect: () => onRefine('concise') },
           { label: 'More detailed', icon: <Plus size={15} />, onSelect: () => onRefine('detailed') },
+          ...(onSend ? ['sep', { label: 'Ask to change response…', icon: <Pencil size={15} />, onSelect: () => setChanging(true) }] as MenuItem[] : []),
         ]} />
       )}
       {more.anchor && (
