@@ -40,6 +40,9 @@ EDGE: dict[str, tuple[str, str, str]] = {
     "clarify_nested_2": ("", "clarify_nested", "needs_input"),
     "clarify_nested_3": ("", "clarify_nested", "stop"),
     "escalation_abstain": ("How many appeals did we win?", "escalation_abstain", "abstain"),
+    # 1.23.0 (§6.1): one multi-question form, then the answer after resume.answers
+    "clarify_multi": ("Denial rate breakdown please", "clarify_multi", "needs_input"),
+    "clarify_multi_2": ("", "clarify_multi", "stop"),
     "cancel_plan": ("Paid amount by payer", "cancel_plan", "aborted"),
     "cancel_sql": ("Paid amount by payer", "cancel_sql", "aborted"),
     "cancel_repair": ("Top denial reason codes", "cancel_repair", "aborted"),
@@ -50,6 +53,9 @@ EDGE: dict[str, tuple[str, str, str]] = {
 EDGE_DIR = EXAMPLES / "edge"
 #: the choice picked at each nested clarification (by label)
 NESTED_PICKS = ("By billed dollars", "Last 90 days")
+#: 1.23.0: the answers sent for the multi-question example (a pick, a pick, a skip)
+MULTI_ANSWERS = [{"questionId": "metric", "choiceIds": ["dollars"]}, {"questionId": "period", "choiceIds": ["last_90"]},
+                 {"questionId": "group", "skipped": True}]
 
 #: extra example: the answer that follows picking the first clarify choice (message.start.resumeOf).
 RESUME = "clarify_resume"
@@ -139,7 +145,7 @@ def capture_edge(model_delay: float = 0.0) -> dict[str, list[dict]]:
     client = _client(model_delay)
     out: dict[str, list[dict]] = {}
     for name, (question, scenario, _finish) in EDGE.items():
-        if name.startswith("clarify_nested_"):
+        if name.startswith(("clarify_nested_", "clarify_multi_")):
             continue
         out[name] = _post(client, {"messages": [{"id": "u_1", "role": "user", "text": question}], "scenario": scenario})
     chain = [out["clarify_nested"]]
@@ -154,7 +160,14 @@ def capture_edge(model_delay: float = 0.0) -> dict[str, list[dict]]:
     n = 0
     for name, stream in zip(("clarify_nested", "clarify_nested_2", "clarify_nested_3"), chain):
         out[name], n = flat[n: n + len(stream)], n + len(stream)
-    return {k: (v if k.startswith("clarify_nested") else normalise(v)) for k, v in out.items()}
+    first = out["clarify_multi"]
+    clar = next(e["part"] for e in first if e["type"] == "part" and e["part"]["type"] == "clarification")
+    second = _post(client, {"messages": [{"id": "u_2", "role": "user", "text": "Metric: By billed dollars; Period: Last 90 days; Group by: By payer"}],
+                            "conversationId": first[0]["conversationId"],
+                            "resume": {"clarificationId": clar["clarificationId"], "answers": MULTI_ANSWERS}})
+    flat = normalise(first + second)
+    out["clarify_multi"], out["clarify_multi_2"] = flat[: len(first)], flat[len(first):]
+    return {k: (v if k.startswith(("clarify_nested", "clarify_multi")) else normalise(v)) for k, v in out.items()}
 
 
 def load_edge(name: str) -> list[dict]:
