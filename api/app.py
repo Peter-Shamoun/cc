@@ -78,14 +78,35 @@ class ChatRequest(BaseModel):
     scenario: str | None = Field(default=None, max_length=32)
 
 
+#: Demo pacing (QA-P1/P4). With the scripted LLM, answers are paced like a real model so the streaming UI
+#: is actually exercised: a pause per model call and per text chunk. CC_API_DEMO_PACE=0 turns it off (tests),
+#: and explicit CC_API_MODEL_DELAY_SECONDS / CC_API_STREAM_DELAY_SECONDS always win.
+DEMO_PACE_MODEL_SECONDS = 0.25
+DEMO_PACE_CHUNK_SECONDS = 0.02
+#: The "slow" scenario must stay stoppable: at least this long per model call while pacing is on.
+SLOW_FLOOR_SECONDS = 0.8
+
+
+def demo_pace_enabled() -> bool:
+    return os.environ.get("CC_API_DEMO_PACE", "1") != "0" and os.environ.get("CC_API_LLM", "scripted") == "scripted"
+
+
+def _paced(name: str, paced_default: float) -> float:
+    value = os.environ.get(name)
+    if value is not None:
+        return float(value)
+    return paced_default if demo_pace_enabled() else 0.0
+
+
 @dataclass
 class Settings:
     llm: str = os.environ.get("CC_API_LLM", "scripted")
     heartbeat_seconds: float = float(os.environ.get("CC_API_HEARTBEAT_SECONDS", "15"))
     resume_seconds: float = 60.0
-    stream_delay_seconds: float = float(os.environ.get("CC_API_STREAM_DELAY_SECONDS", "0"))
+    stream_delay_seconds: float = field(default_factory=lambda: _paced("CC_API_STREAM_DELAY_SECONDS", DEMO_PACE_CHUNK_SECONDS))
     #: simulated model latency per analyzer turn in demo mode (realistic streaming); tests use 0
-    model_delay_seconds: float = float(os.environ.get("CC_API_MODEL_DELAY_SECONDS", "0"))
+    model_delay_seconds: float = field(default_factory=lambda: _paced("CC_API_MODEL_DELAY_SECONDS", DEMO_PACE_MODEL_SECONDS))
+    demo_pace: bool = field(default_factory=demo_pace_enabled)
     clarification_ttl_seconds: float = 1800.0
     analyzer_overrides: dict = field(default_factory=lambda: {
         "glossary": "basic", "data_dictionary": False, "data_profile": False, "row_limit": 5000,
@@ -270,6 +291,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             finish = "stop"
             overrides = {**settings.analyzer_overrides, **SCENARIO_CONFIG.get(scenario or "", {})}
             delay = settings.model_delay_seconds * (4 if scenario == "slow" else 1)
+            if scenario == "slow" and settings.demo_pace:
+                delay = max(delay, SLOW_FLOOR_SECONDS)
             emit({"type": "message.start", "messageId": message_id, "conversationId": conversation_id,
                   "contractVersion": CONTRACT_VERSION, "model": settings.llm, "parentId": user_msg["id"],
                   "strategy": body.options.get("strategy", "tool_loop"), **start_extra})
