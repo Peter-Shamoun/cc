@@ -135,6 +135,13 @@ test.describe('answer edge cases', () => {
         // The action row must not show while the text is still flowing in (ChatGPT/Claude): -1 flags a violation.
         const row = [...document.querySelectorAll('[data-testid="msg-assistant"] [data-testid="msg-actions"]')].at(-1);
         if (n && n < full && row && getComputedStyle(row).visibility === 'visible') seen.push(-1);
+        // ChatGPT hands-on: no caret; the trailing lines fade instead (-2: no fade mask mid-reveal, -3: a caret dot is drawn).
+        if (n && n < full && md?.classList.contains('streaming-caret')) {
+          const last = md.querySelector(':scope > div > div:last-child');
+          if (!last || getComputedStyle(last).maskImage === 'none') seen.push(-2);
+          const p = last?.querySelector('p:last-child');
+          if (p && !['none', 'normal'].includes(getComputedStyle(p, '::after').content)) seen.push(-3);
+        }
         if (performance.now() - t0 < 2500) requestAnimationFrame(tick); else done(seen);
       };
       requestAnimationFrame(tick);
@@ -142,11 +149,15 @@ test.describe('answer edge cases', () => {
     await composer(page).press('Enter');
     const seen = await lengths;
     expect(seen, 'action row visible mid-reveal').not.toContain(-1);
+    expect(seen, 'trailing fade mask mid-reveal').not.toContain(-2);
+    expect(seen, 'no streaming caret dot').not.toContain(-3);
     await expect(lastAssistant(page).getByTestId('msg-actions')).toBeVisible();
     expect(seen.length).toBeGreaterThan(5);
-    expect([...seen].sort((a, b) => a - b)).toEqual(seen);
+    expect([...seen].sort((a, b) => a - b)).toEqual(seen); // also proves no negative violation markers
     expect(seen.at(-1)).toBe(para.length);
     await expect(lastAssistant(page).locator('.streaming-caret')).toHaveCount(0);
+    // Landed: uniform colour, no mask left on any block.
+    expect(await lastAssistant(page).getByTestId('markdown').last().evaluate((md) => [...md.querySelectorAll(':scope > div > div')].every((d) => getComputedStyle(d).maskImage === 'none'))).toBe(true);
   });
 
   test('streaming pacing respects reduced motion: the paragraph appears at once', async ({ page }) => {
