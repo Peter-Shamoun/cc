@@ -99,6 +99,12 @@ describe('crash fallback fidelity (QA-A23 treatment, no pills or boxed cards)', 
     expect(screen.getByRole('button', { name: 'Copy diagnostics' }).className).not.toMatch(/\b(rounded|border)/);
   });
 
+  it('its controls are screen-only (data-print-hide), the notice text still prints', () => {
+    render(<ErrorBoundary scope="section"><Boom /></ErrorBoundary>);
+    expect(screen.getByRole('button', { name: 'Try again' }).closest('[data-print-hide]')).toBeTruthy();
+    expect(screen.getByText(/couldn't be displayed/).closest('[data-print-hide]')).toBeNull();
+  });
+
   it('a caller-supplied fallbackClassName (panel-shaped) still wins over the inline default', () => {
     render(<ErrorBoundary scope="section" fallbackClassName="panel-x"><Boom /></ErrorBoundary>);
     expect(screen.getByTestId('section-crash').className).toBe('panel-x');

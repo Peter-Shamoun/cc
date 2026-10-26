@@ -73,7 +73,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <AlertTriangle size={15} aria-hidden className="mt-0.5 shrink-0 text-danger" />
             <span>{chunk ? "This part couldn't load. Check your connection." : "This part couldn't be displayed."}{rec && <span className="ml-1 text-xs text-fg-subtle">Ref {rec.id}</span>}</span>
           </p>
-          <p className="mt-1 flex items-center gap-3 pl-[23px] text-xs">
+          <p data-print-hide className="mt-1 flex items-center gap-3 pl-[23px] text-xs">
             <button type="button" onClick={this.reset} className={link}>Try again</button>
             {this.props.onDismiss && (
               <button type="button" onClick={this.props.onDismiss} className={link}>{this.props.dismissLabel ?? 'Close'}</button>

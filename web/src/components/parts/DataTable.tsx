@@ -257,7 +257,7 @@ const DataTableView = memo(function DataTableView({ part, onOpen, full }: DataTa
           {hasPhi && ' · PHI masked'}
         </span>
         {!full && onOpen && !withheld && part.rowCount > 8 && (
-          <button type="button" onClick={onOpen} className="underline underline-offset-2 hover:text-fg">Open full table</button>
+          <button type="button" data-print-hide onClick={onOpen} className="underline underline-offset-2 hover:text-fg">Open full table</button>
         )}
       </div>
     </div>

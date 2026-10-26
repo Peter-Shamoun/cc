@@ -109,7 +109,7 @@ export function Callout({ part, onEdit }: { part: CalloutPart; onEdit?: (text: s
             <li key={it.id}>
               <Inline text={it.text} />
               {it.editable && onEdit && (
-                <button type="button" onClick={() => onEdit('Instead, assume ')} className="ml-2 text-xs text-fg-muted underline underline-offset-2 hover:text-fg">Change</button>
+                <button type="button" data-print-hide onClick={() => onEdit('Instead, assume ')} className="ml-2 text-xs text-fg-muted underline underline-offset-2 hover:text-fg">Change</button>
               )}
             </li>
           ))}
@@ -190,7 +190,7 @@ export function ErrorView({ part, onRetry }: { part: ErrorPart; onRetry?: () => 
           <p className="mt-0.5 text-fg-muted">{part.message}</p>
         </div>
       </div>
-      <div className={clsx('flex items-center gap-3 pl-[23px] text-xs', ((part.retryable && onRetry) || part.details) && 'mt-2')}>
+      <div data-print-hide className={clsx('flex items-center gap-3 pl-[23px] text-xs', ((part.retryable && onRetry) || part.details) && 'mt-2')}>
         {part.retryable && onRetry && (
           <button type="button" onClick={onRetry} className="inline-flex items-center gap-1 rounded-md border border-line px-2.5 py-1 font-medium text-fg hover:bg-hover"><RotateCcw size={12} aria-hidden /> Retry</button>
         )}
