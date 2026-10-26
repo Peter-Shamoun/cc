@@ -72,10 +72,11 @@ export class HttpAnalystAdapter implements AnalystAdapter {
     await fetch(`${this.base}/api/chat/${encodeURIComponent(this.current)}/stop`, { method: 'POST', credentials: 'same-origin', headers: this.headers() }).catch(() => undefined);
   }
 
-  async *streamTurn({ conversationId, messages, signal, resume }: Parameters<AnalystAdapter['streamTurn']>[0]): AsyncIterable<AnyStreamEvent> {
+  async *streamTurn({ conversationId, messages, signal, resume, regenerate }: Parameters<AnalystAdapter['streamTurn']>[0]): AsyncIterable<AnyStreamEvent> {
     // The server takes user turns only; prior assistant prose is reconstructed server-side.
-    const users = messages.filter((m) => m.role === 'user').map(({ id, role, text }) => ({ id, role, text }));
-    let body = JSON.stringify({ conversationId, messages: users, ...(resume ? { resume } : {}) });
+    const users = messages.filter((m) => m.role === 'user').map(({ id, role, text, parentId }) => ({ id, role, text, ...(parentId ? { parentId } : {}) }));
+    let body = JSON.stringify({ conversationId, messages: users, ...(resume ? { resume } : {}), ...(regenerate ? { regenerate } : {}) });
+    let regenerateFallback = !!regenerate;
     // `signal` is the user's Stop. We keep reading after it fires so the server's
     // `message.end {finishReason: 'aborted', usage}` still arrives (CONTRACT.md §8: within 1 s);
     // the socket itself is only dropped after STOP_GRACE_MS.
@@ -119,6 +120,12 @@ export class HttpAnalystAdapter implements AnalystAdapter {
         // §6.4: an expired/answered clarification is 409; send the reply as a fresh question instead.
         if (res.status === 409 && resumeFallback && messageId === null) {
           resumeFallback = false;
+          body = JSON.stringify({ conversationId, messages: users });
+          continue;
+        }
+        // The server no longer has the answer to regenerate (ephemeral history, other branch): ask again.
+        if (res.status === 404 && regenerateFallback && messageId === null) {
+          regenerateFallback = false;
           body = JSON.stringify({ conversationId, messages: users });
           continue;
         }
