@@ -1,8 +1,8 @@
-# CC chat contract — review summary for Claude (v1.0 → v1.22.0)
+# CC chat contract — review summary for Claude (v1.0 → v1.23.0)
 
 One page. Sources: `api/CONTRACT.md` (spec and changelog), `api/contract/v1.schema.json` (machine truth),
 `docs/frontend-contract-migration.md` (per-version migration), `docs/frontend-analyzer-adapter.md` (real analyzer).
-State on 2026-10-25: **1.22.0**, all changes additive except 1.22's removal of sharing, demo mode only (ScriptedLLM), **no paid API calls**.
+State on 2026-10-26: **1.23.0**, all changes additive except 1.22's removal of sharing, demo mode only (ScriptedLLM), **no paid API calls**.
 
 ## What the contract is
 An SSE stream (`POST /api/chat`) of `message.start` → `step.*` / `part` / `table.*` / `artifact` → `message.end`, with
@@ -10,7 +10,7 @@ An SSE stream (`POST /api/chat`) of `message.start` → `step.*` / `part` / `tab
 plus REST for conversations, capabilities, feedback and export (sharing was removed in 1.22). TS types are generated from the schema
 (`gen_ts --check` is a drift gate); every example stream is conformance-checked.
 
-## v1.0 → v1.22 at a glance
+## v1.0 → v1.23 at a glance
 | Ver | Theme | Ver | Theme |
 |---|---|---|---|
 | 1.0 | versioned stream, steps, abstain/clarify/escalation | 1.8 | citations (`sources`), export |
@@ -29,6 +29,7 @@ plus REST for conversations, capabilities, feedback and export (sharing was remo
 | | | 1.20.1 | Stop interrupts the running SQL (API-side cursor interrupt; analyzer unchanged) |
 | | | 1.21 | BACKEND-FIT: no request can choose customer/database/schema/tables (`IdentityScopedKey`, 422); demo identity mirrors id token + manifest |
 | | | 1.22 | **sharing removed** (Peter, 2026-10-26): share routes, schemas and `shareExpiry` gone; any share path is the standard 404 |
+| | | 1.23 | **multi-question clarification** (Claude-style): 1–4 questions, 12-char headers, 2–4 described options, multiSelect, Other, Skip; `resume.answers`; demo `clarify_multi`. Live needs the analyzer `ask` spec to carry `questions` (BACKEND-FIT) |
 
 ## Open decisions that need your sign-off
 1. **Shown-SQL masking default.** Proposed `phi` (mask literals compared with PHI-like columns or that look like

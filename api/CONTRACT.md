@@ -1,6 +1,6 @@
 # CC chat API — stream contract
 
-**Version: 1.22.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.23.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -255,6 +255,33 @@ A chart streams like a table (§5.1): `chart.start {partId, plot: PlotHeader, al
 4. Unknown/expired/already-answered `clarificationId` → HTTP 409 `{"error": {"code": "clarification_expired"}}`;
    the UI then just sends the text as a fresh question.
 
+### 6.1 Multi-question clarification (1.23.0)
+
+Modelled on Claude's ask-the-user form. A `clarification` part may carry `questions` (1–4 `ClarifyQuestion`s) that the
+user answers together in one form:
+
+* `ClarifyQuestion {id, header, question, options, multiSelect?}`: `header` is a chip label of **12 characters or
+  fewer**; `question` ≤ 500; `options` are **2–4** `{id, label ≤ 60, description ≤ 200}`, every description required.
+  `multiSelect` lets the user pick several.
+* Every question also offers **Other** (free text, ≤ 500, collapsed to one line) and **Skip**. The UI adds these; they
+  are not options in the list.
+* With `questions`, the part's `question` is the lead-in (default "A few quick questions first:"), and `choices`
+  mirrors question 1 (plus `multiSelect` when Q1 has it), so a pre-1.23 client still shows a usable single question.
+* **Reply:** `resume: {clarificationId, answers: ClarifyAnswer[]}` with `ClarifyAnswer {questionId, choiceIds?
+  (unique, offered ids), otherText?, skipped?}`. A question with no answer counts as skipped; `answers: []` skips them
+  all. Single-select questions take one value (a choice **or** Other).
+* **Validation → 422 `validation`** with a user-safe message, and the clarification **stays pending** so the user can fix
+  it: too many answers; an unknown or repeated `questionId`; a skipped answer with values; an empty non-skipped answer;
+  an unoffered or repeated choice; more than one value on a single-select question; `answers` on a part without
+  `questions`.
+* **Legacy resume** (`choiceIds`/`text` without `answers`) on a multi-question part answers question 1; the rest count
+  as skipped.
+* The analyzer receives one line, `Clarification: Header: value[, value]; Header: no preference` (`api/clarify.py`
+  `summary`, mirrored by `web/src/contract/clarify.ts` `clarifySummary`; both run `api/contract/clarify_cases.json`).
+  Use the same line as the user turn's visible `text` so the transcript matches.
+* **Live mode:** the analyzer's `ask` tool spec carries one `question` only, so live runs still send single questions
+  until the analyzer side adds `questions` (BACKEND-FIT). The demo scenario `clarify_multi` shows the full shape.
+
 ## 7. Usage, cost and latency (`message.end.usage`)
 
 `queries`, `elapsedMs` (required); `tokens? {input, output, cacheRead?, cacheWrite?}`; `costUsd?` with
@@ -381,6 +408,7 @@ Request-only (`ChatRequest.scenario`; no keywords), so e2e tests can pin them. E
 | `multi_table` | stop | **Two tables** in one answer ("By payer", "By claim status"), each with its own SQL `code` part via `sqlPartId`, and a chart per table (`tablePartId`). The second query also streams as steps. |
 | `long_sql` | stop | A ~4.4 KB, 100+ line query (7 CTEs) in `step.sql_running.sql` and the `code` part. Test wrap/scroll/copy/collapse. |
 | `many_repairs` | stop | Four failing queries, each followed by `step.repair_attempt` and a rerun (attempts 2–5), then the answer. |
+| `clarify_multi` | needs_input → stop | 1.23.0 (§6.1): one form with three questions (Metric, Period, Group by — the last multi-select), answered together with `resume.answers`, then the answer (`edge/clarify_multi{,_2}.jsonl`; the example picks dollars and last 90 days and skips Group by). Keyword: "denial rate breakdown" or "ask me a few questions". |
 | `clarify_nested` | needs_input → needs_input → stop | Asks (count vs dollars); after the resume it asks **again** (time window); after the second resume it answers. `resumeOf` chains each message to the one before (`edge/clarify_nested{,_2,_3}.jsonl`). |
 | `escalation_abstain` | abstain | The small model gives up → `escalation` → the larger model also abstains (`abstain` part with suggestions; two models in usage). A refusal itself never escalates. |
 | `cancel_plan` | aborted | Stop while planning, before any SQL. |
@@ -678,6 +706,11 @@ older references still resolve.
 
 ## Changelog
 
+* **1.23.0** (2026-10-26) — **Multi-question clarification** (§6.1), additive. New `$defs` `ClarifyQuestion`,
+  `ClarifyOption`, `ClarifyAnswer`; `ClarificationPart.questions?` (1–4); `ChatRequest.resume.answers?` (≤ 4); demo
+  scenario `clarify_multi` (`edge/clarify_multi{,_2}.jsonl`). Invalid answers → 422 `validation`, still pending. Shared
+  cases `api/contract/clarify_cases.json` (Python + TS); helpers `api/clarify.py`, `web/src/contract/clarify.ts`.
+  Older clients: `choices` mirrors question 1 and a legacy resume answers it.
 * **1.22.0** (2026-10-26) — **Sharing removed** (§17). The routes `GET`/`PUT`/`DELETE /api/conversations/{id}/share`
   and `GET /api/shared/{shareId}` are gone (they are now standard 404 envelopes, like every `/api/share*` path), along
   with the in-memory share registry, expiry and rotation, and the share audit events. These schemas are removed:

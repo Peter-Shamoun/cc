@@ -1,0 +1,638 @@
+{
+ "about": "Shared cases for multi-question clarification (1.23.0, CONTRACT.md §6.1). Run by api/tests/test_clarify_multi_123.py and web/src/contract/clarify.test.ts. `summary` is the exact text after `Clarification:`; `error` null means valid.",
+ "questions": [
+  {
+   "id": "metric",
+   "header": "Metric",
+   "question": "How should the denial rate be measured?",
+   "options": [
+    {
+     "id": "count",
+     "label": "By claim count",
+     "description": "Share of claims that were fully denied"
+    },
+    {
+     "id": "dollars",
+     "label": "By billed dollars",
+     "description": "Share of charges on denied claims"
+    }
+   ]
+  },
+  {
+   "id": "period",
+   "header": "Period",
+   "question": "Which time window?",
+   "options": [
+    {
+     "id": "last_90",
+     "label": "Last 90 days",
+     "description": "Service dates in the last 90 days of data"
+    },
+    {
+     "id": "last_12m",
+     "label": "Last 12 months",
+     "description": "Service dates in the last 12 months of data"
+    },
+    {
+     "id": "all",
+     "label": "All time",
+     "description": "Every service date in the data"
+    }
+   ]
+  },
+  {
+   "id": "group",
+   "header": "Group by",
+   "question": "How should the results be broken down?",
+   "multiSelect": true,
+   "options": [
+    {
+     "id": "payer",
+     "label": "By payer",
+     "description": "One row per payer"
+    },
+    {
+     "id": "month",
+     "label": "By service month",
+     "description": "One row per month of service"
+    }
+   ]
+  }
+ ],
+ "answers": [
+  {
+   "name": "all answered",
+   "answers": [
+    {
+     "questionId": "metric",
+     "choiceIds": [
+      "dollars"
+     ]
+    },
+    {
+     "questionId": "period",
+     "choiceIds": [
+      "last_90"
+     ]
+    },
+    {
+     "questionId": "group",
+     "choiceIds": [
+      "month",
+      "payer"
+     ]
+    }
+   ],
+   "error": null,
+   "summary": "Metric: By billed dollars; Period: Last 90 days; Group by: By payer, By service month"
+  },
+  {
+   "name": "other text and a skip",
+   "answers": [
+    {
+     "questionId": "metric",
+     "otherText": "  net of\nadjustments "
+    },
+    {
+     "questionId": "period",
+     "skipped": true
+    }
+   ],
+   "error": null,
+   "summary": "Metric: net of adjustments; Period: no preference; Group by: no preference"
+  },
+  {
+   "name": "multiSelect with other",
+   "answers": [
+    {
+     "questionId": "group",
+     "choiceIds": [
+      "payer"
+     ],
+     "otherText": "and by CPT"
+    }
+   ],
+   "error": null,
+   "summary": "Metric: no preference; Period: no preference; Group by: By payer, and by CPT"
+  },
+  {
+   "name": "skip all (empty)",
+   "answers": [],
+   "error": null,
+   "summary": "Metric: no preference; Period: no preference; Group by: no preference"
+  },
+  {
+   "name": "order follows questions",
+   "answers": [
+    {
+     "questionId": "period",
+     "choiceIds": [
+      "all"
+     ]
+    },
+    {
+     "questionId": "metric",
+     "choiceIds": [
+      "count"
+     ]
+    }
+   ],
+   "error": null,
+   "summary": "Metric: By claim count; Period: All time; Group by: no preference"
+  },
+  {
+   "name": "unknown question",
+   "answers": [
+    {
+     "questionId": "payer",
+     "choiceIds": [
+      "x"
+     ]
+    }
+   ],
+   "error": "An answer refers to a question that wasn't asked.",
+   "summary": null
+  },
+  {
+   "name": "duplicate",
+   "answers": [
+    {
+     "questionId": "metric",
+     "choiceIds": [
+      "count"
+     ]
+    },
+    {
+     "questionId": "metric",
+     "choiceIds": [
+      "dollars"
+     ]
+    }
+   ],
+   "error": "A question was answered twice.",
+   "summary": null
+  },
+  {
+   "name": "skipped with answer",
+   "answers": [
+    {
+     "questionId": "metric",
+     "choiceIds": [
+      "count"
+     ],
+     "skipped": true
+    }
+   ],
+   "error": "A skipped question can't also have an answer.",
+   "summary": null
+  },
+  {
+   "name": "empty answer",
+   "answers": [
+    {
+     "questionId": "metric",
+     "choiceIds": [],
+     "otherText": "   "
+    }
+   ],
+   "error": "Pick an option, type an answer, or skip the question.",
+   "summary": null
+  },
+  {
+   "name": "option not offered",
+   "answers": [
+    {
+     "questionId": "metric",
+     "choiceIds": [
+      "last_90"
+     ]
+    }
+   ],
+   "error": "An answer picks an option that wasn't offered.",
+   "summary": null
+  },
+  {
+   "name": "repeated option",
+   "answers": [
+    {
+     "questionId": "group",
+     "choiceIds": [
+      "payer",
+      "payer"
+     ]
+    }
+   ],
+   "error": "An answer picks an option that wasn't offered.",
+   "summary": null
+  },
+  {
+   "name": "two picks on single-select",
+   "answers": [
+    {
+     "questionId": "metric",
+     "choiceIds": [
+      "count",
+      "dollars"
+     ]
+    }
+   ],
+   "error": "That question takes one answer.",
+   "summary": null
+  },
+  {
+   "name": "pick plus other on single-select",
+   "answers": [
+    {
+     "questionId": "metric",
+     "choiceIds": [
+      "count"
+     ],
+     "otherText": "x"
+    }
+   ],
+   "error": "That question takes one answer.",
+   "summary": null
+  },
+  {
+   "name": "too many",
+   "answers": [
+    {
+     "questionId": "metric",
+     "skipped": true
+    },
+    {
+     "questionId": "metric",
+     "skipped": true
+    },
+    {
+     "questionId": "metric",
+     "skipped": true
+    },
+    {
+     "questionId": "metric",
+     "skipped": true
+    },
+    {
+     "questionId": "metric",
+     "skipped": true
+    }
+   ],
+   "error": "Too many answers.",
+   "summary": null
+  }
+ ],
+ "normalize": [
+  {
+   "name": "valid passes through (descriptions kept, multiSelect only when true)",
+   "in": [
+    {
+     "id": "a",
+     "header": "Metric",
+     "question": "Which?",
+     "multiSelect": false,
+     "options": [
+      {
+       "id": "x",
+       "label": "X",
+       "description": "dx"
+      },
+      {
+       "id": "y",
+       "label": "Y",
+       "description": "dy"
+      }
+     ]
+    }
+   ],
+   "out": [
+    {
+     "id": "a",
+     "header": "Metric",
+     "question": "Which?",
+     "options": [
+      {
+       "id": "x",
+       "label": "X",
+       "description": "dx"
+      },
+      {
+       "id": "y",
+       "label": "Y",
+       "description": "dy"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "header cut to 12, spaces collapsed, ids filled",
+   "in": [
+    {
+     "header": "A very long header",
+     "question": " Which\n one? ",
+     "options": [
+      {
+       "label": "X",
+       "description": "d"
+      },
+      {
+       "label": "Y",
+       "description": "d"
+      }
+     ]
+    }
+   ],
+   "out": [
+    {
+     "id": "q1",
+     "header": "A very long",
+     "question": "Which one?",
+     "options": [
+      {
+       "id": "o1",
+       "label": "X",
+       "description": "d"
+      },
+      {
+       "id": "o2",
+       "label": "Y",
+       "description": "d"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "fewer than 2 valid options drops the question; >4 options cut",
+   "in": [
+    {
+     "id": "a",
+     "header": "H",
+     "question": "Q",
+     "options": [
+      {
+       "id": "x",
+       "label": "X"
+      },
+      {
+       "id": "y",
+       "label": "Y",
+       "description": "d"
+      }
+     ]
+    },
+    {
+     "id": "b",
+     "header": "H",
+     "question": "Q",
+     "options": [
+      {
+       "id": "o0",
+       "label": "L0",
+       "description": "d"
+      },
+      {
+       "id": "o1",
+       "label": "L1",
+       "description": "d"
+      },
+      {
+       "id": "o2",
+       "label": "L2",
+       "description": "d"
+      },
+      {
+       "id": "o3",
+       "label": "L3",
+       "description": "d"
+      },
+      {
+       "id": "o4",
+       "label": "L4",
+       "description": "d"
+      },
+      {
+       "id": "o5",
+       "label": "L5",
+       "description": "d"
+      }
+     ]
+    }
+   ],
+   "out": [
+    {
+     "id": "b",
+     "header": "H",
+     "question": "Q",
+     "options": [
+      {
+       "id": "o0",
+       "label": "L0",
+       "description": "d"
+      },
+      {
+       "id": "o1",
+       "label": "L1",
+       "description": "d"
+      },
+      {
+       "id": "o2",
+       "label": "L2",
+       "description": "d"
+      },
+      {
+       "id": "o3",
+       "label": "L3",
+       "description": "d"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "at most 4 questions; missing header or duplicate id dropped",
+   "in": [
+    {
+     "id": "d",
+     "header": "",
+     "question": "Q",
+     "options": [
+      {
+       "label": "X",
+       "description": "d"
+      },
+      {
+       "label": "Y",
+       "description": "d"
+      }
+     ]
+    },
+    {
+     "id": "q1",
+     "header": "H",
+     "question": "Q",
+     "options": [
+      {
+       "label": "X",
+       "description": "d"
+      },
+      {
+       "label": "Y",
+       "description": "d"
+      }
+     ]
+    },
+    {
+     "id": "q1",
+     "header": "H",
+     "question": "Q",
+     "options": [
+      {
+       "label": "X",
+       "description": "d"
+      },
+      {
+       "label": "Y",
+       "description": "d"
+      }
+     ]
+    },
+    {
+     "id": "q2",
+     "header": "H",
+     "question": "Q",
+     "options": [
+      {
+       "label": "X",
+       "description": "d"
+      },
+      {
+       "label": "Y",
+       "description": "d"
+      }
+     ]
+    },
+    {
+     "id": "q3",
+     "header": "H",
+     "question": "Q",
+     "options": [
+      {
+       "label": "X",
+       "description": "d"
+      },
+      {
+       "label": "Y",
+       "description": "d"
+      }
+     ]
+    },
+    {
+     "id": "q4",
+     "header": "H",
+     "question": "Q",
+     "options": [
+      {
+       "label": "X",
+       "description": "d"
+      },
+      {
+       "label": "Y",
+       "description": "d"
+      }
+     ]
+    },
+    {
+     "id": "q5",
+     "header": "H",
+     "question": "Q",
+     "options": [
+      {
+       "label": "X",
+       "description": "d"
+      },
+      {
+       "label": "Y",
+       "description": "d"
+      }
+     ]
+    }
+   ],
+   "out": [
+    {
+     "id": "q1",
+     "header": "H",
+     "question": "Q",
+     "options": [
+      {
+       "id": "o1",
+       "label": "X",
+       "description": "d"
+      },
+      {
+       "id": "o2",
+       "label": "Y",
+       "description": "d"
+      }
+     ]
+    },
+    {
+     "id": "q2",
+     "header": "H",
+     "question": "Q",
+     "options": [
+      {
+       "id": "o1",
+       "label": "X",
+       "description": "d"
+      },
+      {
+       "id": "o2",
+       "label": "Y",
+       "description": "d"
+      }
+     ]
+    },
+    {
+     "id": "q3",
+     "header": "H",
+     "question": "Q",
+     "options": [
+      {
+       "id": "o1",
+       "label": "X",
+       "description": "d"
+      },
+      {
+       "id": "o2",
+       "label": "Y",
+       "description": "d"
+      }
+     ]
+    },
+    {
+     "id": "q4",
+     "header": "H",
+     "question": "Q",
+     "options": [
+      {
+       "id": "o1",
+       "label": "X",
+       "description": "d"
+      },
+      {
+       "id": "o2",
+       "label": "Y",
+       "description": "d"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "not a list",
+   "in": "Which?",
+   "out": []
+  }
+ ]
+}

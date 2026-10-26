@@ -39,7 +39,7 @@ def test_every_new_scenario_is_in_the_schema_and_has_an_example():
     enum = schema["$defs"]["ChatRequest"]["properties"]["scenario"]["enum"]
     assert enum == list(SCENARIOS) and "report" in enum
     assert set(NEW_IN_116) <= set(SCENARIOS)
-    assert {v[1] for v in EDGE.values()} == set(NEW_IN_116)
+    assert {v[1] for v in EDGE.values()} == set(NEW_IN_116) | {"clarify_multi"}  # 1.23.0
     assert set(CANCEL_AT) == {s for s in NEW_IN_116 if s.startswith("cancel_")}
     assert tuple(map(int, CONTRACT_VERSION.split("."))) >= (1, 16, 0)
 
