@@ -9,6 +9,13 @@ interface Props {
   scope?: 'app' | 'section';
   /** Allowlisted component name for the report's context, e.g. 'App' or 'ArtifactPanel'. Never user text. */
   name?: string;
+  /** Section scope: a second action next to "Try again", e.g. closing the artifact panel that crashed. */
+  onDismiss?: () => void;
+  dismissLabel?: string;
+  /** Section scope: classes for the fallback card instead of the inline default (e.g. panel-shaped). */
+  fallbackClassName?: string;
+  /** Section scope: a crashed section retries by itself when this changes (new data, another artifact version). */
+  resetKey?: unknown;
 }
 interface State {
   rec: ErrorRecord | null;
@@ -34,6 +41,10 @@ export class ErrorBoundary extends Component<Props, State> {
     this.setState({ rec: reportError(error, 'render', { component, code: isChunkLoadError(error) ? 'chunk_load' : undefined }) });
   }
 
+  componentDidUpdate(prev: Props) {
+    if (this.state.failed && !Object.is(prev.resetKey, this.props.resetKey)) this.reset();
+  }
+
   private reset = () => this.setState({ rec: null, failed: false, chunk: false, copied: 'idle' });
 
   private copy = async () => {
@@ -53,11 +64,16 @@ export class ErrorBoundary extends Component<Props, State> {
 
     if (this.props.scope === 'section') {
       return (
-        <div role="alert" data-testid="section-crash" className="my-2 rounded-xl border border-line bg-muted p-3 text-sm text-fg-muted">
+        <div role="alert" data-testid="section-crash" data-section={this.props.name} className={this.props.fallbackClassName ?? 'my-2 rounded-xl border border-line bg-muted p-3 text-sm text-fg-muted'}>
           <p>{chunk ? "This part couldn't load. Check your connection." : "This part couldn't be displayed."}{rec && <span className="ml-1 text-xs text-fg-subtle">Ref {rec.id}</span>}</p>
           <button type="button" onClick={this.reset} className="mt-2 rounded-full border border-line px-3 py-1 text-xs font-medium text-fg hover:bg-hover">
             Try again
           </button>
+          {this.props.onDismiss && (
+            <button type="button" onClick={this.props.onDismiss} className="ml-2 mt-2 rounded-full border border-line px-3 py-1 text-xs font-medium text-fg hover:bg-hover">
+              {this.props.dismissLabel ?? 'Close'}
+            </button>
+          )}
         </div>
       );
     }

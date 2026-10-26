@@ -100,7 +100,11 @@ test vectors in `web/src/lib/csvFilename.vectors.json`. The Content-Disposition 
     - Allowed: reference id, ISO time, contract version and build mode, error class and kind, bundle frames, allowlisted context, route *kind*, browser family/major/OS, viewport, theme, online flag, and other recent error ids.
     - Never included: the message (even redacted), conversation ids, the raw user agent, titles, or text.
   - When a lazy chunk fails to load (dropped connection or a new deploy), the copy says so and the record carries `code: chunk_load`.
-  - `<ErrorBoundary scope="section" name="…">` is an inline "This part couldn't be displayed · Try again" card. Teams can wrap risky subtrees with it (artifact panel, charts) so one bad part doesn't take down the page.
+  - `<ErrorBoundary scope="section" name="…">` is an inline "This part couldn't be displayed · Try again" card, so one bad part doesn't take down the page. Optional props: `onDismiss`/`dismissLabel` (a second button), `fallbackClassName`, and `resetKey` (it retries by itself when this changes).
+  - Wrapped at the definition, so every call site (chat, shared view, panel) gets the boundary with no call-site edits:
+    - `ChartView` and `DataTable`: an inline card in place of the part. They retry when the part changes, e.g. as the stream fills it in.
+    - `ArtifactPanel`: a panel-shaped card with "Try again" and "Close panel". It retries when another artifact or version opens, and the chat stays usable.
+  - Tests: `src/components/sectionBoundaries.test.tsx`.
   - `web/src/components/ErrorBoundary.test.tsx` throws synthetic PHI (name, MRN, SSN, DOB, email) and asserts none of it reaches the screen or the clipboard.
 - **Residual:** React 18 still `console.error`s errors that a boundary catches, even in production. React 19's `createRoot({ onCaughtError })` closes this gap; do it on upgrade.
 
