@@ -14,7 +14,8 @@ test('500-message thread stays responsive @perf', async ({ page }) => {
     await composer(page).press('Enter');
     await waitIdle(page);
   }
-  await expect(page.getByTestId('msg-assistant')).toHaveCount(250);
+  // Long threads are virtualized (ThreadView, #138): only a window of turns is in the DOM; check the newest turn landed.
+  await expect(page.getByTestId('msg-assistant').last()).toContainText(/\b(249|250): Denials/);
   const domNodes = await page.evaluate(() => document.querySelectorAll('*').length);
   // Typing latency: time from keypress to value update, averaged.
   const t0 = Date.now();
