@@ -332,6 +332,23 @@ class LiveTap:
                             "rationale": (f"{max(agree, 1)} of {len(cands)} candidates returned the same result."
                                           if chosen else "The candidates disagreed, so no answer was chosen.")})
 
+    def abort(self) -> None:
+        """The run was cancelled: close every step still in flight so no UI row is left spinning.
+
+        Open SQL steps get ``step.sql_result {ok: false, error: {code: "cancelled"}}``; an open reasoning part gets
+        ``reasoning.end``. Explore steps only emit on completion, so there is nothing to close (CONTRACT.md §8)."""
+        with self._lock:
+            for pend in list(self.pending.values()):
+                if pend.name in ("run_sql", "final_answer"):
+                    self._step({"type": "step.sql_result", "stepId": pend.step_id, "ok": False,
+                                "elapsedMs": int((time.perf_counter() - pend.started) * 1000),
+                                "error": {"code": "cancelled", "message": "Stopped by the user."}})
+            self.pending.clear()
+            if self.reasoning_started is not None:
+                self.emit({"type": "reasoning.end", "partId": self.reasoning_id,
+                           "durationMs": int((time.perf_counter() - self.reasoning_started) * 1000)})
+                self.reasoning_started = None
+
     def usage(self, elapsed_ms: int, first_event_ms: int | None, first_token_ms: int | None) -> dict:
         models = []
         tin = tout = 0

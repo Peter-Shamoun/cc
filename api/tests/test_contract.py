@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.app import Settings, create_app
-from api.contract import validate_event
+from api.contract import CONTRACT_VERSION, validate_event
 from api.tests.conftest import LABS, events, parts
 
 SCENARIOS = {
@@ -56,7 +56,7 @@ def check_invariants(evs):
     first_answer = next((i for i, e in enumerate(evs) if e["type"] in ("text.start", "part")), len(evs))
     assert not any(e["type"] == "escalation" for e in evs[first_answer:])
     assert not any(e["type"].startswith("step.") and e["type"] != "step.check" for e in evs[first_answer:])
-    assert evs[0]["contractVersion"] == "1.0.0"
+    assert evs[0]["contractVersion"] == CONTRACT_VERSION
 
 
 @pytest.fixture
@@ -245,4 +245,4 @@ def test_heartbeat_validates():
 
 def test_contract_endpoint(client):
     body = client.get("/api/contract").json()
-    assert body["version"] == "1.0.0" and "StreamEvent" in body["schema"]["$defs"]
+    assert body["version"] == CONTRACT_VERSION and "StreamEvent" in body["schema"]["$defs"]
