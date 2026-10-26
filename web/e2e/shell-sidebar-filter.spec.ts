@@ -2,10 +2,12 @@ import { test, expect } from './fixtures';
 import { MOCK, open, ask } from './helpers';
 
 test('inline sidebar filter narrows chats by title @desktop', async ({ page }, info) => {
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   await open(page, MOCK);
   const qs = ['Denial rate by payer', 'Top providers by paid amount', 'Aetna appeals backlog', 'Paid amount trend', 'Cascade Medicaid outliers', 'CARC 16 denials by month'];
-  for (const q of qs) {
+  // QA-S39: the filter only shows past FILTER_AT (20) chats, so pad with neutral titles.
+  const all = [...qs, ...Array.from({ length: 14 }, (_, i) => `Synthetic filler ${i}`)];
+  for (const q of all) {
     await ask(page, q);
     await page.keyboard.press('Control+Shift+O');
   }
@@ -17,7 +19,7 @@ test('inline sidebar filter narrows chats by title @desktop', async ({ page }, i
   await filter.fill('nothing like this');
   await expect(page.getByTestId('filter-empty')).toBeVisible();
   await filter.press('Escape');
-  await expect(page.getByTestId('thread-item')).toHaveCount(qs.length);
+  await expect(page.getByTestId('thread-item')).toHaveCount(all.length);
   await filter.fill('aetna');
   await filter.press('Enter');
   await expect(page.getByTestId('msg-user')).toContainText('Aetna appeals backlog');

@@ -7,7 +7,8 @@ import type { ThreadSummary } from '../adapters/types';
 
 const now = new Date().toISOString();
 const titles = ['Denial rate by payer', 'Top providers Q3', 'Résumé of CARC 16 denials', 'Paid amount trend', 'Cascade Medicaid outliers', 'Aetna appeals backlog'];
-const threads: ThreadSummary[] = titles.map((title, i) => ({ id: `c${i}`, title, updatedAt: now }));
+const fillers = Array.from({ length: 14 }, (_, i) => `Synthetic filler ${i}`);
+const threads: ThreadSummary[] = [...titles, ...fillers].map((title, i) => ({ id: `c${i}`, title, updatedAt: now }));
 
 function setup(extra: Partial<SidebarProps> = {}) {
   const props = {
@@ -48,5 +49,12 @@ describe('sidebar inline filter', () => {
   it('short lists have no filter', () => {
     setup({ threads: threads.slice(0, FILTER_AT - 1) });
     expect(screen.queryByTestId('sidebar-filter')).toBeNull();
+  });
+
+  it('QA-S39: one search entry until the history is long (a handful of chats shows only "Search chats")', () => {
+    expect(FILTER_AT).toBeGreaterThanOrEqual(20);
+    setup({ threads: threads.slice(0, 8) });
+    expect(screen.queryByTestId('sidebar-filter')).toBeNull();
+    expect(screen.getByText('Search chats')).toBeTruthy();
   });
 });
