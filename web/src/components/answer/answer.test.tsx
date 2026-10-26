@@ -108,10 +108,19 @@ describe('answer surface: components', () => {
     render(<AssistantTurn msg={cut} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} />);
     expect(screen.getByTestId('step-summary').textContent).toMatch(/1 stopped/);
   });
-  it('stopped answers show a Retry line', () => {
+  it('stopped answers with content: one quiet note, the single retry is Regenerate in the action row', () => {
     const onRegenerate = vi.fn();
     const v = { ...viewOf('abstain'), finishReason: 'aborted' as const };
     render(<AssistantTurn msg={v} isLast onOpen={noop} onRegenerate={onRegenerate} onEdit={noop} />);
+    expect(within(screen.getByTestId('stopped')).queryByRole('button')).toBeNull();
+    fireEvent.click(within(screen.getByTestId('msg-actions')).getByRole('button', { name: 'Regenerate' }));
+    expect(onRegenerate).toHaveBeenCalled();
+  });
+  it('stopped before anything came back: the note carries Retry (there is no action row)', () => {
+    const onRegenerate = vi.fn();
+    const v = { ...viewOf('abstain'), parts: [], finishReason: 'aborted' as const };
+    render(<AssistantTurn msg={v} isLast onOpen={noop} onRegenerate={onRegenerate} onEdit={noop} />);
+    expect(screen.queryByTestId('msg-actions')).toBeNull();
     fireEvent.click(within(screen.getByTestId('stopped')).getByRole('button', { name: /Retry/ }));
     expect(onRegenerate).toHaveBeenCalled();
   });

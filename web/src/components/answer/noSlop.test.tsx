@@ -12,6 +12,7 @@ const BANNED: [RegExp, string][] = [
   [/backdrop-blur|backdrop-filter/, 'glassmorphism'],
   [/shadow-(lg|xl|2xl)\b/, 'heavy drop shadow'],
   [/animate-bounce/, 'bouncy animation'],
+  [/animate-ping/, 'ripple/ping animation (QA-A25)'],
   [/\b(purple|violet|indigo|fuchsia)-\d/, 'purple/indigo accent'],
   [/bg-clip-text|text-transparent/, 'gradient text'],
   [/[\u2728\u{1F31F}\u{1F680}\u{1F389}]/u, 'emoji in UI chrome'],

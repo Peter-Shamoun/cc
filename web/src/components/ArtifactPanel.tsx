@@ -151,7 +151,7 @@ function ArtifactPanelView({ artifact, onClose, versions, onVersion }: { artifac
           {tabs.length > 1 && (
             <div className="flex shrink-0 rounded-lg bg-muted p-0.5 text-xs" role="tablist">
               {tabs.map((t) => (
-                <button key={t.id} role="tab" type="button" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className={clsx('rounded-md px-2.5 py-1', tab === t.id ? 'bg-elev font-medium shadow-sm' : 'text-fg-muted hover:text-fg')}>{t.label}</button>
+                <button key={t.id} role="tab" type="button" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className={clsx('cc-quiet-focus rounded-md px-2.5 py-1', tab === t.id ? 'bg-elev font-medium shadow-sm' : 'text-fg-muted hover:text-fg')}>{t.label}</button>
               ))}
             </div>
           )}
@@ -190,7 +190,7 @@ function ArtifactPanelView({ artifact, onClose, versions, onVersion }: { artifac
           {tab === 'data' && p.type === 'chart' && (
             <DataTable full part={{ type: 'table', id: `${p.id}-data`, title: `${p.title ?? 'Chart'} data`, columns: Object.keys(p.data?.values[0] ?? {}).map((k) => ({ key: k, label: k, type: typeof p.data?.values[0][k] === 'number' ? 'number' : 'string' })), rows: (p.data?.values ?? []).map((r) => Object.values(r)), rowCount: p.data?.values.length ?? 0 }} />
           )}
-          {tab === 'code' && <CodeBlock code={codeText} language={p.type === 'code' ? p.language : p.type === 'chart' ? 'json' : p.type === 'report' ? 'markdown' : 'sql'} title={p.type === 'code' ? p.title : sql?.title} tall />}
+          {tab === 'code' && <CodeBlock code={codeText} language={p.type === 'code' ? p.language : p.type === 'chart' ? 'json' : p.type === 'report' ? 'markdown' : 'sql'} title={p.type === 'code' ? p.title : sql?.title} masked={((p.type === 'code' ? p : p.type === 'table' ? sql : undefined) as { maskedLiterals?: number } | undefined)?.maskedLiterals} tall />}
         </div>
       </div>
     </section>
