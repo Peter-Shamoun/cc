@@ -16,6 +16,7 @@ import { ArtifactPanel } from '../components/ArtifactPanel';
 import { StarterCards } from './StarterCards';
 import { Header } from './Header';
 import { useStrategy } from './useStrategy';
+import { setFeedbackCapabilities, setFeedbackSink, toFeedbackRequest } from '../lib/feedback';
 import { OfflineBanner } from './OfflineBanner';
 import { useOnline } from '../lib/useOnline';
 import { usePrinting } from '../lib/usePrinting';
@@ -86,6 +87,20 @@ function ShellInner() {
   const loadCaps = useMemo(() => (adapter instanceof HttpAnalystAdapter ? () => adapter.capabilities() : undefined), [adapter]);
   const strategy = useStrategy(loadCaps);
   const chat = useChat(adapter, store, strategy.options);
+  // Contract 1.7.0 (§13): thumbs, reason ids and the comment go to the server for server-known answers
+  // (never our 'a_' placeholders). Reason chips follow the server's Capabilities.feedbackReasons.
+  const convRef = useRef(chat.convId);
+  convRef.current = chat.convId;
+  useEffect(() => { setFeedbackCapabilities(strategy.caps); }, [strategy.caps]);
+  useEffect(() => {
+    if (!(adapter instanceof HttpAnalystAdapter)) return;
+    setFeedbackSink(async (f) => {
+      const cid = convRef.current;
+      if (!cid || f.messageId.startsWith('a_')) return;
+      await adapter.feedback(cid, f.messageId, toFeedbackRequest(f));
+    });
+    return () => setFeedbackSink(null);
+  }, [adapter]);
   // Opening a stored chat can take a round trip (server history): after a short grace period show a
   // thread skeleton instead of the empty state or the previous chat (ChatGPT/Claude behaviour).
   const [opening, setOpening] = useState<string | null>(() => (store instanceof HttpTranscriptStore ? routeId() : null));
