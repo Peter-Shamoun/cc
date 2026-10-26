@@ -6,7 +6,7 @@ Claude, picking up the repo) to run, test, ship and connect the real analyzer. W
 file says what you need and links the rest.
 
 State at handoff: branch `grokbot/frontend-sota`, contract version in `api/contract/__init__.py: CONTRACT_VERSION`
-(1.21.0 when this was written; the sharing removal bumps it again, see §8). Everything runs offline in **demo mode**:
+(**1.22.0** at handoff: 1.21 added BACKEND-FIT, 1.22 removed sharing). Everything runs offline in **demo mode**:
 `ScriptedLLM`, synthetic DuckDB data, no paid model API, no network.
 
 ## 0. Ground rules that still apply
@@ -195,7 +195,7 @@ Full list with owners: **`docs/frontend_deploy.md`** (`api/tests/test_deploy_doc
 
 | Feature | Status | Why / decision |
 |---|---|---|
-| Sharing (share button, dialog, `/shared/*` view, share endpoints, registry, capabilities, examples, docs) | **Removed** (Peter, 12:15 AM 2026-10-26) | Never reintroduce. `/share/*` URLs are a plain 404. Removed with a contract bump (see `docs/frontend-contract-migration.md`). |
+| Sharing (share button, dialog, `/shared/*` view, share endpoints, registry, capabilities, examples, docs) | **Removed** (Peter, 12:15 AM 2026-10-26; contract 1.22.0, shell #302) | Never reintroduce. `/share/*` URLs are a plain 404. See `api/CONTRACT.md` §17 and `docs/frontend-contract-migration.md`. Ratchet: `web/e2e/share-removed.spec.ts`. |
 | Data-source / DB / schema / scope picker (composer "Claims lake · sem.*" chip, ScopePopover, header Scope row) | **Removed** (Peter, 11:57 PM) | Scope comes from the identity (§3.3). Read-only context from the session (for example the organization in the account menu) is fine. |
 | Read aloud (browser speech) | Excluded (12:11 AM) | |
 | Extra keyboard shortcuts beyond the existing ones | Excluded (12:11 AM) | |
@@ -224,7 +224,7 @@ Shell, at the 12:20 AM finalize:
 
 <!-- SECTION: shell. Shell team: layout, sidebar, routes, composer, themes, shortcuts, removed share/scope UI. -->
 
-### 9.x Shell (layout, sidebar, routes, composer, settings, themes, shortcuts)
+### 9.1 Shell (layout, sidebar, routes, composer, settings, themes, shortcuts)
 
 Owner during the sprint: shell. Design rule: ChatGPT/Claude parity from observation only, calm and neutral (one accent,
 hairline borders, ~48rem column, small muted icons, fast quiet motion). `src/shell/slopGuard.test.ts` fails the build
@@ -276,9 +276,9 @@ on gradients, glass/blur, glow, heavy shadows and similar.
 - The header's "Data: Live API / Demo data" row is informational only.
 - Settings is a modal, not a full page.
 
-<!-- SECTION: answer. Answer team: answer rendering (timeline, text, table, chart, clarify, errors), print, copy. -->
+<!-- SECTION: answer (§9.2). Answer team: answer rendering (timeline, text, table, chart, clarify, errors), print, copy. -->
 
-### 9.1 Platform (adapters, streaming, performance, security plumbing)
+### 9.3 Platform (adapters, streaming, performance, security plumbing)
 
 - **Streaming:** `adapters/http.ts` streams SSE through `guardBody` (45 s idle → stalled; 32 MiB per-frame cap),
   de-duplicates replayed events by `seq`, and re-attaches with Last-Event-ID (backoff 250 ms, 1 s, 2 s, 4 s). Offline
@@ -293,7 +293,10 @@ on gradients, glass/blur, glow, heavy shadows and similar.
 - **Non-stream calls:** `lib/fetchGuard.ts` (429 retry, capped JSON bodies).
 - **Clock skew:** `lib/serverClock.ts` (server `Date` offset for expiries and Retry-After).
 - **Performance:** idle prefetch of the Markdown, KaTeX and Vega chunks; windowed thread; 200-turn memory test
-  (`e2e/memory200.spec.ts`); Lighthouse budget (`npm run check:perf`); CPU-throttle audit. See `docs/frontend.md`,
+  (`e2e/memory200.spec.ts`); CPU-throttle audit. Budgets: `web/bundle-budget.json` (initial JS 160 KB gz, CSS 16 KB
+  gz, total JS 800 KB gz) and Lighthouse `scripts/perf_budget.json` (`npm run check:perf`: perf ≥ 0.95, a11y 1.00,
+  cold-load bytes `load-byte-weight` ≤ 350 KB, bytes including the idle prefetch ≤ 800 KB). Initial CSS sits at about
+  15.9/16 KB gz, so new global CSS needs a matching cut. See `docs/frontend.md`,
   `docs/frontend_a11y_perf.md`.
 - **Security plumbing:** CSP nonce, Trusted Types, SRI with import map, no-store, `prefs.ts` as the only `localStorage`
   writer (allowlisted keys), fixed `document.title`. See `docs/frontend_security.md`.
