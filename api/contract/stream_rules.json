@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "description": "Stream ordering rules (CONTRACT.md §2). This file is the single source: api/contract/conformance.py and web/src/contract/conformance.ts are runners that interpret it. Edit the rules here, then run `python -m api.contract.gen_ts` (it embeds them in web/src/contract/streamRules.gen.ts). Paths are dotted (`part.id`). A type ending in `.*` is a prefix match. Heartbeats are ignored by every rule.",
+  "rules": [
+    {"id": "start.first", "kind": "first", "type": "message.start", "doc": "message.start is the first event"},
+    {"id": "end.last", "kind": "last", "type": "message.end", "doc": "message.end is the last event; nothing follows it"},
+    {"id": "start.once", "kind": "count", "type": "message.start", "min": 1, "max": 1, "doc": "exactly one message.start"},
+    {"id": "end.once", "kind": "count", "type": "message.end", "min": 1, "max": 1, "doc": "exactly one message.end"},
+    {"id": "seq.gapless", "kind": "seq", "start": 0, "doc": "seq starts at 0 and is gapless and strictly increasing"},
+    {"id": "message.same_id", "kind": "same", "field": "messageId", "types": ["message.start", "message.end"], "doc": "start and end carry the same messageId"},
+    {"id": "finish.known", "kind": "enum", "type": "message.end", "field": "finishReason", "values": ["stop", "abstain", "needs_input", "error", "aborted"], "doc": "finishReason is one of the five"},
+    {"id": "step.unique", "kind": "unique", "types": ["step.sql_running", "step.explore", "step.repair_attempt", "step.check", "step.candidates"], "field": "stepId", "doc": "stepId is unique within a message (sql_result reuses its sql_running id)"},
+    {"id": "sql.paired", "kind": "span", "open": "step.sql_running", "inner": [], "close": ["step.sql_result"], "key": "stepId", "closeKey": "stepId", "unclosedOk": [], "doc": "every step.sql_result follows its step.sql_running, and every SQL step finishes"},
+    {"id": "repair.target", "kind": "ref", "type": "step.repair_attempt", "field": "failedStepId", "target": "step.sql_result", "targetField": "stepId", "where": {"ok": false}, "doc": "repair_attempt.failedStepId is an earlier failed sql_result"},
+    {"id": "repair.of", "kind": "ref", "type": "step.sql_running", "field": "repairOf", "target": "step.repair_attempt", "targetField": "stepId", "doc": "sql_running.repairOf names an earlier repair_attempt"},
+    {"id": "check.target", "kind": "ref", "type": "step.check", "field": "targetStepId", "target": "step.*", "targetField": "stepId", "doc": "step.check.targetStepId names an earlier step"},
+    {"id": "text.span", "kind": "span", "open": "text.start", "inner": ["text.delta"], "close": ["text.end"], "key": "partId", "closeKey": "partId", "unclosedOk": ["aborted"], "doc": "text.start → text.delta* → text.end per partId"},
+    {"id": "table.span", "kind": "span", "open": "table.start", "inner": ["table.rows"], "close": ["part"], "key": "partId", "closeKey": "part.id", "closeWithoutOpenOk": true, "unclosedOk": ["aborted", "error"], "doc": "table.start → table.rows* → the complete part with the same id (1.9)"},
+    {"id": "patch.target", "kind": "ref", "type": "part.patch", "field": "partId", "target": "part", "targetField": "part.id", "doc": "part.patch names an earlier part"},
+    {"id": "sql_part.target", "kind": "ref", "type": "part", "field": "part.sqlPartId", "target": "part", "targetField": "part.id", "doc": "table.sqlPartId names an earlier part"},
+    {"id": "answer.after_steps", "kind": "none_after", "anchor": ["text.start", "table.start", "part"], "anchorExcept": {"part.type": ["reasoning", "status"]}, "forbidden": ["step.*", "escalation"], "allowed": ["step.check"], "doc": "no steps (except step.check) and no escalation after the answer begins"},
+    {"id": "clarify.needs_input", "kind": "finish_requires", "finishReason": "needs_input", "partType": "clarification", "doc": "needs_input ends a message that has a clarification part"}
+  ]
+}
