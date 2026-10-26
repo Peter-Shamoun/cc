@@ -106,7 +106,13 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -
 .prose-chat :where(table) { width: 100%; border-collapse: collapse; margin: 0.75em 0 1.25em; font-size: 14px; font-family: var(--font-sans); font-variant-numeric: tabular-nums; line-height: 1.5; }
 .prose-chat :where(th) { text-align: start; font-weight: 600; border-bottom: 1px solid var(--border-strong); padding: 0.5em 0.75em; }
 .prose-chat :where(td) { border-bottom: 1px solid var(--border); padding: 0.5em 0.75em; }
-.prose-chat :where(blockquote) { border-inline-start: 3px solid var(--border-strong); padding-inline-start: 1em; color: var(--fg-muted); }
+.prose-chat :where(blockquote) { border-inline-start: 2px solid var(--border-strong); padding-inline-start: 1em; color: var(--fg-muted); margin: 0 0 var(--p-gap); }
+/* Prose fidelity (Claude/ChatGPT): nested bullets step disc → circle → square; h4–h6 stay body-sized but bold (Tailwind's
+   preflight would leave them as plain text); a rule is a hairline in the border tone with room around it, not currentColor. */
+.prose-chat :where(ul ul) { list-style: circle; }
+.prose-chat :where(ul ul ul) { list-style: square; }
+.prose-chat :where(h4, h5, h6) { font-size: 1em; font-weight: 600; line-height: 1.5; margin: 1.2em 0 0.35em; }
+.prose-chat :where(hr) { border: 0; border-top: 1px solid var(--border); margin: 1.5em 0; height: 0; }
 .prose-chat > :first-child { margin-top: 0; }
 .prose-chat > :last-child { margin-bottom: 0; }
 
@@ -126,6 +132,9 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -
    it short). Only blocks that mount during streaming animate; the class goes away at message end, which
    never replays it. Reduced motion turns it off with every other animation. */
 .streaming-caret > div > div { animation: cc-fade 160ms ease-out both; }
+/* ChatGPT/Claude: the action row and Sources appear once the text has finished arriving on screen, not while paced
+   text is still flowing in after the stream ended. visibility keeps their space (no jump) and takes them out of tab order. */
+[data-testid="msg-assistant"]:has(.streaming-caret) :is([data-testid="msg-actions"], [data-testid="sources-chip"]) { visibility: hidden; }
 @keyframes cc-pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.8); } }
 
 .shiki-wrap pre { margin: 0; padding: 1rem; overflow: visible; font-size: 13px; line-height: 1.6; background: transparent !important; }

@@ -28,6 +28,13 @@ export function sourceRows(sources: Source[] | undefined, parts: Part[]): Source
   return [...list].sort((a, b) => rank(a) - rank(b)).map((s) => ({ ...s, columns: columnsFor(s) }));
 }
 
+/** QA-A31: did this turn read data? A query or candidate run that returned (schema exploration alone is not a source), or a table/chart part.
+ *  Claude and ChatGPT only cite when something was consulted, so clarify/abstain turns show no Sources. */
+export function consulted(steps: { kind: string; state: string }[] | undefined, parts: { type: string }[]): boolean {
+  return parts.some((p) => p.type === 'table' || p.type === 'chart')
+    || (steps ?? []).some((s) => (s.kind === 'sql' || s.kind === 'candidates') && (s.state === 'ok' || s.state === 'warn'));
+}
+
 const KIND_ICON: Record<string, typeof Database> = { view: Database, definition: Sigma, document: FileText };
 
 export function SourcesChip({ sources, parts }: { sources: Source[] | undefined; parts: Part[] }) {

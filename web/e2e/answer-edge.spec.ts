@@ -10,6 +10,12 @@ test.describe('answer edge cases', () => {
     await expect(stopBtn(page)).toBeVisible();
     await page.reload();
     await expect(composer(page)).toBeVisible();
+    // With history off (shell #282: chats live in memory only) a reload starts fresh by design: nothing can be stuck.
+    if (await page.getByText(/History off/).count() && !(await page.getByTestId('msg-user').count())) {
+      await expect(page.locator('.streaming-caret')).toHaveCount(0);
+      await expect(stopBtn(page)).toHaveCount(0);
+      return;
+    }
     // Reopen the chat if the reload landed on a fresh screen.
     if (!(await page.getByTestId('msg-user').filter({ hasText: q }).count())) await page.getByRole('navigation', { name: 'Chats' }).getByRole('button', { name: q, exact: true }).click();
     await waitIdle(page);
@@ -119,19 +125,24 @@ test.describe('answer edge cases', () => {
     const para = 'Cigna has the highest denial rate at 20.4%, followed by Medicaid at 20.3%. '.repeat(8).trim();
     await injectStream(page, turn(textPart('t', para)));
     await composer(page).fill('Synthetic question');
-    const lengths = page.evaluate(() => new Promise<number[]>((done) => {
+    const lengths = page.evaluate((full) => new Promise<number[]>((done) => {
       const seen: number[] = [];
       const t0 = performance.now();
       const tick = () => {
         const md = [...document.querySelectorAll('[data-testid="msg-assistant"] [data-testid="markdown"]')].at(-1);
         const n = md?.textContent?.length ?? 0;
         if (n && seen.at(-1) !== n) seen.push(n);
+        // The action row must not show while the text is still flowing in (ChatGPT/Claude): -1 flags a violation.
+        const row = [...document.querySelectorAll('[data-testid="msg-assistant"] [data-testid="msg-actions"]')].at(-1);
+        if (n && n < full && row && getComputedStyle(row).visibility === 'visible') seen.push(-1);
         if (performance.now() - t0 < 2500) requestAnimationFrame(tick); else done(seen);
       };
       requestAnimationFrame(tick);
-    }));
+    }), para.length);
     await composer(page).press('Enter');
     const seen = await lengths;
+    expect(seen, 'action row visible mid-reveal').not.toContain(-1);
+    await expect(lastAssistant(page).getByTestId('msg-actions')).toBeVisible();
     expect(seen.length).toBeGreaterThan(5);
     expect([...seen].sort((a, b) => a - b)).toEqual(seen);
     expect(seen.at(-1)).toBe(para.length);
@@ -145,5 +156,34 @@ test.describe('answer edge cases', () => {
     await injectStream(page, turn(textPart('t', para)));
     await ask(page, 'Synthetic question');
     await expect(lastAssistant(page).getByTestId('markdown')).toHaveText(para);
+  });
+
+  test('prose fidelity: nested bullets, h4, blockquote, rule, inline code and inline math (Claude/ChatGPT)', async ({ page }) => {
+    await open(page, LIVE);
+    const md = '#### Method\n\n- Payers\n  - Commercial\n    - Cigna\n\n> Denials exclude voided claims.\n\nAfter the note.\n\n---\n\nUse `is_latest_submission` and the rate $r = d/n$ per payer.';
+    await injectStream(page, turn(textPart('t', md)));
+    await ask(page, 'Synthetic question');
+    const box = lastAssistant(page).getByTestId('markdown');
+    await expect(box.locator('.katex')).toHaveCount(1, { timeout: 10_000 });
+    const g = await box.evaluate((el) => {
+      const cs = (sel: string) => getComputedStyle(el.querySelector(sel)!);
+      const body = parseFloat(cs('p').fontSize);
+      return {
+        bullets: ['ul', 'ul ul', 'ul ul ul'].map((s) => cs(s).listStyleType),
+        h4: { size: parseFloat(cs('h4').fontSize) / body, weight: Number(cs('h4').fontWeight) },
+        quote: { bar: parseFloat(cs('blockquote').borderInlineStartWidth), below: parseFloat(cs('blockquote').marginBottom) },
+        hr: { top: parseFloat(cs('hr').borderTopWidth), color: cs('hr').borderTopColor, text: getComputedStyle(el).color, margin: parseFloat(cs('hr').marginTop) },
+        code: { mono: /mono/i.test(cs(':not(pre) > code').fontFamily), bg: cs(':not(pre) > code').backgroundColor },
+      };
+    });
+    expect(g.bullets).toEqual(['disc', 'circle', 'square']);
+    expect(g.h4.size).toBeCloseTo(1, 1);
+    expect(g.h4.weight).toBeGreaterThanOrEqual(600);
+    expect(g.quote.bar).toBe(2);
+    expect(g.quote.below).toBeGreaterThan(0);
+    expect(g.hr.top).toBe(1);
+    expect(g.hr.color).not.toBe(g.hr.text); // a hairline in the border tone, not full-contrast text colour
+    expect(g.hr.margin).toBeGreaterThanOrEqual(16);
+    expect(g.code.bg).not.toBe('rgba(0, 0, 0, 0)');
   });
 });

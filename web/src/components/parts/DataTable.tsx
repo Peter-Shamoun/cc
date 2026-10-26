@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ArrowDown, ArrowUp, Download, Lock, Maximize2, ShieldAlert } from 'lucide-react';
 import clsx from 'clsx';
@@ -256,10 +256,13 @@ const DataTableView = memo(function DataTableView({ part, onOpen, full }: DataTa
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-xs text-fg-subtle">
         <span>
-          {part.source ? <>from <code className="font-mono">{part.source.views.join(', ')}</code> · </> : null}
-          {withheld ? `${rowsLabel} · data not shared` : part.rowCount === 0 ? <>No rows</> : <>Showing {part.rows.length.toLocaleString()} of {part.rowCount.toLocaleString()} rows</>}
-          {part.source?.elapsedMs !== undefined && ` · ${(part.source.elapsedMs / 1000).toFixed(2)} s`}
-          {hasPhi && ' · PHI masked'}
+          {/* An empty result already says "Query returned 0 rows" in the body, so the footer doesn't repeat it. */}
+          {[
+            part.source ? <>from <code className="font-mono">{part.source.views.join(', ')}</code></> : null,
+            withheld ? `${rowsLabel} · data not shared` : part.rowCount === 0 ? null : <>Showing {part.rows.length.toLocaleString()} of {part.rowCount.toLocaleString()} rows</>,
+            part.source?.elapsedMs !== undefined ? `${(part.source.elapsedMs / 1000).toFixed(2)} s` : null,
+            hasPhi ? 'PHI masked' : null,
+          ].filter(Boolean).map((seg, i) => <Fragment key={i}>{i > 0 && ' · '}{seg}</Fragment>)}
         </span>
         {!full && onOpen && !withheld && part.rowCount > 8 && (
           <button type="button" data-print-hide onClick={onOpen} className="underline underline-offset-2 hover:text-fg">Open full table</button>
