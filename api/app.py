@@ -31,9 +31,9 @@ from api.contract import CONTRACT_VERSION, schema as contract_schema
 from api.ids import new_id
 from api.live import Cancelled, LiveTap
 from api.mapping import outcome_parts, report_artifacts
-from api.redact import install_access_log_redaction, install_log_redaction
+from api.redact import install_access_log_redaction, install_log_redaction, install_outbound_url_redaction
 from api.security import (MAX_BODY_BYTES, SESSION_COOKIE, BodyLimitMiddleware, CsrfMiddleware, ErrorShieldMiddleware,
-                          SecurityHeadersMiddleware)
+                          HeadMiddleware, SecurityHeadersMiddleware)
 from api.store import DownloadRegistry, Principal
 from api.feedback import MAX_COMMENT, check as check_feedback, record as feedback_record
 from api.capabilities import DEFAULT_STRATEGY, capabilities as capabilities_body, check_options
@@ -250,6 +250,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
     app = FastAPI(title="CC chat API", version="0.1.0", docs_url=None, redoc_url=None, openapi_url=None,
                   lifespan=lifespan)
     install_log_redaction()
+    install_outbound_url_redaction()
+    app.add_middleware(HeadMiddleware)  # innermost: HEAD = GET without a body (not SSE)
     app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_body_bytes)
     app.add_middleware(CsrfMiddleware)
     app.add_middleware(ErrorShieldMiddleware)  # inside SecurityHeaders: 500s get the headers too

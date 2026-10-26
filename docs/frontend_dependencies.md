@@ -1,6 +1,11 @@
 # Frontend dependency audit
 
-Last run: 2026-10-25 (platform). CI runs both audits: `npm run audit` in the web job and `pip-audit -r api/requirements.txt` in the api job. Locally, `web/ci/run_local.sh` runs the npm audit.
+Last run: 2026-10-25, re-checked at 22:20 PDT after the sprint's new dependencies (oxlint, @types/node):
+- `npm audit`: **0** vulnerabilities across 462 packages.
+- `pip-audit -r api/requirements.txt`: **none**.
+- Full-env `pip-audit`: only `pip` itself, as described below.
+
+CI runs both audits: `npm run audit` in the web job and `pip-audit -r api/requirements.txt` in the api job. Locally, `web/ci/run_local.sh` runs both, the pip one whenever pip-audit or uvx is available.
 
 ## npm (web/)
 
