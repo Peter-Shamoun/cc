@@ -188,6 +188,25 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -
   [data-testid="print-title"] { padding-left: 1rem; padding-right: 1rem; }
   .prose-chat pre, .prose-chat table, figure { break-inside: avoid; }
   a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.85em; color: #555; }
+  /*
+   * Paper fidelity (Claude/ChatGPT print): flat, black-on-white, nothing clipped.
+   * Chrome lays print out at the paper width without a resize event, so anything sized in pixels at screen width
+   * (Vega charts, images) is scaled to the column instead of being cut off at the right edge.
+   */
+  [data-testid="chart"] svg.marks, [data-testid="chart"] canvas.marks, figure img, .prose-chat img { max-width: 100% !important; height: auto !important; }
+  /* Code and SQL wrap instead of running off the page (horizontal scrollers don't exist on paper). */
+  .prose-chat pre, .prose-chat pre code, [data-testid="table-sql"] pre { white-space: pre-wrap !important; overflow-wrap: anywhere; overflow: visible !important; max-height: none !important; }
+  /* Tables: no sticky header (it can float over rows); repeat the header row on every page instead. */
+  thead { position: static !important; display: table-header-group; }
+  tr { break-inside: avoid; }
+  /* Flat: no elevation on paper. */
+  *, *::before, *::after { box-shadow: none !important; text-shadow: none !important; }
+  h1, h2, h3, h4, figcaption { break-after: avoid-page; }
+  p, li { orphans: 3; widows: 3; }
+  /* Screen-only affordances inside answers: download, expand, copy, "Change", "Open full table". */
+  [data-testid="msg-assistant"] button[aria-label^="Download"], [data-testid="msg-assistant"] button[aria-label^="Expand"],
+  [data-testid="msg-assistant"] button[aria-label^="Copy"], [data-testid="msg-assistant"] button[aria-label^="View spec"],
+  [data-testid="chart"] figcaption + div, [data-testid="user-actions"], [data-print-hide] { display: none !important; }
   /* "Print this answer": only the marked question + answer. */
   body[data-print-one] [data-message-id]:not([data-print-keep]) { display: none !important; }
   body[data-print-one] [data-message-id] { min-height: 0 !important; }
