@@ -144,3 +144,29 @@ describe('shell QA-S1..S8', () => {
     expect(screen.getByRole('button', { name: 'Chat options: Payer denials Q3' })).toBeTruthy();
   }, 120000);
 });
+
+describe('opening a stored chat', () => {
+  it('shows a thread skeleton while a slow store loads, then the chat', async () => {
+    cleanup();
+    render(<App />);
+    const box = screen.getByRole('textbox', { name: 'Message' });
+    fireEvent.change(box, { target: { value: 'Which CARC codes drive Cascade Medicaid denials?' } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    await waitFor(() => expect(screen.getByTestId('msg-actions')).toBeInTheDocument(), { timeout: 5000 });
+    fireEvent.keyDown(window, { key: 'O', code: 'KeyO', ctrlKey: true, shiftKey: true });
+    await waitFor(() => expect(screen.getByTestId('empty-state')).toBeInTheDocument());
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    const orig = MemoryTranscriptStore.prototype.getConversation;
+    const spy = vi.spyOn(MemoryTranscriptStore.prototype, 'getConversation').mockImplementation(async function (this: MemoryTranscriptStore, id) { await gate; return orig.call(this, id); });
+    fireEvent.click(screen.getAllByTestId('thread-item')[0].querySelector('button')!);
+    await waitFor(() => expect(screen.getByTestId('thread-skeleton')).toBeInTheDocument());
+    expect(screen.queryByTestId('empty-state')).toBeNull();
+    expect(screen.getByText('Loading chat…')).toBeInTheDocument();
+    await act(async () => { release(); await gate; });
+    await waitFor(() => expect(screen.queryByTestId('thread-skeleton')).toBeNull());
+    expect(screen.getByTestId('msg-actions')).toBeInTheDocument();
+    spy.mockRestore();
+  });
+});
+
