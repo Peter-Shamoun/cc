@@ -149,8 +149,8 @@ function Segmented({ value, onChange, options, label }: { value: string; onChang
 function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
     <button type="button" role="switch" aria-checked={checked} aria-label={label} onClick={() => onChange(!checked)}
-      className={clsx('relative h-6 w-10 rounded-full transition-colors', checked ? 'bg-[var(--focus)]' : 'bg-line-strong')}>
-      <span className={clsx('absolute left-0 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-150', checked ? 'translate-x-[18px]' : 'translate-x-0.5')} />
+      className={clsx('relative h-6 w-10 rounded-full transition-colors', checked ? 'bg-accent' : 'bg-line-strong')}>
+      <span className={clsx('absolute left-0 top-0.5 h-5 w-5 rounded-full shadow-sm transition-transform duration-150', checked ? 'translate-x-[18px] bg-accent-fg' : 'translate-x-0.5 bg-white')} />
     </button>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, Copy, Database, Download, Ellipsis, Keyboard, Moon, PanelLeft, Pencil, Settings, Share, SquarePen, Sun, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, Copy, Database, Download, Ellipsis, Keyboard, Moon, PanelLeft, Pencil, Settings, Share, ShieldCheck, SquarePen, Sun, Trash2 } from 'lucide-react';
 import { useTheme } from '../lib/theme';
 import { IconButton } from '../components/ui';
 import { Menu, modKey, useMenu, type MenuItem } from './primitives';
@@ -108,7 +108,7 @@ export function Header(p: HeaderProps) {
         )}
       </div>
       <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
-        <span className="hidden rounded-full bg-[#10a37f]/12 px-2.5 py-1 text-xs font-medium text-[#086b53] @[440px]:inline dark:text-[#4fd1a5]" title="PHI mode, set by the server" data-testid="phi-badge">De-identified</span>
+        <span className="hidden items-center gap-1 px-1.5 text-xs text-fg-subtle @[440px]:inline-flex" title="PHI mode, set by the server" data-testid="phi-badge"><ShieldCheck size={13} strokeWidth={1.75} aria-hidden /> De-identified</span>
         {p.hasChat && (
           <button type="button" onClick={p.onShare ?? share.toggle} aria-haspopup={p.onShare ? 'dialog' : 'menu'} aria-expanded={p.onShare ? undefined : !!share.anchor} data-testid="share-button" className="flex h-9 items-center gap-1.5 rounded-full border border-line px-3 text-sm hover:bg-hover @max-[600px]:w-9 @max-[600px]:justify-center @max-[600px]:px-0" aria-label="Share chat">
             <Share size={15} /> <span className="@max-[600px]:hidden">Share</span>
