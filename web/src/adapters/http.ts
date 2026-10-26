@@ -1,5 +1,5 @@
 import type { StreamEvent } from '../lib/contract';
-import type { AnalystAdapter } from './types';
+import type { AnalystAdapter, AnyStreamEvent } from './types';
 
 /**
  * Adapter for the real analyst endpoint (spec §5). POST {base}/api/chat with
@@ -26,14 +26,14 @@ export class HttpAnalystAdapter implements AnalystAdapter {
     await fetch(`${this.base}/api/chat/${encodeURIComponent(this.current)}/stop`, { method: 'POST', credentials: 'same-origin', headers: this.headers() }).catch(() => undefined);
   }
 
-  async *streamTurn({ conversationId, messages, signal }: Parameters<AnalystAdapter['streamTurn']>[0]): AsyncIterable<StreamEvent> {
+  async *streamTurn({ conversationId, messages, signal, resume }: Parameters<AnalystAdapter['streamTurn']>[0]): AsyncIterable<AnyStreamEvent> {
     const res = await fetch(`${this.base}/api/chat`, {
       method: 'POST',
       credentials: 'same-origin',
       cache: 'no-store',
       headers: this.headers({ 'content-type': 'application/json', accept: 'text/event-stream' }),
       // The server takes user turns only; prior assistant prose is reconstructed server-side.
-      body: JSON.stringify({ conversationId, messages: messages.filter((m) => m.role === 'user').map(({ id, role, text }) => ({ id, role, text })) }),
+      body: JSON.stringify({ conversationId, messages: messages.filter((m) => m.role === 'user').map(({ id, role, text }) => ({ id, role, text })), ...(resume ? { resume } : {}) }),
       signal,
     });
     if (!res.ok || !res.body) {
