@@ -6,7 +6,7 @@
 /* Design tokens from docs/frontend-spec.md §2 (observed/estimated; no proprietary assets). */
 :root, [data-palette="neutral"] {
   --bg: #ffffff; --bg-sidebar: #f9f9f9; --bg-elev: #ffffff; --bg-muted: #f4f4f4; --bg-hover: rgba(0,0,0,0.05);
-  --fg: #0d0d0d; --fg-muted: #5d5d5d; --fg-subtle: #8f8f8f;
+  --fg: #0d0d0d; --fg-muted: #5d5d5d; --fg-subtle: #6b6b6b; /* WCAG AA 4.5:1 on bg and sidebar (QA, axe color-contrast) */
   --border: rgba(0,0,0,0.1); --border-strong: #e6e6e6;
   --accent: #0d0d0d; --accent-fg: #ffffff; --link: #2964aa; --focus: #0285ff; --danger: #e02e2a;
   --callout-bg: #fff8e6; --callout-bar: #e8b339; --code-bg: #f3f3f3;
@@ -16,7 +16,7 @@
 }
 .dark, .dark[data-palette="neutral"] {
   --bg: #212121; --bg-sidebar: #181818; --bg-elev: #303030; --bg-muted: #303030; --bg-hover: rgba(255,255,255,0.05);
-  --fg: #ececec; --fg-muted: #b4b4b4; --fg-subtle: #8f8f8f;
+  --fg: #ececec; --fg-muted: #b4b4b4; --fg-subtle: #9b9b9b;
   --border: rgba(255,255,255,0.1); --border-strong: #424242;
   --accent: #ffffff; --accent-fg: #0d0d0d; --link: #7ab7ff; --danger: #ff6b6b;
   --callout-bg: #3a3020; --callout-bar: #c9952b; --code-bg: #171717;
@@ -24,7 +24,7 @@
 }
 [data-palette="paper"] {
   --bg: #f5f4ed; --bg-sidebar: #efede5; --bg-elev: #faf9f5; --bg-muted: #e8e6dc; --bg-hover: rgba(0,0,0,0.04);
-  --fg: #141413; --fg-muted: #5e5d59; --fg-subtle: #87867f;
+  --fg: #141413; --fg-muted: #5e5d59; --fg-subtle: #64635d;
   --border: rgba(0,0,0,0.1); --border-strong: #e8e6dc;
   --accent: #d97757; --accent-fg: #ffffff; --link: #b5552f; --focus: #3898ec; --danger: #b53333;
   --callout-bg: #f7eed9; --callout-bar: #d97757; --code-bg: #faf9f5;
@@ -34,7 +34,7 @@
 }
 .dark[data-palette="paper"] {
   --bg: #262624; --bg-sidebar: #1f1e1d; --bg-elev: #30302e; --bg-muted: #141413; --bg-hover: rgba(255,255,255,0.05);
-  --fg: #faf9f5; --fg-muted: #b0aea5; --fg-subtle: #87867f;
+  --fg: #faf9f5; --fg-muted: #b0aea5; --fg-subtle: #9a998f;
   --border: rgba(255,255,255,0.08); --border-strong: #3d3d3a;
   --danger: #e26d6d; --callout-bg: #3a3326; --code-bg: #1f1e1d;
   --shadow-composer: 0 0 0 1px var(--border), 0 4px 16px rgba(0,0,0,0.3);
