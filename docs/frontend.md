@@ -85,6 +85,23 @@ Part types and how they render:
 | `error` | Danger bar, message, collapsible details, Retry |
 | unknown | Muted "Unsupported content" chip |
 
+### HTTP errors before the stream starts
+
+`httpError` (`web/src/adapters/http.ts`) resolves an error in this order: `error.code` if it's a known code, then `error.legacyCode`, then the HTTP status. The fallback by status is: 400/422 → validation, 401 → auth_expired, 403 → access_denied, 404 → not_found, 405 → method_not_allowed, 409 → conflict, 410 → transcripts_unavailable, 413 → payload_too_large, 429 → rate_limited.
+
+| code | Card title | Retry |
+|---|---|---|
+| not_found | Not found | no |
+| access_denied | Not available | no |
+| payload_too_large | Message too long (gives the limit from `maxBytes`) | no |
+| clarification_expired / conflict | Ask again | no |
+| rate_limited | Too many requests (honours Retry-After) | yes |
+| internal / any 5xx | Analyst unavailable (generic copy, never the server's message) | yes |
+| method_not_allowed | Not supported | no |
+| unknown 4xx | Request not accepted (keeps the raw code) | no |
+
+Known 4xx cards show the server's fixed message, capped at 300 characters. The adapter handles the regenerate 404 and resume 409 fallbacks before `httpError` runs.
+
 ## Artifact panel
 
 Opens from any table, chart, code or image (and artifact cards). It's resizable by dragging or with the arrow keys (double-click resets to 50%, min 360 px, max 75%). It has segmented tabs (Table | SQL, Chart | Spec | Data, Code, Preview), Copy, Download, Full screen and Close (Esc). Opening it collapses the sidebar on screens narrower than 1400 px.

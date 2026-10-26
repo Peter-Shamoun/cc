@@ -62,26 +62,63 @@ export function networkError(): ErrorPart {
     : { type: 'error', id: 'err-network', code: 'internal', title: "Can't reach the analyst", message: 'The server did not respond. Try again in a moment.', retryable: true };
 }
 
+type Kind = { title: string; message: string; retryable: boolean };
+/** Our copy per known `HttpError.code` (contract `$defs/ErrorCode`, open). Server messages are preferred when present. */
+export const HTTP_ERROR_COPY: Record<string, Kind> = {
+  auth_expired: { title: 'Session expired', message: 'Sign in again to continue.', retryable: false },
+  rate_limited: { title: 'Too many requests', message: 'Wait a moment, then retry.', retryable: true },
+  access_denied: { title: 'Not available', message: "You don't have access to this conversation.", retryable: false },
+  not_found: { title: 'Not found', message: "That conversation or answer doesn't exist any more. Start a new question.", retryable: false },
+  validation: { title: "Couldn't send that", message: 'Check the question and try again.', retryable: false },
+  payload_too_large: { title: 'Message too long', message: 'Shorten the message, then send it again.', retryable: false },
+  clarification_expired: { title: 'Ask again', message: 'That follow-up question has expired. Ask your question again.', retryable: false },
+  conflict: { title: 'Ask again', message: 'This conversation changed in the meantime. Ask your question again.', retryable: false },
+  method_not_allowed: { title: 'Not supported', message: "This server doesn't support that action yet.", retryable: false },
+  invalid_title: { title: "Couldn't rename", message: 'Use a shorter title without line breaks.', retryable: false },
+  transcripts_unavailable: { title: 'Chat unavailable', message: 'This chat is no longer available.', retryable: false },
+  stream_gone: { title: 'Answer no longer streaming', message: 'Reload the conversation to see the saved answer.', retryable: false },
+  internal: { title: 'Analyst unavailable', message: 'Something went wrong on our side. Try again in a moment.', retryable: true },
+};
+/** Fallback when the body has no known code (old server, proxy page, HTML error). */
+const BY_STATUS: Record<number, string> = {
+  400: 'validation', 401: 'auth_expired', 403: 'access_denied', 404: 'not_found', 405: 'method_not_allowed', 409: 'conflict', 410: 'transcripts_unavailable',
+  413: 'payload_too_large', 422: 'validation', 429: 'rate_limited',
+};
+const MAX_SERVER_MESSAGE = 300;
+
 /**
- * Map a non-stream HTTP failure (CONTRACT.md §2: `{"error": {code, message}}`) to an error part.
- * Server messages are fixed, PHI-free strings; we still fall back to our own copy per code.
+ * Map a non-stream HTTP failure (CONTRACT.md §2: `{"error": {code, message, legacyCode?, maxBytes?}}`) to an error part.
+ * Resolution order: `error.code` if we know it, then `legacyCode`, then the HTTP status. 5xx and unknown statuses are
+ * retryable; an unknown 4xx is not (resending the same request won't help).
+ * Server messages are fixed, PHI-free strings. We still cap them and fall back to our own copy per code.
  */
 export async function httpError(res: Response): Promise<ErrorPart> {
-  let code = '';
-  let message = '';
+  let body: Partial<HttpError['error']> = {};
   try {
-    const j = (await res.json()) as Partial<HttpError>;
-    code = j.error?.code ?? '';
-    message = j.error?.message ?? '';
+    const j = (await res.json()) as Partial<HttpError> | null;
+    if (j && typeof j.error === 'object' && j.error) body = j.error;
   } catch { /* not JSON */ }
-  const retryAfter = retryAfterMs(res.headers.get('retry-after')) ?? 0;
+  const str = (v: unknown) => (typeof v === 'string' ? v : '');
+  const raw = str(body.code);
+  const legacy = str(body.legacyCode);
+  const code = HTTP_ERROR_COPY[raw] ? raw : HTTP_ERROR_COPY[legacy] ? legacy : BY_STATUS[res.status] ?? (res.status >= 500 || res.status < 400 ? 'internal' : '');
+  const serverMsg = str(body.message).trim().slice(0, MAX_SERVER_MESSAGE);
   const base = { type: 'error' as const, id: `err-http-${res.status}` };
-  if (res.status === 401 || code === 'auth_expired') return { ...base, code: 'auth_expired', title: 'Session expired', message: message || 'Sign in again to continue.', retryable: false };
-  if (res.status === 429 || code === 'rate_limited') return { ...base, code: 'rate_limited', title: 'Too many requests', message: message || 'Wait a moment, then retry.', retryable: true, ...(retryAfter > 0 ? { retryAfterMs: retryAfter } : {}) };
-  if (res.status === 403 || res.status === 404 || code === 'access_denied') return { ...base, code: 'access_denied', title: 'Not available', message: message || "You don't have access to this conversation.", retryable: false };
-  if (res.status === 410) return { ...base, code: code || 'transcripts_unavailable', title: 'Chat unavailable', message: message || 'This chat is no longer available.', retryable: false };
-  if (res.status === 422 || code === 'validation') return { ...base, code: 'validation', title: "Couldn't send that", message: message || 'Check the question and try again.', retryable: false };
-  return { ...base, code: code || 'internal', title: 'Analyst unavailable', message: `The analyst returned ${res.status}. Try again in a moment.`, retryable: true };
+  if (!code) {
+    // Unknown 4xx with an unknown code: not retryable, keep the server's code for diagnostics.
+    return { ...base, code: raw || `http_${res.status}`, title: 'Request not accepted', message: serverMsg || `The analyst rejected the request (${res.status}).`, retryable: false };
+  }
+  const k = HTTP_ERROR_COPY[code];
+  if (code === 'internal') {
+    // Generic 5xx copy only; a server-side message for an internal error is not shown.
+    return { ...base, code: raw && !HTTP_ERROR_COPY[raw] ? raw : 'internal', title: k.title, message: `The analyst returned ${res.status}. Try again in a moment.`, retryable: true };
+  }
+  let message = serverMsg || k.message;
+  if (code === 'payload_too_large' && !serverMsg && typeof body.maxBytes === 'number' && body.maxBytes > 0) {
+    message = `Shorten the message to under ${Math.max(1, Math.floor(body.maxBytes / 1024))} KB, then send it again.`;
+  }
+  const retryAfter = retryAfterMs(res.headers.get('retry-after')) ?? 0;
+  return { ...base, code, title: k.title, message, retryable: k.retryable, ...(code === 'rate_limited' && retryAfter > 0 ? { retryAfterMs: retryAfter } : {}) };
 }
 
 export class HttpAnalystAdapter implements AnalystAdapter {
