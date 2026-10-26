@@ -1,7 +1,8 @@
 # ClaimClarity chat API — stream contract
 
-**Version: 1.0.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
-TypeScript mirror: [`web/src/api/contract.ts`](../web/src/api/contract.ts)
+**Version: 1.1.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
+client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
 This is the interface between the analyzer (whichever bundle wins the search) and the chat UI.
 The frontend builds against this document only; the analyzer adapts to it.
@@ -19,15 +20,23 @@ The frontend builds against this document only; the analyzer adapts to it.
      Majors get a new schema file (`v2.schema.json`) and the server must keep serving v1 until the UI moves.
 3. Every stream announces its version in `message.start.contractVersion`; `GET /api/contract` returns
    `{version, schema}`.
-4. The contract test suite (`api/tests/test_contract.py`) validates every event emitted by every demo
+4. **One source of truth.** `v1.schema.json` is canonical. `web/src/contract/v1.gen.ts` is generated from it
+   (`python -m api.contract.gen_ts`; `--check` exits 1 on drift, run by `api/tests/test_contract_ts.py`), and
+   `web/src/contract/compat.test.ts` asserts at compile time that every hand-written type in `web/src/api/contract.ts`
+   / `web/src/lib/contract.ts` is mutually assignable with its generated twin, so `npm run build` fails on drift.
+5. The contract test suite (`api/tests/test_contract.py`) validates every event emitted by every demo
    scenario against the schema. A backend change that emits something off-contract fails CI.
 
 ## 1. Transport
 
 * `POST /api/chat` with a `ChatRequest` JSON body → `text/event-stream`.
+* `GET /api/chat/{messageId}/stream` (+ optional `Last-Event-ID`) → the same stream, replayed then live (§8). Works
+  with a native `EventSource` (cookie auth), whose automatic reconnect sends `Last-Event-ID` for you.
 * Each SSE frame is `id: <messageId>:<seq>` + `data: <one JSON StreamEvent>`. Heartbeats have no `id:`.
 * Auth: httpOnly `cc_session` cookie (prod) or `Authorization: Bearer demo:<customer>:<user>` (demo mode).
-* Non-stream failures (401, 404, 422) return `HttpError` JSON: `{"error": {"code", "message"}}`.
+* Non-stream failures (401, 404, 409, 422) return `HttpError` JSON: `{"error": {"code", "message"}}`. Codes the UI
+  should branch on: `auth_expired` (401), `access_denied` (404), `stream_gone` (404: nothing to resume, the run
+  finished > 60 s ago or never existed), `clarification_expired` (409), `validation` (422).
 * Every response carries `Cache-Control: no-store` and the security headers in §10.
 
 ## 2. Ids and ordering guarantees
@@ -126,10 +135,20 @@ answer shows both the small and the large model).
 
 ## 8. Cancel, resume-after-disconnect, regenerate
 
-* **Cancel:** `POST /api/chat/{messageId}/stop` → `{"stopped": true}`. The stream finishes with
-  `message.end {finishReason: "aborted"}` within 1 s. Dropping the connection also cancels.
-* **Reconnect:** re-`POST /api/chat` with header `Last-Event-ID: <messageId>:<seq>`; the server replays every
-  event with a larger seq (available for 60 s after the run ends).
+* **Cancel:** `POST /api/chat/{messageId}/stop` → `{"stopped": true}` (idempotent; 404 `{"stopped": false}` for
+  another user's or an unknown run). The stream finishes with `message.end {finishReason: "aborted"}` within 1 s.
+  Before that `message.end`, the server **closes everything still in flight**: every `step.sql_running` without a result
+  gets `step.sql_result {ok: false, error: {code: "cancelled"}}`, an open reasoning part gets `reasoning.end`, an open
+  text part gets `text.end`. So a UI never has to guess which spinners to stop. Partial parts are not persisted.
+* **Disconnect ≠ cancel (1.1).** If the last attached client drops, the run keeps going for
+  `CC_API_DISCONNECT_GRACE_SECONDS` (default 30 s). If any client re-attaches in that window the run continues;
+  otherwise it is cancelled exactly as if `/stop` had been called. Several tabs may be attached to one run.
+* **Reconnect:** `GET /api/chat/{messageId}/stream` with header `Last-Event-ID: <messageId>:<seq>` (preferred), or
+  re-`POST /api/chat` with that header (1.0 behaviour, body ignored). The server replays every event with a larger
+  seq, then follows the run live with heartbeats; available until 60 s after the run ends. Without `Last-Event-ID`
+  the GET replays from seq 0. Clients still drop `seq <= lastSeq`, so overlapping replays are harmless.
+  Recommended client loop: on a network error before `message.end`, retry the GET with the last seen id after
+  250 ms, 1 s, 2 s, 4 s; on `stream_gone`, reload the conversation from `GET /api/conversations/{id}`.
 * **Regenerate:** `ChatRequest.regenerate = {messageId}` re-runs the user turn that produced `messageId`; the new
   message has `regenerateOf` set and is a sibling branch in the transcript.
 * **Edit:** send the edited text as a user message with `parentId` = the parent of the edited message; the server
@@ -176,6 +195,12 @@ from the demo backend by `python -m api.contract.gen_examples` and checked by `a
 * `error.details` and `step.*.error.message` are scrubbed (quoted literals and long digit runs masked) and ≤500 chars.
 
 ## Changelog
+
+* **1.1.0** (2026-10-25) — transport + tooling, additive. `GET /api/chat/{messageId}/stream` resume (EventSource
+  friendly); a dropped connection no longer cancels immediately (30 s re-attach grace); cancel closes in-flight steps
+  (`step.sql_result` `error.code: "cancelled"`) and reasoning; `stream_gone` error code; TS types generated from the
+  schema with a compile-time drift gate. Schema fixes to match the documented shapes: `artifact.content` is one of
+  table/chart/code/image part or `{markdown}`; `ChatRequest.scenario` is the documented enum.
 
 * **1.0.0** (2026-10-25) — first versioned contract. Adds `seq`, `contractVersion`, `step.*` events,
   `escalation`, `abstain` and `clarification` parts, `finishReason` `abstain`/`needs_input`, rich `usage`,
