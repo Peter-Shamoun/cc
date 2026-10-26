@@ -86,9 +86,9 @@ remove it.
 
 | | desktop | mobile (simulated slow 4G, 4x CPU) |
 |---|---|---|
-| performance / accessibility / best-practices | ≥ 0.95 / 1.00 / 0.95 | ≥ 0.85 / 1.00 / 0.95 |
-| FCP / LCP | ≤ 1000 / 1200 ms | ≤ 3200 / 3500 ms |
-| TBT / time to interactive | ≤ 150 / 1500 ms | ≤ 300 / 4000 ms |
+| performance / accessibility / best-practices | ≥ 0.95 / 1.00 / 0.95 | ≥ 0.95 / 1.00 / 0.95 |
+| FCP / LCP | ≤ 1000 / 1200 ms | ≤ 2500 / 2500 ms |
+| TBT / time to interactive | ≤ 150 / 1500 ms | ≤ 300 / 3000 ms |
 | CLS | ≤ 0.02 | ≤ 0.02 |
 | bytes transferred | ≤ 350 KB | ≤ 350 KB |
 
@@ -108,6 +108,30 @@ remove it.
 - 12.x is pinned because 13.x needs Node ≥ 22.19 and CI runs Node 20.
 - Tighten budgets when the app gets faster; don't loosen them to make a PR pass. A loosening needs a note here saying why.
 - Interaction performance (500-message thread, 10k-row table) is covered separately by `npm run e2e:perf`. The bundle-size budget is `scripts/bundle_budget.mjs`.
+
+**Tightened:** QA-P8 (boot shell, lazy markdown, non-blocking stylesheet) took mobile to 0.98 (median of 3). Mobile FCP, LCP and TTI were tightened then. After #221, mobile performance went 0.85 → 0.90 → **0.95**.
+
+## Slow-3G first paint (local gate)
+
+`scripts/slow3g_budget.mjs` does a cold load of `dist-mock` under DevTools "Slow 3G": 400 kbps, 2 s RTT, cache disabled, desktop 1440×900 and mobile 390×844 with 4x CPU.
+- It serves the build itself, gzip-compressed like production, on `CI_SLOW3G_PORT` (default 5241). `vite preview` doesn't compress, so it would overstate the cost of every byte.
+- It runs after the preview server stops, keeping one server at a time.
+- `SKIP_SLOW3G=1` skips it.
+
+| | desktop | mobile (4x CPU) |
+|---|---|---|
+| first contentful paint | ≤ 2500 ms | ≤ 2500 ms |
+| composer ("Message" textbox) visible | ≤ 3000 ms | ≤ 3500 ms |
+
+**Measurements:**
+- At introduction (sota@03c4268): FCP 2.09 s on both form factors; composer 2.12 s desktop and 2.17–2.20 s mobile.
+- Before the QA-P8 boot shell, FCP was 10.1 s.
+- The 2 s RTT alone is most of that, so the budget mainly catches anything that gets in front of the first paint: a render-blocking stylesheet or font, a synchronous script, or a bigger HTML document.
+- A missing metric fails the step rather than passing.
+
+**Scope:**
+- It's local-gate only. Adding it to `ci/web.yml` waits for the workflow move.
+- QA's `e2e/review/slow3g.mjs` is the screenshot-strip review tool and stays separate.
 
 ### Lint: zero warnings
 
