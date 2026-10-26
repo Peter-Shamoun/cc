@@ -5,8 +5,9 @@ import { useChat } from '../lib/useChat';
 import { MockAnalystAdapter } from '../adapters/mock';
 import { MemoryTranscriptStore } from '../adapters/memoryStore';
 import { HttpAnalystAdapter } from '../adapters/http';
+import { HttpTranscriptStore } from '../adapters/httpStore';
 import { AdapterCtx } from '../adapters/context';
-import type { AnalystAdapter } from '../adapters/types';
+import type { AnalystAdapter, TranscriptStore } from '../adapters/types';
 import { Sidebar, SidebarRail } from '../components/Sidebar';
 import { Composer } from '../components/Composer';
 import { messageMarkdown, type Artifact } from '../components/Message';
@@ -33,6 +34,16 @@ function makeAdapter(): AnalystAdapter {
   return new HttpAnalystAdapter(base === '/' ? '' : base.replace(/\/$/, ''), import.meta.env.VITE_ANALYST_DEMO_TOKEN as string | undefined);
 }
 
+/**
+ * Live API -> chat history comes from the server (/api/conversations, platform #104); offline mock -> memory.
+ * VITE_TRANSCRIPTS=memory forces the in-memory store even against the live API.
+ */
+function makeStore(adapter: AnalystAdapter): TranscriptStore {
+  const base = import.meta.env.VITE_ANALYST_BASE as string | undefined;
+  if (adapter.name !== 'http' || import.meta.env.VITE_TRANSCRIPTS === 'memory' || base === undefined) return new MemoryTranscriptStore();
+  return new HttpTranscriptStore(base === '/' ? '' : base.replace(/\/$/, ''), import.meta.env.VITE_ANALYST_DEMO_TOKEN as string | undefined);
+}
+
 const phoneQuery = () => (typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 767px)') : null);
 /** Hash routes carry only opaque ids (`#/c/c_x1y2`), never titles or text (no PHI in URLs, spec §6). */
 const routeId = () => /^#\/c\/([\w-]+)$/.exec(window.location.hash)?.[1] ?? null;
@@ -48,8 +59,19 @@ export function AppShell() {
 
 function ShellInner() {
   const adapter = useMemo(makeAdapter, []);
-  const store = useMemo(() => new MemoryTranscriptStore(), []);
+  const store = useMemo(() => makeStore(adapter), [adapter]);
   const chat = useChat(adapter, store);
+  // Server store: re-render once the history mode is known; reopen a routed chat after reload (ids only in the URL).
+  const [, setStoreReady] = useState(false);
+  const bootRoute = useRef(routeId());
+  useEffect(() => {
+    if (!(store instanceof HttpTranscriptStore)) return;
+    store.ready.then(() => {
+      setStoreReady(true);
+      const id = bootRoute.current;
+      if (id) chat.open(id);
+    });
+  }, [store]); // eslint-disable-line react-hooks/exhaustive-deps
   const toast = useToast();
   const { setPreference } = useTheme();
   const [mobile, setMobile] = useState(() => phoneQuery()?.matches ?? false);
@@ -115,7 +137,7 @@ function ShellInner() {
     return () => { window.removeEventListener('popstate', on); window.removeEventListener('hashchange', on); };
   }, [chat]);
   // A route to a chat this tab doesn't hold (memory-only history, so: after reload) falls back to a new chat.
-  useEffect(() => { if (routeId() && !chat.convId) window.history.replaceState(null, '', window.location.pathname + window.location.search); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (routeId() && !chat.convId && !(store instanceof HttpTranscriptStore)) window.history.replaceState(null, '', window.location.pathname + window.location.search); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- drafts follow a new chat to its id ----
   const prevConv = useRef<string | null>(null);
@@ -280,7 +302,7 @@ function ShellInner() {
     // Clarification chips / free text resume the paused run (ChatRequest.resume); abstain rephrasings send plainly.
     reply: (t, resume) => send(t, resume),
   };
-  const searchStore = useCallback((q: string) => store.search(q), [store]);
+  const searchStore = useCallback((q: string) => store.search?.(q) ?? Promise.resolve([]), [store]);
   const openFromSearch = async (id: string, messageId?: string) => {
     await chat.open(id);
     closeDrawer();
