@@ -118,8 +118,10 @@ The user never picks a database, lake, schema, view or customer, and no client c
 * **Production:** each request opens a session server-side from the user's Cognito id token: the `custom:customer`
   claim names the tenant, and `ccsim.query.open_session` (via `analyzer.opener.QueryPathOpener`) assumes that
   customer's reader role, reads its semantic-layer manifest and mounts only the `sem.*` relations with per-relation
-  secrets and allowed directories. The analyzer discovers tables itself (`list_relations` over `sem.*`); escalation to
-  `lossless.*` is never granted from chat.
+  secrets and allowed directories. The analyzer discovers tables itself (`list_relations` over `sem.*`). Only the
+  analyzer may escalate to the PHI-stripped `lossless.*`, with a stated reason, when `sem.*` cannot answer: the
+  session is re-opened for the same customer, the grant is audited, and the stream shows it as a `step.explore`
+  with probe `request_escalation` (*data escalation*; the `escalation` event is a model handoff, not this).
 * **Demo:** the token `demo:<customer>:<user>` stands in for the id token and `api/backends.py: DEMO_DIRECTORY`
   for the manifest. The session's customer, user and relations come from them; the DuckDB connection holds exactly
   those relations, can't read files or the network, and has its configuration locked.
@@ -154,7 +156,7 @@ The user never picks a database, lake, schema, view or customer, and no client c
 |---|---|---|
 | `message.start` | first | `messageId`, `conversationId`, `contractVersion`, `model?`, `strategy?`, `parentId?` (user turn), `resumeOf?` `{clarificationId, messageId}`, `regenerateOf?`, `regenerateStyle?` (1.10), `editOf?` (1.2) |
 | `status` | any time | `label` (short present-tense phrase, e.g. "Running query") or `null` to clear |
-| `step.explore` | schema/data probe | `stepId`, `probe` (*open*: `list_views`, `describe_view`, `sample_values`, `lookup_glossary`, `lookup_dictionary`, `search_examples`, `profile`), `target?`, `summary`, `elapsedMs?` |
+| `step.explore` | schema/data probe | `stepId`, `probe` (*open*: `list_views`, `describe_view`, `sample_values`, `lookup_glossary`, `lookup_dictionary`, `search_examples`, `profile`, `request_escalation`), `target?`, `summary`, `elapsedMs?`. `request_escalation` is a data escalation to `lossless.*`: `summary` is `Reason: <reason, PHI-like values masked>`, or `Failed: …` when refused |
 | `step.sql_running` | a query starts | `stepId`, `sql` (full text), `purpose` (`explore`·`answer`·`candidate`·`repair`·`check`), `attempt` (1-based), `candidateId?`, `repairOf?`, `label?` |
 | `step.sql_result` | that query ends | `stepId`, `ok`, `elapsedMs`, `rowCount?`, `columns?` (`{name, type?}` only), `truncated?`, `error?` `{code, message}` |
 | `step.repair_attempt` | a failed query is being fixed | `stepId`, `failedStepId`, `attempt`, `maxAttempts?`, `error`, `revisedSql`, `explanation?` |

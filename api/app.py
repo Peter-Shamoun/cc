@@ -30,10 +30,10 @@ from analyzer.loop import Analyzer
 from analyzer.tools import ToolLayer
 
 from api.backends import (CANCEL_AT, MULTI_TABLE_SQL, MULTI_TABLE_TITLES, SCENARIO_CONFIG, AuthError, DemoAuth,
-                          SimAuth, detect_scenario, make_llm)
+                          ReasonedEscalationOpener, SimAuth, detect_scenario, make_llm)
 from api.contract import CONTRACT_VERSION, schema as contract_schema
 from api.ids import new_id
-from api.live import Cancelled, LiveTap
+from api.live import Cancelled, LiveTap, masked_escalation_reason
 from api.cancel import CancellableOpener
 from api.temporary import DEFAULT_TTL_SECONDS as TEMPORARY_TTL, TemporaryChats
 from api.mapping import multi_table_parts, outcome_parts, prior_artifacts, report_artifacts
@@ -687,18 +687,29 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             answer = None
             cli_sessions: list = []
             opener = CancellableOpener(ctx.opener, run.cancelled).start()  # Stop interrupts the running SQL
+
+            def audit_data_escalation(reason: str):
+                audit("data_escalation", customer=ctx.principal.customer, user=ctx.principal.user,
+                      conversation_id=conversation_id, message_id=message_id,
+                      reason=masked_escalation_reason(reason))
+
+            # lossless.* only on the analyzer's stated reason, for the same signed-in customer, audited
+            session_opener = ReasonedEscalationOpener(opener, on_escalation_granted=audit_data_escalation)
             try:
                 if cli_driver is not None:
                     tap = LiveTap(None, emit, cancelled=run.cancelled, started=started)
+                    queries_signed_in_customer = cli_driver.queries_signed_in_customer
                     answer = cli_driver.answer(question, tap, run.cancelled,
-                                               opener=opener if cli_driver.queries_signed_in_customer else None,
-                                               prepared_sessions=cli_sessions)
+                                               opener=session_opener if queries_signed_in_customer else None,
+                                               prepared_sessions=cli_sessions,
+                                               on_snapshot_escalation=None if queries_signed_in_customer
+                                               else audit_data_escalation)
                 else:
                     config = AnalyzerConfig(**overrides)
                     inner = llm_factory() if llm_factory else make_llm(settings.llm, scenario)
                     tap = LiveTap(inner, emit, cancelled=run.cancelled, model_delay=delay, started=started,
                                   multi_candidate=config.candidates > 1)
-                    answer = Analyzer(opener, tap, config).answer(question)
+                    answer = Analyzer(session_opener, tap, config).answer(question)
                 tap.finish(answer)
                 elapsed = int((time.perf_counter() - started) * 1000)
                 parts, finish = outcome_parts(answer, ctx.principal, downloads.scoped(conversation_id), elapsed_ms=elapsed, question=question,

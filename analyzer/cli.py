@@ -92,11 +92,19 @@ def _query_seconds_spent(session_dir: Path) -> float:
     return sum(json.loads(line).get("seconds", 0.0) for line in path.read_text().splitlines() if line.strip())
 
 
-def _load_escalated(session_dir: Path) -> bool:
+def load_escalated(session_dir: Path) -> bool:
     path = _escalation_path(session_dir)
     if not path.exists():
         return False
     return json.loads(path.read_text()).get("escalated") is True
+
+
+def _session_escalated(session_dir: Path, opener) -> bool:
+    """A run channel's reader session (the API's ``RunReaderSession``) knows whether this run escalated; its word
+    decides, not escalation.json. Otherwise the session's own escalation.json does."""
+    if opener is not None and hasattr(opener, "escalated"):
+        return opener.escalated
+    return load_escalated(session_dir)
 
 
 def latest_interpretation(session_dir: Path) -> dict | None:
@@ -132,7 +140,7 @@ def _tools(session_dir: Path, opener=None) -> tuple[ToolLayer, dict]:
 
     tools = ToolLayer(_session_opener(meta, opener), config, question_id=meta.get("question_id"),
                       question_family=meta.get("question_family"), audit_sink=sink,
-                      restored_escalation=_load_escalated(session_dir),
+                      restored_escalation=_session_escalated(session_dir, opener),
                       restored_query_seconds=_query_seconds_spent(session_dir))
     prior = [call for call in _read_calls(session_dir) if call.get("command") in INVESTIGATIVE_COMMANDS
              and call.get("command") not in UNCHARGED_COMMANDS and call.get("ok")]

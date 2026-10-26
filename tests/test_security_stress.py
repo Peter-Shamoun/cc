@@ -586,6 +586,68 @@ def test_escalation_strips_direct_identifiers_and_phi_ref_qualifiers(world):
         run_agent_sql(_session(world), "SELECT count(*) FROM lossless.edi_entity")
 
 
+def _manifest_lossless_keys(world, session) -> list[str]:
+    """The gold keys the session's own CURRENT manifest lists for lossless.* relations."""
+    s3 = world.aws.client("s3", session.credentials)
+    manifest = json.loads(s3.get_object(
+        Bucket=BUCKET, Key=f"{session.customer}/semantic_layer/{session.version}/manifest.json")["Body"].read())
+    return [key for rel, parts in manifest["relations"].items() if rel.startswith("lossless.")
+            for keys in parts.values() for key in keys]
+
+
+def _stored_keys(world, prefix: str, limit: int = 3) -> list[str]:
+    """Keys that exist, read from the mock's own object table (no request, so no policy applies)."""
+    return [row[0] for row in world.aws.s3.db.execute(
+        "SELECT key FROM objects WHERE bucket = ? AND is_latest = 1 AND delete_marker = 0 AND key LIKE ? "
+        "ORDER BY key LIMIT ?", (BUCKET, prefix + "%", limit)).fetchall()]
+
+
+def test_escalated_credentials_read_only_the_own_customers_lossless_gold(world):
+    """An escalated reader session's temporary credentials, at the AWS level: its own customer's lossless.* gold
+    files are readable; another customer's lossless.* files and every silver (parquet/) or raw file, its own
+    included, are AccessDenied. Through DuckDB with the guard, the scoped secret and allowed_directories all off,
+    another customer's lossless files still fail on the IAM policy."""
+    labs = _session(world, escalate=True)
+    diagnostics = _session(world, "dev@xifin.example", escalate=True)
+    assert (labs.customer, diagnostics.customer) == ("acme_labs", "acme_diagnostics")
+    own_keys, other_keys = _manifest_lossless_keys(world, labs), _manifest_lossless_keys(world, diagnostics)
+    assert own_keys and other_keys and not set(own_keys) & set(other_keys)
+    s3 = world.aws.client("s3", labs.credentials)
+    for key in own_keys[:5]:
+        assert s3.get_object(Bucket=BUCKET, Key=key)["Body"] is not None
+    for key in other_keys[:5]:
+        with pytest.raises(AccessDenied):
+            s3.get_object(Bucket=BUCKET, Key=key)
+    for customer in ("acme_labs", "acme_diagnostics"):
+        silver_and_raw = _stored_keys(world, f"{customer}/parquet/") + _stored_keys(world, f"{customer}/raw/")
+        assert silver_and_raw
+        for key in silver_and_raw:
+            with pytest.raises(AccessDenied):
+                s3.get_object(Bucket=BUCKET, Key=key)
+    unscoped = _session(world, escalate=True, enforce_allowed_directories=False, scope_secret=False)
+    other = f"s3://{BUCKET}/{other_keys[-1]}"
+    with pytest.raises(Exception, match="403|Forbidden|AccessDenied|HTTP"):
+        unscoped.con.execute(f"SELECT count(*) FROM read_parquet('{other}')").fetchall()
+    with pytest.raises(GuardError):
+        run_agent_sql(labs, f"SELECT count(*) FROM read_parquet('{other}')")
+    assert run_agent_sql(labs, "SELECT DISTINCT tenant_code FROM lossless.edi_source_file") == [("acme_labs",)]
+
+
+def test_escalated_session_has_no_identifier_columns_and_refuses_to_open_one(world):
+    from analyzer.tools import is_phi_column
+    from ccsim.query import IdentifierColumnExposed, refuse_identifier_columns
+    session = _session(world, escalate=True)
+    columns = session.con.execute("SELECT table_name, column_name FROM duckdb_columns() "
+                                  "WHERE schema_name = 'lossless'").fetchall()
+    assert len({table for table, _ in columns}) >= 10
+    assert not [f"{table}.{column}" for table, column in columns if is_phi_column(column)]
+    leaky = duckdb.connect()
+    leaky.execute("CREATE SCHEMA lossless")
+    leaky.execute("CREATE TABLE lossless.edi_entity (entity_uid VARCHAR, name_first VARCHAR)")
+    with pytest.raises(IdentifierColumnExposed, match="name_first"):
+        refuse_identifier_columns(leaky)
+
+
 # Correct B1 answers from s1r2 / s4_test whose plans hold the keyless joins the cost check inspects.
 _HISTORICAL_B1_ANSWERS = [
     # g1_ar_open_30 (s1r2): CROSS_PRODUCT of a one-row as-of CTE with every open claim

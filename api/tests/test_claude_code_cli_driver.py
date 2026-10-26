@@ -44,7 +44,13 @@ def tiny_snapshot(tmp_path):
     connection = duckdb.connect()
     connection.execute("CREATE TABLE c AS SELECT * FROM (VALUES ('Aetna', 3), ('Blue Cross', 5)) t(payer_name, claim_count)")
     connection.execute(f"COPY c TO '{snapshot_dir / 'data' / 'sem' / 'sem.claims.parquet'}' (FORMAT parquet)")
-    (snapshot_dir / "meta.json").write_text(json.dumps({"customer": "acme_labs", "relations": ["sem.claims"]}))
+    (snapshot_dir / "data" / "lossless").mkdir()
+    connection.execute("CREATE TABLE f AS SELECT * FROM (VALUES ('f1', 'REJECTED'), ('f2', 'PARSED'), ('f3', 'REJECTED')) "
+                       "t(file_id, parse_status)")
+    connection.execute(f"COPY f TO '{snapshot_dir / 'data' / 'lossless' / 'lossless.edi_source_file.parquet'}' "
+                       "(FORMAT parquet)")
+    (snapshot_dir / "meta.json").write_text(json.dumps({"customer": "acme_labs",
+                                                        "relations": ["sem.claims", "lossless.edi_source_file"]}))
     return snapshot_dir
 
 
@@ -119,13 +125,40 @@ def test_refusal_and_clarification_finals_map(driver_factory):
     assert answer.kind == "clarification" and answer.text == "Which year?"
 
 
-def test_no_final_answer_or_an_escalation_fails_closed(driver_factory):
+LOSSLESS_SQL = "SELECT count(*) AS rejected FROM lossless.edi_source_file WHERE parse_status = 'REJECTED'"
+ESCALATION_REASON = "sem.* has no parse status for file 123-45-6789; need rejected files"
+
+
+def escalation_plan(escalated=True):
+    calls = [{"record": {"command": "escalate", "argument": {"reason": ESCALATION_REASON}, "ok": True,
+                         "result": "ok"}}] if escalated else []
+    calls.append({"record": {"command": "answer", "argument": {"sql": LOSSLESS_SQL, "text": "2 files were rejected."},
+                             "ok": True, "result": "ok"}})
+    files = {"final.json": {"kind": "answer", "sql": LOSSLESS_SQL, "text": "2 files were rejected.", "via": "sql"}}
+    if escalated:
+        files["escalation.json"] = {"escalated": True, "reason": ESCALATION_REASON, "customer": "acme_labs"}
+    return {"calls": calls, "files": files}
+
+
+def test_no_final_answer_fails_closed(driver_factory):
     with pytest.raises(AnalyzerRunFailed, match="without a final answer"):
         run_driver(driver_factory({"calls": []}))
-    escalated = answer_plan()
-    escalated["files"]["escalation.json"] = {"escalated": True}
-    with pytest.raises(AnalyzerRunFailed, match="escalated"):
-        run_driver(driver_factory(escalated))
+
+
+def test_a_snapshot_escalation_is_shown_audited_and_re_executed_with_lossless(driver_factory):
+    granted = []
+    tap = LiveTap(None, (emitted := []).append)
+    answer = driver_factory(escalation_plan()).answer("How many files were rejected?", tap, threading.Event(),
+                                                      on_snapshot_escalation=granted.append)
+    tap.finish(answer)
+    assert answer.kind == "answer" and answer.rows == [[2]]
+    (step,) = [event for event in emitted if event.get("probe") == "request_escalation"]
+    assert step["type"] == "step.explore" and step["summary"].startswith("Reason: sem.* has no parse status")
+    assert "123-45-6789" not in step["summary"]
+    assert granted == [ESCALATION_REASON]          # the app masks it before it reaches the audit log
+    # without a granted escalation the same lossless answer cannot be re-executed
+    with pytest.raises(Exception, match="lossless"):
+        run_driver(driver_factory(escalation_plan(escalated=False)))
 
 
 def test_stop_kills_the_worker_promptly(driver_factory):
@@ -150,7 +183,7 @@ def test_stop_kills_the_worker_promptly(driver_factory):
     assert [event["type"] for event in emitted if event["type"].startswith("step.")] == ["step.explore"]
 
 
-def test_worker_command_is_the_shipped_bundle_without_escalation(tiny_snapshot, tmp_path, monkeypatch):
+def test_worker_command_is_the_shipped_bundle_and_may_escalate(tiny_snapshot, tmp_path, monkeypatch):
     monkeypatch.setattr("bench.agent_session.SESSIONS_ROOT", tmp_path / "sessions")
     driver = ClaudeCodeCliDriver(tiny_snapshot)
     session_dir = driver.prepare_session("Claims by payer?")
@@ -160,7 +193,8 @@ def test_worker_command_is_the_shipped_bundle_without_escalation(tiny_snapshot, 
     command = driver.worker_command(session_dir)
     assert command[:2] == ["claude", "-p"] and command[command.index("--model") + 1] == "haiku"
     assert command[command.index("--effort") + 1] == "low"
-    assert f"Bash(python3 -m analyzer.cli --session {session_dir} escalate:*)" in command
+    disallowed = command[command.index("--disallowedTools") + 1:command.index("--output-format")]
+    assert not [tool for tool in disallowed if "escalate" in tool]   # escalate is an ordinary, audited command
 
 
 def test_app_streams_a_cli_answer_and_saves_it(driver_factory):

@@ -13,7 +13,7 @@ Data scope:
 - With ``DemoAuth`` the CLI queries the bench snapshot named by ``CC_API_ANALYZER_SNAPSHOT`` itself (as the bench does).
 - With a real auth backend (``SimAuth``) the run queries the signed-in customer's lake: ``answer`` gets the request's
   opener (``QueryPathOpener`` → ``ccsim.query.open_session``, customer from the verified token only, wrapped by
-  ``NoEscalateOpener`` and ``CancellableOpener``). This process opens that reader session once per run
+  ``CancellableOpener`` and ``ReasonedEscalationOpener``). This process opens that reader session once per run
   (``RunReaderSession``) and serves the worker's ``analyzer.cli`` commands on a run-scoped unix socket
   (``analyzer.run_channel``): the CLI sends its argv and prints what comes back, so credentials and the connection
   never leave this process and the worker cannot name another customer. The snapshot is then only the TRAIN example
@@ -23,7 +23,8 @@ Session folders hold the question text: the app removes a run's folder once the 
 (``discard_session``), and ``sweep_expired_sessions`` removes any left behind by a crash.
 
 Limits (dev and mock runs only):
-- ``escalate`` (``lossless.*``) is disallowed for the worker, and a session that escalated anyway fails closed.
+- ``escalate "<reason>"`` re-opens the run's reader session with ``lossless.*`` (same customer, audited with the
+  reason by the request's opener). The worker's briefing lists only ``sem.*`` until then.
 - B1 has ``ask`` off, so there is no live clarification; a clarification final still maps (``needs_input``).
 """
 from __future__ import annotations
@@ -41,6 +42,7 @@ from typing import Callable
 
 from analyzer.answer import AnalyzerAnswer
 from analyzer.bundles import bundle
+from analyzer.cli import load_escalated
 from analyzer.examples import LIVE_QUESTION_ID
 from analyzer.harness import _COMMAND_TOOL, cli_prefix, config_from_meta, stamp_session
 from analyzer.opener import SessionHandle, SnapshotOpener
@@ -65,28 +67,42 @@ SESSION_RETENTION_SECONDS = 600.0
 
 
 class RunReaderSession:
-    """One run's reader session: opened through the request's opener on first use, reused by every command of the
-    run, reopened when it is ``READER_SESSION_REOPEN_SECONDS`` old. Escalation goes to the inner opener (which, from
-    chat, refuses it)."""
+    """One run's reader sessions: opened through the request's opener on first use, reused by every command of the
+    run, reopened when one is ``READER_SESSION_REOPEN_SECONDS`` old. ``open_escalated(reason)`` (the ``escalate``
+    command) goes to the request's opener, which audits it; from then on the run is escalated (``escalated``), every
+    later command restores the escalated session, and the non-escalated one is dropped. The escalation state lives
+    here in the API process, never in a file the worker could write."""
 
     def __init__(self, opener, reopen_seconds: float = READER_SESSION_REOPEN_SECONDS, clock=time.monotonic):
         self.opener = opener
         self.reopen_seconds = reopen_seconds
         self.clock = clock
-        self.handle: SessionHandle | None = None
-        self.opened_at = 0.0
+        self.handles: dict[bool, tuple[SessionHandle, float]] = {}
         self.opens = 0
+        self.escalated = False
         self._lock = threading.Lock()
 
+    @property
+    def handle(self) -> SessionHandle | None:
+        current = self.handles.get(self.escalated)
+        return current[0] if current else None
+
     def open(self, escalate: bool) -> SessionHandle:
-        if escalate:
-            return self.opener.open(True)
         with self._lock:
-            if self.handle is None or self.clock() - self.opened_at >= self.reopen_seconds:
-                self.handle = self.opener.open(False)
-                self.opened_at = self.clock()
+            current = self.handles.get(escalate)
+            if current is None or self.clock() - current[1] >= self.reopen_seconds:
+                current = self.handles[escalate] = (self.opener.open(escalate), self.clock())
                 self.opens += 1
-            return self.handle
+            return current[0]
+
+    def open_escalated(self, reason: str) -> SessionHandle:
+        with self._lock:
+            open_escalated = getattr(self.opener, "open_escalated", None)
+            handle = open_escalated(reason) if open_escalated is not None else self.opener.open(True)
+            self.handles = {True: (handle, self.clock())}   # the escalating command closes the sem.* session
+            self.opens += 1
+            self.escalated = True
+            return handle
 
 
 class AnalyzerRunFailed(RuntimeError):
@@ -258,14 +274,15 @@ class ClaudeCodeCliDriver:
 
     def worker_command(self, session_dir: Path) -> list[str]:
         effort = bundle(SHIPPED_ANALYZER_BUNDLE_ID).technique_config["effort"]
-        no_escalation = f"Bash({cli_prefix(session_dir)} escalate:*)"
-        return worker_command(str(session_dir), SHIPPED_ANALYZER_MODEL_ALIAS, effort, (no_escalation,))
+        return worker_command(str(session_dir), SHIPPED_ANALYZER_MODEL_ALIAS, effort)
 
     def answer(self, question_text: str, tap: LiveTap, cancelled: threading.Event, opener=None,
-               prepared_sessions: list | None = None) -> AnalyzerAnswer:
+               prepared_sessions: list | None = None, on_snapshot_escalation=None) -> AnalyzerAnswer:
         """Run the question to its final answer, streaming steps into ``tap``. Raises ``Cancelled`` on Stop.
 
-        ``opener``: the signed-in user's opener (real auth); the run then queries through it over the run channel.
+        ``opener``: the signed-in user's opener (real auth); the run then queries through it over the run channel,
+        and it audits an escalation itself. ``on_snapshot_escalation(reason)``: without an opener the CLI escalates
+        the snapshot session on its own, so the API audits it when the worker's ``escalate`` command succeeded.
         ``prepared_sessions``: the session folder is appended to it, so the caller can discard it once persisted."""
         session_dir = self.prepare_session(question_text, data_channel=opener is not None)
         if prepared_sessions is not None:
@@ -276,14 +293,16 @@ class ClaudeCodeCliDriver:
             from analyzer.cli import execute
             channel = RunChannel(session_dir, lambda argv: execute(argv, opener=reader))
         try:
-            worker_result = self._run_worker(session_dir, tap, cancelled)
+            worker_result = self._run_worker(session_dir, tap, cancelled,
+                                             None if reader is not None else on_snapshot_escalation)
             record_worker_usage(tap, worker_result)
             return final_answer_from_session(session_dir, worker_result, reader)
         finally:
             if channel is not None:
                 channel.close()
 
-    def _run_worker(self, session_dir: Path, tap: LiveTap, cancelled: threading.Event) -> dict:
+    def _run_worker(self, session_dir: Path, tap: LiveTap, cancelled: threading.Event,
+                    on_snapshot_escalation=None) -> dict:
         WORKER_DIRECTORY.mkdir(exist_ok=True)
         process = self.start_worker(self.worker_command(session_dir), WORKER_DIRECTORY,
                                     worker_environment(os.environ), session_dir / "claude_print.json",
@@ -293,16 +312,21 @@ class ClaudeCodeCliDriver:
         calls_tail = CallsFileTail(session_dir / "calls.jsonl")
         deadline = time.monotonic() + self.worker_timeout_seconds
         try:
-            while process.poll() is None:
+            def observe_new_records():
                 for call_record in calls_tail.new_records():
                     observe_call_record(tap, call_record)
+                    if (on_snapshot_escalation is not None and call_record["command"] == "escalate"
+                            and call_record["ok"]):
+                        on_snapshot_escalation(str((call_record.get("argument") or {}).get("reason") or ""))
+
+            while process.poll() is None:
+                observe_new_records()
                 if cancelled.is_set():
                     raise Cancelled()
                 if time.monotonic() > deadline:
                     raise AnalyzerRunFailed(f"worker timed out after {self.worker_timeout_seconds} s")
                 cancelled.wait(self.calls_poll_seconds)
-            for call_record in calls_tail.new_records():
-                observe_call_record(tap, call_record)
+            observe_new_records()
         finally:
             stop_worker_process(process)
             with self._workers_lock:
@@ -318,8 +342,9 @@ def _read_worker_result(result_path: Path) -> dict:
 
 
 def final_answer_from_session(session_dir: Path, worker_result: dict, opener=None) -> AnalyzerAnswer:
-    if (session_dir / "escalation.json").exists():
-        raise AnalyzerRunFailed("the worker escalated to lossless views, which chat never grants")
+    """``opener`` is the run's ``RunReaderSession`` (run channel): its own escalation state decides whether the answer
+    is re-executed with lossless.* mounted. Without one the snapshot session's escalation.json does (the CLI wrote it
+    after a granted ``escalate``)."""
     final_path = session_dir / "final.json"
     if not final_path.exists():
         raise AnalyzerRunFailed("worker ended without a final answer "
@@ -337,7 +362,9 @@ def final_answer_from_session(session_dir: Path, worker_result: dict, opener=Non
     meta = json.loads((session_dir / "session.json").read_text())
     if opener is None and meta.get("data_channel"):
         raise AnalyzerRunFailed("a run-channel session's answer can only be re-executed through the run's opener")
-    tools = ToolLayer(opener or SnapshotOpener(meta["snapshot_path"]), config_from_meta(meta, for_subagent=True))
+    escalated = opener.escalated if opener is not None else load_escalated(session_dir)
+    tools = ToolLayer(opener or SnapshotOpener(meta["snapshot_path"]), config_from_meta(meta, for_subagent=True),
+                      restored_escalation=escalated)
     digest = tools.run_sql(final["sql"], charge=False, include_all_rows=True)
     return AnalyzerAnswer(kind="answer", text=final["text"], sql=final["sql"], rows=digest["all_rows"],
                           columns=digest["columns"], warnings=list(final.get("result_warnings") or []),
