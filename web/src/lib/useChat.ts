@@ -41,7 +41,7 @@ const uid = (p: string) => `${p}_${Math.random().toString(36).slice(2, 10)}`;
 /** `uiKey`: a client-only render key fixed at send, so the row doesn't remount when message.start swaps in the server id (QA-A15: the Thinking row and its timer survive). */
 export type ViewMessage = UserMessage | (AssistantViewV1 & { uiKey?: string; regenerateStyle?: RegenerateStyle });
 
-function toView(m: UserMessage | AssistantMessage): ViewMessage {
+export function toView(m: UserMessage | AssistantMessage): ViewMessage {
   if (m.role === 'user') return m;
   const v = m as AssistantMessage & Partial<AssistantViewV1>;
   return { ...v, parts: v.parts as AssistantViewV1['parts'], streaming: false, status: null, openText: [], steps: v.steps ?? [], escalations: v.escalations ?? [], lastSeq: -1 };

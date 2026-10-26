@@ -521,6 +521,8 @@ must be signed in to the same organization (customer). A conversation has at mos
 * **1.12.0** (2026-10-25) — The §2 ordering rules as data (`stream_rules.json`, §2.1), with Python and TS runners
   and shared cases. Fail-safe client decoding (§3): `sse.ts`, `wellFormed`/`EVENT_SHAPES`, and a guarded
   `reduceV1`. 404/405 now use the error envelope (§1). Request/reducer/SSE fuzz tests. No event or part shape change.
+  Docs: [changelog + migration guide](../docs/frontend-contract-migration.md) and the [real analyzer adapter
+  spec](../docs/frontend-analyzer-adapter.md) (stub `api/analyzer_adapter.py`, paid-API switch off, not wired).
 
 * **1.11.0** (2026-10-25) — Org-scoped share links (§17): `ShareRequest`, `ShareLink`, `SharedConversation`,
   `TablePart.dataWithheld`, and GET/PUT/DELETE `/api/conversations/{id}/share` plus `GET /api/shared/{shareId}`.

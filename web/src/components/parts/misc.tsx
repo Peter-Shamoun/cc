@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, ChevronDown, ChevronRight, Download, FileSpreadsheet, Info, Lightbulb, Loader2, Maximize2, ShieldCheck, Wrench, Check, X, Database, List, BarChart3, ListChecks, Search, RotateCcw, Code2, Table2, Image as ImageIcon, FileText } from 'lucide-react';
 import clsx from 'clsx';
-import ReactMarkdown from 'react-markdown';
 import type { ArtifactPart, CalloutPart, ErrorPart, FilePart, ImagePart, Part, ReasoningPart, ToolCallPart } from '../../lib/contract';
 import { downloadBlob } from '../../lib/csv';
 import { IconButton } from '../ui';
@@ -15,12 +14,9 @@ function fmtBytes(n: number) {
   return n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
 
-/** Inline markdown only (bold, code, links) for callout items. */
-export const Inline = ({ text }: { text: string }) => (
-  <ReactMarkdown allowedElements={['p', 'strong', 'em', 'code', 'a']} unwrapDisallowed components={{ p: ({ children }) => <>{children}</> }}>
-    {text}
-  </ReactMarkdown>
-);
+/** Inline markdown (lazy, see ./Markdown). Re-exported for existing importers. */
+import { Inline } from './Markdown';
+export { Inline };
 
 export function FileCard({ part, onPreview }: { part: FilePart; onPreview?: () => void }) {
   const adapter = useAdapter();
