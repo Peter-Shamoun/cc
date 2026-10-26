@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { newAssistantView, reduce, type AssistantMessage, type AssistantView, type ID, type UserMessage } from './contract';
 import type { AnalystAdapter, ThreadSummary, TranscriptStore } from '../adapters/types';
+import { shortTitle } from '../shell/title';
 
 const uid = (p: string) => `${p}_${Math.random().toString(36).slice(2, 10)}`;
 export type ViewMessage = UserMessage | AssistantView;
@@ -9,10 +10,8 @@ function toView(m: UserMessage | AssistantMessage): ViewMessage {
   return m.role === 'user' ? m : { ...m, streaming: false, status: null, openText: [] };
 }
 
-/** Placeholder title until the server returns a PHI-scrubbed one (spec §6.5). */
-function draftTitle(text: string) {
-  return text.length > 44 ? `${text.slice(0, 44)}…` : text;
-}
+/** Short client-side title (shell/title.ts) until the server returns a PHI-scrubbed one (spec §6.5). */
+const draftTitle = (text: string) => shortTitle(text);
 
 export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
@@ -89,8 +88,9 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     if (!convId) setConvId(cid);
     const user: UserMessage = { id: uid('u'), role: 'user', text: t, createdAt: new Date().toISOString() };
     await store.appendMessage(cid, user, draftTitle(t));
+    refresh(); // show the new chat in the sidebar now, not when the first answer ends (QA-S2)
     await run(cid, [...messages, user]);
-  }, [busy, convId, messages, run, store]);
+  }, [busy, convId, messages, refresh, run, store]);
 
   const stop = useCallback(() => abortRef.current?.abort(), []);
 
