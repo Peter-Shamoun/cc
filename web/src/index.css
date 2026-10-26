@@ -104,3 +104,14 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -
 .step-enter { animation: cc-step-in 180ms ease-out both; }
 @keyframes cc-step-in { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
 .skeleton { background: linear-gradient(90deg, var(--bg-muted) 0%, var(--bg-hover) 50%, var(--bg-muted) 100%); background-size: 200% 100%; animation: cc-shimmer 1.4s linear infinite; }
+
+/* ---- shell motion tokens (observed: ChatGPT/Claude use short, ease-out, mostly opacity/transform) ---- */
+:root { --ease-out: cubic-bezier(.2,.8,.2,1); --dur-fast: 120ms; --dur-med: 200ms; }
+@keyframes cc-fade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes cc-pop { from { opacity: 0; transform: scale(.97) translateY(4px) } to { opacity: 1; transform: none } }
+@keyframes cc-rise { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+@keyframes cc-drop { from { opacity: 0; transform: translateY(-8px) } to { opacity: 1; transform: none } }
+@keyframes cc-drawer { from { transform: translateX(-100%) } to { transform: none } }
+.theme-switching, .theme-switching * { transition: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.scrollbar-thin { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
