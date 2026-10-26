@@ -24,7 +24,6 @@ import { useOnline, useSettledOnline } from '../lib/useOnline';
 import { usePrinting } from '../lib/usePrinting';
 import { SearchDialog } from './SearchDialog';
 import { useEdgeSwipeToOpen, useSwipeToClose } from './swipe';
-import { ShareDialog, type ShareLinkApi } from './ShareDialog';
 import { SettingsDialog, ShortcutsDialog } from './SettingsDialog';
 import { ToastProvider, useFocusTrap, useToast } from './primitives';
 import { NEW_CHAT_KEY, moveDraft } from './drafts';
@@ -170,7 +169,7 @@ function ShellInner() {
   }, [mobile]);
   const closeDrawer = () => { if (mobile) setDrawerOpen(false); };
 
-  const [dialog, setDialog] = useState<null | 'search' | 'settings' | 'shortcuts' | 'share'>(null);
+  const [dialog, setDialog] = useState<null | 'search' | 'settings' | 'shortcuts'>(null);
   const [enterToSend, setEnterToSendState] = useState(() => getPref('enterToSend') !== '0');
   const setEnterToSend = (v: boolean) => { setEnterToSendState(v); setPref('enterToSend', v ? '1' : '0'); };
 
@@ -272,14 +271,6 @@ function ShellInner() {
       }
     }
     : undefined;
-  // Contract 1.11.0 §17: org-only read-only link. Stable per chat, so the dialog fetches the link state once.
-  const shareConv = adapter instanceof HttpAnalystAdapter && chat.convId && !chat.busy ? chat.convId : null;
-  const shareLink = useMemo<ShareLinkApi | undefined>(() => (shareConv && adapter instanceof HttpAnalystAdapter ? {
-    get: () => adapter.getShare(shareConv),
-    set: (includeData, days) => adapter.setShare(shareConv, includeData, days),
-    revoke: () => adapter.revokeShare(shareConv),
-    copy: (url) => copyText(url),
-  } : undefined), [adapter, shareConv]);
   const copyCurrent = async () => { if (await copyText(transcriptMarkdown(currentTitle, chat.messages))) toast({ text: 'Copied chat as Markdown' }); };
   const exportThread = async (id: string) => {
     const c = await store.getConversation(id);
@@ -641,7 +632,7 @@ function ShellInner() {
         <main className="relative flex min-w-0 flex-1 flex-col font-sans md:min-w-[400px]" aria-label="Chat">
           {!empty && <p className="hidden pb-4 text-lg font-semibold print:block" data-testid="print-title">{currentTitle}</p>}
           <Header strategy={strategy} showNav={mobile} onOpenSidebar={() => setSidebar(true)} onNewChat={sidebarProps.onNew} adapterName={adapter.name}
-            hasChat={!empty} onShare={isTempChat ? undefined : () => setDialog('share')}
+            hasChat={!empty} onDownloadJson={serverExport && !isTempChat ? () => serverExport('json') : undefined}
             temporary={temporary} onTemporary={tempStore && (empty || temporary) ? setTemporary : undefined} onCopyMarkdown={copyCurrent} onDownloadMarkdown={exportCurrent} onSettings={() => setDialog('settings')} onShortcuts={() => setDialog('shortcuts')}
             title={chat.convId ? threads.find((t) => t.id === chat.convId)?.title : undefined}
             onRename={(t) => { if (chat.convId) chat.rename(chat.convId, t); }} onDelete={() => { if (chat.convId) requestDelete(chat.convId); }} />
@@ -683,12 +674,6 @@ function ShellInner() {
           onVersion={(v) => { const vs = artifactVersionList ?? []; const a = vs.find((x) => x.version === v); if (a) setArtifact({ ...a, follow: v === vs[vs.length - 1]?.version }); }} />}
       </div>
       {dialog === 'search' && <SearchDialog threads={threads} search={searchStore} onOpen={openFromSearch} onNew={sidebarProps.onNew} onClose={() => setDialog(null)} />}
-      {dialog === 'share' && (
-        <ShareDialog title={currentTitle} firstQuestion={chat.messages.find((m) => m.role === 'user')?.text} messageCount={chat.messages.length}
-          onClose={() => setDialog(null)} onCopyMarkdown={() => { void copyCurrent(); }} onDownloadMarkdown={exportCurrent}
-          onDownloadJson={serverExport ? () => serverExport('json') : undefined} link={shareLink} expiry={strategy.caps.shareExpiry}
-          onPrint={() => { setDialog(null); requestAnimationFrame(() => window.print()); }} />
-      )}
       {dialog === 'settings' && <SettingsDialog onClose={() => setDialog(null)} storeMode={store.mode} enterToSend={enterToSend} setEnterToSend={setEnterToSend} onExportAll={exportAll} threadCount={allThreads.length}
         archived={chat.canArchive ? archivedThreads : undefined} onUnarchive={unarchive} onOpenChat={(id: string) => { setDialog(null); void openChat(id); }} />}
       {dialog === 'shortcuts' && <ShortcutsDialog onClose={() => setDialog(null)} />}
