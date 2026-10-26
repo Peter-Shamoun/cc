@@ -51,9 +51,13 @@ export function toStep(p: ToolCallPart): Step {
 // ------------------------------------------------------------------ v1 step events -> Step
 
 const PROBE: Record<string, string> = {
-  list_views: 'Listed views', describe_view: 'Read schema', sample_values: 'Sampled values', lookup_glossary: 'Looked up glossary',
+  list_views: 'Found the tables it can read', describe_view: 'Read schema', sample_values: 'Sampled values', lookup_glossary: 'Looked up glossary',
   lookup_dictionary: 'Looked up data dictionary', search_examples: 'Searched examples', profile: 'Profiled',
 };
+/** Probes that read one relation: shown as what the analyst looked at, never as a source the user picked. */
+const LOOKED = new Set(['describe_view', 'sample_values', 'profile']);
+/** Only a schema-qualified relation (sem.claims) reads as "Looked at"; a glossary term or value lookup keeps its probe label. */
+const RELATION = /^[A-Za-z_][\w]*\.[A-Za-z_][\w]*$/;
 const PURPOSE: Record<string, string> = { explore: 'Probed the data', answer: 'Ran query', candidate: 'Ran candidate query', repair: 'Re-ran repaired query', check: 'Ran check query' };
 const PRESENT: Record<string, string> = { explore: 'Probing the data', answer: 'Running query', candidate: 'Running candidate query', repair: 'Re-running repaired query', check: 'Running check query' };
 const CHECK: Record<string, string> = { verifier: 'Verifier', row_count: 'Row count', null_share: 'Null share', join_fanout: 'Join fan-out', date_range: 'Date range', definition: 'Metric definition' };
@@ -115,7 +119,9 @@ function fromView(v: StepView, all: StepView[], finished: boolean, aborted: bool
     case 'explore': {
       const e = find(v, 'step.explore');
       if (!e) return null;
-      return { ...base, kind: 'explore', label: `${PROBE[e.probe] ?? humanize(e.probe)}${e.target ? ` · ${e.target}` : ''}`, state: 'ok', message: e.summary, durationMs: e.elapsedMs };
+      // BACKEND-FIT: the analyst finds and reads relations itself; say what it looked at ("Looked at sem.claims").
+      const label = e.target && LOOKED.has(e.probe) && RELATION.test(e.target) ? `Looked at ${e.target}` : `${PROBE[e.probe] ?? humanize(e.probe)}${e.target ? ` · ${e.target}` : ''}`;
+      return { ...base, kind: 'explore', label, target: e.target, state: 'ok', message: e.summary, durationMs: e.elapsedMs };
     }
     case 'candidates': {
       const c = find(v, 'step.candidates');
@@ -201,6 +207,13 @@ export function fmtMs(ms: number): string {
   return `${Math.floor(whole / 3600)}h ${Math.floor((whole % 3600) / 60)}m`;
 }
 
+/** Exploration-only runs name what the analyst read: "Looked at sem.claims, sem.payers" (+N more), else "Looked at the data". */
+function lookedAt(steps: Step[]): string {
+  const t = [...new Set(steps.map((s) => s.target).filter(Boolean) as string[])];
+  if (!t.length) return 'Looked at the data';
+  return `Looked at ${t.slice(0, 2).join(', ')}${t.length > 2 ? ` +${t.length - 2} more` : ''}`;
+}
+
 /** "Ran 3 queries, 1 repair, 2 checks · 12s" (Claude-style one-line summary). */
 export function summarize(steps: Step[], elapsedMs?: number): string {
   const n = (k: StepKind) => steps.filter((s) => s.kind === k).length;
@@ -215,7 +228,7 @@ export function summarize(steps: Step[], elapsedMs?: number): string {
   if (n('schema') + n('search')) bits.push(plural(n('schema') + n('search'), 'lookup'));
   if (n('chart')) bits.push(plural(n('chart'), 'chart'));
   if (n('other')) bits.push(plural(n('other'), 'other step'));
-  let s = bits.length ? `Ran ${bits.join(', ')}` : n('explore') ? 'Explored the data' : `Used ${plural(steps.length, 'tool')}`;
+  let s = bits.length ? `Ran ${bits.join(', ')}` : n('explore') ? lookedAt(steps) : `Used ${plural(steps.length, 'tool')}`;
   const stopped = steps.filter((x) => x.state === 'cancelled').length;
   if (stopped) s += `, ${stopped} stopped`;
   const ms = elapsedMs ?? steps.reduce((a, b) => a + (b.durationMs ?? 0), 0);

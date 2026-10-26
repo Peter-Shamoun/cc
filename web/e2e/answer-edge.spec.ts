@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures';
-import { LIVE, MOCK, open, ask, lastAssistant, composer, stopBtn, waitIdle, injectStream, turn, textPart } from './helpers';
+import { LIVE, MOCK, open, ask, lastAssistant, composer, stopBtn, waitIdle, injectStream, turn, textPart, sse, contractExample } from './helpers';
 
 // Answer-column edge cases and fidelity details (Peter 9:51 / 10:06 directives). Synthetic data only.
 test.describe('answer edge cases', () => {
@@ -150,6 +150,8 @@ test.describe('answer edge cases', () => {
   });
 
   test('streaming pacing respects reduced motion: the paragraph appears at once', async ({ page }) => {
+    const ev = contractExample('tool_steps');
+    test.skip(!ev, 'no contract example tool_steps');
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await open(page, LIVE);
     const para = 'Paid amount by payer, last quarter. '.repeat(12).trim();
@@ -185,5 +187,35 @@ test.describe('answer edge cases', () => {
     expect(g.hr.color).not.toBe(g.hr.text); // a hairline in the border tone, not full-contrast text colour
     expect(g.hr.margin).toBeGreaterThanOrEqual(16);
     expect(g.code.bg).not.toBe('rgba(0, 0, 0, 0)');
+  });
+
+  test('thinking disclosure: collapsed one-line header while it runs, no spinner/timer, fade off under reduced motion, then "Thought for"', async ({ page }) => {
+    const ev = contractExample('tool_steps');
+    test.skip(!ev, 'no contract example tool_steps');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await open(page, LIVE);
+    await page.route('**/api/chat', async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      await new Promise((r) => setTimeout(r, 2500));
+      await route.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream' }, body: sse(ev!) }).catch(() => {});
+    });
+    await composer(page).fill('Synthetic question');
+    await composer(page).press('Enter');
+    const a = lastAssistant(page);
+    const head = a.getByTestId('step-summary');
+    await expect(head).toHaveAttribute('aria-expanded', 'false');
+    await expect(a.getByTestId('step-activity')).toHaveText('Thinking');
+    await expect(head.locator('.animate-spin')).toHaveCount(0);
+    expect(await a.getByTestId('step-activity').evaluate((el) => getComputedStyle(el).animationName)).toBe('none');
+    const t0 = await head.textContent();
+    await page.waitForTimeout(1100);
+    expect(await head.textContent()).toBe(t0); // nothing ticks
+    await expect(a.getByTestId('step-announce')).toHaveAttribute('aria-live', 'polite');
+    await waitIdle(page);
+    await expect(a.getByTestId('step-activity')).toHaveText(/^Thought for \d/);
+    await expect(head).toHaveAttribute('aria-expanded', 'false');
+    await head.click();
+    await expect(head).toHaveAttribute('aria-expanded', 'true');
+    await expect(a.getByTestId('step').first()).toBeVisible();
   });
 });

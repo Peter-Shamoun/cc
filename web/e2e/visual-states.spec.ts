@@ -50,8 +50,9 @@ for (const theme of ['light', 'dark'] as const) {
       await composer(page).fill('Synthetic question');
       await composer(page).press('Enter');
       await page.waitForTimeout(600);
-      await expect(page.getByText(/^\d+(\.\d+)?\s?m?s$/).first()).toBeVisible();
-      await shot(page, `state-thinking-${theme}`, true); // the running timer is masked
+      // Calmer disclosure: one collapsed muted line, no spinner or ticking timer.
+      await expect(lastAssistant(page).getByTestId('step-activity')).toHaveText('Thinking');
+      await shot(page, `state-thinking-${theme}`);
     });
 
     test(`stopped ${theme}`, async ({ page }) => {

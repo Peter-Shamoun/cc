@@ -19,6 +19,8 @@ export interface Step {
   id: ID;
   kind: StepKind;
   label: string;
+  /** Explore probes: the relation the analyst read itself (e.g. sem.claims). */
+  target?: string;
   /** 'cancelled' = still running when the turn ended (stopped or interrupted). */
   state: 'running' | 'ok' | 'error' | 'warn' | 'cancelled';
   sql?: string;
