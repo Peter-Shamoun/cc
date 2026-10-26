@@ -31,12 +31,13 @@ describe('1.16.0 edge scenarios on the answer surface', () => {
     expect(container.querySelector('[data-testid="step-running-dot"]')).toBeNull();
   });
 
-  it('empty: columns, a quiet "No rows" footer, no chart, no "Showing 0 of 0"', () => {
+  it('empty: columns, one quiet "Query returned 0 rows" (the footer does not repeat it), no chart, no "Showing 0 of 0"', () => {
     const { container } = show('empty');
     const t = screen.getByTestId('data-table');
     expect(within(t).getAllByRole('columnheader').length).toBeGreaterThan(0);
     expect(screen.getByTestId('table-empty')).toBeTruthy();
-    expect(container.textContent).toContain('No rows');
+    expect(t.textContent!.match(/0 rows|No rows/g)).toHaveLength(1);
+    expect(t.textContent).not.toMatch(/·\s*·|^\s*·|·\s*$/);
     expect(container.textContent).not.toMatch(/Showing 0 of 0/);
     expect(screen.queryByTestId('chart')).toBeNull();
   });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
 import { Markdown, mayContainMath } from './Markdown';
+import { protectCurrency } from './markdownText';
 
 describe('KaTeX math', () => {
   it('renders $$ math and leaves currency alone', async () => {
@@ -18,5 +19,12 @@ describe('KaTeX math', () => {
     expect(mayContainMath('No math here.')).toBe(false);
     expect(mayContainMath('$E = mc^2$')).toBe(true);
     expect(mayContainMath('\\(x\\)')).toBe(true);
+  });
+  it('a trailing $ mid-stream is undecided, not math (PLAT→ANS-1)', () => {
+    expect(mayContainMath(protectCurrency('totals $'))).toBe(false);
+    expect(mayContainMath(protectCurrency('totals $ \n'))).toBe(false);
+    expect(mayContainMath(protectCurrency('totals $412'))).toBe(false);
+    expect(mayContainMath(protectCurrency('so $x'))).toBe(true);
+    expect(mayContainMath('$E = mc^2$')).toBe(true);
   });
 });
