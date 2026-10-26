@@ -32,7 +32,7 @@ describe('answer feedback → contract 1.7.0', () => {
       return new Response(init.method === 'PUT' ? JSON.stringify({ messageId: 'm/1', rating: 'down', reasons: ['wrong_numbers'], updatedAt: 'now' }) : '{"cleared":true}', { status: 200 });
     }));
     const a = new HttpAnalystAdapter('');
-    const sink = vi.fn((f) => a.feedback('c1', f.messageId, toFeedbackRequest(f)));
+    const sink = vi.fn(async (f: Parameters<typeof toFeedbackRequest>[0]) => { await a.feedback('c1', f.messageId, toFeedbackRequest(f)); });
     setFeedbackSink(sink);
     recordFeedback({ messageId: 'm/1', vote: 'down', reasons: ['wrong_numbers'], detail: 'synthetic note' });
     recordFeedback({ messageId: 'm/1', vote: null });
