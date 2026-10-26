@@ -18,6 +18,7 @@ export const EDGE_SCENARIOS: readonly EdgeScenario[] = [
   { scenario: 'long_sql', finish: 'stop', covers: 'A 100+ line, 4 KB+ query in step.sql_running and the code part (wrap, scroll, copy).' },
   { scenario: 'many_repairs', finish: 'stop', covers: 'Four failed queries and repair attempts before the answer (long step timeline).' },
   { scenario: 'clarify_nested', finish: 'needs_input', covers: 'Asks, then asks again after the first resume, then answers (3 messages, 2 resumes).' },
+  { scenario: 'clarify_multi', finish: 'needs_input', covers: '1.23.0: one Claude-style form with 3 questions (headers, described options, the last multi-select; Other and skip on each), answered together via resume.answers, then the answer.' },
   { scenario: 'escalation_abstain', finish: 'abstain', covers: 'The small model gives up, escalates, and the larger model also abstains.' },
   { scenario: 'cancel_plan', finish: 'aborted', covers: 'Stop while planning, before any SQL.' },
   { scenario: 'cancel_sql', finish: 'aborted', covers: 'Stop while a query runs: its sql_result arrives with error.code "cancelled".' },

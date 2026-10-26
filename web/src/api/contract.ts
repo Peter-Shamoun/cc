@@ -23,7 +23,7 @@ export type {
   Sensitivity, StatusPart, TablePart, TextPart, ToolCallPart, ArtifactPart, PartBase,
 };
 
-export const CONTRACT_VERSION = '1.22.0';
+export const CONTRACT_VERSION = '1.23.0';
 export const CONTRACT_MAJOR = 1;
 
 // ---------------------------------------------------------------- new parts (v1)
@@ -46,12 +46,30 @@ export interface ClarificationPart extends PartBase {
   clarificationId: ID;
   question: string;
   choices?: { id: ID; label: string; description?: string }[];
+  /**
+   * 1.23.0 (CONTRACT.md §6.1): 1–4 questions answered together, like Claude's ask-the-user form. `question` is then
+   * the lead-in and `choices` mirrors question 1. Offer "Other" (free text) and skip on every question.
+   * Helpers: `src/contract/clarify.ts`.
+   */
+  questions?: ClarifyQuestion[];
   allowFreeText: boolean;
   multiSelect?: boolean;
   expiresAt?: ISODate;
   /** Set by the server on reload once the user replied. */
   answered?: boolean;
 }
+
+/** 1.23.0: one question of a multi-question clarification (header ≤ 12 characters, 2–4 described options). */
+export interface ClarifyQuestion {
+  id: ID;
+  header: string;
+  question: string;
+  options: { id: ID; label: string; description: string }[];
+  multiSelect?: boolean;
+}
+
+/** 1.23.0: the reply to one ClarifyQuestion: `choiceIds` and/or `otherText`, or `skipped`. Unanswered = skipped. */
+export interface ClarifyAnswer { questionId: ID; choiceIds?: ID[]; otherText?: string; skipped?: boolean }
 
 export type Part = LegacyPart | AbstainPart | ClarificationPart;
 
@@ -202,7 +220,7 @@ export type { Source, ConversationExport } from '../contract/v1.gen';
 
 /** Demo scenarios (CONTRACT.md §9, §9.1). */
 export type DemoScenario =
-  'table' | 'chart' | 'repair' | 'abstain' | 'clarify' | 'escalation' | 'candidates' | 'error' | 'slow' | 'report' | 'empty' | 'multi_table' | 'long_sql' | 'many_repairs' | 'clarify_nested' | 'escalation_abstain' | 'cancel_plan' | 'cancel_sql' | 'cancel_repair' | 'cancel_candidates' | 'cancel_escalation' | 'cancel_render';
+  'table' | 'chart' | 'repair' | 'abstain' | 'clarify' | 'escalation' | 'candidates' | 'error' | 'slow' | 'report' | 'empty' | 'multi_table' | 'long_sql' | 'many_repairs' | 'clarify_nested' | 'clarify_multi' | 'escalation_abstain' | 'cancel_plan' | 'cancel_sql' | 'cancel_repair' | 'cancel_candidates' | 'cancel_escalation' | 'cancel_render';
 
 export interface ChatRequest {
   conversationId?: ID;
@@ -215,7 +233,8 @@ export interface ChatRequest {
    */
   options?: { strategy?: string; model?: string; [k: string]: unknown };
   /** Answer a ClarificationPart. `messages` carries the user's reply as a normal user turn. */
-  resume?: { clarificationId: ID; choiceIds?: ID[]; text?: string };
+  /** 1.23.0: `answers` replies to `ClarificationPart.questions` (empty = skip all); 422 for a part without questions. */
+  resume?: { clarificationId: ID; choiceIds?: ID[]; text?: string; answers?: ClarifyAnswer[] };
   /**
    * Re-run the assistant message `messageId` for the same user turn. The new message is a sibling branch, i.e. a new
    * version of the answer. 1.10.0: `style` restyles it ('More concise' / 'More detailed'; CONTRACT.md §8.1).
