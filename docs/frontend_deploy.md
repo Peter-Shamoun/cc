@@ -122,3 +122,7 @@ So run one uvicorn worker per container and scale with containers behind sticky 
 
 Proxy and load-balancer idle timeouts must be longer than the 15-s heartbeat (the ALB default of 60 s is fine). The web client treats 45 s of silence as a stalled stream and reconnects.
 
+
+## 10. Possible future changes (no action needed now)
+
+- **CSV filenames use the UTC day.** `claimclarity_<title>_<yyyy-mm-dd>.csv` uses the UTC date, so an export after 5 PM Pacific (4 PM during DST) is named after tomorrow. This is on purpose for now: `web/src/lib/csvFilename.vectors.json` is shared with `api/tests/test_csv_filename.py`, so a client export and an API download of the same table get the same name, and the server doesn't know the user's zone. Switching to local-day names means changing both sides in one PR (the client would have to send its zone or local date to the API). The Markdown export's "Exported on" date already uses the local day (#267).
