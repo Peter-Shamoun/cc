@@ -26,6 +26,7 @@ from api.feedback import apply as apply_feedback
 from api.ids import new_id
 
 DEFAULT_TITLE = "New analysis"
+ARCHIVED_FILTERS = ("include", "exclude", "only")  # 1.17.0: GET /api/conversations?archived=
 MAX_TITLE = 120
 SNIPPET_RADIUS = 48
 
@@ -38,10 +39,13 @@ class Principal:
 
 class TranscriptStore(Protocol):
     mode: str
-    def list_conversations(self, principal: Principal, cursor: str | None = None, query: str | None = None) -> dict: ...
+    def list_conversations(self, principal: Principal, cursor: str | None = None, query: str | None = None,
+                           archived: str = "include") -> dict: ...
     def get_conversation(self, principal: Principal, conversation_id: str) -> dict | None: ...
     def append_message(self, principal: Principal, conversation_id: str, message: dict) -> None: ...
     def rename_conversation(self, principal: Principal, conversation_id: str, title: str) -> dict | None: ...
+    def update_conversation(self, principal: Principal, conversation_id: str, *, title: str | None = None,
+                            pinned: bool | None = None, archived: bool | None = None) -> dict | None: ...
     def auto_title(self, principal: Principal, conversation_id: str, title: str) -> bool: ...
     def set_feedback(self, principal: Principal, conversation_id: str, message_id: str, feedback: dict | None) -> str: ...
     def delete_conversation(self, principal: Principal, conversation_id: str) -> bool: ...
@@ -85,14 +89,54 @@ def find_snippet(conv: dict, query: str) -> str | None:
     return None
 
 
-def page(convs: list[dict], cursor: str | None, size: int, query: str | None) -> dict:
-    """``convs`` newest first, each {id, title, updatedAt(float), messages}. Returns the list endpoint body."""
+def flags(conv: dict) -> dict:
+    """1.17.0: the pin/archive flags every summary carries (always present, false by default)."""
+    return {"pinned": bool(conv.get("pinned")), "archived": bool(conv.get("archived"))}
+
+
+def apply_update(conv: dict, title: str | None, pinned: bool | None, archived: bool | None) -> dict:
+    """PATCH semantics (1.17.0), shared by both stores. Pin/archive never touch ``updatedAt`` (the sidebar order of
+    unpinned chats is recency). Archiving drops the pin; pinning an archived chat brings it back (unarchives it).
+    ``pinned`` and ``archived`` both true is rejected by the caller. Returns the RenameResponse body."""
+    if title is not None:
+        conv["title"] = clean_title(title)
+    if archived is not None:
+        conv["archived"] = archived
+        if archived:
+            conv["pinned"], conv["pinnedAt"] = False, None
+    if pinned is not None:
+        if pinned and not conv.get("pinned"):
+            conv["pinnedAt"] = time.time()
+        elif not pinned:
+            conv["pinnedAt"] = None
+        conv["pinned"] = pinned
+        if pinned:
+            conv["archived"] = False
+    return {"id": conv["id"], "title": conv["title"], "updatedAt": _iso(conv["updatedAt"]), **flags(conv)}
+
+
+def unarchive_on_user_message(conv: dict, message: dict) -> None:
+    """1.17.0: a new user message in an archived chat brings it back to the sidebar (assistant appends don't)."""
+    if message.get("role") == "user" and conv.get("archived"):
+        conv["archived"] = False
+
+
+def page(convs: list[dict], cursor: str | None, size: int, query: str | None, archived: str = "include") -> dict:
+    """``convs`` newest first, each {id, title, updatedAt(float), messages, pinned?, archived?}. Returns the list
+    endpoint body. 1.17.0: ``archived`` filters (include / exclude / only); the plain list (no query) puts pinned
+    chats first, most recently pinned on top; search stays newest first."""
     if query:
         query = query.strip()[:200]
+    if archived == "exclude":
+        convs = [c for c in convs if not c.get("archived")]
+    elif archived == "only":
+        convs = [c for c in convs if c.get("archived")]
+    if not query:
+        convs = sorted(convs, key=lambda c: (not c.get("pinned"), -(c.get("pinnedAt") or 0) if c.get("pinned") else 0))
     rows = []
     for c in convs:
         item = {"id": c["id"], "title": c["title"], "updatedAt": _iso(c["updatedAt"]),
-                "messageCount": len(c["messages"])}
+                "messageCount": len(c["messages"]), **flags(c)}
         if query:
             snippet = find_snippet(c, query)
             if snippet is None:
@@ -122,13 +166,13 @@ class InMemoryTranscriptStore:
         self._retention_days: dict[Principal, int] = {}
         self._audit = audit or (lambda event, **kw: None)
 
-    def list_conversations(self, principal, cursor=None, query=None):
+    def list_conversations(self, principal, cursor=None, query=None, archived="include"):
         self._expire(principal)
         with self._lock:
             mine = sorted((c for cid, c in self._items.items() if self._owners[cid] == principal),
                           key=lambda c: c["updatedAt"], reverse=True)
             snapshot = [{**c, "messages": list(c["messages"])} for c in mine]
-        return page(snapshot, cursor, self.page_size, query)
+        return page(snapshot, cursor, self.page_size, query, archived)
 
     def get_conversation(self, principal, conversation_id):
         self._expire(principal)
@@ -136,7 +180,7 @@ class InMemoryTranscriptStore:
             conv = self._mine(principal, conversation_id)
             if conv is None:
                 return None
-            return {"id": conv["id"], "title": conv["title"], "updatedAt": _iso(conv["updatedAt"]),
+            return {"id": conv["id"], "title": conv["title"], "updatedAt": _iso(conv["updatedAt"]), **flags(conv),
                     "messages": [dict(m) for m in conv["messages"]]}
 
     def append_message(self, principal, conversation_id, message):
@@ -148,17 +192,21 @@ class InMemoryTranscriptStore:
                 self._owners[conversation_id] = principal
             elif self._owners[conversation_id] != principal:
                 raise PermissionError("conversation belongs to another principal")
+            unarchive_on_user_message(conv, message)
             conv["messages"].append(dict(message))
             conv["updatedAt"] = time.time()
 
     def rename_conversation(self, principal, conversation_id, title):
-        title = clean_title(title)
+        return self.update_conversation(principal, conversation_id, title=title)
+
+    def update_conversation(self, principal, conversation_id, *, title=None, pinned=None, archived=None):
+        if title is not None:
+            clean_title(title)  # validate before touching anything
         with self._lock:
             conv = self._mine(principal, conversation_id)
             if conv is None:
                 return None
-            conv["title"] = title
-            return {"id": conv["id"], "title": title, "updatedAt": _iso(conv["updatedAt"])}
+            return apply_update(conv, title, pinned, archived)
 
     def auto_title(self, principal, conversation_id, title):
         """Server-derived title (api.titles). Only replaces the generic title, so a user rename always wins."""
