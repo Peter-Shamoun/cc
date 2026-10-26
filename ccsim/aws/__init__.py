@@ -142,8 +142,12 @@ class LocalAWS:
         TLS-terminating proxy sat in front: DuckDB and boto3 then need no certificates."""
         if self.endpoint is None:
             # a restarted endpoint (after shutdown, or in an unpickled world) keeps its port, so existing clients still reach it
-            self.endpoint = Endpoint(self, port=getattr(self, "_endpoint_port", 0), latency_ms=latency_ms,
-                                     bandwidth_mbps=bandwidth_mbps, secure_transport=secure_transport)
+            try:
+                self.endpoint = Endpoint(self, port=getattr(self, "_endpoint_port", 0), latency_ms=latency_ms,
+                                         bandwidth_mbps=bandwidth_mbps, secure_transport=secure_transport)
+            except OSError:   # the saved port is taken (e.g. a world copied from another machine): any free port
+                self.endpoint = Endpoint(self, port=0, latency_ms=latency_ms, bandwidth_mbps=bandwidth_mbps,
+                                         secure_transport=secure_transport)
             self._endpoint_port = int(self.endpoint.host_port.rsplit(":", 1)[1])
         else:
             self.endpoint.set_latency(latency_ms, bandwidth_mbps)
