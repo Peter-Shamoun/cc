@@ -134,6 +134,7 @@ export const DEMO_CAPABILITIES: Capabilities = {
       "rating": "down"
     }
   ],
+  "sqlLiteralMasking": "phi",
 };
 
 export async function loadCapabilities(base = '', fetchImpl: typeof fetch = (...a) => fetch(...a)): Promise<Capabilities> {

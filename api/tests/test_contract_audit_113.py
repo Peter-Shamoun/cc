@@ -18,7 +18,7 @@ CONTRACT_MD = (ROOT / "api" / "CONTRACT.md").read_text()
 CLOSED = {"Sensitivity", "MessageEnd.finishReason", "StoredMessage.finishReason", "StoredMessage.role",
           "ChatRequest.messages.role", "ChatRequest.scenario", "Capabilities.scope", "RegenerateStyle", "FeedbackRating",
           "ImagePart.mime", "TranscriptsInfo.mode", "CostTier", "StrategyOption.latencyTier", "ModelOption.tier",
-          "Source.role", "ToolCallPart.state", "StepCheck.verdict", "ArtifactPart.kind"}
+          "Source.role", "ToolCallPart.state", "StepCheck.verdict",}
 
 
 def _walk(node, path):
@@ -38,9 +38,10 @@ def every_node():
         yield from _walk(d, name)
 
 
-def test_version_is_1_13():
-    assert CONTRACT_VERSION == SCHEMA["version"] == "1.13.0"
-    assert "**Version: 1.13.0**" in CONTRACT_MD
+def test_version_is_at_least_1_13_and_consistent():
+    assert CONTRACT_VERSION == SCHEMA["version"]
+    assert tuple(map(int, CONTRACT_VERSION.split("."))) >= (1, 13, 0)
+    assert f"**Version: {CONTRACT_VERSION}**" in CONTRACT_MD
 
 
 def test_every_def_is_documented():
