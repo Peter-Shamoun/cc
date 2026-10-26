@@ -208,9 +208,18 @@ describe('answer surface: contract v1 events', () => {
     cleanup();
     const one = vi.fn();
     render(<ClarifyCard part={{ ...part, multiSelect: false }} onReply={one} active />);
-    fireEvent.change(screen.getByLabelText('Answer in your own words'), { target: { value: 'Commercial only' } });
-    fireEvent.submit(screen.getByLabelText('Answer in your own words').closest('form')!);
-    expect(one).toHaveBeenCalledWith('Commercial only', { clarificationId: 'clar-1', text: 'Commercial only' });
+    // QA-A30: no inline text box any more; free text goes through the composer, the card only hints at it.
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.getByTestId('clarify-type-hint').textContent).toBe('Or type your answer below');
+    fireEvent.click(screen.getAllByTestId('clarify-chip')[1]);
+    expect(one).toHaveBeenCalledWith('Medicaid', { clarificationId: 'clar-1', choiceIds: ['p2'] });
+    expect(screen.queryByTestId('clarify-type-hint')).toBeNull();
+    cleanup();
+    render(<ClarifyCard part={{ ...part, multiSelect: false, choices: [] }} onReply={vi.fn()} active />);
+    expect(screen.getByTestId('clarify-type-hint').textContent).toBe('Type your answer below');
+    cleanup();
+    render(<ClarifyCard part={{ ...part, multiSelect: false }} active />);
+    expect(screen.queryByTestId('clarify-type-hint')).toBeNull(); // read-only: nowhere to type
   });
 });
 
