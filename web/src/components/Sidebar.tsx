@@ -40,8 +40,11 @@ export function filterThreads(threads: ThreadSummary[], q: string): ThreadSummar
   if (!words.length) return threads;
   return threads.filter((t) => { const title = fold(t.title || ''); return words.every((w) => title.includes(w)); });
 }
-/** The inline filter appears once the list is long enough to need it. */
-export const FILTER_AT = 6;
+/**
+ * QA-S39: ChatGPT/Claude have one search entry. "Search chats" is ours; the inline title filter only joins it once the
+ * history is long enough that scanning the list stops working.
+ */
+export const FILTER_AT = 20;
 
 export interface SidebarProps {
   threads: ThreadSummary[];
