@@ -141,6 +141,12 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -
 .dark .cc-tip::after { background: #000; box-shadow: 0 0 0 1px rgba(255,255,255,.12); }
 @media (hover: hover) { .cc-tip:hover::after { opacity: 1; transform: translate(-50%, 0); transition-delay: 150ms; } }
 .cc-tip:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+.cc-tip-end::after { left: auto; right: 0; transform: translate(0, -2px); }
+@media (hover: hover) { .cc-tip-end:hover::after { transform: none; } }
+.cc-tip-end:focus-visible::after { transform: none; }
+.cc-tip-right::after { top: 50%; left: calc(100% + 6px); transform: translate(-2px, -50%); }
+@media (hover: hover) { .cc-tip-right:hover::after { transform: translate(0, -50%); } }
+.cc-tip-right:focus-visible::after { transform: translate(0, -50%); }
 
 /* Vega tooltip. The library's injected <style> is disabled for the strict CSP; this is our own theme. */
 #vg-tooltip-element {
