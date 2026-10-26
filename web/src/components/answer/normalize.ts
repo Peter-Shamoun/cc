@@ -82,12 +82,16 @@ function fromView(v: StepView, all: StepView[], finished: boolean, aborted: bool
       const done = !!res;
       const generic = !run?.label || /^(running|ran) (the )?query$/i.test(run.label);
       let label = generic ? (done ? PURPOSE : PRESENT)[purpose] ?? 'Ran query' : done ? pastTense(run!.label!) : run!.label!;
-      if (purpose === 'candidate' && run?.candidateId) label = `Candidate ${run.candidateId}: ${generic ? (done ? 'ran' : 'running') : label}`;
+      // 1.16.0 cancel_*: Stop closes open queries with error.code "cancelled". That is the user's stop, not a failure:
+      // no "Ran"/"Final" past tense, no red X, not counted in "N failed".
+      const stoppedByUser = res?.error?.code === 'cancelled';
+      if (stoppedByUser) label = generic ? 'Query' : run!.label!;
+      if (purpose === 'candidate' && run?.candidateId) label = `Candidate ${run.candidateId}${stoppedByUser && generic ? '' : `: ${generic ? (done ? 'ran' : 'running') : label}`}`;
       return {
         ...base, kind: purpose === 'explore' ? 'explore' : 'sql', label,
-        state: !res && (aborted || !finished) ? (finished ? 'cancelled' : 'running') : state,
+        state: stoppedByUser ? 'cancelled' : !res && (aborted || !finished) ? (finished ? 'cancelled' : 'running') : state,
         sql: run?.sql, maskedLiterals: masked(run), rowCount: res?.rowCount, truncated: res?.truncated, durationMs: res?.elapsedMs,
-        columns: res?.columns?.map((c) => c.name), error: res?.error?.message,
+        columns: res?.columns?.map((c) => c.name), error: stoppedByUser ? undefined : res?.error?.message,
         attempt: run && run.attempt > 1 ? run.attempt : undefined,
       };
     }
@@ -96,7 +100,7 @@ function fromView(v: StepView, all: StepView[], finished: boolean, aborted: bool
       if (!r) return null;
       const rerun = all.find((x) => x.kind === 'sql' && find(x, 'step.sql_running')?.repairOf === v.stepId);
       const rr = rerun && find(rerun, 'step.sql_result');
-      const rstate: Step['state'] = rr ? (rr.ok ? 'ok' : 'error') : finished ? (rerun ? 'cancelled' : 'ok') : 'running';
+      const rstate: Step['state'] = rr ? (rr.ok ? 'ok' : rr.error?.code === 'cancelled' ? 'cancelled' : 'error') : finished ? (rerun ? 'cancelled' : 'ok') : 'running';
       return {
         ...base, kind: 'repair', label: rstate === 'running' ? 'Repairing the query' : 'Repaired the query', message: r.explanation, state: rstate,
         error: r.error.message, previousSql: sqlOf(all, r.failedStepId), sql: r.revisedSql, maskedLiterals: masked(r), attempt: r.attempt, maxAttempts: r.maxAttempts,

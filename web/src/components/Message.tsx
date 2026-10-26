@@ -275,7 +275,8 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
         </div>
       )}
       {isLast && <TransportAnnouncer status={msg.streaming ? msg.status : null} />}
-      {!msg.streaming && msg.finishReason === 'aborted' && <StoppedNote onRetry={isLast && !readOnly ? onRegenerate : undefined} />}
+      {/* ChatGPT/Claude: one retry per turn. With content, Regenerate sits in the action row; the note only carries Retry when nothing came back. */}
+      {!msg.streaming && msg.finishReason === 'aborted' && <StoppedNote onRetry={isLast && !readOnly && empty ? onRegenerate : undefined} />}
       {/* A failed turn used no data for an answer: no Sources chip. */}
       {!msg.streaming && !failed && <SourcesChip sources={(view as { sources?: Source[] }).sources} parts={parts} />}
       {!readOnly && !msg.streaming && !empty && (

@@ -67,7 +67,7 @@ export function StepTimeline({ steps, live, elapsedMs, reasoning = [] }: { steps
         <span className={clsx('truncate', live && 'shimmer')}>{header}</span>
         {live && <span className="shrink-0 tabular-nums text-xs text-fg-subtle" aria-hidden>{fmtMs(Math.max(ticking, 0))}</span>}
         {/* QA-A22: separators so the accessible name reads "Thought for 1s, 2 failed", not "1s2 failed". */}
-        {!live && errors > 0 && <span className="shrink-0 text-xs text-danger"><span className="sr-only">, </span>{errors} failed</span>}
+        {!live && errors > 0 && <span className="shrink-0 text-xs text-fg-subtle" data-testid="step-failed-count"><span className="sr-only">, </span>{errors} failed</span>}
         {!live && !errors && repaired > 0 && <span className="sr-only">, all failures repaired</span>}
         {open ? <ChevronDown size={14} className="shrink-0" aria-hidden /> : <ChevronRight size={14} className="shrink-0" aria-hidden />}
       </button>
