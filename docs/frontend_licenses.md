@@ -1,6 +1,6 @@
 # Frontend licence audit (web/ and api/)
 
-Audited on 2026-10-25 against `web/package-lock.json` (448 packages) and the Python environment used by `api/`.
+Audited on 2026-10-25 against `web/package-lock.json` (448 packages), **re-checked 21:52 PDT** (462 packages, see "Re-check" below) and the Python environment used by `api/`.
 To re-run the web audit:
 
 ```
@@ -18,9 +18,30 @@ from `web/THIRD_PARTY_NOTICES.md`.
 
 | Scope | Count | Licences |
 |---|---|---|
-| web runtime (bundled) | 253 | MIT 177, BSD-3-Clause 39, ISC 30, Apache-2.0 3, BSD-2-Clause 2, Unlicense 1, 0BSD 1 |
-| web dev/build only | 195 | MIT 129, Apache-2.0 28, **MPL-2.0 26**, ISC 4, BSD-2-Clause 2, BSD-3-Clause 2, MIT-0 2, BlueOak-1.0.0 1, CC0-1.0 1 |
+| web runtime (bundled) | 245 | MIT 169, BSD-3-Clause 39, ISC 30, Apache-2.0 3, BSD-2-Clause 2, Unlicense 1, 0BSD 1 |
+| web dev/build only | 217 | MIT 151, Apache-2.0 28, **MPL-2.0 26**, ISC 4, BSD-2-Clause 2, BSD-3-Clause 2, MIT-0 2, BlueOak-1.0.0 1, CC0-1.0 1 |
 | api runtime (Python) | see below | MIT, BSD-3-Clause, Apache-2.0, plus **MPL-2.0 (certifi)** and PSF-2.0 |
+
+## Re-check after the sprint's new dependencies (2026-10-25, 21:52 PDT)
+
+Lockfile diff since the first audit (1b65811, 19:11 PDT): **+22 packages added, all MIT, none shipped in the bundle; 4 lockfile entries removed.**
+- **Added (dev only):**
+  - `oxlint` 1.89.0, plus 19 `@oxlint/binding-*` platform binaries (lint gate);
+  - `@types/node` 22.20.5;
+  - `undici-types` 6.21.0.
+  - All MIT.
+- **Removed:**
+  - `@tanstack/react-table` and `@tanstack/table-core`, which the tables no longer use. Their stale line in `web/THIRD_PARTY_NOTICES.md` is removed.
+  - A nested `katex`/`commander` copy, deduplicated by the katex override.
+  - Runtime packages went 253 → 245.
+- **No new runtime dependency:** the boot shell, Trusted Types, section error boundaries and sign-out are our own code. `npm audit` is clean (local gate).
+- **Unchanged:**
+  - `axe-core` / `@axe-core/playwright` (MPL-2.0, dev).
+  - The `katex` and `postcss-selector-parser` overrides (same licences).
+  - `api/requirements.txt`. The demo backend uses only the standard library for the new access-log and sign-out work.
+- Lighthouse runs as `npx -y lighthouse@12.8.2` and isn't in the lockfile. It's Apache-2.0 and a CI tool only.
+
+`license_audit.mjs` reports **no problems**. The only warnings are the existing MPL-2.0 dev tools in the flags table below.
 
 ## Flags (anything that is not plain permissive)
 
@@ -99,9 +120,7 @@ These are dev/test only and not shipped: pytest, pluggy and iniconfig (MIT), Pyg
 | @shikijs/types | 4.5.0 | MIT | runtime |
 | @shikijs/vscode-textmate | 10.1.0 | MIT | runtime |
 | @streamdown/math | 1.0.3 | Apache-2.0 | runtime |
-| @tanstack/react-table | 8.21.3 | MIT | runtime |
 | @tanstack/react-virtual | 3.14.22 | MIT | runtime |
-| @tanstack/table-core | 8.21.3 | MIT | runtime |
 | @tanstack/virtual-core | 3.19.7 | MIT | runtime |
 | @types/debug | 4.1.13 | MIT | runtime |
 | @types/estree | 1.0.9 | MIT | runtime |
@@ -130,9 +149,6 @@ These are dev/test only and not shipped: pytest, pluggy and iniconfig (MIT), Pyg
 | commander | 15.0.0 | MIT | runtime |
 | commander | 2.20.3 | MIT | runtime |
 | commander | 7.2.0 | MIT | runtime |
-| commander | 8.3.0 | MIT | runtime |
-| commander | 8.3.0 | MIT | runtime |
-| commander | 8.3.0 | MIT | runtime |
 | csstype | 3.2.3 | MIT | runtime |
 | d3-array | 3.2.4 | ISC | runtime |
 | d3-color | 3.1.0 | ISC | runtime |
@@ -194,9 +210,6 @@ These are dev/test only and not shipped: pytest, pluggy and iniconfig (MIT), Pyg
 | is-plain-obj | 4.1.0 | MIT | runtime |
 | js-tokens | 4.0.0 | MIT | runtime |
 | json-stringify-pretty-compact | 4.0.0 | MIT | runtime |
-| katex | 0.16.47 | MIT | runtime |
-| katex | 0.16.47 | MIT | runtime |
-| katex | 0.16.47 | MIT | runtime |
 | katex | 0.19.1 | MIT | runtime |
 | longest-streak | 3.1.0 | MIT | runtime |
 | loose-envify | 1.4.0 | MIT | runtime |
