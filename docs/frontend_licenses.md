@@ -355,4 +355,5 @@ These are dev/test only and not shipped: pytest, pluggy and iniconfig (MIT), Pyg
 | y18n | 5.0.8 | ISC | runtime |
 | yargs | 18.0.0 | MIT | runtime |
 | yargs-parser | 22.0.0 | ISC | runtime |
+| zod | 4.6.7 | MIT | runtime |
 | zwitch | 2.0.4 | MIT | runtime |

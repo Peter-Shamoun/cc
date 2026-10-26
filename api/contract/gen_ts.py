@@ -152,6 +152,15 @@ def generate(schema: dict) -> str:
     lines.append("export const OPEN_KNOWN_VALUES: Record<string, readonly string[]> = "
                  + json.dumps({k: v["known"] for k, v in opens.items() if "known" in v}, separators=(", ", ": "))
                  + ";")
+    if "PlotSpec" in schema["$defs"]:
+        d = schema["$defs"]
+        plot = {"version": d["PlotSpec"]["properties"]["v"]["const"], "kinds": d["PlotKind"]["enum"],
+                "fieldTypes": d["PlotFieldType"]["enum"], "formats": d["PlotFormat"]["enum"],
+                "sorts": d["PlotSort"]["enum"], "temporalPattern": d["PlotSpec"]["x-temporal"], "fieldPattern": d["PlotAxisX"]["properties"]["field"]["pattern"],
+                "caps": d["PlotSpec"]["x-caps"]}
+        lines.append("/** 1.18.0: PlotSpec enums and caps, for the zod mirror in web/src/contract/plot.ts (one source). */")
+        lines.append("export const PLOT_SCHEMA = " + json.dumps(plot, separators=(", ", ": "), ensure_ascii=False)
+                     + " as const;")
     lines.append("export type PartType = Part['type'];")
     lines.append("export type StreamEventType = StreamEvent['type'];")
     return "\n".join(lines) + "\n"

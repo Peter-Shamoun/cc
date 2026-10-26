@@ -1,4 +1,4 @@
-# ClaimClarity chat contract: changelog and migration guide (v1.0 → 1.17.0)
+# ClaimClarity chat contract: changelog and migration guide (v1.0 → 1.18.0)
 
 **For review by Claude.** This is a reading guide to `api/CONTRACT.md`, which stays the normative text, and
 `api/contract/v1.schema.json`. It covers three things:
@@ -10,7 +10,7 @@
 The adapter that produces these events from analyzer and analyst outputs is specified in
 [`frontend-analyzer-adapter.md`](frontend-analyzer-adapter.md).
 
-Every version from 1.0 to 1.17 is **additive**. A 1.0 client keeps working against a 1.17 server, because it ignores
+Every version from 1.0 to 1.18 is **additive**. A 1.0 client keeps working against a 1.18 server, because it ignores
 unknown events, fields and part types (§3). No field was removed or renamed. The one wire-visible tightening is
 1.12's error envelope on 404 and 405, and 1.13's `not_found` for regenerate/edit 404s (below).
 
@@ -36,8 +36,12 @@ unknown events, fields and part types (§3). No field was removed or renamed. Th
 | 1.15 | share expiry (`expiresInDays` 7/30/90, `expiresAt`), rotate id on widening (`rotated`), SQL withheld on data-off shares (`sqlWithheld`), sign-out documented | rotate on false→true; expire shares (same 404); strip SQL from data-off views | show expiry in the share dialog; on `rotated` show the new link; "SQL not shared" when `sqlWithheld` |
 | 1.16 | edge-case demo scenarios (`empty`, `multi_table`, `long_sql`, `many_repairs`, `clarify_nested`, `escalation_abstain`, `cancel_*` ×6) + `report` in the scenario enum; `examples/edge/` | demo backend only | use `EDGE_SCENARIOS` / `examples/edge/*.jsonl` in UI + e2e tests; nothing to migrate |
 | 1.17 | pin/archive persisted: PATCH `{pinned?, archived?}`, flags on summaries, `?archived=` filter, pinned first, `Capabilities.pinArchive` | store flags per user; archive drops pin; pin or a new question unarchives | when `pinArchive`: call `setPinned`/`setArchived`, list the sidebar with `archived=exclude` and Archived chats with `only` |
+| 1.18 | strict `ChartPart.plot` (`PlotSpec`, closed, capped, shared `plot_cases.json`), `chart.start` / `chart.points` progressive charts, server gate (invalid chart → dropped, table fallback) | emit `plot` with every chart; validate before emitting; stream header then points | validate with `checkPlot`, render from `plot` (`plotToVegaLite`), draw from `chart.start`, drop on `rejectedCharts` |
 
 **Migration notes**
+* **1.18 plots.** Nothing breaks: `spec` and `data.values` are still sent (now derived from `plot`). A chart
+  stored before 1.18 has no `plot` and still renders from its sanitized `spec`. A server-side chart that fails the
+  gate is simply absent (a table takes its place if there was none), so never assume a chart follows a table.
 * **1.17 pin/archive.** The list order changes only when something is pinned (pins first). A client that
   sorted by `updatedAt` itself still works but shows pins in date order. Default `archived=include` lists archived
   chats too, so filter with `archived=exclude` or on the flag.

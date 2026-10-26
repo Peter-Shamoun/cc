@@ -34,6 +34,7 @@ from api.mapping import outcome_parts
 from api.reasoning_policy import DEFAULT_POLICY, ReasoningPolicy
 from api.sql_mask import DEFAULT_POLICY as SQL_MASK_DEFAULT, mask_part, masking_emit
 from api.store import DownloadRegistry, Principal
+from api.plot import gate_parts
 from api.stream_parts import emit_parts
 
 PAID_SWITCH_ENV = "CC_API_ALLOW_PAID_API"
@@ -225,6 +226,7 @@ def run_to_events(question: str, run: Callable[[LiveTap], AnalyzerAnswer], inner
         finish = "error"
     emit({"type": "status", "label": "Writing answer" if finish == "stop" else None})
     parts = [mask_part(p, sql_masking) for p in parts]
+    parts, _dropped = gate_parts(parts)  # 1.18.0: validate every PlotSpec before emitting
     if finish != "aborted" and not emit_parts(parts, emit, cancelled=cancelled):
         finish = "aborted"
     emit({"type": "status", "label": None})

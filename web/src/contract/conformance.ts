@@ -9,6 +9,7 @@
  * stream assertions. Never use it to block rendering: clients fail safe and keep rendering (§3).
  */
 import { STREAM_RULES } from './streamRules.gen';
+import { checkPlot } from './plot';
 
 export interface Violation { rule: string; index: number; message: string }
 
@@ -35,6 +36,19 @@ const v = (rule: Rule, index: number, message: string): Violation => ({ rule: ru
 const str = (x: unknown) => JSON.stringify(x) ?? String(x);
 
 type Runner = (r: Rule, evs: Indexed[], finish: unknown) => Violation[];
+
+/** JSON deep equality (key order ignored), like Python `==` on parsed JSON. */
+export function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== typeof b || a === null || b === null || typeof a !== 'object') return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) return a.length === (b as unknown[]).length && a.every((x, i) => deepEqual(x, (b as unknown[])[i]));
+  const ka = Object.keys(a as object);
+  const kb = Object.keys(b as object);
+  return ka.length === kb.length && ka.every((k) => Object.prototype.hasOwnProperty.call(b, k)
+    && deepEqual((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]));
+}
+const isInt = (x: unknown): x is number => Number.isInteger(x) && (x as number) >= 0;
 
 const RUNNERS: Record<string, Runner> = {
   first: (r, evs) => (evs.length && evs[0][1].type === r.type ? [] : [v(r, evs.length ? evs[0][0] : -1, `first event must be ${r.type}`)]),
@@ -128,6 +142,96 @@ const RUNNERS: Record<string, Runner> = {
       if (started && any(e.type, r.forbidden as string[]) && !any(e.type, (r.allowed as string[]) ?? [])) {
         out.push(v(r, i, `${e.type} after the answer began`));
       }
+    }
+    return out;
+  },
+  contiguous: (r, evs) => {
+    const count = new Map<string, number>();
+    const out: Violation[] = [];
+    for (const [i, e] of evs) {
+      if (!(r.types as string[]).includes(e.type)) continue;
+      const k = get(e, r.key as string);
+      const off = get(e, r.offsetField as string);
+      const rows = get(e, r.rowsField as string);
+      if (!isInt(off) || !Array.isArray(rows)) {
+        out.push(v(r, i, `${e.type} needs an integer ${r.offsetField} ≥ 0 and a list`));
+        continue;
+      }
+      const key = `${e.type}\u0000${k === undefined ? 'null' : str(k)}`;
+      const have = count.get(key) ?? 0;
+      if (off > have) {
+        out.push(v(r, i, `${e.type} ${str(k)} offset ${off} skips rows (have ${have})`));
+        continue;
+      }
+      count.set(key, Math.max(have, off + rows.length));
+    }
+    return out;
+  },
+  prefix: (r, evs) => {
+    const acc = new Map<unknown, unknown[]>();
+    const out: Violation[] = [];
+    for (const [i, e] of evs) {
+      if (e.type === r.inner) {
+        const k = get(e, r.key as string);
+        const off = get(e, 'offset');
+        const rows = get(e, r.rowsField as string);
+        if (typeof k === 'string' && isInt(off) && Array.isArray(rows)) {
+          const buf = acc.get(k) ?? [];
+          acc.set(k, buf);
+          rows.forEach((row, j) => {
+            if (off + j < buf.length) buf[off + j] = row;
+            else if (off + j === buf.length) buf.push(row);
+          });
+        }
+      }
+      if (e.type === r.close) {
+        const k = get(e, r.closeKey as string);
+        const got = typeof k === 'string' ? acc.get(k) : undefined;
+        if (got && got.length) {
+          const fin = get(e, r.closeRowsField as string);
+          if (!Array.isArray(fin) || !deepEqual(fin.slice(0, got.length), got)) out.push(v(r, i, `streamed ${r.inner} for ${str(k)} differ from the final part`));
+        }
+      }
+    }
+    return out;
+  },
+  matches: (r, evs) => {
+    const opened = new Map<unknown, unknown>();
+    const out: Violation[] = [];
+    const omit = (r.omit as string[]) ?? [];
+    for (const [i, e] of evs) {
+      if (e.type === r.open) {
+        const k = get(e, r.key as string);
+        if (typeof k === 'string') opened.set(k, get(e, r.field as string));
+      }
+      else if (e.type === r.close) {
+        const k = get(e, r.closeKey as string);
+        if (!opened.has(k)) continue;
+        const fin = get(e, r.closeField as string);
+        const cut = fin !== null && typeof fin === 'object' && !Array.isArray(fin)
+          ? Object.fromEntries(Object.entries(fin).filter(([a]) => !omit.includes(a))) : fin;
+        if (!deepEqual(cut, opened.get(k))) out.push(v(r, i, `${r.closeField} of ${str(k)} differs from its ${r.open}`));
+      }
+    }
+    return out;
+  },
+  plot: (r, evs) => {
+    const out: Violation[] = [];
+    const where = Object.entries((r.where as Record<string, unknown>) ?? {});
+    for (const [i, e] of evs) {
+      if (!matches(e.type, r.type as string) || !where.every(([p, want]) => get(e, p) === want)) continue;
+      let cur: unknown = e;
+      let present = true;
+      for (const k of (r.field as string).split('.')) {
+        if (cur === null || typeof cur !== 'object' || Array.isArray(cur) || !Object.prototype.hasOwnProperty.call(cur, k)) { present = false; break; }
+        cur = (cur as Record<string, unknown>)[k];
+      }
+      if (!present) {
+        if (!r.optional) out.push(v(r, i, `${r.field} missing`));
+        continue;
+      }
+      const bad = checkPlot(cur, { header: !!r.header });
+      if (bad.length) out.push(v(r, i, `${r.field} invalid: ${bad.join(', ')}`));
     }
     return out;
   },

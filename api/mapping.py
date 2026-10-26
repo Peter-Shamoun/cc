@@ -15,10 +15,13 @@ from analyzer.answer import AnalyzerAnswer
 from analyzer.tools import is_phi_column
 
 from api.ids import new_id
+from api.plot import check_plot, to_vega_lite
 from api.store import DownloadRegistry, Principal, csv_filename
 
 PREVIEW_ROWS = 50
 CHART_MAX_ROWS = 5000
+#: column formats (``column_meta``) -> PlotFormat names (contract 1.18.0)
+_PLOT_FORMATS = {"$,.2f": "currency", ".1%": "percent"}
 
 _TOOL_LABELS = {
     "run_sql": "Ran a query",
@@ -174,23 +177,21 @@ def chart_for(columns: list[dict], rows: list) -> dict | None:
             color = categorical[0]
     fields = [x["key"], y["key"]] + ([color["key"]] if color else [])
     values = [{f: _jsonable(r[keys.index(f)]) for f in fields} for r in rows]
-    yaxis = {"field": y["key"], "type": "quantitative", "title": y["label"]}
-    if y.get("format"):
-        yaxis["axis"] = {"format": y["format"]}
-    encoding = {"x": {"field": x["key"], "type": xtype, "title": x["label"]}, "y": yaxis,
-                "tooltip": [{"field": f, "type": "quantitative" if f == y["key"] else
-                             ("temporal" if f == x["key"] and xtype == "temporal" else "nominal")} for f in fields]}
-    if mark == "bar":
-        encoding["x"]["sort"] = "-y"
-    if color:
-        encoding["color"] = {"field": color["key"], "type": "nominal", "title": color["label"]}
     by = dim_label(x['label'])
-    title = f"{y['label']} by {by}"
-    spec = {"$schema": "https://vega.github.io/schema/vega-lite/v5.json", "data": {"name": "result"},
-            "mark": {"type": mark, "point": mark == "line", "tooltip": True}, "encoding": encoding,
-            "width": "container", "height": 280}
-    return {"type": "chart", "id": new_id("p_"), "library": "vega-lite", "spec": spec,
-            "data": {"name": "result", "values": values}, "title": title,
+    # 1.18.0: the strict PlotSpec is the source; the Vega-Lite spec is derived from it (api/plot.py).
+    plot: dict = {"v": 1, "kind": mark, "title": f"{y['label']} by {by}"[:120],
+                  "x": {"field": x["key"], "type": xtype, "title": x["label"][:80]},
+                  "y": {"field": y["key"], "type": "quantitative", "title": y["label"][:80]},
+                  "sort": "-y" if mark == "bar" else "none", "data": values}
+    fmt = _PLOT_FORMATS.get(y.get("format") or "")
+    if fmt:
+        plot["y"]["format"] = fmt
+    if color:
+        plot["series"] = {"field": color["key"], "title": color["label"][:80]}
+    if check_plot(plot):
+        return None  # validate before emitting: an invalid plot is dropped and the table stays
+    return {"type": "chart", "id": new_id("p_"), "library": "vega-lite", "plot": plot, "spec": to_vega_lite(plot),
+            "data": {"name": "result", "values": values}, "title": plot["title"],
             "alt": f"{'Line' if mark == 'line' else 'Bar'} chart of {lower_label(y['label'])} by {by}, "
                    f"{len(rows)} points."}
 
