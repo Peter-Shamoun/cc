@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { X, Download, Maximize, Minimize } from 'lucide-react';
+import { X, Download, Maximize, Minimize, Printer } from 'lucide-react';
 import clsx from 'clsx';
 import type { CodePart } from '../lib/contract';
 import { DataTable } from './parts/DataTable';
 import { ChartView, buildSpec } from './parts/ChartView';
 import { CodeBlock } from './parts/CodeBlock';
+import { Markdown } from './parts/Markdown';
 import { IconButton, CopyButton } from './ui';
-import { csvFilename, downloadText, tableToCsv, tableToTsv } from '../lib/csv';
-import { useBlobUrl } from '../adapters/context';
-import type { Artifact } from './Message';
+import { csvFilename, downloadBlob, downloadText, tableToCsv, tableToTsv } from '../lib/csv';
+import { useAdapter, useBlobUrl } from '../adapters/context';
+import { slug, type Artifact } from './artifacts';
 import { getPref, setPref } from '../lib/prefs';
 import { useFocusTrap } from '../shell/primitives';
 
@@ -43,6 +44,7 @@ function tabsFor(a: Artifact): Tab[] {
     case 'chart': return [{ id: 'preview', label: 'Chart' }, { id: 'code', label: 'Spec' }, { id: 'data', label: 'Data' }];
     case 'code': return [{ id: 'code', label: 'Code' }];
     case 'image': return [{ id: 'preview', label: 'Preview' }];
+    case 'report': return [{ id: 'preview', label: 'Preview' }, { id: 'code', label: 'Markdown' }];
   }
 }
 
@@ -52,7 +54,8 @@ function sqlFor(a: Artifact): CodePart | undefined {
 }
 
 /** Claude-style artifact panel (spec §4.10): resizable, segmented tabs, copy/download/full screen/close. */
-export function ArtifactPanel({ artifact, onClose }: { artifact: Artifact; onClose: () => void }) {
+export function ArtifactPanel({ artifact, onClose, versions, onVersion }: { artifact: Artifact; onClose: () => void; versions?: Artifact[]; onVersion?: (v: number) => void }) {
+  const adapter = useAdapter();
   const [width, setWidthRaw] = useState(initialWidth);
   const phone = usePhone();
   const [fullPref, setFull] = useState(false);
@@ -106,9 +109,12 @@ export function ArtifactPanel({ artifact, onClose }: { artifact: Artifact; onClo
 
   const p = artifact.part;
   const sql = sqlFor(artifact);
-  const codeText = p.type === 'code' ? p.code : p.type === 'chart' ? JSON.stringify(buildSpec(p), null, 2) : sql?.code ?? '';
+  const codeText = p.type === 'code' ? p.code : p.type === 'chart' ? JSON.stringify(buildSpec(p), null, 2) : p.type === 'report' ? p.markdown : sql?.code ?? '';
+  const imageExt = p.type === 'image' ? (p.mime === 'image/svg+xml' ? 'svg' : p.mime === 'image/webp' ? 'webp' : 'png') : '';
   const copyText = () => (tab === 'preview' && p.type === 'table' ? tableToTsv(p) : codeText);
-  const download = () => {
+  const download = async () => {
+    if (p.type === 'image') { if (adapter) downloadBlob(`${slug(artifact.title)}.${imageExt}`, await adapter.fetchBlob(p.blobId)); return; }
+    if (p.type === 'report') { downloadText(`${slug(artifact.title)}.md`, p.markdown, 'text/markdown'); return; }
     if (p.type === 'table' && tab === 'preview') downloadText(csvFilename(p.title), tableToCsv(p));
     else if (p.type === 'code') downloadText(p.title ?? 'snippet.sql', p.code, 'text/plain');
     else downloadText(csvFilename(artifact.title).replace(/\.csv$/, p.type === 'chart' ? '.vl.json' : '.sql'), codeText, 'text/plain');
@@ -137,12 +143,21 @@ export function ArtifactPanel({ artifact, onClose }: { artifact: Artifact; onClo
           )}
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold">{artifact.title}</div>
-            <div className="text-xs capitalize text-fg-subtle">{p.type}{artifact.version ? ` · v${artifact.version}` : ''}</div>
+            <div className="text-xs text-fg-subtle"><span className="capitalize">{p.type === 'report' ? 'document' : p.type}</span>{artifact.version ? ` · v${artifact.version}` : ''}{versions && versions.length > 1 && artifact.version !== versions[versions.length - 1].version ? ' · older version' : ''}</div>
           </div>
+          {versions && versions.length > 1 && onVersion && (
+            <div className="flex shrink-0 items-center gap-0.5 rounded-lg bg-muted p-0.5 text-xs" role="group" aria-label="Versions" data-testid="artifact-versions">
+              {versions.map((v) => (
+                <button key={v.version} type="button" aria-pressed={v.version === artifact.version} onClick={() => onVersion(v.version ?? 1)}
+                  className={clsx('rounded-md px-2 py-0.5 tabular-nums', v.version === artifact.version ? 'bg-elev font-medium shadow-sm' : 'text-fg-muted hover:text-fg')}>v{v.version}</button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
           {p.type !== 'image' && <CopyButton text={copyText} withText={!phone} label="Copy" />}
-          {p.type !== 'image' && <IconButton label="Download" onClick={download}><Download size={16} /></IconButton>}
+          <IconButton label={p.type === 'image' ? `Download ${imageExt.toUpperCase()}` : p.type === 'report' ? 'Download Markdown' : 'Download'} onClick={() => { void download(); }}><Download size={16} /></IconButton>
+          {p.type === 'report' && !phone && <IconButton label="Print report" onClick={() => printReport(ref.current)}><Printer size={16} /></IconButton>}
           {!phone && <IconButton label={full ? 'Exit full screen' : 'Full screen'} onClick={() => setFull((f) => !f)}>{full ? <Minimize size={16} /> : <Maximize size={16} />}</IconButton>}
           <IconButton label="Close panel" onClick={onClose}><X size={18} /></IconButton>
         </div>
@@ -151,18 +166,41 @@ export function ArtifactPanel({ artifact, onClose }: { artifact: Artifact; onClo
         <div className={clsx('min-h-full rounded-2xl border border-line bg-bg', phone ? 'p-2' : 'p-4')}>
           {tab === 'preview' && p.type === 'table' && <DataTable part={p} full />}
           {tab === 'preview' && p.type === 'chart' && <ChartView part={p} full />}
-          {tab === 'preview' && p.type === 'image' && <PanelImage blobId={p.blobId} alt={p.alt} />}
+          {tab === 'preview' && p.type === 'image' && <PanelImage blobId={p.blobId} alt={p.alt} caption={p.caption} />}
+          {tab === 'preview' && p.type === 'report' && (
+            <article className="mx-auto max-w-[42rem] px-2 py-3 md:px-6 md:py-6" data-testid="artifact-report" data-report-doc>
+              <Markdown text={p.markdown} />
+            </article>
+          )}
           {tab === 'data' && p.type === 'chart' && (
             <DataTable full part={{ type: 'table', id: `${p.id}-data`, title: `${p.title ?? 'Chart'} data`, columns: Object.keys(p.data?.values[0] ?? {}).map((k) => ({ key: k, label: k, type: typeof p.data?.values[0][k] === 'number' ? 'number' : 'string' })), rows: (p.data?.values ?? []).map((r) => Object.values(r)), rowCount: p.data?.values.length ?? 0 }} />
           )}
-          {tab === 'code' && <CodeBlock code={codeText} language={p.type === 'code' ? p.language : p.type === 'chart' ? 'json' : 'sql'} title={p.type === 'code' ? p.title : sql?.title} tall />}
+          {tab === 'code' && <CodeBlock code={codeText} language={p.type === 'code' ? p.language : p.type === 'chart' ? 'json' : p.type === 'report' ? 'markdown' : 'sql'} title={p.type === 'code' ? p.title : sql?.title} tall />}
         </div>
       </div>
     </section>
   );
 }
 
-function PanelImage({ blobId, alt }: { blobId: string; alt: string }) {
-  const { url } = useBlobUrl(blobId);
-  return url ? <img src={url} alt={alt} className="mx-auto max-w-full rounded-xl border border-line bg-white" /> : <div className="h-64 animate-pulse rounded-xl bg-muted" />;
+/** Images (PNG/SVG/WebP plots) render through <img>, so an SVG's scripts and external refs never run. */
+function PanelImage({ blobId, alt, caption }: { blobId: string; alt: string; caption?: string }) {
+  const { url, err } = useBlobUrl(blobId);
+  return (
+    <figure className="m-0">
+      {err ? <div className="flex h-64 items-center justify-center rounded-xl border border-line text-sm text-fg-subtle">Image unavailable</div>
+        : url ? <img src={url} alt={alt} className="mx-auto max-w-full rounded-xl border border-line bg-white" data-testid="artifact-image" />
+          : <div className="h-64 animate-pulse rounded-xl bg-muted" />}
+      {caption && <figcaption className="mt-2 text-center text-xs text-fg-subtle">{caption}</figcaption>}
+    </figure>
+  );
+}
+
+/** Print just the report (same body-flag approach as "Print this answer"). */
+function printReport(panel: HTMLElement | null) {
+  if (!panel) return;
+  document.body.setAttribute('data-print-report', '');
+  const done = () => { document.body.removeAttribute('data-print-report'); window.removeEventListener('afterprint', done); };
+  window.addEventListener('afterprint', done);
+  window.print();
+  setTimeout(done, 0);
 }

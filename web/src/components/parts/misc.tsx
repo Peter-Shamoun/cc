@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, ChevronDown, ChevronRight, Download, FileSpreadsheet, Info, Lightbulb, Loader2, Maximize2, ShieldCheck, Wrench, Check, X, Database, List, BarChart3, ListChecks, Search, RotateCcw, Code2, Table2, Image as ImageIcon, FileText, Copy } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, Download, FileSpreadsheet, Info, Lightbulb, Loader2, Maximize2, ShieldCheck, Wrench, Check, X, Database, List, BarChart3, ListChecks, Search, RotateCcw, Code2, Table2, Image as ImageIcon, FileText } from 'lucide-react';
 import clsx from 'clsx';
 import ReactMarkdown from 'react-markdown';
 import type { ArtifactPart, CalloutPart, ErrorPart, FilePart, ImagePart, Part, ReasoningPart, ToolCallPart } from '../../lib/contract';
@@ -211,13 +211,13 @@ const KIND_ICON = { table: Table2, chart: BarChart3, code: Code2, image: ImageIc
 export function ArtifactCard({ part, onOpen }: { part: ArtifactPart; onOpen: () => void }) {
   const Icon = KIND_ICON[part.kind];
   return (
-    <button type="button" onClick={onOpen} className="my-4 flex w-full max-w-md items-center gap-3 rounded-xl border border-line bg-elev p-3 text-left font-sans hover:border-line-strong hover:bg-hover" data-testid="artifact-card">
+    <button type="button" onClick={onOpen} className="my-4 flex w-full max-w-md items-center gap-3 rounded-xl border border-line bg-elev p-3 text-left font-sans hover:border-line-strong hover:bg-hover" data-testid="artifact-card" data-artifact-id={part.artifactId} aria-label={`Open ${part.title}, version ${part.version}`}>
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-line bg-bg"><Icon size={18} /></span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{part.title}</span>
-        <span className="block text-xs capitalize text-fg-subtle">{part.kind} · v{part.version} · Click to open</span>
+        <span className="block text-xs text-fg-subtle"><span className="capitalize">{part.kind === 'report' ? 'Document' : part.kind}</span> · Click to open</span>
       </span>
-      <Copy size={14} className="hidden" />
+      <span className="shrink-0 rounded-md border border-line px-1.5 py-0.5 text-[11px] tabular-nums text-fg-muted" data-testid="artifact-version">v{part.version}</span>
     </button>
   );
 }
