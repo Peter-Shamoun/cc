@@ -1,6 +1,8 @@
 import type { ErrorPart, StreamEvent } from '../lib/contract';
 import type { HttpError } from '../api/contract';
 import type { AnalystAdapter, AnyStreamEvent } from './types';
+import { loadCapabilities } from '../contract/capabilities';
+import type { Capabilities } from '../contract/v1.gen';
 
 /**
  * Adapter for the real analyst endpoint (spec §5). POST {base}/api/chat with
@@ -98,10 +100,12 @@ export class HttpAnalystAdapter implements AnalystAdapter {
     await fetch(`${this.base}/api/chat/${encodeURIComponent(this.current)}/stop`, { method: 'POST', credentials: 'same-origin', headers: this.headers() }).catch(() => undefined);
   }
 
-  async *streamTurn({ conversationId, messages, signal, resume, regenerate, onConnection }: Parameters<AnalystAdapter['streamTurn']>[0]): AsyncIterable<AnyStreamEvent> {
+  async *streamTurn({ conversationId, messages, signal, resume, regenerate, options, onConnection }: Parameters<AnalystAdapter['streamTurn']>[0]): AsyncIterable<AnyStreamEvent> {
     // The server takes user turns only; prior assistant prose is reconstructed server-side.
     const users = messages.filter((m) => m.role === 'user').map(({ id, role, text, parentId, editOf }) => ({ id, role, text, ...(parentId ? { parentId } : {}), ...(editOf ? { editOf } : {}) }));
-    let body = JSON.stringify({ conversationId, messages: users, ...(resume ? { resume } : {}), ...(regenerate ? { regenerate } : {}) });
+    // Strategy/model picks (contract 1.4.0); omitted when everything is the server default.
+    const opt = options && Object.keys(options).length ? { options } : {};
+    let body = JSON.stringify({ conversationId, messages: users, ...(resume ? { resume } : {}), ...(regenerate ? { regenerate } : {}), ...opt });
     let regenerateFallback = !!regenerate;
     // `signal` is the user's Stop. We keep reading after it fires so the server's
     // `message.end {finishReason: 'aborted', usage}` still arrives (CONTRACT.md §8: within 1 s);
@@ -161,13 +165,13 @@ export class HttpAnalystAdapter implements AnalystAdapter {
         // §6.4: an expired/answered clarification is 409; send the reply as a fresh question instead.
         if (res.status === 409 && resumeFallback && messageId === null) {
           resumeFallback = false;
-          body = JSON.stringify({ conversationId, messages: users });
+          body = JSON.stringify({ conversationId, messages: users, ...opt });
           continue;
         }
         // The server no longer has the answer to regenerate (ephemeral history, other branch): ask again.
         if (res.status === 404 && regenerateFallback && messageId === null) {
           regenerateFallback = false;
-          body = JSON.stringify({ conversationId, messages: users });
+          body = JSON.stringify({ conversationId, messages: users, ...opt });
           continue;
         }
         // 429 before the answer starts: wait out Retry-After (status line counts down), then send the same request again.
@@ -250,6 +254,11 @@ export class HttpAnalystAdapter implements AnalystAdapter {
       const t = setTimeout(resolve, ms);
       signal.addEventListener('abort', () => { clearTimeout(t); reject(abortError()); }, { once: true });
     });
+  }
+
+  /** GET /api/capabilities, signed in so `available` reflects the caller's organization (contract 1.5.0 scope). */
+  capabilities(): Promise<Capabilities> {
+    return loadCapabilities(this.base, (u, init) => fetch(u, { ...init, headers: this.headers((init?.headers ?? {}) as Record<string, string>) }));
   }
 
   async fetchBlob(id: string): Promise<Blob> {

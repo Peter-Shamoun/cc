@@ -6,6 +6,11 @@ and echoed on ``message.start.strategy``, but the scripted scenario still drives
 """
 from __future__ import annotations
 
+import json
+import os
+
+from api.feedback import REASONS as FEEDBACK_REASONS
+
 DEFAULT_STRATEGY = "tool_loop"
 DEFAULT_MODEL = "auto"
 
@@ -33,22 +38,44 @@ MODELS: list[dict] = [
      "tier": "medium", "provider": "anthropic", "costTier": "medium"},
 ]
 
+#: Per-organization availability (demo values; prod reads the org's plan/BAA settings). Keyed by Principal.customer.
+#: Override with CC_API_ORG_POLICY (JSON of the same shape). Unlisted orgs get everything.
+ORG_POLICY: dict[str, dict] = {
+    "acme_diagnostics": {
+        "strategies": {"candidates": "Cross-check isn't enabled for your organization."},
+        "models": {"claude-sonnet-5-5": "Sonnet isn't enabled for your organization."},
+    },
+}
+
 STRATEGY_IDS = frozenset(s["id"] for s in STRATEGIES)
 MODEL_IDS = frozenset(m["id"] for m in MODELS)
 
 
-def capabilities(contract_version: str, demo: bool) -> dict:
-    """The ``Capabilities`` body. ``config`` is server-internal and never sent."""
-    strategies = [{k: v for k, v in s.items() if k != "config"} | {"default": s["id"] == DEFAULT_STRATEGY,
-                                                                    "available": True} for s in STRATEGIES]
-    models = [{k: v for k, v in m.items() if v is not None} | {"default": m["id"] == DEFAULT_MODEL}
+def org_policy(customer: str | None) -> dict:
+    raw = os.environ.get("CC_API_ORG_POLICY")
+    policy = json.loads(raw) if raw else ORG_POLICY
+    return policy.get(customer or "", {}) if customer else {}
+
+
+def capabilities(contract_version: str, demo: bool, customer: str | None = None) -> dict:
+    """The ``Capabilities`` body for ``customer`` (None: signed out, nothing org-specific). ``config`` never leaves."""
+    policy = org_policy(customer)
+    off_s, off_m = policy.get("strategies", {}), policy.get("models", {})
+
+    def flag(item: dict, off: dict) -> dict:
+        return {"available": False, "unavailableReason": off[item["id"]]} if item["id"] in off else {"available": True}
+
+    strategies = [{k: v for k, v in s.items() if k != "config"} | {"default": s["id"] == DEFAULT_STRATEGY}
+                  | flag(s, off_s) for s in STRATEGIES]
+    models = [{k: v for k, v in m.items() if v is not None} | {"default": m["id"] == DEFAULT_MODEL} | flag(m, off_m)
               for m in MODELS]
-    return {"contractVersion": contract_version, "demo": demo, "defaults": {"strategy": DEFAULT_STRATEGY,
-            "model": DEFAULT_MODEL}, "strategies": strategies, "models": models}
+    return {"contractVersion": contract_version, "demo": demo, "scope": "organization" if customer else "public",
+            "defaults": {"strategy": DEFAULT_STRATEGY, "model": DEFAULT_MODEL}, "strategies": strategies,
+            "models": models, "feedbackReasons": [dict(r) for r in FEEDBACK_REASONS]}
 
 
-def check_options(options: dict) -> str | None:
-    """None if ``options.strategy`` / ``options.model`` are known and compatible, else a user-facing message."""
+def check_options(options: dict, customer: str | None = None) -> str | None:
+    """None if ``options.strategy`` / ``options.model`` are known, compatible and enabled for the org."""
     strategy = options.get("strategy", DEFAULT_STRATEGY)
     model = options.get("model", DEFAULT_MODEL)
     if strategy not in STRATEGY_IDS:
@@ -58,4 +85,5 @@ def check_options(options: dict) -> str | None:
     allowed = next(s["models"] for s in STRATEGIES if s["id"] == strategy)
     if model not in allowed:
         return "That model isn't available for this strategy."
-    return None
+    policy = org_policy(customer)
+    return policy.get("strategies", {}).get(strategy) or policy.get("models", {}).get(model)

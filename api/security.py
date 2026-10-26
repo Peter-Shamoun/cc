@@ -6,6 +6,8 @@ header (so no route can weaken no-store); the CSV route's Content-Disposition is
 """
 from __future__ import annotations
 
+import logging
+
 API_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; sandbox"
 
 PERMISSIONS_POLICY = ", ".join([
@@ -56,7 +58,9 @@ class SecurityHeadersMiddleware:
 #: Request bodies are small JSON (chat turns carry history as text, <= 8000 chars per message). 1 MiB is far above any
 #: legitimate body and stops a client from making the API buffer and parse megabytes of JSON.
 MAX_BODY_BYTES = 1 << 20
-_TOO_LARGE = b'{"error":{"code":"validation","message":"Request body is too large."}}'
+#: contract 1.5.0: dedicated code; ``legacyCode`` keeps clients that branched on the pre-1.5 ``validation`` working.
+_TOO_LARGE = (b'{"error":{"code":"payload_too_large","legacyCode":"validation",'
+              b'"message":"Request body is too large.","maxBytes":%d}}')
 
 
 class BodyLimitMiddleware:
@@ -72,9 +76,10 @@ class BodyLimitMiddleware:
         self.max_bytes = max_bytes
 
     async def _reject(self, send):
+        body = _TOO_LARGE % self.max_bytes
         await send({"type": "http.response.start", "status": 413,
-                    "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(_TOO_LARGE)).encode())]})
-        await send({"type": "http.response.body", "body": _TOO_LARGE})
+                    "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode())]})
+        await send({"type": "http.response.body", "body": body})
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http" or scope.get("method") in ("GET", "HEAD", "OPTIONS"):
@@ -115,3 +120,39 @@ class BodyLimitMiddleware:
             return await receive()
 
         await self.app(scope, replay, send)
+
+
+class ErrorShieldMiddleware:
+    """Unhandled exceptions become the contract's 500 envelope, ``{"error": {"code": "internal", ...}}``. Only the
+    exception type and code location are logged, never ``str(exc)``, which can carry user input. The exception is
+    not re-raised, so Starlette/uvicorn never print a traceback with the message. If the response has already
+    started (a stream), the connection is just closed."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        started = False
+
+        async def send_wrapper(message):
+            nonlocal started
+            if message["type"] == "http.response.start":
+                started = True
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_wrapper)
+        except Exception as exc:  # noqa: BLE001 - this is the last-resort boundary
+            from api.redact import safe_exc
+            route = scope.get("route")
+            logging.getLogger("cc.api").error("unhandled %s on %s %s", safe_exc(exc), scope.get("method"),
+                                              getattr(route, "path", "?"))
+            if started:
+                return
+            body = b'{"error":{"code":"internal","message":"Something went wrong. Try again in a moment."}}'
+            await send({"type": "http.response.start", "status": 500, "headers": [
+                (b"content-type", b"application/json"), (b"content-length", str(len(body)).encode()),
+                (b"cache-control", b"no-store")]})
+            await send({"type": "http.response.body", "body": body})

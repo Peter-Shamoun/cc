@@ -125,7 +125,7 @@ export function Callout({ part, onEdit }: { part: CalloutPart; onEdit?: (text: s
 export function ReasoningView({ part, running }: { part: ReasoningPart; running: boolean }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="my-2 font-sans text-sm" data-testid="reasoning">
+    <div className="my-2 font-sans text-sm first:mt-0" data-testid="reasoning">
       <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="inline-flex items-center gap-1 text-fg-muted hover:text-fg">
         <span className={clsx(running && 'shimmer')}>{running ? 'Thinking…' : `Thought for ${fmtMs(part.durationMs ?? 1000)}`}</span>
         {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
