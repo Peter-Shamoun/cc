@@ -206,6 +206,8 @@ function ShellInner() {
     if (last && (await copyText(messageMarkdown(last as unknown as AssistantView)))) toast({ text: 'Copied last response' });
   };
   const focusComposer = () => document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message"]')?.focus();
+  /** Touch-first devices: don't focus the composer on our own (it pops the on-screen keyboard), like the ChatGPT/Claude apps. */
+  const coarse = () => !!window.matchMedia?.('(pointer: coarse)').matches;
 
   const onCommand = (c: SlashCommand) => {
     switch (c.action) {
@@ -375,7 +377,15 @@ function ShellInner() {
   const edit = (t: string) => setDraftPush((d) => ({ text: t, n: (d?.n ?? 0) + 1 }));
   const empty = messages.length === 0 && !opening;
   const draftKey = chat.convId ?? NEW_CHAT_KEY;
-  const send = (t: string, resume?: ChatRequest['resume']) => { atBottomRef.current = true; setAtBottom(true); chat.send(t, resume ? { resume } : undefined); };
+  const send = (t: string, resume?: ChatRequest['resume']) => {
+    // The first send swaps the centered empty-state composer for the docked one (a remount), which used to
+    // drop focus to <body>. Keep typing focus where it was, like ChatGPT/Claude: from the composer, or from a
+    // starter card on a fine pointer (a phone keeps its keyboard closed after tapping a card).
+    const a = document.activeElement;
+    const keep = a?.matches('textarea[aria-label="Message"]') || (!!a?.closest('[data-testid="starter-cards"]') && !coarse());
+    atBottomRef.current = true; setAtBottom(true); chat.send(t, resume ? { resume } : undefined);
+    if (keep) requestAnimationFrame(() => { if (!document.activeElement || document.activeElement === document.body) focusComposer(); });
+  };
   /** Up-arrow in an empty composer edits the last question in place (ChatGPT behaviour, QA-S8). */
   const editLast = () => {
     const users = scroller.current?.querySelectorAll<HTMLElement>('[data-testid="msg-user"]');
@@ -427,7 +437,7 @@ function ShellInner() {
   const sidebarProps = {
     threads, activeId: chat.convId, storeMode: store.mode, canPin: chat.canPin,
     onSelect: (id: string) => { void openChat(id); closeDrawer(); },
-    onNew: () => { chat.newChat(); closeDrawer(); requestAnimationFrame(focusComposer); },
+    onNew: () => { chat.newChat(); closeDrawer(); if (!coarse()) requestAnimationFrame(focusComposer); },
     onDelete: requestDelete, onRename: chat.rename, onPin: chat.pin, onExport: exportThread,
     onCollapse: () => setSidebar(false), onSearch: () => setDialog('search'),
     onSettings: () => setDialog('settings'), onShortcuts: () => setDialog('shortcuts'),
@@ -450,7 +460,7 @@ function ShellInner() {
             <div className="flex flex-1 flex-col items-center justify-center px-4 pb-[12vh] max-sm:justify-end max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]" data-testid="empty-state">
               <h1 className="mb-7 text-center tracking-tight max-sm:mb-auto max-sm:mt-auto" style={{ fontFamily: 'var(--heading-font)', fontSize: 'var(--empty-size)', fontWeight: 'var(--empty-weight)' as never }}>What should we look into?</h1>
               <div className="flex w-full max-w-[48rem] flex-col" id="composer">
-                {composer(true)}
+                {composer(!coarse())}
                 <StarterCards onPick={(p) => send(p)} />
               </div>
             </div>
