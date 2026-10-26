@@ -88,6 +88,13 @@ def lower_label(label: str) -> str:
     return " ".join(w if w.lower() in ACRONYMS and w.isupper() else w.lower() for w in label.split())
 
 
+def dim_label(label: str) -> str:
+    """Mid-sentence dimension for chart titles and alt text: ``Payer name`` -> ``payer`` (1.10.0, QA-P6).
+    Axis and column labels keep the full name."""
+    words = lower_label(label).split()
+    return " ".join(words[:-1] if len(words) > 1 and words[-1] == "name" else words)
+
+
 def columns_for(names: list, rows: list) -> list[dict]:
     out = []
     for i, name in enumerate(names):
@@ -177,13 +184,14 @@ def chart_for(columns: list[dict], rows: list) -> dict | None:
         encoding["x"]["sort"] = "-y"
     if color:
         encoding["color"] = {"field": color["key"], "type": "nominal", "title": color["label"]}
-    title = f"{y['label']} by {lower_label(x['label'])}"
+    by = dim_label(x['label'])
+    title = f"{y['label']} by {by}"
     spec = {"$schema": "https://vega.github.io/schema/vega-lite/v5.json", "data": {"name": "result"},
             "mark": {"type": mark, "point": mark == "line", "tooltip": True}, "encoding": encoding,
             "width": "container", "height": 280}
     return {"type": "chart", "id": new_id("p_"), "library": "vega-lite", "spec": spec,
             "data": {"name": "result", "values": values}, "title": title,
-            "alt": f"{'Line' if mark == 'line' else 'Bar'} chart of {lower_label(y['label'])} by {lower_label(x['label'])}, "
+            "alt": f"{'Line' if mark == 'line' else 'Bar'} chart of {lower_label(y['label'])} by {by}, "
                    f"{len(rows)} points."}
 
 

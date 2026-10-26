@@ -1,4 +1,4 @@
-# Paid amount by payer name
+# Paid amount by payer
 
 _Exported from CC on 2026-10-25T20:00:00Z._
 
@@ -31,7 +31,7 @@ ORDER BY paid_amount DESC
 | BCBS | 32990.90 | 158 |
 | Aetna | 31179.18 | 156 |
 
-_Chart: Bar chart of paid amount by payer name, 7 points._
+_Chart: Bar chart of paid amount by payer, 7 points._
 
 **Assumptions**
 - All service dates in the current gold version.

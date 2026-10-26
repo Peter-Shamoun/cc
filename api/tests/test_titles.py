@@ -20,11 +20,13 @@ def col(key, type_="string", **kw):
 
 
 @pytest.mark.parametrize("cols,want", [
-    ([col("payer_name"), col("paid_amount", "currency"), col("claims", "integer")], "Paid amount by payer name"),
+    ([col("payer_name"), col("paid_amount", "currency"), col("claims", "integer")], "Paid amount by payer"),
     ([col("carc_code"), col("claims", "integer")], "Claims by CARC code"),
+    ([col("name"), col("claims", "integer")], "Claims by name"),  # QA-P6: a lone "name" stays
+    ([col("provider_name"), col("claims", "integer")], "Claims by provider"),
     ([col("claims", "integer")], "Claims"),
     ([col("payer_name"), col("service_month", "date"), col("denial_rate", "percent")],
-     "Denial rate by payer name and service month"),
+     "Denial rate by payer and service month"),
 ])
 def test_title_from_schema_identifiers(cols, want):
     assert title_from_columns(cols) == want
@@ -50,9 +52,9 @@ def _ask(client, text, cid=None):
 def test_first_answer_titles_the_conversation_once(client):
     evs = _ask(client, "Paid amount by payer")
     end, cid = evs[-1], evs[0]["conversationId"]
-    assert end["conversationTitle"] == "Paid amount by payer name"
+    assert end["conversationTitle"] == "Paid amount by payer"
     conv = client.get(f"/api/conversations/{cid}", headers=LABS).json()
-    assert conv["title"] == "Paid amount by payer name"
+    assert conv["title"] == "Paid amount by payer"
     _validator("Conversation").validate(conv)
     again = _ask(client, "Paid amount trend by month", cid)
     assert "conversationTitle" not in again[-1], "only the first answer titles a conversation"

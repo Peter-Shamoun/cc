@@ -31,6 +31,7 @@ OUTCOMES: dict[str, tuple[str, str | None]] = {
 }
 #: extra example: the answer that follows picking the first clarify choice (message.start.resumeOf).
 RESUME = "clarify_resume"
+REGENERATE = "regenerate_concise"  # 1.10.0: "More concise" on the `answer` example (CONTRACT.md §8.1)
 #: simulated per-turn model latency (s) when writing examples, so usage/latency look like a real run.
 REALISTIC_MODEL_DELAY = 0.35
 
@@ -92,10 +93,15 @@ def capture(model_delay: float = 0.0) -> dict[str, list[dict]]:
                      "resume": {"clarificationId": clar["clarificationId"],
                                 **({"choiceIds": [choice["id"]]} if "id" in choice else {})}}
             out[RESUME] = _post(client, reply)
+        if outcome == "answer":
+            out[REGENERATE] = _post(client, {"messages": [], "conversationId": evs[0]["conversationId"],
+                                             "regenerate": {"messageId": evs[0]["messageId"], "style": "concise"}})
     # Normalise the clarify pair together so resumeOf ids line up with the asking message.
     pair = normalise(out["clarify"] + out[RESUME])
     out["clarify"], out[RESUME] = pair[: len(out["clarify"])], pair[len(out["clarify"]):]
-    return {k: (v if k in ("clarify", RESUME) else normalise(v)) for k, v in out.items()}
+    pair = normalise(out["answer"] + out[REGENERATE])  # so regenerateOf points at the answer's message id
+    out["answer"], out[REGENERATE] = pair[: len(out["answer"])], pair[len(out["answer"]):]
+    return {k: (v if k in ("clarify", RESUME, "answer", REGENERATE) else normalise(v)) for k, v in out.items()}
 
 
 def capabilities_example() -> dict:
