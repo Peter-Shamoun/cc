@@ -20,7 +20,7 @@ export type {
   Sensitivity, StatusPart, TablePart, TextPart, ToolCallPart, ArtifactPart, PartBase,
 };
 
-export const CONTRACT_VERSION = '1.4.0';
+export const CONTRACT_VERSION = '1.5.0';
 export const CONTRACT_MAJOR = 1;
 
 // ---------------------------------------------------------------- new parts (v1)
@@ -176,7 +176,8 @@ export interface ChatRequest {
   scenario?: 'table' | 'chart' | 'repair' | 'abstain' | 'clarify' | 'escalation' | 'error' | 'candidates' | 'slow';
 }
 
-export interface HttpError { error: { code: string; message: string } }
+/** `code` known values: see the schema. 1.5.0: `payload_too_large` (413) with `legacyCode: 'validation'` and `maxBytes`. */
+export interface HttpError { error: { code: string; message: string; legacyCode?: string; maxBytes?: number } }
 
 // ---------------------------------------------------------------- client view + reducer
 

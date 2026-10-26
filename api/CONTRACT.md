@@ -1,6 +1,6 @@
 # ClaimClarity chat API — stream contract
 
-**Version: 1.4.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.5.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -45,11 +45,12 @@ The frontend builds against this document only; the analyzer adapts to it.
   | 404 | `validation` | `regenerate` / `editOf` points at nothing | |
   | 409 | `clarification_expired` | the clarification can no longer be answered | ask again |
   | 410 | `transcripts_unavailable` | the customer key was destroyed (§11) | history gone |
-  | 413 | `validation` | request body over **1 MiB** (`CC_API_MAX_BODY_BYTES`), rejected before parsing | "message too long" |
+  | 413 | `payload_too_large` (1.5; was `validation`, still sent as `legacyCode`) | request body over **1 MiB** (`CC_API_MAX_BODY_BYTES`; `maxBytes` in the body), rejected before parsing | "message too long"; not retryable |
   | 422 | `validation` / `invalid_title` | bad body, bad `options` (§12), bad title | show `message` |
   | 429 | `rate_limited` | more than **3 unfinished runs** per user (`CC_API_MAX_CONCURRENT_RUNS`) | wait `Retry-After` seconds (sent, currently 3), then retry |
 
-  Every error response still carries the security headers in §10 (the 413 included).
+  Every error response still carries the security headers in §10 (the 413 included). When a code gets more specific,
+  the old one is kept as `error.legacyCode` for at least one minor version. Branch on an unknown `code` by HTTP status.
 * Every response carries `Cache-Control: no-store` and the security headers in §10.
 
 ## 2. Ids and ordering guarantees
@@ -263,6 +264,11 @@ A picker reads what the server can run. The body is `Capabilities` (no user data
 * Send the choice as `ChatRequest.options.strategy` / `options.model`. Omit them for the defaults. An unknown id, or a
   model that is not in the strategy's `models`, is a 422 `validation` before anything runs. `message.start.strategy`
   echoes the strategy; `message.start.model` stays the model that actually ran.
+* **Per organization (1.5.0).** Signed in, the response has `scope: "organization"` and each strategy and model has
+  `available` for the caller's organization, plus `unavailableReason` when it is false: show those disabled, with
+  the reason as a tooltip. Sending one anyway is a 422 `validation` with the same reason. Signed out:
+  `scope: "public"`, everything shows available. Demo policy (`api/capabilities.py:ORG_POLICY`, or
+  `CC_API_ORG_POLICY` as JSON): `acme_diagnostics` has no Cross-check and no Sonnet; other orgs get everything.
 * `costTier` (`low|medium|high`) and `latencyTier` (`fast|medium|slow`) are relative badges, not prices; the real cost
   of an answer is `message.end.usage.costUsd` (§7). `available: false` means show it disabled.
 * Demo strategies (`api/capabilities.py`): `tool_loop` (Standard), `cascade` (Escalate when stuck: Haiku, then Sonnet),
@@ -274,6 +280,10 @@ A picker reads what the server can run. The body is `Capabilities` (no user data
   `runOptions()` (builds `options`, omitting defaults).
 
 ## Changelog
+
+* **1.5.0** (2026-10-25) — 413 has its own code `payload_too_large` (+ `maxBytes`; `legacyCode: "validation"` kept);
+  `HttpError.error.legacyCode` convention. Capabilities are per organization when signed in (`scope`,
+  `available` on models, `unavailableReason`), and the chat request enforces them. Additive.
 
 * **1.4.0** (2026-10-25) — `GET /api/capabilities` (`Capabilities`, `StrategyOption`, `ModelOption`, `CostTier`) and
   typed `ChatRequest.options.{strategy, model}` with 422 validation (§12). Additive; requests without options are

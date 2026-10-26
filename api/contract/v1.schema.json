@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://claimclarity.local/api/contract/v1.schema.json",
   "title": "ClaimClarity chat stream contract",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "One JSON object per SSE data: line. See api/CONTRACT.md. Validate an event against #/$defs/StreamEvent.",
   "$ref": "#/$defs/StreamEvent",
   "$defs": {
@@ -2001,10 +2001,19 @@
           ],
           "properties": {
             "code": {
-              "type": "string"
+              "type": "string",
+              "description": "Branch on this. Known: auth_expired, access_denied, not_found, stream_gone, validation, clarification_expired, invalid_title, transcripts_unavailable, payload_too_large (1.5), rate_limited. Unknown codes: treat by HTTP status."
             },
             "message": {
               "type": "string"
+            },
+            "legacyCode": {
+              "type": "string",
+              "description": "1.5.0: the code this error had before it got a dedicated one (payload_too_large was 'validation'). Clients that predate the new code may branch on it."
+            },
+            "maxBytes": {
+              "type": "integer",
+              "description": "payload_too_large: the body limit in bytes."
             }
           },
           "additionalProperties": true
@@ -2295,7 +2304,11 @@
         },
         "available": {
           "type": "boolean",
-          "description": "False: show it disabled (e.g. not enabled for this organization)."
+          "description": "False: show it disabled (not enabled for this organization; see unavailableReason). Sending it anyway is a 422 validation."
+        },
+        "unavailableReason": {
+          "type": "string",
+          "description": "Why it is unavailable for this organization (show as a tooltip). Present iff available is false."
         }
       },
       "additionalProperties": true
@@ -2306,7 +2319,8 @@
         "id",
         "label",
         "default",
-        "costTier"
+        "costTier",
+        "available"
       ],
       "properties": {
         "id": {
@@ -2334,6 +2348,14 @@
         },
         "costTier": {
           "$ref": "#/$defs/CostTier"
+        },
+        "available": {
+          "type": "boolean",
+          "description": "False: show it disabled for this organization."
+        },
+        "unavailableReason": {
+          "type": "string",
+          "description": "Why it is unavailable for this organization (show as a tooltip). Present iff available is false."
         }
       },
       "additionalProperties": true
@@ -2346,7 +2368,8 @@
         "demo",
         "defaults",
         "strategies",
-        "models"
+        "models",
+        "scope"
       ],
       "properties": {
         "contractVersion": {
@@ -2383,6 +2406,13 @@
           "items": {
             "$ref": "#/$defs/ModelOption"
           }
+        },
+        "scope": {
+          "enum": [
+            "organization",
+            "public"
+          ],
+          "description": "'organization' when the request was signed in, so `available` reflects the caller's organization; 'public' otherwise (everything shows available; the chat request is still checked)."
         }
       },
       "additionalProperties": true
