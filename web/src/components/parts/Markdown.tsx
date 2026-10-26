@@ -56,8 +56,18 @@ const CODE_SPAN = /```[\s\S]*?```|`[^`\n]+`|```[\s\S]*$/g;
  * is unchanged. Fenced and inline code are left alone, including a fence that is
  * still open while the message streams.
  */
+/**
+ * `$$x$$` written on a line of its own is a display equation (QA-S9). remark-math only treats `$$` as a
+ * block when the fences sit on their own lines, so a one-line `$$…$$` is split onto three lines.
+ * `$$x$$` inside a sentence stays inline.
+ */
+const ONE_LINE_DISPLAY = /^([ \t]*)\$\$(?!\$)([^\n]*?[^\\\n])\$\$[ \t]*$/gm;
+export function displayMath(prose: string): string {
+  return prose.replace(ONE_LINE_DISPLAY, (_m, indent: string, body: string) => `${indent}$$\n${indent}${body.trim()}\n${indent}$$`);
+}
+
 function protectCurrency(markdown: string): string {
-  const escape = (prose: string) => prose.replace(/(^|[^\\])\$(?=\d)/g, '$1\\$');
+  const escape = (prose: string) => displayMath(prose).replace(/(^|[^\\])\$(?=\d)/g, '$1\\$');
   let out = '';
   let last = 0;
   for (const match of markdown.matchAll(CODE_SPAN)) {
