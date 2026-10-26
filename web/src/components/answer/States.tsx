@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowUp, Check, ChevronRight, CircleSlash, HelpCircle, Info, Lock, Sparkles, RotateCcw, Square } from 'lucide-react';
+import { ArrowUp, ArrowUpRight, Check, ChevronRight, CircleSlash, HelpCircle, Info, Lock, RotateCcw, Square } from 'lucide-react';
 import clsx from 'clsx';
 import type { ChatRequest } from '../../api/contract';
 import { Markdown } from '../parts/Markdown';
@@ -114,7 +114,7 @@ export function EscalationNote({ ev }: { ev: EscalationEvent }) {
   return (
     <div className="my-2 font-sans text-xs" data-testid="escalation">
       <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-elev px-2.5 py-1 text-fg-muted hover:text-fg">
-        <Sparkles size={12} aria-hidden /> <span className="truncate">Escalated to {modelName(ev.to.model)}</span>
+        <ArrowUpRight size={12} aria-hidden /> <span className="truncate">Escalated to {modelName(ev.to.model)}</span>
         <span className="hidden text-fg-subtle sm:inline">· {TRIGGER[ev.trigger] ?? ev.trigger}</span> <Info size={12} aria-hidden />
       </button>
       {open && <p className="mt-1.5 max-w-prose pl-1 leading-relaxed text-fg-muted">{modelName(ev.from.model)} → {modelName(ev.to.model)}: {ev.reason}</p>}
