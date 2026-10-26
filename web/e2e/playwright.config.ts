@@ -45,7 +45,7 @@ export default defineConfig({
   // Playwright routing (e2e/static.mjs); global-setup builds e2e/.dist/{live,mock}.
   globalSetup: './global-setup.ts',
   webServer: {
-    command: `${py} -m uvicorn api.app:app --host 127.0.0.1 --port ${API_PORT}`,
+    command: `${py} -m uvicorn api.app:app --no-server-header --host 127.0.0.1 --port ${API_PORT}`,
     cwd: repoRoot,
     env: { CC_API_MODE: 'demo', CC_API_LLM: 'scripted' },
     url: `http://127.0.0.1:${API_PORT}/api/health`,
