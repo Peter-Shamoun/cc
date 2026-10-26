@@ -63,11 +63,33 @@ DEFAULT_TECHNIQUE_CONFIG = {
     "time_limit_seconds": 25,
     "prompt_cache": False,
     "refusal_prompt": "explicit",    # explicit | minimal
+    # Analyzer subagent route only (analyzer.harness / analyzer.cli; see analyzer/bundles.py). The stock CLI ignores
+    # them. Each default is the parameter's B0 (off) level from research/analyzer_bundles_v1.md section 0.
+    "playbook": False,                         # #2: frozen playbook file in the briefing (analyzer/playbook.py)
+    "dictionary_detail": "descriptions",       # #3: descriptions | derivations (when data_dictionary is on)
+    "profile_detail": "full",                  # #4: full | enums (when data_profile is on)
+    "lookup_mandatory_before_literals": False,  # #5: sql/answer rejected until each filter literal was looked up
+    "examples_k": 3,                           # #6: solved TRAIN-split examples in the briefing (enable_examples)
+    "generation_mode": "free_sql",             # #8: free_sql | decompose_cte | compiler_sql_fallback |
+                                               #     compiler_decompose_fallback
+    "explore_probes": False,                   # #9: A06 probe protocol through the probe command
+    "plan_mode": "none",                       # #10: none | plan | plan_and_replan | external_plan
+    "state_assumptions": False,                # #11: A09 axes locked in the interpret record
+    "restate_question": False,                 # #25: A05 plan fields in the interpret record
+    "actionable_errors": False,                # #19: SQL errors name the columns/relations to use instead
+    "digest_results": False,                   # #19: results as a digest (summary + first rows), not raw rows
+    "rewritten_tool_descriptions": False,      # #19: one-line purpose per command in the briefing and tool spec
+    "rows_shown_to_model": 20,                 # #20: rows a sql result shows
+    "domain_lint": False,                      # #22: domain SQL lint after sql and answer; feeds repair
+    "reconciliation_checks": False,            # #23: identities the result must satisfy; feed repair
+    "report_confidence": False,                # #26: answer must carry --confidence high|medium|low
+    "candidate_shape": "none",                 # #15: none | direct | query_plan | divide_and_conquer (A04 shapes)
+    "orchestration_bundle": None,              # multi-agent bundle id; analyzer.orchestration drives the roles
 }
 
 
 INVESTIGATIVE_COMMANDS = ("sql", "metrics", "lookup", "examples", "list", "describe", "sample", "profile",
-                          "dictionary", "glossary", "escalate")
+                          "dictionary", "glossary", "escalate", "probe", "spec")
 
 
 class CliError(Exception):

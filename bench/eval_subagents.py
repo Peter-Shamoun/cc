@@ -56,13 +56,17 @@ def prepare(run_label: str, configs: dict, models: list[str], repeats: int, only
         for config_name, technique_config in configs.items():
             for model in models:
                 for repeat in range(repeats):
-                    library = snap / "generated_questions.json" if technique_config.get("enable_examples") else None
+                    # The stock CLI's examples tool reads the snapshot's whole question file. The analyzer agent
+                    # never gets that library: its examples come from the TRAIN split only (analyzer.examples).
+                    library = (snap / "generated_questions.json"
+                               if technique_config.get("enable_examples") and agent == "cli" else None)
                     s = create_session(snap, case, technique_config, model, run_label, library)
                     meta = json.loads((s / "session.json").read_text())
                     meta.update(config_name=config_name, repeat=repeat)
                     (s / "session.json").write_text(json.dumps(meta, indent=1))
                     if agent == "analyzer":
-                        from analyzer.harness import manifest_fields
+                        from analyzer.harness import manifest_fields, stamp_session
+                        stamp_session(s)
                         fields = manifest_fields(s)
                         prompt = fields.pop("prompt")
                     else:

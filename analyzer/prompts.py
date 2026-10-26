@@ -26,6 +26,8 @@ def refusal_text(config: AnalyzerConfig) -> str:
 
 
 def procedure_text(config: AnalyzerConfig) -> str:
+    if config.context_style == "minimal":
+        return "Submit one SELECT that computes the answer.\n"
     if config.context_style == "goal":
         return (
             "Answer the question from this customer's claims and remittances. "

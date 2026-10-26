@@ -10,6 +10,7 @@ columns are redacted on the way out even if a view ever grew one.
 
 from __future__ import annotations
 
+import difflib
 import re
 import threading
 import time
@@ -40,6 +41,26 @@ _HIGH_CARDINALITY_COLUMNS = frozenset({
     "claim_key", "claim_id", "remit_claim_id", "payer_claim_control_number", "check_or_eft_number",
     "billing_npi", "rendering_npi", "referring_npi",
 })
+
+
+# #19 "descriptions" level: what each tool is for and when to use it, instead of what it returns.
+REWRITTEN_TOOL_DESCRIPTIONS = {
+    "list_relations": "Start here only if you do not know which sem.* view holds a fact. Lists every readable view.",
+    "describe_relation": "Before you write SQL on a view: its exact column names and types. Use these names verbatim.",
+    "sample_rows": "See what stored values look like (codes, spellings, flags) before you filter on them.",
+    "run_sql": "Check a draft or an intermediate count. Read the row_count and any warning or lint before you "
+               "trust a number. The SQL you finally submit is re-run and scored.",
+    "request_escalation": "Only when the answer needs a lossless.* relation (raw EDI files, segments). Audited.",
+    "profile": "Which values a low-cardinality column holds and each numeric column's range, without writing SQL.",
+    "lookup_dictionary": "Grain (one row per what) and the meaning of each column. Read it before choosing a view.",
+    "lookup_glossary": "The business definition of a term (denial, current adjudication, primary payer).",
+    "query_metrics": "A typed metric query the compiler turns into SQL; use it for a metric it names.",
+    "lookup_values": "Turn a name in the question (payer, CPT) into the exact stored value before filtering.",
+    "lookup_examples": "Solved questions from the training split with their SQL, for the shape of a query.",
+    "final_answer": "Submit the SQL that computes the answer, once. Every number in the paragraph must come from it.",
+    "refuse": "Decline patient identifiers, another customer's data, or any change to the data.",
+    "ask": "Ask one clarifying question when the request cannot be answered as stated.",
+}
 
 
 class ToolError(ValueError):
@@ -166,6 +187,8 @@ def tool_spec(config: AnalyzerConfig) -> list[dict]:
                                       "required": ["question"]}})
     if not config.enable_sql:
         spec = [tool for tool in spec if tool["name"] != "run_sql"]
+    if config.rewritten_tool_descriptions:
+        spec = [{**tool, "description": REWRITTEN_TOOL_DESCRIPTIONS[tool["name"]]} for tool in spec]
     return spec
 
 
@@ -286,8 +309,11 @@ class ToolLayer:
                 if column in dimensions:
                     columns.append({"name": column, "type": column_type,
                                     "description": dimensions[column].get("description", "")})
-            entries.append({"relation": name, "grain": meta.get("grain", ""), "use_for": meta.get("use_for", ""),
-                            "default_filter": meta.get("default_filter"), "columns": columns})
+            entry = {"relation": name, "grain": meta.get("grain", ""), "use_for": meta.get("use_for", ""),
+                     "default_filter": meta.get("default_filter"), "columns": columns}
+            if self.config.dictionary_detail == "derivations":
+                entry["derivations"] = _metric_derivations(model, name)
+            entries.append(entry)
         return {"relations": entries}
 
     def lookup_glossary(self, term: str | None = None, *, charge: bool = True) -> dict:
@@ -386,6 +412,8 @@ class ToolLayer:
             fetched = cursor.fetchall()
         except (GuardError, QueryTimeout, Exception) as exc:  # noqa: BLE001 - the model sees the message
             message = sql_error_message(exc, self.config.sql_error_hints and self.config.self_correct != "none")
+            if self.config.actionable_errors:
+                message += self._actionable_error_suffix(message, sql)
             self._audit(audit_event, ok=False, sql=sql[:500], error=message, relation=relation,
                         escalated=self.escalated)
             raise ToolError(message) from None
@@ -400,6 +428,10 @@ class ToolLayer:
         digest = {"columns": columns, "rows": shown, "row_count": len(fetched),
                   "truncated": len(fetched) > self.config.rows_shown_to_model,
                   "row_limit": self.config.row_limit, "time_seconds": elapsed}
+        if self.config.digest_results:
+            digest["rows"] = full_rows[:min(DIGEST_ROWS_SHOWN, self.config.rows_shown_to_model)]
+            digest["truncated"] = len(fetched) > len(digest["rows"])
+            digest["column_summary"] = _column_summary(columns, full_rows)
         if include_all_rows:
             digest["all_rows"] = full_rows
         if self.config.result_checks:
@@ -407,6 +439,35 @@ class ToolLayer:
         elif redacted:
             digest["warnings"] = redacted
         return digest
+
+    def _actionable_error_suffix(self, message: str, sql: str) -> str:
+        """#19: name what to use instead. Reads only the session's own catalog."""
+        relations = self.list_relations(charge=False)
+        named = [name for name in dict.fromkeys(re.findall(r"\b(?:sem|lossless)\.[A-Za-z_][A-Za-z0-9_]*", sql))
+                 if name in relations]
+        if re.search(r"Referenced column|not found in FROM clause|does not have a column|column .* not found",
+                     message, re.IGNORECASE):
+            missing = re.search(r'column "?([A-Za-z_][A-Za-z0-9_]*)"? not found|Referenced column "([^"]+)"', message)
+            missing_name = next((group for group in (missing.groups() if missing else ()) if group), "")
+            parts = []
+            for name in named[:3]:
+                columns = [row[0] for row in self.session.con.execute(f"DESCRIBE {name}").fetchall()]
+                close = difflib.get_close_matches(missing_name, columns, n=3, cutoff=0.5) if missing_name else []
+                parts.append(f"{name} columns: {', '.join(columns)}"
+                             + (f" (closest to {missing_name}: {', '.join(close)})" if close else ""))
+            return " Next step: use a column that exists. " + ("; ".join(parts) if parts else
+                                                               f"Describe one of: {', '.join(relations)}")
+        if re.search(r"Table with name|does not exist|Catalog Error|not allowed|not available", message, re.IGNORECASE):
+            return f" Next step: read only these relations: {', '.join(relations)}."
+        if "GROUP BY" in message:
+            return (" Next step: put every selected column that is not inside an aggregate into GROUP BY, or wrap it "
+                    "in any_value().")
+        if re.search(r"Conversion Error|Could not convert|No function matches|Cannot compare", message, re.IGNORECASE):
+            return (" Next step: CAST one side so both have the same type; compare dates with DATE 'YYYY-MM-DD' and "
+                    "booleans with true/false.")
+        if re.search(r"Parser Error|syntax error", message, re.IGNORECASE):
+            return " Next step: send one SELECT (a WITH ... SELECT is fine) with balanced parentheses and quotes."
+        return " Next step: fix the query and run it again."
 
     def _profile_relation(self, relation: str) -> dict:
         described = self.session.con.execute(f"DESCRIBE {relation}").fetchall()
@@ -430,6 +491,8 @@ class ToolLayer:
                             f"SELECT {quoted}, count(*) AS n FROM {relation} GROUP BY 1 ORDER BY n DESC LIMIT 8").fetchall()
                         entry["values"] = [{"value": jsonable(value), "rows": count} for value, count in top]
                     columns.append(entry)
+                elif self.config.profile_detail == "enums":
+                    continue
                 elif column_type in {"DOUBLE", "BIGINT", "INTEGER", "FLOAT", "DATE", "HUGEINT"} or column_type.startswith("DECIMAL"):
                     low, high = self._guarded_profile(
                         f"SELECT min({quoted}), max({quoted}) FROM {relation}").fetchone()
@@ -497,9 +560,43 @@ class ToolLayer:
             self.audit_sink(record)
 
 
+def _metric_derivations(model: dict, relation: str) -> list[dict]:
+    """#3 "+ derivations": how each semantic-model metric is computed on this relation."""
+    derivations = []
+    for name, metric in (model.get("metrics") or {}).items():
+        expression = (metric.get("views") or {}).get(relation)
+        if expression:
+            derivations.append({"metric": name, "expression": expression, "unit": metric.get("unit", ""),
+                                "description": metric.get("description", "")})
+        elif metric.get("kind") == "ratio":
+            derivations.append({"metric": name, "expression": f"{metric['numerator']} / {metric['denominator']}",
+                                "unit": metric.get("unit", ""), "description": metric.get("description", "")})
+    return derivations
+
+
+DIGEST_ROWS_SHOWN = 5
+
+
+def _column_summary(columns: list[str], rows: list) -> dict:
+    """#19 digest: per column, over every returned row, what a reader checks before trusting a number."""
+    summary = {}
+    for index, name in enumerate(columns):
+        values = [row[index] for row in rows]
+        present = [value for value in values if value is not None]
+        entry: dict[str, Any] = {"nulls": len(values) - len(present), "distinct": len({str(v) for v in present})}
+        numbers = [value for value in present if isinstance(value, (int, float)) and not isinstance(value, bool)]
+        if numbers and len(numbers) == len(present):
+            entry.update(min=min(numbers), max=max(numbers), sum=round(sum(numbers), 6))
+        summary[name] = entry
+    return summary
+
+
 def _glossary_body(config: AnalyzerConfig) -> str:
     if config.glossary == "none":
         return ""
+    if config.glossary == "invariants":
+        from bench.glossary_versions import render_version
+        return render_version("v002_invariants").strip()
     text = GLOSSARY.strip()
     if config.glossary == "pitfalls":
         text += "\n\n" + PITFALLS.strip()

@@ -29,6 +29,11 @@ class Analyzer:
         self.opener = opener
         self.llm = llm
         self.config = config or AnalyzerConfig()
+        subagent_only = self.config.subagent_only_levels_in_use()
+        if subagent_only:
+            raise NotImplementedError(
+                f"the in-process loop does not implement {subagent_only}; run them on the subagent route "
+                "(bench.eval_subagents prepare --agent analyzer)")
         self.question_id = question_id
         self.question_family = question_family
         self.example_library = example_library
