@@ -35,7 +35,8 @@ from pathlib import Path
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from api.feedback import apply as apply_feedback
-from api.store import DEFAULT_TITLE, InMemoryTranscriptStore, Principal, _iso, clean_title, page
+from api.store import (DEFAULT_TITLE, InMemoryTranscriptStore, Principal, _iso, apply_update, clean_title, flags, page,
+                       unarchive_on_user_message)
 
 TRANSCRIPT_RETENTION_DAYS = 90
 _SAFE = re.compile(r"^[A-Za-z0-9_:.-]{1,128}$")
@@ -194,18 +195,18 @@ class SealedTranscriptStore:
         self._retention: dict[Principal, int] = {}
 
     # ---- interface -------------------------------------------------------------------------------
-    def list_conversations(self, principal, cursor=None, query=None):
+    def list_conversations(self, principal, cursor=None, query=None, archived="include"):
         self._expire(principal)
         convs = [c for c in (self._load(principal, cid) for cid in self._ids(principal)) if c]
         convs.sort(key=lambda c: c["updatedAt"], reverse=True)
-        return page(convs, cursor, self.page_size, query)
+        return page(convs, cursor, self.page_size, query, archived)
 
     def get_conversation(self, principal, conversation_id):
         self._expire(principal)
         conv = self._load(principal, conversation_id)
         if conv is None:
             return None
-        return {"id": conv["id"], "title": conv["title"], "updatedAt": _iso(conv["updatedAt"]),
+        return {"id": conv["id"], "title": conv["title"], "updatedAt": _iso(conv["updatedAt"]), **flags(conv),
                 "messages": conv["messages"]}
 
     def append_message(self, principal, conversation_id, message):
@@ -216,19 +217,25 @@ class SealedTranscriptStore:
             conv = self._load(principal, conversation_id) or {
                 "id": conversation_id, "title": DEFAULT_TITLE, "createdAt": time.time(), "updatedAt": time.time(),
                 "messages": []}
+            unarchive_on_user_message(conv, message)
             conv["messages"].append(dict(message))
             conv["updatedAt"] = time.time()
             self._save(principal, conv)
 
     def rename_conversation(self, principal, conversation_id, title):
-        title = clean_title(title)
+        return self.update_conversation(principal, conversation_id, title=title)
+
+    def update_conversation(self, principal, conversation_id, *, title=None, pinned=None, archived=None):
+        """1.17.0: title / pin / archive. The flags are sealed with the transcript like the title."""
+        if title is not None:
+            clean_title(title)
         with self._lock:
             conv = self._load(principal, conversation_id)
             if conv is None:
                 return None
-            conv["title"] = title
+            out = apply_update(conv, title, pinned, archived)
             self._save(principal, conv)
-            return {"id": conv["id"], "title": title, "updatedAt": _iso(conv["updatedAt"])}
+            return out
 
     def auto_title(self, principal, conversation_id, title):
         """Server-derived title (api.titles). Only replaces the generic title, so a user rename always wins."""
@@ -349,8 +356,9 @@ class SealedTranscriptStore:
 
     def _save(self, principal, conv: dict) -> None:
         dek = self._dek(principal, create=True)
-        body = json.dumps({"title": conv["title"], "messages": conv["messages"]}, separators=(",", ":"),
-                          default=str).encode()
+        sealed = {"title": conv["title"], "messages": conv["messages"]}
+        sealed.update({k: conv[k] for k in ("pinned", "pinnedAt", "archived") if conv.get(k)})  # 1.17.0, sealed too
+        body = json.dumps(sealed, separators=(",", ":"), default=str).encode()
         prefix = self._prefix(principal)
         self.blobs.put(f"{prefix}content/{conv['id']}.bin",
                        _seal(dek, body, self._aad(principal, f"content:{conv['id']}")))
@@ -372,7 +380,9 @@ class SealedTranscriptStore:
         body = json.loads(_open(dek, blob, self._aad(principal, f"content:{conversation_id}")))
         meta = json.loads(meta_raw)
         return {"id": conversation_id, "title": body["title"], "messages": body["messages"],
-                "createdAt": meta.get("createdAt"), "updatedAt": meta["updatedAt"]}
+                "createdAt": meta.get("createdAt"), "updatedAt": meta["updatedAt"],
+                "pinned": bool(body.get("pinned")), "pinnedAt": body.get("pinnedAt"),
+                "archived": bool(body.get("archived"))}
 
     def _expire(self, principal) -> None:
         now = time.time()

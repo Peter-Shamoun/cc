@@ -48,7 +48,8 @@ def test_store_contract(store):
     assert store.owned_by_other(B, "c1") and not store.owned_by_other(A, "c1") and not store.owned_by_other(B, "c_new")
     items = store.list_conversations(A)["items"]
     assert [i["id"] for i in items] == ["c2", "c1"]
-    assert items[1] == {"id": "c1", "title": "New analysis", "updatedAt": items[1]["updatedAt"], "messageCount": 2}
+    assert items[1] == {"id": "c1", "title": "New analysis", "updatedAt": items[1]["updatedAt"], "messageCount": 2,
+                        "pinned": False, "archived": False}  # 1.17.0 flags
     assert store.list_conversations(B)["items"] == []
     # search: title and message text, owner only, snippet around the hit
     hits = store.list_conversations(A, query="zelda")["items"]

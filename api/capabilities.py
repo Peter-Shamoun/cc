@@ -75,7 +75,8 @@ def capabilities(contract_version: str, demo: bool, customer: str | None = None,
             "defaults": {"strategy": DEFAULT_STRATEGY, "model": DEFAULT_MODEL}, "strategies": strategies,
             "models": models, "feedbackReasons": [dict(r) for r in FEEDBACK_REASONS],
             "sqlLiteralMasking": sql_literal_masking if sql_literal_masking in ("phi", "all", "off") else "phi",
-            "shareExpiry": {"options": list(SHARE_EXPIRY_DAYS), "default": SHARE_DEFAULT_EXPIRY_DAYS}}
+            "shareExpiry": {"options": list(SHARE_EXPIRY_DAYS), "default": SHARE_DEFAULT_EXPIRY_DAYS},
+            "pinArchive": True}  # 1.17.0: PATCH pinned/archived persists server-side
 
 
 def check_options(options: dict, customer: str | None = None) -> str | None:
