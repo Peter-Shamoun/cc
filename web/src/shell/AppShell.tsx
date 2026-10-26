@@ -13,7 +13,7 @@ import { Composer } from '../components/Composer';
 import { messageMarkdown, type Artifact } from '../components/Message';
 import { ThreadView, type ThreadActions } from './ThreadView';
 import { ArtifactPanel } from '../components/ArtifactPanel';
-import { SUGGESTIONS } from '../fixtures';
+import { StarterCards } from './StarterCards';
 import { Header } from './Header';
 import { OfflineBanner } from './OfflineBanner';
 import { useOnline } from '../lib/useOnline';
@@ -434,13 +434,7 @@ function ShellInner() {
               <h1 className="mb-7 text-center tracking-tight max-sm:mb-auto max-sm:mt-auto" style={{ fontFamily: 'var(--heading-font)', fontSize: 'var(--empty-size)', fontWeight: 'var(--empty-weight)' as never }}>What should we look into?</h1>
               <div className="flex w-full max-w-[48rem] flex-col" id="composer">
                 {composer(true)}
-                {/* Phones: one swipeable row above the composer with an edge fade (ChatGPT/Claude mobile), not a cut-off row at the screen edge. */}
-                <div className="mt-4 flex flex-wrap justify-center gap-2 max-sm:order-first max-sm:-mx-4 max-sm:mb-3 max-sm:mt-0 max-sm:flex-nowrap max-sm:justify-start max-sm:overflow-x-auto max-sm:px-4 max-sm:pb-1 max-sm:scrollbar-none max-sm:[mask-image:linear-gradient(to_right,transparent,#000_1rem,#000_calc(100%-2rem),transparent)]" role="group" aria-label="Suggestions">
-                  {SUGGESTIONS.map((s, i) => (
-                    <button key={s.prompt} type="button" onClick={() => send(s.prompt)} style={{ animationDelay: `${i * 40}ms` }}
-                      className="shrink-0 rounded-full border border-line bg-bg px-3.5 py-2 text-sm font-medium text-fg-muted transition-colors hover:bg-hover hover:text-fg motion-safe:animate-[cc-rise_240ms_ease-out_both]">{s.title}</button>
-                  ))}
-                </div>
+                <StarterCards onPick={(p) => send(p)} />
               </div>
             </div>
           ) : (
