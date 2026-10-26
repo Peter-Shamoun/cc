@@ -1,10 +1,15 @@
 import type { AssistantView, ToolCallPart } from '../../lib/contract';
 import type { AssistantViewV1, EscalationEvent, Part as PartV1, StepEvent, StepView, Usage } from '../../api/contract';
+import { sanitizeParts } from './sanitizeParts';
 import type { CheckResult, Candidate, Step, StepKind, UsageView } from './provisional';
 
 /** Either message view: the legacy reducer's or the v1 reducer's. */
 export type AnyView = AssistantView | AssistantViewV1;
-export const partsOf = (m: AnyView) => m.parts as PartV1[];
+/** The message's parts, coerced to the shapes the views read (malformed wire parts never crash the turn). */
+export const partsOf = (m: AnyView): PartV1[] => sanitizeParts(m.parts);
+
+/** 1.14.0 `maskedLiterals` (v1.gen has it; the hand-written event types don't yet). Only positive counts count. */
+const masked = (e: unknown): number | undefined => { const n = (e as { maskedLiterals?: unknown } | undefined)?.maskedLiterals; return typeof n === 'number' && n > 0 ? n : undefined; };
 
 const KIND: Record<string, StepKind> = {
   run_sql: 'sql', sql: 'sql', query: 'sql',
@@ -29,6 +34,7 @@ export function toStep(p: ToolCallPart): Step {
     // A finished check step with a failed check reads as a warning, not a clean pass.
     state: p.state === 'ok' && checks?.some((c) => !c.passed) ? 'warn' : p.state,
     sql: p.input?.sql,
+    maskedLiterals: (p.input as { maskedLiterals?: number } | undefined)?.maskedLiterals,
     rowCount: p.output?.rowCount,
     durationMs: p.durationMs,
     message: p.output?.message,
@@ -80,7 +86,7 @@ function fromView(v: StepView, all: StepView[], finished: boolean, aborted: bool
       return {
         ...base, kind: purpose === 'explore' ? 'explore' : 'sql', label,
         state: !res && (aborted || !finished) ? (finished ? 'cancelled' : 'running') : state,
-        sql: run?.sql, rowCount: res?.rowCount, truncated: res?.truncated, durationMs: res?.elapsedMs,
+        sql: run?.sql, maskedLiterals: masked(run), rowCount: res?.rowCount, truncated: res?.truncated, durationMs: res?.elapsedMs,
         columns: res?.columns?.map((c) => c.name), error: res?.error?.message,
         attempt: run && run.attempt > 1 ? run.attempt : undefined,
       };
@@ -93,7 +99,7 @@ function fromView(v: StepView, all: StepView[], finished: boolean, aborted: bool
       const rstate: Step['state'] = rr ? (rr.ok ? 'ok' : 'error') : finished ? (rerun ? 'cancelled' : 'ok') : 'running';
       return {
         ...base, kind: 'repair', label: rstate === 'running' ? 'Repairing the query' : 'Repaired the query', message: r.explanation, state: rstate,
-        error: r.error.message, previousSql: sqlOf(all, r.failedStepId), sql: r.revisedSql, attempt: r.attempt, maxAttempts: r.maxAttempts,
+        error: r.error.message, previousSql: sqlOf(all, r.failedStepId), sql: r.revisedSql, maskedLiterals: masked(r), attempt: r.attempt, maxAttempts: r.maxAttempts,
       };
     }
     case 'check': {
@@ -111,7 +117,7 @@ function fromView(v: StepView, all: StepView[], finished: boolean, aborted: bool
       const c = find(v, 'step.candidates');
       if (!c) return null;
       const candidates: Candidate[] = c.candidates.map((x) => ({
-        id: x.candidateId, label: x.label ?? x.candidateId, sql: x.sql, rowCount: x.rowCount, score: x.score, ok: x.ok,
+        id: x.candidateId, label: x.label ?? x.candidateId, sql: x.sql, maskedLiterals: masked(x), rowCount: x.rowCount, score: x.score, ok: x.ok,
         chosen: x.candidateId === c.chosenId,
         note: !x.ok ? 'failed' : x.agreesWith?.length ? `agrees with ${x.agreesWith.join(', ')}` : undefined,
       }));

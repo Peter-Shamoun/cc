@@ -88,7 +88,13 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -
 .prose-chat :where(h2) { font-size: 20px; }
 .prose-chat :where(h3) { font-size: 18px; }
 .prose-chat :where(strong) { font-weight: 600; }
-.prose-chat :where(a) { color: var(--link); text-decoration: underline; text-underline-offset: 2px; }
+.prose-chat :where(a) {
+  color: var(--link); text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px;
+  /* Claude/ChatGPT: a quiet underline that firms up on hover, not a heavy full-strength rule. */
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  transition: text-decoration-color var(--dur-fast, 120ms) ease-out;
+}
+.prose-chat :where(a:hover, a:focus-visible) { text-decoration-color: currentColor; }
 .prose-chat :where(:not(pre) > code) { font-family: var(--font-mono); font-size: 0.875em; font-weight: 500; background: var(--bg-muted); padding: 0.125em 0.3em; border-radius: 0.3rem; overflow-wrap: anywhere; }
 .prose-chat :where(table) { width: 100%; border-collapse: collapse; margin: 0.75em 0 1.25em; font-size: 14px; font-family: var(--font-sans); font-variant-numeric: tabular-nums; line-height: 1.5; }
 .prose-chat :where(th) { text-align: start; font-weight: 600; border-bottom: 1px solid var(--border-strong); padding: 0.5em 0.75em; }
@@ -109,6 +115,10 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -
   border-radius: 9999px; background: var(--fg); vertical-align: middle;
   animation: cc-pulse 1s ease-in-out infinite;
 }
+/* New blocks fade in lightly while an answer streams (ChatGPT's soft reveal; Claude streams plainly, so keep
+   it short). Only blocks that mount during streaming animate; the class goes away at message end, which
+   never replays it. Reduced motion turns it off with every other animation. */
+.streaming-caret > div > div { animation: cc-fade 160ms ease-out both; }
 @keyframes cc-pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.8); } }
 
 .shiki-wrap pre { margin: 0; padding: 1rem; overflow: visible; font-size: 13px; line-height: 1.6; background: transparent !important; }
@@ -206,6 +216,9 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -
  * and forced-colors mode gets a system outline, so focus stays visible (WCAG 2.4.7).
  */
 .cc-composer:focus-within { box-shadow: 0 0 0 1px var(--border-strong), 0 6px 20px rgba(0, 0, 0, 0.08); }
+/* QA-A27: the panel focuses its Preview tab when it opens (so Esc and Tab start there); without keyboard use
+ * that programmatic focus shows no ring. Tab navigation (html[data-kbd]) still gets the standard ring. */
+html:not([data-kbd]) .cc-quiet-focus:focus-visible { outline: none; }
 html[data-kbd] .cc-composer:focus-within { box-shadow: 0 0 0 2px var(--focus), 0 6px 20px rgba(0, 0, 0, 0.08); }
 @media (forced-colors: active) { .cc-composer:focus-within { outline: 2px solid Highlight; outline-offset: 1px; } }
 

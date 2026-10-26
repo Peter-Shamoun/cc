@@ -48,8 +48,11 @@ export function storedVote(stored: unknown): Vote | null {
 }
 
 /** SQL behind an answer for the clipboard: one statement as-is, several numbered with their purpose. */
-export function sqlForClipboard(queries: { label: string; sql: string; state?: string }[]): string {
+// Contract 1.14.0 §10: masked SQL is for reading. The copy says so, so nobody pastes `?` placeholders into a console expecting the run's result.
+export const maskComment = (n: number) => `-- Patient values hidden: ${n} ${n === 1 ? 'value is' : 'values are'} shown as ?. Not runnable as-is.`;
+export function sqlForClipboard(queries: { label: string; sql: string; state?: string; maskedLiterals?: number }[]): string {
   const ok = queries.filter((q) => q.state !== 'error' && q.sql.trim());
-  if (ok.length === 1) return ok[0].sql.trim();
-  return ok.map((q, i) => `-- ${i + 1}. ${q.label.replace(/\s+/g, ' ')}\n${q.sql.trim().replace(/;?\s*$/, ';')}`).join('\n\n');
+  const note = (q: (typeof ok)[number]) => (q.maskedLiterals && q.maskedLiterals > 0 ? `${maskComment(q.maskedLiterals)}\n` : '');
+  if (ok.length === 1) return `${note(ok[0])}${ok[0].sql.trim()}`;
+  return ok.map((q, i) => `-- ${i + 1}. ${q.label.replace(/\s+/g, ' ')}\n${note(q)}${q.sql.trim().replace(/;?\s*$/, ';')}`).join('\n\n');
 }

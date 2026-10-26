@@ -6,7 +6,7 @@ import { CodeBlock } from '../parts/CodeBlock';
 import { fmtMs, partsOf, stepsOf, type AnyView } from './normalize';
 import type { Step } from './provisional';
 
-export interface QueryInfo { id: string; label: string; sql: string; rowCount?: number; durationMs?: number; state?: Step['state']; columns?: string[]; error?: string; produces: string[] }
+export interface QueryInfo { id: string; label: string; sql: string; rowCount?: number; durationMs?: number; state?: Step['state']; columns?: string[]; error?: string; produces: string[]; maskedLiterals?: number }
 
 /**
  * Every SQL statement behind an answer, and which table each produced. Sources: tool steps with
@@ -27,17 +27,19 @@ export function queriesOf(m: AnyView): QueryInfo[] {
     if (s.kind === 'repair' && steps.slice(i + 1).some((x) => x.sql?.trim() === s.sql!.trim())) return;
     const dup = out.find((q) => q.sql.trim() === s.sql!.trim());
     const prod = producedBy([s.id, s.resultId]);
-    if (dup) { dup.produces = [...new Set([...dup.produces, ...prod])]; return; }
-    out.push({ id: s.id, label: s.label, sql: s.sql!, rowCount: s.rowCount, durationMs: s.durationMs, state: s.state, columns: s.columns, error: s.kind === 'repair' ? undefined : s.error, produces: prod });
+    if (dup) { dup.produces = [...new Set([...dup.produces, ...prod])]; dup.maskedLiterals ??= s.maskedLiterals; return; }
+    out.push({ id: s.id, label: s.label, sql: s.sql!, maskedLiterals: s.maskedLiterals, rowCount: s.rowCount, durationMs: s.durationMs, state: s.state, columns: s.columns, error: s.kind === 'repair' ? undefined : s.error, produces: prod });
   });
   for (const c of codes) {
     const prod = producedBy([c.id]);
     const dup = out.find((q) => q.sql.trim() === c.code.trim());
-    if (dup) { dup.produces = [...new Set([...dup.produces, ...prod])]; continue; }
-    out.push({ id: c.id, label: c.title ?? 'Query', sql: c.code, produces: prod, state: 'ok' });
+    if (dup) { dup.produces = [...new Set([...dup.produces, ...prod])]; dup.maskedLiterals ??= masked(c); continue; }
+    out.push({ id: c.id, label: c.title ?? 'Query', sql: c.code, maskedLiterals: masked(c), produces: prod, state: 'ok' });
   }
   return out;
 }
+
+const masked = (c: unknown) => { const n = (c as { maskedLiterals?: unknown }).maskedLiterals; return typeof n === 'number' && n > 0 ? n : undefined; };
 
 /** The query that produced `t`, if known. */
 export function queryForTable(m: AnyView, t: TablePart): QueryInfo | undefined {
@@ -46,6 +48,11 @@ export function queryForTable(m: AnyView, t: TablePart): QueryInfo | undefined {
   const code = (partsOf(m) as unknown as LinkedCode[]).find((c) => c.type === 'code' && c.id === t.sqlPartId);
   const ids = [t.sqlPartId, t.resultId, sid, code?.stepId].filter(Boolean);
   return qs.find((q) => ids.includes(q.id)) ?? qs.find((q) => q.produces.includes(t.title ?? 'Result'));
+}
+
+/** Shared view made without data (contract 1.15.0 `sqlWithheld`): say the SQL wasn't shared instead of a dead "View SQL". */
+export function SqlWithheldNote() {
+  return <div className="-mt-1 mb-3 inline-flex items-center gap-1 font-sans text-xs text-fg-subtle" data-testid="sql-withheld"><Code2 size={13} aria-hidden /> SQL not shared</div>;
 }
 
 /** Inline "Query ▸" disclosure under a table, ChatGPT "View analysis" style. */
@@ -57,7 +64,7 @@ export function TableSql({ query }: { query: QueryInfo }) {
       <button type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen((o) => !o)} className="inline-flex items-center gap-1 rounded-md py-0.5 text-fg-subtle hover:text-fg">
         <Code2 size={13} aria-hidden /> View SQL {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
       </button>
-      <div id={id} hidden={!open}>{open && <CodeBlock code={query.sql} language="sql" title={query.label} />}</div>
+      <div id={id} hidden={!open}>{open && <CodeBlock code={query.sql} language="sql" title={query.label} masked={query.maskedLiterals} />}</div>
     </div>
   );
 }
@@ -93,7 +100,7 @@ export function SqlInspector({ queries, onClose }: { queries: QueryInfo[]; onClo
           {q.produces.map((t) => <span key={t} className="inline-flex items-center gap-1"><Table2 size={12} aria-hidden /> produced “{t}”</span>)}
         </div>
         {q.error && <div className="mt-2 rounded-lg border border-danger/25 bg-danger/5 px-3 py-1.5 font-mono text-xs text-fg" data-testid="inspector-error">{q.error}</div>}
-        <CodeBlock code={q.sql} language="sql" title={`query ${Math.min(i, queries.length - 1) + 1} of ${queries.length}`} />
+        <CodeBlock code={q.sql} language="sql" title={`query ${Math.min(i, queries.length - 1) + 1} of ${queries.length}`} masked={q.maskedLiterals} />
         {q.columns && q.columns.length > 0 && <div className="mt-1 text-xs text-fg-subtle" data-testid="inspector-columns">Columns: {q.columns.map((c) => <code key={c} className="mr-1.5 font-mono">{c}</code>)}</div>}
       </div>
     </div>

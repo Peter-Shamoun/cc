@@ -192,7 +192,7 @@ export function ErrorView({ part, onRetry }: { part: ErrorPart; onRetry?: () => 
       </div>
       <div className={clsx('flex items-center gap-3 pl-[23px] text-xs', ((part.retryable && onRetry) || part.details) && 'mt-2')}>
         {part.retryable && onRetry && (
-          <button type="button" onClick={onRetry} className="inline-flex items-center gap-1 rounded-md border border-line px-2.5 py-1 font-medium text-fg hover:bg-hover"><RotateCcw size={12} aria-hidden /> Retry</button>
+          <button type="button" onClick={onRetry} className="-ml-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-fg-muted hover:bg-hover hover:text-fg" data-testid="error-retry"><RotateCcw size={12} aria-hidden /> Retry</button>
         )}
         {part.details && <button type="button" onClick={() => setDetails((d) => !d)} className="text-fg-muted underline underline-offset-2">{details ? 'Hide details' : 'Details'}</button>}
       </div>

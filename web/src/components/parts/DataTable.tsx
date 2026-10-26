@@ -46,6 +46,9 @@ function compareCells(a: unknown, b: unknown, numeric: boolean): number {
 type DataTableProps = { part: TablePart; onOpen?: () => void; full?: boolean };
 
 /** A table that fails to render becomes an inline "Try again" card; the rest of the answer stays. */
+/** Titles that only say "this is a result" are noise above a table (QA-A24). */
+export const shownTitle = (t?: string) => (t && !/^\s*(query\s+)?results?\s*$/i.test(t) ? t : '');
+
 export const DataTable = memo(function DataTable(props: DataTableProps) {
   return (
     <ErrorBoundary scope="section" name="DataTable" resetKey={props.part}>
@@ -161,9 +164,11 @@ const DataTableView = memo(function DataTableView({ part, onOpen, full }: DataTa
   };
 
   return (
-    <div className={clsx('group/table overflow-hidden rounded-xl border border-line bg-elev', !full && 'my-4')} data-testid="data-table" tabIndex={-1}>
-      <div className="flex items-center justify-between gap-2 px-3 pt-2 pb-1">
-        <div className="min-w-0 truncate text-[13px] font-medium text-fg-muted">{part.title}</div>
+    // QA-A24: inline, a table sits in the column like ChatGPT's (thin header rule, hover toolbar), not in a framed
+    // card with a caption row. A generic title ("Result") says nothing, so it isn't shown; a real one stays as a quiet label.
+    <div className={clsx('group/table overflow-hidden', full ? 'rounded-xl border border-line bg-elev' : 'my-4')} data-testid="data-table" data-frame={full ? 'panel' : 'inline'} tabIndex={-1}>
+      <div className={clsx('flex items-center justify-between gap-2', full ? 'px-3 pt-2 pb-1' : 'pb-1')}>
+        <div className="min-w-0 truncate text-[13px] font-medium text-fg-muted" data-testid="table-title">{shownTitle(part.title)}</div>
         <div className={clsx('flex shrink-0 items-center gap-0.5', !full && 'opacity-0 transition-opacity group-hover/table:opacity-100 group-focus-within/table:opacity-100 [@media(hover:none)]:opacity-100')}>
           {full && (
             <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter rows" aria-label="Filter rows" className="mr-1 h-7 rounded-md border border-line bg-bg px-2 text-xs outline-none" />
@@ -192,7 +197,7 @@ const DataTableView = memo(function DataTableView({ part, onOpen, full }: DataTa
         data-virtual={virtual || undefined}
       >
         <table className="w-max min-w-full border-collapse font-sans text-sm tabular-nums">
-          <thead ref={headRef} className="sticky top-0 z-[1] bg-elev">
+          <thead ref={headRef} className={clsx('sticky top-0 z-[1]', full ? 'bg-elev' : 'bg-bg')}>
             <tr>
               {part.columns.map((col, i) => {
                 const numeric = isNumeric(col);
@@ -245,9 +250,9 @@ const DataTableView = memo(function DataTableView({ part, onOpen, full }: DataTa
         </table>
       </div>
         <div aria-hidden data-testid="table-fade-left" data-on={edges.left || undefined}
-          className={clsx('pointer-events-none absolute inset-y-0 left-0 z-[2] w-6 bg-gradient-to-r from-elev to-transparent transition-opacity', edges.left ? 'opacity-100' : 'opacity-0')} />
+          className={clsx('pointer-events-none absolute inset-y-0 left-0 z-[2] w-6 bg-gradient-to-r to-transparent transition-opacity', full ? 'from-elev' : 'from-bg', edges.left ? 'opacity-100' : 'opacity-0')} />
         <div aria-hidden data-testid="table-fade-right" data-on={edges.right || undefined}
-          className={clsx('pointer-events-none absolute inset-y-0 right-0 z-[2] w-8 bg-gradient-to-l from-elev to-transparent transition-opacity', edges.right ? 'opacity-100' : 'opacity-0')} />
+          className={clsx('pointer-events-none absolute inset-y-0 right-0 z-[2] w-8 bg-gradient-to-l to-transparent transition-opacity', full ? 'from-elev' : 'from-bg', edges.right ? 'opacity-100' : 'opacity-0')} />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-xs text-fg-subtle">
         <span>

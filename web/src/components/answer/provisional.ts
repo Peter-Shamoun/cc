@@ -12,7 +12,7 @@ export type StepKind = 'sql' | 'repair' | 'check' | 'explore' | 'candidates' | '
 
 export type Verdict = 'pass' | 'warn' | 'fail';
 export interface CheckResult { name: string; passed: boolean; verdict?: Verdict; detail?: string }
-export interface Candidate { id: ID; label: string; sql?: string; rowCount?: number; score?: number; note?: string; chosen?: boolean; ok?: boolean }
+export interface Candidate { id: ID; label: string; sql?: string; maskedLiterals?: number; rowCount?: number; score?: number; note?: string; chosen?: boolean; ok?: boolean }
 
 /** A step as the timeline sees it. */
 export interface Step {
@@ -22,6 +22,8 @@ export interface Step {
   /** 'cancelled' = still running when the turn ended (stopped or interrupted). */
   state: 'running' | 'ok' | 'error' | 'warn' | 'cancelled';
   sql?: string;
+  /** 1.14.0: literals in the shown `sql` replaced by `?` (CONTRACT.md §10). */
+  maskedLiterals?: number;
   rowCount?: number;
   truncated?: boolean;
   columns?: string[];
