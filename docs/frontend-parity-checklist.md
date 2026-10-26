@@ -24,7 +24,7 @@ Each row names the owning team and a priority (P1–P3). A ❌ or 🟡 at P1–P
 | Archive chats | ✓ | — | ❌ | shell P3 (QA-S20) |
 | Projects / folders | ✓ | ✓ | ❌ | ⛔ for this sprint (needs a backend model). Noted. |
 | Full-text chat search | ✓ | ✓ | ✅ Ctrl+K | — |
-| Multi-tab consistency (a chat created, renamed or deleted in tab A shows up in tab B) | ✓ (on focus/refresh) | ✓ | 🟡 to verify in the chaos pass | shell P2 if broken (QA-S21) |
+| Multi-tab consistency (a chat created, renamed or deleted in tab A shows up in tab B) | ✓ (on focus/refresh) | ✓ | ✅ verified C9: chats created in tab A appear in tab B on focus; a chat deleted in A fails gracefully in B (e2e/chaos.spec.ts multi-tab) | — (QA-S21 not needed) |
 | Draft survives a reload | ✓ | ✓ | 🟡 per-chat drafts are in memory only | ⛔ PHI: no localStorage of question text. Keep as is; document. |
 | Temporary / incognito chat | ✓ | ✓ (incognito) | ❌ | shell P3 (QA-S22); could be "don't save" in demo |
 | Share read-only link | ✓ | ✓ | ✅ /shared/:id (#229) | S18 open (SQL on data-off) |
@@ -48,7 +48,7 @@ Each row names the owning team and a priority (P1–P3). A ❌ or 🟡 at P1–P
 |---|---|---|---|---|
 | Markdown, code highlight, Copy code | ✓ | ✓ | ✅ | — |
 | Math (KaTeX) | ✓ | ✓ | ✅ | — |
-| RTL / mixed-direction text (dir=auto) | ✓ | ✓ | ✅ Markdown dir=auto. Whole-app `dir=rtl` is checked in the chaos pass. | shell P3 if the layout breaks |
+| RTL / mixed-direction text (dir=auto) | ✓ | ✓ | ✅ Markdown dir=auto; whole-app `dir=rtl` verified in C9 chaos (no overflow) | — |
 | Interactive tables (sort, resize, CSV) | ✓ (data analysis) | artifacts | ✅ ahead | — |
 | Charts with hover values and download | ✓ | artifacts | ✅ | — |
 | Side panel for artifacts / reports | canvas | artifacts | 🟡 1.9 report panel landing | answer (review on merge) |
@@ -74,9 +74,9 @@ Each row names the owning team and a priority (P1–P3). A ❌ or 🟡 at P1–P
 | Scroll-to-latest button and no auto-scroll hijack | ✓ | ✓ | ✅ | — |
 | Shortcut sheet (Ctrl+/) | ✓ | — | ✅ | — |
 | Offline banner and resume | ✓ | ✓ | ✅ | — |
-| Reconnect mid-stream / resume after reload | ✓ (resumes) | ✓ | ✅ transport tests; reload at each stage is in the chaos pass | platform |
+| Reconnect mid-stream / resume after reload | ✓ (resumes) | ✓ | ✅ transport tests + C9 chaos reload at 7 stages | — |
 | Quiet screen-reader announcements | ✓ | ✓ | 🟡 | shell **P2 S16** |
-| Zoom 200% / 320 CSS px reflow (WCAG 1.4.10) | ✓ | ✓ | to verify in the chaos pass | shell |
+| Zoom 200% / 320 CSS px reflow (WCAG 1.4.10) | ✓ | ✓ | ✅ verified C9 (200%/400%/320px, no horizontal scroll) | — |
 | Settings radios as a single Tab stop | ✓ | ✓ | 🟡 | shell P3 S17 |
 | Cross-browser (Firefox, WebKit, iOS Safari) | ✓ | ✓ | 🟡 xb pass in progress | per finding |
 | Personalisation / custom instructions / memory | ✓ | ✓ | ❌ | ⛔ PHI and product fit: analyst tool, no per-user memory |
