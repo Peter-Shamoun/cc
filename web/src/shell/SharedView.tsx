@@ -11,6 +11,7 @@ import type { Message } from '../lib/contract';
 import type { SharedConversation } from '../contract/v1.gen';
 import { makeAdapter, ThreadSkeleton } from './AppShell';
 import { ToastProvider } from './primitives';
+import { withholdSql } from './withholdSql';
 
 type State = { kind: 'loading' } | { kind: 'gone' } | { kind: 'signin' } | { kind: 'error' } | { kind: 'ok'; shared: SharedConversation; messages: ViewMessage[] };
 
@@ -32,6 +33,7 @@ export function SharedView({ shareId }: { shareId: string }) {
       (shared) => {
         if (!live) return;
         if (!shared) { setState({ kind: 'gone' }); return; }
+        shared = withholdSql(shared);
         const { visible } = foldThread((shared.messages as unknown as Message[]).map(hydrate).map((m) => toView(m)));
         setState({ kind: 'ok', shared, messages: markAnswered(visible) });
       },
