@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight, Database, Download, Maximize2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Database, Download, EyeOff, Maximize2 } from 'lucide-react';
 import type { CodePart } from '../../lib/contract';
 import { CopyButton, IconButton } from '../ui';
 import { downloadText } from '../../lib/csv';
+import { maskComment } from '../../lib/feedback';
 import { useTheme } from '../../lib/theme';
 import { shikiHtml, type SafeHtml } from '../../security/trustedTypes';
 
@@ -32,9 +33,23 @@ const KNOWN = new Set(['sql', 'python', 'json', 'typescript', 'bash']);
 const EXT: Record<string, string> = { sql: 'sql', python: 'py', json: 'json', typescript: 'ts', bash: 'sh' };
 
 /** ChatGPT-style code block (spec §1.2b): one rounded container, small label top-left, copy top-right. */
-export function CodeBlock({ code, language, title, onOpen, tall }: { code: string; language: string; title?: string; onOpen?: () => void; tall?: boolean }) {
+/**
+ * Contract 1.14.0 §10: the shown SQL has patient-bearing literals replaced by `?`. Say so, quietly, next to the
+ * SQL; the executed SQL is unchanged, and the shown text is for reading, never offered as runnable.
+ */
+export function MaskedNote({ count }: { count: number }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-fg-subtle" data-testid="sql-masked"
+      title={`${count} ${count === 1 ? 'value' : 'values'} that could identify a patient ${count === 1 ? 'is' : 'are'} shown as ?. The query ran with the real values; this copy is for reading, not for running.`}>
+      <EyeOff size={12} aria-hidden /> Patient values hidden
+    </span>
+  );
+}
+
+export function CodeBlock({ code, language, title, onOpen, tall, masked }: { code: string; language: string; title?: string; onOpen?: () => void; tall?: boolean; masked?: number }) {
   const [html, setHtml] = useState<SafeHtml | null>(null);
   const { palette } = useTheme();
+  const copyable = masked && masked > 0 ? `${maskComment(masked)}\n${code}` : code;
   useEffect(() => {
     let alive = true;
     if (!KNOWN.has(language)) return;
@@ -54,9 +69,9 @@ export function CodeBlock({ code, language, title, onOpen, tall }: { code: strin
   return (
     <div className="group/code relative my-4 overflow-hidden rounded-xl bg-[var(--code-bg)]" data-testid="code-block">
       <div className="flex items-center justify-between px-4 pt-2 text-xs text-fg-subtle">
-        <span>{title ? `${language} · ${title}` : language}</span>
+        <span className="flex min-w-0 items-center gap-2"><span className="truncate">{title ? `${language} · ${title}` : language}</span>{!!masked && masked > 0 && <MaskedNote count={masked} />}</span>
         <div className="flex items-center gap-0.5">
-          <IconButton label="Download" className="h-7 w-7 opacity-0 group-hover/code:opacity-100 focus:opacity-100 [@media(hover:none)]:opacity-100" onClick={() => downloadText(title ?? `snippet.${EXT[language] ?? 'txt'}`, code, 'text/plain')}>
+          <IconButton label="Download" className="h-7 w-7 opacity-0 group-hover/code:opacity-100 focus:opacity-100 [@media(hover:none)]:opacity-100" onClick={() => downloadText(title ?? `snippet.${EXT[language] ?? 'txt'}`, copyable, 'text/plain')}>
             <Download size={14} />
           </IconButton>
           {onOpen && (
@@ -64,7 +79,7 @@ export function CodeBlock({ code, language, title, onOpen, tall }: { code: strin
               <Maximize2 size={14} />
             </IconButton>
           )}
-          <CopyButton text={code} label="Copy code" className="h-7 w-7" />
+          <CopyButton text={copyable} label="Copy code" className="h-7 w-7" />
         </div>
       </div>
       <div tabIndex={0} aria-label={`${language} code`} className={tall ? 'shiki-wrap overflow-auto' : 'shiki-wrap max-h-[480px] overflow-auto'}>
@@ -78,13 +93,14 @@ export function CodeBlock({ code, language, title, onOpen, tall }: { code: strin
 export function CodePartView({ part, onOpen }: { part: CodePart; onOpen?: () => void }) {
   const collapsible = part.role === 'query' && part.collapsed !== false;
   const [open, setOpen] = useState(!collapsible);
-  if (!collapsible) return <CodeBlock code={part.code} language={part.language} title={part.title} onOpen={onOpen} />;
+  const masked = (part as { maskedLiterals?: number }).maskedLiterals;
+  if (!collapsible) return <CodeBlock code={part.code} language={part.language} title={part.title} onOpen={onOpen} masked={masked} />;
   return (
     <div className="my-2" data-testid="sql-disclosure">
       <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="inline-flex items-center gap-1.5 rounded-md py-0.5 text-sm text-fg-muted hover:text-fg">
         <Database size={14} /> SQL {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />} <span className="text-fg-subtle">1 query</span>
       </button>
-      {open && <CodeBlock code={part.code} language={part.language} title={part.title} onOpen={onOpen} />}
+      {open && <CodeBlock code={part.code} language={part.language} title={part.title} onOpen={onOpen} masked={masked} />}
     </div>
   );
 }

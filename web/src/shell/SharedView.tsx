@@ -81,7 +81,7 @@ export function SharedView({ shareId }: { shareId: string }) {
                       <article key={m.id} data-message-id={m.id} aria-label={m.role === 'user' ? 'Question' : 'Answer'}>
                         {m.role === 'user'
                           ? <UserBubble msg={m} />
-                          : <AssistantTurn msg={m as AnyView} isLast={false} onOpen={setArtifact} onRegenerate={noop} onEdit={noop} />}
+                          : <AssistantTurn msg={m as AnyView} isLast={false} onOpen={setArtifact} onRegenerate={noop} onEdit={noop} sqlWithheld={!state.shared.includeData || !!state.shared.sqlWithheld} />}
                       </article>
                     ))}
                   </div>

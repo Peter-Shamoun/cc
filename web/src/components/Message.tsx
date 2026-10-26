@@ -10,7 +10,7 @@ import { ChartView } from './parts/ChartView';
 import { ArtifactCard, Callout, ErrorView, FileCard, ImageView, ReasoningView, Unsupported } from './parts/misc';
 import { CopyButton, IconButton } from './ui';
 import { StepTimeline } from './answer/StepTimeline';
-import { queriesOf, queryForTable, SqlInspector, TableSql } from './answer/SqlInspector';
+import { queriesOf, queryForTable, SqlInspector, SqlWithheldNote, TableSql } from './answer/SqlInspector';
 import { AbstainCard, ClarifyCard, EscalationNote, StoppedNote, TableSkeleton } from './answer/States';
 import { AnswerMeta } from './answer/AnswerMeta';
 import { SourcesChip } from './answer/Sources';
@@ -186,7 +186,7 @@ export type Refine = Exclude<RegenerateStyle, 'default'>;
 /** Version label for a styled regeneration (`message.start.regenerateStyle` / `StoredMessage.regenerateStyle`). */
 export const STYLE_LABEL: Record<Refine, string> = { concise: 'Concise', detailed: 'Detailed' };
 
-export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, onOpen, onRegenerate, onEdit, onSend, onReply, onRefine, version, onVersion, versionBusy, readOnly }: { msg: AnyView; isLast: boolean; onOpen: (a: Artifact) => void; onRegenerate: () => void; onEdit: (t: string) => void; onSend?: (t: string) => void; onReply?: OnReply; onRefine?: (style: Refine) => void; version?: { current: number; total: number }; onVersion?: (k: number) => void; versionBusy?: boolean; /** Shared /shared/:id view: no actions, feedback, retry, edits or replies. */ readOnly?: boolean }) {
+export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, onOpen, onRegenerate, onEdit, onSend, onReply, onRefine, version, onVersion, versionBusy, readOnly, sqlWithheld }: { msg: AnyView; isLast: boolean; onOpen: (a: Artifact) => void; onRegenerate: () => void; onEdit: (t: string) => void; onSend?: (t: string) => void; onReply?: OnReply; onRefine?: (style: Refine) => void; version?: { current: number; total: number }; onVersion?: (k: number) => void; versionBusy?: boolean; /** Shared /shared/:id view: no actions, feedback, retry, edits or replies. */ readOnly?: boolean; /** Shared without data (contract 1.15.0): SQL was withheld; tables say "SQL not shared". */ sqlWithheld?: boolean }) {
   const msg = view as AssistantView; // legacy part renderers; v1-only data is read through `view`
   const regenStyle = (view as { regenerateStyle?: RegenerateStyle }).regenerateStyle;
   const styleLabel = regenStyle && regenStyle !== 'default' ? STYLE_LABEL[regenStyle] : undefined;
@@ -200,7 +200,7 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [sqlOpen, setSqlOpen] = useState(false);
-  const open = (part: Artifact['part'], title?: string, version?: number) => onOpen({ part, title: title ?? ((('title' in part && part.title) || (part.type === 'image' ? part.alt : 'Artifact')) as string), version, related: msg.parts });
+  const open = (part: Artifact['part'], title?: string, version?: number) => onOpen({ part, title: title ?? ((('title' in part && part.title) || (part.type === 'image' ? part.alt : 'Artifact')) as string), version, related: parts as typeof msg.parts });
 
   // All steps (v1 step.* events and legacy tool_call parts) render as one live timeline (Claude/ChatGPT).
   const parts = partsOf(view);
@@ -244,6 +244,7 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
     if (p.type === 'table') {
       const q = queryForTable(view, p);
       if (q) blocks.push(<TableSql key={`sql-${p.id}`} query={q} />);
+      else if (sqlWithheld) blocks.push(<SqlWithheldNote key={`sql-${p.id}`} />);
     }
   }
   placeTimeline();
@@ -370,13 +371,13 @@ function PartView({ part, msg, open, openArtifact, onRetry, onEdit }: { part: Pa
     case 'code': return <CodePartView part={part} onOpen={() => open(part)} />;
     case 'image': return <ImageView part={part} onOpen={() => open(part)} />;
     case 'file': {
-      const table = msg.parts.find((p): p is TablePart => p.type === 'table' && p.csvFileId === part.fileId);
+      const table = (partsOf(msg) as typeof msg.parts).find((p): p is TablePart => p.type === 'table' && p.csvFileId === part.fileId);
       return <FileCard part={part} onPreview={part.previewable && table ? () => open(table) : undefined} />;
     }
     case 'callout': return <Callout part={part} onEdit={onEdit} />;
     case 'error': return <ErrorView part={part} onRetry={onRetry} />;
     case 'artifact':
-      return <ArtifactCard part={part} onOpen={() => openArtifact(toArtifact(part, msg.parts))} />;
+      return <ArtifactCard part={part} onOpen={() => openArtifact(toArtifact(part, partsOf(msg) as typeof msg.parts))} />;
     default:
       return KNOWN_PART_TYPES.includes((part as Part).type) ? null : <Unsupported part={part as Part} />;
   }
