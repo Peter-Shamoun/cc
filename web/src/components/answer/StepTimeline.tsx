@@ -66,7 +66,7 @@ function StepRow({ step, last }: { step: Step; last: boolean }) {
   const hasDetail = !!(step.sql || step.error || step.checks?.length || step.candidates?.length || step.message);
   const [open, setOpen] = useState(false);
   const Icon = ICON[step.kind];
-  const meta = [step.rowCount !== undefined && `${step.rowCount.toLocaleString()} rows`, step.durationMs !== undefined && fmtMs(step.durationMs)].filter(Boolean).join(' · ');
+  const meta = [step.rowCount !== undefined && `${step.rowCount.toLocaleString()}${step.truncated ? '+' : ''} rows`, step.durationMs !== undefined && fmtMs(step.durationMs)].filter(Boolean).join(' · ');
   const dot = step.state === 'running' || step.state === 'cancelled' ? 'border-fg-subtle bg-bg' : step.state === 'error' ? 'border-danger bg-danger' : step.state === 'warn' ? 'border-[#e8b339] bg-[#e8b339]' : step.kind === 'repair' ? 'border-[var(--callout-bar)] bg-[var(--callout-bar)]' : 'border-line-strong bg-bg';
   return (
     <li className={clsx('relative step-enter', !last && 'pb-1')} data-testid="step" data-kind={step.kind} data-state={step.state}>

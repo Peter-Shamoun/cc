@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import App from '../../App';
 import { reduce, newAssistantView, type AssistantView, type StreamEvent, type ToolCallPart } from '../../lib/contract';
-import { AssistantTurn } from '../Message';
+import { AssistantTurn, messageMarkdown } from '../Message';
 import { stepsOf, summarize, toStep, fmtUsd } from './normalize';
 import { queriesOf } from './SqlInspector';
 import { ANSWER_FIXTURES } from '../../fixtures/answer';
@@ -35,6 +35,12 @@ describe('answer surface: normalize', () => {
     expect(steps[3].candidates).toHaveLength(3);
     expect(steps[4].checks?.filter((c) => !c.passed)).toHaveLength(1);
     expect(summarize(steps, 12000)).toBe('Ran 2 queries, 1 repair, 4 checks, compared candidates · 12s');
+  });
+  it('a finished check step with a failed check is a warning; copy includes abstain text', () => {
+    expect(stepsOf(viewOf('dup-denials')).find((s) => s.kind === 'check')!.state).toBe('warn');
+    const md = messageMarkdown(viewOf('abstain'));
+    expect(md).toMatch(/claims and remittance data/);
+    expect(md).toMatch(/- Which clinics have the highest denial rate\?/);
   });
   it('keeps unknown tools as "other" and formats money', () => {
     expect(toStep({ type: 'tool_call', id: 'x', tool: 'mystery', label: 'L', state: 'ok' } as ToolCallPart).kind).toBe('other');
