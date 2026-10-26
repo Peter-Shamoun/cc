@@ -1,3 +1,5 @@
+import { getShare, loadShared, revokeShare, setShare } from '../contract/share';
+import type { ShareLink, SharedConversation } from '../contract/v1.gen';
 import type { ErrorPart, StreamEvent } from '../lib/contract';
 import { asSession, type AuthSession } from '../auth/session';
 import type { HttpError } from '../api/contract';
@@ -277,6 +279,13 @@ export class HttpAnalystAdapter implements AnalystAdapter {
     if (!res.ok) throw new Error(`export ${res.status}`);
     return { blob: await res.blob(), filename: serverExportFilename(res.headers.get('content-disposition'), format) };
   }
+
+  /** Contract 1.11.0 §17: org-scoped, read-only share links. Auth (and the CSRF header on cookie sessions) come from the session. */
+  private shareOpts() { return { base: this.base, init: { credentials: 'same-origin' as const, cache: 'no-store' as const, headers: this.headers() } }; }
+  getShare(conversationId: string): Promise<ShareLink | null> { return getShare(conversationId, this.shareOpts()); }
+  setShare(conversationId: string, includeData: boolean): Promise<ShareLink> { return setShare(conversationId, includeData, this.shareOpts()); }
+  revokeShare(conversationId: string): Promise<boolean> { return revokeShare(conversationId, this.shareOpts()); }
+  loadShared(shareId: string): Promise<SharedConversation | null> { return loadShared(shareId, this.shareOpts()); }
 
   async fetchBlob(id: string): Promise<Blob> {
     const res = await fetch(`${this.base}/api/download/${encodeURIComponent(id)}`, { credentials: 'same-origin', cache: 'no-store', headers: this.headers() });
