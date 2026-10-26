@@ -6,6 +6,7 @@ passed to ``create_app(auth=SimAuth(world.aws, world.dep))``.
 from __future__ import annotations
 
 import asyncio
+from collections import deque
 from contextlib import asynccontextmanager
 import json
 import logging
@@ -207,6 +208,10 @@ class Settings:
         "candidates": 1, "cascade": "off"})
 
 
+#: AuditLog keeps only this many recent events in memory (tests read them); the durable record is the log line
+AUDIT_EVENTS_KEPT_IN_MEMORY = 1000
+
+
 class AuditLog:
     """Structured audit events. Field allowlist: no SQL text, no row values, no question text."""
 
@@ -215,7 +220,7 @@ class AuditLog:
                "pinned", "archived", "rules", "temporary"}
 
     def __init__(self):
-        self.events: list[dict] = []
+        self.events: deque[dict] = deque(maxlen=AUDIT_EVENTS_KEPT_IN_MEMORY)
         self._lock = threading.Lock()
 
     def __call__(self, event: str, **detail):
