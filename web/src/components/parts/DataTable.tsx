@@ -206,7 +206,7 @@ export const DataTable = memo(function DataTable({ part, onOpen, full }: { part:
                 {part.columns.map((col, i) => (
                   <td key={`${i}:${col.key}`} style={fixed(widths[i])} title={widths[i] !== undefined && !col.phi ? String(row[i] ?? '') : undefined}
                     className={clsx('border-b border-line px-3 py-2 whitespace-nowrap', isNumeric(col) && 'text-right tabular-nums', col.phi && 'font-mono text-fg-subtle', widths[i] !== undefined && 'overflow-hidden text-ellipsis')}>
-                    {formatCell(row[i], col)}
+                    {!col.phi && (row[i] === null || row[i] === undefined || row[i] === '') ? <span className="text-fg-subtle" title="No value">—</span> : formatCell(row[i], col)}
                   </td>
                 ))}
               </tr>
