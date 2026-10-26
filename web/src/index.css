@@ -99,3 +99,8 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -
 
 @layer base { :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+
+/* Answer surface (Team B): step enter, skeleton shimmer. */
+.step-enter { animation: cc-step-in 180ms ease-out both; }
+@keyframes cc-step-in { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+.skeleton { background: linear-gradient(90deg, var(--bg-muted) 0%, var(--bg-hover) 50%, var(--bg-muted) 100%); background-size: 200% 100%; animation: cc-shimmer 1.4s linear infinite; }
