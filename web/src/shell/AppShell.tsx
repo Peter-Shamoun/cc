@@ -28,14 +28,18 @@ import { useTheme } from '../lib/theme';
 import { scrollBehavior } from '../lib/motion';
 import { copyText, downloadText } from '../lib/csv';
 import { getPref, setPref } from '../lib/prefs';
+import { sessionFromEnv } from '../auth/session';
 import type { AssistantView } from '../lib/contract';
 import type { AssistantViewV1, ChatRequest } from '../api/contract';
+
+/** One auth session for both adapters (src/auth/session.ts): demo token, real-backend cookie, or none. */
+const session = sessionFromEnv();
 
 function makeAdapter(): AnalystAdapter {
   const base = import.meta.env.VITE_ANALYST_BASE as string | undefined;
   // VITE_ANALYST_BASE: '' or unset = offline mock; '/' = same origin (vite proxies /api to :8787); else an absolute URL.
   if (base === undefined || base === '') return new MockAnalystAdapter();
-  return new HttpAnalystAdapter(base === '/' ? '' : base.replace(/\/$/, ''), import.meta.env.VITE_ANALYST_DEMO_TOKEN as string | undefined, demoFaultOption());
+  return new HttpAnalystAdapter(base === '/' ? '' : base.replace(/\/$/, ''), session, demoFaultOption());
 }
 
 /**
@@ -55,7 +59,7 @@ function demoFaultOption(): { demoFault?: 'rate_limited' } {
 function makeStore(adapter: AnalystAdapter): TranscriptStore {
   const base = import.meta.env.VITE_ANALYST_BASE as string | undefined;
   if (adapter.name !== 'http' || import.meta.env.VITE_TRANSCRIPTS === 'memory' || base === undefined) return new MemoryTranscriptStore();
-  return new HttpTranscriptStore(base === '/' ? '' : base.replace(/\/$/, ''), import.meta.env.VITE_ANALYST_DEMO_TOKEN as string | undefined);
+  return new HttpTranscriptStore(base === '/' ? '' : base.replace(/\/$/, ''), session);
 }
 
 const phoneQuery = () => (typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 767px)') : null);

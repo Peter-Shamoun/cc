@@ -99,3 +99,23 @@ test vectors in `web/src/lib/csvFilename.vectors.json`. The Content-Disposition 
 - 422s use the contract envelope with field paths only (`Invalid request: messages.0.id.`). User-controlled keys are masked as `*`. FastAPI's default 422 echoed the offending `input` back.
 
 **Heuristics, not de-identification.** Quoted strings, emails, SSNs, phones, dates, 6+ digit numbers and 8+ char alphanumeric ids are masked. A bare unquoted name is not. The primary rule still stands: never pass user text, SQL or row values to a logger or `reportError`.
+
+## Session / auth boundary (for the real backend)
+
+**One seam per side.**
+- Client: `web/src/auth/session.ts`.
+  - `AuthSession` has `{kind, headers(), onExpired()}`.
+  - `sessionFromEnv()` picks:
+    - `cookieSession` when `VITE_AUTH=cookie` (optional `VITE_SIGN_IN_URL`)
+    - `demoTokenSession` when `VITE_ANALYST_DEMO_TOKEN` is set
+    - `noSession` otherwise (the offline mock)
+  - Both HTTP adapters take the session and call `onExpired()` on 401. Nothing else in the UI knows how auth works.
+- API: `api.backends.AuthBackend` (`mode`, `authenticate(token, request_id) -> AuthContext`), passed as `create_app(auth=...)`.
+
+**Rules the real backend inherits (tested in `api/tests/test_auth_boundary.py` and `web/src/auth/session.test.ts`):**
+- The session cookie is `cc_session`: `HttpOnly; Secure; SameSite=Strict; Path=/api`, set by the backend's sign-in. JS never reads it.
+- Cookie-authenticated `POST/PUT/PATCH/DELETE /api/*` must send `x-cc-csrf: 1`. Without it the API answers 403 `access_denied` (`CsrfMiddleware`). The API grants no CORS, so a cross-site page can't add the header. Bearer (demo) requests aren't cookie-borne and skip the check.
+- Credentials are read only from `Authorization` or the cookie, never from a query parameter.
+- With `CC_API_AUTH` set to anything but `demo`, `create_app()` refuses to start without an explicit `auth=` backend. There's no silent fallback to demo tokens.
+- A token baked into the bundle is public. `vite build` and `sessionFromEnv()` refuse a `VITE_ANALYST_DEMO_TOKEN` that isn't the synthetic `demo:<customer>:<user>` shape.
+- `onExpired` for cookie sessions sends the user to `VITE_SIGN_IN_URL?next=<pathname>`, once, with no query or hash.
