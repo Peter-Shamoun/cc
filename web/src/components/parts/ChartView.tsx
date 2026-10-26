@@ -4,7 +4,7 @@ import type { ChartPart } from '../../lib/contract';
 import { IconButton } from '../ui';
 import { CHART_COLORS, useTheme } from '../../lib/theme';
 import { csvFilename, downloadText, recordsToCsv } from '../../lib/csv';
-import { buildSpec, chartRenderer, readableBars } from '../../render/chartSpec';
+import { buildSpec, chartRenderer, readableBars, withTooltips } from '../../render/chartSpec';
 
 export { buildSpec };
 
@@ -35,7 +35,7 @@ export function ChartView({ part, onOpen, full, onShowSpec }: { part: ChartPart;
   const { mode, palette } = useTheme();
   // QA-A2: redraw only when the spec really changes, not on every new part object identity
   // (stream updates, history rehydrate), so a finished chart never drops back to its placeholder.
-  const specKey = useMemo(() => JSON.stringify(readableBars(buildSpec(part))), [part]);
+  const specKey = useMemo(() => JSON.stringify(readableBars(withTooltips(buildSpec(part)))), [part]);
   // Reserve the plot's own height (+ axis room) so the card does not jump or leave a gap once drawn.
   const reserve = useMemo(() => {
     const h = (JSON.parse(specKey) as { height?: unknown }).height;

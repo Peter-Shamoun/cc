@@ -46,6 +46,7 @@ def test_examples_cover_the_contract_outcomes():
     usage = ex["answer"][-1]["usage"]
     assert usage["costUsd"] > 0 and usage["costIsEstimate"] is True and usage["tokens"]["input"] > 0
     assert usage["latency"]["totalMs"] > 0 and usage["models"]
+    assert set(usage["latency"]["stages"]) == {"plan", "sql", "repair", "checks", "render"}  # 1.6.0
     # tool steps: failed query -> repair attempt -> repaired rerun (attempt 2) -> verifier check
     steps = ex["tool_steps"]
     failed = next(e for e in _types(steps, "step.sql_result") if not e["ok"])

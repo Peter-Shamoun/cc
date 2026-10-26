@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { AssistantMessage, ID, TablePart, UserMessage } from './contract';
 import { newAssistantViewV1, reduceV1, type AssistantViewV1, type ChatRequest, type Usage } from '../api/contract';
 import type { AnalystAdapter, ConnectionInfo, ConnectionState, ThreadSummary, TranscriptStore } from '../adapters/types';
@@ -72,7 +72,10 @@ export function partialUsage(view: AssistantViewV1, startedAt: number): Usage {
 /** Short client-side title (shell/title.ts) until the server returns a PHI-scrubbed one (spec §6.5). */
 const draftTitle = (text: string) => shortTitle(text);
 
-export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
+export function useChat(adapter: AnalystAdapter, store: TranscriptStore, getOptions?: () => ChatRequest['options'] | undefined) {
+  // Read at send time (strategy/model picker) without re-creating every callback.
+  const optionsRef = useRef(getOptions);
+  useLayoutEffect(() => { optionsRef.current = getOptions; }, [getOptions]);
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [convId, setConvId] = useState<ID | null>(null);
   const [messages, setMessages] = useState<ViewMessage[]>([]);
@@ -178,7 +181,7 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     };
     let reloaded = false;
     try {
-      for await (const ev of adapter.streamTurn({ conversationId: cid, messages: wire, signal: ctrl.signal, ...(opts.resume ? { resume: opts.resume } : {}), ...(opts.regenerate ? { regenerate: opts.regenerate } : {}), onConnection })) {
+      for await (const ev of adapter.streamTurn({ conversationId: cid, messages: wire, signal: ctrl.signal, ...(opts.resume ? { resume: opts.resume } : {}), ...(opts.regenerate ? { regenerate: opts.regenerate } : {}), options: optionsRef.current?.(), onConnection })) {
         view = reduceV1(view, ev);
         if (ev.type === 'part' && ev.part.type === 'table' && !prefersReducedMotion() && reveal.note(view.parts) && !revealLoop.pending) revealLoop.schedule();
         // Text and reasoning deltas are batched; structural events (start, parts, steps, end) paint at once.

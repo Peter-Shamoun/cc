@@ -1,6 +1,6 @@
 # ClaimClarity chat API — stream contract
 
-**Version: 1.4.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.8.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -45,11 +45,12 @@ The frontend builds against this document only; the analyzer adapts to it.
   | 404 | `validation` | `regenerate` / `editOf` points at nothing | |
   | 409 | `clarification_expired` | the clarification can no longer be answered | ask again |
   | 410 | `transcripts_unavailable` | the customer key was destroyed (§11) | history gone |
-  | 413 | `validation` | request body over **1 MiB** (`CC_API_MAX_BODY_BYTES`), rejected before parsing | "message too long" |
+  | 413 | `payload_too_large` (1.5; was `validation`, still sent as `legacyCode`) | request body over **1 MiB** (`CC_API_MAX_BODY_BYTES`; `maxBytes` in the body), rejected before parsing | "message too long"; not retryable |
   | 422 | `validation` / `invalid_title` | bad body, bad `options` (§12), bad title | show `message` |
   | 429 | `rate_limited` | more than **3 unfinished runs** per user (`CC_API_MAX_CONCURRENT_RUNS`) | wait `Retry-After` seconds (sent, currently 3), then retry |
 
-  Every error response still carries the security headers in §10 (the 413 included).
+  Every error response still carries the security headers in §10 (the 413 included). When a code gets more specific,
+  the old one is kept as `error.legacyCode` for at least one minor version. Branch on an unknown `code` by HTTP status.
 * Every response carries `Cache-Control: no-store` and the security headers in §10.
 
 ## 2. Ids and ordering guarantees
@@ -142,9 +143,27 @@ CSV: `GET /api/download/{csvFileId}` (auth, no-store, opaque id, short-lived).
 
 `queries`, `elapsedMs` (required); `tokens? {input, output, cacheRead?, cacheWrite?}`; `costUsd?` with
 `costIsEstimate?` (always `true` in demo mode — computed from a static price table, never billed);
-`latency? {firstEventMs?, firstStepMs?, firstTokenMs?, modelMs?, sqlMs?, queueMs?, totalMs}`;
+`latency? {firstEventMs?, firstStepMs?, firstTokenMs?, modelMs?, sqlMs?, queueMs?, totalMs, stages?}`;
 `models?[] {model, role?, inputTokens, outputTokens, costUsd?, calls?}` (one row per model, so an escalated
 answer shows both the small and the large model).
+
+**Per-stage breakdown (1.6.0):** `latency.stages {plan, sql, repair, checks, render}` (`LatencyStages`, all integers
+in ms, all five always present). It is wall clock: every instant of the run belongs to exactly one stage, so the
+stages add up to about `totalMs`, and a stacked bar is safe to draw.
+
+| stage | from → to |
+|---|---|
+| `plan` | run start, and each time a query returns OK → the next `step.sql_running` (model turns + schema exploration) |
+| `sql` | `step.sql_running` (not a repair) → its `step.sql_result` |
+| `repair` | a failed `step.sql_result` or a `step.check {verdict: fail}` → the repaired query's result (model + SQL) |
+| `checks` | the final query's result → the checks are done (the `step.check`/`step.candidates` emitted after it) |
+| `render` | `status "Writing answer"` → `message.end` |
+
+Escalation time lands in the stage that was running (usually `repair`). With parallel candidates (`candidates`
+strategy) the attribution follows the latest stage change, so treat the split as approximate. `modelMs`/`sqlMs`
+remain *summed* durations and can exceed `totalMs` when candidates overlap. Example (`tool_steps.jsonl`, demo pace):
+`{"plan": 1057, "sql": 8, "repair": 356, "checks": 1, "render": 61}` for `totalMs: 1481`. Unknown extra keys may
+appear later (e.g. `queue`); clients ignore them.
 
 ## 8. Cancel, resume-after-disconnect, regenerate
 
@@ -153,6 +172,23 @@ answer shows both the small and the large model).
   Before that `message.end`, the server **closes everything still in flight**: every `step.sql_running` without a result
   gets `step.sql_result {ok: false, error: {code: "cancelled"}}`, an open reasoning part gets `reasoning.end`, an open
   text part gets `text.end`. So a UI never has to guess which spinners to stop. Partial parts are not persisted.
+* **Cancel while a query runs: needs analyzer support (documented 1.6.0; not built yet).** Today the server checks
+  for a stop between model turns and during model latency, but it cannot interrupt a SQL statement that is already
+  running: the analyzer runs it synchronously (`analyzer/tools.py: execute_with_time_limit`). Its watchdog can call
+  `connection.interrupt()`, but only on the time limit (`AnalyzerConfig.time_limit_seconds`, default 25 s); the API
+  has no hook into it. So during a SQL step, `message.end {aborted}` arrives when the query returns, at the latest
+  after the time limit, not within 1 s. Clients should show "Stopping…" after `/stop` until `message.end`, and must
+  not assume the 1 s bound. **Intended semantics, once the analyzer exposes a cancel hook** (e.g. a `cancelled`
+  event checked by the watchdog, which then calls `connection.interrupt()`), which needs no client change:
+  1. `/stop` interrupts the running statement immediately. Its step closes with
+     `step.sql_result {ok: false, elapsedMs, error: {code: "cancelled", message: "Stopped by the user."}}`, the
+     same shape as today's close-out.
+  2. A `cancelled` error never triggers `step.repair_attempt`, `escalation` or a verifier `step.check`. It is not a
+     query failure, and it does not count toward `maxAttempts`.
+  3. Other candidates' statements are interrupted the same way, and each gets its own `cancelled` result.
+  4. `message.end {finishReason: "aborted"}` follows within 1 s of `/stop`. `usage.queries` counts the interrupted
+     statement, and `latency.stages.sql` includes its time up to the interrupt.
+  5. A timeout keeps its own code (`timeout`, repairable); only a user stop is `cancelled`.
 * **Disconnect ≠ cancel (1.1).** If the last attached client drops, the run keeps going for
   `CC_API_DISCONNECT_GRACE_SECONDS` (default 10 s). If any client re-attaches in that window the run continues;
   otherwise it is cancelled exactly as if `/stop` had been called. Several tabs may be attached to one run.
@@ -263,6 +299,11 @@ A picker reads what the server can run. The body is `Capabilities` (no user data
 * Send the choice as `ChatRequest.options.strategy` / `options.model`. Omit them for the defaults. An unknown id, or a
   model that is not in the strategy's `models`, is a 422 `validation` before anything runs. `message.start.strategy`
   echoes the strategy; `message.start.model` stays the model that actually ran.
+* **Per organization (1.5.0).** Signed in, the response has `scope: "organization"` and each strategy and model has
+  `available` for the caller's organization, plus `unavailableReason` when it is false: show those disabled, with
+  the reason as a tooltip. Sending one anyway is a 422 `validation` with the same reason. Signed out:
+  `scope: "public"`, everything shows available. Demo policy (`api/capabilities.py:ORG_POLICY`, or
+  `CC_API_ORG_POLICY` as JSON): `acme_diagnostics` has no Cross-check and no Sonnet; other orgs get everything.
 * `costTier` (`low|medium|high`) and `latencyTier` (`fast|medium|slow`) are relative badges, not prices; the real cost
   of an answer is `message.end.usage.costUsd` (§7). `available: false` means show it disabled.
 * Demo strategies (`api/capabilities.py`): `tool_loop` (Standard), `cascade` (Escalate when stuck: Haiku, then Sonnet),
@@ -273,7 +314,87 @@ A picker reads what the server can run. The body is `Capabilities` (no user data
   kept equal to `api/contract/examples/capabilities.json` by a test), `modelsFor()`, `defaultStrategy()` and
   `runOptions()` (builds `options`, omitting defaults).
 
+## 13. Answer feedback (1.7.0)
+
+Thumbs up/down on an **assistant** message, with optional reason chips and a comment.
+
+* `PUT /api/conversations/{conversationId}/messages/{messageId}/feedback` with body `FeedbackRequest
+  {rating: "up"|"down", reasons?: string[], comment?: string ≤ 1000}`. It returns `Feedback {messageId, rating,
+  reasons, comment?, updatedAt}`. A later PUT replaces the earlier one, so changing your mind is just another PUT.
+* `DELETE` on the same path clears it: `{"cleared": true}`.
+* The stored value comes back on `StoredMessage.feedback` in `GET /api/conversations/{id}`, so a reloaded
+  conversation shows the thumbs state.
+* Reason chips: `Capabilities.feedbackReasons[] {id, label, rating}` (demo: up `correct`, `clear`, `fast`; down
+  `wrong_numbers`, `wrong_query`, `misunderstood`, `missing_data`, `too_slow`, `other`). Ids are stable; show the
+  label. Each reason must belong to the rating you send.
+* Errors:
+  * 422 `validation`: unknown reason, a reason of the other rating, a comment over 1000 characters, or a user
+    message id.
+  * 404 `not_found`: unknown message or conversation, or someone else's.
+  * 401 when signed out.
+  * 410 when the org's transcripts are shredded (same as §11).
+* **PHI:** the comment is user text, treated exactly like a message. It is stored (sealed) with the transcript,
+  never logged, and never in a URL. The audit event `answer_feedback` carries only the rating (`kind`) and the reason
+  ids (`reason`). Ephemeral transcript mode keeps feedback only as long as the conversation.
+* Example: `examples/feedback.json`. Client: `web/src/contract/feedback.ts` (`sendFeedback`, `feedbackUrl`) and
+  `feedbackReasonsFor(capabilities, rating)`.
+
+## 14. Citations: data sources (1.8.0)
+
+`message.end.sources` (and the same list on `StoredMessage.sources`) names the data an answer used. It is built from
+what the run already emitted (SQL steps, explore steps, the answer's SQL and table), so it costs nothing extra. It
+holds schema identifiers only, never row values.
+
+```json
+{"id": "src_1", "kind": "view", "name": "sem.claims", "label": "Claims", "role": "answer",
+ "description": "One row per claim submission with billed, allowed and paid amounts, payer and status.",
+ "stepIds": ["s_1", "s_2"], "partIds": ["p_2", "p_3", "p_4"]}
+```
+
+* `role: "answer"`: the final SQL/table read it. `"explored"`: only looked at while planning. Answer sources come
+  first. An abstain or clarify can carry explored sources only; aborted runs carry none. The field is omitted when
+  empty.
+* `partIds` link to the `code` (SQL), `table` and `chart` parts it fed, so each table can show its own "Sources"
+  chips. `stepIds` link to step rows (`step.sql_running`, `step.explore`).
+* `kind` is an *open* enum: `view` today; `definition` (metric definitions) and `document` are reserved. Show an
+  unknown kind as a plain chip with `label`.
+* `TablePart.source.views` (1.0) stays; `sources` is the richer, message-level list.
+* Inline citation markers inside text (e.g. `[1]`) are **not** in this version. When added, they will reference
+  `Source.id`.
+* Client helpers: `web/src/contract/sources.ts` (`answerSources`, `sourcesForPart`, `sourcesForStep`).
+
+## 15. Export (1.8.0)
+
+`GET /api/conversations/{id}/export?format=markdown|json` (default `markdown`) downloads your own conversation.
+
+* `markdown` (`text/markdown`): the title, then each question and answer: the text, the SQL (fenced), table
+  previews (≤ 50 rows, cells escaped, with a "Showing n of N rows" note), a chart's alt text, callouts,
+  abstain/clarify text, the answer's sources, and your feedback. Reasoning, status and tool parts are left out.
+* `json` (`ConversationExport`): `{format: "claimclarity.conversation", contractVersion, exportedAt, conversation}`,
+  where `conversation` is exactly `GET /api/conversations/{id}`.
+* Both are attachments with `Content-Disposition: attachment; filename="claimclarity_conversation_<yyyy-mm-dd>.<md|json>"`.
+  The title never appears in the filename, because a user rename could hold anything. `Cache-Control: no-store`.
+* Errors: 422 `validation` for any other format; 404 for an unknown or someone else's conversation; 401 when
+  signed out; 410 when shredded. Audit event `conversation_exported` carries the format only.
+* Fetch it with the auth header and save the blob (`exportUrl`, `exportFilename` in `web/src/contract/sources.ts`).
+  Never put the token in the URL. Example: `examples/export.md`.
+* The full table result is still the CSV download (`csvFileId`). Sharing is a separate, later version.
+
 ## Changelog
+
+* **1.8.0** (2026-10-25) — Citations: `Source`, `message.end.sources`, `StoredMessage.sources` (§14). Export:
+  `GET /api/conversations/{id}/export?format=markdown|json`, `ConversationExport` (§15). Additive.
+
+* **1.7.0** (2026-10-25) — Answer feedback (§13): the `PUT`/`DELETE …/messages/{id}/feedback` endpoints,
+  `FeedbackRequest`, `Feedback`, `StoredMessage.feedback`, `Capabilities.feedbackReasons`. Additive.
+
+* **1.6.0** (2026-10-25) — `usage.latency.stages` (`LatencyStages`: plan/sql/repair/checks/render, wall-clock ms;
+  §7). §8 documents that cancelling a running SQL statement needs analyzer support, and gives the intended event
+  semantics. Additive.
+
+* **1.5.0** (2026-10-25) — 413 has its own code `payload_too_large` (+ `maxBytes`; `legacyCode: "validation"` kept);
+  `HttpError.error.legacyCode` convention. Capabilities are per organization when signed in (`scope`,
+  `available` on models, `unavailableReason`), and the chat request enforces them. Additive.
 
 * **1.4.0** (2026-10-25) — `GET /api/capabilities` (`Capabilities`, `StrategyOption`, `ModelOption`, `CostTier`) and
   typed `ChatRequest.options.{strategy, model}` with 422 validation (§12). Additive; requests without options are

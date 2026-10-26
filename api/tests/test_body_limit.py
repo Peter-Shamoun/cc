@@ -18,7 +18,8 @@ def _body(n):
 def test_oversized_body_is_413_with_security_headers():
     r = _client().post("/api/chat", content=_body(5000), headers={**LABS, "Content-Type": "application/json"})
     assert r.status_code == 413
-    assert r.json() == {"error": {"code": "validation", "message": "Request body is too large."}}
+    assert r.json() == {"error": {"code": "payload_too_large", "legacyCode": "validation",
+                                  "message": "Request body is too large.", "maxBytes": 4096}}
     assert r.headers["cache-control"] == "no-store"
     assert "default-src 'none'" in r.headers["content-security-policy"]
 
