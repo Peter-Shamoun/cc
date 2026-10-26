@@ -76,8 +76,7 @@ export function StepTimeline({ steps, live, elapsedMs, reasoning = [] }: { steps
         {!live && !errors && repaired > 0 && <span className="sr-only">, all failures repaired</span>}
         {open ? <ChevronDown size={14} className="shrink-0" aria-hidden /> : <ChevronRight size={14} className="shrink-0" aria-hidden />}
       </button>
-      {/* One polite announcement per new step and one when done; the ticking timer is never announced. */}
-      <span className="sr-only" aria-live="polite" aria-atomic="true" data-testid="step-announce">{mountedLive ? (live ? activity : header) : ''}</span>
+      {/* QA-S16: no live region here; the shell's single status region says "answering…" / "Answer complete" (no double announcements). */}
       <div id={bodyId} hidden={!open} className="step-body">
         {notes.length > 0 && (
           <div className="ml-[6px] mt-1.5 whitespace-pre-line border-l-2 border-line pl-5 leading-relaxed text-fg-muted" data-testid="reasoning-summary">{notes.join('\n\n')}</div>

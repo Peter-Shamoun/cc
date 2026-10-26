@@ -58,23 +58,14 @@ describe('calmer thinking disclosure', () => {
     expect(screen.getByTestId('step-activity')).not.toHaveClass('cc-step-fade');
   });
 
-  it('announces politely: each new step once, then "Thought for", never the timer; replays stay silent', () => {
+  it('adds no live region of its own (QA-S16: the shell status region announces the turn once); the timer never shows', () => {
     vi.useFakeTimers();
-    const { rerender } = render(<StepTimeline live steps={[sql('a', 'running', 'Reading schema')]} />);
-    const live = screen.getByTestId('step-announce');
-    expect(live).toHaveAttribute('aria-live', 'polite');
-    expect(live).toHaveAttribute('aria-atomic', 'true');
-    expect(live).toHaveTextContent(/^Reading schema$/);
+    const { container, rerender } = render(<StepTimeline live steps={[sql('a', 'running', 'Reading schema')]} />);
+    expect(container.querySelector('[aria-live]')).toBeNull();
     act(() => { vi.advanceTimersByTime(2000); });
-    expect(live).toHaveTextContent(/^Reading schema$/);
-    rerender(<StepTimeline live steps={[sql('a', 'ok', 'Reading schema'), sql('b', 'running', 'Counting denials')]} />);
-    expect(live).toHaveTextContent(/^Counting denials$/);
+    expect(screen.getByTestId('step-activity')).toHaveTextContent(/^Reading schema$/);
     rerender(<StepTimeline live={false} steps={[sql('a', 'ok', 'Reading schema', 400), sql('b', 'ok', 'Counting denials', 900)]} />);
-    expect(live.textContent).toMatch(/^Thought for \d/);
-    expect(live.textContent).not.toMatch(/ms$/);
-    cleanup();
-    render(<StepTimeline live={false} steps={[sql('a', 'ok', 'q', 1200)]} />);
-    expect(screen.getByTestId('step-announce')).toBeEmptyDOMElement();
+    expect(container.querySelector('[aria-live]')).toBeNull();
   });
 
   it('reduced motion turns the header fade off (global animation reset covers .cc-step-fade)', () => {
