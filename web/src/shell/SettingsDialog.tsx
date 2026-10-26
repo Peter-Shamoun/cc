@@ -15,7 +15,7 @@ export function SettingsDialog({ onClose, initialTab = 'general', storeMode, ent
   return (
     <Dialog title="Settings" onClose={onClose} testId="settings-dialog">
       <div className="flex min-h-[380px] flex-col gap-2 px-3 pb-4 pt-2 sm:flex-row">
-        <div role="tablist" aria-orientation="vertical" aria-label="Settings sections" className="flex shrink-0 gap-1 sm:w-44 sm:flex-col"
+        <div role="tablist" aria-orientation="vertical" aria-label="Settings sections" className="flex shrink-0 gap-1 overflow-x-auto scrollbar-none max-sm:p-1 sm:w-44 sm:flex-col"
           onKeyDown={(e) => {
             const order = tabs.map((t) => t[0]);
             const i = order.indexOf(tab);
@@ -28,7 +28,7 @@ export function SettingsDialog({ onClose, initialTab = 'general', storeMode, ent
           }}>
           {tabs.map(([id, label, icon]) => (
             <button key={id} id={`settings-tab-${id}`} role="tab" type="button" aria-selected={tab === id} aria-controls={`settings-panel-${id}`} tabIndex={tab === id ? 0 : -1} data-autofocus={tab === id ? '' : undefined} onClick={() => setTab(id)}
-              className={clsx('flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm', tab === id ? 'bg-hover font-medium' : 'text-fg-muted hover:bg-hover hover:text-fg')}>
+              className={clsx('flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm', id === 'shortcuts' && 'max-sm:hidden', tab === id ? 'bg-hover font-medium' : 'text-fg-muted hover:bg-hover hover:text-fg')}>
               {icon}{label}
             </button>
           ))}
@@ -117,7 +117,7 @@ function Segmented({ value, onChange, options, label }: { value: string; onChang
 function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
     <button type="button" role="switch" aria-checked={checked} aria-label={label} onClick={() => onChange(!checked)}
-      className={clsx('relative h-6 w-10 rounded-full transition-colors', checked ? 'bg-[#10a37f]' : 'bg-line-strong')}>
+      className={clsx('relative h-6 w-10 rounded-full transition-colors', checked ? 'bg-[var(--focus)]' : 'bg-line-strong')}>
       <span className={clsx('absolute left-0 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-150', checked ? 'translate-x-[18px]' : 'translate-x-0.5')} />
     </button>
   );
