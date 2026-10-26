@@ -38,7 +38,7 @@ dictionary/profile prompt, `row_limit` 5000, 1 candidate, no cascade).
 
 ### `POST /api/chat` → `text/event-stream`
 
-Body: `{ "conversationId"?: ID, "messages": [{ "id"?: ID, "role": "user", "text": string }], "options"?: { "strategy"?: string } }`.
+Body: `{ "conversationId"?: ID, "messages": [{ "id"?: ID, "role": "user", "text": string }] }`. (No `options.strategy`/`options.model`: 422 since contract 1.24.0.)
 The last user message is the question. No PHI in the URL. Responses carry `Cache-Control: no-store`.
 
 Each event is `id: <messageId>:<seq>` plus `data: <StreamEvent JSON>`. Heartbeats
@@ -49,7 +49,7 @@ after the run ends (same principal only).
 Event sequence:
 
 ```
-message.start {messageId, conversationId, model, strategy}
+message.start {messageId, conversationId, model}
 status {label: "Analyzing"}
 part tool_call ...            one per analyzer step (describe_view, run_sql, request_escalation, ...)
 text.start / text.delta* / text.end   the answer prose (markdown)

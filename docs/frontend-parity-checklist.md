@@ -39,7 +39,7 @@ Each row names the owning team and a priority (P1–P3). A ❌ or 🟡 at P1–P
 | Attach / paste / drag-drop files | ✓ | ✓ | ✅ (chips) | — |
 | Paste a large text block as an attachment chip | — | ✓ | ✅ | — |
 | Slash / tool menu | ✓ (/ tools) | ✓ | ✅ slash.ts | — |
-| Model / mode picker | ✓ | ✓ | ✅ strategy picker | — |
+| Model / mode picker | ✓ | ✓ | removed (1.24.0: one server configuration) | — |
 | Voice dictation | ✓ | ✓ (mobile) | ❌ | ⛔ PHI: browser speech engines send audio to a vendor. Do not ship. |
 | Focus is kept after send (every engine) | ✓ | ✓ | 🟡 **Firefox loses focus to BODY after the first send** | shell **P2 QA-S19** |
 

@@ -46,7 +46,7 @@ API (api/, FastAPI, python -m api)
   mapping.py      AnalyzerAnswer → parts (text, table, chart, callouts, clarify, abstain)
   stream_parts.py parts → text.* / table.* / part events
   contract/       versioned JSON schema, conformance rules, golden examples (Contract team)
-  analyzer_adapter.py, reasoning_policy.py, strategy_config.py, analyst_shim.py   the real-analyzer bridge (§5)
+  analyzer_adapter.py, reasoning_policy.py, analyst_shim.py                     the real-analyzer bridge (§5)
   security.py, redact.py, sql_mask.py, cancel.py, store.py, transcripts.py, export.py, feedback.py
           │
           ▼
@@ -109,8 +109,8 @@ to it at compile time. The client ignores unknown events and fields (forward-com
 - Requests: any `IdentityScopedKey` (`customer`, `tenant`, `schema`, `database`, `relations`, `scope`, `escalate`, …)
   in the body or `options` is 422 `validation` and opens no session. Headers and query parameters are never read for
   scope. Other unknown keys are ignored.
-- Client: the web app sends only `{conversationId, messages, resume?, regenerate?, options?, temporary?}`, options
-  only `strategy`/`model`, no query string, and only auth/CSRF/idempotency/Last-Event-ID headers.
+- Client: the web app sends only `{conversationId, messages, resume?, regenerate?, temporary?}` (no `options`: there
+  is no strategy/model choice since contract 1.24.0, and `options.strategy`/`options.model` are 422), no query string, and only auth/CSRF/idempotency/Last-Event-ID headers.
 - Tests: `api/tests/test_backend_fit.py`, `api/tests/test_backend_fit_121.py` (contract), `web/src/adapters/http.backendFit.test.ts`,
   `web/e2e/backend-fit.spec.ts` (no data-source control anywhere in the UI).
 
@@ -146,11 +146,9 @@ not change.
 |---|---|---|
 | `build_real_llm(kind, *, enable)` | `analyzer_adapter.py` | `AnthropicLLM` / `BedrockLLM(allow_paid_api=True)`, but only if `enable=True` **and** the env switch is set; otherwise raises `PaidAPIDisabled` |
 | `paid_api_enabled(env=None)` | `analyzer_adapter.py` | true only when `CC_API_ALLOW_PAID_API` is the exact phrase |
-| `run_to_events(question, run, inner_llm, *, model, reasoning="drop", sql_masking="phi", cancelled, principal, downloads, strategy)` | `analyzer_adapter.py` | the full framed stream (`message.start` … `message.end`) for one run; wraps `emit` in the reasoning policy and SQL masking |
-| `adapter_strategy(strategy, *, multi_candidate, escalated)` | `analyzer_adapter.py` | the capabilities id for `message.start.strategy` |
+| `run_to_events(question, run, inner_llm, *, model, reasoning="drop", sql_masking="phi", cancelled, principal, downloads)` | `analyzer_adapter.py` | the full framed stream (`message.start` … `message.end`) for one run; wraps `emit` in the reasoning policy and SQL masking |
 | `answer_from_bench(answer, *, columns)` | `analyzer_adapter.py` | `analyst/` (`bench.agents.Answer`) → `AnalyzerAnswer` |
 | `events_for_recording(recording)` | `analyzer_adapter.py` | replays a recorded real run with no model, network or DB (CI) |
-| `strategy_config(strategy, model, *, customer, grid=None, strict=False)` | `strategy_config.py` | strategy/model (and optional grid cell) → `AnalyzerConfig` overrides + fidelity notes |
 | `ToolLoopShim`, `TextRoleShim`, `SingleShotShim` | `analyst_shim.py` | adapt the `analyst/` agents' model interfaces onto `LiveTap` |
 | `CancellableOpener(opener, cancelled)` | `cancel.py` | Stop interrupts the running SQL; already used by `/api/chat` |
 | `SimAuth(aws, deployment)` | `backends.py` | Cognito id token → `Principal(custom:customer, email)`; sessions only through `ccsim.query.open_session` (`QueryPathOpener`) wrapped in `NoEscalateOpener` |
@@ -159,9 +157,9 @@ not change.
 1. In `create_app`, when `settings.llm in ("anthropic", "bedrock")`, build the model with
    `build_real_llm(settings.llm, enable=True)` instead of `make_llm(...)`. Keep `scripted` as the default. The test
    that forbids importing the adapter from `api/app.py` changes in the same PR.
-2. Config: `AnalyzerConfig(**{**settings.analyzer_overrides, **strategy_config(body.options.get("strategy",
-   DEFAULT_STRATEGY), body.options.get("model", "auto"), customer=ctx.principal.customer).overrides})`. This
-   replaces the demo-only `SCENARIO_CONFIG` merge. Drop `scenario` for real runs: it is a demo knob.
+2. Config: `AnalyzerConfig(**settings.analyzer_overrides)`: one server-side configuration (the shipped B1 settings),
+   never request-driven (contract 1.24.0 removed the strategy/model picker). This replaces the demo-only
+   `SCENARIO_CONFIG` merge. Drop `scenario` for real runs: it is a demo knob.
 3. Wrap `emit` with `ReasoningPolicy("drop")` (add a setting if you want `summary`; no env var exists yet) (`api/reasoning_policy.py`), as `run_to_events`
    does. The demo path doesn't need it (scripted text is synthetic), but a real model's text can quote rows.
 4. Keep `CancellableOpener`, `NoEscalateOpener`, `mask_event`/`mask_part` and the audit allowlist exactly as they are.
@@ -187,7 +185,6 @@ not change.
 | `CC_API_AUTH` | `demo` | anything else requires `create_app(auth=SimAuth(...))` |
 | `CC_API_MODE` | — | **mentioned in docstrings but not read by any code.** Sim/prod mode is selected only by passing `auth=SimAuth(...)` to `create_app` (with `CC_API_AUTH` ≠ `demo`) |
 | `CC_API_SQL_LITERAL_MASKING` | `phi` | shown-SQL literal masking: `phi` / `all` / `off`; an unknown value means `phi` |
-| `CC_API_ORG_POLICY` | demo policy (JSON, same shape as `capabilities.ORG_POLICY`) | per-org disabled strategies/models (same rule as the 422 and `strategy_config`) |
 | `CC_API_MAX_CONCURRENT_RUNS` | `3` | per-user run cap |
 | `CC_API_TEMPORARY_TTL_SECONDS` | `3600` | temporary chat TTL; `≤0` turns it off |
 | `CC_API_DEMO_PACE`, `CC_API_MODEL_DELAY_SECONDS`, `CC_API_STREAM_DELAY_SECONDS` | demo pacing | **set `CC_API_DEMO_PACE=0` for real models** (pacing applies only to `scripted`, but be explicit) |
@@ -195,18 +192,12 @@ not change.
 
 The complete list, enforced by `api/tests/test_deploy_doc.py`, is `docs/frontend_deploy.md` §8.
 
-**5.6 Strategy mapping (`capabilities.STRATEGIES[*].config` → `AnalyzerConfig`)**
+**5.6 Analyzer configuration (fixed server-side)**
 
-| capabilities id | label | overrides |
-|---|---|---|
-| `tool_loop` (default) | Standard | `{}` (base: glossary basic, no dictionary/profile, row_limit 5000, candidates 1, cascade off) |
-| `cascade` | Escalate when stuck | `cascade: "haiku_then_sonnet"` |
-| `candidates` | Cross-check | `candidates: 3, candidate_selection: "execution_vote"` |
-
-A non-`auto` model adds `model`. An org-disabled or unknown strategy/model raises `ValueError`, matching the API's
-422. The optional 384-grid cell mapping and its fidelity flags (`multiagent` and `decompose_cte` are
-**unsupported**) are in the adapter spec §3 R4. `message.start.strategy` is always a capabilities id
-(`adapter_strategy`).
+There is no strategy or model choice (contract 1.24.0, product decision). The server runs one shipped configuration:
+analyzer bundle B1 (Haiku, effort low, a single agent with the knowledge briefing; no repair, cascade or candidates),
+set in code and server config (`claude_code_cli_driver.SHIPPED_ANALYZER_BUNDLE_ID`, `settings.analyzer_overrides`),
+never by a request. `options.strategy` / `options.model` are 422 `validation`; `message.start` carries no `strategy`.
 
 **5.7 PHI defaults (keep them all)**
 - Reasoning: `drop`. No model text reaches the client. `summary` is opt-in and built only from labels and counts,
@@ -221,15 +212,15 @@ A non-`auto` model adds `model`. An org-disabled or unknown strategy/model raise
   Until then, live clarifications are single-question. This is logged under BACKEND-FIT in NOTES.
 
 **5.8 How to verify (in order; the first three are free)**
-1. `pytest api/tests/test_analyzer_adapter.py api/tests/test_adapter_r2_r4_r7.py api/tests/test_adapter_strategy_and_timing.py`: 9 recorded shapes plus
+1. `pytest api/tests/test_analyzer_adapter.py api/tests/test_adapter_r2_r7.py api/tests/test_adapter_start_and_timing.py`: 9 recorded shapes plus
    synthetic-PHI runs are schema-valid, conformant (`api.contract.conformance.check(events) == []`) and PHI-free.
 2. Record a real run in a sandbox (wrap the LLM so each `complete()` appends `{model, candidate_index,
    tool_results, completion}`), **scrub row values**, add it under `api/tests/fixtures/analyzer_runs/`, and run
    `events_for_recording` in CI.
 3. Full gates: `pytest api/tests`, `python -m api.contract.gen_ts --check`, `python -m api.contract.make_plot_cases --check`,
    and in `web/` run tsc, oxlint, vitest and build.
-4. A paid smoke test needs Peter's sign-off: in a non-prod deployment set the switch, send one synthetic question per
-   strategy, and confirm `/api/health` shows the LLM, that the stream passes `check()`, that there is no
+4. A paid smoke test needs Peter's sign-off: in a non-prod deployment set the switch, send a few synthetic questions,
+   and confirm `/api/health` shows the LLM, that the stream passes `check()`, that there is no
    `reasoning.delta` under `drop`, that Stop returns `aborted` within 1 s during SQL, and that the audit log has no
    SQL or row values.
 5. Shadow runs: replay recorded questions and gate on `check() == []` and on the PHI scan before turning it on for users.
@@ -245,7 +236,7 @@ re-executed in the sandbox. With `DemoAuth` the data is the bench snapshot; with
 API process against the signed-in customer's reader session (`QueryPathOpener`, opened once per run), reached by the
 worker's `analyzer.cli` over a run-scoped unix socket with a one-run capability (`analyzer/run_channel.py`): no
 credential reaches the worker or the disk, and the customer comes only from the token. Other auth backends are refused,
-as are any strategy/model option but the defaults and the `escalate` command. No live clarification: B1 has `ask`
+as is the `escalate` command (a strategy/model option is 422 on every path, 1.24.0). No live clarification: B1 has `ask`
 off, and multi-question clarify still needs the analyzer `ask` spec change (5.7).
 
 ```bash
@@ -367,7 +358,7 @@ on gradients, glass/blur, glow, heavy shadows and similar.
 | `App.tsx` | Path route switch: app, `/signed-out`, everything else is the 404 (`shell/StatusPage`). |
 | `shell/routes.ts` | `routeFromLocation` (path routes) and `signedOutUrl`. |
 | `shell/AppShell.tsx` | Layout and wiring: sidebar + header + `ThreadView` + docked composer; hash route `#/c/<id>`; dialogs (search, settings, shortcuts, delete/rename); global shortcuts; temporary chat; A30 composer-as-reply (`lib/openClarification.ts`); branch in new chat. |
-| `shell/Header.tsx` | Product menu (strategy / model from `/api/capabilities`), title menu (Rename, Copy as Markdown, Export as Markdown, Export as JSON when the server exports, Delete), temporary-chat toggle, new chat. No share, no scope. |
+| `shell/Header.tsx` | Product name (plain text; no strategy/model picker since 1.24.0), title menu (Rename, Copy as Markdown, Export as Markdown, Export as JSON when the server exports, Delete), temporary-chat toggle, new chat. No share, no scope. |
 | `components/Sidebar.tsx` | New chat, Search chats, date-grouped chats with a row menu (rename, pin, archive, export, delete), filter past 20 rows, collapsed rail with avatar, account menu (identity read-only, Settings, Sign out). Mobile: a drawer with swipe. |
 | `components/Composer.tsx` | `+` (attach text files) / textarea / send. Enter sends, Shift+Enter new line, long pastes become chips, Stop while streaming, offline-aware. Placeholder becomes "Reply…" when a clarifying question is open. |
 | `shell/ThreadView.tsx` | Windowed message list, scroll-to-bottom, stays pinned while streaming. |
@@ -402,7 +393,6 @@ on gradients, glass/blur, glow, heavy shadows and similar.
 - The empty-state heading is larger than ChatGPT's.
 - Account identity is a demo constant (`ACCOUNT` in Sidebar); production should read it from the session (`/api/me`).
 - The `+` attach button adds text files to the question as context; files are not queryable data (see §8 "File upload").
-- Strategy / model in the product menu are validated and echoed by the API but don't change the scripted run (§10).
 - Settings is a modal, not a full page.
 
 <!-- SECTION: answer (§9.2). Answer team: answer rendering (timeline, text, table, chart, clarify, errors), print, copy. -->
@@ -497,8 +487,7 @@ Turn chrome: Sources chip ("Looked at sem.claims +N"; only when data was actuall
 - Live runs are in process memory (re-attach and the run cap are per process; §7 sticky routing).
 - The demo has one relation (`sem.claims`), a subset of production `SEM_TABLES`. Demo answers are scripted, not
   analyzed.
-- `api/app.py` is not wired to the real analyzer (§5). Strategy and model options are validated and echoed but
-  don't change the scripted run.
+- `api/app.py` is not wired to the real analyzer on the `model_api` path (§5).
 - a05 verifier-agent steps need an executor tap (adapter doc §6, open).
 - CSV filenames use the UTC day (`docs/frontend_deploy.md` §10).
 - CI runs locally until the workflow move (§7).
@@ -542,7 +531,7 @@ S37, BF1, sharing removal). So 8.71 is a lower bound for the handed-off build.
   - QA-A28: code Copy is icon-only (optional).
 - BACKEND-FIT questionable items for the PM (not bugs; see §8 and the sprint notes `/workspace/cc_fe/NOTES.md`, "BACKEND-FIT"):
   - BF3: "+" attaches text as context only; the analyzer can't query it.
-  - BF4: the strategy/model picker is validated and echoed but not wired to the scripted run.
+  - BF4: resolved: the strategy/model picker was removed (contract 1.24.0); the server runs one configuration.
   - BF5/BF6: report versions and multi-question clarify are demo-only until the analyzer emits them.
 
 **How to re-run:**

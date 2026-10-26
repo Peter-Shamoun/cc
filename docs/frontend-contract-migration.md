@@ -43,6 +43,7 @@ unknown events, fields and part types (§3). No stream field was removed or rena
 | 1.21 | BACKEND-FIT (§2.1): `IdentityScopedKey`; data scope only from the identity | 422 on a scoped key in `ChatRequest`/`options`; scope only from the token → session opener | remove any database/schema/source picker; never send scope keys |
 | 1.22 | **sharing removed** (§17): share routes, `ShareRequest`/`ShareLink`/`SharedConversation`/`ShareExpiryDays`, `TablePart.dataWithheld`, `Capabilities.shareExpiry` | every `/api/share*`, `/api/shared/*` and `/api/conversations/{id}/share` path is the standard 404 envelope | remove the Share button, dialog and shared view/route |
 | 1.23 | **multi-question clarification** (§6.1): `ClarificationPart.questions`, `ClarifyQuestion`/`ClarifyOption`/`ClarifyAnswer`, `resume.answers`, scenario `clarify_multi` | none; `choices` mirrors question 1, a legacy resume answers question 1 | render the form (header chips, described options, multi-select, Other, Skip); send `resume.answers`; show the 422 message inline |
+| 1.24 | **strategy/model picker removed** (§12): `Capabilities.defaults/strategies/models/scope`, `StrategyOption`/`ModelOption`/`CostTier`, `ChatRequest.options.strategy/model`, `MessageStart.strategy` | run one fixed analyzer configuration (B1); 422 on `options.strategy`/`options.model`; capabilities need no sign-in | drop the picker; send no `options` |
 
 **Migration notes**
 * **1.19 patterns.** Only ids that were already invalid in JS (a trailing `\n`) are now rejected by the server too.
@@ -78,7 +79,7 @@ acceptance test for any backend: `api.contract.conformance.check` in Python, `ch
 
 | event | real analyzer must emit | source in a real run | conformance |
 |---|---|---|---|
-| `message.start` | first, once: `messageId`, `conversationId`, `contractVersion`. Echo `parentId`/`editOf`/`resumeOf`/`regenerateOf`/`regenerateStyle` and `strategy`. `model` = the first model actually used | API layer, not the analyzer | start.first, start.once, message.same_id |
+| `message.start` | first, once: `messageId`, `conversationId`, `contractVersion`. Echo `parentId`/`editOf`/`resumeOf`/`regenerateOf`/`regenerateStyle` (no `strategy` since 1.24). `model` = the first model actually used | API layer, not the analyzer | start.first, start.once, message.same_id |
 | `status` | short labels such as "Thinking", "Running query", "Writing answer"; `null` clears | LiveTap / API | — |
 | `step.explore` | one per schema or data probe tool call: `probe` (mapped tool name), `target` (relation, ≤120 chars), a `summary` built from **counts only** ("8 columns", "20 rows sampled"), `elapsedMs` | `describe_relation`, `list_relations`, `sample_rows`, `lookup_*`, `profile`, … tool results | step.unique |
 | `step.sql_running` | before every executed query, **including the final answer's re-execution**: full `sql`, `purpose` (answer/candidate/repair), `attempt`, `candidateId` (multi), `repairOf` (repair) | `run_sql` / `final_answer` tool calls | step.unique, sql.paired, repair.of |
@@ -105,7 +106,6 @@ acceptance test for any backend: `api.contract.conformance.check` in Python, `ch
 |---|---|---|
 | `ChatRequest.scenario`, demo keywords (§9) | forces a scripted `ScriptedLLM` run | ignored outside demo; remove the keyword routing |
 | `message.start.model` | `settings.llm` (`"scripted"`) | the model id of the first call (the adapter uses `calls[0].model`) |
-| `message.start.strategy` / `options.strategy` | validated and echoed; **not applied** to `AnalyzerConfig` (the scenario drives the run) | apply `capabilities.STRATEGIES[*].config` as overrides |
 | `usage.costUsd`, `costIsEstimate:true` | static price table (`api/live.py: PRICES`); tokens are approximated when the completion has no `usage` | real token usage from the API response; keep `costIsEstimate` until billing reconciles |
 | `usage.latency.*` | real wall clock, but model latency is a **scripted pause** (`CC_API_DEMO_PACE`) | real |
 | `table.rows` timing | streamed from the finished part after the analysis ends | can stream as the DB returns rows, with the same events |

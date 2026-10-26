@@ -109,7 +109,6 @@ Peter decided on 2026-10-26 to remove sharing entirely. The API has no share rou
 | `CC_API_DISCONNECT_GRACE_SECONDS` | `10` | keep |
 | `CC_API_TEMPORARY_TTL_SECONDS` | `3600` | idle lifetime of a temporary chat's in-memory history (contract 1.20, §11.1); `0` turns temporary chat off (no `Capabilities.temporaryChat`, `temporary: true` is 422) |
 | `CC_API_DEMO_PACE`, `CC_API_STREAM_DELAY_SECONDS`, `CC_API_MODEL_DELAY_SECONDS` | demo pacing | `0` / unset |
-| `CC_API_ORG_POLICY` | unset | per-customer model and strategy policy (JSON) |
 | `CC_TRANSCRIPT_MODE` | `ephemeral` | the decided retention mode ([frontend_transcripts.md](frontend_transcripts.md)) |
 | `CC_TRANSCRIPT_DIR`, `CC_TRANSCRIPT_KEYS_DIR` | unset | encrypted volume; keys from KMS, not on the same disk |
 | `CC_TRANSCRIPT_S3_BUCKET` | unset | persisted mode on S3 (wins over `CC_TRANSCRIPT_DIR`): conversation objects with If-Match writes and run-event chunks under `{customer}/transcripts/`; bucket default SSE-KMS; boto3 takes endpoint and credentials from the usual AWS settings |
