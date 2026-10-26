@@ -59,9 +59,11 @@ _SAFE_KEY = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,40}")
 NO_STORE = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
 
 
-_ID = r"^[A-Za-z0-9_:.-]{1,128}$"  # pydantic (Rust regex): `$` is the true end of the string
+#: pydantic (Rust regex): `$` is the true end of the string. Starts alphanumeric: "." / ".." would be path
+#: segments in the run-event object keys.
+_ID = r"^[A-Za-z0-9][A-Za-z0-9_:.-]{0,127}$"
 #: Python `re`: `$` also matches before a trailing "\n", so plain-re checks use fullmatch (1.19.0 edge fix)
-_SAFE_ID = re.compile(r"[A-Za-z0-9_:.-]{1,128}")
+_SAFE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_:.-]{0,127}")
 
 
 class RenameIn(BaseModel):

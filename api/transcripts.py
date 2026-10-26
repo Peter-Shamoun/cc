@@ -51,7 +51,8 @@ from api.store import (DEFAULT_TITLE, InMemoryTranscriptStore, Principal, _iso, 
 TRANSCRIPT_RETENTION_DAYS = 90
 CONDITIONAL_WRITE_ATTEMPTS = 8
 CONDITIONAL_WRITE_BACKOFF_SECONDS = 0.02
-_SAFE = re.compile(r"[A-Za-z0-9_:.-]{1,128}")  # always fullmatch: `$` would accept a trailing "\n"
+#: always fullmatch (`$` would accept a trailing "\n"). Starts alphanumeric: "." / ".." would be path segments.
+_SAFE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_:.-]{0,127}")
 _USER_PREFIX = re.compile(r"^[A-Za-z0-9_:.-]{1,128}/transcripts/users/[0-9a-f]{32}/")
 
 
