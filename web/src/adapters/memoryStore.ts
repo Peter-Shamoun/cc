@@ -4,11 +4,11 @@ import type { SearchHit, TranscriptStore } from './types';
 /** `ephemeral` transcript store: memory only, gone on reload. Nothing touches browser storage. */
 export class MemoryTranscriptStore implements TranscriptStore {
   readonly mode = 'ephemeral' as const;
-  private convs = new Map<ID, { id: ID; title: string; updatedAt: string; pinned?: boolean; messages: Message[] }>();
+  private convs = new Map<ID, { id: ID; title: string; updatedAt: string; pinned?: boolean; archived?: boolean; messages: Message[] }>();
   async listConversations() {
     const items = [...this.convs.values()]
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .map(({ id, title, updatedAt, pinned }) => ({ id, title, updatedAt, pinned: !!pinned }));
+      .map(({ id, title, updatedAt, pinned, archived }) => ({ id, title, updatedAt, pinned: !!pinned, archived: !!archived }));
     return { items };
   }
   async getConversation(id: ID) {
@@ -42,6 +42,12 @@ export class MemoryTranscriptStore implements TranscriptStore {
   async setPinned(id: ID, pinned: boolean) {
     const c = this.convs.get(id);
     if (c) c.pinned = pinned;
+  }
+  async setArchived(id: ID, archived: boolean) {
+    const c = this.convs.get(id);
+    if (!c) return;
+    c.archived = archived;
+    if (archived) c.pinned = false; // ChatGPT: archiving drops the pin
   }
   async search(query: string, limit = 30): Promise<SearchHit[]> {
     const q = query.trim().toLowerCase();

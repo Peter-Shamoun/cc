@@ -41,6 +41,8 @@ export interface TranscriptStore {
   setRetention(policy: { days: number }): Promise<void>;
   /** Pin/unpin a thread to the top of the sidebar (optional; UI hides the action if absent). */
   setPinned?(id: ID, pinned: boolean): Promise<void>;
+  /** Archive/unarchive: archived threads leave the sidebar but stay searchable and openable (optional; UI hides the action if absent). */
+  setArchived?(id: ID, archived: boolean): Promise<void>;
   /**
    * Full-text search across titles AND message text. Runs where the transcripts live (memory here,
    * server-side for an encrypted store), so the query never goes to a URL, log or browser storage.
@@ -48,6 +50,6 @@ export interface TranscriptStore {
   search?(query: string, limit?: number): Promise<SearchHit[]>;
 }
 
-export interface ThreadSummary { id: ID; title: string; updatedAt: ISODate; pinned?: boolean }
+export interface ThreadSummary { id: ID; title: string; updatedAt: ISODate; pinned?: boolean; archived?: boolean }
 /** One search result: the thread, the matched message (if not the title) and a short snippet around the match. */
 export interface SearchHit { id: ID; title: string; updatedAt: ISODate; messageId?: ID; snippet: string; matchStart: number; matchLength: number }

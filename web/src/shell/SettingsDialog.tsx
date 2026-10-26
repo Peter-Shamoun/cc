@@ -1,14 +1,16 @@
 import { useState, type KeyboardEvent, type ReactNode } from 'react';
-import { Database, Keyboard, Monitor, Moon, Settings2, Sun } from 'lucide-react';
+import { ArchiveRestore, Database, Keyboard, Monitor, Moon, Settings2, Sun } from 'lucide-react';
 import clsx from 'clsx';
 import { Dialog, Kbd } from './primitives';
 import { useTheme, type ModePref } from '../lib/theme';
 import { SHORTCUTS } from './shortcuts';
+import type { ThreadSummary } from '../adapters/types';
 
 type Tab = 'general' | 'data' | 'shortcuts';
 
 /** ChatGPT-style settings: tabs on the left, rows of label + control on the right. */
-export function SettingsDialog({ onClose, initialTab = 'general', storeMode, enterToSend, setEnterToSend, onExportAll, threadCount }: { onClose: () => void; initialTab?: Tab; storeMode: string; enterToSend: boolean; setEnterToSend: (v: boolean) => void; onExportAll: () => void; threadCount: number }) {
+export function SettingsDialog({ onClose, initialTab = 'general', storeMode, enterToSend, setEnterToSend, onExportAll, threadCount, archived, onUnarchive, onOpenChat }: { onClose: () => void; initialTab?: Tab; storeMode: string; enterToSend: boolean; setEnterToSend: (v: boolean) => void; onExportAll: () => void; threadCount: number; archived?: ThreadSummary[]; onUnarchive?: (id: string) => void; onOpenChat?: (id: string) => void }) {
+  const [showArchived, setShowArchived] = useState(false);
   const [tab, setTab] = useState<Tab>(initialTab);
   const { preference, setPreference, palette, setPalette } = useTheme();
   const tabs: [Tab, string, ReactNode][] = [['general', 'General', <Settings2 size={16} />], ['data', 'Data controls', <Database size={16} />], ['shortcuts', 'Shortcuts', <Keyboard size={16} />]];
@@ -59,6 +61,26 @@ export function SettingsDialog({ onClose, initialTab = 'general', storeMode, ent
               <Row label="Unsent drafts" hint="Kept per chat in memory only, never in localStorage, because a draft can contain PHI.">
                 <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-fg-muted">Memory only</span>
               </Row>
+              {archived && (
+                <>
+                  <Group label="Chats" />
+                  <Row label="Archived chats" hint={archived.length ? `${archived.length} archived. They stay searchable and keep their history.` : 'Archive a chat from its … menu in the sidebar.'}>
+                    <button type="button" disabled={!archived.length} aria-expanded={showArchived} aria-controls="archived-list" onClick={() => setShowArchived((v) => !v)}
+                      className="rounded-full border border-line px-3 py-1 text-[13px] hover:bg-hover disabled:opacity-40" data-testid="archived-manage">{showArchived && archived.length ? 'Hide' : 'Manage'}</button>
+                  </Row>
+                  {showArchived && archived.length > 0 && (
+                    <ul id="archived-list" aria-label="Archived chats" className="mb-2 divide-y divide-line/60 rounded-lg border border-line/70" data-testid="archived-list">
+                      {archived.map((t) => (
+                        <li key={t.id} className="flex items-center gap-2 py-1 pl-3 pr-1">
+                          <button type="button" onClick={() => onOpenChat?.(t.id)} className="min-w-0 flex-1 truncate py-1 text-left hover:underline" title={t.title}>{t.title}</button>
+                          <button type="button" onClick={() => onUnarchive?.(t.id)} aria-label={`Unarchive ${t.title}`} title="Unarchive"
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-fg-muted hover:bg-hover hover:text-fg"><ArchiveRestore size={15} aria-hidden /></button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              )}
               <Group label="Export" />
               <Row label="Export chats" hint="Download every chat in this session as one Markdown file. PHI-flagged table columns are dropped.">
                 <button type="button" disabled={!threadCount} onClick={onExportAll} className="rounded-full border border-line px-3 py-1 text-[13px] hover:bg-hover disabled:opacity-40">Export</button>

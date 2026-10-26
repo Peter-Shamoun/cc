@@ -308,6 +308,11 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore, getOpti
     refresh();
   }, [refresh, store]);
 
+  const archive = useCallback(async (id: ID, archived: boolean) => {
+    await store.setArchived?.(id, archived);
+    refresh();
+  }, [refresh, store]);
+
   /** `{current, total}` for the version arrows under user message `i`, if it was ever edited. */
   const versionOf = (i: number) => {
     const b = branches[i];
@@ -381,5 +386,5 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore, getOpti
     return () => { delete window.__ccAudit; };
   }, []);
 
-  return { threads, convId, messages, busy, send, stop, open, newChat, regenerate, remove, editAt, switchVersion, versionOf, rename, pin, canPin: !!store.setPinned };
+  return { threads, convId, messages, busy, send, stop, open, newChat, regenerate, remove, editAt, switchVersion, versionOf, rename, pin, canPin: !!store.setPinned, archive, canArchive: !!store.setArchived };
 }

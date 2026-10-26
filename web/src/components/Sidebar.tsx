@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Ellipsis, Filter, Keyboard, MessageSquarePlus, PanelLeft, Pencil, Pin, PinOff, Search, Settings, ShieldCheck, Share, SquarePen, Trash2, X } from 'lucide-react';
+import { Archive, Ellipsis, Filter, Keyboard, MessageSquarePlus, PanelLeft, Pencil, Pin, PinOff, Search, Settings, ShieldCheck, Share, SquarePen, Trash2, X } from 'lucide-react';
 import clsx from 'clsx';
 import { IconButton } from './ui';
 import { Menu, modKey, useMenu, type MenuItem } from '../shell/primitives';
@@ -50,6 +50,8 @@ export interface SidebarProps {
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
   onPin?: (id: string, pinned: boolean) => void;
+  /** Archive a chat (it leaves the list; Settings → Data controls → Archived chats brings it back). */
+  onArchive?: (id: string) => void;
   onExport?: (id: string) => void;
   onCollapse: () => void;
   onSearch: () => void;
@@ -159,7 +161,7 @@ export function Sidebar(p: SidebarProps) {
   );
 }
 
-function ThreadRow({ t, active, tabStop, renaming, setRenaming, onSelect, onRename, onDelete, onPin, onExport, canPin }: SidebarProps & { t: ThreadSummary; active: boolean; tabStop: boolean; renaming: boolean; setRenaming: (id: string | null) => void }) {
+function ThreadRow({ t, active, tabStop, renaming, setRenaming, onSelect, onRename, onDelete, onPin, onArchive, onExport, canPin }: SidebarProps & { t: ThreadSummary; active: boolean; tabStop: boolean; renaming: boolean; setRenaming: (id: string | null) => void }) {
   const menu = useMenu();
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => { if (renaming) input.current?.select(); }, [renaming]);
@@ -167,6 +169,7 @@ function ThreadRow({ t, active, tabStop, renaming, setRenaming, onSelect, onRena
     ...(onExport ? [{ label: 'Export as Markdown', icon: <Share size={16} />, onSelect: () => onExport(t.id) }] : []),
     { label: 'Rename', icon: <Pencil size={16} />, onSelect: () => setRenaming(t.id) },
     ...(canPin && onPin ? [{ label: t.pinned ? 'Unpin' : 'Pin', icon: t.pinned ? <PinOff size={16} /> : <Pin size={16} />, onSelect: () => onPin(t.id, !t.pinned) }] : []),
+    ...(onArchive ? [{ label: 'Archive', icon: <Archive size={16} />, onSelect: () => onArchive(t.id) }] : []),
     'sep',
     { label: 'Delete', icon: <Trash2 size={16} />, danger: true, onSelect: () => onDelete(t.id) },
   ];
