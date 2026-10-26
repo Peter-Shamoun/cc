@@ -24,7 +24,28 @@ describe('toasts', () => {
     expect(onExpire).not.toHaveBeenCalled();
     act(() => { vi.advanceTimersByTime(200); });
     expect(onExpire).toHaveBeenCalledTimes(1);
+    act(() => { vi.advanceTimersByTime(200); });
     expect(screen.queryByTestId('toast')).toBeNull();
+  });
+  it('fades out before it is removed, and is hidden from AT while leaving', () => {
+    vi.useFakeTimers();
+    window.matchMedia = vi.fn((q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, onchange: null, dispatchEvent: () => false }) as MediaQueryList);
+    render(<ToastProvider><Pusher onExpire={() => {}} /></ToastProvider>);
+    fireEvent.click(screen.getByText('push'));
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(screen.getByTestId('toast').getAttribute('data-leaving')).toBe('true');
+    expect(screen.getByTestId('toast').getAttribute('aria-hidden')).toBe('true');
+    act(() => { vi.advanceTimersByTime(170); });
+    expect(screen.queryByTestId('toast')).toBeNull();
+    delete (window as { matchMedia?: unknown }).matchMedia;
+  });
+  it('goes at once with reduced motion', () => {
+    window.matchMedia = vi.fn((q: string) => ({ matches: q.includes('reduce'), media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, onchange: null, dispatchEvent: () => false }) as MediaQueryList);
+    render(<ToastProvider><Pusher onExpire={() => {}} /></ToastProvider>);
+    fireEvent.click(screen.getByText('push'));
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(screen.queryByTestId('toast')).toBeNull();
+    delete (window as { matchMedia?: unknown }).matchMedia;
   });
   it('keeps later toasts running after a hovered one is clicked away', async () => {
     vi.useFakeTimers();
