@@ -1,4 +1,5 @@
 import type { AssistantMessage, ID, ISODate, Message, UserMessage } from '../lib/contract';
+import type { AuthSession } from '../auth/session';
 import type { SearchHit, ThreadSummary, TranscriptStore } from './types';
 import { ConversationsApi, ConversationsApiError } from './conversationsApi';
 import { shortTitle } from '../shell/title';
@@ -49,8 +50,8 @@ export class HttpTranscriptStore implements TranscriptStore {
   /** Conversation the server refused (shredded key etc.); surfaced by the UI as an error later. */
   lastError: ConversationsApiError | null = null;
 
-  constructor(base = '', token?: string, fetchImpl?: typeof fetch) {
-    this.api = new ConversationsApi(base, token, fetchImpl);
+  constructor(base = '', auth?: string | AuthSession, fetchImpl?: typeof fetch) {
+    this.api = new ConversationsApi(base, auth, fetchImpl);
     this.ready = this.api.info().then(
       (i) => { this.mode = i.persisted ? 'server-encrypted' : 'ephemeral'; this.retentionDays = i.retentionDays; },
       (e) => { this.lastError = e instanceof ConversationsApiError ? e : null; },

@@ -22,6 +22,7 @@ import datetime as dt
 import random
 import re
 from dataclasses import dataclass
+from typing import Protocol
 
 import duckdb
 
@@ -52,6 +53,19 @@ class NoEscalateOpener:
 class AuthContext:
     principal: Principal
     opener: object
+
+
+class AuthBackend(Protocol):
+    """What ``create_app(auth=...)`` needs from the real backend. DemoAuth and SimAuth implement it.
+
+    ``token`` is the bearer token, or the ``cc_session`` cookie value (api.app._token). It is never read from a
+    URL. Raise AuthError for anything invalid or expired; the API answers 401 ``auth_expired``. The token is never
+    logged, and neither is the principal's user beyond the audit allowlist. ``opener`` must refuse escalation
+    (wrap it in NoEscalateOpener)."""
+
+    mode: str
+
+    def authenticate(self, token: str, request_id: str) -> AuthContext: ...
 
 
 class SimAuth:
