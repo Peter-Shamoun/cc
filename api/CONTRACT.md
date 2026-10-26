@@ -1,6 +1,6 @@
 # CC chat API — stream contract
 
-**Version: 1.9.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.10.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -34,6 +34,12 @@ The frontend builds against this document only; the analyzer adapts to it.
   with a native `EventSource` (cookie auth), whose automatic reconnect sends `Last-Event-ID` for you.
 * Each SSE frame is `id: <messageId>:<seq>` + `data: <one JSON StreamEvent>`. Heartbeats have no `id:`.
 * Auth: httpOnly `cc_session` cookie (prod) or `Authorization: Bearer demo:<customer>:<user>` (demo mode).
+  Credentials are never accepted in query parameters, because URLs end up in logs.
+* **CSRF (1.10 docs, #198):** a cookie-authenticated (`cc_session`, no `Authorization` header) `POST`/`PUT`/`PATCH`/
+  `DELETE` to `/api/*` must send the header **`x-cc-csrf: 1`**. Without it the API answers 403
+  `{"error":{"code":"access_denied","message":"Missing CSRF header."}}`, before auth or body parsing. Bearer/demo
+  requests are exempt. `GET` (including `EventSource` resume) needs nothing. The header is safe to send always, so
+  adapters should add it to every write.
 * Non-stream failures return `HttpError` JSON: `{"error": {"code", "message"}}`. Statuses and the codes the UI
   should branch on:
 
@@ -46,9 +52,13 @@ The frontend builds against this document only; the analyzer adapts to it.
   | 409 | `clarification_expired` | the clarification can no longer be answered | ask again |
   | 410 | `transcripts_unavailable` | the customer key was destroyed (§11) | history gone |
   | 413 | `payload_too_large` (1.5; was `validation`, still sent as `legacyCode`) | request body over **1 MiB** (`CC_API_MAX_BODY_BYTES`; `maxBytes` in the body), rejected before parsing | "message too long"; not retryable |
+  | 403 | `access_denied` | cookie-session write without `x-cc-csrf: 1` (see CSRF above) | client bug: add the header |
   | 422 | `validation` / `invalid_title` | bad body, bad `options` (§12), bad title | show `message` |
   | 429 | `rate_limited` | more than **3 unfinished runs** per user (`CC_API_MAX_CONCURRENT_RUNS`) | wait `Retry-After` seconds (sent, currently 3), then retry |
 
+  **Every 422 uses this envelope (#186):** request-validation failures are
+  `{"error":{"code":"validation","message":"Invalid request: <field paths>."}}`, e.g. `Invalid request:
+  regenerate.style.`. FastAPI's `{"detail":[...]}` is never sent, and the message names fields, never values.
   Every error response still carries the security headers in §10 (the 413 included). When a code gets more specific,
   the old one is kept as `error.legacyCode` for at least one minor version. Branch on an unknown `code` by HTTP status.
 * Every response carries `Cache-Control: no-store` and the security headers in §10.
@@ -82,7 +92,7 @@ The frontend builds against this document only; the analyzer adapts to it.
 
 | type | when | key fields |
 |---|---|---|
-| `message.start` | first | `messageId`, `conversationId`, `contractVersion`, `model?`, `strategy?`, `parentId?` (user turn), `resumeOf?` `{clarificationId, messageId}`, `regenerateOf?`, `editOf?` (1.2) |
+| `message.start` | first | `messageId`, `conversationId`, `contractVersion`, `model?`, `strategy?`, `parentId?` (user turn), `resumeOf?` `{clarificationId, messageId}`, `regenerateOf?`, `regenerateStyle?` (1.10), `editOf?` (1.2) |
 | `status` | any time | `label` (short present-tense phrase, e.g. "Running query") or `null` to clear |
 | `step.explore` | schema/data probe | `stepId`, `probe` (*open*: `list_views`, `describe_view`, `sample_values`, `lookup_glossary`, `lookup_dictionary`, `search_examples`, `profile`), `target?`, `summary`, `elapsedMs?` |
 | `step.sql_running` | a query starts | `stepId`, `sql` (full text), `purpose` (`explore`·`answer`·`candidate`·`repair`·`check`), `attempt` (1-based), `candidateId?`, `repairOf?`, `label?` |
@@ -217,8 +227,32 @@ appear later (e.g. `queue`); clients ignore them.
   the GET replays from seq 0. Clients still drop `seq <= lastSeq`, so overlapping replays are harmless.
   Recommended client loop: on a network error before `message.end`, retry the GET with the last seen id after
   250 ms, 1 s, 2 s, 4 s; on `stream_gone`, reload the conversation from `GET /api/conversations/{id}`.
-* **Regenerate:** `ChatRequest.regenerate = {messageId}` re-runs the user turn that produced `messageId`; the new
-  message has `regenerateOf` set and is a sibling branch in the transcript.
+* **Regenerate:** `ChatRequest.regenerate = {messageId, style?}` re-runs the user turn that produced `messageId`.
+  The new message has `regenerateOf` set and is a sibling branch in the transcript, i.e. the next version of that
+  answer.
+
+### 8.1 Regenerate styles (1.10.0)
+
+`regenerate.style` is `"default" | "concise" | "detailed"` (`RegenerateStyle`) and backs the "Retry / More concise /
+More detailed" menu. The result **replaces the answer in place as a new version**, not as a follow-up turn:
+`messages: []`, no new user message, and the reply is a sibling with `regenerateOf`.
+
+| style | what changes | always kept |
+|---|---|---|
+| `default` (or absent) | nothing; a plain re-run | everything |
+| `concise` | prose cut to its first sentence; a `chart` that plots the same rows as a `table` is dropped | tables, SQL, artifacts, clarifications, errors, **all assumption/caveat callouts** |
+| `detailed` | adds a **"How this was computed."** paragraph to the last text part: result shape (rows, column labels), where the SQL is, the number of assumptions and caveats | every part of the default answer |
+
+* `message.start.regenerateStyle` and `StoredMessage.regenerateStyle` echo a non-default style, so the version
+  switcher can label it ("Concise").
+* The paragraph is built from part metadata only (labels, counts), never from row values. Abstain, clarify and error
+  answers are not restyled.
+* An unknown style is a 422 `validation` (`Invalid request: regenerate.style.`). Servers older than 1.10 ignore
+  `style` and do a plain re-run, so the request is safe to send.
+* It runs on the server for every backend (demo, sim, prod; `api/styles.py`). A model backend may also use the
+  style as a prompt hint later; the shape above is what's promised.
+* Client: `regenerateRequest(conversationId, messageId, style)` and `REGENERATE_STYLES` in
+  `web/src/contract/regenerate.ts`. Example: `examples/regenerate_concise.jsonl`, "More concise" on `answer.jsonl`.
 * **Edit (1.2):** send the edited text as the user message with `editOf: <id of the user message being edited>`.
   The server stores it as a sibling of that message: it copies the edited message's `parentId`, and when there is none
   (editing the **first** question) it stores no `parentId`, which makes it a new root. The stored user message keeps
@@ -298,7 +332,7 @@ live and reloaded views cannot diverge. An aborted answer is stored with no part
 
 **Titles.** A conversation starts as `"New analysis"`. A question can hold PHI, so the server never echoes it as a
 title. On the first finished answer (`finishReason: "stop"`) of a conversation that still has the generic title, the
-server derives one from the result's **column identifiers** only (`api/titles.py`: "Paid amount by payer name",
+server derives one from the result's **column identifiers** only (`api/titles.py`: "Paid amount by payer",
 "Claims by CARC code"), stores it, and sends it as `message.end.conversationTitle`. The derivation fails closed: a
 PHI column, a non-identifier, or any word outside a fixed analytics vocabulary means no title. A user rename always
 wins and is never overwritten. Clients show `conversationTitle` right away and can keep their own local title only
@@ -426,6 +460,13 @@ re-encode a chart (bar ↔ line, sort) locally from `data.values`; that is a vie
   (markdown summary, `autoOpen: true`). Example: `examples/report.jsonl`.
 
 ## Changelog
+
+* **1.10.0** (2026-10-25) — `ChatRequest.regenerate.style` (`RegenerateStyle`), echoed as
+  `message.start.regenerateStyle` and `StoredMessage.regenerateStyle` (§8.1). Titles (QA-P6): a dimension ending in
+  `name` reads as its entity in `conversationTitle` and in chart `title`/`alt` ("Paid amount by payer", not "by payer
+  name"). Column and axis labels keep "Payer name", and a lone `name` stays. Example streams regenerated. Docs: CSRF
+  header `x-cc-csrf: 1` for cookie-session writes (#198), and 422 always uses the `HttpError` envelope (#186) (§1).
+  Additive.
 
 * **1.9.0** (2026-10-25) — Partial-table streaming: `table.start` / `table.rows` (§5.1; the complete `part` stays
   canonical). Artifact and plot spec (§16): `ChartPart.tablePartId`, versioning, `autoOpen`; demo `report`

@@ -1,7 +1,7 @@
 """Server-side conversation titles that can never carry PHI (contract 1.3.0, ``message.end.conversationTitle``).
 
 A question can hold PHI, so the title is never built from the user's text (see ``api.store``). It is built only
-from the result's column identifiers ("Paid amount by payer name"), and only when every word in them belongs to a
+from the result's column identifiers ("Paid amount by payer"), and only when every word in them belongs to a
 fixed analytics vocabulary. Column aliases are written by the model and could in theory embed a literal
 (``claims_for_jane_doe``), so the check fails closed: one unknown word, a PHI column, or a non-identifier means no
 title, and the conversation keeps the generic one.
@@ -38,8 +38,13 @@ def _words(key: str) -> list[str] | None:
     return words if all(w.lower() in VOCAB or w.isdigit() for w in words) else None
 
 
+def dim_words(words: list[str]) -> list[str]:
+    """1.10.0 (QA-P6): a dimension reads as its entity: ``payer_name`` -> ``payer``. A lone ``name`` stays."""
+    return words[:-1] if len(words) > 1 and words[-1].lower() == "name" else words
+
+
 def title_from_columns(columns: list[dict]) -> str | None:
-    """``columns`` are contract ``Column`` objects. Returns e.g. ``"Denial rate by payer name"`` or None."""
+    """``columns`` are contract ``Column`` objects. Returns e.g. ``"Denial rate by payer"`` or None."""
     measure, dims = None, []
     for col in columns:
         words = _words(str(col.get("key", "")))
@@ -48,7 +53,7 @@ def title_from_columns(columns: list[dict]) -> str | None:
         if col.get("type") in _NUMERIC and measure is None:
             measure = words
         elif col.get("type") not in _NUMERIC:
-            dims.append(" ".join(words))
+            dims.append(" ".join(dim_words(words)))
     if measure is None:
         return None
     head = " ".join(measure)
