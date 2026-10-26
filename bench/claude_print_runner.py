@@ -36,8 +36,11 @@ DISALLOWED_TOOLS = ["Read", "Edit", "Write", "Glob", "Grep", "WebFetch", "WebSea
 
 
 def worker_command(session: str, model: str, effort: str) -> list[str]:
+    # The sandbox allows only the CLI itself, so a shell loop, variable or pipe around it is denied: say so up front.
     prompt = ("Run this command with the Bash tool and follow the instructions it prints exactly:\n"
-              f"python3 -m analyzer.cli --session {session} briefing")
+              f"python3 -m analyzer.cli --session {session} briefing\n"
+              "Run each command exactly as printed, one command per Bash call: no shell variables, loops, pipes "
+              "or redirection.")
     command = ["claude", "-p", prompt, "--model", model, "--permission-mode", "dontAsk",
                "--allowedTools", "Bash(python3 -m analyzer.cli:*)", "Bash(cd:*)", "--add-dir", "/tmp", str(ROOT),   # cd outside the start directory needs the directory added
                "--disallowedTools", *DISALLOWED_TOOLS,
