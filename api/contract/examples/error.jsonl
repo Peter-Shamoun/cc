@@ -1,10 +1,10 @@
-{"type":"message.start","messageId":"m_1","conversationId":"c_1","contractVersion":"1.3.0","model":"scripted","parentId":"u_1","strategy":"tool_loop","seq":0}
+{"type":"message.start","messageId":"m_1","conversationId":"c_1","contractVersion":"1.4.0","model":"scripted","parentId":"u_1","strategy":"tool_loop","seq":0}
 {"type":"status","label":"Thinking","seq":1}
 {"type":"reasoning.delta","partId":"p_1","delta":"Checking the claims view.","seq":2}
 {"type":"status","label":"Exploring sem.claims","seq":3}
-{"type":"step.explore","stepId":"s_1","probe":"describe_view","summary":"8 columns","elapsedMs":4,"target":"sem.claims","seq":4}
-{"type":"reasoning.end","partId":"p_1","durationMs":356,"seq":5}
+{"type":"step.explore","stepId":"s_1","probe":"describe_view","summary":"8 columns","elapsedMs":3,"target":"sem.claims","seq":4}
+{"type":"reasoning.end","partId":"p_1","durationMs":354,"seq":5}
 {"type":"status","label":null,"seq":6}
 {"type":"part","part":{"type":"error","id":"p_2","code":"internal","title":"Something went wrong","message":"The analysis failed. Try again.","retryable":true},"seq":7}
 {"type":"status","label":null,"seq":8}
-{"type":"message.end","messageId":"m_1","finishReason":"error","usage":{"queries":0,"elapsedMs":707,"latency":{"totalMs":707,"modelMs":350,"sqlMs":0,"firstEventMs":0,"firstStepMs":356},"costIsEstimate":true,"costUsd":0.000974,"tokens":{"input":874,"output":20},"models":[{"model":"claude-haiku-5-5","role":"analyst","inputTokens":874,"outputTokens":20,"costUsd":0.000974,"calls":1}]},"seq":9}
+{"type":"message.end","messageId":"m_1","finishReason":"error","usage":{"queries":0,"elapsedMs":707,"latency":{"totalMs":707,"modelMs":350,"sqlMs":0,"firstEventMs":0,"firstStepMs":355},"costIsEstimate":true,"costUsd":0.000974,"tokens":{"input":874,"output":20},"models":[{"model":"claude-haiku-5-5","role":"analyst","inputTokens":874,"outputTokens":20,"costUsd":0.000974,"calls":1}]},"seq":9}

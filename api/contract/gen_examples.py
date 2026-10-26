@@ -97,6 +97,11 @@ def capture(model_delay: float = 0.0) -> dict[str, list[dict]]:
     return {k: (v if k in ("clarify", RESUME) else normalise(v)) for k, v in out.items()}
 
 
+def capabilities_example() -> dict:
+    """GET /api/capabilities as the demo backend serves it (web/src/contract/capabilities.ts mirrors it offline)."""
+    return _client().get("/api/capabilities").json()
+
+
 def dump(events: list[dict]) -> str:
     return "".join(json.dumps(e, ensure_ascii=False, separators=(",", ":")) + "\n" for e in events)
 
@@ -122,6 +127,8 @@ def main(argv: list[str]) -> int:
         print(f"contract examples up to date ({len(captured)})")
         return 0
     EXAMPLES.mkdir(exist_ok=True)
+    (EXAMPLES / "capabilities.json").write_text(json.dumps(capabilities_example(), indent=2) + "\n")
+    print("wrote examples/capabilities.json")
     for k, v in captured.items():
         (EXAMPLES / f"{k}.jsonl").write_text(dump(v))
         print(f"wrote examples/{k}.jsonl ({len(v)} events)")

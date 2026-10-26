@@ -20,7 +20,7 @@ export type {
   Sensitivity, StatusPart, TablePart, TextPart, ToolCallPart, ArtifactPart, PartBase,
 };
 
-export const CONTRACT_VERSION = '1.3.0';
+export const CONTRACT_VERSION = '1.4.0';
 export const CONTRACT_MAJOR = 1;
 
 // ---------------------------------------------------------------- new parts (v1)
@@ -155,13 +155,19 @@ export function isStepEvent(ev: { type: string }): ev is StepEvent {
   return STEP_TYPES.has(ev.type);
 }
 
+// ---------------------------------------------------------------- capabilities (1.4.0)
+
+/** GET /api/capabilities: strategies + models for a picker. Generated from the schema (single source of truth). */
+export type { Capabilities, StrategyOption, ModelOption, CostTier } from '../contract/v1.gen';
+
 // ---------------------------------------------------------------- requests
 
 export interface ChatRequest {
   conversationId?: ID;
   /** `editOf`: id of an earlier user message this one replaces (its sibling; editing the first question makes a new root). */
   messages: { id?: ID; role: 'user'; text: string; parentId?: ID; editOf?: ID }[];
-  options?: Record<string, unknown>;
+  /** 1.4.0: `strategy` / `model` are ids from GET /api/capabilities (see `Capabilities`). */
+  options?: { strategy?: string; model?: string; [k: string]: unknown };
   /** Answer a ClarificationPart. `messages` carries the user's reply as a normal user turn. */
   resume?: { clarificationId: ID; choiceIds?: ID[]; text?: string };
   /** Re-run the assistant message `messageId` (same user turn); the new message is a sibling branch. */
