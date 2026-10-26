@@ -1,6 +1,6 @@
 import { memo, useRef, type CSSProperties, type MutableRefObject, type RefObject } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { AssistantTurn, UserBubble, type Artifact } from '../components/Message';
+import { AssistantTurn, REFINE_PROMPT, UserBubble, type Artifact } from '../components/Message';
 import type { ViewMessage } from '../lib/useChat';
 import type { AnyView } from '../components/answer/normalize';
 import type { OnReply } from '../components/answer/States';
@@ -56,7 +56,8 @@ const Row = memo(function Row({ msg, index, isLast, reserve, lazy, busy, vCur, v
     <div data-message-id={msg.id} style={reserve ? { minHeight: 'calc(100dvh - 330px)' } : lazy ? offscreen : undefined}>
       <AssistantTurn msg={msg as AnyView} isLast={isLast} onOpen={(x) => actions.current.openArtifact(x)} onRegenerate={() => actions.current.regenerate()}
         onEdit={(t) => actions.current.editIntoComposer(t)} onSend={(t) => actions.current.send(t)}
-        onReply={a.reply ? (t, r) => actions.current.reply?.(t, r) : undefined} />
+        onReply={a.reply ? (t, r) => actions.current.reply?.(t, r) : undefined}
+        onRefine={isLast ? (style) => actions.current.send(REFINE_PROMPT[style]) : undefined} />
     </div>
   );
 });

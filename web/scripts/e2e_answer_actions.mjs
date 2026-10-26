@@ -1,0 +1,46 @@
+// Message actions: More actions (Copy as Markdown / Copy SQL), regenerate menu (Try again / More concise /
+// More detailed), thumbs persisting across a thread switch. Usage: node scripts/e2e_answer_actions.mjs [baseUrl] [outDir]
+import { chromium } from 'playwright';
+import fs from 'node:fs';
+const [base = 'http://127.0.0.1:5211/', out = '/workspace/cc_fe/shots/answer'] = process.argv.slice(2);
+const exe = fs.existsSync('/usr/bin/google-chrome') ? '/usr/bin/google-chrome' : undefined;
+const browser = await chromium.launch({ executablePath: exe, headless: true });
+const ctx = await browser.newContext({ viewport: { width: 1024, height: 700 }, permissions: ['clipboard-read', 'clipboard-write'] });
+const pg = await ctx.newPage();
+const errors = [];
+pg.on('pageerror', (e) => errors.push(String(e)));
+const box = () => pg.getByRole('textbox', { name: 'Message' });
+const idle = () => pg.getByRole('button', { name: 'Send message' }).waitFor({ timeout: 120000 });
+await pg.goto(base, { timeout: 90000 });
+await box().waitFor({ timeout: 90000 });
+await box().fill('Which CARC codes drive denials?');
+await pg.keyboard.press('Enter');
+await idle();
+await pg.waitForTimeout(300);
+const last = () => pg.locator('[data-testid="msg-assistant"]').last();
+await last().getByTestId('more-actions').click();
+await pg.screenshot({ path: `${out}/d3_01_more_actions_menu.png` });
+await pg.getByRole('menuitem', { name: /Copy SQL/ }).click();
+const sql = await pg.evaluate(() => navigator.clipboard.readText());
+await last().getByTestId('more-actions').click();
+await pg.getByRole('menuitem', { name: 'Copy as Markdown' }).click();
+const md = await pg.evaluate(() => navigator.clipboard.readText());
+await last().getByRole('button', { name: 'Good response' }).click();
+await last().getByTestId('regenerate-menu-button').click();
+await pg.waitForTimeout(150);
+await pg.screenshot({ path: `${out}/d3_02_regenerate_menu.png` });
+await pg.getByRole('menuitem', { name: 'More concise' }).click();
+await idle();
+const users = await pg.locator('[data-testid="msg-user"]').allTextContents();
+await pg.waitForTimeout(300);
+await pg.screenshot({ path: `${out}/d3_03_more_concise_followup.png` });
+// thumbs persist on the first answer (not last anymore → hover to reveal)
+const firstUp = await pg.locator('[data-testid="msg-assistant"]').first().getByRole('button', { name: 'Good response' }).getAttribute('aria-pressed');
+await last().getByTestId('regenerate-menu-button').click();
+await pg.getByRole('menuitem', { name: 'Try again' }).click();
+await idle();
+const versions = await pg.locator('[data-testid="msg-assistant"]').count();
+const res = { sqlHasSelect: /select/i.test(sql), sqlLen: sql.length, mdHasTable: /\|.*\|/.test(md), users: users.map((u) => u.slice(0, 40)), firstUp, assistants: versions, errors };
+console.log(JSON.stringify(res));
+await browser.close();
+process.exit(res.sqlHasSelect && res.mdHasTable && users.some((u) => u.includes('more concise')) && firstUp === 'true' && !errors.length ? 0 : 1);
