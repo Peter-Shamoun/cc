@@ -65,8 +65,10 @@ export function SearchDialog({ threads, search, onOpen, onNew, onClose }: { thre
                 <>
                   <MessageSquare size={17} className="mt-0.5 shrink-0 text-fg-muted" />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{r.hit.title}</span>
-                    {'snippet' in r.hit && r.hit.messageId && <Snippet hit={r.hit} />}
+                    {'snippet' in r.hit && isTitleHit(r.hit)
+                      ? <span className="block truncate font-medium" data-testid="search-title"><Marked text={r.hit.title} start={r.hit.matchStart} length={r.hit.matchLength} /></span>
+                      : <span className="block truncate font-medium" data-testid="search-title">{r.hit.title}</span>}
+                    {'snippet' in r.hit && !isTitleHit(r.hit) && <Snippet hit={r.hit} />}
                   </span>
                 </>
               )}
@@ -78,12 +80,24 @@ export function SearchDialog({ threads, search, onOpen, onNew, onClose }: { thre
   );
 }
 
-function Snippet({ hit }: { hit: SearchHit }) {
-  const { snippet: s, matchStart: a, matchLength: n } = hit;
-  if (a < 0) return <span className="line-clamp-2 text-fg-muted">{s}</span>;
+/** A hit on the title highlights the title itself; a hit in a message shows that message's snippet (QA-S10). */
+function isTitleHit(hit: SearchHit): boolean {
+  return !hit.messageId && hit.snippet.trim() === hit.title.trim();
+}
+
+function Marked({ text, start, length }: { text: string; start: number; length: number }) {
+  if (start < 0 || length <= 0 || start >= text.length) return <>{text}</>;
   return (
-    <span className="line-clamp-2 text-fg-muted">
-      {s.slice(0, a)}<mark className="rounded-sm bg-[#ffd84d]/45 px-0.5 text-fg dark:bg-[#ffd84d]/25">{s.slice(a, a + n)}</mark>{s.slice(a + n)}
+    <>
+      {text.slice(0, start)}<mark className="rounded-sm bg-[#ffd84d]/45 px-0.5 text-fg dark:bg-[#ffd84d]/25" data-testid="search-mark">{text.slice(start, start + length)}</mark>{text.slice(start + length)}
+    </>
+  );
+}
+
+function Snippet({ hit }: { hit: SearchHit }) {
+  return (
+    <span className="mt-0.5 line-clamp-2 text-[13px] leading-5 text-fg-muted" data-testid="search-snippet">
+      <Marked text={hit.snippet} start={hit.matchStart} length={hit.matchLength} />
     </span>
   );
 }
