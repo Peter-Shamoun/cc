@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { newAssistantView, reduce, type AssistantMessage, type AssistantView, type ID, type UserMessage } from './contract';
-import type { AnalystAdapter, TranscriptStore } from '../adapters/types';
+import type { AnalystAdapter, ThreadSummary, TranscriptStore } from '../adapters/types';
 
 const uid = (p: string) => `${p}_${Math.random().toString(36).slice(2, 10)}`;
 export type ViewMessage = UserMessage | AssistantView;
@@ -15,7 +15,7 @@ function draftTitle(text: string) {
 }
 
 export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
-  const [threads, setThreads] = useState<{ id: ID; title: string; updatedAt: string }[]>([]);
+  const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [convId, setConvId] = useState<ID | null>(null);
   const [messages, setMessages] = useState<ViewMessage[]>([]);
   const [busy, setBusy] = useState(false);
@@ -142,11 +142,16 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     refresh();
   }, [refresh, store]);
 
+  const pin = useCallback(async (id: ID, pinned: boolean) => {
+    await store.setPinned?.(id, pinned);
+    refresh();
+  }, [refresh, store]);
+
   /** `{current, total}` for the version arrows under user message `i`, if it was ever edited. */
   const versionOf = (i: number) => {
     const b = branches[i];
     return b ? { current: b.idx + 1, total: b.versions.length } : undefined;
   };
 
-  return { threads, convId, messages, busy, send, stop, open, newChat, regenerate, remove, editAt, switchVersion, versionOf, rename };
+  return { threads, convId, messages, busy, send, stop, open, newChat, regenerate, remove, editAt, switchVersion, versionOf, rename, pin, canPin: !!store.setPinned };
 }

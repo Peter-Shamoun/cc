@@ -1,17 +1,28 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown } from 'lucide-react';
+import clsx from 'clsx';
 import { useChat } from '../lib/useChat';
 import { MockAnalystAdapter } from '../adapters/mock';
 import { MemoryTranscriptStore } from '../adapters/memoryStore';
 import { HttpAnalystAdapter } from '../adapters/http';
 import { AdapterCtx } from '../adapters/context';
 import type { AnalystAdapter } from '../adapters/types';
-import { Sidebar } from '../components/Sidebar';
+import { Sidebar, SidebarRail } from '../components/Sidebar';
 import { Composer } from '../components/Composer';
-import { AssistantTurn, UserBubble, type Artifact } from '../components/Message';
+import { AssistantTurn, UserBubble, messageMarkdown, type Artifact } from '../components/Message';
 import { ArtifactPanel } from '../components/ArtifactPanel';
 import { SUGGESTIONS } from '../fixtures';
 import { Header } from './Header';
+import { SearchDialog } from './SearchDialog';
+import { SettingsDialog, ShortcutsDialog } from './SettingsDialog';
+import { ToastProvider, useFocusTrap, useToast } from './primitives';
+import { NEW_CHAT_KEY, moveDraft } from './drafts';
+import { transcriptMarkdown, exportFilename } from './exportMarkdown';
+import type { SlashCommand } from './slash';
+import { useTheme } from '../lib/theme';
+import { copyText, downloadText } from '../lib/csv';
+import { getPref, setPref } from '../lib/prefs';
+import type { AssistantView } from '../lib/contract';
 
 function makeAdapter(): AnalystAdapter {
   const base = import.meta.env.VITE_ANALYST_BASE as string | undefined;
@@ -21,47 +32,171 @@ function makeAdapter(): AnalystAdapter {
 }
 
 const phoneQuery = () => (typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 767px)') : null);
+/** Hash routes carry only opaque ids (`#/c/c_x1y2`), never titles or text (no PHI in URLs, spec §6). */
+const routeId = () => /^#\/c\/([\w-]+)$/.exec(window.location.hash)?.[1] ?? null;
+const UNDO_MS = 5000;
 
 export function AppShell() {
+  return (
+    <ToastProvider>
+      <ShellInner />
+    </ToastProvider>
+  );
+}
+
+function ShellInner() {
   const adapter = useMemo(makeAdapter, []);
   const store = useMemo(() => new MemoryTranscriptStore(), []);
   const chat = useChat(adapter, store);
+  const toast = useToast();
+  const { setPreference } = useTheme();
   const [mobile, setMobile] = useState(() => phoneQuery()?.matches ?? false);
+  // Desktop: sidebar open/collapsed is a remembered UI pref. Phone: a drawer, closed by default.
+  const [desktopOpen, setDesktopOpen] = useState(() => getPref('sidebarCollapsed') !== '1');
+  const [drawerOpen, setDrawerOpen] = useState(false);
   useEffect(() => {
     const mq = phoneQuery();
     if (!mq) return;
-    const on = () => { setMobile(mq.matches); setSidebar(!mq.matches); };
+    const on = () => { setMobile(mq.matches); setDrawerOpen(false); };
     mq.addEventListener('change', on);
     return () => mq.removeEventListener('change', on);
   }, []);
-  const [sidebar, setSidebar] = useState(() => window.innerWidth >= 768);
-  // ChatGPT-style shortcuts: Ctrl/⌘+K search chats, Ctrl/⌘+Shift+O new chat.
-  const [searchSignal, setSearchSignal] = useState(0);
+  const sidebarVisible = mobile ? drawerOpen : desktopOpen;
+  const setSidebar = useCallback((open: boolean) => {
+    if (mobile) setDrawerOpen(open);
+    else { setDesktopOpen(open); setPref('sidebarCollapsed', open ? '0' : '1'); }
+  }, [mobile]);
+  const closeDrawer = () => { if (mobile) setDrawerOpen(false); };
+
+  const [dialog, setDialog] = useState<null | 'search' | 'settings' | 'shortcuts'>(null);
+  const [enterToSend, setEnterToSendState] = useState(() => getPref('enterToSend') !== '0');
+  const setEnterToSend = (v: boolean) => { setEnterToSendState(v); setPref('enterToSend', v ? '1' : '0'); };
+
+  // ---- delete with undo: hide now, really delete when the toast expires ----
+  const [pendingDelete, setPendingDelete] = useState<Set<string>>(new Set());
+  const threads = chat.threads.filter((t) => !pendingDelete.has(t.id));
+  const requestDelete = useCallback((id: string) => {
+    const title = chat.threads.find((t) => t.id === id)?.title ?? 'Chat';
+    setPendingDelete((s) => new Set(s).add(id));
+    if (chat.convId === id) chat.newChat();
+    const forget = () => setPendingDelete((s) => { const n = new Set(s); n.delete(id); return n; });
+    toast({
+      text: `Deleted “${title.length > 32 ? `${title.slice(0, 32)}…` : title}”`,
+      ms: UNDO_MS,
+      action: { label: 'Undo', run: forget },
+      onExpire: () => { chat.remove(id).then(forget); },
+    });
+  }, [chat, toast]);
+
+  // ---- routing (#/c/<id>) ----
+  const routing = useRef(false);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const mod = e.metaKey || e.ctrlKey;
-      if (mod && !e.shiftKey && e.key.toLowerCase() === 'k') { e.preventDefault(); setSidebar(true); setSearchSignal((n) => n + 1); }
-      if (mod && e.shiftKey && e.key.toLowerCase() === 'o') { e.preventDefault(); chat.newChat(); }
+    if (routing.current) return;
+    const want = chat.convId ? `#/c/${chat.convId}` : '';
+    if ((window.location.hash || '') !== want) {
+      const url = want || window.location.pathname + window.location.search;
+      if (chat.convId && routeId() === null && window.location.hash === '') window.history.replaceState(null, '', url);
+      else window.history.pushState(null, '', url);
+    }
+  }, [chat.convId]);
+  useEffect(() => {
+    const on = async () => {
+      const id = routeId();
+      if (id === chat.convId) return;
+      routing.current = true;
+      if (id && chat.threads.some((t) => t.id === id)) await chat.open(id);
+      else chat.newChat();
+      routing.current = false;
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [chat.newChat]);
-  /** On phones the sidebar is a drawer: picking anything closes it. */
-  const closeDrawer = () => { if (mobile) setSidebar(false); };
+    window.addEventListener('popstate', on);
+    window.addEventListener('hashchange', on);
+    return () => { window.removeEventListener('popstate', on); window.removeEventListener('hashchange', on); };
+  }, [chat]);
+  // A route to a chat this tab doesn't hold (memory-only history, so: after reload) falls back to a new chat.
+  useEffect(() => { if (routeId() && !chat.convId) window.history.replaceState(null, '', window.location.pathname + window.location.search); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---- drafts follow a new chat to its id ----
+  const prevConv = useRef<string | null>(null);
+  useEffect(() => {
+    if (prevConv.current === null && chat.convId) moveDraft(NEW_CHAT_KEY, chat.convId);
+    prevConv.current = chat.convId;
+  }, [chat.convId]);
+
+  // ---- export / copy ----
+  const currentTitle = threads.find((t) => t.id === chat.convId)?.title ?? 'Chat';
+  const downloadMd = (title: string, md: string) => { downloadText(exportFilename(title), md, 'text/markdown'); toast({ text: 'Chat exported as Markdown' }); };
+  const exportCurrent = () => { if (chat.messages.length) downloadMd(currentTitle, transcriptMarkdown(currentTitle, chat.messages)); };
+  const copyCurrent = async () => { if (await copyText(transcriptMarkdown(currentTitle, chat.messages))) toast({ text: 'Copied chat as Markdown' }); };
+  const exportThread = async (id: string) => {
+    const c = await store.getConversation(id);
+    const title = threads.find((t) => t.id === id)?.title ?? 'Chat';
+    if (c) downloadMd(title, transcriptMarkdown(title, c.messages));
+  };
+  const exportAll = async () => {
+    const parts: string[] = [];
+    for (const t of threads) { const c = await store.getConversation(t.id); if (c) parts.push(transcriptMarkdown(t.title, c.messages)); }
+    downloadMd('cc-chats', parts.join('\n---\n\n'));
+  };
+  const copyLast = async () => {
+    const last = [...chat.messages].reverse().find((m): m is AssistantView => m.role === 'assistant');
+    if (last && (await copyText(messageMarkdown(last)))) toast({ text: 'Copied last response' });
+  };
+  const focusComposer = () => document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message"]')?.focus();
+
+  const onCommand = (c: SlashCommand) => {
+    switch (c.action) {
+      case 'new': chat.newChat(); break;
+      case 'search': setDialog('search'); break;
+      case 'export': exportCurrent(); break;
+      case 'settings': setDialog('settings'); break;
+      case 'shortcuts': setDialog('shortcuts'); break;
+      case 'theme-light': setPreference('light'); break;
+      case 'theme-dark': setPreference('dark'); break;
+      case 'theme-system': setPreference('system'); break;
+    }
+  };
+
+  // ---- global shortcuts (see shell/shortcuts.ts) ----
+  const keys = useRef<(e: KeyboardEvent) => void>(() => {});
+  keys.current = (e: KeyboardEvent) => {
+    const mod = e.metaKey || e.ctrlKey;
+    const k = e.key.toLowerCase();
+    if (mod && !e.shiftKey && k === 'k') { e.preventDefault(); setDialog((d) => (d === 'search' ? null : 'search')); }
+    else if (mod && e.shiftKey && k === 'o') { e.preventDefault(); chat.newChat(); closeDrawer(); requestAnimationFrame(focusComposer); }
+    else if (mod && e.shiftKey && k === 's') { e.preventDefault(); setSidebar(!sidebarVisible); }
+    else if (mod && e.shiftKey && k === 'c') { e.preventDefault(); copyLast(); }
+    else if (mod && e.shiftKey && k === 'e') { e.preventDefault(); exportCurrent(); }
+    else if (mod && (k === ',')) { e.preventDefault(); setDialog('settings'); }
+    else if (mod && (k === '/' || k === '?')) { e.preventDefault(); setDialog((d) => (d === 'shortcuts' ? null : 'shortcuts')); }
+    else if (e.shiftKey && k === 'escape') { e.preventDefault(); focusComposer(); }
+    else if (k === 'escape' && mobile && drawerOpen) { setDrawerOpen(false); }
+  };
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => keys.current(e);
+    window.addEventListener('keydown', on);
+    return () => window.removeEventListener('keydown', on);
+  }, []);
+
+  const drawerRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(drawerRef, mobile && drawerOpen);
+
+  // ---- artifact panel ----
   const [artifact, setArtifact] = useState<Artifact | null>(null);
-  useEffect(() => { if (artifact && window.innerWidth < 1400) setSidebar(false); }, [artifact]);
-  const [draft, setDraft] = useState<{ text: string; n: number } | undefined>();
+  useEffect(() => { if (artifact && window.innerWidth < 1400 && !mobile) setSidebar(false); }, [artifact]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => setArtifact(null), [chat.convId]);
+
+  // ---- scrolling: stick to bottom while streaming, pin a follow-up question to the top ----
+  const [draft, setDraftPush] = useState<{ text: string; n: number } | undefined>();
   const scroller = useRef<HTMLDivElement>(null);
+  const content = useRef<HTMLDivElement>(null);
   const [atBottom, setAtBottom] = useState(true);
+  const atBottomRef = useRef(true);
   const pinned = useRef(false);
   const lastLen = useRef(0);
   const { messages } = chat;
-
   useEffect(() => {
     const el = scroller.current;
     if (!el) return;
-    // ChatGPT/Claude: a follow-up question is pinned to the top of the viewport and the answer
-    // streams in below it, instead of the view chasing the bottom token by token.
     const grew = messages.length > lastLen.current;
     lastLen.current = messages.length;
     const last = messages[messages.length - 1];
@@ -71,73 +206,119 @@ export function AppShell() {
       const u = users[users.length - 1];
       if (u) {
         pinned.current = true;
-        el.scrollTo({ top: el.scrollTop + u.getBoundingClientRect().top - el.getBoundingClientRect().top - 16, behavior: 'smooth' });
+        el.scrollTo({ top: el.scrollTop + u.getBoundingClientRect().top - el.getBoundingClientRect().top - 16, behavior: matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
         return;
       }
     }
-    if (atBottom && !pinned.current) el.scrollTop = el.scrollHeight;
-  }, [messages, atBottom]);
-  useEffect(() => { pinned.current = false; lastLen.current = 0; }, [chat.convId]);
-  useEffect(() => setArtifact(null), [chat.convId]);
+    if (atBottomRef.current && !pinned.current) el.scrollTop = el.scrollHeight;
+  }, [messages]);
+  // Late-growing content (charts, images, tables measured after paint) keeps the view anchored at the bottom.
+  useEffect(() => {
+    const el = scroller.current, inner = content.current;
+    if (!el || !inner || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => { if (atBottomRef.current && !pinned.current) el.scrollTop = el.scrollHeight; });
+    ro.observe(inner);
+    return () => ro.disconnect();
+  }, [messages.length === 0]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { pinned.current = false; lastLen.current = 0; atBottomRef.current = true; setAtBottom(true); }, [chat.convId]);
+  const onScroll = (el: HTMLDivElement) => {
+    const b = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    atBottomRef.current = b;
+    if (b) pinned.current = false;
+    setAtBottom(b);
+  };
+  const jumpToLatest = () => {
+    pinned.current = false;
+    atBottomRef.current = true;
+    scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' });
+  };
 
-  const edit = (t: string) => setDraft((d) => ({ text: t, n: (d?.n ?? 0) + 1 }));
+  const edit = (t: string) => setDraftPush((d) => ({ text: t, n: (d?.n ?? 0) + 1 }));
   const empty = messages.length === 0;
+  const draftKey = chat.convId ?? NEW_CHAT_KEY;
+  const send = (t: string) => { atBottomRef.current = true; setAtBottom(true); chat.send(t); };
   const composer = (autoFocus: boolean, placeholder?: string) => (
-    <Composer onSend={(t) => { setAtBottom(true); chat.send(t); }} onStop={chat.stop} busy={chat.busy} autoFocus={autoFocus} initial={draft} placeholder={placeholder} />
+    <Composer onSend={send} onStop={chat.stop} busy={chat.busy} autoFocus={autoFocus} initial={draft} placeholder={placeholder} draftKey={draftKey} enterToSend={enterToSend} onCommand={onCommand} />
   );
+  const searchStore = useCallback((q: string) => store.search(q), [store]);
+  const openFromSearch = async (id: string, messageId?: string) => {
+    await chat.open(id);
+    closeDrawer();
+    if (messageId) requestAnimationFrame(() => requestAnimationFrame(() => {
+      const target = document.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(messageId)}"]`);
+      target?.scrollIntoView?.({ block: 'center' });
+    }));
+  };
+
+  const sidebarProps = {
+    threads, activeId: chat.convId, storeMode: store.mode, canPin: chat.canPin,
+    onSelect: (id: string) => { chat.open(id); closeDrawer(); },
+    onNew: () => { chat.newChat(); closeDrawer(); requestAnimationFrame(focusComposer); },
+    onDelete: requestDelete, onRename: chat.rename, onPin: chat.pin, onExport: exportThread,
+    onCollapse: () => setSidebar(false), onSearch: () => setDialog('search'),
+    onSettings: () => setDialog('settings'), onShortcuts: () => setDialog('shortcuts'),
+  };
 
   return (
     <AdapterCtx.Provider value={adapter}>
-      <div className="flex h-full overflow-hidden">
-        {sidebar && mobile && <div className="fixed inset-0 z-30 bg-black/40" aria-hidden onClick={() => setSidebar(false)} data-testid="drawer-scrim" />}
-        {sidebar && (
-          <Sidebar threads={chat.threads} activeId={chat.convId} drawer={mobile} onSelect={(id) => { chat.open(id); closeDrawer(); }} onNew={() => { chat.newChat(); closeDrawer(); }} onDelete={chat.remove} onRename={chat.rename} onCollapse={() => setSidebar(false)} storeMode={store.mode} searchSignal={searchSignal} />
-        )}
-        <main className="relative flex min-w-0 flex-1 flex-col font-sans md:min-w-[400px]">
-          <Header showNav={!sidebar || mobile} onOpenSidebar={() => setSidebar(true)} onNewChat={chat.newChat} adapterName={adapter.name} />
+      <div className="flex h-full overflow-hidden bg-bg text-fg">
+        <a href="#composer" onClick={(e) => { e.preventDefault(); focusComposer(); }} className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-[80] focus:rounded-lg focus:bg-elev focus:px-3 focus:py-2 focus:shadow">Skip to message box</a>
+        {mobile && drawerOpen && <div className="fixed inset-0 z-30 bg-black/40 motion-safe:animate-[cc-fade_150ms_ease-out]" aria-hidden onClick={() => setDrawerOpen(false)} data-testid="drawer-scrim" />}
+        {sidebarVisible && (mobile ? <div ref={drawerRef}><Sidebar {...sidebarProps} drawer /></div> : <Sidebar {...sidebarProps} />)}
+        {!sidebarVisible && !mobile && <SidebarRail onExpand={() => setSidebar(true)} onNew={sidebarProps.onNew} onSearch={() => setDialog('search')} onSettings={() => setDialog('settings')} />}
+        <main className="relative flex min-w-0 flex-1 flex-col font-sans md:min-w-[400px]" aria-label="Chat">
+          <Header showNav={!sidebarVisible || mobile} onOpenSidebar={() => setSidebar(true)} onNewChat={sidebarProps.onNew} adapterName={adapter.name}
+            hasChat={!empty} onCopyMarkdown={copyCurrent} onDownloadMarkdown={exportCurrent} onSettings={() => setDialog('settings')} onShortcuts={() => setDialog('shortcuts')} />
 
           {empty ? (
-            <div className="flex flex-1 flex-col items-center justify-center px-4 pb-[12vh]">
-              <h1 className="mb-7 text-center tracking-tight" style={{ fontFamily: 'var(--heading-font)', fontSize: 'var(--empty-size)', fontWeight: 'var(--empty-weight)' as never }}>What should we look into?</h1>
-              <div className="w-full max-w-[48rem]">
+            <div className="flex flex-1 flex-col items-center justify-center px-4 pb-[12vh] max-sm:justify-end max-sm:pb-4" data-testid="empty-state">
+              <h1 className="mb-7 text-center tracking-tight max-sm:mb-auto max-sm:mt-auto" style={{ fontFamily: 'var(--heading-font)', fontSize: 'var(--empty-size)', fontWeight: 'var(--empty-weight)' as never }}>What should we look into?</h1>
+              <div className="w-full max-w-[48rem]" id="composer">
                 {composer(true)}
-                <div className="mt-4 flex flex-wrap justify-center gap-2">
-                  {SUGGESTIONS.map((s) => (
-                    <button key={s.prompt} type="button" onClick={() => chat.send(s.prompt)} className="rounded-full border border-line bg-bg px-3.5 py-2 text-sm font-medium text-fg-muted hover:bg-hover hover:text-fg">{s.title}</button>
+                <div className="mt-4 flex flex-wrap justify-center gap-2 max-sm:flex-nowrap max-sm:justify-start max-sm:overflow-x-auto max-sm:pb-1" role="group" aria-label="Suggestions">
+                  {SUGGESTIONS.map((s, i) => (
+                    <button key={s.prompt} type="button" onClick={() => send(s.prompt)} style={{ animationDelay: `${i * 40}ms` }}
+                      className="shrink-0 rounded-full border border-line bg-bg px-3.5 py-2 text-sm font-medium text-fg-muted transition-colors hover:bg-hover hover:text-fg motion-safe:animate-[cc-rise_240ms_ease-out_both]">{s.title}</button>
                   ))}
                 </div>
               </div>
             </div>
           ) : (
             <>
-              <div ref={scroller} onScroll={(e) => { const el = e.currentTarget; setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80); }} className="flex-1 overflow-y-auto">
-                <div className="mx-auto flex max-w-[48rem] flex-col gap-6 px-4 pb-10 pt-4 md:px-6">
+              <div ref={scroller} onScroll={(e) => onScroll(e.currentTarget)} className="flex-1 overflow-y-auto [overflow-anchor:none]" data-testid="thread-scroller">
+                <div ref={content} className="mx-auto flex max-w-[48rem] flex-col gap-6 px-4 pb-10 pt-4 md:px-6" role="log" aria-live="off" aria-label="Messages">
                   {messages.map((m, i) =>
                     m.role === 'user' ? (
-                      <UserBubble key={m.id} msg={m} disabled={chat.busy} onEdit={(t) => { setAtBottom(true); chat.editAt(i, t); }} version={chat.versionOf(i)} onVersion={(k) => chat.switchVersion(i, k)} />
+                      <div key={m.id} data-message-id={m.id}>
+                        <UserBubble msg={m} disabled={chat.busy} onEdit={(t) => { atBottomRef.current = true; setAtBottom(true); chat.editAt(i, t); }} version={chat.versionOf(i)} onVersion={(k) => chat.switchVersion(i, k)} />
+                      </div>
                     ) : (
                       // The newest answer reserves most of a viewport so the pinned question can sit at the top.
-                      <div key={m.id} style={i === messages.length - 1 && messages.length > 2 ? { minHeight: 'calc(100dvh - 330px)' } : undefined}>
-                        <AssistantTurn msg={m} isLast={i === messages.length - 1} onOpen={setArtifact} onRegenerate={chat.regenerate} onEdit={edit} onSend={(t) => { setAtBottom(true); chat.send(t); }} />
+                      <div key={m.id} data-message-id={m.id} style={i === messages.length - 1 && messages.length > 2 ? { minHeight: 'calc(100dvh - 330px)' } : undefined}>
+                        <AssistantTurn msg={m} isLast={i === messages.length - 1} onOpen={setArtifact} onRegenerate={chat.regenerate} onEdit={edit} onSend={send} />
                       </div>
                     ),
                   )}
                 </div>
               </div>
-              {!atBottom && (
-                <button type="button" aria-label="Jump to latest" onClick={() => { pinned.current = false; scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' }); }} className="absolute bottom-32 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full border border-line bg-bg shadow">
+              <div className="relative mx-auto w-full max-w-[48rem] px-4 md:px-6" id="composer">
+                <button type="button" aria-label="Jump to latest" tabIndex={atBottom ? -1 : 0} aria-hidden={atBottom} onClick={jumpToLatest} data-testid="jump-latest"
+                  className={clsx('absolute -top-12 left-1/2 z-10 flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full border border-line bg-bg text-fg shadow-md transition-[opacity,transform] duration-200',
+                    atBottom ? 'pointer-events-none translate-y-2 opacity-0' : 'opacity-100')}>
                   <ArrowDown size={16} />
                 </button>
-              )}
-              <div className="mx-auto w-full max-w-[48rem] px-4 md:px-6">
                 {composer(false, 'Ask a follow-up')}
                 <p className="py-2 text-center text-xs text-fg-subtle">CC can make mistakes. Check figures against source before use.</p>
               </div>
             </>
           )}
+          <div className="sr-only" aria-live="polite" data-testid="status-live">{chat.busy ? 'CC is answering' : ''}</div>
         </main>
         {artifact && <ArtifactPanel artifact={artifact} onClose={() => setArtifact(null)} />}
       </div>
+      {dialog === 'search' && <SearchDialog threads={threads} search={searchStore} onOpen={openFromSearch} onNew={sidebarProps.onNew} onClose={() => setDialog(null)} />}
+      {dialog === 'settings' && <SettingsDialog onClose={() => setDialog(null)} storeMode={store.mode} enterToSend={enterToSend} setEnterToSend={setEnterToSend} onExportAll={exportAll} threadCount={threads.length} />}
+      {dialog === 'shortcuts' && <ShortcutsDialog onClose={() => setDialog(null)} />}
     </AdapterCtx.Provider>
   );
 }

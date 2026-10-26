@@ -88,14 +88,16 @@ describe('Edit and branch', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
     expect(screen.queryByTestId('feedback-panel')).toBeNull();
     expect(screen.getByText('Thanks for the feedback')).toBeInTheDocument();
-    // search filters the sidebar by title
-    fireEvent.click(screen.getByRole('button', { name: /Search chats/ }));
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search chats' }), { target: { value: 'zzz' } });
-    expect(screen.getByText(/No chats match/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+    // search dialog: full text over titles and message bodies
+    fireEvent.click(screen.getAllByRole('button', { name: /Search chats/ })[0]);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search chats' }), { target: { value: 'zzz' } });
+    await waitFor(() => expect(screen.getByText(/No chats match/)).toBeInTheDocument());
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByTestId('search-dialog')).toBeNull();
     // Ctrl+K reopens search, Ctrl+Shift+O starts a new chat
     fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
-    expect(screen.getByRole('textbox', { name: 'Search chats' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Search chats' })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
     fireEvent.keyDown(window, { key: 'O', ctrlKey: true, shiftKey: true });
     await waitFor(() => expect(screen.getByText('What should we look into?')).toBeInTheDocument());
   });
