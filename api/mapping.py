@@ -281,6 +281,7 @@ def answer_parts(answer: AnalyzerAnswer, principal: Principal, downloads: Downlo
                           "previewable": True, "sensitivity": sensitivity})
         chart = chart_for(cols, rows)
         if chart:
+            chart["tablePartId"] = table["id"]  # 1.9.0: the table the plot was drawn from
             parts.append(chart)
     if answer.assumptions:
         parts.append({"type": "callout", "id": new_id("p_"), "variant": "assumption", "title": "Assumptions",
@@ -300,3 +301,34 @@ def _scrub(text: str) -> str:
     text = re.sub(r"'[^']*'", "'…'", text or "")
     text = re.sub(r"\d{4,}", "…", text)
     return text[:300]
+
+
+def report_artifacts(parts: list[dict]) -> list[dict]:
+    """Demo ``report`` scenario (contract 1.9.0, §16): the chart becomes a ``chart`` artifact and a short ``report``
+    artifact (markdown) summarises the table. Only aggregate values from the result preview, like the table itself."""
+    out: list[dict] = []
+    table = next((p for p in parts if p.get("type") == "table"), None)
+    for part in parts:
+        if part.get("type") != "chart":
+            out.append(part)
+            continue
+        out.append({"type": "artifact", "id": new_id("p_"), "artifactId": new_id("af_"), "version": 1, "kind": "chart",
+                    "title": part.get("title") or "Chart", "content": part, "autoOpen": False})
+    if table and table.get("rows"):
+        cols = table["columns"]
+        head = "| " + " | ".join(c["label"] for c in cols) + " |"
+        rule = "|" + "|".join(" --- " for _ in cols) + "|"
+        body = ["| " + " | ".join(_md_cell(v) for v in row) + " |" for row in table["rows"][:12]]
+        title = (table.get("title") if table.get("title") not in (None, "Result") else None) or "Summary report"
+        markdown = "\n".join([f"# {title}", "", f"{table['rowCount']} rows from "
+                               f"{', '.join('`' + v + '`' for v in (table.get('source') or {}).get('views', [])) or 'the result'}.",
+                               "", head, rule, *body])
+        out.append({"type": "artifact", "id": new_id("p_"), "artifactId": new_id("af_"), "version": 1, "kind": "report",
+                    "title": title, "content": {"markdown": markdown}, "autoOpen": True})
+    return out
+
+
+def _md_cell(value) -> str:
+    if isinstance(value, float):
+        value = f"{value:.2f}" if abs(value) >= 1 else f"{value:.4g}"
+    return str("" if value is None else value).replace("|", "\\|").replace("\n", " ")

@@ -1,6 +1,6 @@
 # ClaimClarity chat API — stream contract
 
-**Version: 1.8.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.9.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -94,6 +94,8 @@ The frontend builds against this document only; the analyzer adapts to it.
 | `reasoning.delta` / `reasoning.end` | optional thinking summary | `partId`, `delta` / `durationMs` |
 | `text.start` / `text.delta` / `text.end` | streamed markdown | `partId`, `delta` |
 | `code.delta` | streamed code part | `partId`, `delta` |
+| `table.start` | a table starts streaming (1.9, §5.1) | `partId`, `columns`, `title?`, `sensitivity?`, `stepId?`, `sqlPartId?` |
+| `table.rows` | preview rows for it | `partId`, `offset`, `rows` |
 | `part` | a complete part (see §5) | `part` |
 | `part.patch` | update a part | `partId`, `patch` |
 | `message.end` | last | `messageId`, `finishReason`, `usage` (§7), `conversationTitle?` (§11) |
@@ -126,6 +128,23 @@ v1 adds `stepId?` to `tool_call`, `table` and `code` (link a result to the step 
 available for inspection) + `table {columns, rows (preview ≤50), rowCount, csvFileId, sqlPartId}` (+ `file` chip when
 `rowCount` > preview) + optional `chart` / `image` + optional `callout`s (assumptions, caveats, PHI redaction).
 CSV: `GET /api/download/{csvFileId}` (auth, no-store, opaque id, short-lived).
+
+### 5.1 Partial-table streaming (1.9.0)
+
+A table's preview rows can stream before the table is complete: `table.start {partId, columns, title?, …}`, then
+`table.rows {partId, offset, rows}` in order (10 rows each in demo), then the **complete `part`** with the same id.
+That `part` is canonical (`rowCount`, `csvFileId`, `source`, …) and replaces the progressive one, which the client
+upserts by id.
+
+* `offset` is the index of the first row, so a replayed chunk after a `Last-Event-ID` resume overwrites and never
+  duplicates.
+* If `message.end` arrives before the complete part (aborted), drop the partial table. Partial tables are never
+  persisted; a reload only ever sees complete parts.
+* Clients older than 1.9 ignore both events (§3) and render the final `part` as before, so this is additive.
+* Reference reducer: `reduceV1` in `web/src/api/contract.ts`, where `AssistantViewV1.streamingTables` lists the ids
+  still streaming, for a "loading rows…" hint.
+* A real backend can stream rows as the database returns them, with the same events. The preview cap (≤ 50 rows)
+  still applies; the full result stays the CSV.
 
 ## 6. Clarifying questions and resume
 
@@ -211,7 +230,8 @@ appear later (e.g. `queue`); clients ignore them.
 ## 9. Demo scenarios (demo mode only)
 
 `ChatRequest.scenario` (or keywords in the question) forces a scripted run on synthetic data:
-`table`, `chart`, `repair`, `abstain`, `clarify` (then resume), `escalation`, `candidates`, `error`, `slow`.
+`table`, `chart`, `repair`, `abstain`, `clarify` (then resume), `escalation`, `candidates`, `error`, `slow`,
+`report` (1.9: "report"/"artifact" in the question; chart + report artifacts, §16).
 Ignored outside demo mode. No paid API is ever called.
 
 Keywords (demo): "denial/reason codes, CARC" → repair · "appeals, prior auth, forecast" or patient identifiers → abstain ·
@@ -380,7 +400,36 @@ holds schema identifiers only, never row values.
   Never put the token in the URL. Example: `examples/export.md`.
 * The full table result is still the CSV download (`csvFileId`). Sharing is a separate, later version.
 
+## 16. Artifacts and plots (1.9.0)
+
+**Plots** are `chart` parts: Vega-Lite only, with inline `data.values` (never `data.url`) and a required `alt`. The
+server never sends script. `chart.tablePartId` (1.9) names the table part it was drawn from, so "show data" can
+scroll to it and sources (§14) can be shared. `staticImageBlobId?` is a PNG for export and print. A client may
+re-encode a chart (bar ↔ line, sort) locally from `data.values`; that is a view change, not a new version.
+
+**Artifacts** are `artifact` parts: openable objects shown in the side panel.
+`{artifactId, version, kind, title, content, autoOpen?}`:
+
+* `kind` is `table`, `chart`, `report` or `code`/`image`. `content` is the matching part, or `{markdown}` for a
+  `report`.
+* **Lifecycle.** An artifact arrives complete, as one `part` event. A **new version** is a new `artifact` part (new
+  part id) with the same `artifactId` and `version + 1`, in the same message or a later one, for example after "make
+  it a line chart". The panel shows the highest version. Earlier versions stay in the transcript as "v1, v2" chips.
+  `part.patch` is only for metadata (`title`, `autoOpen`), never for `content`.
+* `autoOpen: true` asks the client to open the panel once, when the part first arrives live, not on reload. Never
+  steal focus while the user is typing.
+* PHI: artifact content follows the same rules as the part it wraps (`sensitivity`, redacted identifier columns).
+  Reports are built from the aggregate preview only.
+* Streaming artifact content (e.g. a long report as deltas) is **reserved** and not in 1.9. When added, it will use
+  `artifact.delta {partId, delta}`, ignorable under §3.
+* Demo: the `report` scenario returns the table, a `chart` artifact (`autoOpen: false`) and a `report` artifact
+  (markdown summary, `autoOpen: true`). Example: `examples/report.jsonl`.
+
 ## Changelog
+
+* **1.9.0** (2026-10-25) — Partial-table streaming: `table.start` / `table.rows` (§5.1; the complete `part` stays
+  canonical). Artifact and plot spec (§16): `ChartPart.tablePartId`, versioning, `autoOpen`; demo `report`
+  scenario. Additive.
 
 * **1.8.0** (2026-10-25) — Citations: `Source`, `message.end.sources`, `StoredMessage.sources` (§14). Export:
   `GET /api/conversations/{id}/export?format=markdown|json`, `ConversationExport` (§15). Additive.
