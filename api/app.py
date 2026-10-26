@@ -103,6 +103,9 @@ class Settings:
     llm: str = os.environ.get("CC_API_LLM", "scripted")
     heartbeat_seconds: float = float(os.environ.get("CC_API_HEARTBEAT_SECONDS", "15"))
     resume_seconds: float = 60.0
+    #: a run whose last client disconnected is cancelled after this grace period unless a client re-attaches
+    #: (``GET /api/chat/{id}/stream`` or ``POST /api/chat`` + ``Last-Event-ID``). CONTRACT.md §8.
+    disconnect_grace_seconds: float = float(os.environ.get("CC_API_DISCONNECT_GRACE_SECONDS", "10"))
     stream_delay_seconds: float = field(default_factory=lambda: _paced("CC_API_STREAM_DELAY_SECONDS", DEMO_PACE_CHUNK_SECONDS))
     #: simulated model latency per analyzer turn in demo mode (realistic streaming); tests use 0
     model_delay_seconds: float = field(default_factory=lambda: _paced("CC_API_MODEL_DELAY_SECONDS", DEMO_PACE_MODEL_SECONDS))
@@ -138,6 +141,17 @@ class _Run:
     done: bool = False
     cancelled: threading.Event = field(default_factory=threading.Event)
     finished_at: float | None = None
+    subscribers: set = field(default_factory=set)  # (event loop, asyncio.Event) per attached client
+    attached: int = 0
+    grace: threading.Timer | None = None
+
+    def notify(self):
+        """Wake every attached client, each on its own event loop. Thread-safe; never raises."""
+        for loop, ev in list(self.subscribers):
+            try:
+                loop.call_soon_threadsafe(ev.set)
+            except RuntimeError:  # that client's loop is gone
+                self.subscribers.discard((loop, ev))
 
 
 def _token(request: Request) -> str:
@@ -198,8 +212,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             except AuthError:
                 return unauthorized()
             if run is None or run.principal != ctx.principal:
-                return error_json("validation", "Nothing to resume.", 404)
-            return _stream(run, after=int(seq) if seq.isdigit() else -1)
+                return error_json("stream_gone", "Nothing to resume.", 404)
+            return _stream(run, int(seq) if seq.isdigit() else -1, request)
         users = [m for m in body.messages if m.role == "user" and m.text.strip()]
         if not users and not body.regenerate:
             return error_json("validation", "Send a question.", 422)
@@ -261,8 +275,6 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         legacy_tools = bool(body.options.get("legacyToolParts"))
         run = _Run(message_id, ctx.principal)
         runs[message_id] = run
-        loop = asyncio.get_running_loop()
-        queue: asyncio.Queue = asyncio.Queue()
         started = time.perf_counter()
         marks: dict = {}
         persisted_steps: list = []
@@ -284,7 +296,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             elif t == "text.delta" and "first_token" not in marks:
                 marks["first_token"] = int((time.perf_counter() - started) * 1000)
             run.events.append((seq, event))
-            loop.call_soon_threadsafe(queue.put_nowait, (seq, event))
+            run.notify()
 
         def work():
             parts: list[dict] = []
@@ -313,6 +325,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                                               legacy_tools=legacy_tools)
             except Cancelled:
                 finish = "aborted"
+                if tap is not None:
+                    tap.abort()
             except PaidAPIDisabled:
                 parts = [_error("internal", "Model unavailable", "Paid model APIs are disabled on this server.", False)]
                 finish = "error"
@@ -363,45 +377,81 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             audit("chat_message", customer=ctx.principal.customer, user=ctx.principal.user,
                   conversation_id=conversation_id, message_id=message_id, parts=len(parts), queries=usage["queries"],
                   elapsed_ms=elapsed, finish=finish, scenario=scenario, steps=len(persisted_steps))
-            run.done = True
             run.finished_at = time.time()
-            loop.call_soon_threadsafe(queue.put_nowait, None)
+            run.done = True
+            run.notify()
 
         threading.Thread(target=work, name=f"chat-{message_id}", daemon=True).start()
 
-        async def live():
-            while True:
-                try:
-                    item = await asyncio.wait_for(queue.get(), timeout=settings.heartbeat_seconds)
-                except asyncio.TimeoutError:
-                    if await request.is_disconnected():
-                        run.cancelled.set()
-                        return
-                    yield _sse(None, {"type": "heartbeat", "at": _iso(time.time())})
-                    continue
-                if item is None:
-                    return
-                if await request.is_disconnected():
-                    run.cancelled.set()
-                    return
-                seq, payload = item
-                yield _sse(f"{message_id}:{seq}", payload)
+        return _stream(run, -1, request)
 
-        return StreamingResponse(live(), media_type="text/event-stream",
+    def _detach(run: _Run):
+        run.attached -= 1
+        if run.attached > 0 or run.done:
+            return
+        if settings.disconnect_grace_seconds <= 0:
+            run.cancelled.set()
+            return
+
+        def expire():
+            run.grace = None
+            if run.attached == 0 and not run.done:
+                run.cancelled.set()
+        if run.grace is None:  # a thread timer: independent of whichever event loop served the dropped client
+            run.grace = threading.Timer(settings.disconnect_grace_seconds, expire)
+            run.grace.daemon = True
+            run.grace.start()
+
+    def _stream(run: _Run, after: int, request: Request):
+        """Replay events with seq > ``after``, then follow the run live. Heartbeat on silence (no id).
+
+        Several clients may be attached to one run; the run is only cancelled when none is attached for
+        ``disconnect_grace_seconds`` (CONTRACT.md §8)."""
+        async def gen():
+            wake = asyncio.Event()
+            sub = (asyncio.get_running_loop(), wake)
+            run.subscribers.add(sub)
+            run.attached += 1
+            if run.grace is not None:
+                run.grace.cancel()
+                run.grace = None
+            sent = after
+            try:
+                while True:
+                    wake.clear()
+                    for seq, payload in run.events[sent + 1:]:
+                        yield _sse(f"{run.message_id}:{seq}", payload)
+                        sent = seq
+                    if run.done and sent >= len(run.events) - 1:
+                        return
+                    try:
+                        await asyncio.wait_for(wake.wait(), timeout=settings.heartbeat_seconds)
+                    except asyncio.TimeoutError:
+                        if await request.is_disconnected():
+                            return
+                        yield _sse(None, {"type": "heartbeat", "at": _iso(time.time())})
+            finally:
+                run.subscribers.discard(sub)
+                _detach(run)
+
+        return StreamingResponse(gen(), media_type="text/event-stream",
                                  headers={**NO_STORE, "X-Accel-Buffering": "no"})
 
-    def _stream(run: _Run, after: int):
-        async def replay():
-            sent = after
-            while True:
-                pending = [(s, p) for s, p in list(run.events) if s > sent]
-                for seq, payload in pending:
-                    yield _sse(f"{run.message_id}:{seq}", payload)
-                    sent = seq
-                if run.done and sent >= len(run.events) - 1:
-                    return
-                await asyncio.sleep(0.05)
-        return StreamingResponse(replay(), media_type="text/event-stream", headers=NO_STORE)
+    @app.get("/api/chat/{message_id}/stream")
+    def resume_stream(message_id: str, request: Request):
+        """EventSource-friendly resume: replays events after ``Last-Event-ID`` (or all), then follows live."""
+        gc_runs()
+        try:
+            ctx = authed(request, new_id("r"))
+        except AuthError:
+            return unauthorized()
+        run = runs.get(message_id)
+        if run is None or run.principal != ctx.principal:
+            return error_json("stream_gone", "Nothing to resume.", 404)
+        last_event = request.headers.get("last-event-id") or ""
+        mid, _, seq = last_event.rpartition(":")
+        after = int(seq) if mid == message_id and seq.isdigit() else -1
+        return _stream(run, after, request)
 
     @app.post("/api/chat/{message_id}/stop")
     def stop(message_id: str, request: Request):

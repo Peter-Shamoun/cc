@@ -3,6 +3,9 @@
  * Prose spec: api/CONTRACT.md. If you need a new event, change CONTRACT.md + the schema + this
  * file FIRST (minor version bump), then make the backend emit it.
  *
+ * Drift gate: these types are pinned to the schema-generated ../contract/v1.gen.ts by
+ * ../contract/compat.test.ts, so `tsc -b` fails if this file and the schema disagree.
+ *
  * Part shapes predating v1 live in ../lib/contract and are re-exported here unchanged.
  */
 import type {
@@ -17,7 +20,7 @@ export type {
   Sensitivity, StatusPart, TablePart, TextPart, ToolCallPart, ArtifactPart, PartBase,
 };
 
-export const CONTRACT_VERSION = '1.0.0';
+export const CONTRACT_VERSION = '1.1.0';
 export const CONTRACT_MAJOR = 1;
 
 // ---------------------------------------------------------------- new parts (v1)
