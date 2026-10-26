@@ -68,7 +68,7 @@ export function ImageView({ part, onOpen }: { part: ImagePart; onOpen?: () => vo
       <div data-testid="image-frame" className="max-w-full h-auto!" style={frame}>
         {err ? (
           <div className="flex h-full w-full items-center justify-center rounded-xl border border-line text-sm text-fg-subtle">Image unavailable</div>
-        ) : url ? (
+        ) : url ? ( // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- mouse shortcut; the Expand image button is the keyboard path
           <img src={url} alt={part.alt} onClick={() => setLightbox(true)} className="h-full w-full cursor-zoom-in rounded-xl border border-line bg-white object-contain" />
         ) : (
           <div className="h-full w-full animate-pulse rounded-xl bg-muted" data-testid="image-skeleton" />
@@ -79,7 +79,7 @@ export function ImageView({ part, onOpen }: { part: ImagePart; onOpen?: () => vo
         <IconButton label="Expand image" className="bg-elev/90 shadow" onClick={onOpen ?? (() => setLightbox(true))}><Maximize2 size={14} /></IconButton>
       </div>
       {part.caption && <figcaption className="mt-1.5 text-xs text-fg-subtle">{part.caption}</figcaption>}
-      {lightbox && url && (
+      {lightbox && url && ( // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdrop click; Escape and the Close button are the keyboard path
         <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={part.alt} onClick={() => setLightbox(false)} tabIndex={-1} className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-8">
           <img src={url} alt={part.alt} className="max-h-full max-w-full rounded-lg bg-white" />
           <IconButton label="Close" className="absolute right-4 top-4 bg-white/90 text-black" onClick={() => setLightbox(false)}><X size={18} /></IconButton>

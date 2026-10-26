@@ -74,3 +74,8 @@ node web/scripts/header_check.mjs none --api http://127.0.0.1:8131
 CI runs both: after the CSP check in the web job, and in the api job. Launch the API with `python -m api` (or
 `uvicorn … --no-server-header`). uvicorn's own `server: uvicorn` header is added below the app, so middleware can't
 remove it.
+## Lint policy (oxlint)
+
+- `jsx-a11y/prefer-tag-over-role`, `jsx-a11y/no-noninteractive-tabindex` and `react/incompatible-library` are **off**. ARIA roles on divs are valid. Scrollable regions *need* `tabIndex=0` (axe `scrollable-region-focusable`). TanStack hooks are fine without React Compiler. Runtime a11y is gated by the axe e2e suite.
+- Any other jsx-a11y exception is a per-site `oxlint-disable-next-line <rule> -- <reason>` comment. The reason must name the keyboard path (delegated Escape, aria-activedescendant combobox, roving tabindex, or a separate button). Don't add file-wide disables.
+- Remaining warnings are React-Compiler-style rules (refs, purity, set-state-in-effect, immutability, use-memo). Owners are listed in `NOTES.md`. Once these reach zero, `.oxlintrc.json` flips `warn` to `error`.
