@@ -5,6 +5,7 @@ cd "$(dirname "$0")/.."
 PORT="${1:-5239}"
 node scripts/license_audit.mjs >/dev/null && echo "ok   licences"
 npm run -s lint >/dev/null && echo "ok   lint"
+npm run -s audit >/dev/null && echo "ok   npm audit"
 npx tsc -b && echo "ok   typecheck"
 npx vitest run --maxWorkers=2
 npx vite build >/dev/null && echo "ok   build"
