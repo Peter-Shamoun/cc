@@ -10,7 +10,7 @@ import pytest
 from ccsim import edi_mock as m
 from ccsim import edi_reference as R
 from ccsim.edi_mock import Scenario, generate
-from ccsim.parser import split_segments
+from ccsim.parser import iter_segment_chunks
 
 START = date(2026, 7, 1)
 
@@ -27,8 +27,9 @@ def run(tmp_path_factory):
 
 
 def _segments(body: bytes):
-    segs, *_ = split_segments(body.decode("utf-8", "replace"))
-    return [e for _, e, _ in segs]
+    chunks = iter_segment_chunks(body.decode("utf-8", "replace"))
+    next(chunks)                                                  # the delimiters
+    return [e for segments in chunks for _, _, e, _ in segments]
 
 
 def _claims_837(files):
