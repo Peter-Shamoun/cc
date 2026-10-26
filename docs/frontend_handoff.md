@@ -6,7 +6,7 @@ Claude, picking up the repo) to run, test, ship and connect the real analyzer. W
 file says what you need and links the rest.
 
 State at handoff: branch `grokbot/frontend-sota`, contract version in `api/contract/__init__.py: CONTRACT_VERSION`
-(1.21.0 when this was written; the sharing removal bumps it again, see §8). Everything runs offline in **demo mode**:
+(**1.22.0** at handoff: 1.21 added BACKEND-FIT, 1.22 removed sharing). Everything runs offline in **demo mode**:
 `ScriptedLLM`, synthetic DuckDB data, no paid model API, no network.
 
 ## 0. Ground rules that still apply
@@ -276,7 +276,7 @@ Full list with owners: **`docs/frontend_deploy.md`** (`api/tests/test_deploy_doc
 
 | Feature | Status | Why / decision |
 |---|---|---|
-| Sharing (share button, dialog, `/shared/*` view, share endpoints, registry, capabilities, examples, docs) | **Removed** (Peter, 12:15 AM 2026-10-26) | Never reintroduce. `/share/*` URLs are a plain 404. Removed with a contract bump (see `docs/frontend-contract-migration.md`). |
+| Sharing (share button, dialog, `/shared/*` view, share endpoints, registry, capabilities, examples, docs) | **Removed** (Peter, 12:15 AM 2026-10-26; contract 1.22.0, shell #302) | Never reintroduce. `/share/*` URLs are a plain 404. See `api/CONTRACT.md` §17 and `docs/frontend-contract-migration.md`. Ratchet: `web/e2e/share-removed.spec.ts`. |
 | Data-source / DB / schema / scope picker (composer "Claims lake · sem.*" chip, ScopePopover, header Scope row) | **Removed** (Peter, 11:57 PM) | Scope comes from the identity (§3.3). Read-only context from the session (for example the organization in the account menu) is fine. |
 | Read aloud (browser speech) | Excluded (12:11 AM) | |
 | Extra keyboard shortcuts beyond the existing ones | Excluded (12:11 AM) | |
@@ -288,8 +288,22 @@ Full list with owners: **`docs/frontend_deploy.md`** (`api/tests/test_deploy_doc
 | Anything needing `analyzer/` changes, paid LLM calls, infra the backend lacks, or that breaks identity-scoped data / PHI rules | Excluded (12:11 AM) | Log ideas under BACKEND-FIT in the sprint NOTES instead of building them. |
 | File upload / attachments | Not built | PHI. The analyzer reads only the identity's `sem.*` relations. |
 
-<!-- SECTION: not-built. Teams list in-flight features dropped at the 12:20 AM finalize (multi-question clarify form,
-A30 composer reply, collapsed thinking, context-full state, quote-a-selection, suggested follow-ups) as built / not built. -->
+### 8.1 Finalize (12:20 AM): what was finished and what was dropped
+
+| Item | Status | Notes |
+|---|---|---|
+| Multi-question clarify form (Claude-style: 1–4 questions, options, Other, Skip) | Built (answer UI; contract 1.23.0, `web/src/contract/clarify.ts`) | **Demo-only** (`clarify_multi` scenario) until the analyzer's `ask` tool carries `questions`; the adapter passes them through unchanged. |
+| A30: reply to a clarification from the composer | Built (#295) | The card hints "Or type your answer below". |
+| Collapsed thinking disclosure | Built (answer) | Reasoning is dropped by default on the real path (§5, R2), so it shows only when steps or a summary exist. |
+| Suggested follow-ups | Built, provisional (`follow_ups` part) | Treat it as provisional until the contract pins the part. |
+| "Ask to change response…" | Built (answer) | Sends the instruction as the next turn (the contract has no regenerate instruction). |
+| Context-full / chat-length-limit state | **Not built** | No error code was defined. |
+| Quote-a-selection | **Not built** | The draft was discarded. |
+| Response preferences | **Not built** | |
+| ChatGPT pill-shaped composer | **Not built** | The patch was kept outside the repo. |
+| Accessibility *settings* (gap #13) | **Not built** (excluded) | Existing a11y compliance stays. |
+
+<!-- SECTION: not-built (teams: correct the table above if your item's status changes). -->
 
 Shell, at the 12:20 AM finalize:
 
@@ -314,7 +328,7 @@ Contract, at the 12:20 AM finalize:
 
 <!-- SECTION: shell. Shell team: layout, sidebar, routes, composer, themes, shortcuts, removed share/scope UI. -->
 
-### 9.x Shell (layout, sidebar, routes, composer, settings, themes, shortcuts)
+### 9.1 Shell (layout, sidebar, routes, composer, settings, themes, shortcuts)
 
 Owner during the sprint: shell. Design rule: ChatGPT/Claude parity from observation only, calm and neutral (one accent,
 hairline borders, ~48rem column, small muted icons, fast quiet motion). `src/shell/slopGuard.test.ts` fails the build
@@ -366,9 +380,9 @@ on gradients, glass/blur, glow, heavy shadows and similar.
 - The header's "Data: Live API / Demo data" row is informational only.
 - Settings is a modal, not a full page.
 
-<!-- SECTION: answer. Answer team: answer rendering (timeline, text, table, chart, clarify, errors), print, copy. -->
+<!-- SECTION: answer (§9.2). Answer team: answer rendering (timeline, text, table, chart, clarify, errors), print, copy. -->
 
-### 9.1 Platform (adapters, streaming, performance, security plumbing)
+### 9.3 Platform (adapters, streaming, performance, security plumbing)
 
 - **Streaming:** `adapters/http.ts` streams SSE through `guardBody` (45 s idle → stalled; 32 MiB per-frame cap),
   de-duplicates replayed events by `seq`, and re-attaches with Last-Event-ID (backoff 250 ms, 1 s, 2 s, 4 s). Offline
@@ -383,7 +397,10 @@ on gradients, glass/blur, glow, heavy shadows and similar.
 - **Non-stream calls:** `lib/fetchGuard.ts` (429 retry, capped JSON bodies).
 - **Clock skew:** `lib/serverClock.ts` (server `Date` offset for expiries and Retry-After).
 - **Performance:** idle prefetch of the Markdown, KaTeX and Vega chunks; windowed thread; 200-turn memory test
-  (`e2e/memory200.spec.ts`); Lighthouse budget (`npm run check:perf`); CPU-throttle audit. See `docs/frontend.md`,
+  (`e2e/memory200.spec.ts`); CPU-throttle audit. Budgets: `web/bundle-budget.json` (initial JS 160 KB gz, CSS 16 KB
+  gz, total JS 800 KB gz) and Lighthouse `scripts/perf_budget.json` (`npm run check:perf`: perf ≥ 0.95, a11y 1.00,
+  cold-load bytes `load-byte-weight` ≤ 350 KB, bytes including the idle prefetch ≤ 800 KB). Initial CSS sits at about
+  15.9/16 KB gz, so new global CSS needs a matching cut. See `docs/frontend.md`,
   `docs/frontend_a11y_perf.md`.
 - **Security plumbing:** CSP nonce, Trusted Types, SRI with import map, no-store, `prefs.ts` as the only `localStorage`
   writer (allowlisted keys), fixed `document.title`. See `docs/frontend_security.md`.
@@ -399,6 +416,9 @@ on gradients, glass/blur, glow, heavy shadows and similar.
 - CSV filenames use the UTC day (`docs/frontend_deploy.md` §10).
 - CI runs locally until the workflow move (§7).
 - Transcript storage is `ephemeral` by default. The persistent mode needs the retention decision and KMS keys.
+
+- Multi-question clarify and suggested follow-ups work end to end only in the demo until the analyzer emits them
+  (BACKEND-FIT: the analyzer `ask` tool has only `question`).
 
 <!-- SECTION: limitations. Any team: append known limitations in your area. -->
 
