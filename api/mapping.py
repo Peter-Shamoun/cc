@@ -66,11 +66,33 @@ def column_type(name: str, values: list) -> str:
     return "string"
 
 
+#: Revenue-cycle acronyms kept upper-case in labels and chart titles (QA-P5: "Claims by CARC code", not "carc code").
+ACRONYMS = frozenset({"carc", "rarc", "bcbs", "cpt", "npi", "icd", "hcpcs", "drg", "eob", "era", "pos", "hmo", "ppo",
+                      "ar", "id", "mrn", "tin", "ein", "ndc", "loinc", "cms", "uhc"})
+
+
+def _word(w: str, first: bool) -> str:
+    if w.lower() in ACRONYMS:
+        return w.upper()
+    return w.capitalize() if first else w.lower()
+
+
+def humanize(name: str) -> str:
+    """``carc_code`` -> ``CARC code``; ``payer_name`` -> ``Payer name``."""
+    words = [w for w in str(name).replace("_", " ").split() if w]
+    return " ".join(_word(w, i == 0) for i, w in enumerate(words)) or str(name)
+
+
+def lower_label(label: str) -> str:
+    """Mid-sentence form of a label: lower-case except acronyms (``CARC code``, ``service month``)."""
+    return " ".join(w if w.lower() in ACRONYMS and w.isupper() else w.lower() for w in label.split())
+
+
 def columns_for(names: list, rows: list) -> list[dict]:
     out = []
     for i, name in enumerate(names):
         ctype = column_type(name, [r[i] for r in rows[:200]])
-        col = {"key": name, "label": name.replace("_", " ").strip().capitalize() or name, "type": ctype}
+        col = {"key": name, "label": humanize(name), "type": ctype}
         if ctype == "currency":
             col["format"] = "$,.2f"
         elif ctype == "percent":
@@ -155,13 +177,13 @@ def chart_for(columns: list[dict], rows: list) -> dict | None:
         encoding["x"]["sort"] = "-y"
     if color:
         encoding["color"] = {"field": color["key"], "type": "nominal", "title": color["label"]}
-    title = f"{y['label']} by {x['label'].lower()}"
+    title = f"{y['label']} by {lower_label(x['label'])}"
     spec = {"$schema": "https://vega.github.io/schema/vega-lite/v5.json", "data": {"name": "result"},
             "mark": {"type": mark, "point": mark == "line", "tooltip": True}, "encoding": encoding,
             "width": "container", "height": 280}
     return {"type": "chart", "id": new_id("p_"), "library": "vega-lite", "spec": spec,
             "data": {"name": "result", "values": values}, "title": title,
-            "alt": f"{'Line' if mark == 'line' else 'Bar'} chart of {y['label'].lower()} by {x['label'].lower()}, "
+            "alt": f"{'Line' if mark == 'line' else 'Bar'} chart of {lower_label(y['label'])} by {lower_label(x['label'])}, "
                    f"{len(rows)} points."}
 
 
