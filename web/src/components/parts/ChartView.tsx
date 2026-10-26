@@ -47,8 +47,16 @@ export function datumLabel(spec: Record<string, unknown>, datum: unknown): strin
   return v ? (v.length > 60 ? v.slice(0, 59) + '…' : v) : null;
 }
 
-/** PNG blob from a data URL (Vega's toImageURL), for the clipboard. */
-const dataUrlBlob = async (url: string): Promise<Blob> => (await fetch(url)).blob();
+/** PNG blob from a data URL (Vega's toImageURL), for the clipboard. Decoded in place: fetch() of a data: URL is
+ * blocked by the CSP (`connect-src 'self'`). */
+export function dataUrlBlob(url: string): Blob {
+  const match = /^data:([^;,]+);base64,(.*)$/.exec(url);
+  if (!match) throw new Error('Chart image is not a base64 data URL');
+  const binary = atob(match[2]);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: match[1] });
+}
 export const canCopyImage = (): boolean => typeof ClipboardItem !== 'undefined' && !!navigator.clipboard?.write;
 
 /**
@@ -199,7 +207,7 @@ function ChartViewInner({ part, onOpen, full, onShowSpec, onAsk }: ChartViewProp
     try {
       const url = await viewRef.current?.toImageURL('png', 2);
       if (!url) return;
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': await dataUrlBlob(url) })]);
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': dataUrlBlob(url) })]);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch { /* clipboard refused (permissions, insecure context): the PNG download is right next to it */ }

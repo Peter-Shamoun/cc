@@ -24,7 +24,8 @@ beforeEach(() => {
   write.mockClear();
   vi.stubGlobal('ClipboardItem', class { constructor(public items: Record<string, Blob>) {} });
   Object.defineProperty(navigator, 'clipboard', { value: { write, writeText: vi.fn() }, configurable: true });
-  vi.stubGlobal('fetch', vi.fn(async () => ({ blob: async () => new Blob(['png'], { type: 'image/png' }) })));
+  // fetch() of a data: URL is blocked by the CSP in the browser: fail the test if the copy path uses it
+  vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('fetch is blocked by connect-src'); }));
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
@@ -102,5 +103,20 @@ describe('datumLabel', () => {
     expect(datumLabel({ layer: [{ mark: 'bar', encoding: { x: { field: 'p', type: 'nominal' } } }, { mark: 'rule' }] }, { p: 'Layered' })).toBe('Layered');
     expect(datumLabel(enc({ x: { field: 'p', type: 'nominal' } }), 'nope')).toBeNull();
     expect(datumLabel(enc({ x: { field: 'p', type: 'ordinal' } }), { p: 'y'.repeat(80) })).toHaveLength(60);
+  });
+});
+
+describe('dataUrlBlob', () => {
+  it('decodes a base64 PNG data URL without fetch (the CSP blocks fetch of data: URLs)', async () => {
+    const { dataUrlBlob } = await import('./ChartView');
+    const blob = dataUrlBlob('data:image/png;base64,iVBORw0KGgo=');
+    expect(fetch).not.toHaveBeenCalled();
+    expect(blob.type).toBe('image/png');
+    expect(Array.from(new Uint8Array(await blob.arrayBuffer()))).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  });
+
+  it('refuses anything but a base64 data URL', async () => {
+    const { dataUrlBlob } = await import('./ChartView');
+    expect(() => dataUrlBlob('https://example.com/x.png')).toThrow();
   });
 });
