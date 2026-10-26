@@ -21,7 +21,8 @@ CLOSED = {"Sensitivity", "MessageEnd.finishReason", "StoredMessage.finishReason"
           "Source.role", "ToolCallPart.state", "StepCheck.verdict",
           "ShareExpiryDays", "ConversationArchivedFilter",
           # 1.18.0: the PlotSpec is strict by design; a client drops a plot it does not know (the table stays)
-          "PlotKind", "PlotFieldType", "PlotFormat", "PlotSort"}
+          "PlotKind", "PlotFieldType", "PlotFormat", "PlotSort",
+          "IdentityScopedKey"}
 
 
 def _walk(node, path):

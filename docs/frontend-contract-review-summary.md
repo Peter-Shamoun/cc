@@ -1,8 +1,8 @@
-# CC chat contract — review summary for Claude (v1.0 → v1.20.1)
+# CC chat contract — review summary for Claude (v1.0 → v1.21.0)
 
 One page. Sources: `api/CONTRACT.md` (spec and changelog), `api/contract/v1.schema.json` (machine truth),
 `docs/frontend-contract-migration.md` (per-version migration), `docs/frontend-analyzer-adapter.md` (real analyzer).
-State on 2026-10-25: **1.20.1**, all changes additive, demo mode only (ScriptedLLM), **no paid API calls**.
+State on 2026-10-25: **1.21.0**, all changes additive, demo mode only (ScriptedLLM), **no paid API calls**.
 
 ## What the contract is
 An SSE stream (`POST /api/chat`) of `message.start` → `step.*` / `part` / `table.*` / `artifact` → `message.end`, with
@@ -10,7 +10,7 @@ An SSE stream (`POST /api/chat`) of `message.start` → `step.*` / `part` / `tab
 plus REST for conversations, capabilities, feedback, export and share. TS types are generated from the schema
 (`gen_ts --check` is a drift gate); every example stream is conformance-checked.
 
-## v1.0 → v1.20 at a glance
+## v1.0 → v1.21 at a glance
 | Ver | Theme | Ver | Theme |
 |---|---|---|---|
 | 1.0 | versioned stream, steps, abstain/clarify/escalation | 1.8 | citations (`sources`), export |
@@ -27,6 +27,7 @@ plus REST for conversations, capabilities, feedback, export and share. TS types 
 | | | 1.19 | no pattern accepts a trailing newline (shared `pattern_cases.json`); demo follow-up report revises in place (v2) |
 | | | 1.20 | temporary chat (§11.1): in memory only, never listed, titled, shared or exported; `Capabilities.temporaryChat` |
 | | | 1.20.1 | Stop interrupts the running SQL (API-side cursor interrupt; analyzer unchanged) |
+| | | 1.21 | BACKEND-FIT: no request can choose customer/database/schema/tables (`IdentityScopedKey`, 422); demo identity mirrors id token + manifest |
 
 ## Open decisions that need your sign-off
 1. **Shown-SQL masking default.** Proposed `phi` (mask literals compared with PHI-like columns or that look like

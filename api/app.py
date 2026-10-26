@@ -20,7 +20,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from pydantic import BaseModel, Field, StrictBool
+from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
 from analyzer.config import AnalyzerConfig
 from analyzer.llm import PaidAPIDisabled
@@ -111,7 +111,12 @@ class RegenerateIn(BaseModel):
     style: Literal["default", "concise", "detailed"] = "default"
 
 
+#: 1.21.0 (BACKEND-FIT, CONTRACT §2.1): the customer, data source and relations come only from the identity.
+IDENTITY_SCOPED_KEYS = frozenset(contract_schema()["$defs"]["IdentityScopedKey"]["enum"])
+
+
 class ChatRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")  # kept only to refuse IDENTITY_SCOPED_KEYS; other extras are ignored
     conversationId: str | None = Field(default=None, pattern=_ID)
     messages: list[ChatMessageIn] = Field(default_factory=list)
     options: dict = Field(default_factory=dict)
@@ -394,6 +399,10 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             if run is None or run.principal != ctx.principal:
                 return error_json("stream_gone", "Nothing to resume.", 404)
             return _stream(run, int(seq) if seq.isascii() and seq.isdigit() else -1, request)
+        scoped = sorted(IDENTITY_SCOPED_KEYS & (set(body.model_extra or {}) | set(body.options)))
+        if scoped:
+            # the client can't pick a customer, database, schema or tables: they come from the sign-in (§2.1)
+            return error_json("validation", "The data you can query comes from your sign-in; a request can't choose it.", 422)
         users = [m for m in body.messages if m.role == "user" and m.text.strip()]
         if not users and not body.regenerate:
             return error_json("validation", "Send a question.", 422)
