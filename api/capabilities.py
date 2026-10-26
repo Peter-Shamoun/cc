@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 
+from api.share import DEFAULT_EXPIRY_DAYS as SHARE_DEFAULT_EXPIRY_DAYS, EXPIRY_DAYS as SHARE_EXPIRY_DAYS
 from api.feedback import REASONS as FEEDBACK_REASONS
 
 DEFAULT_STRATEGY = "tool_loop"
@@ -57,7 +58,8 @@ def org_policy(customer: str | None) -> dict:
     return policy.get(customer or "", {}) if customer else {}
 
 
-def capabilities(contract_version: str, demo: bool, customer: str | None = None) -> dict:
+def capabilities(contract_version: str, demo: bool, customer: str | None = None,
+                 sql_literal_masking: str = "phi") -> dict:
     """The ``Capabilities`` body for ``customer`` (None: signed out, nothing org-specific). ``config`` never leaves."""
     policy = org_policy(customer)
     off_s, off_m = policy.get("strategies", {}), policy.get("models", {})
@@ -71,7 +73,9 @@ def capabilities(contract_version: str, demo: bool, customer: str | None = None)
               for m in MODELS]
     return {"contractVersion": contract_version, "demo": demo, "scope": "organization" if customer else "public",
             "defaults": {"strategy": DEFAULT_STRATEGY, "model": DEFAULT_MODEL}, "strategies": strategies,
-            "models": models, "feedbackReasons": [dict(r) for r in FEEDBACK_REASONS]}
+            "models": models, "feedbackReasons": [dict(r) for r in FEEDBACK_REASONS],
+            "sqlLiteralMasking": sql_literal_masking if sql_literal_masking in ("phi", "all", "off") else "phi",
+            "shareExpiry": {"options": list(SHARE_EXPIRY_DAYS), "default": SHARE_DEFAULT_EXPIRY_DAYS}}
 
 
 def check_options(options: dict, customer: str | None = None) -> str | None:

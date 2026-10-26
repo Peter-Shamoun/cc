@@ -190,12 +190,12 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
         </div>
         <div className="relative h-9 w-9 shrink-0">
           {busy ? (
-            <button key="stop" type="button" onClick={onStop} aria-label="Stop generating" title="Stop (Esc)" className="absolute inset-0 flex items-center justify-center rounded-full bg-accent text-accent-fg motion-safe:animate-[cc-pop_150ms_ease-out]">
+            <button key="stop" type="button" onClick={onStop} aria-label="Stop generating" title="Stop (Esc)" className="absolute inset-0 flex items-center justify-center rounded-full bg-accent text-accent-fg">
               <Square size={12} fill="currentColor" />
             </button>
           ) : (
             <button key="send" type="submit" aria-label="Send message" disabled={!canSend} title={offline ? "You're offline" : undefined}
-              className={clsx('absolute inset-0 flex items-center justify-center rounded-full bg-accent text-accent-fg transition-[opacity,transform] duration-150 motion-safe:animate-[cc-pop_150ms_ease-out]', canSend ? 'opacity-100 active:scale-95' : 'opacity-30')}>
+              className={clsx('absolute inset-0 flex items-center justify-center rounded-full bg-accent text-accent-fg transition-[opacity,transform] duration-150', canSend ? 'opacity-100 active:scale-95' : 'opacity-30')}>
               <ArrowUp size={18} strokeWidth={2.5} />
             </button>
           )}

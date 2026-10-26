@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { EyeOff, Lock, SquarePen } from 'lucide-react';
+import { Code2, EyeOff, Lock, SquarePen } from 'lucide-react';
 import { AssistantTurn, UserBubble, type Artifact } from '../components/Message';
 import { ArtifactPanel } from '../components/ArtifactPanel';
 import type { AnyView } from '../components/answer/normalize';
@@ -11,6 +11,7 @@ import type { Message } from '../lib/contract';
 import type { SharedConversation } from '../contract/v1.gen';
 import { makeAdapter, ThreadSkeleton } from './AppShell';
 import { ToastProvider } from './primitives';
+import { withholdSql } from './withholdSql';
 
 type State = { kind: 'loading' } | { kind: 'gone' } | { kind: 'signin' } | { kind: 'error' } | { kind: 'ok'; shared: SharedConversation; messages: ViewMessage[] };
 
@@ -32,6 +33,7 @@ export function SharedView({ shareId }: { shareId: string }) {
       (shared) => {
         if (!live) return;
         if (!shared) { setState({ kind: 'gone' }); return; }
+        shared = withholdSql(shared);
         const { visible } = foldThread((shared.messages as unknown as Message[]).map(hydrate).map((m) => toView(m)));
         setState({ kind: 'ok', shared, messages: markAnswered(visible) });
       },
@@ -39,9 +41,9 @@ export function SharedView({ shareId }: { shareId: string }) {
     );
     return () => { live = false; };
   }, [adapter, shareId]);
-  useEffect(() => {
-    document.title = state.kind === 'ok' ? `${state.shared.title || 'Shared chat'} · ClaimClarity` : 'Shared chat · ClaimClarity';
-  }, [state]);
+  // A fixed title, never the chat's own: titles echo the question (a member's name, a claim id), and browsers keep
+  // page titles in history, sync them across devices and show them in tab strips during screen shares.
+  useEffect(() => { document.title = 'Shared chat · ClaimClarity'; }, []);
 
   return (
     <ToastProvider>
@@ -68,18 +70,23 @@ export function SharedView({ shareId }: { shareId: string }) {
                       <span className="flex items-center gap-1.5"><Lock size={13} aria-hidden /> Shared within your organization · Read-only</span>
                       {state.shared.updatedAt && <span>{new Date(state.shared.updatedAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}</span>}
                       {!state.shared.includeData && (
-                        <span className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-fg-muted" data-testid="shared-no-data">
+                        <span className="flex items-center gap-1 text-xs text-fg-muted" data-testid="shared-no-data">
                           <EyeOff size={12} aria-hidden /> Result data not shared
+                        </span>
+                      )}
+                      {(state.shared.sqlWithheld || !state.shared.includeData) && (
+                        <span className="flex items-center gap-1 text-xs text-fg-muted" data-testid="shared-no-sql">
+                          <Code2 size={12} aria-hidden /> SQL not shared
                         </span>
                       )}
                     </p>
                   </div>
-                  <div className="cc-readonly flex flex-col gap-6" role="feed" aria-label="Messages" aria-busy="false">
+                  <div className="flex flex-col gap-6" role="feed" aria-label="Messages" aria-busy="false">
                     {state.messages.map((m) => (
                       <article key={m.id} data-message-id={m.id} aria-label={m.role === 'user' ? 'Question' : 'Answer'}>
                         {m.role === 'user'
                           ? <UserBubble msg={m} />
-                          : <AssistantTurn msg={m as AnyView} isLast={false} onOpen={setArtifact} onRegenerate={noop} onEdit={noop} />}
+                          : <AssistantTurn msg={m as AnyView} isLast={false} readOnly onOpen={setArtifact} onRegenerate={noop} onEdit={noop} />}
                       </article>
                     ))}
                   </div>

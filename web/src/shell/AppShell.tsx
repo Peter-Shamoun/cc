@@ -154,7 +154,9 @@ function ShellInner() {
 
   // ---- delete with undo: hide now, really delete when the toast expires ----
   const [pendingDelete, setPendingDelete] = useState<Set<string>>(new Set());
-  const threads = chat.threads.filter((t) => !pendingDelete.has(t.id));
+  const allThreads = chat.threads.filter((t) => !pendingDelete.has(t.id));
+  const threads = allThreads.filter((t) => !t.archived);
+  const archivedThreads = allThreads.filter((t) => t.archived);
   const requestDelete = useCallback((id: string) => {
     const title = chat.threads.find((t) => t.id === id)?.title ?? 'Chat';
     const wasOpen = chat.convId === id;
@@ -177,6 +179,20 @@ function ShellInner() {
       onExpire: () => { chat.remove(id).then(forget); },
     });
   }, [chat, toast]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** ChatGPT-style archive: the chat leaves the sidebar (still searchable); Undo or Settings → Archived chats restores it. */
+  const requestArchive = useCallback((id: string) => {
+    const title = chat.threads.find((t) => t.id === id)?.title ?? 'Chat';
+    const wasOpen = chat.convId === id;
+    void chat.archive(id, true);
+    if (wasOpen) { chat.newChat(); requestAnimationFrame(focusComposer); }
+    toast({
+      text: `Archived “${title.length > 32 ? `${title.slice(0, 32)}…` : title}”`,
+      ms: UNDO_MS,
+      action: { label: 'Undo', run: () => { void chat.archive(id, false); if (wasOpen) void chat.open(id); } },
+    });
+  }, [chat, toast]);
+  const unarchive = useCallback((id: string) => { void chat.archive(id, false); }, [chat]);
 
   // ---- routing (#/c/<id>) ----
   const routing = useRef(false);
@@ -236,7 +252,7 @@ function ShellInner() {
   const shareConv = adapter instanceof HttpAnalystAdapter && chat.convId && !chat.busy ? chat.convId : null;
   const shareLink = useMemo<ShareLinkApi | undefined>(() => (shareConv && adapter instanceof HttpAnalystAdapter ? {
     get: () => adapter.getShare(shareConv),
-    set: (includeData) => adapter.setShare(shareConv, includeData),
+    set: (includeData, days) => adapter.setShare(shareConv, includeData, days),
     revoke: () => adapter.revokeShare(shareConv),
     copy: (url) => copyText(url),
   } : undefined), [adapter, shareConv]);
@@ -546,6 +562,7 @@ function ShellInner() {
     onSelect: (id: string) => { closeDrawer(); void openChat(id).then(focusAfterOpen); },
     onNew: () => { chat.newChat(); closeDrawer(); if (!coarse()) requestAnimationFrame(focusComposer); },
     onDelete: requestDelete, onRename: chat.rename, onPin: chat.pin, onExport: exportThread,
+    onArchive: chat.canArchive ? requestArchive : undefined,
     onCollapse: () => setSidebar(false), onSearch: () => setDialog('search'),
     onSettings: () => setDialog('settings'), onShortcuts: () => setDialog('shortcuts'),
   };
@@ -610,10 +627,11 @@ function ShellInner() {
       {dialog === 'share' && (
         <ShareDialog title={currentTitle} firstQuestion={chat.messages.find((m) => m.role === 'user')?.text} messageCount={chat.messages.length}
           onClose={() => setDialog(null)} onCopyMarkdown={() => { void copyCurrent(); }} onDownloadMarkdown={exportCurrent}
-          onDownloadJson={serverExport ? () => serverExport('json') : undefined} link={shareLink}
+          onDownloadJson={serverExport ? () => serverExport('json') : undefined} link={shareLink} expiry={strategy.caps.shareExpiry}
           onPrint={() => { setDialog(null); requestAnimationFrame(() => window.print()); }} />
       )}
-      {dialog === 'settings' && <SettingsDialog onClose={() => setDialog(null)} storeMode={store.mode} enterToSend={enterToSend} setEnterToSend={setEnterToSend} onExportAll={exportAll} threadCount={threads.length} />}
+      {dialog === 'settings' && <SettingsDialog onClose={() => setDialog(null)} storeMode={store.mode} enterToSend={enterToSend} setEnterToSend={setEnterToSend} onExportAll={exportAll} threadCount={allThreads.length}
+        archived={chat.canArchive ? archivedThreads : undefined} onUnarchive={unarchive} onOpenChat={(id: string) => { setDialog(null); void openChat(id); }} />}
       {dialog === 'shortcuts' && <ShortcutsDialog onClose={() => setDialog(null)} />}
     </AdapterCtx.Provider>
   );

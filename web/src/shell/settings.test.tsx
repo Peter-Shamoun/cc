@@ -34,3 +34,51 @@ describe('settings layout', () => {
     expect(within(screen.getByRole('tabpanel')).getByRole('heading', { level: 3 })).toHaveTextContent('Data controls');
   });
 });
+
+describe('settings radio groups (QA-S17)', () => {
+  it('each group is one Tab stop: only the checked radio is tabbable', () => {
+    open();
+    for (const name of ['Theme', 'Style']) {
+      const radios = within(screen.getByRole('radiogroup', { name })).getAllByRole('radio');
+      expect(radios.filter((r) => r.getAttribute('tabindex') === '0')).toHaveLength(1);
+      expect(radios.find((r) => r.getAttribute('tabindex') === '0')).toHaveAttribute('aria-checked', 'true');
+      expect(radios.filter((r) => r.getAttribute('tabindex') === '-1')).toHaveLength(radios.length - 1);
+    }
+  });
+
+  it('arrows select and focus the next radio, wrapping; Home/End jump; the tab stop follows', () => {
+    open();
+    const group = screen.getByRole('radiogroup', { name: 'Theme' });
+    const radios = () => within(group).getAllByRole('radio');
+    const checked = () => radios().find((r) => r.getAttribute('aria-checked') === 'true')!;
+    const start = radios().indexOf(checked());
+    fireEvent.keyDown(checked(), { key: 'ArrowRight' });
+    const n = radios().length;
+    expect(radios().indexOf(checked())).toBe((start + 1) % n);
+    expect(document.activeElement).toBe(checked());
+    expect(checked()).toHaveAttribute('tabindex', '0');
+    fireEvent.keyDown(checked(), { key: 'End' });
+    expect(radios().indexOf(checked())).toBe(n - 1);
+    fireEvent.keyDown(checked(), { key: 'ArrowDown' });
+    expect(radios().indexOf(checked())).toBe(0);
+    fireEvent.keyDown(checked(), { key: 'ArrowLeft' });
+    expect(radios().indexOf(checked())).toBe(n - 1);
+    fireEvent.keyDown(checked(), { key: 'Home' });
+    expect(radios().indexOf(checked())).toBe(0);
+    expect(document.activeElement).toBe(checked());
+    expect(radios().filter((r) => r.getAttribute('tabindex') === '0')).toEqual([checked()]);
+  });
+
+  it('mirrors Left/Right in RTL', () => {
+    document.documentElement.dir = 'rtl';
+    try {
+      open();
+      const group = screen.getByRole('radiogroup', { name: 'Theme' });
+      const radios = within(group).getAllByRole('radio');
+      expect(radios.length).toBeGreaterThan(2);
+      fireEvent.click(radios[0]);
+      fireEvent.keyDown(radios[0], { key: 'ArrowLeft' });
+      expect(radios[1]).toHaveAttribute('aria-checked', 'true');
+    } finally { document.documentElement.dir = ''; }
+  });
+});

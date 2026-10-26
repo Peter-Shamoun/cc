@@ -1,5 +1,7 @@
+import { noteServerDate } from '../lib/serverClock';
+import { retryAfterOf } from '../lib/fetchGuard';
 import { getShare, loadShared, revokeShare, setShare } from '../contract/share';
-import type { ShareLink, SharedConversation } from '../contract/v1.gen';
+import type { ShareExpiryDays, ShareLink, SharedConversation } from '../contract/v1.gen';
 import type { ErrorPart, StreamEvent } from '../lib/contract';
 import { asSession, type AuthSession } from '../auth/session';
 import type { HttpError } from '../api/contract';
@@ -28,6 +30,14 @@ export interface HttpAdapterOptions {
   maxRateRetries: number;
   /** Longest Retry-After we'll wait on our own; longer (or missing past the cap) falls through to the error card. */
   maxRateWaitMs: number;
+  /**
+   * A stream that sends nothing (not even the server's 15-s heartbeat) for this long is treated as dropped: the
+   * connection is closed and, once the answer has started, re-attached with Last-Event-ID. Before it starts, the
+   * answer ends with a retryable "timed out" card instead of a spinner that never stops.
+   */
+  idleTimeoutMs: number;
+  /** One SSE line (one event) larger than this is refused instead of buffering until the tab runs out of memory. */
+  maxFrameBytes: number;
   /** Demo-only fault injection (dev query param ?fault=429): the first attempt asks the demo API for a 429. */
   demoFault?: 'rate_limited';
 }
@@ -44,13 +54,7 @@ export function streamGone(): Error {
   return e;
 }
 
-export function retryAfterMs(value: string | null, now = Date.now()): number | null {
-  if (!value) return null;
-  const v = value.trim();
-  if (/^\d+$/.test(v)) return Number(v) * 1000;
-  const at = Date.parse(v);
-  return Number.isNaN(at) ? null : Math.max(0, at - now);
-}
+export { retryAfterMs } from '../lib/fetchGuard';
 
 const abortError = () => new DOMException('aborted', 'AbortError');
 const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
@@ -117,7 +121,7 @@ export async function httpError(res: Response): Promise<ErrorPart> {
   if (code === 'payload_too_large' && !serverMsg && typeof body.maxBytes === 'number' && body.maxBytes > 0) {
     message = `Shorten the message to under ${Math.max(1, Math.floor(body.maxBytes / 1024))} KB, then send it again.`;
   }
-  const retryAfter = retryAfterMs(res.headers.get('retry-after')) ?? 0;
+  const retryAfter = retryAfterOf(res) ?? 0;
   return { ...base, code, title: k.title, message, retryable: k.retryable, ...(code === 'rate_limited' && retryAfter > 0 ? { retryAfterMs: retryAfter } : {}) };
 }
 
@@ -130,7 +134,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
    */
   constructor(private base = '', auth?: string | AuthSession, opts: Partial<HttpAdapterOptions> = {}) {
     this.auth = asSession(auth);
-    this.opts = { maxRetries: 4, retryBaseMs: 500, stopGraceMs: 1500, offlineWaitMs: 45_000, maxRateRetries: 2, maxRateWaitMs: 30_000, ...opts };
+    this.opts = { maxRetries: 4, retryBaseMs: 500, stopGraceMs: 1500, offlineWaitMs: 45_000, maxRateRetries: 2, maxRateWaitMs: 30_000, idleTimeoutMs: 45_000, maxFrameBytes: 32 * 1024 * 1024, ...opts };
   }
   private readonly opts: HttpAdapterOptions;
   private readonly auth: AuthSession;
@@ -207,6 +211,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
           yield { type: 'message.end', messageId: '', finishReason: 'error' };
           return;
         }
+        noteServerDate(res.headers.get('date'));
         // §6.4: an expired/answered clarification is 409; send the reply as a fresh question instead.
         if (res.status === 409 && resumeFallback && messageId === null) {
           resumeFallback = false;
@@ -221,7 +226,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
         }
         // 429 before the answer starts: wait out Retry-After (status line counts down), then send the same request again.
         if (res.status === 429 && messageId === null && rateRetries < this.opts.maxRateRetries) {
-          const wait = retryAfterMs(res.headers.get('retry-after')) ?? this.opts.retryBaseMs * 2 ** rateRetries;
+          const wait = retryAfterOf(res) ?? this.opts.retryBaseMs * 2 ** rateRetries;
           if (wait <= this.opts.maxRateWaitMs) {
             rateRetries++;
             onConnection?.('rate_limited', { retryInMs: wait });
@@ -236,6 +241,25 @@ export class HttpAnalystAdapter implements AnalystAdapter {
         }
         if (!res.ok || !res.body) {
           if (messageId !== null && res.status >= 500 && retries < this.opts.maxRetries) { onConnection?.('reconnecting'); dropped = true; await this.backoff(++retries, signal); continue; }
+          // Session expired while re-attaching to a running answer: keep what already streamed, end it with the
+          // sign-in card (not "Connection lost"), and tell the session layer so the app can prompt for sign-in.
+          if (messageId !== null && res.status === 401) {
+            this.auth.onExpired();
+            yield { type: 'part', part: await httpError(res) };
+            yield { type: 'message.end', messageId, finishReason: 'error' };
+            return;
+          }
+          // Rate-limited while re-attaching: wait out Retry-After (capped) like a 5xx, instead of dropping the answer.
+          if (messageId !== null && res.status === 429 && retries < this.opts.maxRetries) {
+            const wait = retryAfterOf(res);
+            if (wait === null || wait <= this.opts.maxRateWaitMs) {
+              onConnection?.('reconnecting');
+              dropped = true;
+              retries++;
+              if (wait === null) await this.backoff(retries, signal); else await this.sleep(wait, signal);
+              continue;
+            }
+          }
           if (messageId !== null && res.status === 404) throw streamGone(); // §8 stream_gone: useChat reloads the stored answer
           if (messageId !== null) throw new Error(`replay ${res.status}`); // the run is gone: useChat shows "Connection lost"
           if (res.status === 401) this.auth.onExpired();
@@ -244,7 +268,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
           return;
         }
         try {
-          for await (const ev of parseSse(res.body)) {
+          for await (const ev of parseSse(guardBody(res.body, this.opts))) {
             if ((ev as { type: string }).type === 'heartbeat') continue;
             const seq = (ev as { seq?: number }).seq;
             if (typeof seq === 'number') {
@@ -259,6 +283,17 @@ export class HttpAnalystAdapter implements AnalystAdapter {
           }
         } catch (e) {
           if (wire.signal.aborted) throw abortError();
+          if (e instanceof StreamGuardError && e.reason === 'too_large') {
+            // Re-attaching would replay the same event: end the answer with what already arrived.
+            yield { type: 'part', part: tooLargeError() };
+            yield { type: 'message.end', messageId: messageId ?? '', finishReason: 'error' };
+            return;
+          }
+          if (e instanceof StreamGuardError && messageId === null) {
+            yield { type: 'part', part: stalledError() };
+            yield { type: 'message.end', messageId: '', finishReason: 'error' };
+            return;
+          }
           if (messageId === null) throw e;
         }
         // The stream closed without message.end: a dropped connection.
@@ -321,7 +356,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
   /** Contract 1.11.0 §17: org-scoped, read-only share links. Auth (and the CSRF header on cookie sessions) come from the session. */
   private shareOpts() { return { base: this.base, init: { credentials: 'same-origin' as const, cache: 'no-store' as const, headers: this.headers() } }; }
   getShare(conversationId: string): Promise<ShareLink | null> { return getShare(conversationId, this.shareOpts()); }
-  setShare(conversationId: string, includeData: boolean): Promise<ShareLink> { return setShare(conversationId, includeData, this.shareOpts()); }
+  setShare(conversationId: string, includeData: boolean, expiresInDays?: ShareExpiryDays): Promise<ShareLink> { return setShare(conversationId, includeData, { ...this.shareOpts(), expiresInDays }); }
   revokeShare(conversationId: string): Promise<boolean> { return revokeShare(conversationId, this.shareOpts()); }
   loadShared(shareId: string): Promise<SharedConversation | null> { return loadShared(shareId, this.shareOpts()); }
 
@@ -330,6 +365,50 @@ export class HttpAnalystAdapter implements AnalystAdapter {
     if (!res.ok) throw new Error(`blob ${res.status}`);
     return res.blob();
   }
+}
+
+/** Why `guardBody` gave up on a stream. */
+export class StreamGuardError extends Error {
+  constructor(readonly reason: 'stalled' | 'too_large') { super(`stream_${reason}`); this.name = 'StreamGuardError'; }
+}
+
+export function stalledError(): ErrorPart {
+  return { type: 'error', id: 'err-stalled', code: 'timeout', title: 'The analyst stopped responding', message: 'No reply arrived for a while. Try again.', retryable: true };
+}
+
+export function tooLargeError(): ErrorPart {
+  return { type: 'error', id: 'err-too-large', code: 'internal', title: 'Answer too large to show', message: 'Ask for fewer rows or a summary instead.', retryable: false };
+}
+
+/**
+ * Wraps a response body with two limits: no bytes for `idleTimeoutMs` (the server heartbeats every 15 s) errors the
+ * stream as stalled, and one line growing past `maxFrameBytes` without a line break errors it as too large. Either
+ * way the underlying connection is cancelled, so a hung proxy or runaway event can't hold the tab.
+ */
+export function guardBody(body: ReadableStream<Uint8Array>, o: Pick<HttpAdapterOptions, 'idleTimeoutMs' | 'maxFrameBytes'>): ReadableStream<Uint8Array> {
+  const reader = body.getReader();
+  let sinceBreak = 0;
+  return new ReadableStream<Uint8Array>({
+    async pull(ctrl) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const idle = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new StreamGuardError('stalled')), o.idleTimeoutMs); });
+      try {
+        const r = await Promise.race([reader.read(), idle]);
+        if (r.done) { ctrl.close(); return; }
+        const c = r.value;
+        const brk = Math.max(c.lastIndexOf(10), c.lastIndexOf(13));
+        sinceBreak = brk === -1 ? sinceBreak + c.byteLength : c.byteLength - brk - 1;
+        if (sinceBreak > o.maxFrameBytes) throw new StreamGuardError('too_large');
+        ctrl.enqueue(c);
+      } catch (e) {
+        reader.cancel().catch(() => {});
+        ctrl.error(e);
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+    cancel(reason) { return reader.cancel(reason); },
+  });
 }
 
 /**

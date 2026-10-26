@@ -1,5 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getShare, loadShared, revokeShare, setShare, shareIdFromPath, shareUrl, sharedUrl } from './share';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { DEMO_CAPABILITIES } from './capabilities';
+import {
+  DEFAULT_SHARE_EXPIRY_DAYS, SHARE_EXPIRY_DAYS, getShare, loadShared, revokeShare, setShare, shareDaysLeft,
+  shareIdFromPath, shareUrl, sharedUrl,
+} from './share';
+import type { ShareLink, SharedConversation } from './v1.gen';
+
+const example: unknown = JSON.parse(readFileSync(resolve(process.cwd(), '../api/contract/examples/share.json'), 'utf8'));
 
 const reply = (status: number, body: unknown) =>
   Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }));
@@ -31,5 +40,36 @@ describe('share (1.11.0)', () => {
   });
   it('revokes', async () => {
     await expect(revokeShare('c_1', { fetchImpl: () => reply(200, { revoked: true }) })).resolves.toBe(true);
+  });
+});
+
+describe('share (1.15.0: expiry, rotation, SQL withheld)', () => {
+  it('sends expiresInDays only when chosen', async () => {
+    const fetchImpl = vi.fn(() => reply(200, LINK));
+    await setShare('c_1', false, { fetchImpl, expiresInDays: 7 });
+    await setShare('c_1', true, { fetchImpl });
+    const bodies = fetchImpl.mock.calls.map((c) => JSON.parse(String((c as unknown as [string, RequestInit])[1].body)));
+    expect(bodies).toEqual([{ includeData: false, expiresInDays: 7 }, { includeData: true }]);
+  });
+  it('exposes the options and counts days left', () => {
+    expect(SHARE_EXPIRY_DAYS).toEqual([7, 30, 90]);
+    expect(DEFAULT_SHARE_EXPIRY_DAYS).toBe(30);
+    const now = Date.parse('2026-10-25T20:00:00Z');
+    expect(shareDaysLeft({ expiresAt: '2026-11-24T20:00:00Z' }, now)).toBe(30);
+    expect(shareDaysLeft({ expiresAt: '2026-10-25T21:00:00Z' }, now)).toBe(1);
+    expect(shareDaysLeft({ expiresAt: '2026-10-01T00:00:00Z' }, now)).toBe(0);
+    expect(shareDaysLeft({}, now)).toBeNull();
+    expect(shareDaysLeft({ expiresAt: 'nope' }, now)).toBeNull();
+  });
+  it('the example shows expiry, rotation on widening and withheld SQL', () => {
+    const ex = example as unknown as {
+      share: { response: ShareLink }; view: { response: SharedConversation }; widen: { response: ShareLink };
+    };
+    expect(ex.share.response.expiresInDays).toBe(30);
+    expect(ex.view.response.sqlWithheld).toBe(true);
+    expect(JSON.stringify(ex.view.response)).not.toMatch(/SELECT/);
+    expect(ex.widen.response.rotated).toBe(true);
+    expect(ex.widen.response.shareId).not.toBe(ex.share.response.shareId);
+    expect(DEMO_CAPABILITIES.shareExpiry).toEqual({ options: [7, 30, 90], default: 30 });
   });
 });

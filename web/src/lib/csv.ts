@@ -70,6 +70,8 @@ export function isNumeric(c: Column) {
   return c.type === 'integer' || c.type === 'number' || c.type === 'currency' || c.type === 'percent';
 }
 
+const NUMERIC_STRING = /^-?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i;
+
 export function formatCell(v: unknown, c: Column, allowPhi = false): string {
   if (c.phi && !allowPhi) {
     const s = String(v ?? '');
@@ -77,25 +79,45 @@ export function formatCell(v: unknown, c: Column, allowPhi = false): string {
   }
   if (v === null || v === undefined || v === '') return '—';
   if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+  // Warehouses often send DECIMAL/BIGINT as strings ("1234.50", "9007199254740993"): format them like numbers.
+  if (typeof v === 'string' && isNumeric(c) && NUMERIC_STRING.test(v.trim())) {
+    const n = Number(v.trim());
+    // Beyond 2^53 a float would change the digits; group the exact string instead.
+    if (c.type === 'integer' && !Number.isSafeInteger(n) && /^-?\d+$/.test(v.trim())) return v.trim().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    v = n;
+  }
+  if (typeof v === 'bigint') return v.toLocaleString('en-US');
+  if (Array.isArray(v)) return v.map((x) => (x === null || x === undefined ? '—' : typeof x === 'object' ? JSON.stringify(x) : String(x))).join(', ');
+  if (typeof v === 'object') { try { const j = JSON.stringify(v); return j.length > 200 ? `${j.slice(0, 199)}…` : j; } catch { return '—'; } }
   if (typeof v !== 'number') return String(v);
   if (!Number.isFinite(v)) return '—';
+  if (Object.is(v, -0)) v = 0;
+  const num = v as number;
   switch (c.type) {
-    case 'percent':
-      return `${(v * 100).toFixed(1)}%`;
+    case 'percent': {
+      const pct = num * 100;
+      // A tiny non-zero share must not read "0.0%".
+      if (pct !== 0 && Math.abs(pct) < 0.05) return `${pct < 0 ? '>-' : '<'}0.1%`;
+      return `${pct.toFixed(1).replace(/^-0\.0$/, '0.0')}%`;
+    }
     case 'currency':
-      return v.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      return (Math.abs(num) < 0.005 ? 0 : num).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
     case 'integer':
-      return Math.round(v).toLocaleString('en-US');
+      return (Math.round(num) || 0).toLocaleString('en-US');
     case 'number':
-      return v.toLocaleString('en-US', { maximumFractionDigits: 3 });
+      // Very small magnitudes would round to "0": keep 3 significant digits instead.
+      if (num !== 0 && Math.abs(num) < 0.0005) return num.toPrecision(3);
+      return num.toLocaleString('en-US', { maximumFractionDigits: 3 });
     default:
-      return String(v);
+      return String(num);
   }
 }
 
 /** Spec §4.2 filename: claimclarity_<slug>_<yyyy-mm-dd>.csv (no PHI in names). */
 export function csvFilename(title: string | undefined, d = new Date()) {
   const slug = (title ?? 'table').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 48) || 'table';
+  // UTC day on purpose: csvFilename.vectors.json is shared with api/tests/test_csv_filename.py, so a client export and
+  // an API download of the same table get the same name (the server doesn't know the user's zone).
   return `claimclarity_${slug}_${d.toISOString().slice(0, 10)}.csv`;
 }
 

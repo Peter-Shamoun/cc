@@ -1,12 +1,15 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { Braces, Check, Copy, FileText, Link2, Lock, Printer } from 'lucide-react';
 import { Dialog } from './primitives';
-import type { ShareLink } from '../contract/v1.gen';
+import type { ShareExpiryDays, ShareLink } from '../contract/v1.gen';
+import { shareDaysLeft } from '../contract/share';
+import { serverNow } from '../lib/serverClock';
 
 /** Contract 1.11.0 §17 share calls for the open chat (absent when the chat isn't on a server, e.g. the offline mock). */
 export interface ShareLinkApi {
   get: () => Promise<ShareLink | null>;
-  set: (includeData: boolean) => Promise<ShareLink>;
+  /** `expiresInDays` (1.15.0) restarts the lifetime; omit it to keep the current expiry. */
+  set: (includeData: boolean, expiresInDays?: ShareExpiryDays) => Promise<ShareLink>;
   revoke: () => Promise<boolean>;
   /** Copies the absolute link; resolves false when the clipboard is unavailable. */
   copy: (url: string) => Promise<boolean>;
@@ -24,6 +27,8 @@ export interface ShareDialogProps {
   onDownloadJson?: () => void;
   onPrint: () => void;
   link?: ShareLinkApi;
+  /** `Capabilities.shareExpiry` (1.15.0). Absent from older servers, whose links never expire. */
+  expiry?: { options: ShareExpiryDays[]; default: ShareExpiryDays };
 }
 
 /**
@@ -43,7 +48,7 @@ export function ShareDialog(p: ShareDialogProps) {
           <div className="mt-2 text-xs text-fg-subtle">{p.messageCount} {p.messageCount === 1 ? 'message' : 'messages'} · de-identified demo data</div>
         </div>
 
-        {p.link ? <LinkSection api={p.link} /> : (
+        {p.link ? <LinkSection api={p.link} expiry={p.expiry} /> : (
           <section aria-labelledby="share-link-h">
             <h3 id="share-link-h" className="mb-2 text-xs font-medium uppercase tracking-wide text-fg-subtle">Link</h3>
             <div className="flex items-center gap-3 rounded-xl border border-line px-3 py-2.5">
@@ -88,16 +93,19 @@ function Action({ icon, label, hint, onClick, disabled }: { icon: ReactNode; lab
 type LinkState = { kind: 'loading' } | { kind: 'none' } | { kind: 'shared'; link: ShareLink } | { kind: 'error'; message: string };
 
 /** Create, copy, scope (with/without data) and revoke the org-only link. Never logs or displays more of the id than the URL. */
-function LinkSection({ api }: { api: ShareLinkApi }) {
+function LinkSection({ api, expiry }: { api: ShareLinkApi; expiry?: ShareDialogProps['expiry'] }) {
   const [state, setState] = useState<LinkState>({ kind: 'loading' });
   const [includeData, setIncludeData] = useState(false);
+  const [days, setDays] = useState<ShareExpiryDays | undefined>(expiry?.default);
+  /** 1.15.0: turning data on issued a new id and revoked the old one; say so until the dialog closes. */
+  const [rotated, setRotated] = useState(false);
   const [working, setWorking] = useState(false);
   const [copied, setCopied] = useState(false);
   const id = useId();
   useEffect(() => {
     let live = true;
     api.get().then(
-      (l) => { if (!live) return; setState(l ? { kind: 'shared', link: l } : { kind: 'none' }); if (l) setIncludeData(l.includeData); },
+      (l) => { if (!live) return; setState(l ? { kind: 'shared', link: l } : { kind: 'none' }); if (l) { setIncludeData(l.includeData); if (l.expiresInDays) setDays(l.expiresInDays as ShareExpiryDays); } },
       () => { if (live) setState({ kind: 'error', message: "Couldn't check this chat's link." }); },
     );
     return () => { live = false; };
@@ -108,13 +116,23 @@ function LinkSection({ api }: { api: ShareLinkApi }) {
   };
   const absolute = (l: ShareLink) => new URL(l.url, window.location.origin).href;
   const copy = async (l: ShareLink) => { const ok = await api.copy(absolute(l)); setCopied(ok); if (ok) window.setTimeout(() => setCopied(false), 2000); };
-  const create = () => act(async () => { const l = await api.set(includeData); setState({ kind: 'shared', link: l }); await copy(l); }, "Couldn't create the link. Try again.");
+  const create = () => act(async () => { const l = await api.set(includeData, days); setRotated(false); setState({ kind: 'shared', link: l }); await copy(l); }, "Couldn't create the link. Try again.");
+  const update = (next: boolean, d?: ShareExpiryDays) => act(async () => {
+    const l = await api.set(next, d);
+    if (l.rotated) { setRotated(true); setCopied(false); }
+    setState({ kind: 'shared', link: l });
+  }, "Couldn't update the link. Try again.");
+  // Widening rotates the link, and a rotated share would fall back to 30 days, so carry the chosen lifetime over.
   const toggle = (next: boolean) => {
     setIncludeData(next);
-    if (state.kind === 'shared') void act(async () => { const l = await api.set(next); setState({ kind: 'shared', link: l }); }, "Couldn't update the link. Try again.");
+    if (state.kind === 'shared') void update(next, next && !state.link.includeData ? days : undefined);
   };
-  const revoke = () => act(async () => { await api.revoke(); setState({ kind: 'none' }); setCopied(false); }, "Couldn't stop sharing. Try again.");
+  const changeDays = (d: ShareExpiryDays) => { setDays(d); if (state.kind === 'shared') void update(includeData, d); };
+  const revoke = () => act(async () => { await api.revoke(); setState({ kind: 'none' }); setCopied(false); setRotated(false); }, "Couldn't stop sharing. Try again.");
   const shared = state.kind === 'shared' ? state.link : null;
+  // Server clock, so a skewed device clock doesn't misstate how long the link has left.
+  const left = shared ? shareDaysLeft(shared, serverNow()) : null;
+  const fmt = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   return (
     <section aria-labelledby="share-link-h" data-testid="share-link" aria-busy={state.kind === 'loading' || working}>
       <h3 id="share-link-h" className="mb-2 text-xs font-medium uppercase tracking-wide text-fg-subtle">Link</h3>
@@ -144,28 +162,42 @@ function LinkSection({ api }: { api: ShareLinkApi }) {
             </button>
           </div>
         )}
+        {shared && rotated && (
+          <p className="border-t border-line px-3 py-2 text-xs text-fg-muted" data-testid="share-rotated">
+            This is a new link. The old link no longer works, so share this one again.
+          </p>
+        )}
         <div className="relative flex items-start gap-3 border-t border-line px-3 py-2.5">
           <span className="min-w-0 flex-1">
             <label htmlFor={`${id}-sw`} className="block cursor-pointer after:absolute after:inset-0">Include result data</label>
             <span id={`${id}-data`} className="block text-xs text-fg-subtle">
-              {includeData ? 'Table previews (up to 50 rows) and charts are shared. CSV downloads never are.' : 'Off: questions, answers, SQL and steps only. Tables show their size, not their rows.'}
+              {includeData ? 'Table previews (up to 50 rows), charts and SQL are shared. CSV downloads never are.' : shared ? 'Off: questions, answers and steps only. SQL is not shared. Turning this on replaces the link.' : 'Off: questions, answers and steps only. SQL is not shared, and tables show their size, not their rows.'}
             </span>
           </span>
           <span className="relative mt-0.5 flex shrink-0">
           <input id={`${id}-sw`} type="checkbox" role="switch" aria-checked={includeData} checked={includeData} disabled={working} onChange={(e) => toggle(e.target.checked)} aria-describedby={`${id}-data`} data-testid="share-include-data"
             className="peer absolute inset-0 z-10 m-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-default" />
-          <span aria-hidden className="relative h-5 w-9 shrink-0 rounded-full bg-fg/20 transition-colors peer-checked:bg-accent peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--focus)] peer-disabled:opacity-50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:translate-x-4" />
+          <span aria-hidden className="relative h-5 w-9 shrink-0 rounded-full bg-fg/20 transition-colors peer-checked:bg-accent peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--focus)] peer-disabled:opacity-50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:after:translate-x-4 peer-checked:after:bg-accent-fg" />
           </span>
         </div>
+        {expiry && expiry.options.length > 0 && (
+          <div className="flex items-center justify-between gap-3 border-t border-line px-3 py-2.5">
+            <label htmlFor={`${id}-exp`}>Link expires after</label>
+            <select id={`${id}-exp`} value={days} disabled={working} onChange={(e) => changeDays(Number(e.target.value) as ShareExpiryDays)} data-testid="share-expiry"
+              className="rounded-md border border-line bg-bg px-2 py-1 text-sm text-fg hover:bg-hover focus-visible:outline-2 focus-visible:outline-[var(--focus)] disabled:opacity-50">
+              {expiry.options.map((d) => <option key={d} value={d}>{d} days</option>)}
+            </select>
+          </div>
+        )}
         {shared && (
           <div className="flex items-center justify-between gap-3 border-t border-line px-3 py-2 text-xs text-fg-subtle">
-            <span>Link created {new Date(shared.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+            <span data-testid="share-dates">Created {fmt(shared.createdAt)}{shared.expiresAt && left !== null ? (left === 0 ? ' · Expired' : ` · Expires ${fmt(shared.expiresAt)}, in ${left} ${left === 1 ? 'day' : 'days'}`) : ''}</span>
             <button type="button" onClick={revoke} disabled={working} data-testid="revoke-link" className="rounded-md px-2 py-1 font-medium text-[var(--danger)] hover:bg-hover disabled:opacity-50">Stop sharing</button>
           </div>
         )}
       </div>
       <p role="status" className={state.kind === 'error' ? 'mt-2 text-xs text-[var(--danger)]' : 'sr-only'}>
-        {state.kind === 'error' ? state.message : copied ? 'Link copied' : shared ? 'Link active' : ''}
+        {state.kind === 'error' ? state.message : copied ? 'Link copied' : rotated ? 'New link created. The old link no longer works.' : shared ? 'Link active' : ''}
       </p>
     </section>
   );

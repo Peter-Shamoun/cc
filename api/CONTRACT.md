@@ -1,6 +1,6 @@
 # ClaimClarity chat API — stream contract
 
-**Version: 1.13.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.16.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -46,6 +46,10 @@ The frontend builds against this document only; the analyzer adapts to it.
   `{"error":{"code":"access_denied","message":"Missing CSRF header."}}`, before auth or body parsing. Bearer/demo
   requests are exempt. `GET` (including `EventSource` resume) needs nothing. The header is safe to send always, so
   adapters should add it to every write.
+* **Sign-out (documented in 1.15.0, #233):** `POST /api/auth/sign-out` → **204, no body**, with
+  `Clear-Site-Data: "cache", "storage"` and an expired `cc_session` cookie. CSRF-protected like any cookie write.
+  Best effort server-side (`AuthBackend.sign_out(token)`); it always clears the browser, even for an unknown token.
+  Client: `signOut(base, session, {signInUrl})` in `web/src/auth/session.ts`. Not needed in demo mode.
 * Non-stream failures return `HttpError` JSON: `{"error": {"code", "message"}}`. Statuses and the codes the UI
   should branch on:
 
@@ -215,7 +219,8 @@ answer shows both the small and the large model).
 
 **Per-stage breakdown (1.6.0):** `latency.stages {plan, sql, repair, checks, render}` (`LatencyStages`, all integers
 in ms, all five always present). It is wall clock: every instant of the run belongs to exactly one stage, so the
-stages add up to about `totalMs`, and a stacked bar is safe to draw.
+stages add up to `totalMs` (**exactly since 1.14.0**: the server gives clock drift to `plan` and rounds by largest
+remainder, `api.live.partition_ms`), and a stacked bar is safe to draw.
 
 | stage | from → to |
 |---|---|
@@ -317,6 +322,32 @@ Canonical example streams for every outcome (answer, tool steps/repair, abstain,
 chart, candidates, error) live in [`api/contract/examples/`](contract/examples/README.md), one event per line, regenerated
 from the demo backend by `python -m api.contract.gen_examples` and checked by `api/tests/test_contract_examples.py`.
 
+### 9.1 Edge-case scenarios (1.16.0)
+
+Request-only (`ChatRequest.scenario`; no keywords), so e2e tests can pin them. Every one runs through the real
+`Analyzer` + `LiveTap` with `ScriptedLLM`, passes `stream_rules.json` (§2.1), and has a recorded stream in
+`api/contract/examples/edge/<name>.jsonl` checked by `api/tests/test_edge_scenarios.py` and
+`web/src/contract/edgeCases.test.ts` (`EDGE_SCENARIOS` in `web/src/contract/edgeCases.ts`).
+
+| `scenario` | finish | What it exercises |
+|---|---|---|
+| `empty` | stop | Query returns **0 rows** (`sql_result.rowCount: 0`): table part with columns and `rows: []`, an explanation, no chart. The verifier's "no rows" bounce is off here so the empty answer stands. |
+| `multi_table` | stop | **Two tables** in one answer ("By payer", "By claim status"), each with its own SQL `code` part via `sqlPartId`, and a chart per table (`tablePartId`). The second query also streams as steps. |
+| `long_sql` | stop | A ~4.4 KB, 100+ line query (7 CTEs) in `step.sql_running.sql` and the `code` part. Test wrap/scroll/copy/collapse. |
+| `many_repairs` | stop | Four failing queries, each followed by `step.repair_attempt` and a rerun (attempts 2–5), then the answer. |
+| `clarify_nested` | needs_input → needs_input → stop | Asks (count vs dollars); after the resume it asks **again** (time window); after the second resume it answers. `resumeOf` chains each message to the one before (`edge/clarify_nested{,_2,_3}.jsonl`). |
+| `escalation_abstain` | abstain | The small model gives up → `escalation` → the larger model also abstains (`abstain` part with suggestions; two models in usage). A refusal itself never escalates. |
+| `cancel_plan` | aborted | Stop while planning, before any SQL. |
+| `cancel_sql` | aborted | Stop while a query runs: its `step.sql_result` arrives `ok: false`, `error.code: "cancelled"`. |
+| `cancel_repair` | aborted | Stop right after a `step.repair_attempt`. |
+| `cancel_candidates` | aborted | Stop while candidate `k2` runs; every open candidate query closes as cancelled. |
+| `cancel_escalation` | aborted | Stop right after the `escalation` event. |
+| `cancel_render` | aborted | Stop as the answer text starts rendering: open text/reasoning blocks close, no table part. |
+
+In the `cancel_*` scenarios the **server presses Stop itself** when the stage's first event is emitted (same path as
+`POST /api/chat/{messageId}/stop`, §8), so the cut point is deterministic. Clients must render each as a normal
+`aborted` message: no step left spinning, no error part.
+
 ## 10. PHI and security rules
 
 * Step events never carry row values: `step.sql_result` has counts and column names/types only.
@@ -342,6 +373,23 @@ from the demo backend by `python -m api.contract.gen_examples` and checked by `a
   server start. No inline `<script>` or `<style>` without the nonce. Tests that inject CSS must use constructed
   stylesheets (`document.adoptedStyleSheets`), not `addStyleTag`.
 * `error.details` and `step.*.error.message` are scrubbed (quoted literals and long digit runs masked) and ≤500 chars.
+* **Shown SQL masks PHI-bearing literals (1.14.0).** The SQL a run *executes* is unchanged; the SQL it *shows*
+  (`step.sql_running.sql`, `step.repair_attempt.revisedSql`, `step.candidates[].sql`, the `code` part with `role: query`, legacy `tool_call` input, and
+  therefore transcripts, shares and exports) has literals replaced by `?`, and the event/part carries
+  `maskedLiterals: <n>`. The server policy is `Capabilities.sqlLiteralMasking` (env `CC_API_SQL_LITERAL_MASKING`;
+  an unknown value means `phi`, so a typo never turns it off):
+
+  | policy | masks | keeps |
+  |---|---|---|
+  | `phi` (default) | literals compared with a PHI-bearing column (patient/member/subscriber/guarantor ids and names, MRN, DOB, SSN, NPI, address, zip, phone, e-mail, account, claim/encounter/accession ids), including inside calls (`lower(last_name) = ?`) and literal-first (`? = mrn`); any literal whose value looks like an identifier (SSN, e-mail, phone, 7+ digits, 8+ letters-and-digits) | `status = 'denied'`, `service_date BETWEEN '2026-01-01' AND …`, `LIMIT 10`, `GROUP BY 1` |
+  | `all` | every string literal and every number compared with a column | `LIMIT`/`OFFSET`/ordinals |
+  | `off` | nothing (pre-1.14 behaviour) | |
+
+  SQL the masker cannot tokenize (an unterminated string) is replaced by a fixed comment under `phi`/`all`, never
+  shown raw. **UI:** when `maskedLiterals` is present, say so next to the SQL ("Patient values hidden") and never
+  offer to run the shown SQL. **Residual risk under `phi`:** a name in free text compared with a non-PHI column
+  (`note ILIKE '%Jane%'`) is not caught; a deployment that needs certainty uses `all`. Implementation:
+  `api/sql_mask.py`; tests: `api/tests/test_sql_mask.py`.
 
 ## 11. Conversation history (REST)
 
@@ -504,30 +552,58 @@ must be signed in to the same organization (customer). A conversation has at mos
 | Request | Body | Response |
 |---|---|---|
 | `GET /api/conversations/{id}/share` | | `ShareLink`, or 404 `not_found` when not shared |
-| `PUT /api/conversations/{id}/share` | `ShareRequest {includeData?: false}` | `ShareLink {shareId, conversationId, url, scope: "organization", includeData, createdAt}`. Idempotent: it returns the same `shareId` and updates `includeData` |
+| `PUT /api/conversations/{id}/share` | `ShareRequest {includeData?: false, expiresInDays?: 7\|30\|90}` | `ShareLink {shareId, conversationId, url, scope: "organization", includeData, createdAt, expiresAt, expiresInDays, rotated?}`. Same `shareId` unless data is widened (below); 422 for another `expiresInDays` |
 | `DELETE /api/conversations/{id}/share` | | `{revoked: true}`, or 404 when there was none |
-| `GET /api/shared/{shareId}` | | `SharedConversation {shareId, title, updatedAt, includeData, createdAt, messages: StoredMessage[]}` |
+| `GET /api/shared/{shareId}` | | `SharedConversation {shareId, title, updatedAt, includeData, createdAt, expiresAt, sqlWithheld?, messages: StoredMessage[]}` |
 
 * Only the owner can manage a share. Anyone else gets a 404, like any other user's conversation (§1).
-* The viewer gets **404 `not_found`** for an unknown, revoked, other-organization or deleted-conversation share
-  alike, so a link reveals nothing. 401 when signed out, 410 `transcripts_unavailable` after crypto-shredding.
+* The viewer gets **404 `not_found`** for an unknown, revoked, **expired**, other-organization or
+  deleted-conversation share alike, so a link reveals nothing. 401 when signed out, 410 `transcripts_unavailable` after crypto-shredding.
   Deleting the conversation revokes its share.
 * **Data is withheld by default.** With `includeData: false`, tables keep `columns` and `rowCount`, but `rows: []`
   and `dataWithheld: true` (`TablePart.dataWithheld`, 1.11). `chart` parts and `table`/`chart`/`report`/`image`
-  artifacts are left out. Prose, SQL, steps, callouts and sources stay. With `includeData: true`, the stored preview
+  artifacts are left out. **SQL is withheld too (1.15.0, QA-S18)**: SQL `code` parts are removed, `table.sqlPartId`
+  is dropped, SQL strings in stored steps (`sql`, `revisedSql`, `candidates[].sql`) and `tool_call.input.sql` are
+  `""`, and the view says `sqlWithheld: true` (show "SQL not shared"). Prose, steps, callouts and sources stay. With `includeData: true`, the stored preview
   rows (≤ 50 per table) are shared. **Never shared:** the CSV (`csvFileId` is removed), `feedback`, and the owner's
   identity.
+* **Widening rotates the link (1.15.0, S1).** A PUT that turns `includeData` from false to true issues a **new**
+  `shareId` and revokes the old one, so a link handed out for a data-free view never starts showing rows. The
+  response has `rotated: true`; the dialog must show the new link and say the old one stopped working. Narrowing
+  (true→false) or an unchanged `includeData` keeps the id.
+* **Expiry (1.15.0, S4).** Every share expires. `expiresInDays` is 7, **30 (default)** or 90, counted from the PUT
+  that set it; a PUT without it keeps the current expiry (a new or rotated share gets 30 days). `Capabilities.shareExpiry`
+  lists the options and default. The dialog shows the expiry (`expiresAt`, e.g. "Expires Nov 24 · in 30 days";
+  `shareDaysLeft()` in `web/src/contract/share.ts`). An expired share is gone: viewer 404 as above, and the owner's GET
+  is 404 "not shared". A share from a pre-1.15 server has no `expiresAt` (no expiry).
 * `url` is the app path `/shared/<shareId>`. The share id has 144 random bits and is a capability inside the org:
   don't log it. The response is `no-store` with `Referrer-Policy: no-referrer`.
 * UI: the share dialog defaults to "Without result data", with an opt-in toggle. Show `rowCount` and "data not
   shared" for withheld tables. The view is read-only, with no composer and no regenerate.
 * Audit: `conversation_shared` / `conversation_share_revoked` / `shared_conversation_viewed`, with `kind` =
-  `with_data`|`no_data` and never the share id.
+  `with_data`|`no_data` (and `expires_in_days`, `rotated` on `conversation_shared`, 1.15) and never the share id.
 * Demo: shares are kept in memory (they are lost on restart). A real backend persists them with the transcript.
 * Client: `getShare`, `setShare`, `revokeShare`, `loadShared` and `shareIdFromPath` in `web/src/contract/share.ts`.
   Example: `examples/share.json`.
 
 ## Changelog
+
+* **1.16.0** (2026-10-25) — Edge-case demo scenarios (§9.1), additive. `ChatRequest.scenario` gains `empty`,
+  `multi_table`, `long_sql`, `many_repairs`, `clarify_nested`, `escalation_abstain` and `cancel_plan|sql|repair|
+  candidates|escalation|render`; the enum now also lists `report` (1.9.0, previously missing from the schema and
+  `contract.ts`). Recorded streams in `examples/edge/`, conformance-tested in Python and TS. No event or part shape
+  changed. `web/src/api/contract.ts` exports `DemoScenario`.
+* **1.15.0** (2026-10-25) — Share security (#241), additive. **S1:** turning `includeData` on issues a new share id
+  and revokes the old one (`ShareLink.rotated`); narrowing keeps it. **S4:** shares expire, `expiresInDays` 7 / 30
+  (default) / 90 (`ShareRequest.expiresInDays`, `ShareExpiryDays`, `ShareLink.expiresAt`/`expiresInDays`,
+  `SharedConversation.expiresAt`, `Capabilities.shareExpiry`); expired = the same 404. **QA-S18:** a data-off share
+  withholds SQL server-side (`SharedConversation.sqlWithheld`). §1 documents `POST /api/auth/sign-out` (204, #233).
+
+* **1.14.0** (2026-10-25) — Additive. **Shown-SQL literal masking (§10):** `maskedLiterals` on `step.sql_running`,
+  `step.repair_attempt`, `step.candidates[]` and `CodePart`; `Capabilities.sqlLiteralMasking` (`phi` default, `all`, `off`; open). Applies
+  in demo mode and in the analyzer adapter (still unwired). **`ArtifactPart.kind` is open** (`x-fallback: report`) now
+  that the web renderer has a generic icon (#242). **`latency.stages` sum exactly to `totalMs`** (§7; was "about").
+  The adapter's `message.start.strategy` is a capabilities id (#244).
 
 * **1.13.0** (2026-10-25) — Review audit; additive. **Errors:** the 404s of `stop` and `DELETE` conversation carry
   the error envelope (old keys kept), so §1 has no exceptions; `regenerate`/`editOf` "nothing to point at" 404s are

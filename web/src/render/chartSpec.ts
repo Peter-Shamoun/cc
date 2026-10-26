@@ -62,14 +62,17 @@ export function readableBars(spec: Record<string, unknown>): Record<string, unkn
   const longest = Math.max(0, ...[...labels].map((l) => l.length));
   if (labels.size <= MANY_BARS && longest <= LONG_LABEL) {
     const axis = x.axis === null ? null : { labelAngle: 0, labelLimit: 120, ...x.axis };
-    return { ...spec, encoding: { ...enc, x: { ...x, axis } } };
+    // One or two categories would stretch into slabs across the whole width: keep bars half a band wide.
+    const slim = labels.size <= 2 ? { mark: { ...(isRecord(mark) ? mark : { type: 'bar' }), width: { band: 0.5 } } } : {};
+    return { ...spec, ...slim, encoding: { ...enc, x: { ...x, axis } } };
   }
   const sort = x.sort === '-y' ? '-x' : x.sort === 'y' ? 'x' : x.sort;
   const flipped: Record<string, unknown> = {
     ...enc,
     x: y.axis === null ? y : { ...y, axis: { tickCount: 6, ...y.axis } },
     // The category axis title would sit rotated behind long labels; the chart title already names it.
-    y: { ...x, title: null, ...(sort !== undefined ? { sort } : {}), axis: x.axis === null ? null : { labelLimit: 200, ...x.axis, labelAngle: 0 } },
+    // Hundreds of categories cannot all get a readable row in 640px: hide colliding labels instead of overprinting them.
+    y: { ...x, title: null, ...(sort !== undefined ? { sort } : {}), axis: x.axis === null ? null : { labelLimit: 200, ...(labels.size * 28 > 640 ? { labelOverlap: 'greedy', labelFontSize: 10 } : {}), ...x.axis, labelAngle: 0 } },
   };
   const height = Math.min(Math.max(labels.size * 28, 140), 640);
   return { ...spec, encoding: flipped, height };

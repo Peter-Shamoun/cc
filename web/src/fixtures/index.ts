@@ -69,7 +69,7 @@ function plotSvg(): string {
   const bw = (w - left - 20) / bars.length;
   const rects = bars.map(([k, v], i) => {
     const bh = ((h - top - bottom) * v) / max, x = left + i * bw + 10, y = h - bottom - bh;
-    return `<rect x="${x}" y="${y}" width="${bw - 20}" height="${bh}" rx="3" fill="#4C78A8"/>` +
+    return `<rect x="${x}" y="${y}" width="${bw - 20}" height="${bh}" rx="3" fill="#5B7FA6"/>` +
       `<text x="${x + (bw - 20) / 2}" y="${h - bottom + 18}" font-size="12" text-anchor="middle" fill="#555">${k}</text>` +
       `<text x="${x + (bw - 20) / 2}" y="${y - 6}" font-size="11" text-anchor="middle" fill="#333">${v}%</text>`;
   }).join('');

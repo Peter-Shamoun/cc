@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { getPref, setPref } from './prefs';
+import { getPref, onPrefChange, setPref } from './prefs';
 
 /** Resolved colour mode actually painted. */
 export type Mode = 'light' | 'dark';
@@ -26,7 +26,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     mq.addEventListener?.('change', on);
     return () => mq.removeEventListener?.('change', on);
   }, []);
-  const [palette, setPaletteState] = useState<Palette>(() => (getPref('palette') as Palette) ?? 'neutral');
+  const [palette, setPaletteState] = useState<Palette>(() => { const p = getPref('palette'); return p === 'paper' || p === 'neutral' ? p : 'neutral'; });
+  // Theme or palette changed in another tab: follow it, like ChatGPT/Claude do. Invalid values are ignored.
+  useEffect(() => {
+    const offTheme = onPrefChange('theme', (v) => { if (v === 'light' || v === 'dark' || v === 'system') setPreference(v); });
+    const offPalette = onPrefChange('palette', (v) => { if (v === 'neutral' || v === 'paper') setPaletteState(v); });
+    return () => { offTheme(); offPalette(); };
+  }, []);
   const mode: Mode = preference === 'system' ? (osDark ? 'dark' : 'light') : preference;
   useEffect(() => {
     const el = document.documentElement;
@@ -48,6 +54,7 @@ export const useTheme = () => useContext(Ctx);
 
 /** Chart palettes from spec §2.3. */
 export const CHART_COLORS: Record<Palette, string[]> = {
-  neutral: ['#4C78A8', '#F58518', '#54A24B', '#E45756', '#72B7B2', '#EECA3B', '#B279A2', '#9D755D'],
+  // Restrained: one muted blue leads; the rest are desaturated, similar in weight, so no series shouts (Peter 10:06 PM: no neon/rainbow).
+  neutral: ['#5B7FA6', '#C08552', '#6F9A7A', '#B0625C', '#7EA6A6', '#B5A05F', '#8C7FA0', '#8A7A6B'],
   paper: ['#D97757', '#6A9BCC', '#788C5D', '#C46686', '#B8A16B', '#5E5D59', '#3898EC', '#B53333'],
 };
