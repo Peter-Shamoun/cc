@@ -5,8 +5,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export const LIVE = `http://127.0.0.1:${process.env.E2E_LIVE_PORT ?? 5240}/`;
-export const MOCK = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 5241}/`;
+import { LIVE as L, MOCK as M } from './static.mjs';
+export const LIVE: string = L;
+export const MOCK: string = M;
 export const CONTRACT_DIR = path.resolve(__dirname, '..', '..', 'api', 'contract');
 
 export type Theme = 'light' | 'dark';
