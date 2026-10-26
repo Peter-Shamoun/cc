@@ -68,18 +68,20 @@ function auditVisit(count: number) {
 }
 
 /** The message list. Only rows whose message object or position flags changed re-render while a reply streams. */
-export function ThreadView({ messages, busy, actions, scrollRef, scrollToIndexRef }: {
+export function ThreadView({ messages, busy, actions, scrollRef, scrollToIndexRef, renderAll }: {
   messages: ViewMessage[];
   busy: boolean;
   actions: ThreadActions;
   scrollRef?: RefObject<HTMLDivElement | null>;
   /** Virtual lists pin by index. Null while the list is short enough to scroll the real DOM node. */
   scrollToIndexRef?: MutableRefObject<((index: number) => void) | null>;
+  /** Render every turn (printing): the virtual window would print only what is on screen. */
+  renderAll?: boolean;
 }) {
   const ref = useRef(actions);
   ref.current = actions;
   const n = messages.length;
-  const virtual = n > VIRTUAL_AT && !!scrollRef;
+  const virtual = n > VIRTUAL_AT && !!scrollRef && !renderAll;
   const virtualizer = useVirtualizer({
     count: virtual ? n : 0,
     getScrollElement: () => scrollRef?.current ?? null,

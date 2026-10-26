@@ -18,7 +18,9 @@ import { Header } from './Header';
 import { useStrategy } from './useStrategy';
 import { OfflineBanner } from './OfflineBanner';
 import { useOnline } from '../lib/useOnline';
+import { usePrinting } from '../lib/usePrinting';
 import { SearchDialog } from './SearchDialog';
+import { ShareDialog } from './ShareDialog';
 import { SettingsDialog, ShortcutsDialog } from './SettingsDialog';
 import { ToastProvider, useFocusTrap, useToast } from './primitives';
 import { NEW_CHAT_KEY, moveDraft } from './drafts';
@@ -122,7 +124,7 @@ function ShellInner() {
   }, [mobile]);
   const closeDrawer = () => { if (mobile) setDrawerOpen(false); };
 
-  const [dialog, setDialog] = useState<null | 'search' | 'settings' | 'shortcuts'>(null);
+  const [dialog, setDialog] = useState<null | 'search' | 'settings' | 'shortcuts' | 'share'>(null);
   const [enterToSend, setEnterToSendState] = useState(() => getPref('enterToSend') !== '0');
   const setEnterToSend = (v: boolean) => { setEnterToSendState(v); setPref('enterToSend', v ? '1' : '0'); };
 
@@ -190,6 +192,21 @@ function ShellInner() {
   const currentTitle = threads.find((t) => t.id === chat.convId)?.title ?? 'Chat';
   const downloadMd = (title: string, md: string) => { downloadText(exportFilename(title), md, 'text/markdown'); toast({ text: 'Chat exported as Markdown' }); };
   const exportCurrent = () => { if (chat.messages.length) downloadMd(currentTitle, transcriptMarkdown(currentTitle, chat.messages)); };
+  // Contract 1.8.0 §15: the server's own export, when the chat is stored server-side.
+  const serverExport = adapter instanceof HttpAnalystAdapter && chat.convId && !chat.busy
+    ? async (format: 'json' | 'markdown') => {
+      try {
+        const { blob, filename } = await adapter.exportConversation(chat.convId!, format);
+        const url = URL.createObjectURL(blob);
+        const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        toast({ text: format === 'json' ? 'Chat exported as JSON' : 'Chat exported as Markdown' });
+      } catch {
+        toast({ text: "Couldn't export this chat. Try again." });
+      }
+    }
+    : undefined;
   const copyCurrent = async () => { if (await copyText(transcriptMarkdown(currentTitle, chat.messages))) toast({ text: 'Copied chat as Markdown' }); };
   const exportThread = async (id: string) => {
     const c = await store.getConversation(id);
@@ -399,6 +416,7 @@ function ShellInner() {
     return true;
   };
   const online = useOnline();
+  const printing = usePrinting();
   const composer = (autoFocus: boolean, placeholder?: string) => (
     <>
       {!online && <OfflineBanner />}
@@ -451,8 +469,9 @@ function ShellInner() {
         {sidebarVisible && (mobile ? <div ref={drawerRef}><Sidebar {...sidebarProps} drawer /></div> : <Sidebar {...sidebarProps} />)}
         {!sidebarVisible && !mobile && <SidebarRail onExpand={() => setSidebar(true)} onNew={sidebarProps.onNew} onSearch={() => setDialog('search')} onSettings={() => setDialog('settings')} />}
         <main className="relative flex min-w-0 flex-1 flex-col font-sans md:min-w-[400px]" aria-label="Chat">
+          {!empty && <p className="hidden pb-4 text-lg font-semibold print:block" data-testid="print-title">{currentTitle}</p>}
           <Header strategy={strategy} showNav={mobile} onOpenSidebar={() => setSidebar(true)} onNewChat={sidebarProps.onNew} adapterName={adapter.name}
-            hasChat={!empty} onCopyMarkdown={copyCurrent} onDownloadMarkdown={exportCurrent} onSettings={() => setDialog('settings')} onShortcuts={() => setDialog('shortcuts')}
+            hasChat={!empty} onShare={() => setDialog('share')} onCopyMarkdown={copyCurrent} onDownloadMarkdown={exportCurrent} onSettings={() => setDialog('settings')} onShortcuts={() => setDialog('shortcuts')}
             title={chat.convId ? threads.find((t) => t.id === chat.convId)?.title : undefined}
             onRename={(t) => { if (chat.convId) chat.rename(chat.convId, t); }} onDelete={() => { if (chat.convId) requestDelete(chat.convId); }} />
 
@@ -470,7 +489,7 @@ function ShellInner() {
               <div ref={scroller} tabIndex={0} role="region" aria-label="Conversation" onScroll={(e) => onScroll(e.currentTarget)} onWheel={(e) => markUserScroll(e)} onTouchMove={() => markUserScroll()} onPointerDown={() => markUserScroll()} onKeyDown={() => markUserScroll()} className="flex-1 overflow-y-auto [overflow-anchor:none] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--focus)]" data-testid="thread-scroller">
                 <div ref={content} className="mx-auto flex max-w-[48rem] flex-col gap-6 px-4 pb-10 pt-4 md:px-6" role={virtualList ? undefined : 'log'} aria-live={virtualList ? undefined : 'polite'} aria-relevant={virtualList ? undefined : 'additions'} aria-busy={virtualList ? undefined : chat.busy} aria-label={virtualList ? undefined : 'Messages'}>
                   <h1 className="sr-only" data-testid="thread-title">{currentTitle}</h1>
-                  {opening ? <ThreadSkeleton /> : <ThreadView messages={messages} busy={chat.busy} actions={threadActions} scrollRef={scroller} scrollToIndexRef={scrollToIndexRef} />}
+                  {opening ? <ThreadSkeleton /> : <ThreadView messages={messages} busy={chat.busy} actions={threadActions} scrollRef={scroller} scrollToIndexRef={scrollToIndexRef} renderAll={printing} />}
                 </div>
               </div>
               <div className="relative mx-auto w-full max-w-[48rem] px-4 md:px-6" id="composer">
@@ -491,6 +510,12 @@ function ShellInner() {
         {artifact && <ArtifactPanel artifact={artifact} onClose={() => setArtifact(null)} />}
       </div>
       {dialog === 'search' && <SearchDialog threads={threads} search={searchStore} onOpen={openFromSearch} onNew={sidebarProps.onNew} onClose={() => setDialog(null)} />}
+      {dialog === 'share' && (
+        <ShareDialog title={currentTitle} firstQuestion={chat.messages.find((m) => m.role === 'user')?.text} messageCount={chat.messages.length}
+          onClose={() => setDialog(null)} onCopyMarkdown={() => { void copyCurrent(); }} onDownloadMarkdown={exportCurrent}
+          onDownloadJson={serverExport ? () => serverExport('json') : undefined}
+          onPrint={() => { setDialog(null); requestAnimationFrame(() => window.print()); }} />
+      )}
       {dialog === 'settings' && <SettingsDialog onClose={() => setDialog(null)} storeMode={store.mode} enterToSend={enterToSend} setEnterToSend={setEnterToSend} onExportAll={exportAll} threadCount={threads.length} />}
       {dialog === 'shortcuts' && <ShortcutsDialog onClose={() => setDialog(null)} />}
     </AdapterCtx.Provider>
