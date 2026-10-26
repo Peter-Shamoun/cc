@@ -42,6 +42,8 @@ export async function waitIdle(page: Page, timeout = 45_000) {
   // While streaming the send button turns into a stop button; it comes back when the turn ends.
   await expect(stopBtn(page)).toHaveCount(0, { timeout });
   await expect(sendBtn(page)).toBeVisible({ timeout });
+  // Paced text (lib/pacedText) may still be flowing in for up to ~1 s after the stream ends; the caret marks it.
+  await expect(page.locator('.streaming-caret')).toHaveCount(0, { timeout });
 }
 
 /** Events of the response stream contract, one object per SSE `data:` line. */

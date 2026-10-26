@@ -182,9 +182,11 @@ function VersionNav({ version, onVersion, disabled }: { version: { current: numb
     });
   };
   return (
-    <div className="flex items-center font-sans text-xs text-fg-muted" data-testid="version-nav">
+    // ChatGPT/Claude: "‹ 2/2 ›". Named group so a screen reader hears "Versions, 2 of 2" rather than a bare "2/2".
+    <div role="group" aria-label="Versions" className="flex items-center font-sans text-xs text-fg-muted" data-testid="version-nav">
       <IconButton label="Previous version" className="h-7 w-7" disabled={disabled || version.current <= 1} onClick={(e) => go(e, version.current - 2, 'Previous version')}><ChevronLeft size={15} /></IconButton>
-      <span className="tabular-nums">{version.current}/{version.total}</span>
+      <span className="tabular-nums" aria-hidden>{version.current}/{version.total}</span>
+      <span className="sr-only">{version.current} of {version.total}</span>
       <IconButton label="Next version" className="h-7 w-7" disabled={disabled || version.current >= version.total} onClick={(e) => go(e, version.current, 'Next version')}><ChevronRight size={15} /></IconButton>
     </div>
   );
@@ -197,6 +199,12 @@ export const STYLE_LABEL: Record<Refine, string> = { concise: 'Concise', detaile
 
 export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, onOpen, onRegenerate, onEdit, onSend, onReply, onRefine, version, onVersion, versionBusy, readOnly, sqlWithheld }: { msg: AnyView; isLast: boolean; onOpen: (a: Artifact) => void; onRegenerate: () => void; onEdit: (t: string) => void; onSend?: (t: string) => void; onReply?: OnReply; onRefine?: (style: Refine) => void; version?: { current: number; total: number }; onVersion?: (k: number) => void; versionBusy?: boolean; /** Shared /shared/:id view: no actions, feedback, retry, edits or replies. */ readOnly?: boolean; /** Shared without data (contract 1.15.0): SQL was withheld; tables say "SQL not shared". */ sqlWithheld?: boolean }) {
   const msg = view as AssistantView; // legacy part renderers; v1-only data is read through `view`
+  // Which turn was streaming on screen in this row (uiKey survives the server-id swap; a version switch changes it),
+  // so text that lands in one network chunk still flows in, while history and old versions show at once.
+  const turnKey = ('uiKey' in view && (view as { uiKey?: string }).uiKey) || view.id;
+  const [liveKey, setLiveKey] = useState<string | null>(view.streaming ? turnKey : null);
+  if (view.streaming && liveKey !== turnKey) setLiveKey(turnKey);
+  const liveTurn = liveKey === turnKey;
   const regenStyle = (view as { regenerateStyle?: RegenerateStyle }).regenerateStyle;
   const styleLabel = regenStyle && regenStyle !== 'default' ? STYLE_LABEL[regenStyle] : undefined;
   const reply: OnReply | undefined = onReply ?? (onSend ? (t) => onSend(t) : undefined);
@@ -249,7 +257,7 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
     if (p.type === 'code' && p.role === 'query' && linkedSql.has(p.id)) continue; // shown under its table
     if (p.type === 'abstain') { blocks.push(<AbstainCard key={p.id} part={p} onReply={readOnly ? undefined : reply} />); continue; }
     if (p.type === 'clarification') { blocks.push(<ClarifyCard key={p.id} part={p} onReply={readOnly ? undefined : reply} active={!readOnly && isLast && !msg.streaming} />); continue; }
-    blocks.push(<PartView key={p.id} part={p as Part} msg={msg} open={open} openArtifact={onOpen} onRetry={readOnly ? undefined : onRegenerate} onEdit={readOnly ? undefined : onEdit} />);
+    blocks.push(<PartView key={p.id} part={p as Part} msg={msg} liveTurn={liveTurn} open={open} openArtifact={onOpen} onRetry={readOnly ? undefined : onRegenerate} onEdit={readOnly ? undefined : onEdit} />);
     if (p.type === 'table') {
       const q = queryForTable(view, p);
       if (q) blocks.push(<TableSql key={`sql-${p.id}`} query={q} />);
@@ -371,9 +379,9 @@ function FeedbackPanel({ onClose, onSubmit }: { onClose: () => void; onSubmit: (
   );
 }
 
-function PartView({ part, msg, open, openArtifact, onRetry, onEdit }: { part: Part; msg: AssistantView; open: (p: Artifact['part'], title?: string, v?: number) => void; openArtifact: (a: Artifact) => void; onRetry?: () => void; onEdit?: (t: string) => void }) {
+function PartView({ part, msg, liveTurn, open, openArtifact, onRetry, onEdit }: { part: Part; msg: AssistantView; liveTurn?: boolean; open: (p: Artifact['part'], title?: string, v?: number) => void; openArtifact: (a: Artifact) => void; onRetry?: () => void; onEdit?: (t: string) => void }) {
   switch (part.type) {
-    case 'text': return <Markdown text={part.text} streaming={msg.openText.includes(part.id)} />;
+    case 'text': return <Markdown text={part.text} streaming={msg.openText.includes(part.id)} paced liveTurn={liveTurn} />;
     case 'reasoning': return <ReasoningView part={part} running={msg.streaming && part.durationMs === undefined} />;
     case 'status': return null;
     case 'table': return <DataTable part={part} onOpen={() => open(part)} />;

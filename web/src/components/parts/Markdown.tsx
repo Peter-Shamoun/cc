@@ -1,6 +1,7 @@
 import { onceOk } from '../../lib/onceOk';
 import { memo, useEffect, useState } from 'react';
 import clsx from 'clsx';
+import { usePacedText } from '../../lib/pacedText';
 
 export { displayMath, loadMath, mayContainMath } from './markdownText';
 
@@ -31,8 +32,10 @@ function useImpl(): Impl | null {
 const BOX = { overflowWrap: 'anywhere', wordBreak: 'break-word', maxWidth: '100%', minWidth: 0, unicodeBidi: 'isolate' } as const;
 
 /** Assistant prose. See MarkdownImpl for the renderer and its safety rules. */
-export const Markdown = memo(function Markdown({ text, streaming }: { text: string; streaming?: boolean }) {
+export const Markdown = memo(function Markdown({ text: full, streaming: open, paced, liveTurn }: { text: string; streaming?: boolean; /** Answer prose: reveal streamed text evenly (lib/pacedText); the caret stays until it has caught up. */ paced?: boolean; /** The turn was streaming on screen (see usePacedText). */ liveTurn?: boolean }) {
   const m = useImpl();
+  const { shown: text, pending } = usePacedText(full, !!open && !!paced, !!paced && !!liveTurn);
+  const streaming = !!open || pending;
   if (m) return <m.MarkdownImpl text={text} streaming={streaming} />;
   return (
     <div className={clsx('prose-chat', streaming && 'streaming-caret')} data-testid="markdown" data-pending="" dir="auto" style={BOX}>
