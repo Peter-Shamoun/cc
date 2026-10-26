@@ -16,7 +16,9 @@ export const currentMath = (): MathPlugin | null => mathPlugin;
 export const loadMath: () => Promise<MathPlugin> = onceOk(() => import('./mathPlugin').then((m) => (mathPlugin = m.mathPlugin)));
 /** Unescaped `$` (after protectCurrency) or `\(`/`\[` delimiters mean the text may contain math. */
 export function mayContainMath(protectedText: string): boolean {
-  return /(^|[^\\])\$|\\\(|\\\[/.test(protectedText);
+  // A `$` at the very end of the buffer is undecided mid-stream ("totals $" → "$412" becomes currency once the digit
+  // arrives), so it doesn't trigger KaTeX until more text shows what it is (PLAT→ANS-1).
+  return /(^|[^\\])\$(?!\s*$)|\\\(|\\\[/.test(protectedText);
 }
 const CODE_SPAN = /```[\s\S]*?```|`[^`\n]+`|```[\s\S]*$/g;
 
