@@ -124,18 +124,28 @@ def feedback_example() -> dict:
 
 
 def share_example() -> dict:
-    """PUT .../share then GET /api/shared/{id} by a colleague in the same org (1.11.0); ids and times normalised."""
+    """PUT .../share then GET /api/shared/{id} by a colleague in the same org (1.11.0); ids and times normalised.
+    1.15.0: the link expires (default 30 days), and widening to `includeData: true` rotates the id (`rotated`)."""
     client = _client()
     _post(client, {"messages": [{"id": "u_1", "role": "user", "text": "Paid amount by service month"}],
                    "conversationId": "c_1", "scenario": "chart"})
     link = client.put("/api/conversations/c_1/share", json={}, headers=_HEADERS).json()
     colleague = {**_HEADERS, "Authorization": _HEADERS["Authorization"].rsplit(":", 1)[0] + ":colleague"}
     view = client.get(f"/api/shared/{link['shareId']}", headers=colleague).json()
-    raw = json.dumps({"link": link, "view": view}).replace(link["shareId"], "sh_1")
+    widened = client.put("/api/conversations/c_1/share", json={"includeData": True, "expiresInDays": 7},
+                         headers=_HEADERS).json()
+    raw = json.dumps({"link": link, "view": view, "widened": widened})
+    raw = raw.replace(link["shareId"], "sh_1").replace(widened["shareId"], "sh_2")
+    raw = re.sub(r'("expiresAt": )"[^"]+"', r'\1"EXPIRES"', raw)
     raw = re.sub(r'"\d{4}-\d\d-\d\dT[0-9:.]+Z"', '"2026-10-25T20:00:00Z"', raw)
     out = json.loads(json.dumps(normalise([json.loads(raw)])[0]))
+    out["link"]["expiresAt"] = out["view"]["expiresAt"] = "2026-11-24T20:00:00Z"
+    out["widened"]["expiresAt"] = "2026-11-01T20:00:00Z"
     return {"share": {"method": "PUT", "path": "/api/conversations/c_1/share", "request": {}, "response": out["link"]},
             "view": {"method": "GET", "path": "/api/shared/sh_1", "response": out["view"]},
+            "widen": {"method": "PUT", "path": "/api/conversations/c_1/share",
+                      "request": {"includeData": True, "expiresInDays": 7}, "response": out["widened"],
+                      "note": "Widening issues a new id; GET /api/shared/sh_1 is now 404."},
             "revoke": {"method": "DELETE", "path": "/api/conversations/c_1/share", "response": {"revoked": True}}}
 
 

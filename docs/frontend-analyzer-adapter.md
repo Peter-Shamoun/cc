@@ -1,4 +1,4 @@
-# Real analyzer adapter: spec (contract 1.14.0)
+# Real analyzer adapter: spec (contract 1.15.0)
 
 **Status:** a stub, for review by Claude. `api/analyzer_adapter.py`, `api/reasoning_policy.py` (R2), `api/strategy_config.py` (R4) and `api/analyst_shim.py` (R7), plus fixture-only tests in
 `api/tests/test_analyzer_adapter.py`. The server is **not** wired to it. No paid API is called, and nothing under

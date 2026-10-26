@@ -68,6 +68,7 @@ class FeedbackIn(BaseModel):
 
 class ShareIn(BaseModel):
     includeData: bool = False
+    expiresInDays: Literal[7, 30, 90] | None = None  # 1.15.0 (S4): None keeps the current expiry; new shares get 30
 
 
 class SearchIn(BaseModel):
@@ -166,7 +167,8 @@ class AuditLog:
     """Structured audit events. Field allowlist: no SQL text, no row values, no question text."""
 
     ALLOWED = {"customer", "user", "file_id", "row_count", "conversation_id", "message_id", "parts",
-               "queries", "elapsed_ms", "finish", "kind", "reason", "status", "scenario", "steps"}
+               "queries", "elapsed_ms", "finish", "kind", "reason", "status", "scenario", "steps",
+               "expires_in_days", "rotated"}
 
     def __init__(self):
         self.events: list[dict] = []
@@ -258,6 +260,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
     app.add_middleware(SecurityHeadersMiddleware)  # outermost, so the 413 carries the security headers too
     app.state.audit, app.state.store, app.state.downloads, app.state.runs = audit, store, downloads, runs
     app.state.settings, app.state.auth = settings, auth
+    app.state.shares = shares
 
     def authed(request: Request, request_id: str):
         return auth.authenticate(_token(request), request_id)
@@ -894,13 +897,16 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
 
     @app.put("/api/conversations/{conversation_id}/share")
     def put_share(conversation_id: str, body: ShareIn, request: Request):
-        """Create (or update) the org-scoped read-only link. ``includeData`` defaults to false."""
+        """Create (or update) the org-scoped read-only link. ``includeData`` defaults to false. 1.15.0: widening
+        ``includeData`` issues a new id and revokes the old one (S1); ``expiresInDays`` is 7, 30 (default) or 90 (S4)."""
         ctx, err = _own_conversation(request, conversation_id)
         if err is not None:
             return err
-        share = shares.put(ctx.principal.customer, ctx.principal.user, conversation_id, body.includeData, _iso(time.time()))
+        share = shares.put(ctx.principal.customer, ctx.principal.user, conversation_id, body.includeData,
+                           body.expiresInDays)
         audit("conversation_shared", customer=ctx.principal.customer, user=ctx.principal.user,
-              conversation_id=conversation_id, kind="with_data" if body.includeData else "no_data")
+              conversation_id=conversation_id, kind="with_data" if body.includeData else "no_data",
+              expires_in_days=share.expires_in_days, rotated=share.rotated)
         return JSONResponse(share_link(share), headers=NO_STORE)
 
     @app.delete("/api/conversations/{conversation_id}/share")

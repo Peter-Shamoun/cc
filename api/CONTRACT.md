@@ -1,6 +1,6 @@
 # ClaimClarity chat API — stream contract
 
-**Version: 1.14.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.15.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -46,6 +46,10 @@ The frontend builds against this document only; the analyzer adapts to it.
   `{"error":{"code":"access_denied","message":"Missing CSRF header."}}`, before auth or body parsing. Bearer/demo
   requests are exempt. `GET` (including `EventSource` resume) needs nothing. The header is safe to send always, so
   adapters should add it to every write.
+* **Sign-out (documented in 1.15.0, #233):** `POST /api/auth/sign-out` → **204, no body**, with
+  `Clear-Site-Data: "cache", "storage"` and an expired `cc_session` cookie. CSRF-protected like any cookie write.
+  Best effort server-side (`AuthBackend.sign_out(token)`); it always clears the browser, even for an unknown token.
+  Client: `signOut(base, session, {signInUrl})` in `web/src/auth/session.ts`. Not needed in demo mode.
 * Non-stream failures return `HttpError` JSON: `{"error": {"code", "message"}}`. Statuses and the codes the UI
   should branch on:
 
@@ -522,30 +526,47 @@ must be signed in to the same organization (customer). A conversation has at mos
 | Request | Body | Response |
 |---|---|---|
 | `GET /api/conversations/{id}/share` | | `ShareLink`, or 404 `not_found` when not shared |
-| `PUT /api/conversations/{id}/share` | `ShareRequest {includeData?: false}` | `ShareLink {shareId, conversationId, url, scope: "organization", includeData, createdAt}`. Idempotent: it returns the same `shareId` and updates `includeData` |
+| `PUT /api/conversations/{id}/share` | `ShareRequest {includeData?: false, expiresInDays?: 7\|30\|90}` | `ShareLink {shareId, conversationId, url, scope: "organization", includeData, createdAt, expiresAt, expiresInDays, rotated?}`. Same `shareId` unless data is widened (below); 422 for another `expiresInDays` |
 | `DELETE /api/conversations/{id}/share` | | `{revoked: true}`, or 404 when there was none |
-| `GET /api/shared/{shareId}` | | `SharedConversation {shareId, title, updatedAt, includeData, createdAt, messages: StoredMessage[]}` |
+| `GET /api/shared/{shareId}` | | `SharedConversation {shareId, title, updatedAt, includeData, createdAt, expiresAt, sqlWithheld?, messages: StoredMessage[]}` |
 
 * Only the owner can manage a share. Anyone else gets a 404, like any other user's conversation (§1).
-* The viewer gets **404 `not_found`** for an unknown, revoked, other-organization or deleted-conversation share
-  alike, so a link reveals nothing. 401 when signed out, 410 `transcripts_unavailable` after crypto-shredding.
+* The viewer gets **404 `not_found`** for an unknown, revoked, **expired**, other-organization or
+  deleted-conversation share alike, so a link reveals nothing. 401 when signed out, 410 `transcripts_unavailable` after crypto-shredding.
   Deleting the conversation revokes its share.
 * **Data is withheld by default.** With `includeData: false`, tables keep `columns` and `rowCount`, but `rows: []`
   and `dataWithheld: true` (`TablePart.dataWithheld`, 1.11). `chart` parts and `table`/`chart`/`report`/`image`
-  artifacts are left out. Prose, SQL, steps, callouts and sources stay. With `includeData: true`, the stored preview
+  artifacts are left out. **SQL is withheld too (1.15.0, QA-S18)**: SQL `code` parts are removed, `table.sqlPartId`
+  is dropped, SQL strings in stored steps (`sql`, `revisedSql`, `candidates[].sql`) and `tool_call.input.sql` are
+  `""`, and the view says `sqlWithheld: true` (show "SQL not shared"). Prose, steps, callouts and sources stay. With `includeData: true`, the stored preview
   rows (≤ 50 per table) are shared. **Never shared:** the CSV (`csvFileId` is removed), `feedback`, and the owner's
   identity.
+* **Widening rotates the link (1.15.0, S1).** A PUT that turns `includeData` from false to true issues a **new**
+  `shareId` and revokes the old one, so a link handed out for a data-free view never starts showing rows. The
+  response has `rotated: true`; the dialog must show the new link and say the old one stopped working. Narrowing
+  (true→false) or an unchanged `includeData` keeps the id.
+* **Expiry (1.15.0, S4).** Every share expires. `expiresInDays` is 7, **30 (default)** or 90, counted from the PUT
+  that set it; a PUT without it keeps the current expiry (a new or rotated share gets 30 days). `Capabilities.shareExpiry`
+  lists the options and default. The dialog shows the expiry (`expiresAt`, e.g. "Expires Nov 24 · in 30 days";
+  `shareDaysLeft()` in `web/src/contract/share.ts`). An expired share is gone: viewer 404 as above, and the owner's GET
+  is 404 "not shared". A share from a pre-1.15 server has no `expiresAt` (no expiry).
 * `url` is the app path `/shared/<shareId>`. The share id has 144 random bits and is a capability inside the org:
   don't log it. The response is `no-store` with `Referrer-Policy: no-referrer`.
 * UI: the share dialog defaults to "Without result data", with an opt-in toggle. Show `rowCount` and "data not
   shared" for withheld tables. The view is read-only, with no composer and no regenerate.
 * Audit: `conversation_shared` / `conversation_share_revoked` / `shared_conversation_viewed`, with `kind` =
-  `with_data`|`no_data` and never the share id.
+  `with_data`|`no_data` (and `expires_in_days`, `rotated` on `conversation_shared`, 1.15) and never the share id.
 * Demo: shares are kept in memory (they are lost on restart). A real backend persists them with the transcript.
 * Client: `getShare`, `setShare`, `revokeShare`, `loadShared` and `shareIdFromPath` in `web/src/contract/share.ts`.
   Example: `examples/share.json`.
 
 ## Changelog
+
+* **1.15.0** (2026-10-25) — Share security (#241), additive. **S1:** turning `includeData` on issues a new share id
+  and revokes the old one (`ShareLink.rotated`); narrowing keeps it. **S4:** shares expire, `expiresInDays` 7 / 30
+  (default) / 90 (`ShareRequest.expiresInDays`, `ShareExpiryDays`, `ShareLink.expiresAt`/`expiresInDays`,
+  `SharedConversation.expiresAt`, `Capabilities.shareExpiry`); expired = the same 404. **QA-S18:** a data-off share
+  withholds SQL server-side (`SharedConversation.sqlWithheld`). §1 documents `POST /api/auth/sign-out` (204, #233).
 
 * **1.14.0** (2026-10-25) — Additive. **Shown-SQL literal masking (§10):** `maskedLiterals` on `step.sql_running`,
   `step.repair_attempt`, `step.candidates[]` and `CodePart`; `Capabilities.sqlLiteralMasking` (`phi` default, `all`, `off`; open). Applies
