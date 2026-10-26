@@ -43,6 +43,27 @@ describe('boot shell hand-off (QA-P8)', () => {
   });
 });
 
+describe('boot focus on touch', () => {
+  const coarse = (on: boolean) => { window.matchMedia = ((q: string) => ({ matches: on && q.includes('coarse'), media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia; };
+  afterEach(() => coarse(false));
+  it('does not move autofocus into the React composer on touch unless the reader typed', () => {
+    coarse(true);
+    document.body.innerHTML = `<textarea id="${BOOT_INPUT_ID}"></textarea>`;
+    (document.getElementById(BOOT_INPUT_ID) as HTMLTextAreaElement).focus();
+    adoptBootDraft();
+    document.body.innerHTML = '<form data-testid="composer"><textarea></textarea></form>';
+    restoreBootFocus();
+    expect(document.activeElement).not.toBe(document.querySelector('textarea'));
+    document.body.innerHTML = `<textarea id="${BOOT_INPUT_ID}"></textarea>`;
+    const el = document.getElementById(BOOT_INPUT_ID) as HTMLTextAreaElement;
+    el.focus(); el.value = 'typed';
+    adoptBootDraft();
+    document.body.innerHTML = '<form data-testid="composer"><textarea>typed</textarea></form>';
+    restoreBootFocus();
+    expect(document.activeElement).toBe(document.querySelector('textarea'));
+  });
+});
+
 describe('index.html boot shell', () => {
   it('has a real Message textbox matching the React composer, and the app greeting', () => {
     expect(html).toMatch(new RegExp(`<textarea id="${BOOT_INPUT_ID}" aria-label="Message" placeholder="Ask about your claims"`));

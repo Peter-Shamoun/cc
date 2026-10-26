@@ -324,19 +324,52 @@ def report_artifacts(parts: list[dict]) -> list[dict]:
                     "title": part.get("title") or "Chart", "content": part, "autoOpen": False})
     if table and table.get("rows"):
         cols = table["columns"]
+        num = [c.get("type") in _NUMERIC for c in cols]
         head = "| " + " | ".join(c["label"] for c in cols) + " |"
-        rule = "|" + "|".join(" --- " for _ in cols) + "|"
-        body = ["| " + " | ".join(_md_cell(v) for v in row) + " |" for row in table["rows"][:12]]
+        rule = "|" + "|".join(" ---: " if n else " --- " for n in num) + "|"
+        body = ["| " + " | ".join(_md_cell(v, c.get("type")) for v, c in zip(row, cols)) + " |" for row in table["rows"][:12]]
         title = (table.get("title") if table.get("title") not in (None, "Result") else None) or "Summary report"
-        markdown = "\n".join([f"# {title}", "", f"{table['rowCount']} rows from "
-                               f"{', '.join('`' + v + '`' for v in (table.get('source') or {}).get('views', [])) or 'the result'}.",
-                               "", head, rule, *body])
+        n = table["rowCount"]
+        views = ", ".join("`" + v + "`" for v in (table.get("source") or {}).get("views", [])) or "the result"
+        markdown = "\n".join([f"# {title}", "", f"{n} row{'' if n == 1 else 's'} from {views}.", "",
+                               *_key_figures(table), "## Data", "", head, rule, *body,
+                               *([""] + [f"_Showing the first 12 of {n} rows._"] if n > 12 else [])])
         out.append({"type": "artifact", "id": new_id("p_"), "artifactId": new_id("af_"), "version": 1, "kind": "report",
                     "title": title, "content": {"markdown": markdown}, "autoOpen": True})
     return out
 
 
-def _md_cell(value) -> str:
-    if isinstance(value, float):
-        value = f"{value:.2f}" if abs(value) >= 1 else f"{value:.4g}"
-    return str("" if value is None else value).replace("|", "\\|").replace("\n", " ")
+_NUMERIC = ("number", "integer", "currency", "percent")
+
+
+def _md_cell(value, kind: str | None = None) -> str:
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if kind == "currency":
+            value = f"${value:,.2f}"
+        elif kind == "percent":
+            value = f"{value * 100:.1f}%" if abs(value) <= 1 else f"{value:.1f}%"
+        elif isinstance(value, float):
+            value = f"{value:,.2f}" if abs(value) >= 1 else f"{value:.4g}"
+        else:
+            value = f"{value:,}"
+    return str("—" if value is None else value).replace("|", "\\|").replace("\n", " ")
+
+
+def _key_figures(table: dict) -> list[str]:
+    """Demo report summary: total, highest and lowest of the first numeric column, from the aggregate preview."""
+    cols, rows = table["columns"], table["rows"]
+    idx = next((i for i, c in enumerate(cols) if c.get("type") in _NUMERIC), None)
+    if idx is None or len(rows) < 2:
+        return []
+    label_i = next((i for i, c in enumerate(cols) if i != idx), None)
+    vals = [(r[idx], r[label_i] if label_i is not None else "") for r in rows if isinstance(r[idx], (int, float))]
+    if not vals:
+        return []
+    kind = cols[idx].get("type")
+    hi, lo = max(vals, key=lambda t: t[0]), min(vals, key=lambda t: t[0])
+    out = ["## Key figures", ""]
+    if kind != "percent":
+        out.append(f"- **Total {cols[idx]['label'].lower()}:** {_md_cell(sum(v for v, _ in vals), kind)}")
+    out += [f"- **Highest:** {_md_cell(hi[0], kind)} ({_md_cell(hi[1])})",
+            f"- **Lowest:** {_md_cell(lo[0], kind)} ({_md_cell(lo[1])})", ""]
+    return out

@@ -9,6 +9,7 @@
 #   CI_ONLY=web|api      run one job only
 #   FAIL_FAST=1          stop at the first failure
 #   SKIP_LIGHTHOUSE=1    skip the Lighthouse budget
+#   SKIP_SLOW3G=1        skip the slow-3G first-paint budget (CI_SLOW3G_PORT, default 5241)
 #   LH_RUNS=n            Lighthouse runs per form factor (default 1 locally; CI uses 3)
 #   CI_API_PORT          port for the API header check (default 8139)
 #   CC_PYTHON            Python with api deps (default: /workspace/cc_fe/venvA, ../.venv, python3)
@@ -112,6 +113,11 @@ main() {
         step "web: vite preview did not start" false
       fi
       stop_server
+      if [ -z "${SKIP_SLOW3G:-}" ]; then
+        # Own gzip static server (one server at a time: preview is already stopped). Not in web.yml yet: local gate only.
+        mem_gate
+        step "web: slow-3G first paint (FCP <= 2.5 s, composer)" node scripts/slow3g_budget.mjs dist-mock "${CI_SLOW3G_PORT:-5241}"
+      fi
       # tsc -b rewrites the build-info file; keep the tree clean
       git -C "$ROOT" checkout -q -- web/tsconfig.tsbuildinfo 2>/dev/null || true
   fi

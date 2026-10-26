@@ -87,7 +87,7 @@ export function Sidebar(p: SidebarProps) {
   ];
   const Root = p.drawer ? 'div' : 'aside';
   return (
-    <Root className={clsx('flex h-full w-[260px] shrink-0 flex-col bg-sidebar font-sans', p.drawer && 'fixed inset-y-0 left-0 z-40 w-[min(300px,85vw)] shadow-2xl motion-safe:animate-[cc-drawer_200ms_var(--ease-out)]')}
+    <Root className={clsx('flex h-full w-[260px] shrink-0 flex-col bg-sidebar font-sans', p.drawer && 'fixed inset-y-0 left-0 z-40 w-[min(300px,85vw)] cc-pan-y shadow-2xl motion-safe:animate-[cc-drawer_200ms_var(--ease-out)]')}
       data-testid="sidebar" aria-modal={p.drawer || undefined} role={p.drawer ? 'dialog' : undefined} aria-label="Chat history" tabIndex={p.drawer ? -1 : undefined}>
       <div className="flex h-[52px] shrink-0 items-center justify-between px-2">
         <div className="flex items-center gap-2 px-2 font-semibold">

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Download, Maximize2, FileJson } from 'lucide-react';
 import type { ChartPart } from '../../lib/contract';
 import { IconButton } from '../ui';
+import { ErrorBoundary } from '../ErrorBoundary';
 import { CHART_COLORS, useTheme } from '../../lib/theme';
 import { csvFilename, downloadText, recordsToCsv } from '../../lib/csv';
 import { buildSpec, chartRenderer, readableBars, utcDates, withTooltips } from '../../render/chartSpec';
@@ -26,7 +27,18 @@ function remoteBlockedLoader(createVegaLoader: typeof import('vega').loader) {
   return loader;
 }
 
-export function ChartView({ part, onOpen, full, onShowSpec }: { part: ChartPart; onOpen?: () => void; full?: boolean; onShowSpec?: () => void }) {
+type ChartViewProps = { part: ChartPart; onOpen?: () => void; full?: boolean; onShowSpec?: () => void };
+
+/** A chart that fails to render (bad spec, renderer bug) becomes an inline "Try again" card; the rest of the answer stays. */
+export function ChartView(props: ChartViewProps) {
+  return (
+    <ErrorBoundary scope="section" name="ChartView" resetKey={props.part}>
+      <ChartViewInner {...props} />
+    </ErrorBoundary>
+  );
+}
+
+function ChartViewInner({ part, onOpen, full, onShowSpec }: ChartViewProps) {
   const ref = useRef<HTMLDivElement>(null);
   const viewRef = useRef<View | null>(null);
   const [err, setErr] = useState<string | null>(null);

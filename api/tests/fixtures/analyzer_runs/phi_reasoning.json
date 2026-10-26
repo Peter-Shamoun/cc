@@ -1,0 +1,104 @@
+{
+ "question": "How many claims since January 2024?",
+ "_comment": "SYNTHETIC PHI fixture for the R2 reasoning policy. Every identifier below is invented: the name, MRN, DOB, member ID and NPI belong to no one. The model text quotes them on purpose; none may reach the stream.",
+ "calls": [
+  {
+   "model": "claude-haiku-5-5",
+   "candidate": 0,
+   "tool_results": [],
+   "completion": {
+    "text": "Patient Jane Testperson (MRN 00123456, DOB 01/02/1980) shows up in the sample; member ID XYZ123456789, ordering NPI 1234567893.",
+    "tool_calls": [
+     {
+      "name": "sample_rows",
+      "arguments": {
+       "relation": "sem.claims"
+      },
+      "id": "t1"
+     }
+    ]
+   }
+  },
+  {
+   "model": "claude-haiku-5-5",
+   "candidate": 0,
+   "tool_results": [
+    {
+     "tool_use_id": "t1",
+     "content": "{\"row_count\": 2, \"columns\": [\"patient_name\", \"mrn\", \"dob\"], \"rows\": [[\"Jane Testperson\", \"00123456\", \"1980-01-02\"], [\"Testperson, Jane\", \"00123456\", \"01/02/1980\"]]}"
+    }
+   ],
+   "completion": {
+    "text": "Jane Testperson's date of birth is 1980-01-02; Dr. Ramona Fakename (NPI 1234567893) ordered the panel.",
+    "tool_calls": [
+     {
+      "name": "run_sql",
+      "arguments": {
+       "sql": "SELECT COUNT(*) AS claims FROM sem.claims WHERE service_date >= DATE '2024-01-01' AND member_dob IS NOT NULL"
+      },
+      "id": "t2"
+     }
+    ]
+   }
+  },
+  {
+   "model": "claude-haiku-5-5",
+   "candidate": 0,
+   "tool_results": [
+    {
+     "tool_use_id": "t2",
+     "content": "ERROR: Binder Error: no match for 01/02/1980 near 'Jane Testperson' member XYZ123456789. Revise the SQL and try again."
+    }
+   ],
+   "completion": {
+    "text": "Dropping the filter on subscriber id XYZ123456789 for Testperson, Jane.",
+    "tool_calls": [
+     {
+      "name": "run_sql",
+      "arguments": {
+       "sql": "SELECT COUNT(*) AS claims FROM sem.claims WHERE service_date >= DATE '2024-01-01'"
+      },
+      "id": "t3"
+     }
+    ]
+   }
+  },
+  {
+   "model": "claude-haiku-5-5",
+   "candidate": 0,
+   "tool_results": [
+    {
+     "tool_use_id": "t3",
+     "content": "{\"row_count\": 1, \"columns\": [\"claims\"], \"rows\": [[42]]}"
+    }
+   ],
+   "completion": {
+    "text": "MRN 00123456 is not needed for the count.",
+    "tool_calls": [
+     {
+      "name": "final_answer",
+      "arguments": {
+       "sql": "SELECT COUNT(*) AS claims FROM sem.claims WHERE service_date >= DATE '2024-01-01'",
+       "answer": "There are 42 claims since January 2024."
+      },
+      "id": "t4"
+     }
+    ]
+   }
+  }
+ ],
+ "answer": {
+  "kind": "answer",
+  "model": "claude-haiku-5-5",
+  "text": "There are 42 claims since January 2024.",
+  "sql": "SELECT COUNT(*) AS claims FROM sem.claims WHERE service_date >= DATE '2024-01-01'",
+  "rows": [
+   [
+    42
+   ]
+  ],
+  "columns": [
+   "claims"
+  ]
+ }
+}
