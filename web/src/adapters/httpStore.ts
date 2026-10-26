@@ -1,6 +1,7 @@
 import type { AssistantMessage, ID, ISODate, Message, UserMessage } from '../lib/contract';
 import type { SearchHit, ThreadSummary, TranscriptStore } from './types';
 import { ConversationsApi, ConversationsApiError } from './conversationsApi';
+import { shortTitle } from '../shell/title';
 import { newAssistantViewV1, reduceV1, type FinishReason, type StreamEvent } from '../api/contract';
 
 /**
@@ -21,6 +22,8 @@ export function hydrate(m: Message): Message {
 
 /** The server's generic title (api/store.py DEFAULT_TITLE): it never echoes the first question. */
 const SERVER_DEFAULT_TITLE = 'New analysis';
+/** After a reload, how many untitled chats get a client title per list call, how many fetches at once, and how long the list waits. */
+const TITLE_FETCH = { limit: 12, concurrency: 4, waitMs: 1500 };
 
 /**
  * TranscriptStore over the platform chat-history endpoints (docs/frontend_transcripts.md).
@@ -62,6 +65,7 @@ export class HttpTranscriptStore implements TranscriptStore {
     let page: Awaited<ReturnType<ConversationsApi['list']>> = { items: [] };
     try { page = await this.api.list(cursor); this.lastError = null; }
     catch (e) { if (!(e instanceof ConversationsApiError)) throw e; this.lastError = e; }
+    await this.deriveTitles(page.items.filter((c) => c.title === SERVER_DEFAULT_TITLE).map((c) => c.id));
     const items: ThreadSummary[] = page.items.map((c) => ({ id: c.id, title: this.title(c.id, c.title), updatedAt: c.updatedAt }));
     for (const id of items.map((i) => i.id)) { this.pending.delete(id); this.known.add(id); }
     // chats the server hasn't recorded yet (first turn still connecting) go on top
@@ -69,9 +73,39 @@ export class HttpTranscriptStore implements TranscriptStore {
     return { items, next: page.next };
   }
 
+  /**
+   * The server keeps chats titled "New analysis" (it never echoes a question as a title,
+   * docs/frontend_transcripts.md). After a reload this tab has lost the short titles it made, so
+   * rebuild them the same way, in memory only: shortTitle(first question). Bounded and best-effort;
+   * chats not done within waitMs get their title on the next list.
+   */
+  private deriving = new Map<ID, Promise<void>>();
+  private deriveTitles(ids: ID[]): Promise<void> {
+    const todo = ids.filter((id) => !this.titles.has(id)).slice(0, TITLE_FETCH.limit);
+    if (!todo.length) return Promise.resolve();
+    const one = (id: ID) => {
+      let p = this.deriving.get(id);
+      if (!p) {
+        p = this.api.get(id).then((c) => { if (c) this.learnTitle(id, c.messages); }, () => undefined).finally(() => this.deriving.delete(id));
+        this.deriving.set(id, p);
+      }
+      return p;
+    };
+    const queue = [...todo];
+    const worker = async () => { for (let id = queue.shift(); id; id = queue.shift()) await one(id); };
+    const all = Promise.all(Array.from({ length: Math.min(TITLE_FETCH.concurrency, todo.length) }, worker)).then(() => undefined);
+    return Promise.race([all, new Promise<void>((r) => setTimeout(r, TITLE_FETCH.waitMs))]);
+  }
+
+  private learnTitle(id: ID, messages: Message[]) {
+    const first = messages.find((m) => m.role === 'user') as UserMessage | undefined;
+    if (first?.text && !this.titles.has(id)) this.titles.set(id, shortTitle(first.text));
+  }
+
   async getConversation(id: ID): Promise<{ id: ID; messages: Message[] } | undefined> {
     const c = await this.api.get(id);
     if (c) this.known.add(id);
+    if (c) this.learnTitle(id, c.messages);
     return c ? { id: c.id, messages: c.messages.map(hydrate) } : undefined;
   }
 

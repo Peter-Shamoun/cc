@@ -27,8 +27,8 @@ async function reopenFirstThread() {
 await newChat();
 await ask('Top denial reason codes last quarter');
 await pg.getByRole('button', { name: 'Stop generating' }).waitFor({ timeout: 30000 });
-await pg.waitForTimeout(2500);
-await pg.getByRole('button', { name: 'Stop generating' }).click();
+await pg.waitForTimeout(1200);
+await pg.getByRole('button', { name: 'Stop generating' }).click({ timeout: 5000 });
 await idle();
 await pg.waitForTimeout(500);
 results.stopMeta = (await pg.getByTestId('answer-meta').last().textContent().catch(() => null)) ?? '(none)';
@@ -56,8 +56,18 @@ await pg.getByRole('button', { name: 'Regenerate' }).last().click();
 await idle();
 await pg.waitForTimeout(800);
 await reopenFirstThread();
-results.userTurnsAfterRegenerateReload = await pg.getByText('Claims by month', { exact: true }).count();
+results.userTurnsAfterRegenerateReload = await pg.getByTestId('msg-user').count();
 await shot('03_regenerate_after_reload');
+
+// 4) Reload keeps the open chat (#/c/<id>) and real sidebar titles
+const before = pg.url();
+await pg.reload({ timeout: 90000 });
+await pg.getByTestId('thread-item').first().waitFor({ timeout: 30000 });
+await pg.waitForTimeout(2000);
+results.reloadKeepsRoute = pg.url() === before && /#\/c\//.test(before);
+results.reloadShowsChat = (await pg.getByTestId('msg-assistant').count()) > 0;
+results.sidebarTitlesAfterReload = await pg.getByTestId('thread-item').allTextContents();
+await shot('04_reload_titles_route');
 
 results.pageErrors = errors;
 console.log(JSON.stringify(results, null, 2));
