@@ -18,8 +18,11 @@ Owner: platform team (frontend SOTA sprint). Source of truth:
 
 Why each relaxation exists:
 
-* **No `'unsafe-inline'` / `'unsafe-eval'` for scripts.** The pre-paint theme script moved to
-  `web/public/theme-init.js`. Vega used `new Function` for expressions; `ChartView` now passes `ast: true`
+* **No `'unsafe-inline'` / `'unsafe-eval'` for scripts.** The pre-paint theme script lives in
+  `web/public/theme-init.js` (single source); the build inlines it into `index.html` as a nonce'd script
+  (`web/scripts/boot_shell.mjs`, QA-P8: one fewer render-blocking round trip). It reads only allowlisted UI prefs
+  and records whether a chat is open, never the id. The static boot shell's `<style>` is nonce'd the same way;
+  `checkHtmlNonce` fails the header/CSP gates if any inline element lacks the response nonce. Vega used `new Function` for expressions; `ChartView` now passes `ast: true`
   so vega-embed uses `vega-interpreter`.
 * **No `'wasm-unsafe-eval'`.** Shiki runs its JavaScript regex engine (fine-grained imports in CodeBlock.tsx), so no WebAssembly is compiled.
 * **`style-src-attr 'unsafe-inline'`** only. Shiki token colours, KaTeX layout and Vega SVG set inline
@@ -44,7 +47,8 @@ so there is exactly one `Cache-Control`.
 
 ## Checks
 * `pytest api/tests/test_headers.py` — headers on every response type.
-* `web/src/security/headers.test.ts` — policy shape, no inline script/style in `index.html`, no
+* `web/src/security/headers.test.ts` — policy shape, `index.html` source has no inline script and only the
+  boot-shell `<style>`, the boot-shell transform passes `checkHtmlNonce`, no
   `eval`/`new Function`/`createElement('style')` in `src/`, Vega interpreter options present.
 * `npm run check:csp -- <url> [shotDir]` (Playwright, `web/scripts/csp_check.mjs`) — loads a running build,
   asks the live demo questions (or every fixture with `CSP_MODE=mock`), and fails on any CSP violation,

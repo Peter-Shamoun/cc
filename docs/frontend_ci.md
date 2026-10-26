@@ -20,7 +20,7 @@ secrets and makes no paid API calls.
 | API tests (separate job) | `pytest api/tests -q` | any API test fails |
 
 Guard tests that run inside `npm test`:
-- `src/security/headers.test.ts`: the CSP and header policy. index.html has no inline script or style, and src/ uses no eval, `new Function` or injected `<style>`.
+- `src/security/headers.test.ts`: the CSP and header policy. The index.html source has no inline script and only the boot-shell `<style>`; the built page's inline theme script and style carry the nonce (`scripts/boot_shell.mjs`, checked with `checkHtmlNonce`); and src/ uses no eval, `new Function` or injected `<style>`.
 - `src/security/phi.test.tsx`: every fixture that has a table is streamed through the real App. The test then searches these sinks for row values: every console method, localStorage, sessionStorage, cookies, `location.href`, `history.pushState`/`replaceState` (state and URL), `document.title`, `window.name` and fetch URLs. It also checks that PHI columns are masked in the DOM and that only `cc.pref.*` keys are persisted.
 - `src/security/licenses.test.ts`: the licence audit and the coverage of THIRD_PARTY_NOTICES.
 
@@ -109,9 +109,7 @@ remove it.
 - Tighten budgets when the app gets faster; don't loosen them to make a PR pass. A loosening needs a note here saying why.
 - Interaction performance (500-message thread, 10k-row table) is covered separately by `npm run e2e:perf`. The bundle-size budget is `scripts/bundle_budget.mjs`.
 
-### Warning ratchet
+### Lint: zero warnings
 
-`npm run lint` (and the CI lint step) runs `oxlint --max-warnings 20`. The count can't grow while the burn-down is in progress.
-- **If your PR adds a warning,** fix it or add an `oxlint-disable-next-line <rule> -- <reason>` comment. Don't raise the number.
-- **If your PR fixes warnings,** lower the number in `web/package.json` in the same PR.
-- **At 0,** platform switches the remaining rules to `error` and drops the flag.
+The burn-down is finished: 21 → 18 with QA-P8, then to 0 with shell #218 and answer #219. Every rule that used to warn in `web/.oxlintrc.json` is now `error`, and `npm run lint` (plus the CI and local-gate lint step) still passes `--max-warnings 0` as a backstop. Any new finding fails the build.
+- If a finding is a deliberate exception, add `// oxlint-disable-next-line <rule> -- <reason>` on that line. Never turn a rule back to `warn` or raise the flag.

@@ -117,6 +117,30 @@ The table was already virtualized at 200 rows (about 24 DOM rows). The mount lon
 
 Scrolling the table: before p95 16.7 ms, 38 rows, heap 54.5 MB, 0 long tasks. After p95 16.7 ms, frame max 16.8 ms, 24 rows, heap 13.1 MB, 0 shell commits, 0 long tasks. Sorting the Claims column stays inside the table, so the shell commit counter stays at 0 in both runs. After: p95 16.7 ms, frame max 16.8 ms, 23 DOM rows, heap 14.1 MB, 0 long tasks.
 
+### Slow 3G cold load (QA-P8)
+
+QA C7 found a fresh load on Slow 3G blank for about 10 s: nothing painted until the 925 KB entry chunk (≈275 KB gz) arrived, and the stylesheet plus `theme-init.js` in `<head>` each cost a 2 s round trip first. Measured with QA's `web/e2e/review/slow3g.mjs` (400 kbps, 2 s RTT per request, gzip; mobile adds 4× CPU) on the mock build.
+
+| | Before | After |
+|---|---|---|
+| First contentful paint, desktop / mobile | 10,096 / 10,204 ms | 2,084 / 2,096 ms |
+| "Message" textbox visible and typeable | 10,248 / 10,263 ms | 2,125 / 2,159 ms |
+| React composer takes over | 10,248 ms | ≈7,200 ms |
+| Bytes before the app is interactive | 294 KB, 5 requests | 148 KB, 4 requests |
+| Initial JS (gz) | ≈272 KB | 129 KB |
+| CLS at hand-off | n/a | 0 |
+| Lighthouse mobile perf (median of 3) | 0.92 | 0.98 (FCP/LCP 1.81 s, TBT 0) |
+
+2 s is the floor for this profile: the HTML itself costs one round trip. What changed:
+
+- **Static boot shell in `index.html`.** The greeting, the composer pill, the sidebar column, and placeholder space for the starter cards, sized to the React empty state at 1440×900 and 390×844, so the swap doesn't shift layout. Colours come from inline `--ccb-*` tokens for both palettes, light and dark. The inlined theme script sets `.dark` before the body parses, so a dark preference never flashes white. A `#/c/<id>` deep link shows neutral bars instead of the greeting. The text is static, with no PHI.
+- **The boot composer is a real textarea** (`aria-label="Message"`, like the React one). Text typed before JS arrives moves into the in-memory new-chat draft (`src/lib/bootShell.ts`, never storage), and focus and caret follow it.
+- **Nothing render-blocking in `<head>`.** `theme-init.js` is inlined with the nonce, and the stylesheet moves to the end of `<body>` (`scripts/boot_shell.mjs`). Module scripts still wait for it, so React never renders unstyled.
+- **The markdown renderer is a lazy chunk** (`MarkdownImpl`, 142 KB gz). It carries Streamdown, marked, micromark/mdast, rehype-raw/parse5, tailwind-merge and react-markdown. `main.tsx` preloads it at idle after first paint. Once it's loaded, renders are synchronous; before that, an answer shows as plain wrapped text in the same box. Pure helpers stay in `markdownText.ts`.
+- **Budgets tightened:** initial JS 300 → 160 KB gz (`bundle-budget.json`), and Lighthouse mobile ≥ 0.90 with FCP/LCP ≤ 2.5 s (`scripts/perf_budget.json`).
+
+Reproduce: `VITE_ANALYST_BASE= npx vite build --outDir e2e/.dist/mock --emptyOutDir && E2E_STATIC_PORT=5253 node e2e/review/slow3g.mjs <outDir>`.
+
 ## What changed
 
 - Subtle, link, and accent-foreground tokens were darkened or lightened per palette until each pair clears WCAG AA on that palette’s surfaces. Shimmer animates `color` instead of clipping a gradient to transparent text. `prefers-reduced-motion: reduce` disables animation, transition, and smooth scrolling. The suggestion entrance moves without fading text through a failing contrast. Chart download controls appear at full opacity instead of fading through one.
