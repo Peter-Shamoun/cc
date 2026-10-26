@@ -14,8 +14,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-import tempfile
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -41,15 +39,6 @@ class QuerySession:
     request_id: str
     clock: object
     audit: object
-
-
-def _read_only_temp_directory() -> str:
-    """DuckDB adds temp_directory to allowed_directories, and COPY into that directory succeeds even when
-    enable_external_access is false. A mode-0555 directory keeps the spill path from becoming a write target."""
-    path = Path(tempfile.gettempdir()) / "ccsim-duckdb-ro"
-    path.mkdir(exist_ok=True)
-    os.chmod(path, 0o555)
-    return str(path)
 
 
 def login(aws, upn: str) -> str:
@@ -89,7 +78,9 @@ def open_session(aws, dep: Deployment, id_token: str, escalate: bool = False, re
         con.execute("CREATE SCHEMA lossless")
         for rel in APPEND_RELATIONS:
             con.execute(f"CREATE VIEW {rel} AS SELECT * FROM read_parquet({files(rel)!r}, hive_partitioning=false)")
-    con.execute("SET temp_directory = ?", [_read_only_temp_directory()])
+    # DuckDB unions temp_directory into allowed_directories, so COPY into it would succeed even with external access
+    # off. No temp directory means no spill path to write to, for any process user (root ignores a 0555 directory).
+    con.execute("SET temp_directory = ''")
     con.execute("SET memory_limit = '2GB'")
     con.execute("SET enable_external_file_cache = false")
     con.execute("SET allow_unredacted_secrets = false")
