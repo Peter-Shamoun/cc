@@ -36,14 +36,20 @@ export class MockAnalystAdapter implements AnalystAdapter {
     const stamp = (e: object) => ({ ...e, seq: seq++ }) as unknown as AnyStreamEvent;
     yield stamp({ type: 'message.start', messageId, conversationId, contractVersion: CONTRACT_VERSION, strategy: 'mock-replay' });
     const t0 = Date.now();
+    let ran = 0; // SQL that finished before a Stop, so a stopped answer keeps its query count
     try {
-      for (const step of fixture.steps) for await (const e of this.emit(step, signal)) yield stamp(e);
+      for (const step of fixture.steps) {
+        for await (const e of this.emit(step, signal)) {
+          if ((e as { type?: string }).type === 'step.sql_result') ran++;
+          yield stamp(e);
+        }
+      }
       const u = fixture.usage;
       const elapsedMs = u?.latency?.totalMs ?? Date.now() - t0;
       yield stamp({ type: 'message.end', messageId, finishReason: fixture.finishReason ?? 'stop', usage: { ...u, queries: fixture.queries, elapsedMs } });
     } catch (e) {
       if ((e as Error).name !== 'AbortError') throw e;
-      yield stamp({ type: 'message.end', messageId, finishReason: 'aborted', usage: { queries: 0, elapsedMs: Date.now() - t0 } });
+      yield stamp({ type: 'message.end', messageId, finishReason: 'aborted', usage: { queries: ran, elapsedMs: Date.now() - t0 } });
     }
   }
 
