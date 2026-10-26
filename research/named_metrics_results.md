@@ -22,7 +22,7 @@ Seven views over sem.* only (`claude/schema/06_named_metric_views.sql`), documen
 The views are created at every session open (`bench.dataset.open_snapshot`, `ccsim.query.open_session`) because
 they add no data: the dataset id and snapshot do not change. With the parameter off they are hidden from
 `list`, `profile` and `dictionary` and absent from the briefing; the B1 briefing is byte-identical to the
-historical B1 except the product rename (ClaimClarity -> CC). Scoring re-runs answers on the same views.
+historical B1 except the product rename. Scoring re-runs answers on the same views.
 
 Verification (`tests/test_named_metric_views.py`): each view checked against SQL over the generator ledger
 (`answer_key.duckdb`) on the bench snapshot and on a freshly generated 30-day dataset; documentation must name
