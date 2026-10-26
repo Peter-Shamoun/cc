@@ -1,11 +1,11 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AdapterCtx } from '../adapters/context';
 import type { AnalystAdapter } from '../adapters/types';
 import { ChartView } from '../components/parts/ChartView';
 import { DataTable } from '../components/parts/DataTable';
 import { ImageView } from '../components/parts/misc';
-import { Markdown } from '../components/parts/Markdown';
+import { loadMath, Markdown } from '../components/parts/Markdown';
 import { recordsToCsv, tableToCsv, tableToTsv } from '../lib/csv';
 import { CHART_COLORS, ThemeProvider, useTheme } from '../lib/theme';
 import { buildSpec, chartRenderer } from './chartSpec';
@@ -106,6 +106,8 @@ describe('safe links', () => {
 });
 
 describe('markdown fixtures', () => {
+  // KaTeX is lazy in the app; preload it so these fixtures render math synchronously.
+  beforeAll(async () => { await loadMath(); });
   it.each(markdownFixtures)('$id renders without active content', (fixture) => {
     const { container } = render(<Markdown text={fixture.markdown} streaming={fixture.streaming} />);
     assertNoActiveContent(container);
