@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
-import { LIVE, open, ask, composer, sendBtn, gap } from './helpers';
+import { LIVE, open, ask, composer, sendBtn } from './helpers';
 
 // Deep fidelity pass (C9 follow-up) against how Claude.ai and ChatGPT behave today (observed UI, never their source).
 // Each assertion names its reference. gap() lines are ratchets for findings filed in backlog/<team>.md.
@@ -77,7 +77,6 @@ test.describe('fidelity: thread chrome (ChatGPT)', () => {
     await other.hover(); await page.waitForTimeout(200);
     const bg = (l: typeof active) => l.evaluate((e) => getComputedStyle(e).backgroundColor);
     const [a, h] = [await bg(active), await bg(other)];
-    gap('QA-S33');
     expect(a, 'active row fill vs hovered row fill').not.toBe(h);
   });
 });

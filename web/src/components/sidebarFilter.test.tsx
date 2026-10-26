@@ -58,3 +58,16 @@ describe('sidebar inline filter', () => {
     expect(screen.getByText('Search chats')).toBeTruthy();
   });
 });
+
+describe('sidebar active row (QA-S33)', () => {
+  it('marks the open chat with aria-current and its own fill, distinct from the hover fill', () => {
+    setup({ activeId: 'c1' });
+    const [first, active] = screen.getAllByTestId('thread-item');
+    expect(active.querySelector('button')).toHaveAttribute('aria-current', 'page');
+    expect(first.querySelector('button')).not.toHaveAttribute('aria-current');
+    expect(active).toHaveClass('bg-active', 'font-medium');
+    expect(active.className).not.toMatch(/\bhover:bg-hover\b/);
+    expect(first).toHaveClass('hover:bg-hover');
+    expect(first).not.toHaveClass('bg-active');
+  });
+});

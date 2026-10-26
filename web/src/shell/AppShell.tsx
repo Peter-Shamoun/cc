@@ -631,7 +631,7 @@ function ShellInner() {
         {!sidebarVisible && !mobile && <SidebarRail onExpand={() => setSidebar(true)} onNew={sidebarProps.onNew} onSearch={() => setDialog('search')} onSettings={sidebarProps.onSettings} onShortcuts={sidebarProps.onShortcuts} onSignOut={sidebarProps.onSignOut} />}
         <main className="relative flex min-w-0 flex-1 flex-col font-sans md:min-w-[400px]" aria-label="Chat">
           {!empty && <p className="hidden pb-4 text-lg font-semibold print:block" data-testid="print-title">{currentTitle}</p>}
-          <Header strategy={strategy} showNav={mobile} onOpenSidebar={() => setSidebar(true)} onNewChat={sidebarProps.onNew} adapterName={adapter.name}
+          <Header strategy={strategy} showNav={mobile} onOpenSidebar={() => setSidebar(true)} onNewChat={sidebarProps.onNew}
             hasChat={!empty} onDownloadJson={serverExport && !isTempChat ? () => serverExport('json') : undefined}
             temporary={temporary} onTemporary={tempStore && (empty || temporary) ? setTemporary : undefined} onCopyMarkdown={copyCurrent} onDownloadMarkdown={exportCurrent} onSettings={() => setDialog('settings')} onShortcuts={() => setDialog('shortcuts')}
             title={chat.convId ? threads.find((t) => t.id === chat.convId)?.title : undefined}

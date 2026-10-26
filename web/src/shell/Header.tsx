@@ -9,7 +9,6 @@ export interface HeaderProps {
   showNav: boolean;
   onOpenSidebar: () => void;
   onNewChat: () => void;
-  adapterName: string;
   hasChat: boolean;
   onCopyMarkdown: () => void;
   onDownloadMarkdown: () => void;
@@ -28,7 +27,7 @@ export interface HeaderProps {
   onTemporary?: (on: boolean) => void;
 }
 
-/** Top bar: sidebar/new-chat when the sidebar is hidden, product menu (strategy + data mode), PHI badge and "…". No sharing (Peter 12:15 AM): copy/export live in the title menu. */
+/** Top bar: sidebar/new-chat when the sidebar is hidden, product menu (strategy/model), PHI badge and "…". No sharing (Peter 12:15 AM): copy/export live in the title menu. */
 export function Header(p: HeaderProps) {
   const { mode, toggleMode } = useTheme();
   const more = useMenu();
@@ -51,21 +50,17 @@ export function Header(p: HeaderProps) {
     ...(p.onDownloadJson ? [{ label: 'Export as JSON', icon: <Download size={16} />, onSelect: p.onDownloadJson }] : []),
     ...(p.onDelete ? ['sep' as const, { label: 'Delete', icon: <Trash2 size={16} />, danger: true, onSelect: p.onDelete }] : []),
   ];
-  const dataLabel = p.adapterName === 'http' ? 'Live API' : 'Demo data';
-  // Strategy + data mode live in the product menu (QA-S6): ChatGPT/Claude headers stay near-empty. No data-source or
-  // scope entries: the session decides the customer and relations server-side (Peter 11:57 PM, BACKEND-FIT).
+  // Strategy/model live in the product menu (QA-S6): ChatGPT/Claude headers stay near-empty. No data-source, scope or
+  // data-mode entries: the deployment and session decide the data server-side (CONTRACT §2.1, BACKEND-FIT, QA-BF2).
   const st = p.strategy;
   const productItems: MenuItem[] = st?.strategy ? [
     { heading: 'Strategy' },
     ...st.caps.strategies.map((s): MenuItem => ({ label: s.label, description: s.description, meta: tierLabel(s.costTier, s.latencyTier), checked: s.id === st.strategy?.id, disabled: s.available === false, title: s.unavailableReason, onSelect: () => st.setStrategy(s.id) })),
     ...(st.models.length > 1 ? ['sep' as const, { heading: 'Model' }, ...st.models.map((m): MenuItem => ({ label: m.label, description: m.description, checked: m.id === st.model?.id, disabled: m.available === false, title: m.unavailableReason, onSelect: () => st.setModel(m.id) }))] : []),
-    'sep',
-    { label: `Data: ${dataLabel}${st.caps.demo ? ' · scripted runs' : ''}`, icon: <span className="block h-2 w-2 rounded-full bg-[#10a37f]" />, onSelect: () => {} },
-  ] : [
-    { label: `Data: ${dataLabel}`, icon: <span className="block h-2 w-2 rounded-full bg-[#10a37f]" />, onSelect: () => {} },
-  ];
+  ] : [];
   // The picked strategy shows in the button only when it is not the default (ChatGPT shows the model name).
   const pickLabel = st && !st.isDefault ? [st.strategy?.label, st.model && st.model.id !== st.caps.defaults.model ? st.model.label : ''].filter(Boolean).join(' · ') : '';
+  const productName = <span className="whitespace-nowrap">CC <span className={p.hasChat && p.title ? 'text-fg-subtle @max-[820px]:hidden' : 'text-fg-subtle @max-[560px]:hidden'}>{pickLabel || 'Analyst'}</span></span>;
   const moreItems: MenuItem[] = [
     { label: mode === 'dark' ? 'Light mode' : 'Dark mode', icon: mode === 'dark' ? <Sun size={16} /> : <Moon size={16} />, onSelect: toggleMode },
     { label: 'Settings', icon: <Settings size={16} />, onSelect: p.onSettings },
@@ -80,11 +75,13 @@ export function Header(p: HeaderProps) {
             <IconButton label="New chat" tip={`New chat · ${modKey()} ⇧ O`} onClick={p.onNewChat} className="max-sm:hidden"><SquarePen size={18} /></IconButton>
           </>
         )}
-        <button type="button" onClick={product.toggle} aria-haspopup="menu" aria-expanded={!!product.anchor} data-testid="product-menu" data-mode={p.adapterName}
-          className="flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-lg hover:bg-hover" aria-label={`CC Analyst, ${pickLabel ? `${pickLabel}, ` : ''}${dataLabel}`}>
-          <span className="whitespace-nowrap">CC <span className={p.hasChat && p.title ? 'text-fg-subtle @max-[820px]:hidden' : 'text-fg-subtle @max-[560px]:hidden'}>{pickLabel || 'Analyst'}</span></span>
-          <ChevronDown size={16} className="shrink-0 text-fg-subtle" />
-        </button>
+        {productItems.length ? (
+          <button type="button" onClick={product.toggle} aria-haspopup="menu" aria-expanded={!!product.anchor} data-testid="product-menu"
+            className="flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-lg hover:bg-hover" aria-label={`CC Analyst${pickLabel ? `, ${pickLabel}` : ''}`}>
+            {productName}
+            <ChevronDown size={16} className="shrink-0 text-fg-subtle" />
+          </button>
+        ) : <span className="shrink-0 px-2.5 py-1.5 text-lg" data-testid="product-name">{productName}</span>}
         {p.hasChat && p.title && (
           <div className="flex min-w-0 items-center @max-[520px]:hidden" data-testid="header-title">
             <span className="mx-0.5 text-fg-subtle/60" aria-hidden>/</span>

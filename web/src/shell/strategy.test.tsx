@@ -24,6 +24,7 @@ describe('strategy picker (contract 1.4.0)', () => {
     const std = within(menu).getByRole('menuitemradio', { name: /Standard/ });
     expect(std).toHaveAttribute('aria-checked', 'true');
     expect(std).toHaveTextContent('Low cost · Fast');
+    expect(menu).not.toHaveTextContent(/Data:|Demo data|Live API/); // QA-BF2: the deployment decides the data, not a menu
     await waitFor(() => expect(document.activeElement).toBe(std));
     fireEvent.click(within(menu).getByRole('menuitemradio', { name: /Cross-check/ }));
     expect(screen.queryByRole('menu')).toBeNull();
