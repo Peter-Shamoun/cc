@@ -155,7 +155,9 @@ export function Menu({ anchor, items, onClose, align = 'start', side = 'bottom',
 export function useMenu() {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const toggle = useCallback((e: React.MouseEvent<HTMLElement>) => { const t = e.currentTarget; setAnchor((a) => (a ? null : t)); }, []);
-  return { anchor, toggle, close: useCallback(() => setAnchor(null), []) };
+  /** Open anchored to `el` (a long-press / right-click on a row opens its options menu). */
+  const openAt = useCallback((el: HTMLElement) => setAnchor(el), []);
+  return { anchor, toggle, openAt, close: useCallback(() => setAnchor(null), []) };
 }
 
 // ---------- Toasts ----------
