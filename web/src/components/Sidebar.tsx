@@ -65,6 +65,23 @@ export interface SidebarProps {
   onSignOut?: () => void;
 }
 
+/** Synthetic demo identity (no real user data in the client). */
+export const ACCOUNT = { initials: 'DU', name: 'Demo user', detail: 'acme_labs · analyst' } as const;
+
+function Avatar() {
+  return <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-fg/80 text-[11px] font-semibold text-bg" aria-hidden>{ACCOUNT.initials}</span>;
+}
+
+type AccountActions = Pick<SidebarProps, 'onSettings' | 'onShortcuts' | 'onSignOut'>;
+/** One account menu for the full sidebar and the collapsed rail. */
+export function accountMenuItems(p: AccountActions): MenuItem[] {
+  return [
+    { label: 'Settings', icon: <Settings size={16} />, onSelect: p.onSettings, shortcut: `${modKey()} ,` },
+    { label: 'Keyboard shortcuts', icon: <Keyboard size={16} />, onSelect: p.onShortcuts, shortcut: `${modKey()} /` },
+    ...(p.onSignOut ? [{ label: 'Sign out', icon: <LogOut size={16} />, onSelect: p.onSignOut }] : []),
+  ];
+}
+
 /** Full sidebar (ChatGPT/Claude): new chat, search, date-grouped threads with hover "…" menu, account row. */
 export function Sidebar(p: SidebarProps) {
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -89,11 +106,7 @@ export function Sidebar(p: SidebarProps) {
     items[n]?.focus();
   };
   const activeOrFirst = shown.some((t) => t.id === p.activeId) ? p.activeId : shown[0]?.id;
-  const accountItems: MenuItem[] = [
-    { label: 'Settings', icon: <Settings size={16} />, onSelect: p.onSettings, shortcut: `${modKey()} ,` },
-    { label: 'Keyboard shortcuts', icon: <Keyboard size={16} />, onSelect: p.onShortcuts, shortcut: `${modKey()} /` },
-    ...(p.onSignOut ? [{ label: 'Sign out', icon: <LogOut size={16} />, onSelect: p.onSignOut }] : []),
-  ];
+  const accountItems = accountMenuItems(p);
   const Root = p.drawer ? 'div' : 'aside';
   return (
     <Root className={clsx('flex h-full w-[260px] shrink-0 flex-col bg-sidebar font-sans', p.drawer && 'fixed inset-y-0 left-0 z-40 w-[min(300px,85vw)] cc-pan-y shadow-lg motion-safe:animate-[cc-drawer_200ms_var(--ease-out)]')}
@@ -156,10 +169,10 @@ export function Sidebar(p: SidebarProps) {
           <span>{p.storeMode === 'ephemeral' ? <><b className="font-medium text-fg-muted">History off</b> · chats live in memory only.</> : 'History on'} Synthetic demo data.</span>
         </div>
         <button type="button" onClick={account.toggle} aria-haspopup="menu" aria-expanded={!!account.anchor} className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm hover:bg-hover" data-testid="account-button">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-fg/80 text-[11px] font-semibold text-bg" aria-hidden>DU</span>
+          <Avatar />
           <span className="min-w-0 flex-1">
-            <span className="block truncate font-medium">Demo user</span>
-            <span className="block truncate text-xs text-fg-subtle">acme_labs · analyst</span>
+            <span className="block truncate font-medium">{ACCOUNT.name}</span>
+            <span className="block truncate text-xs text-fg-subtle">{ACCOUNT.detail}</span>
           </span>
         </button>
         {account.anchor && <Menu label="Account" anchor={account.anchor} items={accountItems} onClose={account.close} side="top" />}
@@ -208,15 +221,20 @@ function ThreadRow({ t, active, tabStop, renaming, setRenaming, onSelect, onRena
   );
 }
 
-/** Collapsed desktop rail (Claude-style): icons only, the sidebar's main actions stay one click away. */
-export function SidebarRail({ onExpand, onNew, onSearch, onSettings }: { onExpand: () => void; onNew: () => void; onSearch: () => void; onSettings: () => void }) {
+/** Collapsed desktop rail (ChatGPT/Claude): icons only; the account avatar at the bottom opens the same account menu (QA-S40). */
+export function SidebarRail({ onExpand, onNew, onSearch, ...acct }: { onExpand: () => void; onNew: () => void; onSearch: () => void } & AccountActions) {
+  const account = useMenu();
   return (
     <aside className="flex h-full w-[52px] shrink-0 flex-col items-center gap-1 border-r border-line/60 bg-sidebar py-2.5 font-sans max-md:hidden" aria-label="Sidebar (collapsed)" data-testid="sidebar-rail">
       <IconButton label="Open sidebar" tip={`Open sidebar · ${modKey()} ⇧ S`} tipAt="right" onClick={onExpand}><PanelLeft size={18} /></IconButton>
       <IconButton label="New chat" tip={`New chat · ${modKey()} ⇧ O`} tipAt="right" onClick={onNew}><MessageSquarePlus size={18} /></IconButton>
       <IconButton label="Search chats" tip={`Search chats · ${modKey()} K`} tipAt="right" onClick={onSearch}><Search size={18} /></IconButton>
       <div className="flex-1" />
-      <IconButton label="Settings" tip={`Settings · ${modKey()} ,`} tipAt="right" onClick={onSettings}><Settings size={18} /></IconButton>
+      <button type="button" onClick={account.toggle} aria-haspopup="menu" aria-expanded={!!account.anchor} aria-label={`Account: ${ACCOUNT.name}`} title={ACCOUNT.name}
+        className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-hover" data-testid="rail-account">
+        <Avatar />
+      </button>
+      {account.anchor && <Menu label="Account" anchor={account.anchor} items={accountMenuItems(acct)} onClose={account.close} side="top" />}
     </aside>
   );
 }
