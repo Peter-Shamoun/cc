@@ -177,7 +177,7 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
         </div>
         <div className="relative h-9 w-9 shrink-0">
           {busy ? (
-            <button key="stop" type="button" onClick={onStop} aria-label="Stop generating" className="absolute inset-0 flex items-center justify-center rounded-full bg-accent text-accent-fg motion-safe:animate-[cc-pop_150ms_ease-out]">
+            <button key="stop" type="button" onClick={onStop} aria-label="Stop generating" title="Stop (Esc)" className="absolute inset-0 flex items-center justify-center rounded-full bg-accent text-accent-fg motion-safe:animate-[cc-pop_150ms_ease-out]">
               <Square size={12} fill="currentColor" />
             </button>
           ) : (

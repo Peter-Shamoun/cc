@@ -225,6 +225,8 @@ function ShellInner() {
     else if (mod && (k === '/' || k === '?')) { e.preventDefault(); setDialog((d) => (d === 'shortcuts' ? null : 'shortcuts')); }
     else if (e.shiftKey && k === 'escape') { e.preventDefault(); focusComposer(); }
     else if (k === 'escape' && mobile && drawerOpen) { setDrawerOpen(false); }
+    // Esc stops a streaming reply (Claude) when focus is in the composer or nowhere in particular.
+    else if (k === 'escape' && chat.busy && !e.defaultPrevented && !dialog && (document.activeElement === document.body || document.activeElement?.closest('[data-testid="composer"]'))) { e.preventDefault(); chat.stop(); }
   };
   useEffect(() => {
     const on = (e: KeyboardEvent) => keys.current(e);

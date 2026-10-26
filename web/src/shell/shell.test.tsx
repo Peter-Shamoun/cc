@@ -170,3 +170,23 @@ describe('opening a stored chat', () => {
   });
 });
 
+describe('stop with Esc', () => {
+  it('stops a streaming reply when Esc is pressed in the composer', async () => {
+    cleanup();
+    const { MockAnalystAdapter } = await import('../adapters/mock');
+    const orig = MockAnalystAdapter.prototype.streamTurn;
+    // Hold the stream open after its first event until the run is aborted.
+    const spy = vi.spyOn(MockAnalystAdapter.prototype, 'streamTurn').mockImplementation(async function* (this: InstanceType<typeof MockAnalystAdapter>, args) {
+      for await (const e of orig.call(this, args)) { yield e; break; }
+      await new Promise((_, reject) => args.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))));
+    });
+    render(<App />);
+    const box = screen.getByRole('textbox', { name: 'Message' });
+    fireEvent.change(box, { target: { value: 'Plot the monthly denial trend' } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Stop generating' })).toBeInTheDocument());
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Message' }), { key: 'Escape' });
+    await waitFor(() => expect(screen.getByTestId('stopped')).toBeInTheDocument());
+    spy.mockRestore();
+  });
+});
