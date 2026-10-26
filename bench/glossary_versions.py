@@ -1,8 +1,12 @@
 """Glossary versions as files, with provenance.
 
 v000 is the basic glossary. v001 is that text plus the screen-1 pitfalls block. Both are snapshots of the strings
-the sandbox already serves (bench.agents.GLOSSARY, bench.agent_cli.PITFALLS). A later version is written only by
-the learner, after validation accepts an entry, and it points at its parent.
+the sandbox already serves (bench.agents.GLOSSARY, bench.agent_cli.PITFALLS). v002 is the "+ invariants" level of
+parameter #1 (research/analyzer_parameters_v1.md): basic plus only the pitfalls bullets that state facts about the
+data (submission grain, current adjudication, de-duplicated 835s, line grain, time basis). It leaves out the
+answer-shape conventions (percent arithmetic, ranking) that were written against the screen-1 questions and did
+not replicate held-out. A later version is written only by the learner, after validation accepts an entry, and it
+points at its parent.
 
 Rendering v000 and v001 must stay byte-identical to those strings. The sandbox serves a ``version:<id>`` glossary
 setting through render_version, so a screen can pin the text it scored.
@@ -42,6 +46,20 @@ def split_entries(text: str) -> list[str]:
     return entries
 
 
+INVARIANTS_HEADER = "Invariants:"
+# 1-based positions of the PITFALLS bullets that are data invariants. 6 (percent arithmetic) and 7 (ranking) are
+# the screen-1 answer-shape pitfalls and stay out of v002.
+INVARIANT_PITFALL_BULLETS = (1, 2, 3, 4, 5)
+
+
+def _invariant_entries(pitfall_entries: list[dict], provenance: dict) -> list[dict]:
+    bullets = [entry for entry in pitfall_entries if entry["kind"] == "bullet"]
+    chosen = [bullets[position - 1] for position in INVARIANT_PITFALL_BULLETS]
+    header = _entry("invariants-00", "invariants", INVARIANTS_HEADER, provenance)
+    return [header] + [_entry(entry["entry_id"].replace("pitfalls-", "invariants-"), "invariants", entry["text"],
+                              provenance) for entry in chosen]
+
+
 def _entry(entry_id: str, section: str, text: str, provenance: dict) -> dict:
     return dict(entry_id=entry_id, section=section, kind="header" if not text.startswith("- ") else "bullet",
                 text=text, provenance=provenance)
@@ -69,7 +87,16 @@ def canonical_documents() -> list[dict]:
     v001 = _document("v001_screen1_pitfalls", "v000_basic",
                      [dict(section="basic", entries=basic_entries), dict(section="pitfalls", entries=pitfall_entries)],
                      "Screen-1 pitfalls glossary: basic definitions plus the invariants and traps block.")
-    return [v000, v001]
+    invariant_prov = dict(origin="hand_written", source="bench/agent_cli.py PITFALLS bullets "
+                          + ", ".join(str(position) for position in INVARIANT_PITFALL_BULLETS),
+                          train_question_ids=[],
+                          note="The data-invariant bullets of the screen-1 pitfalls block, without its answer-shape "
+                               "pitfalls (percent arithmetic, ranking). Bullet text is unchanged.")
+    v002 = _document("v002_invariants", "v000_basic",
+                     [dict(section="basic", entries=basic_entries),
+                      dict(section="invariants", entries=_invariant_entries(pitfall_entries, invariant_prov))],
+                     "Basic definitions plus the invariants part of the screen-1 block (parameter #1 '+ invariants').")
+    return [v000, v001, v002]
 
 
 def render_document(doc: dict) -> str:

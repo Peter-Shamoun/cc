@@ -18,16 +18,45 @@ _GLOSSARY_ALIASES = {
     "none": "none",
     "basic": "basic",
     "glossary": "basic",
+    "invariants": "invariants",
     "pitfalls": "pitfalls",
     "glossary+invariants": "pitfalls",
     "glossary+invariants+pitfalls": "pitfalls",
 }
-_CONTEXT_STYLES = {"goal", "procedural", "procedural_minimal"}
+GLOSSARY_LEVELS = {"none", "basic", "invariants", "pitfalls"}
+_CONTEXT_STYLES = {"goal", "procedural", "procedural_minimal", "minimal"}
 _EFFORTS = {"default", "low", "medium", "high"}
 _SELF_CORRECT = {"none", "errors_only", "errors+result_signals"}
 _SELECTION = {"execution_vote", "first_passing", "agree_or_abstain"}
 _CASCADES = {"off", "haiku_then_sonnet"}
 _REFUSAL = {"minimal", "explicit"}
+_DICTIONARY_DETAIL = {"descriptions", "derivations"}
+_PROFILE_DETAIL = {"full", "enums"}
+GENERATION_MODES = {"free_sql", "decompose_cte", "compiler_sql_fallback", "compiler_decompose_fallback"}
+PLAN_MODES = {"none", "plan", "plan_and_replan", "external_plan"}
+CANDIDATE_SHAPES = {"none", "direct", "query_plan", "divide_and_conquer"}
+
+# Levels that exist only on the Claude Code subagent route (analyzer.cli + analyzer.harness). The in-process loop
+# refuses a config that sets any of them away from its off level instead of silently ignoring it.
+SUBAGENT_ROUTE_OFF_LEVELS = dict(
+    playbook=False,
+    dictionary_detail="descriptions",
+    profile_detail="full",
+    lookup_mandatory_before_literals=False,
+    generation_mode="free_sql",
+    explore_probes=False,
+    plan_mode="none",
+    state_assumptions=False,
+    restate_question=False,
+    actionable_errors=False,
+    digest_results=False,
+    rewritten_tool_descriptions=False,
+    domain_lint=False,
+    reconciliation_checks=False,
+    report_confidence=False,
+    candidate_shape="none",
+    orchestration_bundle=None,
+)
 
 
 def _baseline() -> dict:
@@ -61,6 +90,8 @@ def _baseline() -> dict:
         prompt_cache=False,
         refusal_prompt="explicit",
         max_tokens=16000,
+        examples_k=3,
+        **SUBAGENT_ROUTE_OFF_LEVELS,
     )
 
 
@@ -96,11 +127,29 @@ class AnalyzerConfig:
     prompt_cache: bool = False
     refusal_prompt: str = "explicit"
     max_tokens: int = 16000
+    examples_k: int = 3
+    playbook: bool = False
+    dictionary_detail: str = "descriptions"
+    profile_detail: str = "full"
+    lookup_mandatory_before_literals: bool = False
+    generation_mode: str = "free_sql"
+    explore_probes: bool = False
+    plan_mode: str = "none"
+    state_assumptions: bool = False
+    restate_question: bool = False
+    actionable_errors: bool = False
+    digest_results: bool = False
+    rewritten_tool_descriptions: bool = False
+    domain_lint: bool = False
+    reconciliation_checks: bool = False
+    report_confidence: bool = False
+    candidate_shape: str = "none"
+    orchestration_bundle: str | None = None
     cascade_models: tuple[str, ...] = (HAIKU_MODEL, SONNET_MODEL)
 
     def __post_init__(self):
         self.glossary = _GLOSSARY_ALIASES.get(self.glossary, self.glossary)
-        if self.glossary not in {"none", "basic", "pitfalls"}:
+        if self.glossary not in GLOSSARY_LEVELS:
             raise ValueError(f"unknown glossary {self.glossary!r}")
         if self.context_style not in _CONTEXT_STYLES:
             raise ValueError(f"unknown context_style {self.context_style!r}")
@@ -114,6 +163,21 @@ class AnalyzerConfig:
             raise ValueError(f"unknown cascade {self.cascade!r}")
         if self.refusal_prompt not in _REFUSAL:
             raise ValueError(f"unknown refusal_prompt {self.refusal_prompt!r}")
+        if self.dictionary_detail not in _DICTIONARY_DETAIL:
+            raise ValueError(f"unknown dictionary_detail {self.dictionary_detail!r}")
+        if self.profile_detail not in _PROFILE_DETAIL:
+            raise ValueError(f"unknown profile_detail {self.profile_detail!r}")
+        if self.generation_mode not in GENERATION_MODES:
+            raise ValueError(f"unknown generation_mode {self.generation_mode!r}")
+        if self.plan_mode not in PLAN_MODES:
+            raise ValueError(f"unknown plan_mode {self.plan_mode!r}")
+        if self.candidate_shape not in CANDIDATE_SHAPES:
+            raise ValueError(f"unknown candidate_shape {self.candidate_shape!r}")
+        if self.lookup_mandatory_before_literals and not self.enable_lookup:
+            raise ValueError("lookup_mandatory_before_literals needs enable_lookup")
+        self.examples_k = int(self.examples_k)
+        if self.enable_examples and not 1 <= self.examples_k <= 10:
+            raise ValueError("examples_k must be from 1 to 10")
         self.candidates = int(self.candidates)
         if not 1 <= self.candidates <= 5:
             raise ValueError("candidates must be from 1 to 5")
@@ -143,6 +207,14 @@ class AnalyzerConfig:
         if unknown:
             raise ValueError(f"unknown technique settings: {sorted(unknown)}")
         return cls(**raw)
+
+    def subagent_only_levels_in_use(self) -> list[str]:
+        """Settings this config moves off their off level that only the subagent route implements."""
+        return sorted(name for name, off in SUBAGENT_ROUTE_OFF_LEVELS.items() if getattr(self, name) != off)
+
+    def interpretation_required(self) -> bool:
+        """Any of #10, #11, #25 on: an interpret record must precede sql, spec and answer."""
+        return self.plan_mode != "none" or self.state_assumptions or self.restate_question
 
     def screen_dict(self) -> dict:
         """The subset stored on a bench session. Drops cascade model ids (not a screen knob)."""
