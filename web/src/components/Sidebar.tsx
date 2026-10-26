@@ -88,6 +88,7 @@ export function Sidebar(p: SidebarProps) {
           <kbd className="hidden font-sans text-xs text-fg-subtle group-hover/nav:inline">{modKey()} K</kbd>
         </button>
       </nav>
+      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- arrow-key navigation delegated from focused chat links */}
       <div ref={list} onKeyDown={onListKey} className="scrollbar-thin mt-4 flex-1 overflow-y-auto px-2 text-sm" aria-label="Chats" role="navigation">
         {p.threads.length === 0 && <div className="px-2.5 text-xs text-fg-subtle">No chats yet</div>}
         {groups.map(([g, items]) => (

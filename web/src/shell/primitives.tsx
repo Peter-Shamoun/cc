@@ -38,7 +38,7 @@ export function Dialog({ title, onClose, children, className, hideTitle, testId 
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [onClose]);
-  return createPortal(
+  return createPortal( // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- backdrop click; Escape is the keyboard path
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-3 pt-[10vh] font-sans max-sm:p-0 max-sm:pt-0 motion-safe:animate-[cc-fade_120ms_ease-out] dark:bg-black/60" onMouseDown={(e) => e.target === e.currentTarget && onClose()} data-testid={testId ? `${testId}-scrim` : undefined}>
       <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={id} tabIndex={-1} data-testid={testId}
         className={clsx(!className?.includes('max-w-') && 'max-w-[680px]', 'relative w-full rounded-2xl border border-line bg-elev text-fg shadow-[0_16px_70px_rgba(0,0,0,0.25)] outline-none motion-safe:animate-[cc-pop_160ms_cubic-bezier(.2,.9,.3,1.2)] max-sm:flex max-sm:min-h-full max-sm:flex-col max-sm:rounded-none max-sm:border-0 max-sm:shadow-none max-sm:motion-safe:animate-[cc-rise_200ms_ease-out]', className, 'max-sm:max-w-none')}>
@@ -90,10 +90,10 @@ export function Menu({ anchor, items, onClose, align = 'start', side = 'bottom',
     else if (e.key === 'End') go(els.length - 1);
     else if (e.key === 'Escape' || e.key === 'Tab') { e.preventDefault(); e.stopPropagation(); close(); }
   };
-  return createPortal(
+  return createPortal( // oxlint-disable-next-line jsx-a11y/interactive-supports-focus -- arrow keys delegated from focused menuitems (roving tabindex)
     <div ref={ref} role="menu" aria-label={label} onKeyDown={onKey} style={pos ?? { top: -9999, left: -9999 }}
       className="fixed z-[60] min-w-[200px] rounded-2xl border border-line bg-elev p-1.5 font-sans text-sm text-fg shadow-[0_8px_30px_rgba(0,0,0,0.16)] motion-safe:animate-[cc-pop_120ms_ease-out]">
-      {items.map((it, i) =>
+      {items.map((it, i) => // oxlint-disable-next-line jsx-a11y/control-has-associated-label -- non-focusable menu separator needs no label
         it === 'sep' ? <div key={`s${i}`} role="separator" className="my-1 h-px bg-line" /> : (
           <button key={it.label} type="button" role="menuitem" tabIndex={-1} onClick={() => { onClose(); it.onSelect(); }}
             className={clsx('flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left outline-none hover:bg-hover focus-visible:bg-hover focus-visible:outline-none', it.danger && 'text-danger')}>

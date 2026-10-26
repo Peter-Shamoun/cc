@@ -54,11 +54,13 @@ export function SearchDialog({ threads, search, onOpen, onNew, onClose }: { thre
           className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-fg-subtle focus-visible:outline-none" />
         <button type="button" onClick={onClose} className="shrink-0 rounded-md px-2 py-1 text-sm font-medium text-fg-muted hover:bg-hover hover:text-fg sm:hidden">Cancel</button>
       </div>
+      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-to-interactive-role -- combobox popup; driven from the search input via aria-activedescendant */}
       <ul id={lid} role="listbox" aria-label="Results" className="scrollbar-thin max-h-[min(440px,60vh)] overflow-y-auto p-2 text-sm max-sm:max-h-none max-sm:flex-1">
         {hits && hits.length === 0 && <li className="px-3 py-8 text-center text-fg-subtle" role="presentation">No chats match “{q}”</li>}
         {rows.map((r, i) => (
           <li key={r.key} role="presentation">
             {r.kind === 'thread' && r.group && <div className="px-3 pb-1 pt-3 text-xs font-medium text-fg-subtle" role="presentation">{r.group}</div>}
+            {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/interactive-supports-focus -- combobox option; driven from the search input via aria-activedescendant */}
             <div id={`${lid}-${i}`} role="option" aria-selected={i === active} onMouseMove={() => setActive(i)} onClick={() => pick(r)}
               className={clsx('flex cursor-pointer items-start gap-3 rounded-xl px-3 py-2.5', i === active && 'bg-hover')} data-testid="search-result">
               {r.kind === 'new' ? (<><SquarePen size={17} className="mt-0.5 shrink-0" /><span>New chat</span></>) : (

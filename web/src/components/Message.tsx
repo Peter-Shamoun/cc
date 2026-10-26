@@ -177,7 +177,7 @@ function FeedbackPanel({ onClose, onSubmit }: { onClose: () => void; onSubmit: (
     el.scrollIntoView?.({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
     el.querySelector<HTMLButtonElement>('button[aria-pressed]')?.focus({ preventScroll: true });
   }, []);
-  return (
+  return ( // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Escape delegated from focused children
     <div ref={ref} className="mt-2 scroll-mb-28 rounded-xl border border-line bg-bg p-3 font-sans text-sm" data-testid="feedback-panel" role="group" aria-label="Tell us more"
       onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }}>
       <div className="mb-2 flex items-center justify-between">
