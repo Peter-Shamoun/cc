@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { LIVE, open, injectStream, turn, textPart, composer, waitIdle } from './helpers';
 
 /** Performance budgets: 500-message thread, 10k-row table. Numbers go to the QA scorecard. */
