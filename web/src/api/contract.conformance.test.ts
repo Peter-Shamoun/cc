@@ -116,6 +116,26 @@ const CASES: { [K in StreamEvent['type']]: () => void } = {
     const v = run([start(), s({ type: 'code.delta', partId: 'q', delta: 'SELECT ' }), s({ type: 'code.delta', partId: 'q', delta: '1' })]);
     expect(v.parts[0]).toMatchObject({ type: 'code', code: 'SELECT 1' });
   },
+  'table.start': () => {
+    const cols = [{ key: 'payer', label: 'Payer', type: 'string' }];
+    const v = run([start(), s({ type: 'table.start', partId: 't', columns: cols, title: 'Result' })]);
+    expect(v.parts[0]).toMatchObject({ type: 'table', id: 't', rows: [], rowCount: 0, title: 'Result' });
+    expect(v.streamingTables).toEqual(['t']);
+    // aborted before the complete part: the partial table is dropped
+    const ended = run([s({ type: 'message.end', messageId: 'm1', finishReason: 'aborted', usage: { queries: 0, elapsedMs: 1 } })], v);
+    expect(ended.parts).toEqual([]);
+  },
+  'table.rows': () => {
+    const cols = [{ key: 'payer', label: 'Payer', type: 'string' }];
+    const v = run([start(), s({ type: 'table.start', partId: 't', columns: cols }), s({ type: 'table.rows', partId: 't', offset: 0, rows: [['A'], ['B']] }),
+      s({ type: 'table.rows', partId: 't', offset: 1, rows: [['B'], ['C']] })]);
+    expect(v.parts[0]).toMatchObject({ rows: [['A'], ['B'], ['C']], rowCount: 3 });
+    const done = run([s({ type: 'part', part: { type: 'table', id: 't', columns: cols, rows: [['A'], ['B'], ['C']], rowCount: 80 } })], v);
+    expect(done.parts).toHaveLength(1);
+    expect(done.parts[0]).toMatchObject({ rowCount: 80 });
+    expect(done.streamingTables).toEqual([]);
+    expect(run([s({ type: 'table.rows', partId: 'zz', offset: 0, rows: [['x']] })], done).parts).toEqual(done.parts);
+  },
   part: () => {
     const v = run([start(), s({ type: 'part', part: { type: 'callout', id: 'c', tone: 'info', body: 'a' } }), s({ type: 'part', part: { type: 'callout', id: 'c', tone: 'warning', body: 'b' } })]);
     expect(v.parts).toHaveLength(1);

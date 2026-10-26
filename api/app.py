@@ -29,7 +29,7 @@ from api.backends import SCENARIO_CONFIG, AuthError, DemoAuth, detect_scenario, 
 from api.contract import CONTRACT_VERSION, schema as contract_schema
 from api.ids import new_id
 from api.live import Cancelled, LiveTap
-from api.mapping import outcome_parts
+from api.mapping import outcome_parts, report_artifacts
 from api.redact import install_log_redaction
 from api.security import (MAX_BODY_BYTES, SESSION_COOKIE, BodyLimitMiddleware, CsrfMiddleware, ErrorShieldMiddleware,
                           SecurityHeadersMiddleware)
@@ -43,6 +43,8 @@ from api.transcripts import CustomerKeyDisabled, make_store
 
 log = logging.getLogger("cc.api")
 _SAFE_KEY = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,40}")
+#: rows per ``table.rows`` event (contract 1.9.0)
+TABLE_CHUNK_ROWS = 10
 NO_STORE = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
 
 
@@ -436,6 +438,22 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             run.events.append((seq, event))
             run.notify()
 
+        def stream_table(part: dict):
+            """1.9.0 (§5.1): announce the table, then its preview rows in chunks. The complete ``part`` follows."""
+            start = {"type": "table.start", "partId": part["id"], "columns": part["columns"]}
+            for key in ("title", "sensitivity", "stepId", "sqlPartId"):
+                if part.get(key) is not None:
+                    start[key] = part[key]
+            emit(start)
+            rows = part["rows"]
+            for offset in range(0, len(rows), TABLE_CHUNK_ROWS):
+                if run.cancelled.is_set():
+                    return
+                emit({"type": "table.rows", "partId": part["id"], "offset": offset,
+                      "rows": rows[offset:offset + TABLE_CHUNK_ROWS]})
+                if settings.stream_delay_seconds:
+                    time.sleep(settings.stream_delay_seconds)
+
         def work():
             parts: list[dict] = []
             finish = "stop"
@@ -461,6 +479,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 parts, finish = outcome_parts(answer, ctx.principal, downloads.scoped(conversation_id), elapsed_ms=elapsed, question=question,
                                               ask_args=tap.ask_args, refuse_args=tap.refuse_args,
                                               legacy_tools=legacy_tools)
+                if scenario == "report" and finish == "stop":
+                    parts = report_artifacts(parts)
             except Cancelled:
                 finish = "aborted"
                 if tap is not None:
@@ -493,6 +513,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                             time.sleep(settings.stream_delay_seconds)
                     emit({"type": "text.end", "partId": part["id"]})
                 else:
+                    if part["type"] == "table" and part.get("rows"):
+                        stream_table(part)
                     emit({"type": "part", "part": part})
                     if part["type"] == "clarification" and not run.discarded.is_set():
                         clarifications[part["clarificationId"]] = {
