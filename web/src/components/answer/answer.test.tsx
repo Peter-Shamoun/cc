@@ -68,7 +68,7 @@ describe('answer surface: components', () => {
     rerender(<AssistantTurn msg={viewOf('dup-denials')} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} />);
     expect(screen.getByTestId('step-summary')).toHaveAttribute('aria-expanded', 'false');
     // QA-A10: one "Thought for …" row; the counts join the header once it is expanded.
-    expect(screen.getByTestId('step-summary').textContent).toMatch(/^Thought for \d+(\.\d)?s(all failures repaired)?$/);
+    expect(screen.getByTestId('step-summary').textContent).toMatch(/^Thought for \d+(\.\d)?s(, all failures repaired)?$/);
     expect(screen.queryByTestId('reasoning')).toBeNull();
     fireEvent.click(screen.getByTestId('step-summary'));
     expect(screen.getByTestId('step-summary').textContent).toMatch(/· Ran 2 queries, 1 repair, 4 checks, compared candidates/);
