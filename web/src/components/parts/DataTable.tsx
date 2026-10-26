@@ -204,7 +204,7 @@ const DataTableView = memo(function DataTableView({ part, onOpen, full }: DataTa
                 const dir = sort?.index === i ? sort.dir : null;
                 return (
                   <th key={`${i}:${col.key}`} scope="col" aria-sort={dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : 'none'} title={col.description} style={fixed(widths[i])}
-                    className={clsx('group/th relative border-b border-line px-3 py-2 font-semibold whitespace-nowrap', numeric ? 'text-right' : 'text-left', widths[i] !== undefined && 'overflow-hidden text-ellipsis')}>
+                    className={clsx('group/th relative border-b border-line-strong px-3 py-2 font-semibold whitespace-nowrap', numeric ? 'text-right' : 'text-left', widths[i] !== undefined && 'overflow-hidden text-ellipsis')}>
                     <button type="button" disabled={!!col.phi || withheld} onClick={() => cycle(i)} className={clsx('inline-flex items-center gap-1', numeric && 'flex-row-reverse')}>
                       {col.label}
                       {col.phi && <ShieldAlert size={12} className="text-fg-subtle" aria-label="PHI, masked" />}

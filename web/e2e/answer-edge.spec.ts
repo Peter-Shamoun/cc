@@ -77,4 +77,40 @@ test.describe('answer edge cases', () => {
     await page.hover('#probe-link');
     await expect.poll(() => page.$eval('#probe-link', (a) => { const cs = getComputedStyle(a); return cs.textDecorationColor === cs.color; })).toBe(true);
   });
+
+  test('code block: long lines scroll inside the block, never the page; Wrap lines wraps them', async ({ page }) => {
+    await page.setViewportSize({ width: 800, height: 800 });
+    await open(page, MOCK);
+    await ask(page, 'What was our denial rate by payer last quarter?');
+    await lastAssistant(page).getByRole('button', { name: /View SQL/i }).first().click();
+    const block = lastAssistant(page).getByTestId('code-block').first();
+    await expect(block).toBeVisible();
+    // Make one line very long (synthetic) to probe the layout.
+    await block.locator('pre').first().evaluate((pre) => { pre.textContent = `SELECT ${'payer_name_column, '.repeat(40)}1 FROM claims`; });
+    const body = block.locator('.shiki-wrap');
+    const m = await body.evaluate((el) => ({ sw: el.scrollWidth, cw: el.clientWidth }));
+    expect(m.sw).toBeGreaterThan(m.cw);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+    await block.hover();
+    await block.getByRole('button', { name: 'Wrap lines' }).click();
+    const w = await body.evaluate((el) => ({ sw: el.scrollWidth, cw: el.clientWidth }));
+    expect(w.sw).toBeLessThanOrEqual(w.cw + 1);
+  });
+
+  test('turn spacing: question → answer and answer → next question', async ({ page }) => {
+    await open(page, MOCK);
+    await ask(page, 'What was our denial rate by payer last quarter?');
+    await ask(page, 'Total paid by payer');
+    const g = await page.evaluate(() => {
+      const us = [...document.querySelectorAll('[data-testid="msg-user"]')];
+      const as = [...document.querySelectorAll('[data-testid="msg-assistant"]')];
+      const r = (e: Element) => e.getBoundingClientRect();
+      return { qToA: Math.round(r(as[0]).top - r(us[0]).bottom), aToQ: Math.round(r(us[1]).top - r(as[0]).bottom) };
+    });
+    console.log('turn spacing', JSON.stringify(g));
+    expect(g.qToA).toBeGreaterThanOrEqual(12);
+    expect(g.qToA).toBeLessThanOrEqual(32);
+    expect(g.aToQ).toBeGreaterThanOrEqual(24);
+    expect(g.aToQ).toBeLessThanOrEqual(56);
+  });
 });

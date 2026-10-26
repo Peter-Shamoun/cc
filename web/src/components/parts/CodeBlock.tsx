@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight, Database, Download, EyeOff, Maximize2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Database, Download, EyeOff, Maximize2, WrapText } from 'lucide-react';
 import type { CodePart } from '../../lib/contract';
 import { CopyButton, IconButton } from '../ui';
 import { downloadText } from '../../lib/csv';
@@ -32,7 +32,6 @@ function highlighter() {
 const KNOWN = new Set(['sql', 'python', 'json', 'typescript', 'bash']);
 const EXT: Record<string, string> = { sql: 'sql', python: 'py', json: 'json', typescript: 'ts', bash: 'sh' };
 
-/** ChatGPT-style code block (spec §1.2b): one rounded container, small label top-left, copy top-right. */
 /**
  * Contract 1.14.0 §10: the shown SQL has patient-bearing literals replaced by `?`. Say so, quietly, next to the
  * SQL; the executed SQL is unchanged, and the shown text is for reading, never offered as runnable.
@@ -46,9 +45,16 @@ export function MaskedNote({ count }: { count: number }) {
   );
 }
 
+/**
+ * Code block (spec §1.2b), as observed in ChatGPT/Claude: one quiet rounded container, the language small at top-left,
+ * a labelled "Copy code" at top-right, secondary actions (wrap, download, open) on hover. Long lines scroll inside the
+ * block (never the page); Wrap lines soft-wraps them instead.
+ */
 export function CodeBlock({ code, language, title, onOpen, tall, masked }: { code: string; language: string; title?: string; onOpen?: () => void; tall?: boolean; masked?: number }) {
   const [html, setHtml] = useState<SafeHtml | null>(null);
+  const [wrap, setWrap] = useState(false);
   const { palette } = useTheme();
+  const label = language && language !== 'text' ? language : '';
   const copyable = masked && masked > 0 ? `${maskComment(masked)}\n${code}` : code;
   useEffect(() => {
     let alive = true;
@@ -69,8 +75,11 @@ export function CodeBlock({ code, language, title, onOpen, tall, masked }: { cod
   return (
     <div className="group/code relative my-4 overflow-hidden rounded-xl bg-[var(--code-bg)]" data-testid="code-block">
       <div className="flex items-center justify-between px-4 pt-2 text-xs text-fg-subtle">
-        <span className="flex min-w-0 items-center gap-2"><span className="truncate">{title ? `${language} · ${title}` : language}</span>{!!masked && masked > 0 && <MaskedNote count={masked} />}</span>
+        <span className="flex min-w-0 items-center gap-2"><span className="truncate" data-testid="code-lang">{[label, title].filter(Boolean).join(' · ')}</span>{!!masked && masked > 0 && <MaskedNote count={masked} />}</span>
         <div className="flex items-center gap-0.5">
+          <IconButton label={wrap ? 'Don\'t wrap lines' : 'Wrap lines'} aria-pressed={wrap} className="h-7 w-7 opacity-0 group-hover/code:opacity-100 focus:opacity-100 [@media(hover:none)]:opacity-100" onClick={() => setWrap((w) => !w)}>
+            <WrapText size={14} />
+          </IconButton>
           <IconButton label="Download" className="h-7 w-7 opacity-0 group-hover/code:opacity-100 focus:opacity-100 [@media(hover:none)]:opacity-100" onClick={() => downloadText(title ?? `snippet.${EXT[language] ?? 'txt'}`, copyable, 'text/plain')}>
             <Download size={14} />
           </IconButton>
@@ -79,10 +88,10 @@ export function CodeBlock({ code, language, title, onOpen, tall, masked }: { cod
               <Maximize2 size={14} />
             </IconButton>
           )}
-          <CopyButton text={copyable} label="Copy code" className="h-7 w-7" />
+          <CopyButton text={copyable} label="Copy code" withText className="h-7" />
         </div>
       </div>
-      <div tabIndex={0} aria-label={`${language} code`} className={tall ? 'shiki-wrap overflow-auto' : 'shiki-wrap max-h-[480px] overflow-auto'}>
+      <div tabIndex={0} aria-label={`${label || 'Plain'} code`} data-wrap={wrap || undefined} className={tall ? 'shiki-wrap overflow-auto' : 'shiki-wrap max-h-[480px] overflow-auto'}>
         {html ? <div dangerouslySetInnerHTML={{ __html: html }} /> : <pre className="font-mono"><code>{code}</code></pre>}
       </div>
     </div>

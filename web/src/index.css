@@ -122,6 +122,7 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -
 @keyframes cc-pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.8); } }
 
 .shiki-wrap pre { margin: 0; padding: 1rem; overflow: visible; font-size: 13px; line-height: 1.6; background: transparent !important; }
+.shiki-wrap[data-wrap] pre, .shiki-wrap[data-wrap] code { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
 .dark .shiki, .dark .shiki span { color: var(--shiki-dark) !important; }
 .shimmer { animation: cc-shimmer 1.6s linear infinite; }
 @keyframes cc-shimmer { 0%, 100% { color: var(--fg-muted); } 50% { color: var(--fg); } }
