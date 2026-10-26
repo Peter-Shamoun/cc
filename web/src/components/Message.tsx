@@ -12,6 +12,7 @@ import { CopyButton, IconButton } from './ui';
 import { StepTimeline } from './answer/StepTimeline';
 import { queriesOf, queryForTable, SqlInspector, SqlWithheldNote, TableSql } from './answer/SqlInspector';
 import { AbstainCard, ClarifyCard, EscalationNote, StoppedNote, TableSkeleton } from './answer/States';
+import { ClarifyForm, isMultiClarification } from './answer/ClarifyForm';
 import { AnswerMeta } from './answer/AnswerMeta';
 import { SourcesChip, consulted } from './answer/Sources';
 import { escalationsOf, partsOf, stepsOf, usageOf, type AnyView } from './answer/normalize';
@@ -256,7 +257,7 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
     if (p.type === 'reasoning' && timeline) continue; // shown inside the timeline
     if (p.type === 'code' && p.role === 'query' && linkedSql.has(p.id)) continue; // shown under its table
     if (p.type === 'abstain') { blocks.push(<AbstainCard key={p.id} part={p} onReply={readOnly ? undefined : reply} />); continue; }
-    if (p.type === 'clarification') { blocks.push(<ClarifyCard key={p.id} part={p} onReply={readOnly ? undefined : reply} active={!readOnly && isLast && !msg.streaming} />); continue; }
+    if (p.type === 'clarification') { const C = isMultiClarification(p) ? ClarifyForm : ClarifyCard; blocks.push(<C key={p.id} part={p as never} onReply={readOnly ? undefined : reply} active={!readOnly && isLast && !msg.streaming} />); continue; }
     blocks.push(<PartView key={p.id} part={p as Part} msg={msg} liveTurn={liveTurn} open={open} openArtifact={onOpen} onRetry={readOnly ? undefined : onRegenerate} onEdit={readOnly ? undefined : onEdit} />);
     if (p.type === 'table') {
       const q = queryForTable(view, p);
