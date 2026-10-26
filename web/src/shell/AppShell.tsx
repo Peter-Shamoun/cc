@@ -252,7 +252,7 @@ function ShellInner() {
   const shareConv = adapter instanceof HttpAnalystAdapter && chat.convId && !chat.busy ? chat.convId : null;
   const shareLink = useMemo<ShareLinkApi | undefined>(() => (shareConv && adapter instanceof HttpAnalystAdapter ? {
     get: () => adapter.getShare(shareConv),
-    set: (includeData) => adapter.setShare(shareConv, includeData),
+    set: (includeData, days) => adapter.setShare(shareConv, includeData, days),
     revoke: () => adapter.revokeShare(shareConv),
     copy: (url) => copyText(url),
   } : undefined), [adapter, shareConv]);
@@ -627,7 +627,7 @@ function ShellInner() {
       {dialog === 'share' && (
         <ShareDialog title={currentTitle} firstQuestion={chat.messages.find((m) => m.role === 'user')?.text} messageCount={chat.messages.length}
           onClose={() => setDialog(null)} onCopyMarkdown={() => { void copyCurrent(); }} onDownloadMarkdown={exportCurrent}
-          onDownloadJson={serverExport ? () => serverExport('json') : undefined} link={shareLink}
+          onDownloadJson={serverExport ? () => serverExport('json') : undefined} link={shareLink} expiry={strategy.caps.shareExpiry}
           onPrint={() => { setDialog(null); requestAnimationFrame(() => window.print()); }} />
       )}
       {dialog === 'settings' && <SettingsDialog onClose={() => setDialog(null)} storeMode={store.mode} enterToSend={enterToSend} setEnterToSend={setEnterToSend} onExportAll={exportAll} threadCount={allThreads.length}
