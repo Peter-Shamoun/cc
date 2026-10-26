@@ -25,6 +25,10 @@ describe('header rules (scripts/header_check.mjs)', () => {
       .toContain("CSP: script-src must not allow 'unsafe-inline'");
     expect(checkHeaders('html', { ...h, 'Content-Security-Policy': h['Content-Security-Policy'].replace("frame-ancestors 'none'", "frame-ancestors *") }))
       .toContain("CSP: frame-ancestors must be 'none'");
+    expect(checkHeaders('html', { ...h, 'Content-Security-Policy': h['Content-Security-Policy'].replace("require-trusted-types-for 'script'; ", '') }))
+      .toContain("CSP: require-trusted-types-for 'script' missing (Trusted Types)");
+    expect(checkHeaders('html', { ...h, 'Content-Security-Policy': h['Content-Security-Policy'].replace('trusted-types cc-html default', 'trusted-types *') }))
+      .toContain('CSP: trusted-types must name policies, not * or allow-duplicates (prod)');
     const { 'Cache-Control': _cc, ...noCache } = h;
     expect(checkHeaders('html', noCache)).toContain('missing Cache-Control');
     expect(checkHeaders('html', { ...h, 'X-Content-Type-Options': 'sniff' })[0]).toMatch(/nosniff/);

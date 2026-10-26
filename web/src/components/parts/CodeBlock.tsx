@@ -4,6 +4,7 @@ import type { CodePart } from '../../lib/contract';
 import { CopyButton, IconButton } from '../ui';
 import { downloadText } from '../../lib/csv';
 import { useTheme } from '../../lib/theme';
+import { shikiHtml, type SafeHtml } from '../../security/trustedTypes';
 
 /**
  * Fine-grained Shiki: only the five languages and four themes we render, and the JavaScript regex engine
@@ -32,7 +33,7 @@ const EXT: Record<string, string> = { sql: 'sql', python: 'py', json: 'json', ty
 
 /** ChatGPT-style code block (spec §1.2b): one rounded container, small label top-left, copy top-right. */
 export function CodeBlock({ code, language, title, onOpen, tall }: { code: string; language: string; title?: string; onOpen?: () => void; tall?: boolean }) {
-  const [html, setHtml] = useState<string | null>(null);
+  const [html, setHtml] = useState<SafeHtml | null>(null);
   const { palette } = useTheme();
   useEffect(() => {
     let alive = true;
@@ -41,7 +42,7 @@ export function CodeBlock({ code, language, title, onOpen, tall }: { code: strin
       const [light, dark] = palette === 'paper' ? ['vitesse-light', 'vitesse-dark'] : ['github-light', 'github-dark'];
       highlighter()
         .then((h) => h.codeToHtml(code, { lang: language, themes: { light, dark }, defaultColor: 'light' }))
-        .then((out) => alive && setHtml(out))
+        .then((out) => alive && setHtml(shikiHtml(out)))
         .catch(() => {});
     }, 100);
     return () => {

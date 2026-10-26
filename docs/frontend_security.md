@@ -8,7 +8,7 @@ Owner: platform team (frontend SOTA sprint). Source of truth:
 
 | Header | Value |
 |---|---|
-| Content-Security-Policy | `default-src 'self'; script-src 'self' 'nonce-…'; style-src 'self' 'nonce-…'; style-src-elem 'self' 'nonce-…'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; media-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-src 'none'; frame-ancestors 'none'; upgrade-insecure-requests` |
+| Content-Security-Policy | `default-src 'self'; script-src 'self' 'nonce-…'; style-src 'self' 'nonce-…'; style-src-elem 'self' 'nonce-…'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; media-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-src 'none'; frame-ancestors 'none'; require-trusted-types-for 'script'; trusted-types cc-html default; upgrade-insecure-requests` (dev adds `'allow-duplicates'` for HMR) |
 | Cache-Control | `no-store` on HTML (and everything outside `/assets/`); hashed `/assets/*` are `public, max-age=31536000, immutable` |
 | Referrer-Policy | `no-referrer` |
 | X-Content-Type-Options | `nosniff` |
@@ -187,3 +187,24 @@ No response may carry `ETag`, `Last-Modified`, `Expires` or `Age`, and forged `I
 | `GET`/`PUT`/`DELETE …/share`, `GET /api/shared/{id}` | share link, shared view | no-store ✓, shared view `no-referrer` |
 
 The audit found no gaps: `SecurityHeadersMiddleware` overrides any per-route value on every status. The web side is checked separately by `header_rules.mjs`: HTML is no-store, and hashed assets are no-store or immutable.
+
+## Trusted Types
+
+The web CSP enforces Trusted Types: `require-trusted-types-for 'script'; trusted-types cc-html default`. A plain string reaching a DOM-XSS sink now **throws** instead of executing. That covers `innerHTML`/`outerHTML`/`insertAdjacentHTML`, `document.write`, `<script>` src/text and `eval`-like calls, whether in our code or any dependency. A DOM-XSS bug becomes a broken render, not script execution. The code is in `web/src/security/trustedTypes.ts`.
+
+**Policies:**
+- **`cc-html`** has exactly two producers:
+  - `shikiHtml()`, Shiki's highlighted code (CodeBlock's `dangerouslySetInnerHTML`). It only accepts markup starting with `<pre` and containing no script/iframe/object/embed/link/meta/base/form/style/img/svg tags, `javascript:` or quoted `on*=` handlers. Anything else falls back to plain `<pre><code>` text.
+  - `tooltipHtml()`, chart tooltips (vega-tooltip's `formatTooltip`). It produces the same `<h2>` + key/value `<table>` markup as vega-tooltip's default, with our own escaping of `& < > " '`. It **drops the `image` field**, so a model-authored spec can't make the tooltip load a URL.
+- **`default`**, the browser's fallback for plain strings, accepts only `''`: vega-embed clears its container with `innerHTML = ''` on every render. Any other string is rejected.
+- `installTrustedTypes()` runs in main.tsx before the first render.
+
+**Why React works:** React 18 passes `dangerouslySetInnerHTML.__html` straight to `innerHTML`, so a TrustedHTML object goes through. Nothing else in the app or its rendering dependencies (react-markdown, KaTeX, Vega/vega-lite on the AST interpreter, Shiki) uses a sink.
+
+**Verification:**
+- `scripts/csp_check.mjs` replays every mock fixture under the enforcing CSP with no violations.
+- Manual run in headless Chrome: code is highlighted (73 Shiki spans), the chart tooltip renders, and a deliberate `innerHTML = '<b>x</b>'` is blocked. Shots are in shots/platform/trusted-types/.
+- `scripts/header_rules.mjs` fails the header check if `require-trusted-types-for 'script'` is missing, or if `trusted-types` is `*` or allows duplicates.
+
+**Adding a sink:** don't. Render with React elements. If a library needs HTML, add a narrowly-validated producer to `trustedTypes.ts` with a test, and say why here. Never widen `default` and never add `'allow-duplicates'` or `*` in production. Browsers without Trusted Types (Firefox, older Safari) ignore the directive; React's escaping still applies there.
+
