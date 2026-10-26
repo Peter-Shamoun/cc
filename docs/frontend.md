@@ -108,6 +108,18 @@ Known 4xx cards show the server's fixed message, capped at 300 characters. The a
 - **Huge.** One SSE line that grows past `maxFrameBytes` (32 MiB) without a line break is refused before the decoder buffers it. The answer ends with what already arrived plus "Answer too large to show". It isn't re-attached, because the replay would send the same event. Large but complete events (a 200 KB text part) pass. Tests: `src/adapters/http.guard.test.ts`.
 - **Clock skew.** Server deadlines are judged by the server's clock. `src/lib/serverClock.ts` keeps the offset from each stream response's `Date` header (applied past 2 s). `useExpired` (download and clarification expiry) uses it. A Retry-After HTTP date is measured against the same response's `Date` (RFC 9110). With a local clock an hour off, "retry in 5 s" stays 5 s instead of retrying at once or giving up. `1.5` or `-3` is rejected rather than parsed as a date. Tests: `src/lib/serverClock.test.tsx`.
 
+### Non-stream calls: rate limits and oversized bodies
+
+`web/src/lib/fetchGuard.ts` covers the conversation list, search and detail, shares, feedback and capabilities:
+- **429:** `fetchRetrying` waits out Retry-After (seconds, or an HTTP date measured against the response's `Date`), up to 10 s and at most 2 times, then returns the 429 to the normal error path. A 429 means the server did nothing, so the identical request is safe to repeat. Before this, a 429 on `/api/capabilities` silently fell back to the demo model list.
+- **Oversized bodies:** `readJsonCapped` refuses a body over the cap (by Content-Length, or by counting while reading) before parsing it. The caps are 8 MiB for list and search pages, 32 MiB for a conversation or shared chat, and 1 MiB for capabilities. The list reports `response_too_large`, and the shared view shows its "couldn't load" state.
+
+Tests: `src/lib/fetchGuard.test.ts`.
+
+### Theme across tabs
+
+Changing theme or palette in one tab updates every open tab, as in ChatGPT and Claude. `onPrefChange` in `lib/prefs.ts` listens to the `storage` event, which fires only in other tabs and only when the value changes, so tabs can't ping-pong. Values outside the allowlist are ignored, and a stored junk palette falls back to `neutral`. Tests: `src/lib/themeSync.test.tsx`.
+
 ## Artifact panel
 
 Opens from any table, chart, code or image (and artifact cards). It's resizable by dragging or with the arrow keys (double-click resets to 50%, min 360 px, max 75%). It has segmented tabs (Table | SQL, Chart | Spec | Data, Code, Preview), Copy, Download, Full screen and Close (Esc). Opening it collapses the sidebar on screens narrower than 1400 px.
@@ -162,3 +174,9 @@ Recommendation: keep the Vite app (structure already mirrors the template, small
 - An ESLint rule banning direct `localStorage` use outside `prefs.ts`, and axe-core checks.
 - Shiki currently ships its full language bundle as lazy chunks. Switch to `shiki/core` with only sql, python, json and bash.
 - Playwright visual comparisons against logged-in reference screenshots.
+
+## Offline/online flapping
+
+- The browser fires `online` before the link actually carries traffic, so the first reconnect after an offline period often fails. `HttpAnalystAdapter` gives that one try for free (a 250 ms backoff that doesn't count against `maxRetries`). It gets one per real offline period, which keeps it bounded. Replayed events are still de-duplicated by `seq`.
+- The offline banner uses `useSettledOnline()` (`lib/useOnline.ts`): offline shows only after 1 s of continuous offline, and the banner hides as soon as the connection is back. The Send button still follows the raw `navigator.onLine`, so nothing is sent into a blip.
+- Tests: `adapters/http.flapping.test.ts`.

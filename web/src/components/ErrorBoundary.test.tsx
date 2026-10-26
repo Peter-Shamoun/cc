@@ -74,6 +74,37 @@ describe('crash screen', () => {
   });
 });
 
+describe('crash fallback fidelity (QA-A23 treatment, no pills or boxed cards)', () => {
+  const classesIn = (el: Element) => [el, ...Array.from(el.querySelectorAll('*'))].map((e) => e.getAttribute('class') ?? '').join(' ');
+
+  it('section crash is a quiet inline notice: no filled card, no border, plain text controls', () => {
+    const onDismiss = vi.fn();
+    render(<ErrorBoundary scope="section" name="DataTable" onDismiss={onDismiss} dismissLabel="Close panel"><Boom /></ErrorBoundary>);
+    const box = screen.getByTestId('section-crash');
+    const cls = classesIn(box);
+    expect(cls).not.toMatch(/\b(rounded-(full|xl|2xl|lg)|border(-line)?|bg-muted|bg-elev|shadow(-\w+)?)\b/);
+    expect(cls).not.toMatch(/gradient|backdrop-blur/);
+    expect(box.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true'); // small icon, decorative
+    for (const name of ['Try again', 'Close panel']) {
+      const b = screen.getByRole('button', { name });
+      expect(b.className).not.toMatch(/\b(rounded|border|px-|bg-)/); // a text control, not a button chip
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Close panel' }));
+    expect(onDismiss).toHaveBeenCalledOnce();
+  });
+
+  it('app crash screen has no pill buttons and a text "Copy diagnostics" control', () => {
+    render(<ErrorBoundary><Boom /></ErrorBoundary>);
+    expect(classesIn(screen.getByTestId('app-crash'))).not.toMatch(/rounded-full|gradient|shadow-(lg|xl|2xl)/);
+    expect(screen.getByRole('button', { name: 'Copy diagnostics' }).className).not.toMatch(/\b(rounded|border)/);
+  });
+
+  it('a caller-supplied fallbackClassName (panel-shaped) still wins over the inline default', () => {
+    render(<ErrorBoundary scope="section" fallbackClassName="panel-x"><Boom /></ErrorBoundary>);
+    expect(screen.getByTestId('section-crash').className).toBe('panel-x');
+  });
+});
+
 describe('diagnostics helpers', () => {
   it('reduces the user agent to family, major version and OS', () => {
     expect(browserFamily('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.7390.54 Safari/537.36 Edg/141.0.3537.57')).toBe('Edge 141 · Windows');

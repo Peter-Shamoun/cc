@@ -1,11 +1,12 @@
 import { Component, type ReactNode } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { reportError, type ErrorRecord } from '../lib/errorReporting';
 import { buildDiagnostics, isChunkLoadError } from '../lib/diagnostics';
 import { copyText } from '../lib/csv';
 
 interface Props {
   children: ReactNode;
-  /** 'app' (default) replaces the page with the crash screen. 'section' shows an inline card with "Try again". */
+  /** 'app' (default) replaces the page with the crash screen. 'section' shows a quiet inline notice with "Try again". */
   scope?: 'app' | 'section';
   /** Allowlisted component name for the report's context, e.g. 'App' or 'ArtifactPanel'. Never user text. */
   name?: string;
@@ -63,17 +64,21 @@ export class ErrorBoundary extends Component<Props, State> {
     const diag = rec ? buildDiagnostics(rec) : '';
 
     if (this.props.scope === 'section') {
+      // Like the answer's error line (QA-A23) and ChatGPT/Claude: a quiet inline notice, small icon, no filled card or
+      // border, and plain text controls rather than pill buttons.
+      const link = 'font-medium text-fg underline-offset-2 hover:underline focus-visible:underline';
       return (
-        <div role="alert" data-testid="section-crash" data-section={this.props.name} className={this.props.fallbackClassName ?? 'my-2 rounded-xl border border-line bg-muted p-3 text-sm text-fg-muted'}>
-          <p>{chunk ? "This part couldn't load. Check your connection." : "This part couldn't be displayed."}{rec && <span className="ml-1 text-xs text-fg-subtle">Ref {rec.id}</span>}</p>
-          <button type="button" onClick={this.reset} className="mt-2 rounded-full border border-line px-3 py-1 text-xs font-medium text-fg hover:bg-hover">
-            Try again
-          </button>
-          {this.props.onDismiss && (
-            <button type="button" onClick={this.props.onDismiss} className="ml-2 mt-2 rounded-full border border-line px-3 py-1 text-xs font-medium text-fg hover:bg-hover">
-              {this.props.dismissLabel ?? 'Close'}
-            </button>
-          )}
+        <div role="alert" data-testid="section-crash" data-section={this.props.name} className={this.props.fallbackClassName ?? 'my-2 font-sans text-sm text-fg-muted'}>
+          <p className="flex items-start gap-2">
+            <AlertTriangle size={15} aria-hidden className="mt-0.5 shrink-0 text-danger" />
+            <span>{chunk ? "This part couldn't load. Check your connection." : "This part couldn't be displayed."}{rec && <span className="ml-1 text-xs text-fg-subtle">Ref {rec.id}</span>}</span>
+          </p>
+          <p className="mt-1 flex items-center gap-3 pl-[23px] text-xs">
+            <button type="button" onClick={this.reset} className={link}>Try again</button>
+            {this.props.onDismiss && (
+              <button type="button" onClick={this.props.onDismiss} className={link}>{this.props.dismissLabel ?? 'Close'}</button>
+            )}
+          </p>
         </div>
       );
     }
@@ -87,10 +92,10 @@ export class ErrorBoundary extends Component<Props, State> {
             : 'The page hit an unexpected error. Your chats are saved on the server. Reload to continue.'}
         </p>
         <div className="flex flex-wrap items-center justify-center gap-2">
-          <button type="button" autoFocus onClick={() => window.location.reload()} className="rounded-full bg-fg px-4 py-2 text-sm font-medium text-bg hover:opacity-90">
+          <button type="button" autoFocus onClick={() => window.location.reload()} className="rounded-md bg-fg px-4 py-2 text-sm font-medium text-bg hover:opacity-90">
             Reload
           </button>
-          <button type="button" onClick={this.newChat} className="rounded-full border border-line px-4 py-2 text-sm font-medium hover:bg-hover">
+          <button type="button" onClick={this.newChat} className="rounded-md border border-line px-4 py-2 text-sm font-medium hover:bg-hover">
             Start a new chat
           </button>
         </div>
@@ -100,7 +105,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <p className="mt-2 text-fg-muted">Includes no message text or patient data. Below is exactly what gets copied.</p>
             <pre data-testid="crash-diagnostics" className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded-lg border border-line bg-muted p-2 font-mono text-[11px] leading-snug">{diag}</pre>
             <div className="mt-2 flex items-center gap-2">
-              <button type="button" onClick={this.copy} className="rounded-full border border-line px-3 py-1 font-medium text-fg hover:bg-hover">
+              <button type="button" onClick={this.copy} className="font-medium text-fg underline-offset-2 hover:underline focus-visible:underline">
                 Copy diagnostics
               </button>
               <span aria-live="polite">{copied === 'ok' ? 'Copied' : copied === 'fail' ? "Couldn't copy. Select the text above." : ''}</span>

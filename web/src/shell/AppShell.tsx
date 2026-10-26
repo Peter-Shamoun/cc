@@ -20,7 +20,7 @@ import { Header } from './Header';
 import { useStrategy } from './useStrategy';
 import { setFeedbackCapabilities, setFeedbackSink, toFeedbackRequest } from '../lib/feedback';
 import { OfflineBanner } from './OfflineBanner';
-import { useOnline } from '../lib/useOnline';
+import { useOnline, useSettledOnline } from '../lib/useOnline';
 import { usePrinting } from '../lib/usePrinting';
 import { SearchDialog } from './SearchDialog';
 import { useEdgeSwipeToOpen, useSwipeToClose } from './swipe';
@@ -252,7 +252,7 @@ function ShellInner() {
   const shareConv = adapter instanceof HttpAnalystAdapter && chat.convId && !chat.busy ? chat.convId : null;
   const shareLink = useMemo<ShareLinkApi | undefined>(() => (shareConv && adapter instanceof HttpAnalystAdapter ? {
     get: () => adapter.getShare(shareConv),
-    set: (includeData) => adapter.setShare(shareConv, includeData),
+    set: (includeData, days) => adapter.setShare(shareConv, includeData, days),
     revoke: () => adapter.revokeShare(shareConv),
     copy: (url) => copyText(url),
   } : undefined), [adapter, shareConv]);
@@ -519,11 +519,12 @@ function ShellInner() {
     });
     return true;
   };
-  const online = useOnline();
+  const online = useOnline(); // gates Send at once
+  const bannerOnline = useSettledOnline(); // the banner waits out sub-second flaps
   const printing = usePrinting();
   const composer = (autoFocus: boolean, placeholder?: string) => (
     <>
-      {!online && <OfflineBanner />}
+      {!bannerOnline && <OfflineBanner />}
       <Composer onEditLast={editLast} onSend={send} onStop={chat.stop} busy={chat.busy} autoFocus={autoFocus} initial={draft} placeholder={placeholder} draftKey={draftKey} enterToSend={enterToSend} onCommand={onCommand} offline={!online} />
     </>
   );
@@ -627,7 +628,7 @@ function ShellInner() {
       {dialog === 'share' && (
         <ShareDialog title={currentTitle} firstQuestion={chat.messages.find((m) => m.role === 'user')?.text} messageCount={chat.messages.length}
           onClose={() => setDialog(null)} onCopyMarkdown={() => { void copyCurrent(); }} onDownloadMarkdown={exportCurrent}
-          onDownloadJson={serverExport ? () => serverExport('json') : undefined} link={shareLink}
+          onDownloadJson={serverExport ? () => serverExport('json') : undefined} link={shareLink} expiry={strategy.caps.shareExpiry}
           onPrint={() => { setDialog(null); requestAnimationFrame(() => window.print()); }} />
       )}
       {dialog === 'settings' && <SettingsDialog onClose={() => setDialog(null)} storeMode={store.mode} enterToSend={enterToSend} setEnterToSend={setEnterToSend} onExportAll={exportAll} threadCount={allThreads.length}

@@ -1,6 +1,7 @@
-import { noteServerDate, serverNow } from '../lib/serverClock';
+import { noteServerDate } from '../lib/serverClock';
+import { retryAfterOf } from '../lib/fetchGuard';
 import { getShare, loadShared, revokeShare, setShare } from '../contract/share';
-import type { ShareLink, SharedConversation } from '../contract/v1.gen';
+import type { ShareExpiryDays, ShareLink, SharedConversation } from '../contract/v1.gen';
 import type { ErrorPart, StreamEvent } from '../lib/contract';
 import { asSession, type AuthSession } from '../auth/session';
 import type { HttpError } from '../api/contract';
@@ -53,24 +54,7 @@ export function streamGone(): Error {
   return e;
 }
 
-/**
- * An HTTP-date is server time, so it is measured against the same response's `Date` header (RFC 9110 §10.2.3); without
- * one, against the server clock estimate. The local clock alone would retry at once when it runs fast, or wait
- * (or give up) far too long when it runs slow.
- */
-export function retryAfterMs(value: string | null, now = serverNow(), serverDate?: string | null): number | null {
-  if (!value) return null;
-  const v = value.trim();
-  if (/^\d+$/.test(v)) return Number(v) * 1000;
-  if (!/[a-z]/i.test(v)) return null; // "1.5", "-3": not delay-seconds and not a date (Date.parse would guess one)
-  const at = Date.parse(v);
-  if (Number.isNaN(at)) return null;
-  const ref = serverDate ? Date.parse(serverDate) : NaN;
-  return Math.max(0, at - (Number.isNaN(ref) ? now : ref));
-}
-
-/** Retry-After of a response, measured against that response's own `Date`. */
-const retryAfterOf = (res: Response) => retryAfterMs(res.headers.get('retry-after'), serverNow(), res.headers.get('date'));
+export { retryAfterMs } from '../lib/fetchGuard';
 
 const abortError = () => new DOMException('aborted', 'AbortError');
 const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
@@ -187,6 +171,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
     let messageId: string | null = null;
     let lastSeq = -1;
     let retries = 0;
+    let backOnline = false; // set after waiting out an offline period; buys one free reconnect try
     let dropped = false; // between a drop and the first replayed event
     let resumeFallback = !!resume;
     let rateRetries = 0;
@@ -219,7 +204,10 @@ export class HttpAnalystAdapter implements AnalystAdapter {
             });
         } catch (e) {
           if (wire.signal.aborted || signal.aborted) throw abortError();
-          if (messageId !== null && isOffline()) { onConnection?.('offline'); dropped = true; await this.waitOnline(signal); continue; } // offline: wait, don't burn retries
+          if (messageId !== null && isOffline()) { onConnection?.('offline'); dropped = true; await this.waitOnline(signal); backOnline = true; continue; } // offline: wait, don't burn retries
+          // Just came back online: the browser fires 'online' before the link carries traffic. One free, backed-off
+          // try per real offline period (so it stays bounded), instead of spending the reconnect budget on a flap.
+          if (messageId !== null && backOnline) { backOnline = false; onConnection?.('reconnecting'); dropped = true; await this.backoff(1, signal); continue; }
           if (messageId !== null && retries < this.opts.maxRetries) { onConnection?.('reconnecting'); dropped = true; await this.backoff(++retries, signal); continue; }
           if (messageId !== null) throw e;
           // Never reached the server: say why, as a retryable error part (Retry = regenerate).
@@ -293,6 +281,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
             }
             if (ev.type === 'message.start') this.current = messageId = ev.messageId;
             retries = 0;
+            backOnline = false;
             if (dropped) { dropped = false; onConnection?.('live'); }
             yield ev;
             if (ev.type === 'message.end') return;
@@ -314,7 +303,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
         }
         // The stream closed without message.end: a dropped connection.
         if (signal.aborted) throw abortError();
-        if (isOffline()) { onConnection?.('offline'); dropped = true; await this.waitOnline(signal); continue; }
+        if (isOffline()) { onConnection?.('offline'); dropped = true; await this.waitOnline(signal); backOnline = true; continue; }
         if (messageId === null || retries >= this.opts.maxRetries) throw new Error('stream dropped');
         onConnection?.('reconnecting');
         dropped = true;
@@ -372,7 +361,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
   /** Contract 1.11.0 §17: org-scoped, read-only share links. Auth (and the CSRF header on cookie sessions) come from the session. */
   private shareOpts() { return { base: this.base, init: { credentials: 'same-origin' as const, cache: 'no-store' as const, headers: this.headers() } }; }
   getShare(conversationId: string): Promise<ShareLink | null> { return getShare(conversationId, this.shareOpts()); }
-  setShare(conversationId: string, includeData: boolean): Promise<ShareLink> { return setShare(conversationId, includeData, this.shareOpts()); }
+  setShare(conversationId: string, includeData: boolean, expiresInDays?: ShareExpiryDays): Promise<ShareLink> { return setShare(conversationId, includeData, { ...this.shareOpts(), expiresInDays }); }
   revokeShare(conversationId: string): Promise<boolean> { return revokeShare(conversationId, this.shareOpts()); }
   loadShared(shareId: string): Promise<SharedConversation | null> { return loadShared(shareId, this.shareOpts()); }
 

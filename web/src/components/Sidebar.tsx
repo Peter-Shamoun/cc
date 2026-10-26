@@ -5,15 +5,19 @@ import { IconButton } from './ui';
 import { Menu, modKey, useMenu, type MenuItem } from '../shell/primitives';
 import type { ThreadSummary } from '../adapters/types';
 
-const DAY = 86400000;
-/** ChatGPT-style date buckets, computed against local midnight (not a rolling 24h). */
+/**
+ * ChatGPT-style date buckets, by local calendar day (not a rolling 24 h). Day boundaries are built with `new Date(y,
+ * m, d - n)`, never `midnight - n * 24 h`: across a DST change a day is 23 or 25 hours long, and the fixed-length
+ * version put a chat from 23:30 two days ago under "Yesterday". An unparseable timestamp goes to "Older", not "NaN".
+ */
 export function bucket(iso: string, now = new Date()): string {
-  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const t = Date.parse(iso);
-  if (t >= midnight) return 'Today';
-  if (t >= midnight - DAY) return 'Yesterday';
-  if (t >= midnight - 7 * DAY) return 'Previous 7 days';
-  if (t >= midnight - 30 * DAY) return 'Previous 30 days';
+  if (Number.isNaN(t)) return 'Older';
+  const dayStart = (back: number) => new Date(now.getFullYear(), now.getMonth(), now.getDate() - back).getTime();
+  if (t >= dayStart(0)) return 'Today';
+  if (t >= dayStart(1)) return 'Yesterday';
+  if (t >= dayStart(7)) return 'Previous 7 days';
+  if (t >= dayStart(30)) return 'Previous 30 days';
   const d = new Date(t);
   return d.getFullYear() === now.getFullYear() ? d.toLocaleString('en-US', { month: 'long' }) : String(d.getFullYear());
 }

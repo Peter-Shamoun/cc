@@ -5,6 +5,7 @@
  * falls back to DEMO_CAPABILITIES, which mirrors the demo backend. capabilities.test.ts keeps it equal to
  * api/contract/examples/capabilities.json (`python -m api.contract.gen_examples`).
  */
+import { fetchRetrying, readJsonCapped } from '../lib/fetchGuard';
 import { CONTRACT_VERSION } from '../api/contract';
 import type { Capabilities, FeedbackRating, FeedbackReason, ModelOption, StrategyOption } from './v1.gen';
 
@@ -136,13 +137,15 @@ export const DEMO_CAPABILITIES: Capabilities = {
   ],
   "sqlLiteralMasking": "phi",
   "shareExpiry": { "options": [7, 30, 90], "default": 30 },
+  "pinArchive": true,
 };
 
 export async function loadCapabilities(base = '', fetchImpl: typeof fetch = (...a) => fetch(...a)): Promise<Capabilities> {
   try {
-    const res = await fetchImpl(`${base}/api/capabilities`, { credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });
+    // A 429 here would otherwise fall back to the demo capabilities: wait it out first.
+    const res = await fetchRetrying(fetchImpl, `${base}/api/capabilities`, { credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } }, { maxRetries: 1, maxWaitMs: 5000 });
     if (!res.ok) return DEMO_CAPABILITIES;
-    const body = (await res.json()) as Capabilities;
+    const body = await readJsonCapped<Capabilities>(res, 1024 * 1024);
     return Array.isArray(body?.strategies) && Array.isArray(body?.models) ? body : DEMO_CAPABILITIES;
   } catch {
     return DEMO_CAPABILITIES;
