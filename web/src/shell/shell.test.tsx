@@ -128,7 +128,9 @@ describe('shell QA-S1..S8', () => {
     fireEvent.keyDown(box, { key: 'Enter' });
     // sidebar shows the chat while the first answer is still streaming
     await waitFor(() => expect(screen.getAllByText('Denial rate by payer').length).toBeGreaterThan(0));
-    expect(screen.getByRole('log', { name: 'Messages' }).getAttribute('aria-live')).toBe('polite');
+    // QA-S16: the thread is not a live region; only the status region speaks.
+    expect(screen.queryByRole('log')).toBeNull();
+    expect(screen.getByTestId('thread-content').closest('[aria-live]')).toBeNull();
     expect(screen.getByRole('heading', { level: 1, name: 'Denial rate by payer' })).toBeTruthy();
     await waitFor(() => expect(screen.getByTestId('status-live').textContent).toBe('Answer complete'), { timeout: 60000 });
     const follow = screen.getByRole('textbox', { name: 'Message' });

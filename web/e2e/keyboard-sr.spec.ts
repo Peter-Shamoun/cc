@@ -124,7 +124,6 @@ test.describe('screen-reader announcements @desktop', () => {
   });
 
   test('QA-S16: streaming tokens and the thinking timer never land in a live region', async ({ page }) => {
-    gap('QA-S16');
     await open(page, LIVE);
     await record(page);
     await ask(page, 'Which CARC codes drive denials?');
