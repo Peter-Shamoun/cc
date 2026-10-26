@@ -40,7 +40,7 @@ def worker_command(session: str, model: str, effort: str) -> list[str]:
     prompt = ("Run this command with the Bash tool and follow the instructions it prints exactly:\n"
               f"python3 -m analyzer.cli --session {session} briefing\n"
               "Run each command exactly as printed, one command per Bash call: no shell variables, loops, pipes "
-              "or redirection.")
+              "or redirection. Put any argument that contains a $ sign (dollar amounts) in single quotes.")
     command = ["claude", "-p", prompt, "--model", model, "--permission-mode", "dontAsk",
                "--allowedTools", "Bash(python3 -m analyzer.cli:*)", "Bash(cd:*)", "--add-dir", "/tmp", str(ROOT),   # cd outside the start directory needs the directory added
                "--disallowedTools", *DISALLOWED_TOOLS,
