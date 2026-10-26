@@ -57,7 +57,8 @@ def org_policy(customer: str | None) -> dict:
     return policy.get(customer or "", {}) if customer else {}
 
 
-def capabilities(contract_version: str, demo: bool, customer: str | None = None) -> dict:
+def capabilities(contract_version: str, demo: bool, customer: str | None = None,
+                 sql_literal_masking: str = "phi") -> dict:
     """The ``Capabilities`` body for ``customer`` (None: signed out, nothing org-specific). ``config`` never leaves."""
     policy = org_policy(customer)
     off_s, off_m = policy.get("strategies", {}), policy.get("models", {})
@@ -71,7 +72,8 @@ def capabilities(contract_version: str, demo: bool, customer: str | None = None)
               for m in MODELS]
     return {"contractVersion": contract_version, "demo": demo, "scope": "organization" if customer else "public",
             "defaults": {"strategy": DEFAULT_STRATEGY, "model": DEFAULT_MODEL}, "strategies": strategies,
-            "models": models, "feedbackReasons": [dict(r) for r in FEEDBACK_REASONS]}
+            "models": models, "feedbackReasons": [dict(r) for r in FEEDBACK_REASONS],
+            "sqlLiteralMasking": sql_literal_masking if sql_literal_masking in ("phi", "all", "off") else "phi"}
 
 
 def check_options(options: dict, customer: str | None = None) -> str | None:

@@ -1,5 +1,5 @@
 {
-  "contractVersion": "1.13.0",
+  "contractVersion": "1.14.0",
   "demo": true,
   "scope": "public",
   "defaults": {
@@ -123,5 +123,6 @@
       "label": "Something else",
       "rating": "down"
     }
-  ]
+  ],
+  "sqlLiteralMasking": "phi"
 }

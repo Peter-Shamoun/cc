@@ -1,4 +1,4 @@
-# Real analyzer adapter: spec (contract 1.13.0)
+# Real analyzer adapter: spec (contract 1.14.0)
 
 **Status:** a stub, for review by Claude. `api/analyzer_adapter.py`, `api/reasoning_policy.py` (R2), `api/strategy_config.py` (R4) and `api/analyst_shim.py` (R7), plus fixture-only tests in
 `api/tests/test_analyzer_adapter.py`. The server is **not** wired to it. No paid API is called, and nothing under
@@ -100,9 +100,12 @@ protocol need a small shim to `Completion`: see §6 (R7) and `api/analyst_shim.p
   * Tests (`api/tests/test_adapter_r2_r4_r7.py`) use the synthetic `phi_reasoning` recording, whose model text, sampled
     rows and DB error quote an invented patient name, MRN, DOB, member ID and NPI. None of them may appear anywhere in
     the stream under either policy, including Stop mid-run. The demo path (`api.app` + ScriptedLLM) is unchanged.
-  * Residual risk (not R2): `step.sql_running.sql` and the `code` part show the model's SQL verbatim. A literal in a
-    `WHERE` clause is visible. `sem.*` exposes no direct identifiers, and the analyzer refuses identifier requests, but a
-    reviewer should know.
+  * Shown SQL (closed in 1.14.0, **needs sign-off**): before 1.14, `step.sql_running.sql` and the `code` part showed
+    the model's SQL verbatim, so a `WHERE` literal was visible. Now every shown SQL goes through `api.sql_mask`
+    (`masking_emit` + `mask_part`, in `run_to_events` and in `api.app`): policy `phi` by default masks literals
+    compared with PHI-bearing columns and identifier-like values, and sets `maskedLiterals` (CONTRACT.md §10). The
+    executed SQL is unchanged. Remaining risk under `phi`: a name in free text against a non-PHI column; `all`
+    closes it at the cost of readability. Proposed for production: `phi` everywhere, `all` for orgs that ask.
 * **R3 Paid-API switch.** `build_real_llm(kind, enable=True)` returns `AnthropicLLM`/`BedrockLLM(allow_paid_api=True)`
   only when `CC_API_ALLOW_PAID_API` equals the exact phrase `i-understand-this-calls-a-paid-model-api` **and** the
   caller passes `enable=True`. Anything else raises the analyzer's `PaidAPIDisabled`, which `api.app` already maps to
