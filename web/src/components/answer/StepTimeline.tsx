@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { AlertTriangle, BarChart3, Check, ChevronDown, ChevronRight, Database, GitCompare, List, ListChecks, Loader2, Search, Sparkles, Telescope, Wrench, X, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, BarChart3, Check, ChevronDown, ChevronRight, Database, GitCompare, List, ListChecks, Loader2, Search, Telescope, ArrowUpRight, Wrench, X, type LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
 import { CodeBlock } from '../parts/CodeBlock';
 import { fmtMs, summarize, unresolvedFailures } from './normalize';
@@ -8,7 +8,7 @@ import type { CheckResult, Step, StepKind } from './provisional';
 /** Reasoning folded into the timeline (QA-A10): one "Thought for 1.2s" row, like ChatGPT/Claude. */
 export type TimelineReasoning = { summary?: string; durationMs?: number };
 
-const ICON: Record<StepKind, LucideIcon> = { sql: Database, repair: Wrench, check: ListChecks, explore: Telescope, candidates: GitCompare, escalation: Sparkles, chart: BarChart3, schema: List, search: Search, other: Wrench };
+const ICON: Record<StepKind, LucideIcon> = { sql: Database, repair: Wrench, check: ListChecks, explore: Telescope, candidates: GitCompare, escalation: ArrowUpRight, chart: BarChart3, schema: List, search: Search, other: Wrench };
 const KIND_LABEL: Record<StepKind, string> = { sql: 'Query', repair: 'Repair', check: 'Check', explore: 'Probe', candidates: 'Candidates', escalation: 'Escalation', chart: 'Chart', schema: 'Schema', search: 'Search', other: 'Step' };
 
 /** Ticks while `live`, for the running timer in the header. */
