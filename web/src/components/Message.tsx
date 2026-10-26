@@ -1,5 +1,5 @@
 import { memo, useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, Code2, FileText, Minimize2, MoreHorizontal, Pencil, Plus, Printer, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Code2, FileText, Minimize2, MoreHorizontal, Pencil, Plus, Printer, RefreshCw, Split, ThumbsDown, ThumbsUp } from 'lucide-react';
 import clsx from 'clsx';
 import type { AssistantView, Part, TablePart, UserMessage } from '../lib/contract';
 import { KNOWN_PART_TYPES } from '../lib/contract';
@@ -197,7 +197,7 @@ export type Refine = Exclude<RegenerateStyle, 'default'>;
 /** Version label for a styled regeneration (`message.start.regenerateStyle` / `StoredMessage.regenerateStyle`). */
 export const STYLE_LABEL: Record<Refine, string> = { concise: 'Concise', detailed: 'Detailed' };
 
-export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, onOpen, onRegenerate, onEdit, onSend, onReply, onRefine, version, onVersion, versionBusy, readOnly, sqlWithheld }: { msg: AnyView; isLast: boolean; onOpen: (a: Artifact) => void; onRegenerate: () => void; onEdit: (t: string) => void; onSend?: (t: string) => void; onReply?: OnReply; onRefine?: (style: Refine) => void; version?: { current: number; total: number }; onVersion?: (k: number) => void; versionBusy?: boolean; /** Shared /shared/:id view: no actions, feedback, retry, edits or replies. */ readOnly?: boolean; /** Shared without data (contract 1.15.0): SQL was withheld; tables say "SQL not shared". */ sqlWithheld?: boolean }) {
+export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, onOpen, onRegenerate, onEdit, onSend, onReply, onRefine, version, onVersion, versionBusy, readOnly, sqlWithheld, onBranch }: { msg: AnyView; isLast: boolean; onOpen: (a: Artifact) => void; onRegenerate: () => void; onEdit: (t: string) => void; onSend?: (t: string) => void; onReply?: OnReply; onRefine?: (style: Refine) => void; version?: { current: number; total: number }; onVersion?: (k: number) => void; versionBusy?: boolean; /** Shared /shared/:id view: no actions, feedback, retry, edits or replies. */ readOnly?: boolean; /** Shared without data (contract 1.15.0): SQL was withheld; tables say "SQL not shared". */ sqlWithheld?: boolean; /** QA-S41 (shell): "Branch in new chat" in More actions. */ onBranch?: () => void }) {
   const msg = view as AssistantView; // legacy part renderers; v1-only data is read through `view`
   // Which turn was streaming on screen in this row (uiKey survives the server-id swap; a version switch changes it),
   // so text that lands in one network chunk still flows in, while history and old versions show at once.
@@ -316,6 +316,7 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
       )}
       {more.anchor && (
         <Menu anchor={more.anchor} onClose={more.close} label="More actions" items={[
+          ...(onBranch && !view.streaming ? [{ label: 'Branch in new chat', icon: <Split size={15} />, onSelect: onBranch } as MenuItem] : []),
           { label: 'Print this answer', icon: <Printer size={15} />, onSelect: () => printOne(rootRef.current) },
           { label: 'Copy as Markdown', icon: <FileText size={15} />, onSelect: () => { void copyText(messageMarkdown(view)).then((ok) => ok && toast({ text: 'Copied as Markdown' })); } },
           ...(okQueries ? [{ label: okQueries > 1 ? `Copy SQL (${okQueries} queries)` : 'Copy SQL', icon: <Code2 size={15} />, onSelect: () => { void copyText(sqlForClipboard(queries)).then((ok) => ok && toast({ text: 'SQL copied' })); } } as MenuItem] : []),
