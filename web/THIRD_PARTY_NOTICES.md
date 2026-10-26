@@ -8,6 +8,7 @@ source is copied. It depends on these Apache-2.0 packages, whose license texts s
 |---|---|---|---|
 | streamdown | Apache-2.0 | Copyright 2023 Vercel, Inc. | Streaming markdown with unfinished-markdown repair |
 | remend (dependency of streamdown) | Apache-2.0 | Vercel, Inc. | Incomplete-markdown repair |
+| @streamdown/math | Apache-2.0 | Vercel, Inc. | KaTeX plugin wiring for Streamdown |
 
 Other runtime dependencies are MIT/ISC/BSD (React, TanStack Table/Virtual, Shiki, Vega,
-lucide-react, clsx). Run `npx license-checker --production --summary` in `web/` for the full list.
+lucide-react, clsx, KaTeX (MIT, fonts under SIL OFL 1.1 via katex/dist), remark-math, rehype-katex). Run `npx license-checker --production --summary` in `web/` for the full list.
