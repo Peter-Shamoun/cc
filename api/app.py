@@ -35,6 +35,8 @@ from api.security import MAX_BODY_BYTES, BodyLimitMiddleware, ErrorShieldMiddlew
 from api.store import DownloadRegistry, Principal
 from api.feedback import MAX_COMMENT, check as check_feedback, record as feedback_record
 from api.capabilities import DEFAULT_STRATEGY, capabilities as capabilities_body, check_options
+from api.export import FORMATS as EXPORT_FORMATS, as_json as export_json, as_markdown as export_markdown, filename as export_filename
+from api.sources import sources_for
 from api.titles import title_from_parts
 from api.transcripts import CustomerKeyDisabled, make_store
 
@@ -494,6 +496,9 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             usage = (tap.usage(elapsed, marks.get("first_event"), marks.get("first_token")) if tap is not None
                      else {"queries": 0, "elapsedMs": elapsed})
             end = {"type": "message.end", "messageId": message_id, "finishReason": finish, "usage": usage}
+            sources = sources_for(parts, persisted_steps) if finish != "aborted" else []
+            if sources:
+                end["sources"] = sources
             title = title_from_parts(parts) if finish == "stop" else None
             if title and conversation_id:
                 try:
@@ -506,6 +511,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             record = {"id": message_id, "role": "assistant", "parts": kept, "createdAt": _iso(time.time()),
                       "parentId": user_msg["id"], "finishReason": finish, "usage": usage,
                       "steps": persisted_steps if finish != "aborted" else []}
+            if sources:
+                record["sources"] = sources
             if start_extra.get("regenerateOf"):
                 record["regenerateOf"] = start_extra["regenerateOf"]
             try:
@@ -719,6 +726,32 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         audit("conversation_renamed", customer=ctx.principal.customer, user=ctx.principal.user,
               conversation_id=conversation_id)
         return JSONResponse(out, headers=NO_STORE)
+
+    @app.get("/api/conversations/{conversation_id}/export")
+    def export_conversation(conversation_id: str, request: Request, format: str = "markdown"):
+        """Download the conversation as Markdown or JSON (contract 1.8.0, §15). Your own transcript only."""
+        try:
+            ctx = authed(request, new_id("r"))
+        except AuthError:
+            return unauthorized()
+        if format not in EXPORT_FORMATS:
+            return error_json("validation", "Use format=markdown or format=json.", 422)
+        try:
+            conv = store.get_conversation(ctx.principal, conversation_id) if _SAFE_ID.match(conversation_id) else None
+        except CustomerKeyDisabled:
+            return shredded()
+        if conv is None:
+            return not_found()
+        now = _iso(time.time())
+        if format == "json":
+            body = json.dumps(export_json(conv, CONTRACT_VERSION, now), ensure_ascii=False, default=str)
+        else:
+            body = export_markdown(conv, now)
+        audit("conversation_exported", customer=ctx.principal.customer, user=ctx.principal.user,
+              conversation_id=conversation_id, kind=format)
+        mime = EXPORT_FORMATS[format][0]
+        return Response(body.encode(), media_type=mime, headers={
+            **NO_STORE, "Content-Disposition": f'attachment; filename="{export_filename(format)}"'})
 
     @app.put("/api/conversations/{conversation_id}/messages/{message_id}/feedback")
     def put_feedback(conversation_id: str, message_id: str, body: FeedbackIn, request: Request):
