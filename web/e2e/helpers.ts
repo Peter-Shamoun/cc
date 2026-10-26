@@ -27,7 +27,7 @@ export async function open(page: Page, url: string, theme: Theme = 'light', pale
 
 export const composer = (page: Page) => page.getByRole('textbox', { name: 'Message' });
 export const sendBtn = (page: Page) => page.getByRole('button', { name: 'Send message' });
-export const stopBtn = (page: Page) => page.getByRole('button', { name: /stop/i });
+export const stopBtn = (page: Page) => page.getByRole('button', { name: /^stop/i });
 export const lastAssistant = (page: Page) => page.getByTestId('msg-assistant').last();
 
 /** Type a prompt, press Enter, and (by default) wait for the turn to finish. */
