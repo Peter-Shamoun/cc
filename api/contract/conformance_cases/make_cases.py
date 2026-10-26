@@ -12,6 +12,15 @@ def td(p): return {"type": "text.delta", "partId": p, "delta": "x"}
 def te(p): return {"type": "text.end", "partId": p}
 def part(p, t="callout", **kw): return {"type": "part", "part": {"type": t, "id": p, **kw}}
 HB = {"type": "heartbeat"}
+HDR = {"v": 1, "kind": "bar", "title": "Paid by payer", "x": {"field": "payer", "type": "nominal", "title": "Payer"},
+       "y": {"field": "paid", "type": "quantitative", "title": "Paid"}}
+ROWS = [{"payer": "A", "paid": 1}, {"payer": "B", "paid": 2}]
+TABLE = part("t1", "table", rows=[["A", 1], ["B", 2]], rowCount=2)
+def CS(p, **hdr): return {"type": "chart.start", "partId": p, "plot": {**HDR, **hdr}, "tablePartId": "t1"}
+def CP(p, off, rows): return {"type": "chart.points", "partId": p, "offset": off, "rows": rows}
+def CHART(p, table="t1", data=None):
+    return part(p, "chart", library="vega-lite", spec={}, alt="a", tablePartId=table,
+                plot={**HDR, "data": ROWS if data is None else data})
 
 
 def seq(evs, start=0):
@@ -64,6 +73,43 @@ CASES = [
     ("sql_part_unknown", seq([S, part("p1", "table", sqlPartId="p9"), E()]), ["sql_part.target"]),
     ("repair_of_unknown", seq([S, {**run("s1"), "purpose": "repair", "repairOf": "s9"}, res("s1"), E()]), ["repair.of"]),
     ("needs_input_without_clarification", seq([S, E("needs_input")]), ["clarify.needs_input"]),
+    # 1.18.0: streaming charts (§5.2) and the strict PlotSpec (§16.1)
+    ("ok_chart_stream", seq([S, TABLE, CS("c1"), CP("c1", 0, ROWS[:1]), CP("c1", 1, ROWS[1:]), CHART("c1"), E()]), []),
+    ("ok_chart_replay_overlaps", seq([S, TABLE, CS("c1"), CP("c1", 0, ROWS), CP("c1", 0, ROWS[:1]), CHART("c1"), E()]), []),
+    ("ok_chart_aborted_mid_points", seq([S, TABLE, CS("c1"), CP("c1", 0, ROWS[:1]), E("aborted")]), []),
+    ("ok_chart_without_stream", seq([S, TABLE, CHART("c1"), E()]), []),
+    ("ok_legacy_chart_without_plot", seq([S, part("c1", "chart", library="vega-lite", spec={}, alt="a"), E()]), []),
+    ("chart_never_completed", seq([S, TABLE, CS("c1"), CP("c1", 0, ROWS), E()]), ["chart.span"]),
+    ("points_without_start", seq([S, TABLE, CP("c1", 0, ROWS), CHART("c1"), E()]), ["chart.span"]),
+    ("points_gap", seq([S, TABLE, CS("c1"), CP("c1", 0, ROWS[:1]), CP("c1", 5, ROWS[1:]), CHART("c1"), E()]),
+     ["rows.contiguous"]),
+    ("table_rows_gap", seq([S, {"type": "table.start", "partId": "t1", "columns": []},
+                            {"type": "table.rows", "partId": "t1", "offset": 2, "rows": [["a"]]},
+                            part("t1", "table", rows=[["a"]], rowCount=1), E()]), ["rows.contiguous"]),
+    ("table_rows_bad_offset", seq([S, {"type": "table.start", "partId": "t1", "columns": []},
+                                   {"type": "table.rows", "partId": "t1", "offset": -1, "rows": []},
+                                   part("t1", "table", rows=[], rowCount=0), E()]), ["rows.contiguous"]),
+    ("table_rows_differ_from_part", seq([S, {"type": "table.start", "partId": "t1", "columns": []},
+                                         {"type": "table.rows", "partId": "t1", "offset": 0, "rows": [["a"]]},
+                                         part("t1", "table", rows=[["b"]], rowCount=1), E()]), ["table.rows.final"]),
+    ("points_differ_from_part", seq([S, TABLE, CS("c1"), CP("c1", 0, [{"payer": "Z", "paid": 9}]), CHART("c1"), E()]),
+     ["chart.points.final"]),
+    ("header_differs_from_part", seq([S, TABLE, CS("c1", title="Other"), CP("c1", 0, ROWS), CHART("c1"), E()]),
+     ["chart.header.final"]),
+    ("bad_header", seq([S, TABLE, CS("c1", kind="pie"), CHART("c1"), E()]), ["chart.header.final", "chart.start.plot"]),
+    ("bad_plot_in_part", seq([S, TABLE, CHART("c1", data=[]), E()]), ["chart.part.plot"]),
+    ("chart_table_unknown", seq([S, CHART("c1", table="t9"), E()]), ["chart.table.target"]),
+    ("chart_start_table_unknown", seq([S, TABLE, {**CS("c1"), "tablePartId": "t9"}, CHART("c1"), E()]),
+     ["chart.start.table"]),
+    ("chart_start_after_steps_rule", seq([S, TABLE, CS("c1"), CHART("c1"), run("s1"), res("s1"), E()]),
+     ["answer.after_steps", "answer.after_steps"]),
+    # robustness: ids that are JSON objects/arrays never crash a runner (they never match)
+    ("object_ids_never_crash", seq([S, {"type": "part", "part": {"id": {"a": 1}, "type": "table", "sqlPartId": ["x"]}},
+                                    {"type": "part.patch", "partId": {"b": 1}},
+                                    {"type": "table.rows", "partId": {"b": 1}, "offset": 0, "rows": []},
+                                    {"type": "chart.points", "partId": [1], "offset": 0, "rows": []}, E()]),
+     ["chart.span", "patch.target", "sql_part.target", "table.span"]),
+    ("seq_as_integral_float", [S | {"seq": 0}, E() | {"seq": 1.0}], []),
 ]
 
 if __name__ == "__main__":

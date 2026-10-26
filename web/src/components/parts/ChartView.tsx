@@ -7,6 +7,7 @@ import { tooltipHtml } from '../../security/trustedTypes';
 import { CHART_COLORS, useTheme } from '../../lib/theme';
 import { csvFilename, downloadText, recordsToCsv } from '../../lib/csv';
 import { buildSpec, chartRenderer, readableBars, utcDates, withTooltips } from '../../render/chartSpec';
+import { parsePlot } from '../../contract/plot';
 
 export { buildSpec };
 
@@ -32,6 +33,9 @@ type ChartViewProps = { part: ChartPart; onOpen?: () => void; full?: boolean; on
 
 /** A chart that fails to render (bad spec, renderer bug) becomes an inline "Try again" card; the rest of the answer stays. */
 export function ChartView(props: ChartViewProps) {
+  // 1.18.0: validate a strict plot before rendering; an invalid one is not drawn (the table stays). Contract §16.1.
+  const plotOk = useMemo(() => props.part.plot === undefined || parsePlot(props.part.plot) !== null, [props.part.plot]);
+  if (!plotOk) return null;
   return (
     <ErrorBoundary scope="section" name="ChartView" resetKey={props.part}>
       <ChartViewInner {...props} />

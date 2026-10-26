@@ -14,7 +14,8 @@ import type {
   TextPart, ToolCallPart, ArtifactPart, PartBase, StreamEvent as LegacyStreamEvent,
 } from '../lib/contract';
 import { reduce as legacyReduce } from '../lib/contract';
-import type { ErrorCode, Source } from '../contract/v1.gen';
+import type { ErrorCode, PlotHeader, PlotRow, Source } from '../contract/v1.gen';
+import { checkPlot, plotToVegaLite, type PlotRule } from '../contract/plot';
 import { EVENT_SHAPES } from '../contract/v1.gen';
 
 export type {
@@ -22,7 +23,7 @@ export type {
   Sensitivity, StatusPart, TablePart, TextPart, ToolCallPart, ArtifactPart, PartBase,
 };
 
-export const CONTRACT_VERSION = '1.17.0';
+export const CONTRACT_VERSION = '1.18.0';
 export const CONTRACT_MAJOR = 1;
 
 // ---------------------------------------------------------------- new parts (v1)
@@ -143,6 +144,12 @@ export interface TableStartEvent extends Seq {
 }
 /** 1.9.0: preview rows; `offset` = index of the first row, so a replayed chunk overwrites instead of duplicating. */
 export interface TableRowsEvent extends Seq { type: 'table.rows'; partId: ID; offset: number; rows: unknown[][] }
+/** 1.18.0 (§5.2): a chart starts streaming. `plot` is the PlotHeader (everything but data); draw from the first point. */
+export interface ChartStartEvent extends Seq {
+  type: 'chart.start'; partId: ID; plot: PlotHeader; alt?: string; tablePartId?: ID; sensitivity?: Sensitivity;
+}
+/** 1.18.0: chart points; `offset` = index of the first point, so a replayed chunk overwrites instead of duplicating. */
+export interface ChartPointsEvent extends Seq { type: 'chart.points'; partId: ID; offset: number; rows: PlotRow[] }
 export interface PartEvent extends Seq { type: 'part'; part: Part }
 export interface PartPatchEvent extends Seq { type: 'part.patch'; partId: ID; patch: Record<string, unknown> }
 export interface MessageEndEvent extends Seq {
@@ -159,12 +166,12 @@ export type StepEvent = StepSqlRunningEvent | StepSqlResultEvent | StepRepairAtt
 export type StreamEvent =
   | MessageStartEvent | StatusEvent | StepEvent | EscalationEvent
   | TextStartEvent | TextDeltaEvent | TextEndEvent | ReasoningDeltaEvent | ReasoningEndEvent | CodeDeltaEvent
-  | TableStartEvent | TableRowsEvent | PartEvent | PartPatchEvent | MessageEndEvent | HeartbeatEvent;
+  | TableStartEvent | TableRowsEvent | ChartStartEvent | ChartPointsEvent | PartEvent | PartPatchEvent | MessageEndEvent | HeartbeatEvent;
 
 export const EVENT_TYPES = [
   'message.start', 'status', 'step.sql_running', 'step.sql_result', 'step.repair_attempt', 'step.check', 'step.explore',
   'step.candidates', 'escalation', 'text.start', 'text.delta', 'text.end', 'reasoning.delta', 'reasoning.end',
-  'code.delta', 'table.start', 'table.rows', 'part', 'part.patch', 'message.end', 'heartbeat',
+  'code.delta', 'table.start', 'table.rows', 'chart.start', 'chart.points', 'part', 'part.patch', 'message.end', 'heartbeat',
 ] as const satisfies readonly StreamEvent['type'][];
 
 export const PART_TYPES = [
@@ -181,6 +188,8 @@ export function isStepEvent(ev: { type: string }): ev is StepEvent {
 
 /** GET /api/capabilities: strategies + models for a picker. Generated from the schema (single source of truth). */
 export type { Capabilities, StrategyOption, ModelOption, CostTier } from '../contract/v1.gen';
+/** 1.18.0: the strict plot spec (validator, Vega-Lite derivation: src/contract/plot.ts). */
+export type { PlotSpec, PlotHeader, PlotRow, PlotKind, PlotFormat } from '../contract/v1.gen';
 /** 1.7.0: answer feedback (CONTRACT.md §13). Client: src/contract/feedback.ts. */
 export type { Feedback, FeedbackRating, FeedbackReason, FeedbackRequest } from '../contract/v1.gen';
 /** 1.8.0: citations (§14) and conversation export (§15). */
@@ -242,6 +251,10 @@ export interface AssistantViewV1 extends Omit<LegacyAssistantView, 'finishReason
   lastSeq: number;
   /** 1.9.0: ids of table parts still streaming (table.start seen, complete `part` not yet). Show a "loading rows" hint. */
   streamingTables?: ID[];
+  /** 1.18.0: ids of chart parts still streaming (chart.start seen, complete `part` not yet). */
+  streamingCharts?: ID[];
+  /** 1.18.0: charts dropped because their PlotSpec failed validation (rule ids only, never values). The table stays. */
+  rejectedCharts?: { partId: ID; rules: PlotRule[] }[];
   /** 1.8.0: message.end.sources. */
   sources?: Source[];
 }
@@ -330,7 +343,26 @@ export function wellFormed(ev: unknown): boolean {
   }
   if (e.type === 'part' && !(isObj(e.part) && typeof (e.part as Part).id === 'string' && typeof (e.part as Part).type === 'string')) return false;
   if (e.type === 'table.rows' && !((e.rows as unknown[]).every(Array.isArray) && (e.offset as number) >= 0)) return false;
+  if (e.type === 'chart.points' && !((e.rows as unknown[]).every(isObj) && (e.offset as number) >= 0)) return false;
   return true;
+}
+
+/** Overwrite `rows` at `offset` (replays overwrite in place). Returns the same array when the chunk would leave a gap. */
+function overlay<T>(rows: readonly T[], offset: number, chunk: readonly T[]): T[] {
+  if (!Number.isInteger(offset) || offset < 0 || offset > rows.length) return rows as T[];
+  const out = rows.slice();
+  chunk.forEach((r, j) => { out[offset + j] = r; });
+  return out;
+}
+
+/** 1.18.0: drop a chart whose plot failed validation (the table stays) and remember why, rule ids only. */
+function reject(m: AssistantViewV1, partId: ID, rules: PlotRule[]): AssistantViewV1 {
+  return {
+    ...m,
+    parts: m.parts.filter((p) => p.id !== partId),
+    streamingCharts: (m.streamingCharts ?? []).filter((id) => id !== partId),
+    rejectedCharts: [...(m.rejectedCharts ?? []).filter((r) => r.partId !== partId), { partId, rules }],
+  };
 }
 
 /** Test-only: the reducer without the fail-safe wrapper, so fuzz tests can see faults. Use `reduceV1` in the app. */
@@ -356,9 +388,9 @@ function reduceWellFormed(m: AssistantViewV1, ev: StreamEvent | { type: string; 
     case 'message.end': {
       const steps = m.steps.map((s) => (s.state === 'running' ? { ...s, state: e.finishReason === 'aborted' ? 'error' as const : 'ok' as const } : s));
       // a table whose complete part never came is partial: drop it (1.9.0, CONTRACT.md §5.1)
-      const partial = new Set(m.streamingTables ?? []);
+      const partial = new Set([...(m.streamingTables ?? []), ...(m.streamingCharts ?? [])]);
       const parts = partial.size ? m.parts.filter((p) => !partial.has(p.id)) : m.parts;
-      return { ...m, steps, parts, streamingTables: [], streaming: false, status: null, openText: [], finishReason: e.finishReason, usage: e.usage, sources: e.sources };
+      return { ...m, steps, parts, streamingTables: [], streamingCharts: [], streaming: false, status: null, openText: [], finishReason: e.finishReason, usage: e.usage, sources: e.sources };
     }
     case 'table.start': {
       if (m.parts.some((p) => p.id === e.partId)) return m;
@@ -369,13 +401,44 @@ function reduceWellFormed(m: AssistantViewV1, ev: StreamEvent | { type: string; 
       if (!(m.streamingTables ?? []).includes(e.partId)) return m;
       return { ...m, parts: m.parts.map((p) => {
         if (p.id !== e.partId || p.type !== 'table') return p;
-        const rows = p.rows.slice(0, e.offset);
-        rows.push(...e.rows);
-        return { ...p, rows, rowCount: Math.max(p.rowCount, rows.length) };
+        // A replayed chunk overwrites in place (rows after it stay); a chunk past the end would leave a hole: skip it.
+        const rows = overlay(p.rows, e.offset, e.rows);
+        return rows === p.rows ? p : { ...p, rows, rowCount: Math.max(p.rowCount, rows.length) };
       }) };
     }
+    case 'chart.start': {
+      if (m.parts.some((p) => p.id === e.partId)) return m;
+      const bad = checkPlot(e.plot, { header: true });
+      if (bad.length) return reject(m, e.partId, bad);
+      const chart = {
+        type: 'chart', id: e.partId, library: 'vega-lite', plot: { ...e.plot, data: [] }, spec: plotToVegaLite(e.plot),
+        data: { name: 'result', values: [] }, title: e.plot.title, alt: e.alt ?? e.plot.title,
+        ...(e.tablePartId ? { tablePartId: e.tablePartId } : {}), ...(e.sensitivity ? { sensitivity: e.sensitivity } : {}),
+      } as unknown as Part;
+      return { ...m, parts: [...m.parts, chart], streamingCharts: [...(m.streamingCharts ?? []), e.partId] };
+    }
+    case 'chart.points': {
+      if (!(m.streamingCharts ?? []).includes(e.partId)) return m;
+      const cur = m.parts.find((p) => p.id === e.partId);
+      if (!cur || cur.type !== 'chart' || !cur.plot) return m;
+      const data = overlay(cur.plot.data, e.offset, e.rows);
+      if (data === cur.plot.data) return m;
+      const plot = { ...cur.plot, data };
+      const bad = checkPlot(plot);
+      if (bad.length) return reject(m, e.partId, bad);
+      const next = { ...cur, plot, data: { name: 'result', values: data } } as Part;
+      return { ...m, parts: m.parts.map((p) => (p.id === e.partId ? next : p)) };
+    }
     case 'part': {
-      const next = { ...m, streamingTables: (m.streamingTables ?? []).filter((id) => id !== e.part.id) };
+      // 1.18.0: validate a chart's PlotSpec (or a chart artifact's) before it can render; an invalid one is dropped.
+      const chart = e.part.type === 'chart' ? e.part
+        : e.part.type === 'artifact' && isObj(e.part.content) && (e.part.content as Part).type === 'chart' ? e.part.content as Part : null;
+      if (chart && chart.type === 'chart' && chart.plot !== undefined) {
+        const bad = checkPlot(chart.plot);
+        if (bad.length) return reject(m, e.part.id, bad);
+      }
+      const next = { ...m, streamingTables: (m.streamingTables ?? []).filter((id) => id !== e.part.id),
+        streamingCharts: (m.streamingCharts ?? []).filter((id) => id !== e.part.id) };
       const legacy = legacyReduce(next as unknown as LegacyAssistantView, e as unknown as LegacyStreamEvent);
       return { ...next, parts: legacy.parts as Part[], status: legacy.status, openText: legacy.openText };
     }

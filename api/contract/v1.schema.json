@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://claimclarity.local/api/contract/v1.schema.json",
   "title": "ClaimClarity chat stream contract",
-  "version": "1.17.0",
+  "version": "1.18.0",
   "description": "One JSON object per SSE data: line. See api/CONTRACT.md. Validate an event against #/$defs/StreamEvent.",
   "$ref": "#/$defs/StreamEvent",
   "$defs": {
@@ -700,8 +700,239 @@
       },
       "additionalProperties": true
     },
+    "PlotKind": {
+      "description": "1.18.0: closed. The chart kinds a client must draw. A server never sends another; a client drops a plot with an unknown kind (the table stays).",
+      "enum": [
+        "bar",
+        "line",
+        "area",
+        "point"
+      ]
+    },
+    "PlotFieldType": {
+      "description": "1.18.0: closed. The x encoding type.",
+      "enum": [
+        "temporal",
+        "nominal",
+        "ordinal",
+        "quantitative"
+      ]
+    },
+    "PlotFormat": {
+      "description": "1.18.0: closed. Number/date formats by name; the renderer maps them (currency `$,.2f`, percent `.1%`, integer `,d`, number `,.2~f`, date `%b %-d, %Y`, month `%b %Y`).",
+      "enum": [
+        "currency",
+        "percent",
+        "integer",
+        "number",
+        "date",
+        "month"
+      ]
+    },
+    "PlotSort": {
+      "description": "1.18.0: closed. `-y` = bars by value, descending; `x` = by x ascending; `none` = data order.",
+      "enum": [
+        "-y",
+        "x",
+        "none"
+      ]
+    },
+    "PlotAxisX": {
+      "type": "object",
+      "description": "1.18.0: the x encoding.",
+      "required": [
+        "field",
+        "type",
+        "title"
+      ],
+      "properties": {
+        "field": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}(?![\\s\\S])",
+          "description": "A row key: an identifier of at most 64 characters. `(?![\\s\\S])` instead of `$`, because Python's `$` also matches before a trailing newline."
+        },
+        "type": {
+          "$ref": "#/$defs/PlotFieldType"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 80
+        },
+        "format": {
+          "$ref": "#/$defs/PlotFormat"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PlotAxisY": {
+      "type": "object",
+      "description": "1.18.0: the y encoding, always a finite number (or null for a gap).",
+      "required": [
+        "field",
+        "type",
+        "title"
+      ],
+      "properties": {
+        "field": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}(?![\\s\\S])",
+          "description": "A row key: an identifier of at most 64 characters. `(?![\\s\\S])` instead of `$`, because Python's `$` also matches before a trailing newline."
+        },
+        "type": {
+          "const": "quantitative"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 80
+        },
+        "format": {
+          "$ref": "#/$defs/PlotFormat"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PlotSeries": {
+      "type": "object",
+      "description": "1.18.0: optional colour series; at most `maxSeries` (10) distinct values.",
+      "required": [
+        "field",
+        "title"
+      ],
+      "properties": {
+        "field": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}(?![\\s\\S])",
+          "description": "A row key: an identifier of at most 64 characters. `(?![\\s\\S])` instead of `$`, because Python's `$` also matches before a trailing newline."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 80
+        }
+      },
+      "additionalProperties": false
+    },
+    "PlotValue": {
+      "description": "1.18.0: a row value: a finite number, a string of at most 200 characters, or null.",
+      "type": [
+        "number",
+        "string",
+        "null"
+      ],
+      "maxLength": 200
+    },
+    "PlotRow": {
+      "type": "object",
+      "description": "1.18.0: one point, keyed by the declared x/y/series fields only.",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}(?![\\s\\S])",
+        "description": "A row key: an identifier of at most 64 characters. `(?![\\s\\S])` instead of `$`, because Python's `$` also matches before a trailing newline."
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/PlotValue"
+      }
+    },
+    "PlotHeader": {
+      "type": "object",
+      "description": "1.18.0 (§16.2): a PlotSpec without `data`: everything a client needs before the first draw. Sent in `chart.start`.",
+      "required": [
+        "v",
+        "kind",
+        "title",
+        "x",
+        "y"
+      ],
+      "properties": {
+        "v": {
+          "const": 1,
+          "description": "PlotSpec version. A client that does not know this version drops the plot (the table stays)."
+        },
+        "kind": {
+          "$ref": "#/$defs/PlotKind"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "x": {
+          "$ref": "#/$defs/PlotAxisX"
+        },
+        "y": {
+          "$ref": "#/$defs/PlotAxisY"
+        },
+        "series": {
+          "$ref": "#/$defs/PlotSeries"
+        },
+        "sort": {
+          "$ref": "#/$defs/PlotSort"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PlotSpec": {
+      "type": "object",
+      "description": "1.18.0 (§16.1): the strict, closed, versioned chart spec (an idea from json-render.dev; concept only). The server validates it before emitting and drops the chart on failure (the table stays); the client validates it before rendering. Caps are in `x-caps`.",
+      "required": [
+        "v",
+        "kind",
+        "title",
+        "x",
+        "y",
+        "data"
+      ],
+      "properties": {
+        "v": {
+          "const": 1,
+          "description": "PlotSpec version. A client that does not know this version drops the plot (the table stays)."
+        },
+        "kind": {
+          "$ref": "#/$defs/PlotKind"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "x": {
+          "$ref": "#/$defs/PlotAxisX"
+        },
+        "y": {
+          "$ref": "#/$defs/PlotAxisY"
+        },
+        "series": {
+          "$ref": "#/$defs/PlotSeries"
+        },
+        "sort": {
+          "$ref": "#/$defs/PlotSort"
+        },
+        "data": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2000,
+          "items": {
+            "$ref": "#/$defs/PlotRow"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "x-caps": {
+        "maxPoints": 2000,
+        "minPoints": 1,
+        "maxSeries": 10,
+        "maxTitle": 120,
+        "maxAxisTitle": 80,
+        "maxString": 200,
+        "maxFieldName": 64,
+        "chunkPoints": 50
+      },
+      "x-temporal": "^[0-9]{4}-[0-9]{2}(-[0-9]{2}([T ][0-9]{2}:[0-9]{2}(:[0-9]{2}(\\.[0-9]{1,9})?)?(Z|[+-][0-9]{2}:?[0-9]{2})?)?)?(?![\\s\\S])"
+    },
     "ChartPart": {
-      "description": "A Vega-Lite chart with inline `data.values` (never `data.url`).",
+      "description": "A chart. 1.18.0: `plot` (PlotSpec, strict) is the source; the Vega-Lite `spec` with inline `data.values` (never `data.url`) is derived from it.",
       "type": "object",
       "required": [
         "type",
@@ -779,6 +1010,10 @@
         "tablePartId": {
           "$ref": "#/$defs/ID",
           "description": "1.9.0: the table part this plot was drawn from (same message)."
+        },
+        "plot": {
+          "$ref": "#/$defs/PlotSpec",
+          "description": "1.18.0: the strict plot spec. `spec`/`data` are derived from it for pre-1.18 clients. A 1.18 client renders from `plot` and drops the chart if it fails validation."
         }
       },
       "additionalProperties": true
@@ -2058,6 +2293,12 @@
           "$ref": "#/$defs/TableRows"
         },
         {
+          "$ref": "#/$defs/ChartStart"
+        },
+        {
+          "$ref": "#/$defs/ChartPoints"
+        },
+        {
           "$ref": "#/$defs/PartEvent"
         },
         {
@@ -2984,6 +3225,75 @@
           "type": "array",
           "items": {
             "type": "array"
+          }
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "ChartStart": {
+      "type": "object",
+      "description": "1.18.0 (§5.2): a chart is about to stream. The header has every field needed for the first draw; draw from the first `chart.points`. The complete `part` with the same id follows and is canonical. If message.end comes first (aborted/error), drop the partial chart.",
+      "required": [
+        "type",
+        "partId",
+        "plot",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "chart.start"
+        },
+        "partId": {
+          "$ref": "#/$defs/ID"
+        },
+        "plot": {
+          "$ref": "#/$defs/PlotHeader"
+        },
+        "alt": {
+          "type": "string"
+        },
+        "tablePartId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "ChartPoints": {
+      "type": "object",
+      "description": "1.18.0: points for a streaming chart, in order. `offset` is the index of the first point, so a replayed chunk overwrites rather than duplicates.",
+      "required": [
+        "type",
+        "partId",
+        "offset",
+        "rows",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "chart.points"
+        },
+        "partId": {
+          "$ref": "#/$defs/ID"
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PlotRow"
           }
         },
         "seq": {

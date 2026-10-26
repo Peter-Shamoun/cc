@@ -136,6 +136,23 @@ const CASES: { [K in StreamEvent['type']]: () => void } = {
     expect(done.streamingTables).toEqual([]);
     expect(run([s({ type: 'table.rows', partId: 'zz', offset: 0, rows: [['x']] })], done).parts).toEqual(done.parts);
   },
+  'chart.start': () => {
+    const plot = { v: 1, kind: 'bar', title: 'Paid by payer', x: { field: 'payer', type: 'nominal', title: 'Payer' }, y: { field: 'paid', type: 'quantitative', title: 'Paid' } };
+    const v = run([start(), s({ type: 'chart.start', partId: 'ch', plot, tablePartId: 't' })]);
+    expect(v.parts[0]).toMatchObject({ type: 'chart', id: 'ch', plot: { ...plot, data: [] }, tablePartId: 't' });
+    expect(v.streamingCharts).toEqual(['ch']);
+    const bad = run([start(), s({ type: 'chart.start', partId: 'ch', plot: { ...plot, kind: 'pie' } })]);
+    expect(bad.parts).toEqual([]);
+    expect(bad.rejectedCharts).toEqual([{ partId: 'ch', rules: ['plot.kind'] }]);
+  },
+  'chart.points': () => {
+    const plot = { v: 1, kind: 'bar', title: 'Paid by payer', x: { field: 'payer', type: 'nominal', title: 'Payer' }, y: { field: 'paid', type: 'quantitative', title: 'Paid' } };
+    const v = run([start(), s({ type: 'chart.start', partId: 'ch', plot }), s({ type: 'chart.points', partId: 'ch', offset: 0, rows: [{ payer: 'A', paid: 1 }, { payer: 'B', paid: 2 }] }),
+      s({ type: 'chart.points', partId: 'ch', offset: 1, rows: [{ payer: 'B', paid: 2 }, { payer: 'C', paid: 3 }] })]);
+    expect(v.parts[0]).toMatchObject({ plot: { data: [{ payer: 'A', paid: 1 }, { payer: 'B', paid: 2 }, { payer: 'C', paid: 3 }] } });
+    const ended = run([s({ type: 'message.end', messageId: 'm1', finishReason: 'aborted', usage: { queries: 0, elapsedMs: 1 } })], v);
+    expect(ended.parts).toEqual([]);
+  },
   part: () => {
     const v = run([start(), s({ type: 'part', part: { type: 'callout', id: 'c', tone: 'info', body: 'a' } }), s({ type: 'part', part: { type: 'callout', id: 'c', tone: 'warning', body: 'b' } })]);
     expect(v.parts).toHaveLength(1);

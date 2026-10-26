@@ -35,7 +35,8 @@
     "streamdown": "^2.7.1",
     "vega": "^6.4.0",
     "vega-embed": "^7.3.0",
-    "vega-lite": "^6.4.3"
+    "vega-lite": "^6.4.3",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
