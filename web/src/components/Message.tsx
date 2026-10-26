@@ -16,7 +16,8 @@ import { AnswerMeta } from './answer/AnswerMeta';
 import { escalationsOf, partsOf, stepsOf, usageOf, type AnyView } from './answer/normalize';
 import type { OnReply } from './answer/States';
 import { copyText, tableToTsv, visible } from '../lib/csv';
-import { feedbackFor, recordFeedback, sqlForClipboard, type Vote } from '../lib/feedback';
+import { MAX_FEEDBACK_COMMENT } from '../contract/feedback';
+import { feedbackFor, feedbackReasons, recordFeedback, sqlForClipboard, storedVote, type Vote } from '../lib/feedback';
 import { Menu, useMenu, useToast, type MenuItem } from '../shell/primitives';
 import { isTransportStatus, transportAnnouncement } from '../lib/useChat';
 
@@ -113,7 +114,7 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
   const msg = view as AssistantView; // legacy part renderers; v1-only data is read through `view`
   const reply: OnReply | undefined = onReply ?? (onSend ? (t) => onSend(t) : undefined);
   // Feedback survives remounts (virtualized rows) in memory; see lib/feedback.ts.
-  const [vote, setVoteState] = useState<Vote | null>(() => feedbackFor(view.id)?.vote ?? msg.feedback ?? null);
+  const [vote, setVoteState] = useState<Vote | null>(() => feedbackFor(view.id)?.vote ?? storedVote((view as { feedback?: unknown }).feedback));
   const setVote = (v: Vote | null) => { setVoteState(v); recordFeedback({ messageId: view.id, vote: v }); };
   const regen = useMenu();
   const more = useMenu();
@@ -225,12 +226,10 @@ function TransportAnnouncer({ status }: { status: string | null | undefined }) {
   return <span role="status" aria-live="polite" aria-atomic="true" className="sr-only" data-testid="transport-announcer">{said}</span>;
 }
 
-const FEEDBACK_REASONS = ['Wrong numbers', 'Wrong or missing filter', 'Misread the question', 'SQL looks wrong', 'Chart not helpful', 'Too slow', 'Other'];
-
 /**
- * Thumbs-down follow-up (as in ChatGPT/Claude): reason chips plus optional detail. The detail can
- * contain PHI, so v1 keeps it in component state only; a feedback endpoint with the same PHI
- * handling as chat text is a backend follow-up.
+ * Thumbs-down follow-up (as in ChatGPT/Claude): reason chips (Capabilities.feedbackReasons, contract
+ * 1.7.0; ids sent, labels shown) plus an optional comment (≤ 1000 chars). The comment is user text:
+ * it goes only to the feedback endpoint, never to logs, URLs or storage.
  */
 function FeedbackPanel({ onClose, onSubmit }: { onClose: () => void; onSubmit: (f: { reasons: string[]; detail: string }) => void }) {
   const [reasons, setReasons] = useState<string[]>([]);
@@ -253,12 +252,12 @@ function FeedbackPanel({ onClose, onSubmit }: { onClose: () => void; onSubmit: (
         <IconButton label="Close feedback" className="h-7 w-7" onClick={onClose}>×</IconButton>
       </div>
       <div className="flex flex-wrap gap-2">
-        {FEEDBACK_REASONS.map((r) => (
-          <button key={r} type="button" aria-pressed={reasons.includes(r)} onClick={() => toggle(r)}
-            className={clsx('rounded-full border px-3 py-1.5 text-[13px]', reasons.includes(r) ? 'border-fg bg-hover' : 'border-line hover:bg-hover')}>{r}</button>
+        {feedbackReasons('down').map((r) => (
+          <button key={r.id} type="button" aria-pressed={reasons.includes(r.id)} onClick={() => toggle(r.id)} data-reason={r.id}
+            className={clsx('rounded-full border px-3 py-1.5 text-[13px]', reasons.includes(r.id) ? 'border-fg bg-hover' : 'border-line hover:bg-hover')}>{r.label}</button>
         ))}
       </div>
-      <textarea value={detail} onChange={(e) => setDetail(e.target.value)} rows={2} aria-label="Feedback detail" placeholder="What should the answer have been? (optional, no patient identifiers)"
+      <textarea value={detail} onChange={(e) => setDetail(e.target.value)} rows={2} maxLength={MAX_FEEDBACK_COMMENT} aria-label="Feedback detail" placeholder="What should the answer have been? (optional, no patient identifiers)"
         className="mt-3 w-full resize-none rounded-lg border border-line bg-bg px-3 py-2 outline-none focus:border-fg-subtle" />
       <div className="mt-2 flex justify-end">
         <button type="button" disabled={!reasons.length && !detail.trim()} onClick={() => onSubmit({ reasons, detail })} className="rounded-full bg-fg px-3.5 py-1.5 text-bg disabled:opacity-40">Submit</button>
