@@ -3,7 +3,6 @@ import { useEffect } from 'react';
 
 /** Quiet full-page status (404, signed out, session expired): small mark, one plain heading, one action. */
 function StatusPage({ title, children, action, testId }: { title: string; children: ReactNode; action: { label: string; href: string }; testId: string }) {
-  useEffect(() => { document.title = `${title} · CC`; }, [title]);
   return (
     <div className="flex min-h-dvh flex-col bg-bg font-sans text-fg" data-testid={testId}>
       <header className="flex h-[52px] items-center gap-2 px-4 text-[15px] font-semibold">
@@ -24,6 +23,8 @@ function StatusPage({ title, children, action, testId }: { title: string; childr
 const home = () => import.meta.env.BASE_URL || '/';
 
 export function NotFoundPage() {
+  // document.title is a PHI sink (security/titleSink.test.tsx): literal strings only.
+  useEffect(() => { document.title = 'Page not found · CC'; }, []);
   return (
     <StatusPage title="Page not found" testId="not-found" action={{ label: 'Go to CC', href: home() }}>
       This link doesn’t go anywhere. It may be mistyped, or the page may have moved.
@@ -32,6 +33,10 @@ export function NotFoundPage() {
 }
 
 export function SignedOutPage({ expired, signInUrl }: { expired: boolean; signInUrl?: string }) {
+  useEffect(() => {
+    if (expired) document.title = 'Your session expired · CC';
+    else document.title = 'You’re signed out · CC';
+  }, [expired]);
   return (
     <StatusPage title={expired ? 'Your session expired' : 'You’re signed out'} testId="signed-out" action={{ label: 'Sign in again', href: signInUrl || home() }}>
       {expired ? 'For your security, you were signed out. Sign in again to continue where you left off.' : 'This browser no longer has access to your chats. Sign in again to get back to them.'}
