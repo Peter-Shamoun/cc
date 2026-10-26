@@ -127,7 +127,10 @@ def chart_for(columns: list[dict], rows: list) -> dict | None:
     categorical = [c for c in usable if c["type"] in ("string", "code")]
     if not measures:
         return None
-    y = measures[-1]
+    # The headline measure comes first in the SELECT (e.g. denial_rate, then claims as support);
+    # a rate/percent beats a raw count when both are present.
+    rates = [c for c in measures if c["type"] == "percent" or re.search(r"(rate|pct|percent|share)", c["key"])]
+    y = rates[0] if rates else measures[0]
     keys = [c["key"] for c in columns]
     if temporal and len(rows) <= 500:
         x, mark, xtype = temporal[0], "line", "temporal"
