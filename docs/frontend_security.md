@@ -208,3 +208,29 @@ The web CSP enforces Trusted Types: `require-trusted-types-for 'script'; trusted
 
 **Adding a sink:** don't. Render with React elements. If a library needs HTML, add a narrowly-validated producer to `trustedTypes.ts` with a test, and say why here. Never widen `default` and never add `'allow-duplicates'` or `*` in production. Browsers without Trusted Types (Firefox, older Safari) ignore the directive; React's escaping still applies there.
 
+## Subresource Integrity
+
+Production builds (`vite build`, including the mock build) pin every built script and stylesheet by hash. This is done by `sriPlugin` in `web/vite.config.ts`, which calls `web/scripts/sri.mjs`.
+
+**What's covered:**
+- **Static tags.** The entry `<script type="module">`, every `<link rel="modulepreload">` and the stylesheet get `integrity="sha384-…"` (plus `crossorigin`, which Vite already adds). The browser refuses a file whose bytes don't match.
+- **Lazy chunks.** These include vega, Shiki grammars and the markdown renderer, loaded with `import()`, which has no integrity attribute. They're covered by an **import map with an `integrity` section** placed before the first module script. It carries the CSP nonce like every other inline script, and it lists every `.js` file in `assets/`.
+  - Chrome 127+ and Safari 18+ enforce it. Other browsers ignore the key and still load the files.
+
+**How it's applied:** the hashes are computed in `writeBundle`, after the files are on disk, so they cover the exact served bytes.
+
+**Requirements for serving:**
+- A server or CDN may compress `/assets/` files: integrity is checked on the decoded body.
+- It must **not** rewrite them (minify, inject, or "optimise"), or the app won't boot.
+- Dev (`vite`) has no SRI because files change on every edit.
+
+**Verification:**
+- `web/src/security/sri.test.ts` (7 tests): hashing; placement before module scripts and modulepreloads; idempotence; that the check catches a tampered file, a missing attribute, a missing crossorigin, a late map or an unlisted chunk; that the build fails if a referenced asset is missing; and `<` escaping in the map.
+- **Local gate:** `node scripts/sri_check.mjs dist dist-mock` re-hashes both builds.
+- Then `csp_check.mjs` loads the SRI'd mock build and fails on any console error, which would include an integrity failure.
+- **Manual check in Chrome 156 (2026-10-25, 21:58 PDT):** a clean build loads a lazy chunk with no console errors. After one byte was appended to that chunk on disk, `import()` was rejected with "Failed to find a valid digest in the 'integrity' attribute".
+
+**Limits:**
+- KaTeX fonts are loaded from CSS, and fetched fonts have no SRI.
+- Integrity doesn't protect against a compromised build, only against tampering after the build: on a CDN, in a cache, or by a proxy.
+
