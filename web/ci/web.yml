@@ -33,6 +33,8 @@ jobs:
         run: node scripts/license_audit.mjs
       - name: Lint (oxlint: hooks, PHI sinks, eval, a11y basics)
         run: npm run -s lint
+      - name: Dependency audit (npm, all deps incl. dev/build)
+        run: npm run -s audit
       - name: Typecheck
         run: npx tsc -b
       - name: Unit tests (incl. CSP, PHI-sink and licence tests)
@@ -75,6 +77,8 @@ jobs:
           CC_API_MODE: demo
           CC_API_LLM: scripted
         run: pytest api/tests -q
+      - name: Dependency audit (pip-audit, api runtime + test deps)
+        run: pip install pip-audit && pip-audit -r api/requirements.txt
       - name: API response headers (python -m api, no Server header)
         env:
           CC_API_MODE: demo
