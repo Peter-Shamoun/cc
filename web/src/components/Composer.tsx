@@ -7,6 +7,11 @@ import { matchSlash, type SlashCommand } from '../shell/slash';
 /** Pastes this long become an attachment chip instead of flooding the box (Claude-style). */
 export const PASTE_CHARS = 1200;
 export const PASTE_LINES = 15;
+/** Text files the composer can attach as chips (read locally, kept in memory only). */
+export const ATTACH_ACCEPT = '.txt,.csv,.tsv,.md,.sql,.json,.log,text/plain,text/csv,text/markdown,application/json';
+export const ATTACH_MAX = 256 * 1024;
+const TEXT_EXT = /\.(txt|csv|tsv|md|sql|json|log)$/i;
+
 export const isLongPaste = (t: string) => t.length >= PASTE_CHARS || t.split('\n').length > PASTE_LINES;
 
 export interface ComposerProps {
@@ -36,10 +41,24 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
   const [slashDismissed, setSlashDismissed] = useState(false);
   const lid = useId();
   // Long pastes ride along as chips; they live in component memory only (never drafts or storage).
-  const [pastes, setPastes] = useState<{ id: number; text: string }[]>([]);
+  const [pastes, setPastes] = useState<{ id: number; text: string; name?: string }[]>([]);
+  const [notice, setNotice] = useState('');
+  const [dragging, setDragging] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const addFiles = async (files: FileList | File[]) => {
+    const skipped: string[] = [];
+    for (const f of [...files]) {
+      if (!(f.type.startsWith('text/') || f.type === 'application/json' || TEXT_EXT.test(f.name))) { skipped.push(`${f.name} isn't a text file`); continue; }
+      if (f.size > ATTACH_MAX) { skipped.push(`${f.name} is over 256 KB`); continue; }
+      const text = await f.text();
+      setPastes((ps) => [...ps, { id: ++pasteSeq.current, text, name: f.name }]);
+    }
+    setNotice(skipped.join(' · '));
+    ref.current?.focus();
+  };
   const pasteSeq = useRef(0);
   const setValue = (t: string) => { setValueState(t); if (draftKey) setDraft(draftKey, t); };
-  useEffect(() => { setValueState(draftKey ? getDraft(draftKey) : ''); setPastes([]); }, [draftKey]);
+  useEffect(() => { setValueState(draftKey ? getDraft(draftKey) : ''); setPastes([]); setNotice(''); }, [draftKey]);
   useEffect(() => {
     if (initial !== undefined) {
       setValue(initial.text);
@@ -63,7 +82,8 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
   const submit = () => {
     if (slash?.length) { runCommand(slash[slashIdx]); return; }
     if ((!value.trim() && !pastes.length) || busy) return;
-    onSend([value.trim(), ...pastes.map((x) => x.text)].filter(Boolean).join('\n\n'));
+    onSend([value.trim(), ...pastes.map((x) => (x.name ? `${x.name}:\n${x.text}` : x.text))].filter(Boolean).join('\n\n'));
+    setNotice('');
     setValue('');
     setPastes([]);
   };
@@ -72,8 +92,12 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
   return (
     <form
       onSubmit={(e) => { e.preventDefault(); submit(); }}
-      className="relative w-full cursor-text rounded-[28px] bg-elev p-2.5 font-sans shadow-[var(--shadow-composer)] transition-shadow duration-150 focus-within:shadow-[0_0_0_2px_var(--focus),0_6px_20px_rgba(0,0,0,0.08)]"
+      className="relative w-full cursor-text rounded-[28px] bg-elev data-[dragging]:shadow-[0_0_0_2px_var(--focus)] data-[dragging]:bg-hover p-2.5 font-sans shadow-[var(--shadow-composer)] transition-shadow duration-150 focus-within:shadow-[0_0_0_2px_var(--focus),0_6px_20px_rgba(0,0,0,0.08)]"
       onClick={(e) => { if (e.target === e.currentTarget) ref.current?.focus(); }}
+      onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDragging(true); } }}
+      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false); }}
+      onDrop={(e) => { if (e.dataTransfer.files.length) { e.preventDefault(); setDragging(false); void addFiles(e.dataTransfer.files); } }}
+      data-dragging={dragging || undefined}
       data-testid="composer"
     >
       {slash && slash.length > 0 && (
@@ -88,15 +112,16 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
         </ul>
       )}
       {pastes.length > 0 && (
-        <ul className="flex gap-2 overflow-x-auto px-1 pb-2 pt-1 scrollbar-none" aria-label="Pasted text" data-testid="paste-chips">
+        <ul className="flex gap-2 overflow-x-auto px-1 pb-2 pt-1 scrollbar-none" aria-label="Attachments" data-testid="paste-chips">
           {pastes.map((x) => {
             const lines = x.text.split('\n').length;
             return (
               <li key={x.id} className="group/chip relative flex h-[88px] w-[132px] shrink-0 flex-col justify-between overflow-hidden rounded-xl border border-line bg-bg p-2.5 text-left motion-safe:animate-[cc-pop_150ms_ease-out]" data-testid="paste-chip">
-                <p className="line-clamp-3 break-all font-mono text-[10.5px] leading-[14px] text-fg-muted" aria-hidden>{x.text.slice(0, 160)}</p>
-                <span className="mt-1 inline-flex w-fit rounded border border-line px-1 text-[10px] font-semibold uppercase tracking-wide text-fg-subtle">Pasted</span>
-                <span className="sr-only">Pasted text, {lines} lines, {x.text.length} characters</span>
-                <button type="button" onClick={() => removePaste(x.id)} aria-label={`Remove pasted text (${lines} lines)`}
+                <p className={clsx('break-all font-mono text-[10.5px] leading-[14px] text-fg-muted', x.name ? 'line-clamp-2' : 'line-clamp-3')} aria-hidden>{x.text.slice(0, 160)}</p>
+                {x.name && <span className="truncate text-[11px] font-medium text-fg" aria-hidden title={x.name}>{x.name}</span>}
+                <span className="mt-1 inline-flex w-fit rounded border border-line px-1 text-[10px] font-semibold uppercase tracking-wide text-fg-subtle" aria-hidden>{x.name ? (x.name.split('.').pop() ?? 'file') : 'Pasted'}</span>
+                <span className="sr-only">{x.name ? `File ${x.name}` : 'Pasted text'}, {lines} lines, {x.text.length} characters</span>
+                <button type="button" onClick={() => removePaste(x.id)} aria-label={x.name ? `Remove ${x.name}` : `Remove pasted text (${lines} lines)`}
                   className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full border border-line bg-elev text-fg-muted opacity-0 shadow-sm hover:text-fg focus-visible:opacity-100 group-hover/chip:opacity-100 max-md:opacity-100">
                   <X size={12} strokeWidth={2.5} />
                 </button>
@@ -105,6 +130,7 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
           })}
         </ul>
       )}
+      {notice && <p role="status" className="px-3 pb-1 text-xs text-[var(--danger)]" data-testid="attach-notice">{notice}</p>}
       <textarea
         onPaste={(e) => {
           const t = e.clipboardData.getData('text/plain');
@@ -140,9 +166,11 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
       />
       <div className="flex items-center justify-between">
         <div className="flex min-w-0 items-center gap-1">
-          <button type="button" aria-label="Add files" title="Attachments (coming later)" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-fg-muted hover:bg-hover">
+          <button type="button" aria-label="Attach text files" title="Attach text files (.txt, .csv, .md, .sql, .json)" onClick={() => fileInput.current?.click()} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-fg-muted hover:bg-hover">
             <Plus size={20} />
           </button>
+          <input ref={fileInput} type="file" multiple accept={ATTACH_ACCEPT} className="hidden" tabIndex={-1} aria-hidden data-testid="attach-input"
+            onChange={(e) => { if (e.currentTarget.files?.length) void addFiles(e.currentTarget.files); e.currentTarget.value = ''; }} />
           <span className="inline-flex min-w-0 items-center gap-1.5 truncate rounded-full border border-line px-3 py-1.5 text-xs text-fg-muted" title="Queries run in a scoped, PHI-safe session">
             <Database size={13} className="shrink-0" /> <span className="truncate">Claims lake · sem.*</span>
           </span>
