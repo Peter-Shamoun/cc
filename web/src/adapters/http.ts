@@ -1,4 +1,5 @@
-import type { StreamEvent } from '../lib/contract';
+import type { ErrorPart, StreamEvent } from '../lib/contract';
+import type { HttpError } from '../api/contract';
 import type { AnalystAdapter, AnyStreamEvent } from './types';
 
 /**
@@ -13,9 +14,41 @@ export interface HttpAdapterOptions {
   retryBaseMs: number;
   /** After Stop, how long to keep reading for the server's aborted message.end (with usage). */
   stopGraceMs: number;
+  /** How long a dropped stream waits for the browser to come back online before giving up. */
+  offlineWaitMs: number;
 }
 
 const abortError = () => new DOMException('aborted', 'AbortError');
+const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
+
+/** The request never reached the server (offline, DNS, CORS, server down). */
+export function networkError(): ErrorPart {
+  return isOffline()
+    ? { type: 'error', id: 'err-offline', code: 'offline', title: "You're offline", message: 'Check your connection, then retry.', retryable: true }
+    : { type: 'error', id: 'err-network', code: 'internal', title: "Can't reach the analyst", message: 'The server did not respond. Try again in a moment.', retryable: true };
+}
+
+/**
+ * Map a non-stream HTTP failure (CONTRACT.md §2: `{"error": {code, message}}`) to an error part.
+ * Server messages are fixed, PHI-free strings; we still fall back to our own copy per code.
+ */
+export async function httpError(res: Response): Promise<ErrorPart> {
+  let code = '';
+  let message = '';
+  try {
+    const j = (await res.json()) as Partial<HttpError>;
+    code = j.error?.code ?? '';
+    message = j.error?.message ?? '';
+  } catch { /* not JSON */ }
+  const retryAfter = Number(res.headers.get('retry-after'));
+  const base = { type: 'error' as const, id: `err-http-${res.status}` };
+  if (res.status === 401 || code === 'auth_expired') return { ...base, code: 'auth_expired', title: 'Session expired', message: message || 'Sign in again to continue.', retryable: false };
+  if (res.status === 429 || code === 'rate_limited') return { ...base, code: 'rate_limited', title: 'Too many requests', message: message || 'Wait a moment, then retry.', retryable: true, ...(retryAfter > 0 ? { retryAfterMs: retryAfter * 1000 } : {}) };
+  if (res.status === 403 || res.status === 404 || code === 'access_denied') return { ...base, code: 'access_denied', title: 'Not available', message: message || "You don't have access to this conversation.", retryable: false };
+  if (res.status === 410) return { ...base, code: code || 'transcripts_unavailable', title: 'Chat unavailable', message: message || 'This chat is no longer available.', retryable: false };
+  if (res.status === 422 || code === 'validation') return { ...base, code: 'validation', title: "Couldn't send that", message: message || 'Check the question and try again.', retryable: false };
+  return { ...base, code: code || 'internal', title: 'Analyst unavailable', message: `The analyst returned ${res.status}. Try again in a moment.`, retryable: true };
+}
 
 export class HttpAnalystAdapter implements AnalystAdapter {
   readonly name = 'http';
@@ -25,7 +58,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
    * Real deployments leave it unset and authenticate with the httpOnly `cc_session` cookie.
    */
   constructor(private base = '', private token?: string, opts: Partial<HttpAdapterOptions> = {}) {
-    this.opts = { maxRetries: 3, retryBaseMs: 500, stopGraceMs: 1500, ...opts };
+    this.opts = { maxRetries: 3, retryBaseMs: 500, stopGraceMs: 1500, offlineWaitMs: 45_000, ...opts };
   }
   private readonly opts: HttpAdapterOptions;
 
@@ -75,8 +108,13 @@ export class HttpAnalystAdapter implements AnalystAdapter {
           });
         } catch (e) {
           if (wire.signal.aborted || signal.aborted) throw abortError();
+          if (messageId !== null && isOffline()) { await this.waitOnline(signal); continue; } // offline: wait, don't burn retries
           if (messageId !== null && retries < this.opts.maxRetries) { await this.backoff(++retries, signal); continue; }
-          throw e;
+          if (messageId !== null) throw e;
+          // Never reached the server: say why, as a retryable error part (Retry = regenerate).
+          yield { type: 'part', part: networkError() };
+          yield { type: 'message.end', messageId: '', finishReason: 'error' };
+          return;
         }
         // §6.4: an expired/answered clarification is 409; send the reply as a fresh question instead.
         if (res.status === 409 && resumeFallback && messageId === null) {
@@ -87,7 +125,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
         if (!res.ok || !res.body) {
           if (messageId !== null && res.status >= 500 && retries < this.opts.maxRetries) { await this.backoff(++retries, signal); continue; }
           if (messageId !== null) throw new Error(`replay ${res.status}`); // the run is gone: useChat shows "Connection lost"
-          yield { type: 'part', part: { type: 'error', id: 'err-http', code: 'internal', title: 'Connection lost', message: `The analyst returned ${res.status}.`, retryable: true } };
+          yield { type: 'part', part: await httpError(res) };
           yield { type: 'message.end', messageId: '', finishReason: 'error' };
           return;
         }
@@ -110,6 +148,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
         }
         // The stream closed without message.end: a dropped connection.
         if (signal.aborted) throw abortError();
+        if (isOffline()) { await this.waitOnline(signal); continue; }
         if (messageId === null || retries >= this.opts.maxRetries) throw new Error('stream dropped');
         await this.backoff(++retries, signal);
       }
@@ -118,6 +157,18 @@ export class HttpAnalystAdapter implements AnalystAdapter {
       signal.removeEventListener('abort', onAbort);
       this.current = null;
     }
+  }
+
+  /** Wait for the browser to come back online (bounded: the server replays for 60 s after a run ends). */
+  private waitOnline(signal: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const done = () => { clearTimeout(t); window.removeEventListener('online', done); signal.removeEventListener('abort', aborted); resolve(); };
+      const aborted = () => { clearTimeout(t); window.removeEventListener('online', done); reject(abortError()); };
+      const t = setTimeout(() => { window.removeEventListener('online', done); signal.removeEventListener('abort', aborted); reject(new Error('offline')); }, this.opts.offlineWaitMs);
+      if (signal.aborted) return aborted();
+      window.addEventListener('online', done, { once: true });
+      signal.addEventListener('abort', aborted, { once: true });
+    });
   }
 
   private backoff(attempt: number, signal: AbortSignal): Promise<void> {
