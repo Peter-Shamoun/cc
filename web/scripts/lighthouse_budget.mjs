@@ -55,8 +55,21 @@ function runLighthouse(url, preset, outFile, version) {
   const args = [...pre, url, '--only-categories=performance,accessibility,best-practices', '--output=json',
     `--output-path=${outFile}`, '--quiet', '--chrome-flags=--headless=new --no-sandbox --disable-dev-shm-usage'];
   if (preset === 'desktop') args.push('--preset=desktop');
-  execFileSync(cmd, args, { stdio: ['ignore', 'ignore', 'inherit'], env: { ...process.env, ...(chrome ? { CHROME_PATH: chrome } : {}) } });
-  return JSON.parse(fs.readFileSync(outFile, 'utf8'));
+  // Lighthouse has transient trace failures (NO_NAVSTART, NO_FCP on a cold Chrome). Retry those; a persistent
+  // runtime error is still returned and fails the budget in evaluate().
+  let last = { runtimeError: { code: 'LIGHTHOUSE_DID_NOT_RUN' }, categories: {}, audits: {} };
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    fs.rmSync(outFile, { force: true });
+    try {
+      execFileSync(cmd, args, { stdio: ['ignore', 'ignore', 'inherit'], env: { ...process.env, ...(chrome ? { CHROME_PATH: chrome } : {}) } });
+    } catch (e) {
+      last = { runtimeError: { code: `LIGHTHOUSE_EXIT_${e.status ?? 'ERR'}` }, categories: {}, audits: {} };
+    }
+    if (fs.existsSync(outFile)) last = JSON.parse(fs.readFileSync(outFile, 'utf8'));
+    if (!last.runtimeError) return last;
+    console.error(`lighthouse ${preset}: ${last.runtimeError.code} (attempt ${attempt}/3)`);
+  }
+  return last;
 }
 
 function main(argv) {

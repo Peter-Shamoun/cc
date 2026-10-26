@@ -16,7 +16,8 @@
     "lint": "oxlint -c .oxlintrc.json --max-warnings 1",
     "check:headers": "node scripts/header_check.mjs",
     "check:perf": "node scripts/lighthouse_budget.mjs",
-    "audit": "npm audit --audit-level=low"
+    "audit": "npm audit --audit-level=low",
+    "ci": "bash ci/run_local.sh"
   },
   "dependencies": {
     "@streamdown/math": "^1.0.3",
