@@ -101,7 +101,7 @@ export function ThreadView({ messages, busy, actions, scrollRef, scrollToIndexRe
     const v = m.role === 'user' ? actions.versionOf(i) : undefined;
     const isLast = i === n - 1;
     return (
-      <Row key={m.id} msg={m} index={i} isLast={isLast} reserve={isLast && m.role === 'assistant'} lazy={!virtual && i < n - LIVE_TAIL}
+      <Row key={('uiKey' in m && m.uiKey) || m.id} msg={m} index={i} isLast={isLast} reserve={isLast && m.role === 'assistant'} lazy={!virtual && i < n - LIVE_TAIL}
         busy={m.role === 'user' ? busy : false} vCur={v?.current} vTotal={v?.total} actions={ref} />
     );
   };

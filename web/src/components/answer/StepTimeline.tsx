@@ -50,7 +50,9 @@ export function StepTimeline({ steps, live, elapsedMs, reasoning = [] }: { steps
   const repaired = steps.filter((s) => s.kind === 'repair' && s.state === 'ok').length;
   const counts = summarize(steps).replace(/ · .*$/, '');
   const worked = steps.reduce((a, b) => a + (b.durationMs ?? 0), 0) + reasoning.reduce((a, r) => a + (r.durationMs ?? 0), 0);
-  const thoughtMs = mountedLive.current ? Math.max(ticking, 0) : elapsedMs ?? worked;
+  // QA-A16: never shorter than the longest step it contains (a 2.4s query under "Thought for 1.8s" reads wrong).
+  const longest = Math.max(0, ...steps.map((s) => s.durationMs ?? 0), ...reasoning.map((r) => r.durationMs ?? 0));
+  const thoughtMs = Math.max(mountedLive.current ? Math.max(ticking, 0) : elapsedMs ?? worked, longest);
   const stopped = steps.filter((x) => x.state === 'cancelled').length;
   // Collapsed: "Thought for 1.2s" (plus "1 stopped" if any). Expanded: the counts join the header.
   const header = live ? 'Thinking…' : [`Thought for ${fmtMs(Math.max(thoughtMs, 1000))}`, open && steps.length ? counts : stopped ? `${stopped} stopped` : ''].filter(Boolean).join(' · ');
@@ -72,9 +74,11 @@ export function StepTimeline({ steps, live, elapsedMs, reasoning = [] }: { steps
         {notes.length > 0 && (
           <div className="ml-[6px] mt-1.5 whitespace-pre-line border-l-2 border-line pl-5 leading-relaxed text-fg-muted" data-testid="reasoning-summary">{notes.join('\n\n')}</div>
         )}
-        <ol className="relative ml-[6px] mt-1 border-l border-line pl-5" aria-live={live ? 'polite' : undefined}>
-          {steps.map((s, i) => <StepRow key={s.id} step={s} last={i === steps.length - 1} showAgent={multiAgent} />)}
-        </ol>
+        {steps.length > 0 && (
+          <ol className="relative ml-[6px] mt-1 border-l border-line pl-5" aria-live={live ? 'polite' : undefined}>
+            {steps.map((s, i) => <StepRow key={s.id} step={s} last={i === steps.length - 1} showAgent={multiAgent} />)}
+          </ol>
+        )}
       </div>
     </div>
   );

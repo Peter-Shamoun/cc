@@ -38,7 +38,8 @@ import { createTableReveal, prefersReducedMotion } from './tableReveal';
 import { foldThread } from './threadTree';
 
 const uid = (p: string) => `${p}_${Math.random().toString(36).slice(2, 10)}`;
-export type ViewMessage = UserMessage | AssistantViewV1;
+/** `uiKey`: a client-only render key fixed at send, so the row doesn't remount when message.start swaps in the server id (QA-A15: the Thinking row and its timer survive). */
+export type ViewMessage = UserMessage | (AssistantViewV1 & { uiKey?: string });
 
 function toView(m: UserMessage | AssistantMessage): ViewMessage {
   if (m.role === 'user') return m;
@@ -129,7 +130,8 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore, getOpti
   const run = useCallback(async (cid: ID, history: ViewMessage[], opts: { resume?: ChatRequest['resume']; regenerate?: ChatRequest['regenerate'] } = {}) => {
     const ctrl = new AbortController();
     abortRef.current = ctrl;
-    let view = newAssistantViewV1(uid('a'));
+    const placeholder = uid('a');
+    let view: AssistantViewV1 & { uiKey?: string } = { ...newAssistantViewV1(placeholder), uiKey: placeholder };
     const startedAt = Date.now();
     history = markAnswered(history);
     const token = ++runRef.current;
