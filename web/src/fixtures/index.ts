@@ -4,9 +4,11 @@
  * public X12 code list.
  */
 import type { Column, Part } from '../lib/contract';
+import { ANSWER_FIXTURES } from './answer';
+import type { UsageDetail } from '../components/answer/provisional';
 
 export type FixtureStep = Part | { status: string };
-export interface Fixture { id: string; title: string; prompt: string; match: RegExp; queries: number; steps: FixtureStep[] }
+export interface Fixture { id: string; title: string; prompt: string; match: RegExp; queries: number; steps: FixtureStep[]; usage?: Partial<UsageDetail>; hidden?: boolean }
 
 const payers: [string, number, number][] = [
   ['Northwind Health Plan', 18432, 0.142],
@@ -167,8 +169,11 @@ export const FIXTURES: Fixture[] = [
   },
 ];
 
+const ALL: Fixture[] = [...FIXTURES, ...ANSWER_FIXTURES];
+
 export function pickFixture(prompt: string): Fixture {
-  return FIXTURES.find((f) => f.prompt === prompt) ?? FIXTURES.find((f) => f.match.test(prompt)) ?? FIXTURES[0];
+  return ALL.find((f) => f.prompt === prompt) ?? ANSWER_FIXTURES.find((f) => f.match.test(prompt)) ?? FIXTURES.find((f) => f.match.test(prompt)) ?? FIXTURES[0];
 }
 
-export const SUGGESTIONS = FIXTURES.map((f) => ({ title: f.title, prompt: f.prompt }));
+/** Main demos plus the answer-surface demos (Team B: repair/candidates/checks, abstain, clarify). */
+export const SUGGESTIONS = ALL.filter((f) => !f.hidden).map((f) => ({ title: f.title, prompt: f.prompt }));
