@@ -113,6 +113,8 @@ class Settings:
     model_delay_seconds: float = field(default_factory=lambda: _paced("CC_API_MODEL_DELAY_SECONDS", DEMO_PACE_MODEL_SECONDS))
     demo_pace: bool = field(default_factory=demo_pace_enabled)
     max_body_bytes: int = int(os.environ.get("CC_API_MAX_BODY_BYTES", str(MAX_BODY_BYTES)))
+    #: unfinished /api/chat runs allowed per user at once (429 rate_limited beyond it)
+    max_concurrent_runs: int = int(os.environ.get("CC_API_MAX_CONCURRENT_RUNS", "3"))
     clarification_ttl_seconds: float = 1800.0
     analyzer_overrides: dict = field(default_factory=lambda: {
         "glossary": "basic", "data_dictionary": False, "data_profile": False, "row_limit": 5000,
@@ -235,6 +237,15 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         if demo and request.headers.get("x-demo-fault") == "rate_limited":
             return JSONResponse(
                 {"error": {"code": "rate_limited", "message": "Too many requests (demo fault)."}},
+                429,
+                headers={**NO_STORE, "Retry-After": "3"},
+            )
+        # One user can't pin the analyzer threads: at most max_concurrent_runs unfinished runs per principal.
+        active = sum(1 for r in list(runs.values()) if r.principal == ctx.principal and not r.done)
+        if active >= settings.max_concurrent_runs:
+            audit("chat_rate_limited", customer=ctx.principal.customer, user=ctx.principal.user, reason="concurrent_runs")
+            return JSONResponse(
+                {"error": {"code": "rate_limited", "message": "Too many answers in progress. Wait for one to finish."}},
                 429,
                 headers={**NO_STORE, "Retry-After": "3"},
             )
