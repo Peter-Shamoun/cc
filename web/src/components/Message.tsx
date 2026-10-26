@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, Pencil, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react';
 import clsx from 'clsx';
 import type { AssistantView, ChartPart, CodePart, ImagePart, Part, TablePart, UserMessage } from '../lib/contract';
@@ -40,7 +40,7 @@ export function messageMarkdown(m: AnyView): string {
     .join('\n\n');
 }
 
-export function UserBubble({ msg, onEdit, version, onVersion, disabled }: { msg: UserMessage; onEdit?: (t: string) => void; version?: { current: number; total: number }; onVersion?: (k: number) => void; disabled?: boolean }) {
+export const UserBubble = memo(function UserBubble({ msg, onEdit, version, onVersion, disabled }: { msg: UserMessage; onEdit?: (t: string) => void; version?: { current: number; total: number }; onVersion?: (k: number) => void; disabled?: boolean }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(msg.text);
   if (editing) {
@@ -75,9 +75,9 @@ export function UserBubble({ msg, onEdit, version, onVersion, disabled }: { msg:
       </div>
     </div>
   );
-}
+});
 
-export function AssistantTurn({ msg: view, isLast, onOpen, onRegenerate, onEdit, onSend, onReply }: { msg: AnyView; isLast: boolean; onOpen: (a: Artifact) => void; onRegenerate: () => void; onEdit: (t: string) => void; onSend?: (t: string) => void; onReply?: OnReply }) {
+export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, onOpen, onRegenerate, onEdit, onSend, onReply }: { msg: AnyView; isLast: boolean; onOpen: (a: Artifact) => void; onRegenerate: () => void; onEdit: (t: string) => void; onSend?: (t: string) => void; onReply?: OnReply }) {
   const msg = view as AssistantView; // legacy part renderers; v1-only data is read through `view`
   const reply: OnReply | undefined = onReply ?? (onSend ? (t) => onSend(t) : undefined);
   const [vote, setVote] = useState<'up' | 'down' | null>(msg.feedback ?? null);
@@ -128,7 +128,7 @@ export function AssistantTurn({ msg: view, isLast, onOpen, onRegenerate, onEdit,
   const empty = parts.length === 0 && steps.length === 0;
   const nQueries = usage?.queries ?? queries.length;
   return (
-    <div className="group" data-testid="msg-assistant" aria-live={msg.streaming ? 'polite' : undefined} aria-busy={msg.streaming}>
+    <div className="group" data-testid="msg-assistant">
       {blocks}
       {msg.streaming && (msg.status || empty) && (
         <div className="my-2 flex items-center gap-2 font-sans text-sm text-fg-muted" data-testid="status">
@@ -150,7 +150,7 @@ export function AssistantTurn({ msg: view, isLast, onOpen, onRegenerate, onEdit,
       {feedbackOpen && <FeedbackPanel onClose={() => setFeedbackOpen(false)} onSubmit={() => { setFeedbackOpen(false); setFeedbackSent(true); }} />}
     </div>
   );
-}
+});
 
 const FEEDBACK_REASONS = ['Wrong numbers', 'Wrong or missing filter', 'Misread the question', 'SQL looks wrong', 'Chart not helpful', 'Too slow', 'Other'];
 

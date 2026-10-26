@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AssistantMessage, ID, UserMessage } from './contract';
+import type { AssistantMessage, ID, TablePart, UserMessage } from './contract';
 import { newAssistantViewV1, reduceV1, type AssistantViewV1, type ChatRequest, type Usage } from '../api/contract';
 import type { AnalystAdapter, ConnectionState, ThreadSummary, TranscriptStore } from '../adapters/types';
 
@@ -65,6 +65,8 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
   const abortRef = useRef<AbortController | null>(null);
   /** Bumped by every run, open and newChat: a run that is no longer current must not touch the view. */
   const runRef = useRef(0);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
 
   const refresh = useCallback(async () => setThreads((await store.listConversations()).items), [store]);
   useEffect(() => {
@@ -219,6 +221,71 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     const b = branches[i];
     return b ? { current: b.idx + 1, total: b.versions.length } : undefined;
   };
+
+  // Dev/perf hook only. Activated by ?audit=1; it never talks to the network.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !new URLSearchParams(window.location.search).has('audit')) return;
+    const paragraph = (i: number) =>
+      `Denial rate for group ${i} is ${((i * 3) % 19) + 4}%. **Net** of reversals, the month moved about ${(i % 5) + 1} points.\n\n- Check the payer mix\n- September is still open`;
+    const assistant = (id: string, parts: AssistantViewV1['parts']): ViewMessage => ({
+      id, role: 'assistant', createdAt: '2026-10-01T00:00:00Z', streaming: false, status: null, openText: [], parts, steps: [], escalations: [], lastSeq: -1,
+    });
+    window.__ccAudit = {
+      seedMessages(count: number) {
+        const msgs: ViewMessage[] = [];
+        for (let i = 0; i < count; i++) {
+          if (i % 2 === 0) msgs.push({ id: `u${i}`, role: 'user', text: `What changed in denial rate for payer group ${i}?`, createdAt: '2026-10-01T00:00:00Z' });
+          else msgs.push(assistant(`a${i}`, [{ type: 'text', id: `t${i}`, text: paragraph(i) }]));
+        }
+        setConvId('audit');
+        setBranches({});
+        setBusy(false);
+        setMessages(msgs);
+      },
+      seedTable(rowCount: number) {
+        const columns: TablePart['columns'] = [
+          { key: 'payer', label: 'Payer', type: 'string' },
+          { key: 'claims', label: 'Claims', type: 'integer' },
+          { key: 'rate', label: 'Denial rate', type: 'percent' },
+          { key: 'amt', label: 'Denied $', type: 'currency' },
+        ];
+        const rows = Array.from({ length: rowCount }, (_, i) => [`Payer ${i % 80}`, 1000 + i, (i % 50) / 100, Math.round(i * 12.4)]);
+        const part: TablePart = { type: 'table', id: 'audit-table', title: 'Preview', columns, rows, rowCount, source: { views: ['sem.claims'], elapsedMs: 40 } };
+        setConvId('audit');
+        setBranches({});
+        setBusy(false);
+        setMessages([
+          { id: 'u-table', role: 'user', text: 'Show the full preview.', createdAt: '2026-10-01T00:00:00Z' },
+          assistant('a-table', [part]),
+        ]);
+      },
+      async burst(tokens: number, gapMs = 8) {
+        const existing = messagesRef.current;
+        const history: ViewMessage[] = existing.length
+          ? [...existing, { id: 'u-burst', role: 'user', text: 'Explain the denial trend in detail.', createdAt: '2026-10-01T00:00:00Z' }]
+          : [{ id: 'u-burst', role: 'user', text: 'Explain the denial trend in detail.', createdAt: '2026-10-01T00:00:00Z' }];
+        let view = newAssistantViewV1('a-burst');
+        let seq = 0;
+        view = reduceV1(view, { type: 'message.start', seq: seq++, messageId: 'a-burst', conversationId: 'audit', contractVersion: 'v1' });
+        view = reduceV1(view, { type: 'text.start', seq: seq++, partId: 'p-burst' });
+        setConvId('audit');
+        setBusy(true);
+        const bits = ['Denial ', 'rates ', 'rose ', 'through ', 'Q3 ', 'for ', 'the ', 'largest ', 'payers. '];
+        const batch = frameBatch(() => setMessages([...history, view]));
+        batch.now();
+        for (let i = 0; i < tokens; i++) {
+          view = reduceV1(view, { type: 'text.delta', seq: seq++, partId: 'p-burst', delta: bits[i % bits.length] });
+          batch.schedule();
+          if (gapMs > 0) await new Promise((resolve) => setTimeout(resolve, gapMs));
+        }
+        view = reduceV1(view, { type: 'text.end', seq: seq++, partId: 'p-burst' });
+        view = { ...view, streaming: false, status: null, openText: [] };
+        batch.now();
+        setBusy(false);
+      },
+    };
+    return () => { delete window.__ccAudit; };
+  }, []);
 
   return { threads, convId, messages, busy, send, stop, open, newChat, regenerate, remove, editAt, switchVersion, versionOf, rename, pin, canPin: !!store.setPinned };
 }

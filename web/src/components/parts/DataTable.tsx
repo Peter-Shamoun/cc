@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { flexRender, getCoreRowModel, getFilteredRowModel, getSortedRowModel, useReactTable, type ColumnDef, type SortingState } from '@tanstack/react-table';
 import { ArrowDown, ArrowUp, Download, Maximize2, ShieldAlert } from 'lucide-react';
 import clsx from 'clsx';
 import type { TablePart } from '../../lib/contract';
@@ -8,9 +7,10 @@ import { csvFilename, downloadBlob, downloadText, formatCell, isNumeric, tableTo
 import { CopyButton, IconButton } from '../ui';
 import { useAdapter } from '../../adapters/context';
 
-type Row = unknown[];
 const VIRTUALIZE_AT = 200;
 const ROW_H = 37;
+
+type Sort = { index: number; dir: 'asc' | 'desc' } | null;
 
 /** Null, blank, and non-finite values sort after every real number (Excel-style blanks). */
 function compareNumeric(a: unknown, b: unknown): number {
@@ -28,38 +28,39 @@ function compareNumeric(a: unknown, b: unknown): number {
   return fa ? -1 : 1;
 }
 
-export function DataTable({ part, onOpen, full }: { part: TablePart; onOpen?: () => void; full?: boolean }) {
+function compareCells(a: unknown, b: unknown, numeric: boolean): number {
+  if (numeric) return compareNumeric(a, b);
+  const aNil = a === null || a === undefined || a === '';
+  const bNil = b === null || b === undefined || b === '';
+  if (aNil || bNil) return aNil === bNil ? 0 : aNil ? 1 : -1;
+  return String(a).localeCompare(String(b), undefined, { numeric: true });
+}
+
+export const DataTable = memo(function DataTable({ part, onOpen, full }: { part: TablePart; onOpen?: () => void; full?: boolean }) {
   const adapter = useAdapter();
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [sort, setSort] = useState<Sort>(null);
   const [filter, setFilter] = useState('');
-  const columns = useMemo<ColumnDef<Row>[]>(
-    () =>
-      part.columns.map((c, i) => ({
-        // Index keeps two columns that share a key from collapsing into one.
-        id: `${i}:${c.key}`,
-        accessorFn: (r) => (c.phi ? null : r[i]),
-        header: c.label,
-        cell: (info) => formatCell(info.row.original[i], c),
-        enableSorting: !c.phi,
-        // Spec §4.2: first click is ascending, then descending, then clear. TanStack otherwise starts numbers at descending.
-        sortDescFirst: false,
-        sortingFn: isNumeric(c) ? (a, b, id) => compareNumeric(a.getValue(id), b.getValue(id)) : 'alphanumeric',
-        meta: { numeric: isNumeric(c), phi: c.phi, description: c.description },
-      })),
-    [part.columns],
-  );
-  const table = useReactTable({
-    data: part.rows,
-    columns,
-    state: { sorting, globalFilter: filter },
-    onSortingChange: setSorting,
-    onGlobalFilterChange: setFilter,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-  });
-  const rows = table.getRowModel().rows;
-  // Virtualize once a table is big enough to cost layout time (spec §4.3: 10k-row previews).
+  const rows = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    let next = part.rows;
+    if (q) next = part.rows.filter((row) => row.some((cell, i) => !part.columns[i]?.phi && String(cell ?? '').toLowerCase().includes(q)));
+    if (!sort) return next;
+    const numeric = isNumeric(part.columns[sort.index]);
+    const { index, dir } = sort;
+    const copy = next.slice();
+    copy.sort((a, b) => {
+      const c = compareCells(a[index], b[index], numeric);
+      return dir === 'asc' ? c : -c;
+    });
+    return copy;
+  }, [part.rows, part.columns, filter, sort]);
+  const cycle = (index: number) => {
+    setSort((cur) => {
+      if (!cur || cur.index !== index) return { index, dir: 'asc' };
+      if (cur.dir === 'asc') return { index, dir: 'desc' };
+      return null;
+    });
+  };
   const scrollRef = useRef<HTMLDivElement>(null);
   const virtual = rows.length > VIRTUALIZE_AT;
   const rv = useVirtualizer({
@@ -91,7 +92,7 @@ export function DataTable({ part, onOpen, full }: { part: TablePart; onOpen?: ()
   const items = virtual ? rv.getVirtualItems() : [];
   const padTop = virtual && items.length ? items[0].start : 0;
   const padBottom = virtual && items.length ? rv.getTotalSize() - items[items.length - 1].end : 0;
-  const shown = virtual ? items.map((v) => rows[v.index]) : rows;
+  const shown = virtual ? items.map((v) => ({ key: v.index, row: rows[v.index] })) : rows.map((row, index) => ({ key: index, row }));
   const hasPhi = part.columns.some((c) => c.phi);
   const download = async () => {
     const name = csvFilename(part.title);
@@ -127,6 +128,8 @@ export function DataTable({ part, onOpen, full }: { part: TablePart; onOpen?: ()
       <div className="relative">
       <div
         ref={scrollRef}
+        tabIndex={0}
+        aria-label="Table rows"
         onScroll={measureEdges}
         className={clsx('overflow-auto overscroll-x-contain', full ? 'max-h-[calc(100vh-170px)]' : 'max-h-[400px]')}
         style={virtual ? { height: full ? 'calc(100vh - 170px)' : 400 } : undefined}
@@ -134,37 +137,32 @@ export function DataTable({ part, onOpen, full }: { part: TablePart; onOpen?: ()
       >
         <table className="w-max min-w-full border-collapse font-sans text-sm">
           <thead className="sticky top-0 z-[1] bg-elev">
-            {table.getHeaderGroups().map((hg) => (
-              <tr key={hg.id}>
-                {hg.headers.map((h) => {
-                  const meta = h.column.columnDef.meta as { numeric?: boolean; phi?: boolean; description?: string };
-                  const dir = h.column.getIsSorted();
-                  return (
-                    <th key={h.id} scope="col" aria-sort={dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : 'none'} title={meta.description}
-                      className={clsx('border-b border-line px-3 py-2 font-semibold whitespace-nowrap', meta.numeric ? 'text-right' : 'text-left')}>
-                      <button type="button" disabled={!h.column.getCanSort()} onClick={h.column.getToggleSortingHandler()} className={clsx('inline-flex items-center gap-1', meta.numeric && 'flex-row-reverse')}>
-                        {flexRender(h.column.columnDef.header, h.getContext())}
-                        {meta.phi && <ShieldAlert size={12} className="text-fg-subtle" aria-label="PHI, masked" />}
-                        {dir === 'asc' ? <ArrowUp size={13} /> : dir === 'desc' ? <ArrowDown size={13} /> : null}
-                      </button>
-                    </th>
-                  );
-                })}
-              </tr>
-            ))}
+            <tr>
+              {part.columns.map((col, i) => {
+                const numeric = isNumeric(col);
+                const dir = sort?.index === i ? sort.dir : null;
+                return (
+                  <th key={`${i}:${col.key}`} scope="col" aria-sort={dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : 'none'} title={col.description}
+                    className={clsx('border-b border-line px-3 py-2 font-semibold whitespace-nowrap', numeric ? 'text-right' : 'text-left')}>
+                    <button type="button" disabled={!!col.phi} onClick={() => cycle(i)} className={clsx('inline-flex items-center gap-1', numeric && 'flex-row-reverse')}>
+                      {col.label}
+                      {col.phi && <ShieldAlert size={12} className="text-fg-subtle" aria-label="PHI, masked" />}
+                      {dir === 'asc' ? <ArrowUp size={13} /> : dir === 'desc' ? <ArrowDown size={13} /> : null}
+                    </button>
+                  </th>
+                );
+              })}
+            </tr>
           </thead>
           <tbody>
             {padTop > 0 && <tr aria-hidden style={{ height: padTop }} />}
-            {shown.map((r) => (
-              <tr key={r.id} className="hover:bg-hover" style={virtual ? { height: ROW_H } : undefined}>
-                {r.getVisibleCells().map((c) => {
-                  const meta = c.column.columnDef.meta as { numeric?: boolean; phi?: boolean };
-                  return (
-                    <td key={c.id} className={clsx('border-b border-line px-3 py-2 whitespace-nowrap', meta.numeric && 'text-right tabular-nums', meta.phi && 'font-mono text-fg-subtle')}>
-                      {flexRender(c.column.columnDef.cell, c.getContext())}
-                    </td>
-                  );
-                })}
+            {shown.map(({ key, row }) => (
+              <tr key={key} className="hover:bg-hover" style={virtual ? { height: ROW_H } : undefined}>
+                {part.columns.map((col, i) => (
+                  <td key={`${i}:${col.key}`} className={clsx('border-b border-line px-3 py-2 whitespace-nowrap', isNumeric(col) && 'text-right tabular-nums', col.phi && 'font-mono text-fg-subtle')}>
+                    {formatCell(row[i], col)}
+                  </td>
+                ))}
               </tr>
             ))}
             {padBottom > 0 && <tr aria-hidden style={{ height: padBottom }} />}
@@ -192,4 +190,4 @@ export function DataTable({ part, onOpen, full }: { part: TablePart; onOpen?: ()
       </div>
     </div>
   );
-}
+});
