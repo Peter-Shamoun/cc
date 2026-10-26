@@ -149,6 +149,10 @@ analyzer will stream the same events when it plugs in.
 
 Realistic timing for UI work: `CC_API_MODEL_DELAY_SECONDS=0.6 CC_API_STREAM_DELAY_SECONDS=0.03 uvicorn api.app:app --port 8101`.
 
+Canonical example streams for every outcome (answer, tool steps/repair, abstain, clarify + resume, escalation,
+chart, candidates, error) live in [`api/contract/examples/`](contract/examples/README.md), one event per line, regenerated
+from the demo backend by `python -m api.contract.gen_examples` and checked by `api/tests/test_contract_examples.py`.
+
 ## 10. PHI and security rules
 
 * Step events never carry row values: `step.sql_result` has counts and column names/types only.
