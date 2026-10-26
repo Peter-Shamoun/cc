@@ -1,6 +1,6 @@
 # CC chat API — stream contract
 
-**Version: 1.13.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.14.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -215,7 +215,8 @@ answer shows both the small and the large model).
 
 **Per-stage breakdown (1.6.0):** `latency.stages {plan, sql, repair, checks, render}` (`LatencyStages`, all integers
 in ms, all five always present). It is wall clock: every instant of the run belongs to exactly one stage, so the
-stages add up to about `totalMs`, and a stacked bar is safe to draw.
+stages add up to `totalMs` (**exactly since 1.14.0**: the server gives clock drift to `plan` and rounds by largest
+remainder, `api.live.partition_ms`), and a stacked bar is safe to draw.
 
 | stage | from → to |
 |---|---|
@@ -342,6 +343,23 @@ from the demo backend by `python -m api.contract.gen_examples` and checked by `a
   server start. No inline `<script>` or `<style>` without the nonce. Tests that inject CSS must use constructed
   stylesheets (`document.adoptedStyleSheets`), not `addStyleTag`.
 * `error.details` and `step.*.error.message` are scrubbed (quoted literals and long digit runs masked) and ≤500 chars.
+* **Shown SQL masks PHI-bearing literals (1.14.0).** The SQL a run *executes* is unchanged; the SQL it *shows*
+  (`step.sql_running.sql`, `step.repair_attempt.revisedSql`, `step.candidates[].sql`, the `code` part with `role: query`, legacy `tool_call` input, and
+  therefore transcripts, shares and exports) has literals replaced by `?`, and the event/part carries
+  `maskedLiterals: <n>`. The server policy is `Capabilities.sqlLiteralMasking` (env `CC_API_SQL_LITERAL_MASKING`;
+  an unknown value means `phi`, so a typo never turns it off):
+
+  | policy | masks | keeps |
+  |---|---|---|
+  | `phi` (default) | literals compared with a PHI-bearing column (patient/member/subscriber/guarantor ids and names, MRN, DOB, SSN, NPI, address, zip, phone, e-mail, account, claim/encounter/accession ids), including inside calls (`lower(last_name) = ?`) and literal-first (`? = mrn`); any literal whose value looks like an identifier (SSN, e-mail, phone, 7+ digits, 8+ letters-and-digits) | `status = 'denied'`, `service_date BETWEEN '2026-01-01' AND …`, `LIMIT 10`, `GROUP BY 1` |
+  | `all` | every string literal and every number compared with a column | `LIMIT`/`OFFSET`/ordinals |
+  | `off` | nothing (pre-1.14 behaviour) | |
+
+  SQL the masker cannot tokenize (an unterminated string) is replaced by a fixed comment under `phi`/`all`, never
+  shown raw. **UI:** when `maskedLiterals` is present, say so next to the SQL ("Patient values hidden") and never
+  offer to run the shown SQL. **Residual risk under `phi`:** a name in free text compared with a non-PHI column
+  (`note ILIKE '%Jane%'`) is not caught; a deployment that needs certainty uses `all`. Implementation:
+  `api/sql_mask.py`; tests: `api/tests/test_sql_mask.py`.
 
 ## 11. Conversation history (REST)
 
@@ -528,6 +546,12 @@ must be signed in to the same organization (customer). A conversation has at mos
   Example: `examples/share.json`.
 
 ## Changelog
+
+* **1.14.0** (2026-10-25) — Additive. **Shown-SQL literal masking (§10):** `maskedLiterals` on `step.sql_running`,
+  `step.repair_attempt`, `step.candidates[]` and `CodePart`; `Capabilities.sqlLiteralMasking` (`phi` default, `all`, `off`; open). Applies
+  in demo mode and in the analyzer adapter (still unwired). **`ArtifactPart.kind` is open** (`x-fallback: report`) now
+  that the web renderer has a generic icon (#242). **`latency.stages` sum exactly to `totalMs`** (§7; was "about").
+  The adapter's `message.start.strategy` is a capabilities id (#244).
 
 * **1.13.0** (2026-10-25) — Review audit; additive. **Errors:** the 404s of `stop` and `DELETE` conversation carry
   the error envelope (old keys kept), so §1 has no exceptions; `regenerate`/`editOf` "nothing to point at" 404s are

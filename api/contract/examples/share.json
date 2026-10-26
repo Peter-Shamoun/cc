@@ -36,7 +36,7 @@
               "type": "reasoning",
               "id": "p_1",
               "summary": "Checking the claims view.",
-              "durationMs": 16
+              "durationMs": 15
             },
             {
               "type": "text",
@@ -84,7 +84,7 @@
                 "views": [
                   "sem.claims"
                 ],
-                "elapsedMs": 18
+                "elapsedMs": 17
               },
               "sqlPartId": "p_3",
               "dataWithheld": true
@@ -120,21 +120,21 @@
           "finishReason": "stop",
           "usage": {
             "queries": 2,
-            "elapsedMs": 80,
+            "elapsedMs": 78,
             "latency": {
-              "totalMs": 80,
+              "totalMs": 78,
               "modelMs": 0,
-              "sqlMs": 5,
+              "sqlMs": 4,
               "stages": {
-                "plan": 13,
-                "sql": 6,
+                "plan": 12,
+                "sql": 5,
                 "repair": 0,
-                "checks": 2,
-                "render": 61
+                "checks": 1,
+                "render": 60
               },
               "firstEventMs": 0,
               "firstStepMs": 11,
-              "firstTokenMs": 20
+              "firstTokenMs": 18
             },
             "costIsEstimate": true,
             "costUsd": 0.003891,
@@ -176,7 +176,7 @@
               "type": "step.sql_result",
               "stepId": "s_2",
               "ok": true,
-              "elapsedMs": 3,
+              "elapsedMs": 2,
               "rowCount": 1,
               "columns": [
                 {
