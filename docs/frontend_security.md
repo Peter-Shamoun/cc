@@ -58,9 +58,17 @@ defuse_cell`), and Download CSV, Copy table (TSV) and chart "Download data" (`we
 or header that starts with `= + - @`, TAB or CR gets a leading `'`, so Excel or Sheets shows it as text instead of running
 it (e.g. `=HYPERLINK(...)` exfiltration). Numbers, negatives included, stay numeric. Tests: `api/tests/test_csv_injection.py`,
 `web/src/security/csvInjection.test.ts`.
+
 ## Request-body cap
 
 `api/security.py BodyLimitMiddleware` (pure ASGI, inside the security-headers middleware) rejects POST/PUT/PATCH bodies
 over 1 MiB (`CC_API_MAX_BODY_BYTES`) with 413 `{"error":{"code":"validation",…}}` before the route parses them. A declared
 Content-Length over the limit is refused unread, and chunked bodies are counted. GET (incl. SSE) is untouched. A
 60-message history at about 7 KB each (420 KB) still fits. Tests: `api/tests/test_body_limit.py`.
+
+## Concurrent-run cap
+
+`POST /api/chat` allows at most 3 unfinished runs per user (`CC_API_MAX_CONCURRENT_RUNS`). Beyond that it returns 429
+`rate_limited` with `Retry-After: 3`, which the web client already auto-retries. Nothing is stored or run, and the audit
+event `chat_rate_limited` (reason `concurrent_runs`) carries no question text. Other users are unaffected. Tests:
+`api/tests/test_concurrent_runs.py`.
