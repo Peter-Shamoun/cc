@@ -4,7 +4,8 @@ import type { HttpError } from '../api/contract';
 import type { AnalystAdapter, AnyStreamEvent } from './types';
 import { loadCapabilities } from '../contract/capabilities';
 import { exportUrl, exportFilename as serverExportFilename, type ExportFormat } from '../contract/sources';
-import type { Capabilities } from '../contract/v1.gen';
+import type { Capabilities, Feedback, FeedbackRequest } from '../contract/v1.gen';
+import { sendFeedback } from '../contract/feedback';
 
 /**
  * Adapter for the real analyst endpoint (spec §5). POST {base}/api/chat with
@@ -261,6 +262,10 @@ export class HttpAnalystAdapter implements AnalystAdapter {
     });
   }
 
+  /** PUT (or DELETE when `req` is null) the answer's feedback, contract 1.7.0 §13. */
+  feedback(conversationId: string, messageId: string, req: FeedbackRequest | null): Promise<Feedback | null> {
+    return sendFeedback(conversationId, messageId, req, { base: this.base, init: { credentials: 'same-origin', headers: this.headers() } });
+  }
   /** GET /api/capabilities, signed in so `available` reflects the caller's organization (contract 1.5.0 scope). */
   capabilities(): Promise<Capabilities> {
     return loadCapabilities(this.base, (u, init) => fetch(u, { ...init, headers: this.headers((init?.headers ?? {}) as Record<string, string>) }));

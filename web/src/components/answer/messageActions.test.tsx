@@ -68,9 +68,9 @@ describe('message actions', () => {
   it('thumbs survive a remount (memory store) and a down vote with reasons is recorded', () => {
     const { unmount } = render(<AssistantTurn msg={view()} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} />);
     fireEvent.click(screen.getByRole('button', { name: 'Bad response' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Wrong numbers' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Numbers look wrong' }));
     fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
-    expect(feedbackFor(view().id)).toMatchObject({ vote: 'down', reasons: ['Wrong numbers'] });
+    expect(feedbackFor(view().id)).toMatchObject({ vote: 'down', reasons: ['wrong_numbers'] });
     unmount();
     render(<AssistantTurn msg={view()} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} />);
     expect(screen.getByRole('button', { name: 'Bad response' }).getAttribute('aria-pressed')).toBe('true');
