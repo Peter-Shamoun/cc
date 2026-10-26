@@ -286,7 +286,12 @@ function ShellInner() {
   useEffect(() => {
     const el = scroller.current, inner = content.current;
     if (!el || !inner || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(() => { if (atBottomRef.current && !pinned.current) el.scrollTop = el.scrollHeight; });
+    const ro = new ResizeObserver(() => {
+      if (atBottomRef.current && !pinned.current) el.scrollTop = el.scrollHeight;
+      // QA-A2: a pinned question lets the answer grow below the fold (chart under the composer)
+      // without any scroll event. Re-measure so "Jump to latest" shows, like ChatGPT's down arrow.
+      else setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80);
+    });
     ro.observe(inner);
     return () => ro.disconnect();
   }, [messages.length === 0]); // eslint-disable-line react-hooks/exhaustive-deps

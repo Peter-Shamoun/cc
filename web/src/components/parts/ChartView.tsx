@@ -1,12 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Download, Maximize2, FileJson } from 'lucide-react';
 import type { ChartPart } from '../../lib/contract';
 import { IconButton } from '../ui';
 import { CHART_COLORS, useTheme } from '../../lib/theme';
 import { csvFilename, downloadText, recordsToCsv } from '../../lib/csv';
-import { buildSpec, chartRenderer } from '../../render/chartSpec';
+import { buildSpec, chartRenderer, readableBars } from '../../render/chartSpec';
 
 export { buildSpec };
+
+/** One shared lazy load: remounts (virtual list, reopened chats) redraw without waiting on the import again. */
+let vegaModules: Promise<[typeof import('vega-embed'), typeof import('vega')]> | null = null;
+const loadVega = () => (vegaModules ??= Promise.all([import('vega-embed'), import('vega')]));
 
 type View = { finalize: () => void; toImageURL: (t: 'png' | 'svg', scale?: number) => Promise<string> };
 
@@ -29,15 +33,22 @@ export function ChartView({ part, onOpen, full, onShowSpec }: { part: ChartPart;
   // QA-A2: keep a skeleton at the final height until vega has drawn, so the card never shows an empty frame.
   const [ready, setReady] = useState(false);
   const { mode, palette } = useTheme();
+  // QA-A2: redraw only when the spec really changes, not on every new part object identity
+  // (stream updates, history rehydrate), so a finished chart never drops back to its placeholder.
+  const specKey = useMemo(() => JSON.stringify(readableBars(buildSpec(part))), [part]);
+  // Reserve the plot's own height (+ axis room) so the card does not jump or leave a gap once drawn.
+  const reserve = useMemo(() => {
+    const h = (JSON.parse(specKey) as { height?: unknown }).height;
+    return typeof h === 'number' ? Math.max(160, h + 56) : 300;
+  }, [specKey]);
   useEffect(() => {
     let alive = true;
-    setReady(false);
     // ThemeProvider's effect runs after this one. Set the tokens first so the
     // first embed already matches the active mode and palette.
     const root = document.documentElement;
     root.classList.toggle('dark', mode === 'dark');
     root.dataset.palette = palette;
-    Promise.all([import('vega-embed'), import('vega')])
+    loadVega()
       .then(([{ default: embed }, { loader: createVegaLoader }]) => {
         if (!alive || !ref.current) return;
         const dark = mode === 'dark';
@@ -46,7 +57,7 @@ export function ChartView({ part, onOpen, full, onShowSpec }: { part: ChartPart;
         const colors = CHART_COLORS[palette];
         // QA-A3: on narrow cards put the legend under the plot and let it wrap, so series never clip.
         const narrow = (ref.current.clientWidth || window.innerWidth) < 480;
-        return embed(ref.current, buildSpec(part) as never, {
+        return embed(ref.current, JSON.parse(specKey), {
           actions: false,
           renderer: chartRenderer(part),
           // vega-interpreter: no Function/eval on model-authored expressions (spec §6.9) and no 'unsafe-eval' in the CSP.
@@ -86,7 +97,7 @@ export function ChartView({ part, onOpen, full, onShowSpec }: { part: ChartPart;
       viewRef.current?.finalize();
       viewRef.current = null;
     };
-  }, [part, mode, palette]);
+  }, [specKey, mode, palette]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dl = async (t: 'png' | 'svg') => {
     const url = await viewRef.current?.toImageURL(t, 2);
@@ -112,13 +123,13 @@ export function ChartView({ part, onOpen, full, onShowSpec }: { part: ChartPart;
           {onOpen && <IconButton label="Expand chart" className="h-7 w-7" onClick={onOpen}><Maximize2 size={14} /></IconButton>}
         </div>
       </div>
-      <div className="px-3 pb-3" style={{ minHeight: full ? 360 : 300 }}>
+      <div className="px-3 pb-3" style={{ minHeight: full ? 360 : reserve }}>
         {err ? (
           <div className="text-sm text-danger">Chart failed to render: {err}</div>
         ) : (
           <div className="relative">
-            {!ready && <ChartSkeleton height={full ? 360 : 280} />}
-            <div ref={ref} className={ready ? 'w-full' : 'w-full opacity-0'} role="img" aria-label={part.alt} aria-busy={!ready} />
+            {!ready && <ChartSkeleton height={full ? 360 : reserve - 20} />}
+            <div ref={ref} className={'w-full transition-opacity duration-300 motion-reduce:transition-none ' + (ready ? 'opacity-100' : 'opacity-0')} role="img" aria-label={part.alt} aria-busy={!ready} />
           </div>
         )}
       </div>
