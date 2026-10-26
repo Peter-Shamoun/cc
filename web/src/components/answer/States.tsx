@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowUp, Check, CircleSlash, HelpCircle, Info, Lock, Sparkles, RotateCcw, Square } from 'lucide-react';
+import { ArrowUp, Check, ChevronRight, CircleSlash, HelpCircle, Info, Lock, Sparkles, RotateCcw, Square } from 'lucide-react';
 import clsx from 'clsx';
 import type { ChatRequest } from '../../api/contract';
 import { Markdown } from '../parts/Markdown';
@@ -30,8 +30,11 @@ export function AbstainCard({ part, onReply }: { part: AbstainPart; onReply?: On
       <div className="flex items-center gap-2 font-medium text-fg"><Icon size={16} className="shrink-0 text-fg-muted" aria-hidden /> {ABSTAIN_TITLE[part.category] ?? "I can't answer this from the data I have"}</div>
       <div className="abstain-reason mt-1 text-fg-muted [&_p]:my-1"><Markdown text={part.reason} /></div>
       {part.details && (
-        <details className="mt-1 text-[13px]" data-testid="abstain-details">
-          <summary className="cursor-pointer text-fg-subtle hover:text-fg">What would be needed</summary>
+        <details className="group/needed mt-1 text-[13px]" data-testid="abstain-details">
+          {/* Same chevron disclosure as the timeline and "View SQL", not the browser's ▶ marker. */}
+          <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-fg-subtle hover:text-fg [&::-webkit-details-marker]:hidden">
+            What would be needed<ChevronRight size={13} className="transition-transform group-open/needed:rotate-90" aria-hidden />
+          </summary>
           <div className="mt-1 text-fg-muted [&_p]:my-1"><Markdown text={part.details} /></div>
         </details>
       )}
