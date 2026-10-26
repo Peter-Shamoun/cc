@@ -11,7 +11,11 @@ export type AnyStreamEvent = LegacyStreamEvent | V1StreamEvent;
  */
 export interface AnalystAdapter {
   readonly name: string;
-  streamTurn(input: { conversationId: ID; messages: { id: ID; role: 'user' | 'assistant'; text: string }[]; signal: AbortSignal; resume?: ChatRequest['resume'] }): AsyncIterable<AnyStreamEvent>;
+  /**
+   * `parentId` on a user message marks an edit (sibling branch, CONTRACT.md §8); `regenerate` re-runs the
+   * user turn of an earlier answer so the server records a sibling instead of a duplicate question.
+   */
+  streamTurn(input: { conversationId: ID; messages: { id: ID; role: 'user' | 'assistant'; text: string; parentId?: ID }[]; signal: AbortSignal; resume?: ChatRequest['resume']; regenerate?: ChatRequest['regenerate'] }): AsyncIterable<AnyStreamEvent>;
   /** Fetch an image/file blob by opaque id (auth header, never a PHI-bearing URL). */
   fetchBlob(id: ID): Promise<Blob>;
 }
