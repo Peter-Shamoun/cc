@@ -78,7 +78,7 @@ function StepRow({ step, last }: { step: Step; last: boolean }) {
         <Icon size={14} className="shrink-0" aria-hidden />
         <span className="sr-only">{KIND_LABEL[step.kind]}:</span>
         <span className={clsx('min-w-0 truncate', step.state === 'running' && 'shimmer')}>{step.label}</span>
-        {step.attempt !== undefined && <span className="shrink-0 rounded-full border border-line px-1.5 text-[11px] text-fg-subtle">attempt {step.attempt}</span>}
+        {step.attempt !== undefined && step.attempt > 1 && <span className="shrink-0 rounded-full border border-line px-1.5 text-[11px] text-fg-subtle">attempt {step.attempt}</span>}
         {step.state === 'ok' && <Check size={13} className="shrink-0 text-[#10a37f]" aria-label="done" />}
         {step.state === 'error' && <X size={13} className="shrink-0 text-danger" aria-label="failed" />}
         {step.state === 'warn' && <AlertTriangle size={13} className="shrink-0 text-[#b7791f] dark:text-[#e8b339]" aria-label="warning" />}
@@ -98,7 +98,7 @@ function StepRow({ step, last }: { step: Step; last: boolean }) {
               <span className="min-w-0 break-words font-mono text-xs leading-relaxed">{step.error}</span>
             </div>
           )}
-          {step.message && !step.error && <div className="text-[13px]">{step.message}</div>}
+          {step.message && (!step.error || step.kind === 'repair') && <div className="text-[13px]">{step.message}</div>}
           {step.checks && <ChecksList checks={step.checks} />}
           {step.candidates && <CandidateTable candidates={step.candidates} />}
           {step.previousSql && <details className="text-xs"><summary className="cursor-pointer text-fg-subtle hover:text-fg">Previous SQL</summary><CodeBlock code={step.previousSql} language="sql" title="before repair" /></details>}
