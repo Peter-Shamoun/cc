@@ -4,6 +4,7 @@ import { newAssistantViewV1, reduceV1, type AssistantViewV1, type ChatRequest, t
 import type { AnalystAdapter, ThreadSummary, TranscriptStore } from '../adapters/types';
 import { shortTitle } from '../shell/title';
 import { frameBatch } from './frameBatch';
+import { foldThread } from './threadTree';
 
 const uid = (p: string) => `${p}_${Math.random().toString(36).slice(2, 10)}`;
 export type ViewMessage = UserMessage | AssistantViewV1;
@@ -74,8 +75,10 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     setBusy(false);
     const c = await store.getConversation(id);
     setConvId(c ? id : null);
-    setBranches({});
-    setMessages(c ? markAnswered(c.messages.map(toView)) : []);
+    // Server transcripts are append-only with parentId links: show the newest path, keep edits as versions.
+    const { visible, branches: b } = foldThread(c ? c.messages.map(toView) : []);
+    setBranches(b);
+    setMessages(markAnswered(visible));
   }, [store]);
 
   const newChat = useCallback(() => {
@@ -87,7 +90,7 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     setMessages([]);
   }, []);
 
-  const run = useCallback(async (cid: ID, history: ViewMessage[], resume?: ChatRequest['resume']) => {
+  const run = useCallback(async (cid: ID, history: ViewMessage[], opts: { resume?: ChatRequest['resume']; regenerate?: ChatRequest['regenerate'] } = {}) => {
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     let view = newAssistantViewV1(uid('a'));
@@ -101,9 +104,9 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     const schedule = batch.schedule;
     set();
     setBusy(true);
-    const wire = history.map((m) => ({ id: m.id, role: m.role, text: m.role === 'user' ? m.text : m.parts.map((p) => (p.type === 'text' ? p.text : '')).join('\n') }));
+    const wire = history.map((m) => ({ id: m.id, role: m.role, text: m.role === 'user' ? m.text : m.parts.map((p) => (p.type === 'text' ? p.text : '')).join('\n'), ...(m.role === 'user' && m.parentId ? { parentId: m.parentId } : {}) }));
     try {
-      for await (const ev of adapter.streamTurn({ conversationId: cid, messages: wire, signal: ctrl.signal, ...(resume ? { resume } : {}) })) {
+      for await (const ev of adapter.streamTurn({ conversationId: cid, messages: wire, signal: ctrl.signal, ...(opts.resume ? { resume: opts.resume } : {}), ...(opts.regenerate ? { regenerate: opts.regenerate } : {}) })) {
         view = reduceV1(view, ev);
         // Text and reasoning deltas are batched; structural events (start, parts, steps, end) paint at once.
         if (ev.type === 'text.delta' || ev.type === 'reasoning.delta') schedule();
@@ -134,7 +137,7 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     const user: UserMessage = { id: uid('u'), role: 'user', text: t, createdAt: new Date().toISOString() };
     await store.appendMessage(cid, user, draftTitle(t));
     refresh(); // show the new chat in the sidebar now, not when the first answer ends (QA-S2)
-    await run(cid, [...messages, user], opts?.resume);
+    await run(cid, [...messages, user], { resume: opts?.resume });
   }, [busy, convId, messages, refresh, run, store]);
 
   const stop = useCallback(() => abortRef.current?.abort(), []);
@@ -143,8 +146,12 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     if (!convId || busy) return;
     const lastUserIdx = messages.map((m) => m.role).lastIndexOf('user');
     if (lastUserIdx < 0) return;
+    // A server-known answer (id from message.start, not our 'a_' placeholder) is re-run with
+    // ChatRequest.regenerate so the server records a sibling instead of a second copy of the question.
+    const prev = messages.slice(lastUserIdx + 1).find((m) => m.role === 'assistant');
+    const regen = prev && !prev.id.startsWith('a_') ? { messageId: prev.id } : undefined;
     await store.truncateAfter(convId, messages[lastUserIdx].id);
-    await run(convId, messages.slice(0, lastUserIdx + 1));
+    await run(convId, messages.slice(0, lastUserIdx + 1), { regenerate: regen });
   }, [busy, convId, messages, run, store]);
 
   const remove = useCallback(async (id: ID) => {
@@ -162,7 +169,8 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     const b = branches[i] ?? { versions: [tail], idx: 0 };
     const versions = [...b.versions];
     versions[b.idx] = tail;
-    const user: UserMessage = { id: uid('u'), role: 'user', text: t, createdAt: new Date().toISOString() };
+    // parentId = the message before the edited one: the server stores the edit as a sibling branch (§8).
+    const user: UserMessage = { id: uid('u'), role: 'user', text: t, createdAt: new Date().toISOString(), ...(i > 0 ? { parentId: messages[i - 1].id } : {}) };
     versions.push([user]);
     setBranches((all) => ({ ...Object.fromEntries(Object.entries(all).filter(([k]) => Number(k) < i)), [i]: { versions, idx: versions.length - 1 } }));
     const prefix = messages.slice(0, i);
