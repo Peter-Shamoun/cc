@@ -25,6 +25,17 @@ export interface HttpAdapterOptions {
 }
 
 /** Retry-After as delay-seconds or an HTTP date (RFC 9110 §10.2.3), in ms; null if absent/garbled. */
+/** CONTRACT.md §8: the server has nothing to replay (run finished > 60 s ago or never existed). */
+async function errorCode(res: Response): Promise<string | undefined> {
+  try { return ((await res.clone().json()) as { error?: { code?: string } })?.error?.code; } catch { return undefined; }
+}
+
+export function streamGone(): Error {
+  const e = new Error('stream_gone');
+  e.name = 'StreamGoneError';
+  return e;
+}
+
 export function retryAfterMs(value: string | null, now = Date.now()): number | null {
   if (!value) return null;
   const v = value.trim();
@@ -73,7 +84,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
    * Real deployments leave it unset and authenticate with the httpOnly `cc_session` cookie.
    */
   constructor(private base = '', private token?: string, opts: Partial<HttpAdapterOptions> = {}) {
-    this.opts = { maxRetries: 3, retryBaseMs: 500, stopGraceMs: 1500, offlineWaitMs: 45_000, maxRateRetries: 2, maxRateWaitMs: 30_000, ...opts };
+    this.opts = { maxRetries: 4, retryBaseMs: 500, stopGraceMs: 1500, offlineWaitMs: 45_000, maxRateRetries: 2, maxRateWaitMs: 30_000, ...opts };
   }
   private readonly opts: HttpAdapterOptions;
 
@@ -89,7 +100,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
 
   async *streamTurn({ conversationId, messages, signal, resume, regenerate, onConnection }: Parameters<AnalystAdapter['streamTurn']>[0]): AsyncIterable<AnyStreamEvent> {
     // The server takes user turns only; prior assistant prose is reconstructed server-side.
-    const users = messages.filter((m) => m.role === 'user').map(({ id, role, text, parentId }) => ({ id, role, text, ...(parentId ? { parentId } : {}) }));
+    const users = messages.filter((m) => m.role === 'user').map(({ id, role, text, parentId, editOf }) => ({ id, role, text, ...(parentId ? { parentId } : {}), ...(editOf ? { editOf } : {}) }));
     let body = JSON.stringify({ conversationId, messages: users, ...(resume ? { resume } : {}), ...(regenerate ? { regenerate } : {}) });
     let regenerateFallback = !!regenerate;
     // `signal` is the user's Stop. We keep reading after it fires so the server's
@@ -111,6 +122,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
     let resumeFallback = !!resume;
     let rateRetries = 0;
     let first = true;
+    let useGet = true;
     try {
       for (;;) {
         // Reconnect (CONTRACT.md §8): same POST, plus Last-Event-ID so the server replays only what we missed.
@@ -118,15 +130,24 @@ export class HttpAnalystAdapter implements AnalystAdapter {
         if (first && this.opts.demoFault) replay['x-demo-fault'] = this.opts.demoFault; // first attempt only, so the retry gets through
         first = false;
         let res: Response;
+        // Contract 1.1: re-attach with GET /api/chat/{id}/stream (preferred); a 1.0 server without that
+        // route gets the old POST replay. The server keeps the run alive ~10 s after a drop, which the
+        // 250 ms / 1 s / 2 s / 4 s backoff fits inside.
+        const viaGet = messageId !== null && useGet;
         try {
-          res = await fetch(`${this.base}/api/chat`, {
-            method: 'POST',
-            credentials: 'same-origin',
-            cache: 'no-store',
-            headers: this.headers({ 'content-type': 'application/json', accept: 'text/event-stream', ...replay }),
-            body,
-            signal: wire.signal,
-          });
+          res = viaGet
+            ? await fetch(`${this.base}/api/chat/${encodeURIComponent(messageId!)}/stream`, {
+              method: 'GET', credentials: 'same-origin', cache: 'no-store',
+              headers: this.headers({ accept: 'text/event-stream', ...replay }), signal: wire.signal,
+            })
+            : await fetch(`${this.base}/api/chat`, {
+              method: 'POST',
+              credentials: 'same-origin',
+              cache: 'no-store',
+              headers: this.headers({ 'content-type': 'application/json', accept: 'text/event-stream', ...replay }),
+              body,
+              signal: wire.signal,
+            });
         } catch (e) {
           if (wire.signal.aborted || signal.aborted) throw abortError();
           if (messageId !== null && isOffline()) { onConnection?.('offline'); dropped = true; await this.waitOnline(signal); continue; } // offline: wait, don't burn retries
@@ -160,8 +181,13 @@ export class HttpAnalystAdapter implements AnalystAdapter {
             continue;
           }
         }
+        if (viaGet && (res.status === 404 || res.status === 405) && (await errorCode(res)) !== 'stream_gone') {
+          useGet = false; // no GET resume route (1.0 server): replay over POST right away
+          continue;
+        }
         if (!res.ok || !res.body) {
           if (messageId !== null && res.status >= 500 && retries < this.opts.maxRetries) { onConnection?.('reconnecting'); dropped = true; await this.backoff(++retries, signal); continue; }
+          if (messageId !== null && res.status === 404) throw streamGone(); // §8 stream_gone: useChat reloads the stored answer
           if (messageId !== null) throw new Error(`replay ${res.status}`); // the run is gone: useChat shows "Connection lost"
           yield { type: 'part', part: await httpError(res) };
           yield { type: 'message.end', messageId: '', finishReason: 'error' };
@@ -212,8 +238,10 @@ export class HttpAnalystAdapter implements AnalystAdapter {
     });
   }
 
+  /** CONTRACT.md §8 reconnect schedule: base/2, 2×base, 4×base, 8×base (250 ms, 1 s, 2 s, 4 s at the default 500). */
   private backoff(attempt: number, signal: AbortSignal): Promise<void> {
-    return this.sleep(Math.min(this.opts.retryBaseMs * 2 ** (attempt - 1), 4000), signal);
+    const ms = attempt === 1 ? this.opts.retryBaseMs / 2 : this.opts.retryBaseMs * 2 ** (attempt - 1);
+    return this.sleep(Math.min(ms, 4000), signal);
   }
 
   private sleep(ms: number, signal: AbortSignal): Promise<void> {

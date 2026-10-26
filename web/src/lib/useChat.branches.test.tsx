@@ -48,7 +48,31 @@ describe('server branches (regenerate / edit, CONTRACT.md §8)', () => {
     await act(async () => { await result.current.editAt(2, 'second question, edited'); });
     await waitFor(() => expect(result.current.busy).toBe(false));
     const sent = spy.mock.calls.at(-1)![0].messages.at(-1)!;
-    expect(sent).toMatchObject({ role: 'user', text: 'second question, edited', parentId: before });
+    expect(sent).toMatchObject({ role: 'user', text: 'second question, edited', parentId: before, editOf: expect.any(String) });
+  });
+
+  it('editing the first question sends editOf and no parentId (contract 1.2: a new root)', async () => {
+    const adapter = new MockAnalystAdapter(0);
+    const spy = vi.spyOn(adapter, 'streamTurn');
+    const store = new MemoryTranscriptStore();
+    const { result } = renderHook(() => useChat(adapter, store));
+    await act(async () => { await result.current.send('first question'); });
+    await waitFor(() => expect(result.current.busy).toBe(false));
+    const original = result.current.messages[0].id;
+    await act(async () => { await result.current.editAt(0, 'first question, edited'); });
+    await waitFor(() => expect(result.current.busy).toBe(false));
+    const sent = spy.mock.calls.at(-1)![0].messages;
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ role: 'user', text: 'first question, edited', editOf: original });
+    expect(sent[0].parentId).toBeUndefined();
+    expect(result.current.versionOf(0)).toEqual({ current: 2, total: 2 });
+  });
+
+  it('http sends editOf on the wire', async () => {
+    const bodies: { messages: { editOf?: string; parentId?: string }[] }[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (_u: string, init: RequestInit) => { bodies.push(JSON.parse(init.body as string)); return new Response('', { status: 500 }); }));
+    await drain(new HttpAnalystAdapter('').streamTurn({ ...turn, messages: [{ id: 'u1e', role: 'user', text: 'q', editOf: 'u1' }] })).catch(() => undefined);
+    expect(bodies[0].messages[0]).toEqual({ id: 'u1e', role: 'user', text: 'q', editOf: 'u1' });
   });
 
   it('open() folds an append-only server transcript to the newest path with edit versions', async () => {
