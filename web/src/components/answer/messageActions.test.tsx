@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { AssistantTurn, REFINE_PROMPT } from '../Message';
+import { AssistantTurn } from '../Message';
 import { DUP_V1_ANSWER, DUP_V1_STEPS } from '../../fixtures/answerV1';
 import { newAssistantViewV1, reduceV1, type AssistantViewV1, type StreamEvent as V1Event } from '../../api/contract';
 import { clearFeedbackForTests, feedbackFor, recordFeedback, setFeedbackSink, sqlForClipboard } from '../../lib/feedback';
@@ -45,7 +45,21 @@ describe('message actions', () => {
     fireEvent.click(screen.getByTestId('regenerate-menu-button'));
     fireEvent.click(screen.getByRole('menuitem', { name: /Try again/ }));
     expect(regen).toHaveBeenCalledTimes(1);
-    expect(REFINE_PROMPT.detailed).toMatch(/more detail/);
+    // QA-A18: the main button regenerates in one click even when styles exist.
+    fireEvent.click(screen.getByRole('button', { name: 'Regenerate' }));
+    expect(regen).toHaveBeenCalledTimes(2);
+  });
+  it('a regenerated answer shows ‹ 2/2 › and switches versions', () => {
+    const onVersion = vi.fn();
+    render(<AssistantTurn msg={view()} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} version={{ current: 2, total: 2 }} onVersion={onVersion} />);
+    expect(screen.getByTestId('msg-actions')).toHaveTextContent('2/2');
+    fireEvent.click(screen.getByRole('button', { name: 'Previous version' }));
+    expect(onVersion).toHaveBeenCalledWith(0);
+    expect((screen.getByRole('button', { name: 'Next version' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+  it('a styled regeneration carries its version label', () => {
+    render(<AssistantTurn msg={{ ...view(), regenerateStyle: 'concise' } as never} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} />);
+    expect(screen.getByTestId('regen-style')).toHaveTextContent('Concise');
   });
   it('without onRefine the button regenerates directly', () => {
     const regen = vi.fn();
