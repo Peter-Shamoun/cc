@@ -45,9 +45,6 @@ await p.keyboard.press('Escape'); await p.waitForTimeout(200); await L('expand E
 // edit via keyboard
 await focusOn(p.getByRole('button', { name: 'Edit message' }).last()); await p.keyboard.press('Enter'); await p.waitForTimeout(250); await L('edit Enter');
 await p.keyboard.press('Escape'); await p.waitForTimeout(200); await L('edit Esc');
-// scope popover
-await focusOn(p.getByRole('button', { name: /Claims lake/ })); await p.keyboard.press('Enter'); await p.waitForTimeout(250); await L('scope Enter');
-await p.keyboard.press('ArrowDown'); await L('scope ArrowDown'); await p.keyboard.press('Escape'); await p.waitForTimeout(150); await L('scope Esc');
 // slash
 await p.getByRole('textbox', { name: 'Message' }).focus(); await p.keyboard.type('/'); await p.waitForTimeout(250); await L('slash');
 await p.keyboard.press('ArrowDown'); await L('slash ArrowDown'); await p.screenshot({ path: `${out}/kb-slash.png` });

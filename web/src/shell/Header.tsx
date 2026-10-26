@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, Copy, Database, Download, Ellipsis, Keyboard, MessageCircleDashed, Moon, PanelLeft, Pencil, Settings, Share, ShieldCheck, SquarePen, Sun, Trash2 } from 'lucide-react';
+import { ChevronDown, Copy, Download, Ellipsis, Keyboard, MessageCircleDashed, Moon, PanelLeft, Pencil, Settings, Share, ShieldCheck, SquarePen, Sun, Trash2 } from 'lucide-react';
 import { useTheme } from '../lib/theme';
 import { IconButton } from '../components/ui';
 import { Menu, modKey, useMenu, type MenuItem } from './primitives';
@@ -28,7 +28,7 @@ export interface HeaderProps {
   onTemporary?: (on: boolean) => void;
 }
 
-/** Top bar: sidebar/new-chat when the sidebar is hidden, product menu (scope + data mode), PHI badge, Share and "…" (ChatGPT layout). */
+/** Top bar: sidebar/new-chat when the sidebar is hidden, product menu (strategy + data mode), PHI badge, Share and "…" (ChatGPT layout). */
 export function Header(p: HeaderProps) {
   const { mode, toggleMode } = useTheme();
   const share = useMenu();
@@ -51,7 +51,8 @@ export function Header(p: HeaderProps) {
     ...(p.onDelete ? ['sep' as const, { label: 'Delete', icon: <Trash2 size={16} />, danger: true, onSelect: p.onDelete }] : []),
   ];
   const dataLabel = p.adapterName === 'http' ? 'Live API' : 'Demo data';
-  // Scope + data mode live in the product menu (QA-S6): ChatGPT/Claude headers stay near-empty.
+  // Strategy + data mode live in the product menu (QA-S6): ChatGPT/Claude headers stay near-empty. No data-source or
+  // scope entries: the session decides the customer and relations server-side (Peter 11:57 PM, BACKEND-FIT).
   const st = p.strategy;
   const productItems: MenuItem[] = st?.strategy ? [
     { heading: 'Strategy' },
@@ -60,9 +61,6 @@ export function Header(p: HeaderProps) {
     'sep',
     { label: `Data: ${dataLabel}${st.caps.demo ? ' · scripted runs' : ''}`, icon: <span className="block h-2 w-2 rounded-full bg-[#10a37f]" />, onSelect: () => {} },
   ] : [
-    { label: 'Analyst · SQL over the de-identified claims lake', icon: <Check size={16} />, onSelect: () => {} },
-    'sep',
-    { label: 'Scope: payer all · 2025-10..2026-09', icon: <Database size={16} />, onSelect: () => {} },
     { label: `Data: ${dataLabel}`, icon: <span className="block h-2 w-2 rounded-full bg-[#10a37f]" />, onSelect: () => {} },
   ];
   // The picked strategy shows in the button only when it is not the default (ChatGPT shows the model name).
