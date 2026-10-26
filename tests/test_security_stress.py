@@ -7,6 +7,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import tempfile
 import random
 import re
 from pathlib import Path
@@ -369,12 +370,11 @@ def _note_texts(world) -> set[str]:
 
 def test_reader_temp_directory_rejects_copy_and_agent_sql_cannot_read_settings(world):
     session = _session(world)
-    temp = session.con.execute("SELECT current_setting('temp_directory')").fetchone()[0]
-    with pytest.raises(duckdb.Error):
-        session.con.execute(f"COPY (SELECT 'PHI-ROW' AS patient) TO '{temp}/exfil.csv'")
-    assert not list(Path(temp).glob("exfil.csv"))
-    mode = os.stat(temp).st_mode & 0o777
-    assert mode == 0o555
+    assert session.con.execute("SELECT current_setting('temp_directory')").fetchone()[0] == ""
+    for target in (Path(tempfile.gettempdir()) / "exfil.csv", Path("exfil.csv")):
+        with pytest.raises(duckdb.Error):
+            session.con.execute(f"COPY (SELECT 'PHI-ROW' AS patient) TO '{target}'")
+        assert not target.exists()
     # The connection itself still answers current_setting. The agent entry point must not.
     assert session.con.execute("SELECT current_setting('memory_limit')").fetchone()[0]
     with pytest.raises(GuardError):

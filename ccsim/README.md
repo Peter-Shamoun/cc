@@ -57,7 +57,7 @@ s.con.execute("SELECT payer_name, avg(is_denied::INT) FROM sem.remit_claims WHER
 | Readers never see a half-built or older gold | CURRENT is flipped by a conditional write, and only forward. | `test_current_never_moves_backwards` |
 | Incremental gold equals a full rebuild | Same view SQL over each touched claim's full silver history; a batch that crashed after its silver commit is caught up by the next one. | `test_incremental_gold_equals_full_rebuild` |
 | One batch per customer at a time | S3 lease lock (`If-None-Match` create, `If-Match` takeover after expiry). | `test_batch_lock_is_exclusive_and_expires` |
-| Agent SQL cannot read files, settings, or another schema | `bench/guard.py`, also used by the semantic escape hatch. Reader sessions lock DuckDB and point `temp_directory` at a mode-0555 directory. | `tests/test_security_stress.py` |
+| Agent SQL cannot read files, settings, or another schema | `bench/guard.py`, also used by the semantic escape hatch. Reader sessions lock DuckDB and set no `temp_directory`, so there is no spill path to write to. | `tests/test_security_stress.py` |
 | Every agent query and escalation is attributable | Hash-chained `agent-audit.jsonl` (SQL and row count, not result cells) and hash-chained CloudTrail. | `tests/test_security_stress.py` |
 | Design A stores no message text | The transcript store's default mode writes metadata and the query audit only. A disk scan after a chat finds none of the message. | `test_ephemeral_mode_leaves_no_content_on_disk` |
 | Design B chats are per user and per customer | Transcript role, ABAC prefix, and a transcript KMS key that is not the lake key. | `test_persisted_transcripts_are_isolated_across_customers_and_users` |
@@ -88,7 +88,8 @@ s.con.execute("SELECT payer_name, avg(is_denied::INT) FROM sem.remit_claims WHER
    rule probably gives the wrong business answer. Decide whether the view should skip CARC-18 events.
 8. **Mitigated (DuckDB): `COPY ... TO` a path inside `allowed_directories` is not stopped by
    `enable_external_access=false`, and DuckDB unions `temp_directory` into `allowed_directories`.** The reader
-   session points `temp_directory` at a mode-0555 directory, so that write fails. `COPY` to `s3://` is still
+   session sets `temp_directory` to empty (no spilling), so there is no writable path. A mode-0555 directory was
+   tried first and is not enough: a process running as root ignores the mode. `COPY` to `s3://` is still
    stopped by the read-only IAM role, and `COPY` / `CREATE SECRET` are rejected by `bench/guard.py` before
    DuckDB sees them. Keep both layers. `duckdb_secrets()` redacts the secret and session token but still
    returns the access key id; the guard blocks that function.
