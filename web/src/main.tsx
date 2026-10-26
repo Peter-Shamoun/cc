@@ -6,8 +6,11 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { installGlobalErrorHandlers } from './lib/errorReporting';
 import { preloadMarkdown } from './components/parts/Markdown';
 import { adoptBootDraft, restoreBootFocus } from './lib/bootShell';
+import { installTrustedTypes } from './security/trustedTypes';
 
 installGlobalErrorHandlers();
+// Before anything renders: the CSP's Trusted Types `default` policy (accepts only '').
+installTrustedTypes();
 // Text typed into the static boot composer before JS arrived becomes the new-chat draft (QA-P8).
 adoptBootDraft();
 
