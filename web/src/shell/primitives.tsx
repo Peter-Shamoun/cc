@@ -8,10 +8,10 @@ const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),textarea
 
 /** Keep Tab inside `ref` and restore focus to whatever opened it on unmount (WAI-ARIA dialog pattern). */
 /** `initial: 'container'` focuses the dialog itself when nothing inside asks for focus (no stray ring on a Close button). */
-export function useFocusTrap(ref: RefObject<HTMLElement | null>, active = true, initial: 'first' | 'container' = 'first') {
+export function useFocusTrap(ref: RefObject<HTMLElement | null>, active = true, initial: 'first' | 'container' = 'first', openedFrom?: Element | null) {
   useEffect(() => {
     if (!active) return;
-    const opener = document.activeElement as HTMLElement | null;
+    const opener = (openedFrom ?? document.activeElement) as HTMLElement | null;
     const el = ref.current;
     if (el && !el.contains(document.activeElement)) (el.querySelector<HTMLElement>('[autofocus],[data-autofocus]') ?? (initial === 'first' ? el.querySelector<HTMLElement>(FOCUSABLE) : null) ?? el).focus();
     const onKey = (e: KeyboardEvent) => {
@@ -24,15 +24,28 @@ export function useFocusTrap(ref: RefObject<HTMLElement | null>, active = true, 
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     };
     document.addEventListener('keydown', onKey);
-    return () => { document.removeEventListener('keydown', onKey); if (opener?.isConnected) opener.focus(); };
-  }, [active, ref, initial]);
+    return () => { document.removeEventListener('keydown', onKey); restoreFocus(opener); };
+  }, [active, ref, initial, openedFrom]);
+}
+
+/**
+ * Give focus back on close: to the opener if it is still on the page, else to the app's main input
+ * (`data-focus-fallback`, the composer) so focus never drops to <body> (e.g. Settings opened from a menu item).
+ * Phones skip the fallback so closing a sheet doesn't pop the keyboard.
+ */
+export function restoreFocus(opener: HTMLElement | null) {
+  if (opener?.isConnected && opener !== document.body) { opener.focus(); return; }
+  if (window.matchMedia?.('(pointer: coarse)').matches) return;
+  document.querySelector<HTMLElement>('[data-focus-fallback]')?.focus();
 }
 
 /** Centered modal (settings, search, shortcuts); a full-screen sheet on phones. Esc and scrim click close it. */
 export function Dialog({ title, onClose, children, className, hideTitle, testId }: { title: string; onClose: () => void; children: ReactNode; className?: string; hideTitle?: boolean; testId?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
-  useFocusTrap(ref, true, 'container');
+  // Read the opener during render: a child input's autoFocus runs at commit, before any effect could see it.
+  const [openedFrom] = useState(() => document.activeElement);
+  useFocusTrap(ref, true, 'container', openedFrom);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
     window.addEventListener('keydown', onKey, true);
