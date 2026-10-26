@@ -240,6 +240,19 @@ function ShellInner() {
   const focusComposer = () => document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message"]')?.focus();
   /** Touch-first devices: don't focus the composer on our own (it pops the on-screen keyboard), like the ChatGPT/Claude apps. */
   const coarse = () => !!window.matchMedia?.('(pointer: coarse)').matches;
+  /**
+   * After opening a chat from the sidebar or search, a desktop user can type the follow-up right away
+   * (ChatGPT/Claude). Not on touch (no surprise keyboard), and never steal focus from another field the
+   * user has moved to while the history loaded.
+   */
+  const focusAfterOpen = () => {
+    if (coarse()) return;
+    requestAnimationFrame(() => {
+      const a = document.activeElement as HTMLElement | null;
+      if (a && a !== document.body && a.matches('input, textarea, select, [contenteditable="true"]') && !a.matches('textarea[aria-label="Message"]')) return;
+      focusComposer();
+    });
+  };
 
   const onCommand = (c: SlashCommand) => {
     switch (c.action) {
@@ -461,6 +474,7 @@ function ShellInner() {
   const openFromSearch = async (id: string, messageId?: string) => {
     await openChat(id);
     closeDrawer();
+    if (!messageId) focusAfterOpen();
     if (messageId) requestAnimationFrame(() => requestAnimationFrame(() => {
       const target = document.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(messageId)}"]`);
       target?.scrollIntoView?.({ block: 'center' });
@@ -469,7 +483,7 @@ function ShellInner() {
 
   const sidebarProps = {
     threads, activeId: chat.convId, storeMode: store.mode, canPin: chat.canPin,
-    onSelect: (id: string) => { void openChat(id); closeDrawer(); },
+    onSelect: (id: string) => { closeDrawer(); void openChat(id).then(focusAfterOpen); },
     onNew: () => { chat.newChat(); closeDrawer(); if (!coarse()) requestAnimationFrame(focusComposer); },
     onDelete: requestDelete, onRename: chat.rename, onPin: chat.pin, onExport: exportThread,
     onCollapse: () => setSidebar(false), onSearch: () => setDialog('search'),
