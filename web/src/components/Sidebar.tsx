@@ -181,6 +181,8 @@ function ThreadRow({ t, active, tabStop, renaming, setRenaming, onSelect, onRena
     { label: 'Delete', icon: <Trash2 size={16} />, danger: true, onSelect: () => onDelete(t.id) },
   ];
   return (
+    // QA-S38: touch has no hover, so rows stay plain titles (only the open chat shows "…"); a long-press opens
+    // any row's options, as ChatGPT/Claude mobile do. Right-click does the same on desktop.
     <li className={clsx('group relative flex items-center rounded-lg', active ? 'bg-hover' : 'hover:bg-hover', menu.anchor && 'bg-hover')} data-testid="thread-item">
       {renaming ? (
         <input ref={input} defaultValue={t.title} aria-label="Rename chat" className="m-0.5 min-w-0 flex-1 rounded-md border border-[var(--focus)] bg-bg px-2 py-1.5 outline-none"
@@ -188,6 +190,7 @@ function ThreadRow({ t, active, tabStop, renaming, setRenaming, onSelect, onRena
           onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { e.currentTarget.value = t.title; setRenaming(null); } }} />
       ) : (
         <button type="button" data-thread-link={t.id} tabIndex={tabStop ? 0 : -1} aria-current={active ? 'page' : undefined} onClick={() => onSelect(t.id)} onDoubleClick={() => setRenaming(t.id)}
+          onContextMenu={(e) => { const btn = e.currentTarget.parentElement?.querySelector<HTMLElement>('[data-testid="thread-options"]'); if (!btn) return; e.preventDefault(); menu.openAt(btn); }}
           onKeyDown={(e) => { if (e.key === 'F2') { e.preventDefault(); setRenaming(t.id); } if (e.key === 'Delete') { e.preventDefault(); onDelete(t.id); } }}
           className="min-w-0 flex-1 overflow-hidden whitespace-nowrap py-2 pl-2.5 pr-8 text-left [mask-image:linear-gradient(to_right,black_85%,transparent)] group-hover:[mask-image:linear-gradient(to_right,black_70%,transparent)]" title={t.title}>
           {t.pinned && <Pin size={12} className="mr-1.5 inline -translate-y-px text-fg-subtle" aria-label="Pinned" />}
@@ -196,7 +199,7 @@ function ThreadRow({ t, active, tabStop, renaming, setRenaming, onSelect, onRena
       )}
       {!renaming && (
         <IconButton label={`Options for ${t.title}`} aria-haspopup="menu" aria-expanded={!!menu.anchor} onClick={menu.toggle}
-          className={clsx('absolute right-1 h-7 w-7 opacity-0 focus-visible:opacity-100 group-hover:opacity-100 max-md:opacity-100', menu.anchor && 'opacity-100')}>
+          className={clsx('absolute right-1 h-7 w-7 opacity-0 focus-visible:opacity-100 group-hover:opacity-100', active ? 'max-md:opacity-100' : '[@media(hover:none)]:pointer-events-none', menu.anchor && 'opacity-100')} data-testid="thread-options">
           <Ellipsis size={16} />
         </IconButton>
       )}

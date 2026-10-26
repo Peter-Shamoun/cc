@@ -32,7 +32,7 @@ from api.backends import (CANCEL_AT, MULTI_TABLE_SQL, MULTI_TABLE_TITLES, SCENAR
 from api.contract import CONTRACT_VERSION, schema as contract_schema
 from api.ids import new_id
 from api.live import Cancelled, LiveTap
-from api.mapping import multi_table_parts, outcome_parts, report_artifacts
+from api.mapping import multi_table_parts, outcome_parts, prior_artifacts, report_artifacts
 from api.redact import install_access_log_redaction, install_log_redaction, install_outbound_url_redaction
 from api.security import (MAX_BODY_BYTES, SESSION_COOKIE, BodyLimitMiddleware, CsrfMiddleware, ErrorShieldMiddleware,
                           HeadMiddleware, SecurityHeadersMiddleware)
@@ -55,8 +55,9 @@ _SAFE_KEY = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,40}")
 NO_STORE = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
 
 
-_ID = r"^[A-Za-z0-9_:.-]{1,128}$"
-_SAFE_ID = re.compile(_ID)
+_ID = r"^[A-Za-z0-9_:.-]{1,128}$"  # pydantic (Rust regex): `$` is the true end of the string
+#: Python `re`: `$` also matches before a trailing "\n", so plain-re checks use fullmatch (1.19.0 edge fix)
+_SAFE_ID = re.compile(r"[A-Za-z0-9_:.-]{1,128}")
 
 
 class RenameIn(BaseModel):
@@ -393,7 +394,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         if bad_option:
             return error_json("validation", bad_option, 422)
         conversation_id = body.conversationId or new_id("c_")
-        if not _SAFE_ID.match(conversation_id) or store.owned_by_other(ctx.principal, conversation_id):
+        if not _SAFE_ID.fullmatch(conversation_id) or store.owned_by_other(ctx.principal, conversation_id):
             return error_json("access_denied", "Not found.", 404)
         demo = getattr(auth, "mode", "") == "demo"
         # Demo-only fault injection for the web client's 429 auto-retry (web ?fault=429, dev builds only).
@@ -475,6 +476,14 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         scenario = detect_scenario(question, scenario_hint) if demo else None
         if scenario and "scenario" not in user_msg and isinstance(user_msg, dict):
             user_msg["scenario"] = scenario
+        prior: dict = {}
+        if scenario == "report" and body.conversationId:
+            # 1.19.0 (QA-C1): a follow-up report revises the branch's earlier artifacts (same artifactId, version + 1)
+            try:
+                conv = store.get_conversation(ctx.principal, conversation_id)
+            except CustomerKeyDisabled:
+                return shredded()
+            prior = prior_artifacts((conv or {}).get("messages", []), user_msg.get("parentId"), user_msg.get("id"))
         legacy_tools = bool(body.options.get("legacyToolParts"))
         run = _Run(message_id, ctx.principal, conversation_id=conversation_id)
         runs[message_id] = run
@@ -533,7 +542,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                                               ask_args=tap.ask_args, refuse_args=tap.refuse_args,
                                               legacy_tools=legacy_tools)
                 if scenario == "report" and finish == "stop":
-                    parts = report_artifacts(parts)
+                    parts = report_artifacts(parts, prior)
                 if scenario == "multi_table" and finish == "stop":
                     # 1.16.0 demo: the second query already ran live (its steps streamed); show its rows too
                     tools = ToolLayer(ctx.opener, config)
@@ -837,7 +846,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         if format not in EXPORT_FORMATS:
             return error_json("validation", "Use format=markdown or format=json.", 422)
         try:
-            conv = store.get_conversation(ctx.principal, conversation_id) if _SAFE_ID.match(conversation_id) else None
+            conv = store.get_conversation(ctx.principal, conversation_id) if _SAFE_ID.fullmatch(conversation_id) else None
         except CustomerKeyDisabled:
             return shredded()
         if conv is None:
@@ -867,7 +876,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             ctx = authed(request, new_id("r"))
         except AuthError:
             return unauthorized()
-        if not (_SAFE_ID.match(conversation_id) and _SAFE_ID.match(message_id)):
+        if not (_SAFE_ID.fullmatch(conversation_id) and _SAFE_ID.fullmatch(message_id)):
             return not_found()
         record = None
         if body is not None:
@@ -916,7 +925,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         except AuthError:
             return None, unauthorized()
         try:
-            conv = store.get_conversation(ctx.principal, conversation_id) if _SAFE_ID.match(conversation_id) else None
+            conv = store.get_conversation(ctx.principal, conversation_id) if _SAFE_ID.fullmatch(conversation_id) else None
         except CustomerKeyDisabled:
             return None, shredded()
         return (ctx, None) if conv is not None else (None, not_found())
@@ -962,7 +971,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             ctx = authed(request, new_id("r"))
         except AuthError:
             return unauthorized()
-        share = shares.get(share_id, ctx.principal.customer) if _SAFE_ID.match(share_id) else None
+        share = shares.get(share_id, ctx.principal.customer) if _SAFE_ID.fullmatch(share_id) else None
         if share is None:
             return not_found()
         try:

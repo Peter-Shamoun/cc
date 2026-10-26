@@ -16,7 +16,7 @@ export function SettingsDialog({ onClose, initialTab = 'general', storeMode, ent
   const tabs: [Tab, string, ReactNode][] = [['general', 'General', <Settings2 size={16} />], ['data', 'Data controls', <Database size={16} />], ['shortcuts', 'Shortcuts', <Keyboard size={16} />]];
   return (
     <Dialog title="Settings" onClose={onClose} testId="settings-dialog">
-      <div className="mt-3 flex flex-col border-t border-line/70 max-sm:flex-1 sm:h-[min(440px,70vh)] sm:flex-row">
+      <div className="mt-3 flex flex-col border-t border-line/70 max-sm:flex-1 sm:h-[min(520px,80vh)] sm:flex-row">
         {/* oxlint-disable-next-line jsx-a11y/interactive-supports-focus -- arrow keys delegated from the focused tab (roving tabindex) */}
         <div role="tablist" aria-orientation="vertical" aria-label="Settings sections" className="flex shrink-0 gap-0.5 overflow-x-auto scrollbar-none p-2 max-sm:border-b max-sm:border-line/70 sm:w-44 sm:flex-col sm:border-r sm:border-line/70"
           onKeyDown={(e) => {
@@ -56,10 +56,10 @@ export function SettingsDialog({ onClose, initialTab = 'general', storeMode, ent
             <>
               <Group label="Storage" />
               <Row label="Chat history" hint={storeMode === 'ephemeral' ? 'Off. Chats live in this tab’s memory and are gone on reload. Nothing is written to browser storage.' : 'On. Chats are stored encrypted server-side.'}>
-                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-fg-muted">{storeMode === 'ephemeral' ? 'Memory only' : 'Server'}</span>
+                <span className="text-[13px] text-fg-muted" data-testid="settings-value">{storeMode === 'ephemeral' ? 'Memory only' : 'Server'}</span>
               </Row>
               <Row label="Unsent drafts" hint="Kept per chat in memory only, never in localStorage, because a draft can contain PHI.">
-                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-fg-muted">Memory only</span>
+                <span className="text-[13px] text-fg-muted" data-testid="settings-value">Memory only</span>
               </Row>
               {archived && (
                 <>
