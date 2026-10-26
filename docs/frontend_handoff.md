@@ -153,7 +153,7 @@ not change.
 | `strategy_config(strategy, model, *, customer, grid=None, strict=False)` | `strategy_config.py` | strategy/model (and optional grid cell) → `AnalyzerConfig` overrides + fidelity notes |
 | `ToolLoopShim`, `TextRoleShim`, `SingleShotShim` | `analyst_shim.py` | adapt the `analyst/` agents' model interfaces onto `LiveTap` |
 | `CancellableOpener(opener, cancelled)` | `cancel.py` | Stop interrupts the running SQL; already used by `/api/chat` |
-| `SimAuth(aws, deployment)` | `backends.py` | Cognito id token → `Principal(custom:customer, email)`; sessions only through `ccsim.query.open_session` (`QueryPathOpener`) wrapped in `NoEscalateOpener` |
+| `SimAuth(aws, deployment)` | `backends.py` | Cognito id token → `Principal(custom:customer, email)`; sessions only through `ccsim.query.open_session` (`QueryPathOpener`); `/api/chat` wraps it in `ReasonedEscalationOpener` |
 
 **5.3 The wiring PR (one reviewed PR; about 20 lines in `api/app.py`)**
 1. In `create_app`, when `settings.llm in ("anthropic", "bedrock")`, build the model with
@@ -164,7 +164,7 @@ not change.
    replaces the demo-only `SCENARIO_CONFIG` merge. Drop `scenario` for real runs: it is a demo knob.
 3. Wrap `emit` with `ReasoningPolicy("drop")` (add a setting if you want `summary`; no env var exists yet) (`api/reasoning_policy.py`), as `run_to_events`
    does. The demo path doesn't need it (scripted text is synthetic), but a real model's text can quote rows.
-4. Keep `CancellableOpener`, `NoEscalateOpener`, `mask_event`/`mask_part` and the audit allowlist exactly as they are.
+4. Keep `CancellableOpener`, `ReasonedEscalationOpener`, `mask_event`/`mask_part` and the audit allowlist exactly as they are.
 5. Auth: `create_app(auth=SimAuth(aws, deployment))` with `CC_API_AUTH` set to something other than `demo`.
    `create_app` refuses to start without an explicit backend in that case. The data scope comes **only** from the
    token (`custom:customer` → `open_session` → the manifest's allowed relations). The request can't choose it:
@@ -216,7 +216,8 @@ A non-`auto` model adds `model`. An org-disabled or unknown strategy/model raise
 - `step.sql_result` carries column names and counts only, never row values. Error text goes through `scrub()`.
 - Audit: an allowlist of fields only (no SQL, rows or question text). Access logs record route shapes, and IPs are
   truncated.
-- Escalation (`lossless.*`) is never granted from chat (`NoEscalateOpener`).
+- Escalation (`lossless.*`, PHI-stripped) only on the analyzer's stated reason, for the token's customer, audited as
+  `data_escalation` and shown as a `request_escalation` step (`ReasonedEscalationOpener`).
 - The analyzer `ask` spec carries `questions` (`analyzer/tools.py` `clarification_request`) and the shipped B1 has
   `ask` on (`research/clarify_results.md`), so live clarifications arrive as the multi-question form.
 
@@ -245,7 +246,8 @@ re-executed in the sandbox. With `DemoAuth` the data is the bench snapshot; with
 API process against the signed-in customer's reader session (`QueryPathOpener`, opened once per run), reached by the
 worker's `analyzer.cli` over a run-scoped unix socket with a one-run capability (`analyzer/run_channel.py`): no
 credential reaches the worker or the disk, and the customer comes only from the token. Other auth backends are refused,
-as are any strategy/model option but the defaults and the `escalate` command. B1 has `ask` on, so a live run can end in
+as are any strategy/model option but the defaults. `escalate "<reason>"` re-opens the run's reader session
+with `lossless.*` for the same customer and is audited (`ReasonedEscalationOpener`). B1 has `ask` on, so a live run can end in
 a multi-question clarification (5.7).
 
 ```bash

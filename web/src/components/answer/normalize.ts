@@ -53,6 +53,8 @@ export function toStep(p: ToolCallPart): Step {
 const PROBE: Record<string, string> = {
   list_views: 'Found the tables it can read', describe_view: 'Read schema', sample_values: 'Sampled values', lookup_glossary: 'Looked up glossary',
   lookup_dictionary: 'Looked up data dictionary', search_examples: 'Searched examples', profile: 'Profiled',
+  // data escalation to the PHI-stripped lossless.* EDI tables; the step's summary carries the analyzer's reason
+  request_escalation: 'Used the full EDI data',
 };
 /** Probes that read one relation: shown as what the analyst looked at, never as a source the user picked. */
 const LOOKED = new Set(['describe_view', 'sample_values', 'profile']);
@@ -120,7 +122,8 @@ function fromView(v: StepView, all: StepView[], finished: boolean, aborted: bool
       const e = find(v, 'step.explore');
       if (!e) return null;
       // BACKEND-FIT: the analyst finds and reads relations itself; say what it looked at ("Looked at sem.claims").
-      const label = e.target && LOOKED.has(e.probe) && RELATION.test(e.target) ? `Looked at ${e.target}` : `${PROBE[e.probe] ?? humanize(e.probe)}${e.target ? ` · ${e.target}` : ''}`;
+      const refusedEscalation = e.probe === 'request_escalation' && /^Failed/.test(e.summary);
+      const label = refusedEscalation ? 'Asked for the full EDI data' : e.target && LOOKED.has(e.probe) && RELATION.test(e.target) ? `Looked at ${e.target}` : `${PROBE[e.probe] ?? humanize(e.probe)}${e.target ? ` · ${e.target}` : ''}`;
       return { ...base, kind: 'explore', label, target: e.target, state: 'ok', message: e.summary, durationMs: e.elapsedMs };
     }
     case 'candidates': {

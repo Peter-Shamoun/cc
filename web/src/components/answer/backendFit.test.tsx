@@ -21,6 +21,14 @@ describe('BACKEND-FIT: the analyst chooses the data, not the user', () => {
     // A value/term lookup (live.py maps lookup_values → sample_values with a term target) is not a relation read.
     expect(stepsOf(v1([ex('x3', 'sample_values', 'denied')]))[0].label).toBe('Sampled values · denied');
   });
+  it('a data escalation reads as using the full EDI data, with the stated reason', () => {
+    const esc = (stepId: string, summary: string) => ({ type: 'step.explore', stepId, probe: 'request_escalation', summary, elapsedMs: 5 }) as V1Event;
+    const steps = stepsOf(v1([esc('e0', 'Failed: request_escalation requires a reason'), esc('e1', 'Reason: sem.* has no file parse status')]));
+    expect(steps.map((s) => [s.label, s.message])).toEqual([
+      ['Asked for the full EDI data', 'Failed: request_escalation requires a reason'],
+      ['Used the full EDI data', 'Reason: sem.* has no file parse status'],
+    ]);
+  });
   it('an exploration-only run summarizes as the relations it read', () => {
     const st = (target?: string): Step => ({ id: target ?? 'n', kind: 'explore', state: 'ok', label: 'x', target });
     expect(summarize([st('sem.claims')])).toBe('Looked at sem.claims');
