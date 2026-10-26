@@ -21,11 +21,13 @@ type Loose = ToolCallPart & { kind?: string; error?: string; previousSql?: strin
 export function toStep(p: ToolCallPart): Step {
   const l = p as Loose;
   const args = (p.input?.args ?? {}) as Record<string, unknown>;
+  const checks = l.checks ?? l.output?.checks ?? (args.checks as CheckResult[] | undefined);
   return {
     id: p.id,
     kind: KIND[l.kind ?? p.tool] ?? 'other',
     label: p.label,
-    state: p.state,
+    // A finished check step with a failed check reads as a warning, not a clean pass.
+    state: p.state === 'ok' && checks?.some((c) => !c.passed) ? 'warn' : p.state,
     sql: p.input?.sql,
     rowCount: p.output?.rowCount,
     durationMs: p.durationMs,
@@ -33,7 +35,7 @@ export function toStep(p: ToolCallPart): Step {
     error: l.error ?? (args.error as string | undefined),
     previousSql: l.previousSql ?? (args.previousSql as string | undefined),
     attempt: l.attempt ?? (args.attempt as number | undefined),
-    checks: l.checks ?? l.output?.checks ?? (args.checks as CheckResult[] | undefined),
+    checks,
     candidates: l.candidates ?? l.output?.candidates ?? (args.candidates as Candidate[] | undefined),
     agent: p.agent,
     resultId: l.output?.resultId,
