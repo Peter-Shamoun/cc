@@ -1,0 +1,10 @@
+{
+  "about": "Shared cases for every string pattern in v1.schema.json (1.19.0). Run by api/tests/test_patterns_119.py (jsonschema, Python re) and web/src/contract/patterns.test.ts (ECMAScript RegExp). Both must agree. A trailing newline must never pass: Python's `$` matches before a final \\n, so the schema anchors with (?![\\s\\S]) and uses [0-9] (Python's \\d is Unicode).",
+  "cases": [
+    {"path": "$defs.ID", "ok": ["m_1", "c:abc.def-9", "A"], "bad": ["", "m_1\n", "m_1\r\n", "\nm_1", "m 1", "m/1", "m_1\u0000", "ｍ_1", "é"]},
+    {"path": "$defs.MessageStart.properties.contractVersion", "ok": ["1.0.0", "1.19.0", "1.123.45"], "bad": ["1.19.0\n", "2.0.0", "1.19", "1.19.0-rc1", "1.١٩.0", "v1.19.0", " 1.19.0"]},
+    {"path": "$defs.ShareLink.properties.url", "ok": ["/shared/sh_abc-9"], "bad": ["/shared/sh_abc\n", "/shared/", "https://x/shared/a", "/shared/a/b", "/shared/a?x=1"]},
+    {"path": "$defs.PlotRow.propertyNames", "ok": ["payer", "_x", "a1"], "bad": ["payer\n", "1a", "a-b", "", "ä"]},
+    {"path": "$defs.PlotSpec.x-temporal", "ok": ["2026-10", "2026-10-25", "2026-10-25T23:21:00Z", "2026-10-25 23:21", "2026-10-25T23:21:00.123+07:00"], "bad": ["2026-10-25\n", "٢٠٢٦-10-25", "Oct 2026", "2026-10-25T", "2026"]}
+  ]
+}

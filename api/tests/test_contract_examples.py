@@ -10,7 +10,7 @@ from api.tests.test_contract import check_invariants
 
 FINISH = {"answer": "stop", "tool_steps": "stop", "abstain": "abstain", "clarify": "needs_input",
           "clarify_resume": "stop", "escalation": "stop", "chart": "stop", "candidates": "stop", "error": "error",
-          "report": "stop", "regenerate_concise": "stop"}
+          "report": "stop", "regenerate_concise": "stop", "report_v2": "stop"}
 REQUIRED_BY_QA = ("answer", "tool_steps", "abstain", "clarify", "escalation")
 
 
@@ -35,7 +35,8 @@ def test_example_is_on_contract(outcome):
 def test_qa_outcomes_published():
     for outcome in REQUIRED_BY_QA:
         assert (gen_examples.EXAMPLES / f"{outcome}.jsonl").exists(), outcome
-    assert set(FINISH) == set(gen_examples.OUTCOMES) | {gen_examples.RESUME, gen_examples.REGENERATE}
+    assert set(FINISH) == set(gen_examples.OUTCOMES) | {gen_examples.RESUME, gen_examples.REGENERATE,
+                                                       gen_examples.REPORT_V2}
 
 
 def test_examples_cover_the_contract_outcomes():
@@ -83,3 +84,12 @@ def test_examples_match_demo_backend():
     for outcome, evs in captured.items():
         assert gen_examples.shape(gen_examples.load(outcome)) == gen_examples.shape(evs), (
             f"{outcome}.jsonl drifted from the demo backend: run python -m api.contract.gen_examples")
+
+
+def test_report_v2_example_revises_the_report_in_place():
+    """1.19.0 (QA-C1): the follow-up keeps each artifact's artifactId and bumps the version."""
+    v1 = {p["kind"]: p for p in _parts(gen_examples.load("report"), "artifact")}
+    v2 = {p["kind"]: p for p in _parts(gen_examples.load(gen_examples.REPORT_V2), "artifact")}
+    assert v1 and set(v1) == set(v2)
+    for kind in v1:
+        assert (v2[kind]["artifactId"], v2[kind]["version"]) == (v1[kind]["artifactId"], v1[kind]["version"] + 1)

@@ -38,7 +38,7 @@
               "type": "reasoning",
               "id": "p_1",
               "summary": "Checking the claims view.",
-              "durationMs": 13
+              "durationMs": 44
             },
             {
               "type": "text",
@@ -76,7 +76,7 @@
                 "views": [
                   "sem.claims"
                 ],
-                "elapsedMs": 14
+                "elapsedMs": 45
               },
               "dataWithheld": true
             },
@@ -111,21 +111,21 @@
           "finishReason": "stop",
           "usage": {
             "queries": 2,
-            "elapsedMs": 75,
+            "elapsedMs": 106,
             "latency": {
-              "totalMs": 75,
+              "totalMs": 106,
               "modelMs": 0,
-              "sqlMs": 3,
+              "sqlMs": 19,
               "stages": {
-                "plan": 11,
-                "sql": 4,
+                "plan": 24,
+                "sql": 21,
                 "repair": 0,
                 "checks": 0,
-                "render": 60
+                "render": 61
               },
               "firstEventMs": 0,
-              "firstStepMs": 10,
-              "firstTokenMs": 15
+              "firstStepMs": 21,
+              "firstTokenMs": 45
             },
             "costIsEstimate": true,
             "costUsd": 0.003891,
@@ -150,7 +150,7 @@
               "stepId": "s_1",
               "probe": "describe_view",
               "summary": "8 columns",
-              "elapsedMs": 8,
+              "elapsedMs": 20,
               "target": "sem.claims",
               "seq": 4
             },
@@ -167,7 +167,7 @@
               "type": "step.sql_result",
               "stepId": "s_2",
               "ok": true,
-              "elapsedMs": 2,
+              "elapsedMs": 7,
               "rowCount": 1,
               "columns": [
                 {
@@ -195,7 +195,7 @@
               "type": "step.sql_result",
               "stepId": "s_3",
               "ok": true,
-              "elapsedMs": 1,
+              "elapsedMs": 12,
               "rowCount": 1,
               "columns": [
                 {
