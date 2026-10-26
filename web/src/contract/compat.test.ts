@@ -18,6 +18,7 @@ function same<A, B>(ok: Same<A, B>): Same<A, B> { return ok; }
 
 // shared shapes
 same<H.Usage, G.Usage>(true);
+same<H.LatencyStages, G.LatencyStages>(true);
 same<H.ColumnSummary, G.ColumnSummary>(true);
 same<H.StepError, G.StepError>(true);
 same<H.ModelRef, G.ModelRef>(true);

@@ -1,6 +1,6 @@
 # ClaimClarity chat API — stream contract
 
-**Version: 1.5.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.6.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -143,9 +143,27 @@ CSV: `GET /api/download/{csvFileId}` (auth, no-store, opaque id, short-lived).
 
 `queries`, `elapsedMs` (required); `tokens? {input, output, cacheRead?, cacheWrite?}`; `costUsd?` with
 `costIsEstimate?` (always `true` in demo mode — computed from a static price table, never billed);
-`latency? {firstEventMs?, firstStepMs?, firstTokenMs?, modelMs?, sqlMs?, queueMs?, totalMs}`;
+`latency? {firstEventMs?, firstStepMs?, firstTokenMs?, modelMs?, sqlMs?, queueMs?, totalMs, stages?}`;
 `models?[] {model, role?, inputTokens, outputTokens, costUsd?, calls?}` (one row per model, so an escalated
 answer shows both the small and the large model).
+
+**Per-stage breakdown (1.6.0):** `latency.stages {plan, sql, repair, checks, render}` (`LatencyStages`, all integers
+in ms, all five always present). It is wall clock: every instant of the run belongs to exactly one stage, so the
+stages add up to about `totalMs`, and a stacked bar is safe to draw.
+
+| stage | from → to |
+|---|---|
+| `plan` | run start, and each time a query returns OK → the next `step.sql_running` (model turns + schema exploration) |
+| `sql` | `step.sql_running` (not a repair) → its `step.sql_result` |
+| `repair` | a failed `step.sql_result` or a `step.check {verdict: fail}` → the repaired query's result (model + SQL) |
+| `checks` | the final query's result → the checks are done (the `step.check`/`step.candidates` emitted after it) |
+| `render` | `status "Writing answer"` → `message.end` |
+
+Escalation time lands in the stage that was running (usually `repair`). With parallel candidates (`candidates`
+strategy) the attribution follows the latest stage change, so treat the split as approximate. `modelMs`/`sqlMs`
+remain *summed* durations and can exceed `totalMs` when candidates overlap. Example (`tool_steps.jsonl`, demo pace):
+`{"plan": 1057, "sql": 8, "repair": 356, "checks": 1, "render": 61}` for `totalMs: 1481`. Unknown extra keys may
+appear later (e.g. `queue`); clients ignore them.
 
 ## 8. Cancel, resume-after-disconnect, regenerate
 
@@ -154,6 +172,23 @@ answer shows both the small and the large model).
   Before that `message.end`, the server **closes everything still in flight**: every `step.sql_running` without a result
   gets `step.sql_result {ok: false, error: {code: "cancelled"}}`, an open reasoning part gets `reasoning.end`, an open
   text part gets `text.end`. So a UI never has to guess which spinners to stop. Partial parts are not persisted.
+* **Cancel while a query runs: needs analyzer support (documented 1.6.0; not built yet).** Today the server checks
+  for a stop between model turns and during model latency, but it cannot interrupt a SQL statement that is already
+  running: the analyzer runs it synchronously (`analyzer/tools.py: execute_with_time_limit`). Its watchdog can call
+  `connection.interrupt()`, but only on the time limit (`AnalyzerConfig.time_limit_seconds`, default 25 s); the API
+  has no hook into it. So during a SQL step, `message.end {aborted}` arrives when the query returns, at the latest
+  after the time limit, not within 1 s. Clients should show "Stopping…" after `/stop` until `message.end`, and must
+  not assume the 1 s bound. **Intended semantics, once the analyzer exposes a cancel hook** (e.g. a `cancelled`
+  event checked by the watchdog, which then calls `connection.interrupt()`), which needs no client change:
+  1. `/stop` interrupts the running statement immediately. Its step closes with
+     `step.sql_result {ok: false, elapsedMs, error: {code: "cancelled", message: "Stopped by the user."}}`, the
+     same shape as today's close-out.
+  2. A `cancelled` error never triggers `step.repair_attempt`, `escalation` or a verifier `step.check`. It is not a
+     query failure, and it does not count toward `maxAttempts`.
+  3. Other candidates' statements are interrupted the same way, and each gets its own `cancelled` result.
+  4. `message.end {finishReason: "aborted"}` follows within 1 s of `/stop`. `usage.queries` counts the interrupted
+     statement, and `latency.stages.sql` includes its time up to the interrupt.
+  5. A timeout keeps its own code (`timeout`, repairable); only a user stop is `cancelled`.
 * **Disconnect ≠ cancel (1.1).** If the last attached client drops, the run keeps going for
   `CC_API_DISCONNECT_GRACE_SECONDS` (default 10 s). If any client re-attaches in that window the run continues;
   otherwise it is cancelled exactly as if `/stop` had been called. Several tabs may be attached to one run.
@@ -280,6 +315,10 @@ A picker reads what the server can run. The body is `Capabilities` (no user data
   `runOptions()` (builds `options`, omitting defaults).
 
 ## Changelog
+
+* **1.6.0** (2026-10-25) — `usage.latency.stages` (`LatencyStages`: plan/sql/repair/checks/render, wall-clock ms;
+  §7). §8 documents that cancelling a running SQL statement needs analyzer support, and gives the intended event
+  semantics. Additive.
 
 * **1.5.0** (2026-10-25) — 413 has its own code `payload_too_large` (+ `maxBytes`; `legacyCode: "validation"` kept);
   `HttpError.error.legacyCode` convention. Capabilities are per organization when signed in (`scope`,

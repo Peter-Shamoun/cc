@@ -78,6 +78,13 @@ class TapStats:
     first_step_ms: float | None = None
     queries: int = 0
     models: dict = field(default_factory=dict)  # model -> {inputTokens, outputTokens, calls}
+    #: wall-clock ms per stage (CONTRACT.md §7 ``latency.stages``); each instant belongs to exactly one stage
+    stages: dict = field(default_factory=lambda: dict.fromkeys(STAGES, 0.0))
+
+
+#: per-stage latency buckets, in pipeline order: planning (model turns + schema exploration), running SQL,
+#: repairing after a failed query or verification (model + SQL), result checks, and writing the answer.
+STAGES = ("plan", "sql", "repair", "checks", "render")
 
 
 class LiveTap:
@@ -103,6 +110,14 @@ class LiveTap:
         self._lock = threading.Lock()
         self._escalated_from: str | None = None
         self.calls = getattr(inner, "calls", [])
+        self._stage = "plan"
+        self._stage_t = self.started
+
+    def enter(self, stage: str) -> None:
+        """Close the running stage at now and start ``stage`` (wall clock, so stages sum to the run time)."""
+        now = time.perf_counter()
+        self.stats.stages[self._stage] += (now - self._stage_t) * 1000
+        self._stage, self._stage_t = stage, now
 
     # -- helpers
     def _ms(self) -> int:
@@ -197,6 +212,7 @@ class LiveTap:
                             "attempt": n, "maxAttempts": 3, "error": {"code": error["code"], "message": error["message"]},
                             "revisedSql": sql, "explanation": "Revised the query after the database error."})
                 ev.update(purpose="repair", repairOf=repair_id, attempt=attempt)
+            self.enter("repair" if failed else "sql")
             self._step(ev)
             self.emit({"type": "status", "label": "Running query"})
             if name == "final_answer":
@@ -222,12 +238,14 @@ class LiveTap:
         elapsed = int((time.perf_counter() - pend.started) * 1000)
         if pend.name in ("run_sql", "final_answer"):
             self.stats.sql_ms += elapsed
+            self.enter("plan")  # the model reads the result next; a failure below switches to repair
             is_error = content.startswith("ERROR:") or content.startswith("final SQL failed:")
             if pend.name == "final_answer" and content.startswith("result failed verification:"):
                 self._step({"type": "step.sql_result", "stepId": pend.step_id, "ok": True, "elapsedMs": elapsed})
                 self._step({"type": "step.check", "stepId": new_id("s_"), "check": "verifier", "verdict": "fail",
                             "message": scrub(content.split(":", 1)[1].split(". Revise")[0], 400),
                             "targetStepId": pend.step_id, "action": "repair"})
+                self.enter("repair")
                 return
             if is_error:
                 message = scrub(content.split(":", 1)[1].strip().split(". Revise the SQL")[0], 400)
@@ -235,6 +253,7 @@ class LiveTap:
                 self._step({"type": "step.sql_result", "stepId": pend.step_id, "ok": False, "elapsedMs": elapsed,
                             "error": {"code": err["code"], "message": message}})
                 self.failed[pend.candidate] = (pend.step_id, err)
+                self.enter("repair")
                 return
             ev = {"type": "step.sql_result", "stepId": pend.step_id, "ok": True, "elapsedMs": elapsed}
             if rows is None:
@@ -290,6 +309,7 @@ class LiveTap:
                         self._finish_call(pend, "{}")
                     del self.pending[tool_use_id]
             self.pending.clear()
+            self.enter("checks")
             if self.reasoning_started is not None:
                 self.emit({"type": "reasoning.end", "partId": self.reasoning_id,
                            "durationMs": int((time.perf_counter() - self.reasoning_started) * 1000)})
@@ -360,7 +380,9 @@ class LiveTap:
             tin += row["inputTokens"]
             tout += row["outputTokens"]
             cost += c
-        latency = {"totalMs": elapsed_ms, "modelMs": int(self.stats.model_ms), "sqlMs": int(self.stats.sql_ms)}
+        self.enter(self._stage)
+        latency = {"totalMs": elapsed_ms, "modelMs": int(self.stats.model_ms), "sqlMs": int(self.stats.sql_ms),
+                   "stages": {k: int(round(self.stats.stages[k])) for k in STAGES}}
         if first_event_ms is not None:
             latency["firstEventMs"] = first_event_ms
         if self.stats.first_step_ms is not None:
