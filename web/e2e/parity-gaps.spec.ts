@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures';
 import AxeBuilder from '@axe-core/playwright';
-import { LIVE, open, ask, lastAssistant, composer, sse, turn, textPart, gap } from './helpers';
+import { LIVE, open, ask, lastAssistant, composer, sse, turn, textPart } from './helpers';
 
 // SOTA-parity ratchets for open QA backlog items. Each gap() flips to "Expected to fail, but passed"
 // when the owning team lands the fix; then delete the gap() line.
@@ -23,7 +23,6 @@ test.describe('parity gaps @both', () => {
   });
 
   test('before the first event the turn shows a labelled "Thinking" row, not a bare dot (QA-A15)', async ({ page }) => {
-    gap('QA-A15');
     await page.route('**/api/chat', async (route) => {
       if (route.request().method() !== 'POST') return route.continue();
       await new Promise((r) => setTimeout(r, 2500)); // the server is slow to send its first event
