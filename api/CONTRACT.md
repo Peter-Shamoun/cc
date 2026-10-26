@@ -1,6 +1,6 @@
 # ClaimClarity chat API — stream contract
 
-**Version: 1.1.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.2.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -68,7 +68,7 @@ The frontend builds against this document only; the analyzer adapts to it.
 
 | type | when | key fields |
 |---|---|---|
-| `message.start` | first | `messageId`, `conversationId`, `contractVersion`, `model?`, `strategy?`, `parentId?` (user turn), `resumeOf?` `{clarificationId, messageId}`, `regenerateOf?` |
+| `message.start` | first | `messageId`, `conversationId`, `contractVersion`, `model?`, `strategy?`, `parentId?` (user turn), `resumeOf?` `{clarificationId, messageId}`, `regenerateOf?`, `editOf?` (1.2) |
 | `status` | any time | `label` (short present-tense phrase, e.g. "Running query") or `null` to clear |
 | `step.explore` | schema/data probe | `stepId`, `probe` (*open*: `list_views`, `describe_view`, `sample_values`, `lookup_glossary`, `lookup_dictionary`, `search_examples`, `profile`), `target?`, `summary`, `elapsedMs?` |
 | `step.sql_running` | a query starts | `stepId`, `sql` (full text), `purpose` (`explore`·`answer`·`candidate`·`repair`·`check`), `attempt` (1-based), `candidateId?`, `repairOf?`, `label?` |
@@ -151,8 +151,13 @@ answer shows both the small and the large model).
   250 ms, 1 s, 2 s, 4 s; on `stream_gone`, reload the conversation from `GET /api/conversations/{id}`.
 * **Regenerate:** `ChatRequest.regenerate = {messageId}` re-runs the user turn that produced `messageId`; the new
   message has `regenerateOf` set and is a sibling branch in the transcript.
-* **Edit:** send the edited text as a user message with `parentId` = the parent of the edited message; the server
-  stores it as a sibling branch.
+* **Edit (1.2):** send the edited text as the user message with `editOf: <id of the user message being edited>`.
+  The server stores it as a sibling of that message: it copies the edited message's `parentId`, and when there is none
+  (editing the **first** question) it stores no `parentId`, which makes it a new root. The stored user message keeps
+  `editOf`, and the answer's `message.start.editOf` echoes it. An unknown `editOf` in this conversation returns 404
+  `validation`. Folding rule for clients: a stored message with `editOf` and no `parentId` is a root; any other message
+  without `parentId` follows the message before it. The 1.0 form, a user message with `parentId` = the parent of the
+  edited message, still works for non-first questions.
 
 ## 9. Demo scenarios (demo mode only)
 
@@ -195,6 +200,9 @@ from the demo backend by `python -m api.contract.gen_examples` and checked by `a
 * `error.details` and `step.*.error.message` are scrubbed (quoted literals and long digit runs masked) and ≤500 chars.
 
 ## Changelog
+
+* **1.2.0** (2026-10-25) — `editOf` on the ChatRequest user message and on `message.start`, so an edit of the first
+  question (no parent) can be expressed. Additive.
 
 * **1.1.0** (2026-10-25) — transport + tooling, additive. `GET /api/chat/{messageId}/stream` resume (EventSource
   friendly); a dropped connection no longer cancels immediately (10 s re-attach grace); cancel closes in-flight steps
