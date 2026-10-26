@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures';
-import { LIVE, MOCK, open, ask, lastAssistant, composer, stopBtn, waitIdle } from './helpers';
+import { LIVE, MOCK, open, ask, lastAssistant, composer, stopBtn, waitIdle, injectStream, turn, textPart } from './helpers';
 
 // Answer-column edge cases and fidelity details (Peter 9:51 / 10:06 directives). Synthetic data only.
 test.describe('answer edge cases', () => {
@@ -112,5 +112,38 @@ test.describe('answer edge cases', () => {
     expect(g.qToA).toBeLessThanOrEqual(32);
     expect(g.aToQ).toBeGreaterThanOrEqual(24);
     expect(g.aToQ).toBeLessThanOrEqual(56);
+  });
+
+  test('streaming pacing: a one-shot paragraph flows in over frames (ChatGPT/Claude), and lands complete', async ({ page }) => {
+    await open(page, LIVE);
+    const para = 'Cigna has the highest denial rate at 20.4%, followed by Medicaid at 20.3%. '.repeat(8).trim();
+    await injectStream(page, turn(textPart('t', para)));
+    await composer(page).fill('Synthetic question');
+    const lengths = page.evaluate(() => new Promise<number[]>((done) => {
+      const seen: number[] = [];
+      const t0 = performance.now();
+      const tick = () => {
+        const md = [...document.querySelectorAll('[data-testid="msg-assistant"] [data-testid="markdown"]')].at(-1);
+        const n = md?.textContent?.length ?? 0;
+        if (n && seen.at(-1) !== n) seen.push(n);
+        if (performance.now() - t0 < 2500) requestAnimationFrame(tick); else done(seen);
+      };
+      requestAnimationFrame(tick);
+    }));
+    await composer(page).press('Enter');
+    const seen = await lengths;
+    expect(seen.length).toBeGreaterThan(5);
+    expect([...seen].sort((a, b) => a - b)).toEqual(seen);
+    expect(seen.at(-1)).toBe(para.length);
+    await expect(lastAssistant(page).locator('.streaming-caret')).toHaveCount(0);
+  });
+
+  test('streaming pacing respects reduced motion: the paragraph appears at once', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await open(page, LIVE);
+    const para = 'Paid amount by payer, last quarter. '.repeat(12).trim();
+    await injectStream(page, turn(textPart('t', para)));
+    await ask(page, 'Synthetic question');
+    await expect(lastAssistant(page).getByTestId('markdown')).toHaveText(para);
   });
 });
