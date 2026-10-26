@@ -311,11 +311,12 @@ function ShellInner() {
             hasChat={!empty} onCopyMarkdown={copyCurrent} onDownloadMarkdown={exportCurrent} onSettings={() => setDialog('settings')} onShortcuts={() => setDialog('shortcuts')} />
 
           {empty ? (
-            <div className="flex flex-1 flex-col items-center justify-center px-4 pb-[12vh] max-sm:justify-end max-sm:pb-4" data-testid="empty-state">
+            <div className="flex flex-1 flex-col items-center justify-center px-4 pb-[12vh] max-sm:justify-end max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]" data-testid="empty-state">
               <h1 className="mb-7 text-center tracking-tight max-sm:mb-auto max-sm:mt-auto" style={{ fontFamily: 'var(--heading-font)', fontSize: 'var(--empty-size)', fontWeight: 'var(--empty-weight)' as never }}>What should we look into?</h1>
-              <div className="w-full max-w-[48rem]" id="composer">
+              <div className="flex w-full max-w-[48rem] flex-col" id="composer">
                 {composer(true)}
-                <div className="mt-4 flex flex-wrap justify-center gap-2 max-sm:flex-nowrap max-sm:justify-start max-sm:overflow-x-auto max-sm:pb-1" role="group" aria-label="Suggestions">
+                {/* Phones: one swipeable row above the composer with an edge fade (ChatGPT/Claude mobile), not a cut-off row at the screen edge. */}
+                <div className="mt-4 flex flex-wrap justify-center gap-2 max-sm:order-first max-sm:-mx-4 max-sm:mb-3 max-sm:mt-0 max-sm:flex-nowrap max-sm:justify-start max-sm:overflow-x-auto max-sm:px-4 max-sm:pb-1 max-sm:scrollbar-none max-sm:[mask-image:linear-gradient(to_right,transparent,#000_1rem,#000_calc(100%-2rem),transparent)]" role="group" aria-label="Suggestions">
                   {SUGGESTIONS.map((s, i) => (
                     <button key={s.prompt} type="button" onClick={() => send(s.prompt)} style={{ animationDelay: `${i * 40}ms` }}
                       className="shrink-0 rounded-full border border-line bg-bg px-3.5 py-2 text-sm font-medium text-fg-muted transition-colors hover:bg-hover hover:text-fg motion-safe:animate-[cc-rise_240ms_ease-out_both]">{s.title}</button>
