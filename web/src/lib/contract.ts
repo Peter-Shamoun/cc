@@ -53,6 +53,8 @@ export interface TablePart extends PartBase {
   csvFileId?: ID;
   sqlPartId?: ID;
   source?: { views: string[]; elapsedMs?: number; asOf?: ISODate };
+  /** 1.11.0: set only in a SharedConversation shared without data. `rows` is empty, while `columns`/`rowCount` are real. */
+  dataWithheld?: boolean;
 }
 
 export interface FilePart extends PartBase {

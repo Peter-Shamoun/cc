@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://cc.local/api/contract/v1.schema.json",
   "title": "CC chat stream contract",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "One JSON object per SSE data: line. See api/CONTRACT.md. Validate an event against #/$defs/StreamEvent.",
   "$ref": "#/$defs/StreamEvent",
   "$defs": {
@@ -535,6 +535,10 @@
             }
           },
           "additionalProperties": true
+        },
+        "dataWithheld": {
+          "type": "boolean",
+          "description": "1.11.0: only in a SharedConversation shared without data. `rows` is empty, while `columns` and `rowCount` are real."
         }
       },
       "additionalProperties": true
@@ -2748,6 +2752,95 @@
         "detailed"
       ],
       "description": "1.10.0: how a regenerated answer is restyled (CONTRACT.md §8.1). `default` means a plain re-run. `concise` cuts the prose to its first sentence and drops a chart that duplicates a table. `detailed` adds a 'How this was computed' paragraph. Tables, SQL, artifacts and every assumption/caveat callout are always kept."
+    },
+    "ShareRequest": {
+      "type": "object",
+      "description": "1.11.0: PUT /api/conversations/{id}/share body (CONTRACT.md §17).",
+      "properties": {
+        "includeData": {
+          "type": "boolean",
+          "default": false,
+          "description": "Share the stored preview rows (≤ 50 per table, never the CSV). Default false: tables are shown without rows, and charts and data artifacts are left out."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ShareLink": {
+      "type": "object",
+      "description": "1.11.0: the active share of a conversation. Read-only, org-scoped and revocable.",
+      "required": [
+        "shareId",
+        "conversationId",
+        "url",
+        "scope",
+        "includeData",
+        "createdAt"
+      ],
+      "properties": {
+        "shareId": {
+          "$ref": "#/$defs/ID"
+        },
+        "conversationId": {
+          "$ref": "#/$defs/ID"
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^/shared/[A-Za-z0-9_-]+$",
+          "description": "App-relative path. The viewer must be signed in to the same organization."
+        },
+        "scope": {
+          "const": "organization"
+        },
+        "includeData": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": true
+    },
+    "SharedConversation": {
+      "type": "object",
+      "description": "1.11.0: GET /api/shared/{shareId}. The owner's conversation, read-only. Feedback, file ids and (unless includeData) rows are removed.",
+      "required": [
+        "shareId",
+        "messages",
+        "includeData",
+        "createdAt"
+      ],
+      "properties": {
+        "shareId": {
+          "$ref": "#/$defs/ID"
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "updatedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "includeData": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/StoredMessage"
+          }
+        }
+      },
+      "additionalProperties": true
     }
   }
 }

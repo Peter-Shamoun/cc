@@ -1,0 +1,263 @@
+{
+  "share": {
+    "method": "PUT",
+    "path": "/api/conversations/c_1/share",
+    "request": {},
+    "response": {
+      "shareId": "sh_1",
+      "conversationId": "c_1",
+      "url": "/shared/sh_1",
+      "scope": "organization",
+      "includeData": false,
+      "createdAt": "2026-10-25T20:00:00Z"
+    }
+  },
+  "view": {
+    "method": "GET",
+    "path": "/api/shared/sh_1",
+    "response": {
+      "shareId": "sh_1",
+      "title": "Claims",
+      "updatedAt": "2026-10-25T20:00:00Z",
+      "includeData": false,
+      "createdAt": "2026-10-25T20:00:00Z",
+      "messages": [
+        {
+          "id": "u_1",
+          "role": "user",
+          "text": "Paid amount by service month",
+          "createdAt": "2026-10-25T20:00:00Z"
+        },
+        {
+          "id": "m_1",
+          "role": "assistant",
+          "parts": [
+            {
+              "type": "reasoning",
+              "id": "p_1",
+              "summary": "Checking the claims view.",
+              "durationMs": 15
+            },
+            {
+              "type": "text",
+              "id": "p_2",
+              "text": "Overall claim volume and dollars."
+            },
+            {
+              "type": "code",
+              "id": "p_3",
+              "language": "sql",
+              "code": "SELECT COUNT(*) AS claims, SUM(charge_amount) AS charge_amount, SUM(paid_amount) AS paid_amount\nFROM sem.claims",
+              "title": "SQL",
+              "role": "query",
+              "collapsed": true,
+              "rerunnable": false
+            },
+            {
+              "type": "table",
+              "id": "p_4",
+              "title": "Result",
+              "columns": [
+                {
+                  "key": "claims",
+                  "label": "Claims",
+                  "type": "integer"
+                },
+                {
+                  "key": "charge_amount",
+                  "label": "Charge amount",
+                  "type": "currency",
+                  "format": "$,.2f"
+                },
+                {
+                  "key": "paid_amount",
+                  "label": "Paid amount",
+                  "type": "currency",
+                  "format": "$,.2f"
+                }
+              ],
+              "rows": [],
+              "rowCount": 1,
+              "resultId": "f_1",
+              "sensitivity": "deidentified",
+              "source": {
+                "views": [
+                  "sem.claims"
+                ],
+                "elapsedMs": 18
+              },
+              "sqlPartId": "p_3",
+              "dataWithheld": true
+            },
+            {
+              "type": "callout",
+              "id": "p_5",
+              "variant": "assumption",
+              "title": "Assumptions",
+              "items": [
+                {
+                  "id": "a_1",
+                  "text": "Counts every claim in the current gold version.",
+                  "editable": true
+                }
+              ]
+            },
+            {
+              "type": "callout",
+              "id": "p_6",
+              "variant": "caveat",
+              "title": "Check before using",
+              "items": [
+                {
+                  "id": "a_2",
+                  "text": "sem.claims/claim_lines used without is_latest_submission: resubmitted claims count more than once"
+                }
+              ]
+            }
+          ],
+          "createdAt": "2026-10-25T20:00:00Z",
+          "parentId": "u_1",
+          "finishReason": "stop",
+          "usage": {
+            "queries": 2,
+            "elapsedMs": 79,
+            "latency": {
+              "totalMs": 79,
+              "modelMs": 0,
+              "sqlMs": 4,
+              "stages": {
+                "plan": 13,
+                "sql": 5,
+                "repair": 0,
+                "checks": 1,
+                "render": 61
+              },
+              "firstEventMs": 0,
+              "firstStepMs": 11,
+              "firstTokenMs": 18
+            },
+            "costIsEstimate": true,
+            "costUsd": 0.003891,
+            "tokens": {
+              "input": 3281,
+              "output": 122
+            },
+            "models": [
+              {
+                "model": "claude-haiku-5-5",
+                "role": "analyst",
+                "inputTokens": 3281,
+                "outputTokens": 122,
+                "costUsd": 0.003891,
+                "calls": 3
+              }
+            ]
+          },
+          "steps": [
+            {
+              "type": "step.explore",
+              "stepId": "s_1",
+              "probe": "describe_view",
+              "summary": "8 columns",
+              "elapsedMs": 9,
+              "target": "sem.claims",
+              "seq": 4
+            },
+            {
+              "type": "step.sql_running",
+              "stepId": "s_2",
+              "sql": "SELECT COUNT(*) AS claims, SUM(charge_amount) AS charge_amount, SUM(paid_amount) AS paid_amount\nFROM sem.claims",
+              "attempt": 1,
+              "purpose": "answer",
+              "label": "Running query",
+              "seq": 5
+            },
+            {
+              "type": "step.sql_result",
+              "stepId": "s_2",
+              "ok": true,
+              "elapsedMs": 2,
+              "rowCount": 1,
+              "columns": [
+                {
+                  "name": "claims"
+                },
+                {
+                  "name": "charge_amount"
+                },
+                {
+                  "name": "paid_amount"
+                }
+              ],
+              "seq": 7
+            },
+            {
+              "type": "step.sql_running",
+              "stepId": "s_3",
+              "sql": "SELECT COUNT(*) AS claims, SUM(charge_amount) AS charge_amount, SUM(paid_amount) AS paid_amount\nFROM sem.claims",
+              "attempt": 1,
+              "purpose": "answer",
+              "label": "Final query",
+              "seq": 8
+            },
+            {
+              "type": "step.sql_result",
+              "stepId": "s_3",
+              "ok": true,
+              "elapsedMs": 2,
+              "rowCount": 1,
+              "columns": [
+                {
+                  "name": "claims"
+                },
+                {
+                  "name": "charge_amount"
+                },
+                {
+                  "name": "paid_amount"
+                }
+              ],
+              "seq": 10
+            },
+            {
+              "type": "step.check",
+              "stepId": "s_4",
+              "check": "verifier",
+              "verdict": "warn",
+              "message": "sem.claims/claim_lines used without is_latest_submission: resubmitted claims count more than once",
+              "action": "caveat",
+              "targetStepId": "s_3",
+              "seq": 12
+            }
+          ],
+          "sources": [
+            {
+              "id": "src_1",
+              "kind": "view",
+              "name": "sem.claims",
+              "label": "Claims",
+              "role": "answer",
+              "description": "One row per claim submission with billed, allowed and paid amounts, payer and status.",
+              "stepIds": [
+                "s_1",
+                "s_2",
+                "s_3"
+              ],
+              "partIds": [
+                "p_3",
+                "p_4"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "revoke": {
+    "method": "DELETE",
+    "path": "/api/conversations/c_1/share",
+    "response": {
+      "revoked": true
+    }
+  }
+}

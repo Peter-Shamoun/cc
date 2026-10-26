@@ -1,6 +1,6 @@
 # CC chat API — stream contract
 
-**Version: 1.10.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.11.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -459,7 +459,42 @@ re-encode a chart (bar ↔ line, sort) locally from `data.values`; that is a vie
 * Demo: the `report` scenario returns the table, a `chart` artifact (`autoOpen: false`) and a `report` artifact
   (markdown summary, `autoOpen: true`). Example: `examples/report.jsonl`.
 
+## 17. Share inside the organization (1.11.0)
+
+A share is a **read-only, org-scoped, revocable** link to one conversation. There are no public links: the viewer
+must be signed in to the same organization (customer). A conversation has at most one active share.
+
+| Request | Body | Response |
+|---|---|---|
+| `GET /api/conversations/{id}/share` | | `ShareLink`, or 404 `not_found` when not shared |
+| `PUT /api/conversations/{id}/share` | `ShareRequest {includeData?: false}` | `ShareLink {shareId, conversationId, url, scope: "organization", includeData, createdAt}`. Idempotent: it returns the same `shareId` and updates `includeData` |
+| `DELETE /api/conversations/{id}/share` | | `{revoked: true}`, or 404 when there was none |
+| `GET /api/shared/{shareId}` | | `SharedConversation {shareId, title, updatedAt, includeData, createdAt, messages: StoredMessage[]}` |
+
+* Only the owner can manage a share. Anyone else gets a 404, like any other user's conversation (§1).
+* The viewer gets **404 `not_found`** for an unknown, revoked, other-organization or deleted-conversation share
+  alike, so a link reveals nothing. 401 when signed out, 410 `transcripts_unavailable` after crypto-shredding.
+  Deleting the conversation revokes its share.
+* **Data is withheld by default.** With `includeData: false`, tables keep `columns` and `rowCount`, but `rows: []`
+  and `dataWithheld: true` (`TablePart.dataWithheld`, 1.11). `chart` parts and `table`/`chart`/`report`/`image`
+  artifacts are left out. Prose, SQL, steps, callouts and sources stay. With `includeData: true`, the stored preview
+  rows (≤ 50 per table) are shared. **Never shared:** the CSV (`csvFileId` is removed), `feedback`, and the owner's
+  identity.
+* `url` is the app path `/shared/<shareId>`. The share id has 144 random bits and is a capability inside the org:
+  don't log it. The response is `no-store` with `Referrer-Policy: no-referrer`.
+* UI: the share dialog defaults to "Without result data", with an opt-in toggle. Show `rowCount` and "data not
+  shared" for withheld tables. The view is read-only, with no composer and no regenerate.
+* Audit: `conversation_shared` / `conversation_share_revoked` / `shared_conversation_viewed`, with `kind` =
+  `with_data`|`no_data` and never the share id.
+* Demo: shares are kept in memory (they are lost on restart). A real backend persists them with the transcript.
+* Client: `getShare`, `setShare`, `revokeShare`, `loadShared` and `shareIdFromPath` in `web/src/contract/share.ts`.
+  Example: `examples/share.json`.
+
 ## Changelog
+
+* **1.11.0** (2026-10-25) — Org-scoped share links (§17): `ShareRequest`, `ShareLink`, `SharedConversation`,
+  `TablePart.dataWithheld`, and GET/PUT/DELETE `/api/conversations/{id}/share` plus `GET /api/shared/{shareId}`.
+  `includeData` defaults to false. Additive.
 
 * **1.10.0** (2026-10-25) — `ChatRequest.regenerate.style` (`RegenerateStyle`), echoed as
   `message.start.regenerateStyle` and `StoredMessage.regenerateStyle` (§8.1). Titles (QA-P6): a dimension ending in
