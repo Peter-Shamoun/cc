@@ -329,7 +329,7 @@ function ShellInner() {
         {sidebarVisible && (mobile ? <div ref={drawerRef}><Sidebar {...sidebarProps} drawer /></div> : <Sidebar {...sidebarProps} />)}
         {!sidebarVisible && !mobile && <SidebarRail onExpand={() => setSidebar(true)} onNew={sidebarProps.onNew} onSearch={() => setDialog('search')} onSettings={() => setDialog('settings')} />}
         <main className="relative flex min-w-0 flex-1 flex-col font-sans md:min-w-[400px]" aria-label="Chat">
-          <Header showNav={!sidebarVisible || mobile} onOpenSidebar={() => setSidebar(true)} onNewChat={sidebarProps.onNew} adapterName={adapter.name}
+          <Header showNav={mobile} onOpenSidebar={() => setSidebar(true)} onNewChat={sidebarProps.onNew} adapterName={adapter.name}
             hasChat={!empty} onCopyMarkdown={copyCurrent} onDownloadMarkdown={exportCurrent} onSettings={() => setDialog('settings')} onShortcuts={() => setDialog('shortcuts')} />
 
           {empty ? (
