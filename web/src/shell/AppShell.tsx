@@ -11,6 +11,7 @@ import type { AnalystAdapter, TranscriptStore } from '../adapters/types';
 import { Sidebar, SidebarRail } from '../components/Sidebar';
 import { Composer } from '../components/Composer';
 import { messageMarkdown, type Artifact } from '../components/Message';
+import { artifactVersions, autoOpenIds, nextAutoOpen, userIsTyping } from '../components/artifacts';
 import { ThreadView, type ThreadActions } from './ThreadView';
 import { ArtifactPanel } from '../components/ArtifactPanel';
 import { StarterCards } from './StarterCards';
@@ -301,12 +302,44 @@ function ShellInner() {
   useFocusTrap(drawerRef, mobile && drawerOpen);
 
   // ---- artifact panel ----
-  const [artifact, setArtifact] = useState<Artifact | null>(null);
+  // `follow`: the panel tracks the highest version of a versioned artifact (contract 1.9 §16), so a v2 that
+  // arrives while v1 is open replaces it; picking an older version chip turns following off.
+  const [artifactSel, setArtifact] = useState<(Artifact & { follow?: boolean }) | null>(null);
+  const artifactVersionList = artifactSel?.artifactId ? artifactVersions(chat.messages, artifactSel.artifactId) : undefined;
+  const artifact: Artifact | null = !artifactSel ? null
+    : artifactVersionList?.length ? (artifactSel.follow ? artifactVersionList[artifactVersionList.length - 1] : artifactVersionList.find((v) => v.version === artifactSel.version) ?? artifactSel)
+      : artifactSel;
   // Opening an artifact on a narrower desktop makes room by collapsing the sidebar (an event, not an effect).
   const openArtifact = (a: Artifact | null) => {
-    setArtifact(a);
+    if (a?.artifactId) {
+      const vs = artifactVersions(chat.messages, a.artifactId);
+      const top = vs[vs.length - 1]?.version ?? a.version;
+      setArtifact({ ...a, follow: a.version === undefined || a.version >= (top ?? 0) });
+    } else setArtifact(a);
     if (a && window.innerWidth < 1400 && !mobile) setSidebar(false);
   };
+  // autoOpen (§16): open once when an artifact part first arrives live, never on reload and never while typing
+  // (and never move focus). Only messages seen streaming in this tab count as live.
+  // A burst can deliver the artifact and message.end in one chunk (never rendered as streaming), and the server
+  // message id replaces the client placeholder, so "busy at the previous run" also marks the last answer live.
+  const liveMsgs = useRef(new Set<string>());
+  const autoSeen = useRef(new Set<string>());
+  const busyBefore = useRef(false);
+  useEffect(() => {
+    const lastAnswer = [...chat.messages].reverse().find((m) => m.role === 'assistant');
+    if (lastAnswer && (busyBefore.current || chat.busy)) liveMsgs.current.add(lastAnswer.id);
+    busyBefore.current = chat.busy;
+    const live = chat.messages.filter((m) => m.role === 'assistant' && ((m as { streaming?: boolean }).streaming || liveMsgs.current.has(m.id)));
+    for (const m of live) liveMsgs.current.add(m.id);
+    // Answers already there when a chat loads (reload, history, version switch) never auto-open later.
+    for (const id of autoOpenIds(chat.messages.filter((m) => !live.includes(m)))) autoSeen.current.add(id);
+    if (!live.length) return;
+    const next = nextAutoOpen(live, autoSeen.current);
+    for (const id of autoOpenIds(live)) autoSeen.current.add(id);
+    if (!next || userIsTyping()) return;
+    const { partId: _p, ...a } = next;
+    openArtifact({ ...a });
+  }, [chat.messages, chat.busy]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- scrolling: pin each new question (the first one too, QA-S3) to the top while its answer streams ----
   const [draft, setDraftPush] = useState<{ text: string; n: number } | undefined>();
@@ -552,7 +585,8 @@ function ShellInner() {
           )}
           <div className="sr-only" role="status" aria-live="polite" aria-atomic="true" data-testid="status-live">{announce}</div>
         </main>
-        {artifact && <ArtifactPanel artifact={artifact} onClose={() => setArtifact(null)} />}
+        {artifact && <ArtifactPanel artifact={artifact} onClose={() => setArtifact(null)} versions={artifactVersionList}
+          onVersion={(v) => { const vs = artifactVersionList ?? []; const a = vs.find((x) => x.version === v); if (a) setArtifact({ ...a, follow: v === vs[vs.length - 1]?.version }); }} />}
       </div>
       {dialog === 'search' && <SearchDialog threads={threads} search={searchStore} onOpen={openFromSearch} onNew={sidebarProps.onNew} onClose={() => setDialog(null)} />}
       {dialog === 'share' && (
