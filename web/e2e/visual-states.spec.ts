@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
-import { LIVE, open, ask, freeze, lastAssistant, injectStream, contractExample, composer, sse, turn, textPart } from './helpers';
+import { LIVE, open, ask, freeze, lastAssistant, injectStream, contractExample, composer, sse, turn, textPart, isolateHistory } from './helpers';
 
 /**
  * Visual baselines for every answer state, light + dark, 1440 (desktop) and 390 (mobile).
@@ -10,7 +10,11 @@ import { LIVE, open, ask, freeze, lastAssistant, injectStream, contractExample, 
 const shot = async (page: Page, name: string, timer = false) => {
   await freeze(page);
   await page.mouse.move(0, 0);
-  await expect(page).toHaveScreenshot(`${name}.png`, { mask: [page.locator('time'), ...(timer ? [page.getByText(/^\d+(\.\d+)?\s?m?s$/)] : [])], maxDiffPixelRatio: 0.002 });
+  if (timer) {
+    // Tag the running timer's element once; masking by text raced with the ticking value (timer text changes).
+    await page.evaluate(() => { for (const el of document.querySelectorAll('span,div')) if (el.children.length === 0 && /^\d+(\.\d+)?\s?m?s$/.test((el.textContent || '').trim())) el.setAttribute('data-qa-timer', ''); });
+  }
+  await expect(page).toHaveScreenshot(`${name}.png`, { mask: [page.locator('time'), ...(timer ? [page.locator('[data-qa-timer]')] : [])], maxDiffPixelRatio: 0.002 });
 };
 const outcome = async (page: Page, name: string, prompt = 'Synthetic question') => {
   const ev = contractExample(name);
@@ -21,7 +25,7 @@ const outcome = async (page: Page, name: string, prompt = 'Synthetic question') 
 
 for (const theme of ['light', 'dark'] as const) {
   test.describe(`answer states ${theme} @both`, () => {
-    test.beforeEach(async ({ page }) => { await open(page, LIVE, theme); });
+    test.beforeEach(async ({ page }) => { await isolateHistory(page); await open(page, LIVE, theme); });
 
     for (const name of ['answer', 'chart', 'clarify', 'abstain', 'escalation', 'error', 'report', 'candidates']) {
       test(`${name} ${theme}`, async ({ page }) => {
