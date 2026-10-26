@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import clsx from 'clsx';
 import { CodeBlock } from './CodeBlock';
 import { safeHref } from '../../render/safeHref';
-import { currentMath, loadMath, mayContainMath, protectCurrency, type MathPlugin } from './markdownText';
+import { currentMath, loadMath, mayContainMath, protectCurrency, repairStreamingTail, type MathPlugin } from './markdownText';
 // Streamdown (Apache-2.0) word fade-in keyframes for [data-sd-animate]; plain stylesheet, CSP-safe.
 import 'streamdown/styles.css';
 
@@ -53,7 +53,7 @@ function textContent(node: ReactNode): string {
  * closed) and memoizes per block so only the tail re-renders.
  */
 export const MarkdownImpl = memo(function MarkdownImpl({ text, streaming }: { text: string; streaming?: boolean }) {
-  const source = protectCurrency(text);
+  const source = protectCurrency(streaming ? repairStreamingTail(text) : text);
   const math = useMath(source);
   return (
     <div
