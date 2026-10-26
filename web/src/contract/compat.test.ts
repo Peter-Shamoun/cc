@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import type * as G from './v1.gen';
 import * as Gv from './v1.gen';
 import type * as H from '../api/contract';
+import type * as CA from '../adapters/conversationsApi';
 import { CONTRACT_VERSION, EVENT_TYPES, PART_TYPES } from '../api/contract';
 
 /** true iff A and B are mutually assignable (non-distributive). */
@@ -63,6 +64,13 @@ same<H.StreamEvent['type'], G.StreamEvent['type']>(true);
 // requests
 same<H.ChatRequest, G.ChatRequest>(true);
 same<H.HttpError, G.HttpError>(true);
+
+// conversation REST (1.3.0): the history client's shapes match the schema
+same<CA.ConversationSummary, G.ConversationSummary>(true);
+same<CA.ConversationPage, G.ConversationPage>(true);
+same<CA.TranscriptInfo, G.TranscriptsInfo>(true);
+same<Awaited<ReturnType<CA.ConversationsApi['rename']>>, G.RenameResponse>(true);
+same<CA.ConversationDetail['id'], G.Conversation['id']>(true);
 
 describe('contract drift (schema -> TS)', () => {
   it('versions agree', () => {
