@@ -29,7 +29,7 @@ describe('Share & export dialog', () => {
     expect(within(dlg).getByTestId('share-preview')).toHaveTextContent('2 messages');
     const link = within(dlg).getByTestId('create-link');
     expect(link).toHaveAttribute('aria-disabled', 'true');
-    expect(link).toHaveAccessibleDescription(/isn't available in this demo/);
+    expect(link).toHaveAccessibleDescription(/need the analyst server/);
     expect(within(dlg).getByRole('button', { name: 'Copy as Markdown' })).toBeInTheDocument();
     expect(within(dlg).getByRole('button', { name: 'Download Markdown' })).toBeInTheDocument();
     expect(within(dlg).queryByRole('button', { name: 'Download JSON' })).toBeNull();

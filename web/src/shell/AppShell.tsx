@@ -21,7 +21,7 @@ import { OfflineBanner } from './OfflineBanner';
 import { useOnline } from '../lib/useOnline';
 import { usePrinting } from '../lib/usePrinting';
 import { SearchDialog } from './SearchDialog';
-import { ShareDialog } from './ShareDialog';
+import { ShareDialog, type ShareLinkApi } from './ShareDialog';
 import { SettingsDialog, ShortcutsDialog } from './SettingsDialog';
 import { ToastProvider, useFocusTrap, useToast } from './primitives';
 import { NEW_CHAT_KEY, moveDraft } from './drafts';
@@ -39,7 +39,7 @@ import type { AssistantViewV1, ChatRequest } from '../api/contract';
 /** One auth session for both adapters (src/auth/session.ts): demo token, real-backend cookie, or none. */
 const session = sessionFromEnv();
 
-function makeAdapter(): AnalystAdapter {
+export function makeAdapter(): AnalystAdapter {
   const base = import.meta.env.VITE_ANALYST_BASE as string | undefined;
   // VITE_ANALYST_BASE: '' or unset = offline mock; '/' = same origin (vite proxies /api to :8787); else an absolute URL.
   if (base === undefined || base === '') return new MockAnalystAdapter();
@@ -229,6 +229,14 @@ function ShellInner() {
       }
     }
     : undefined;
+  // Contract 1.11.0 §17: org-only read-only link. Stable per chat, so the dialog fetches the link state once.
+  const shareConv = adapter instanceof HttpAnalystAdapter && chat.convId && !chat.busy ? chat.convId : null;
+  const shareLink = useMemo<ShareLinkApi | undefined>(() => (shareConv && adapter instanceof HttpAnalystAdapter ? {
+    get: () => adapter.getShare(shareConv),
+    set: (includeData) => adapter.setShare(shareConv, includeData),
+    revoke: () => adapter.revokeShare(shareConv),
+    copy: (url) => copyText(url),
+  } : undefined), [adapter, shareConv]);
   const copyCurrent = async () => { if (await copyText(transcriptMarkdown(currentTitle, chat.messages))) toast({ text: 'Copied chat as Markdown' }); };
   const exportThread = async (id: string) => {
     const c = await store.getConversation(id);
@@ -558,7 +566,7 @@ function ShellInner() {
       {dialog === 'share' && (
         <ShareDialog title={currentTitle} firstQuestion={chat.messages.find((m) => m.role === 'user')?.text} messageCount={chat.messages.length}
           onClose={() => setDialog(null)} onCopyMarkdown={() => { void copyCurrent(); }} onDownloadMarkdown={exportCurrent}
-          onDownloadJson={serverExport ? () => serverExport('json') : undefined}
+          onDownloadJson={serverExport ? () => serverExport('json') : undefined} link={shareLink}
           onPrint={() => { setDialog(null); requestAnimationFrame(() => window.print()); }} />
       )}
       {dialog === 'settings' && <SettingsDialog onClose={() => setDialog(null)} storeMode={store.mode} enterToSend={enterToSend} setEnterToSend={setEnterToSend} onExportAll={exportAll} threadCount={threads.length} />}
@@ -568,7 +576,7 @@ function ShellInner() {
 }
 
 /** Placeholder thread while a stored chat loads: a question bubble and a few answer lines, shimmering. */
-function ThreadSkeleton() {
+export function ThreadSkeleton() {
   return (
     <div className="flex flex-col gap-6" data-testid="thread-skeleton">
       <span className="sr-only" role="status">Loading chat…</span>
