@@ -36,6 +36,7 @@ import fcntl
 import hashlib
 import json
 import os
+import random
 import re
 import threading
 import time
@@ -49,6 +50,7 @@ from api.store import (DEFAULT_TITLE, InMemoryTranscriptStore, Principal, _iso, 
 
 TRANSCRIPT_RETENTION_DAYS = 90
 CONDITIONAL_WRITE_ATTEMPTS = 8
+CONDITIONAL_WRITE_BACKOFF_SECONDS = 0.02
 _SAFE = re.compile(r"[A-Za-z0-9_:.-]{1,128}")  # always fullmatch: `$` would accept a trailing "\n"
 _USER_PREFIX = re.compile(r"^[A-Za-z0-9_:.-]{1,128}/transcripts/users/[0-9a-f]{32}/")
 
@@ -473,9 +475,11 @@ class SealedTranscriptStore:
                     return result
                 try:
                     self._save(principal, conv, etag)
+                    return result
                 except PreconditionFailed:
-                    continue
-                return result
+                    pass
+            # another writer won: back off outside the lock with jitter, so writers that keep colliding spread out
+            time.sleep(random.uniform(0, CONDITIONAL_WRITE_BACKOFF_SECONDS * (_attempt + 1)))
         raise ConcurrentUpdateConflict(f"conversation changed under {CONDITIONAL_WRITE_ATTEMPTS} conditional writes")
 
     def _delete_objects(self, prefix: str, conversation_id: str) -> None:
