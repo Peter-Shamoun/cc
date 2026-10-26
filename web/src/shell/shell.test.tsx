@@ -97,8 +97,11 @@ describe('app shell', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
     expect(screen.queryByTestId('thread-item')).toBeNull();
     expect(screen.getByText('What should we look into?')).toBeInTheDocument();
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Message' })));
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
     expect(screen.getByTestId('thread-item')).toBeInTheDocument();
+    // undo reopens the chat that was open
+    await waitFor(() => expect(screen.getByTestId('msg-actions')).toBeInTheDocument());
     // settings: theme radio
     fireEvent.keyDown(window, { key: ',', ctrlKey: true });
     fireEvent.click(screen.getByRole('radio', { name: /Dark/ }));
