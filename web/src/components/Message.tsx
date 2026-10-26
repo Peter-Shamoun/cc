@@ -16,6 +16,7 @@ import { AnswerMeta } from './answer/AnswerMeta';
 import { escalationsOf, partsOf, stepsOf, usageOf, type AnyView } from './answer/normalize';
 import type { OnReply } from './answer/States';
 import { tableToTsv, visible } from '../lib/csv';
+import { isTransportStatus } from '../lib/useChat';
 
 export type Artifact = { part: TablePart | ChartPart | CodePart | ImagePart; title: string; version?: number; related: Part[] };
 
@@ -100,7 +101,9 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
   const lastTool = parts.map((p) => p.type).lastIndexOf('tool_call');
   const answering = parts.some((p, i) => i > lastTool && ANSWER.includes(p.type));
   const timelineLive = msg.streaming && !answering;
-  const timeline = steps.length > 0 ? <StepTimeline key="timeline" steps={steps} live={timelineLive} elapsedMs={usage?.elapsedMs} /> : null;
+  // QA-A10: reasoning folds into the timeline, so the answer has one "Thought for 1.2s" row, not two.
+  const reasoning = steps.length > 0 ? parts.filter((p): p is Extract<typeof p, { type: 'reasoning' }> => p.type === 'reasoning') : [];
+  const timeline = steps.length > 0 ? <StepTimeline key="timeline" steps={steps} live={timelineLive} elapsedMs={usage?.elapsedMs} reasoning={reasoning} /> : null;
   const blocks: ReactNode[] = [];
   let timelineDone = false;
   const placeTimeline = () => {
@@ -113,6 +116,7 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
     if (p.type === 'tool_call') { placeTimeline(); continue; }
     // v1 steps aren't parts: the timeline goes before the first non-reasoning part.
     if (p.type !== 'reasoning' && p.type !== 'status') placeTimeline();
+    if (p.type === 'reasoning' && timeline) continue; // shown inside the timeline
     if (p.type === 'code' && p.role === 'query' && linkedSql.has(p.id)) continue; // shown under its table
     if (p.type === 'abstain') { blocks.push(<AbstainCard key={p.id} part={p} onReply={reply} />); continue; }
     if (p.type === 'clarification') { blocks.push(<ClarifyCard key={p.id} part={p} onReply={reply} active={isLast && !msg.streaming} />); continue; }
@@ -130,7 +134,8 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
   return (
     <div className="group" data-testid="msg-assistant">
       {blocks}
-      {msg.streaming && (msg.status || empty) && (
+      {/* QA-A7: while the timeline is live it already says what is happening; only transport states (offline, reconnecting, 429) add a line. */}
+      {msg.streaming && (msg.status || empty) && !(timeline && timelineLive && !isTransportStatus(msg.status)) && (
         <div className="my-2 flex items-center gap-2 font-sans text-sm text-fg-muted" data-testid="status">
           {empty && !msg.status ? <span className="streaming-caret prose-chat" /> : <span className="shimmer">{msg.status}</span>}
         </div>

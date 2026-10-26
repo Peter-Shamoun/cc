@@ -6,6 +6,10 @@ import type { AnalystAdapter, ConnectionInfo, ConnectionState, ThreadSummary, Tr
 const CONNECTION_LABEL = { offline: 'Offline, waiting for the network…', reconnecting: 'Reconnecting…' } as const;
 const RATE_LIMIT_PREFIX = 'Busy right now';
 /** Status line while a 429 is waited out: "Busy right now, retrying in 3s…" (never below 1s, then "retrying…"). */
+/** Client transport statuses (offline, reconnecting, 429 countdown); these show even while the step timeline is live. */
+export function isTransportStatus(s: string | null | undefined): boolean {
+  return !!s && (s === CONNECTION_LABEL.offline || s === CONNECTION_LABEL.reconnecting || s.startsWith(RATE_LIMIT_PREFIX));
+}
 export function rateLimitLabel(msLeft: number): string {
   const s = Math.ceil(msLeft / 1000);
   return s >= 1 ? `${RATE_LIMIT_PREFIX}, retrying in ${s}s…` : `${RATE_LIMIT_PREFIX}, retrying…`;
@@ -133,7 +137,7 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     let serverStatus: string | null = null;
     let countdown: ReturnType<typeof setInterval> | undefined;
     const stopCountdown = () => { if (countdown !== undefined) { clearInterval(countdown); countdown = undefined; } };
-    const isTransport = (s: string | null | undefined) => !!s && (s === CONNECTION_LABEL.offline || s === CONNECTION_LABEL.reconnecting || s.startsWith(RATE_LIMIT_PREFIX));
+    const isTransport = isTransportStatus;
     const onConnection = (state: ConnectionState, info?: ConnectionInfo) => {
       stopCountdown();
       if (!view.streaming || !current()) return;

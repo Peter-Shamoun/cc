@@ -8,13 +8,14 @@ import { IconButton } from '../ui';
 import { useAdapter, useBlobUrl } from '../../adapters/context';
 import { CodeBlock } from './CodeBlock';
 import { imageDisplayBox } from '../../render/imageFrame';
+import { fmtMs } from '../answer/normalize';
 
 function fmtBytes(n: number) {
   return n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
 
 /** Inline markdown only (bold, code, links) for callout items. */
-const Inline = ({ text }: { text: string }) => (
+export const Inline = ({ text }: { text: string }) => (
   <ReactMarkdown allowedElements={['p', 'strong', 'em', 'code', 'a']} unwrapDisallowed components={{ p: ({ children }) => <>{children}</> }}>
     {text}
   </ReactMarkdown>
@@ -123,11 +124,10 @@ export function Callout({ part, onEdit }: { part: CalloutPart; onEdit?: (text: s
 
 export function ReasoningView({ part, running }: { part: ReasoningPart; running: boolean }) {
   const [open, setOpen] = useState(false);
-  const secs = part.durationMs ? Math.max(1, Math.round(part.durationMs / 1000)) : null;
   return (
     <div className="my-2 font-sans text-sm" data-testid="reasoning">
       <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="inline-flex items-center gap-1 text-fg-muted hover:text-fg">
-        <span className={clsx(running && 'shimmer')}>{running ? 'Thinking…' : `Thought for ${secs ?? 1} s`}</span>
+        <span className={clsx(running && 'shimmer')}>{running ? 'Thinking…' : `Thought for ${fmtMs(part.durationMs ?? 1000)}`}</span>
         {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
       </button>
       {open && <div className="mt-1.5 border-l-2 border-line pl-4 leading-relaxed text-fg-muted">{part.summary}</div>}
@@ -140,7 +140,7 @@ const TOOL_ICON: Record<string, typeof Wrench> = { run_sql: Database, describe_v
 export function ToolRow({ part }: { part: ToolCallPart }) {
   const [open, setOpen] = useState(false);
   const Icon = TOOL_ICON[part.tool] ?? Wrench;
-  const meta = [part.output?.rowCount !== undefined && `${part.output.rowCount.toLocaleString()} rows`, part.durationMs !== undefined && `${part.durationMs} ms`].filter(Boolean).join(' · ');
+  const meta = [part.output?.rowCount !== undefined && `${part.output.rowCount.toLocaleString()} rows`, part.durationMs !== undefined && fmtMs(part.durationMs)].filter(Boolean).join(' · ');
   return (
     <div className="font-sans text-sm" data-testid="tool-call" data-state={part.state}>
       <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="group inline-flex max-w-full items-center gap-2 rounded-md py-1 text-left text-fg-muted hover:text-fg">
