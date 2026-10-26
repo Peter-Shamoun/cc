@@ -27,6 +27,7 @@ OUTCOMES: dict[str, tuple[str, str | None]] = {
     "chart": ("Paid amount trend by month", "chart"),
     "candidates": ("Average paid per claim by payer", "candidates"),
     "error": ("simulate an error please", "error"),
+    "report": ("Paid amount by month as a report", "report"),
 }
 #: extra example: the answer that follows picking the first clarify choice (message.start.resumeOf).
 RESUME = "clarify_resume"

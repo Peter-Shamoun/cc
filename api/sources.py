@@ -60,6 +60,9 @@ def sources_for(parts: list[dict], steps: list[dict]) -> list[dict]:
             table_views[part["id"]] = views
             for view in views:
                 add(view, "answer", part_id=part["id"])
+        elif part.get("type") == "artifact" and part.get("kind") in ("chart", "report") and table_views:
+            for view in next(reversed(table_views.values())):  # demo artifacts are built from the latest table
+                add(view, "answer", part_id=part.get("id"))
         elif part.get("type") == "chart" and table_views:
             for view in next(reversed(table_views.values())):  # charts plot the latest table
                 add(view, "answer", part_id=part.get("id"))

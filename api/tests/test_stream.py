@@ -7,7 +7,8 @@ KNOWN = {"text", "reasoning", "status", "tool_call", "table", "file", "image", "
          "artifact", "error", "abstain", "clarification"}
 EVENT_TYPES = {"message.start", "text.start", "text.delta", "text.end", "reasoning.delta", "reasoning.end",
                "code.delta", "part", "part.patch", "status", "message.end", "heartbeat", "step.sql_running",
-               "step.sql_result", "step.repair_attempt", "step.check", "step.explore", "step.candidates", "escalation"}
+               "step.sql_result", "step.repair_attempt", "step.check", "step.explore", "step.candidates", "escalation",
+               "table.start", "table.rows"}
 
 
 def reduce(evs):
