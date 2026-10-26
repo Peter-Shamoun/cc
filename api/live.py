@@ -42,8 +42,12 @@ def price(model: str, input_tokens: int, output_tokens: int) -> float:
 
 
 def scrub(text: str, limit: int = 300) -> str:
-    """Error text without literals: quoted strings and long digit runs are masked."""
+    """Error text without literals: quoted strings, dates, e-mail addresses, IDs mixing letters and digits, and long
+    digit runs are masked (adapter spec R2: a database error can echo a value from the data)."""
     text = re.sub(r"'[^']*'", "'…'", str(text or ""))
+    text = re.sub(r"\b\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}\b", "…", text)
+    text = re.sub(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b", "…", text)
+    text = re.sub(r"\b(?=[A-Za-z0-9]*[A-Za-z])(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{6,}\b", "…", text)
     text = re.sub(r"\d{4,}", "…", text)
     return text[:limit]
 

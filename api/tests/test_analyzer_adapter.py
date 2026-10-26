@@ -34,7 +34,8 @@ def parts(evs):
 
 
 def test_fixture_set():
-    assert NAMES == ["abstain", "answer", "candidates", "clarify", "escalation", "no_answer", "refusal", "repair"]
+    assert NAMES == ["abstain", "answer", "candidates", "clarify", "escalation", "no_answer", "phi_reasoning", "refusal",
+                     "repair"]
 
 
 @pytest.mark.parametrize("name", NAMES)
@@ -63,7 +64,10 @@ def test_answer_maps_tools_to_steps_and_answer_to_parts():
     assert all(r["ok"] for r in res) and res[0]["rowCount"] == 3 and res[-1]["columns"][0] == {"name": "payer_name"}
     check_ev = next(e for e in evs if e["type"] == "step.check")
     assert check_ev["verdict"] == "pass" and check_ev["targetStepId"] == runs[-1]["stepId"]
-    assert types(evs).count("reasoning.delta") == 1 and "reasoning.end" in types(evs)
+    assert "reasoning.delta" not in types(evs) and "reasoning.end" not in types(evs)   # R2: dropped by default
+    raw = events_for_recording(Recording.from_json(json.loads((FIXTURES / "answer.json").read_text())),
+                               reasoning="summary")
+    assert types(raw).count("reasoning.delta") == 1 and "Checking the claims view." not in json.dumps(raw)
     kinds = [p["type"] for p in parts(evs)]
     assert kinds[:2] == ["code", "table"] and "callout" in kinds
     table = next(p for p in parts(evs) if p["type"] == "table")
