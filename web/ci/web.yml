@@ -1,0 +1,74 @@
+# INSTALL: copy to .github/workflows/web.yml. The sprint's GitHub token has no `workflow` scope, so it
+# can't push files under .github/workflows itself (see docs/frontend_ci.md).
+name: web
+# Frontend CI (web/ and api/). Demo mode only: no secrets, no paid API calls.
+on:
+  pull_request:
+    branches: [grokbot/frontend-sota, claude/trusting-heisenberg-8xvazk]
+    paths: ['web/**', 'api/**', 'docs/frontend*.md', '.github/workflows/web.yml', 'web/ci/web.yml']
+  push:
+    branches: [grokbot/frontend-sota]
+    paths: ['web/**', 'api/**', '.github/workflows/web.yml', 'web/ci/web.yml']
+permissions:
+  contents: read
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: true
+defaults:
+  run:
+    working-directory: web
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: Lint (licences + static safety checks)
+        run: node scripts/license_audit.mjs
+      - name: Typecheck
+        run: npx tsc -b
+      - name: Unit tests (incl. CSP, PHI-sink and licence tests)
+        run: npx vitest run --maxWorkers=2
+      - name: Build
+        run: npx vite build
+      - name: Bundle-size budget
+        run: node scripts/bundle_budget.mjs
+      - name: CSP check (mock build, every fixture, headless Chrome)
+        env:
+          CSP_MODE: mock
+          CC_PREVIEW: '1'
+        run: |
+          npx vite build --mode mock --outDir dist-mock
+          npx vite preview --outDir dist-mock --port 5231 --strictPort &
+          for i in $(seq 60); do curl -sf -o /dev/null http://127.0.0.1:5231/ && break; sleep 1; done
+          node scripts/csp_check.mjs http://127.0.0.1:5231/ "$RUNNER_TEMP/shots"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: csp-check-shot
+          path: ${{ runner.temp }}/shots
+          if-no-files-found: ignore
+  api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -e ".[dev]" -r api/requirements.txt
+      - name: API tests (demo mode, ScriptedLLM)
+        env:
+          CC_API_MODE: demo
+          CC_API_LLM: scripted
+        run: pytest api/tests -q
