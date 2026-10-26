@@ -41,9 +41,9 @@ export function SharedView({ shareId }: { shareId: string }) {
     );
     return () => { live = false; };
   }, [adapter, shareId]);
-  useEffect(() => {
-    document.title = state.kind === 'ok' ? `${state.shared.title || 'Shared chat'} · CC` : 'Shared chat · CC';
-  }, [state]);
+  // A fixed title, never the chat's own: titles echo the question (a member's name, a claim id), and browsers keep
+  // page titles in history, sync them across devices and show them in tab strips during screen shares.
+  useEffect(() => { document.title = 'Shared chat · CC'; }, []);
 
   return (
     <ToastProvider>
