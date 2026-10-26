@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
+import { memo, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, Pencil, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react';
 import clsx from 'clsx';
 import type { AssistantView, ChartPart, CodePart, ImagePart, Part, TablePart, UserMessage } from '../lib/contract';
@@ -41,6 +41,29 @@ export function messageMarkdown(m: AnyView): string {
     .join('\n\n');
 }
 
+/** Long pastes collapse to ~9 lines with a fade and "Show more" (ChatGPT/Claude). */
+const LONG_CHARS = 700;
+const LONG_LINES = 9;
+export function isLongQuestion(text: string): boolean {
+  return text.length > LONG_CHARS || text.split('\n').length > LONG_LINES;
+}
+function UserText({ text }: { text: string }) {
+  const long = isLongQuestion(text);
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  return (
+    <div className="max-w-[70%] rounded-[18px] bg-muted px-4 py-2.5 leading-normal">
+      <div id={id} className={clsx('whitespace-pre-wrap break-words', long && !open && 'max-h-[13.5em] overflow-hidden [mask-image:linear-gradient(to_bottom,black_70%,transparent)]')} data-testid="user-text">{text}</div>
+      {long && (
+        <button type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen((o) => !o)}
+          className="mt-1 font-sans text-sm font-medium text-fg-muted underline-offset-2 hover:text-fg hover:underline" data-testid="user-show-more">
+          {open ? 'Show less' : 'Show more'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export const UserBubble = memo(function UserBubble({ msg, onEdit, version, onVersion, disabled }: { msg: UserMessage; onEdit?: (t: string) => void; version?: { current: number; total: number }; onVersion?: (k: number) => void; disabled?: boolean }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(msg.text);
@@ -61,9 +84,11 @@ export const UserBubble = memo(function UserBubble({ msg, onEdit, version, onVer
     );
   }
   return (
-    <div className="group flex flex-col items-end" data-testid="msg-user">
-      <div className="max-w-[70%] whitespace-pre-wrap rounded-[18px] bg-muted px-4 py-2.5 leading-normal">{msg.text}</div>
-      <div className={clsx('mt-1 flex items-center gap-0.5 transition-opacity group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100', version ? 'opacity-100' : 'opacity-0')}>
+    <div className="group relative flex flex-col items-end" data-testid="msg-user">
+      <UserText text={msg.text} />
+      {/* Hover actions overlay the space under the bubble instead of reserving a row, so the answer starts
+          right below the question (ChatGPT/Claude spacing). With version arrows the row stays in flow. */}
+      <div className={clsx('flex items-center gap-0.5 rounded-full bg-bg transition-opacity group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100', version ? 'mt-1 opacity-100' : 'absolute right-0 top-full z-10 mt-0.5 opacity-0 [@media(hover:none)]:static [@media(hover:none)]:mt-1')} data-testid="user-actions">
         <CopyButton text={msg.text} />
         {onEdit && <IconButton label="Edit message" disabled={disabled} onClick={() => { setValue(msg.text); setEditing(true); }}><Pencil size={15} /></IconButton>}
         {version && onVersion && (
@@ -136,7 +161,7 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
       {blocks}
       {/* QA-A7: while the timeline is live it already says what is happening; only transport states (offline, reconnecting, 429) add a line. */}
       {msg.streaming && (msg.status || empty) && !(timeline && timelineLive && !isTransportStatus(msg.status)) && (
-        <div className="my-2 flex items-center gap-2 font-sans text-sm text-fg-muted" data-testid="status">
+        <div className="my-2 flex items-center gap-2 font-sans text-sm text-fg-muted first:mt-0" data-testid="status">
           {empty && !msg.status ? <span className="streaming-caret prose-chat" /> : <span className="shimmer">{msg.status}</span>}
         </div>
       )}
