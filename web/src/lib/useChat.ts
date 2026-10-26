@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AssistantMessage, ID, TablePart, UserMessage } from './contract';
 import { newAssistantViewV1, reduceV1, type AssistantViewV1, type ChatRequest, type Usage } from '../api/contract';
-import type { AnalystAdapter, ConnectionState, ThreadSummary, TranscriptStore } from '../adapters/types';
+import type { AnalystAdapter, ConnectionInfo, ConnectionState, ThreadSummary, TranscriptStore } from '../adapters/types';
 
 const CONNECTION_LABEL = { offline: 'Offline, waiting for the network…', reconnecting: 'Reconnecting…' } as const;
+const RATE_LIMIT_PREFIX = 'Busy right now';
+/** Status line while a 429 is waited out: "Busy right now, retrying in 3s…" (never below 1s, then "retrying…"). */
+export function rateLimitLabel(msLeft: number): string {
+  const s = Math.ceil(msLeft / 1000);
+  return s >= 1 ? `${RATE_LIMIT_PREFIX}, retrying in ${s}s…` : `${RATE_LIMIT_PREFIX}, retrying…`;
+}
 import { shortTitle } from '../shell/title';
 import { frameBatch } from './frameBatch';
 import { foldThread } from './threadTree';
@@ -112,13 +118,27 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     // Transport hiccups show in the status line (client view state, not a contract event); the
     // server's own status comes back once the replay resumes.
     let serverStatus: string | null = null;
-    const onConnection = (state: ConnectionState) => {
-      if (!view.streaming) return;
-      if (state === 'live') view = { ...view, status: serverStatus };
-      else {
-        if (view.status !== CONNECTION_LABEL.offline && view.status !== CONNECTION_LABEL.reconnecting) serverStatus = view.status;
-        view = { ...view, status: CONNECTION_LABEL[state] };
+    let countdown: ReturnType<typeof setInterval> | undefined;
+    const stopCountdown = () => { if (countdown !== undefined) { clearInterval(countdown); countdown = undefined; } };
+    const isTransport = (s: string | null | undefined) => !!s && (s === CONNECTION_LABEL.offline || s === CONNECTION_LABEL.reconnecting || s.startsWith(RATE_LIMIT_PREFIX));
+    const onConnection = (state: ConnectionState, info?: ConnectionInfo) => {
+      stopCountdown();
+      if (!view.streaming || !current()) return;
+      if (state === 'live') { view = { ...view, status: serverStatus }; set(); return; }
+      if (!isTransport(view.status)) serverStatus = view.status ?? null;
+      if (state === 'rate_limited') {
+        // 429 + Retry-After: the adapter waits and retries on its own; count the wait down once a second.
+        const until = Date.now() + (info?.retryInMs ?? 0);
+        const tick = () => {
+          if (!view.streaming || !current()) return stopCountdown();
+          view = { ...view, status: rateLimitLabel(until - Date.now()) };
+          set();
+        };
+        tick();
+        countdown = setInterval(tick, 1000);
+        return;
       }
+      view = { ...view, status: CONNECTION_LABEL[state] };
       set();
     };
     try {
@@ -135,6 +155,7 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
         if (view.streaming) view = reduceV1(view, { type: 'message.end', messageId: view.id, finishReason: 'error', usage: partialUsage(view, startedAt) } as never);
       }
     }
+    stopCountdown();
     // Stopped before the server's aborted message.end arrived: keep what ran (queries, time) on the answer.
     if (ctrl.signal.aborted && view.streaming) view = reduceV1(view, { type: 'message.end', messageId: view.id, finishReason: 'aborted', usage: partialUsage(view, startedAt) } as never);
     view = { ...view, streaming: false, status: null, openText: [] };

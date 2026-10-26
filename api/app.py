@@ -191,6 +191,14 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         if not _SAFE_ID.match(conversation_id) or store.owned_by_other(ctx.principal, conversation_id):
             return error_json("access_denied", "Not found.", 404)
         demo = getattr(auth, "mode", "") == "demo"
+        # Demo-only fault injection for the web client's 429 auto-retry (web ?fault=429, dev builds only).
+        # Ignored outside demo mode; nothing is stored or run.
+        if demo and request.headers.get("x-demo-fault") == "rate_limited":
+            return JSONResponse(
+                {"error": {"code": "rate_limited", "message": "Too many requests (demo fault)."}},
+                429,
+                headers={**NO_STORE, "Retry-After": "3"},
+            )
         start_extra: dict = {}
         scenario_hint = body.scenario if demo else None
         if body.regenerate:

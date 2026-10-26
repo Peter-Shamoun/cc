@@ -10,7 +10,9 @@ export type AnyStreamEvent = LegacyStreamEvent | V1StreamEvent;
  * Cognito -> STS (900 s) -> scoped DuckDB session server-side.
  */
 /** Transport state of a running stream: 'reconnecting'/'offline' after a drop, 'live' once replay resumes. */
-export type ConnectionState = 'live' | 'reconnecting' | 'offline';
+export type ConnectionState = 'live' | 'reconnecting' | 'offline' | 'rate_limited';
+/** Extra detail for a connection change; `retryInMs` is set with 'rate_limited' (from Retry-After). */
+export interface ConnectionInfo { retryInMs?: number }
 
 export interface AnalystAdapter {
   readonly name: string;
@@ -18,7 +20,7 @@ export interface AnalystAdapter {
    * `parentId` on a user message marks an edit (sibling branch, CONTRACT.md §8); `regenerate` re-runs the
    * user turn of an earlier answer so the server records a sibling instead of a duplicate question.
    */
-  streamTurn(input: { conversationId: ID; messages: { id: ID; role: 'user' | 'assistant'; text: string; parentId?: ID }[]; signal: AbortSignal; resume?: ChatRequest['resume']; regenerate?: ChatRequest['regenerate']; onConnection?: (state: ConnectionState) => void }): AsyncIterable<AnyStreamEvent>;
+  streamTurn(input: { conversationId: ID; messages: { id: ID; role: 'user' | 'assistant'; text: string; parentId?: ID }[]; signal: AbortSignal; resume?: ChatRequest['resume']; regenerate?: ChatRequest['regenerate']; onConnection?: (state: ConnectionState, info?: ConnectionInfo) => void }): AsyncIterable<AnyStreamEvent>;
   /** Fetch an image/file blob by opaque id (auth header, never a PHI-bearing URL). */
   fetchBlob(id: ID): Promise<Blob>;
 }

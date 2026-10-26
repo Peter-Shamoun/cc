@@ -32,7 +32,17 @@ function makeAdapter(): AnalystAdapter {
   const base = import.meta.env.VITE_ANALYST_BASE as string | undefined;
   // VITE_ANALYST_BASE: '' or unset = offline mock; '/' = same origin (vite proxies /api to :8787); else an absolute URL.
   if (base === undefined || base === '') return new MockAnalystAdapter();
-  return new HttpAnalystAdapter(base === '/' ? '' : base.replace(/\/$/, ''), import.meta.env.VITE_ANALYST_DEMO_TOKEN as string | undefined);
+  return new HttpAnalystAdapter(base === '/' ? '' : base.replace(/\/$/, ''), import.meta.env.VITE_ANALYST_DEMO_TOKEN as string | undefined, demoFaultOption());
+}
+
+/**
+ * Dev-only fault injection: `?fault=429` makes the first try of each answer come back 429 + Retry-After
+ * from the demo API (which ignores the header outside demo mode), to exercise the auto-retry countdown.
+ * Only in `vite dev` or a build made with VITE_DEMO_FAULTS=1; production builds drop this branch.
+ */
+function demoFaultOption(): { demoFault?: 'rate_limited' } {
+  if (!(import.meta.env.DEV || import.meta.env.VITE_DEMO_FAULTS === '1')) return {};
+  return new URLSearchParams(window.location.search).get('fault') === '429' ? { demoFault: 'rate_limited' } : {};
 }
 
 /**
