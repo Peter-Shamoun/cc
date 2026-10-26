@@ -4,6 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 PORT="${1:-5239}"
 node scripts/license_audit.mjs >/dev/null && echo "ok   licences"
+npm run -s lint >/dev/null && echo "ok   lint"
 npx tsc -b && echo "ok   typecheck"
 npx vitest run --maxWorkers=2
 npx vite build >/dev/null && echo "ok   build"
