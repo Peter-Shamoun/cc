@@ -30,7 +30,19 @@ function securityHeadersPlugin(devNonce: string): Plugin {
         const isHtml = !isAsset && (url === '/' || url.endsWith('.html') || !path.extname(url));
         const nonce = newNonce();
         for (const [k, v] of Object.entries(securityHeaders(nonce, { noStore: !isAsset }))) res.setHeader(k, v);
-        if (isAsset) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        if (isAsset) {
+          // A missing hashed asset (e.g. a stale chunk after a deploy) must 404, not fall back to index.html: the SPA
+          // fallback would serve HTML as JS, un-nonced (placeholder left in), with a cacheable status.
+          const file = path.join(dist, decodeURIComponent(url));
+          if (!file.startsWith(dist + path.sep) || !fs.existsSync(file)) {
+            res.statusCode = 404;
+            res.setHeader('Cache-Control', 'no-store');
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+            res.end(req.method === 'HEAD' ? undefined : 'Not found');
+            return;
+          }
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        }
         if (isHtml && (req.method === 'GET' || req.method === 'HEAD') && !url.startsWith('/api/')) {
           const html = fs.readFileSync(path.join(dist, 'index.html'), 'utf8').split(NONCE_PLACEHOLDER).join(nonce);
           res.setHeader('Content-Type', 'text/html; charset=utf-8');

@@ -13,7 +13,8 @@
     "e2e:perf": "playwright test -c e2e/playwright.config.ts --project=perf",
     "e2e:update": "playwright test -c e2e/playwright.config.ts --project=desktop --project=mobile --update-snapshots -g visual",
     "check:csp": "node scripts/csp_check.mjs",
-    "lint": "oxlint -c .oxlintrc.json"
+    "lint": "oxlint -c .oxlintrc.json",
+    "check:headers": "node scripts/header_check.mjs"
   },
   "dependencies": {
     "@streamdown/math": "^1.0.3",

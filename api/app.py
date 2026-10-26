@@ -1,6 +1,6 @@
 """FastAPI app: POST /api/chat (SSE), stop, downloads, health, conversations.
 
-Run: ``uvicorn api.app:app --port 8787`` (demo mode) or ``CC_API_MODE=sim`` with a world
+Run: ``python -m api --port 8787`` (demo mode; or ``uvicorn api.app:app --no-server-header``) or ``CC_API_MODE=sim`` with a world
 passed to ``create_app(auth=SimAuth(world.aws, world.dep))``.
 """
 from __future__ import annotations

@@ -19,7 +19,7 @@ To point at a real backend, set `VITE_ANALYST_BASE`. Empty or unset means the of
 
 ```bash
 pip install -e . && pip install -r api/requirements.txt
-uvicorn api.app:app --port 8787                       # demo mode: scripted model, synthetic DuckDB, no paid APIs
+python -m api --port 8787                             # demo mode (no Server header): scripted model, synthetic DuckDB, no paid APIs
 cd web
 VITE_ANALYST_BASE=/ VITE_ANALYST_DEMO_TOKEN=demo:acme_labs:peter npx vite --port 5174
 node scripts/shots_v1.mjs http://127.0.0.1:5174/ http://127.0.0.1:5175/ /workspace/cc_web/shots   # second URL = a mock-mode dev server
