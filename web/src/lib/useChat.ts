@@ -3,6 +3,7 @@ import type { AssistantMessage, ID, UserMessage } from './contract';
 import { newAssistantViewV1, reduceV1, type AssistantViewV1, type ChatRequest, type Usage } from '../api/contract';
 import type { AnalystAdapter, ThreadSummary, TranscriptStore } from '../adapters/types';
 import { shortTitle } from '../shell/title';
+import { frameBatch } from './frameBatch';
 
 const uid = (p: string) => `${p}_${Math.random().toString(36).slice(2, 10)}`;
 export type ViewMessage = UserMessage | AssistantViewV1;
@@ -59,6 +60,8 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     return rest as unknown as AssistantMessage;
   };
   const abortRef = useRef<AbortController | null>(null);
+  /** Bumped by every run, open and newChat: a run that is no longer current must not touch the view. */
+  const runRef = useRef(0);
 
   const refresh = useCallback(async () => setThreads((await store.listConversations()).items), [store]);
   useEffect(() => {
@@ -67,6 +70,8 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
 
   const open = useCallback(async (id: ID) => {
     abortRef.current?.abort();
+    runRef.current++;
+    setBusy(false);
     const c = await store.getConversation(id);
     setConvId(c ? id : null);
     setBranches({});
@@ -75,6 +80,8 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
 
   const newChat = useCallback(() => {
     abortRef.current?.abort();
+    runRef.current++;
+    setBusy(false);
     setConvId(null);
     setBranches({});
     setMessages([]);
@@ -86,14 +93,21 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     let view = newAssistantViewV1(uid('a'));
     const startedAt = Date.now();
     history = markAnswered(history);
-    const set = () => setMessages([...history, view]);
+    const token = ++runRef.current;
+    const current = () => runRef.current === token;
+    // Stream batching (lib/frameBatch): one render per animation frame for text/reasoning deltas.
+    const batch = frameBatch(() => { if (current()) setMessages([...history, view]); });
+    const set = batch.now;
+    const schedule = batch.schedule;
     set();
     setBusy(true);
     const wire = history.map((m) => ({ id: m.id, role: m.role, text: m.role === 'user' ? m.text : m.parts.map((p) => (p.type === 'text' ? p.text : '')).join('\n') }));
     try {
       for await (const ev of adapter.streamTurn({ conversationId: cid, messages: wire, signal: ctrl.signal, ...(resume ? { resume } : {}) })) {
         view = reduceV1(view, ev);
-        set();
+        // Text and reasoning deltas are batched; structural events (start, parts, steps, end) paint at once.
+        if (ev.type === 'text.delta' || ev.type === 'reasoning.delta') schedule();
+        else set();
         if (ev.type === 'message.end') break;
       }
     } catch (e) {
@@ -106,7 +120,7 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     if (ctrl.signal.aborted && view.streaming) view = reduceV1(view, { type: 'message.end', messageId: view.id, finishReason: 'aborted', usage: partialUsage(view, startedAt) } as never);
     view = { ...view, streaming: false, status: null, openText: [] };
     set();
-    setBusy(false);
+    if (current()) setBusy(false);
     await store.appendMessage(cid, persist(view));
     refresh();
   }, [adapter, refresh, store]);
