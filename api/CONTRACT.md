@@ -1,6 +1,6 @@
 # ClaimClarity chat API — stream contract
 
-**Version: 1.19.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.20.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -463,6 +463,25 @@ PHI column, a non-identifier, or any word outside a fixed analytics vocabulary m
 wins and is never overwritten. Clients show `conversationTitle` right away and can keep their own local title only
 while the server title is still the generic one.
 
+### 11.1 Temporary chat (1.20.0)
+
+Like ChatGPT's Temporary chat: a chat the user doesn't want kept. Announced by `Capabilities.temporaryChat:
+{ttlSeconds}`; older servers lack it, so don't offer the mode there (or keep it client-side only).
+* Send `ChatRequest.temporary: true` on **every** turn of the chat (first question, follow-ups, edits, regenerates,
+  clarification replies). The stream is the normal one; `message.start` carries `temporary: true`.
+* **Never saved.** The turns live only in server memory, scoped to the user, so follow-ups, edit and regenerate work
+  while the chat is open. Nothing reaches the transcript store or disk, in either transcript mode. The history is
+  dropped after `ttlSeconds` idle, on `DELETE /api/conversations/{id}` (the client's "discard" on leaving the chat), on
+  `DELETE /api/conversations` (not counted in `deleted`), and on sign-out. At most 20 per user (least recently used
+  goes first).
+* **Never listed or reachable as history.** Not in the list or search; `GET`, `PATCH`, export, share and feedback on
+  its id are 404 `access_denied`, so it can't be shared, renamed, pinned or rated.
+* **No title.** `message.end` never carries `conversationTitle`.
+* **No crossing.** A temporary turn on a saved chat's id, or a saved turn on a temporary chat's id, is 422
+  `validation` ("Start a new chat"). Another user's id is 404.
+* Audit: `chat_message` gains `temporary: true` (no text, as always). Deploy: `CC_API_TEMPORARY_TTL_SECONDS` (3600);
+  `0` turns the mode off (no capability, `temporary: true` is 422).
+
 ## 12. Capabilities: strategies and models (`GET /api/capabilities`)
 
 A picker reads what the server can run. The body is `Capabilities` (no user data, `no-store`, fetch once per session):
@@ -671,6 +690,10 @@ must be signed in to the same organization (customer). A conversation has at mos
 
 ## Changelog
 
+* **1.20.0** (2026-10-25) — Temporary chat (§11.1), additive. `ChatRequest.temporary`, `MessageStart.temporary`
+  (`true` when set) and `Capabilities.temporaryChat {ttlSeconds}`. A temporary chat is held in memory for its idle
+  TTL only: never stored, listed, searched, titled, exported, rated or shared; discard with `DELETE`; a chat can't move
+  between temporary and saved (422).
 * **1.19.0** (2026-10-25) — Edge fixes, no new fields. (1) **No id or pattern accepts a trailing newline.**
   Python's `re` `$` also matches before a final `\n` (and `\d` matches any Unicode digit), so `ID`,
   `contractVersion` and `ShareLink.url` now anchor with `(?![\s\S])` and use `[0-9]`, like the 1.18 plot patterns;

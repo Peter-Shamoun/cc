@@ -59,7 +59,7 @@ def org_policy(customer: str | None) -> dict:
 
 
 def capabilities(contract_version: str, demo: bool, customer: str | None = None,
-                 sql_literal_masking: str = "phi") -> dict:
+                 sql_literal_masking: str = "phi", temporary_ttl_seconds: float | None = None) -> dict:
     """The ``Capabilities`` body for ``customer`` (None: signed out, nothing org-specific). ``config`` never leaves."""
     policy = org_policy(customer)
     off_s, off_m = policy.get("strategies", {}), policy.get("models", {})
@@ -76,7 +76,10 @@ def capabilities(contract_version: str, demo: bool, customer: str | None = None,
             "models": models, "feedbackReasons": [dict(r) for r in FEEDBACK_REASONS],
             "sqlLiteralMasking": sql_literal_masking if sql_literal_masking in ("phi", "all", "off") else "phi",
             "shareExpiry": {"options": list(SHARE_EXPIRY_DAYS), "default": SHARE_DEFAULT_EXPIRY_DAYS},
-            "pinArchive": True}  # 1.17.0: PATCH pinned/archived persists server-side
+            "pinArchive": True,  # 1.17.0: PATCH pinned/archived persists server-side
+            # 1.20.0: ChatRequest.temporary is honoured (never saved, listed or shared; §11.1)
+            **({"temporaryChat": {"ttlSeconds": max(1, round(temporary_ttl_seconds))}}
+               if temporary_ttl_seconds and temporary_ttl_seconds > 0 else {})}
 
 
 def check_options(options: dict, customer: str | None = None) -> str | None:
