@@ -435,9 +435,13 @@ function ShellInner() {
   }, [messages]);
   // Late-growing content (charts, images, tables measured after paint) keeps the view anchored at the bottom.
   useEffect(() => {
-    const el = scroller.current, inner = content.current;
-    if (!el || !inner || typeof ResizeObserver === 'undefined') return;
+    const inner = content.current;
+    if (!scroller.current || !inner || typeof ResizeObserver === 'undefined') return;
+    // Memory: read the scroller inside the callback; don't capture it. React's alternate fiber can keep this
+    // effect's closures after you leave a chat, and a captured element kept that chat's whole thread alive.
     const ro = new ResizeObserver(() => {
+      const el = scroller.current;
+      if (!el) return;
       if (atBottomRef.current && !pinned.current) el.scrollTop = el.scrollHeight;
       // QA-A2: a pinned question lets the answer grow below the fold (chart under the composer)
       // without any scroll event. Re-measure so "Jump to latest" shows, like ChatGPT's down arrow.

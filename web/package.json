@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "shots": "node scripts/screenshots.mjs",
+    "shots": "node scripts/memguard.mjs -- node scripts/screenshots.mjs",
     "e2e": "playwright test --workers=1 -c e2e/playwright.config.ts --project=desktop --project=mobile",
     "e2e:chaos": "playwright test --workers=1 -c e2e/playwright.config.ts --project=chaos",
     "e2e:xb": "playwright test --workers=1 -c e2e/playwright.config.ts --project=firefox && playwright test --workers=1 -c e2e/playwright.config.ts --project=webkit --project=mobile-webkit",
@@ -17,9 +17,10 @@
     "check:csp": "node scripts/csp_check.mjs",
     "lint": "oxlint -c .oxlintrc.json --max-warnings 0",
     "check:headers": "node scripts/header_check.mjs",
-    "check:perf": "node scripts/lighthouse_budget.mjs",
+    "check:perf": "node scripts/memguard.mjs -- node scripts/lighthouse_budget.mjs",
     "audit": "npm audit --audit-level=low",
-    "ci": "bash ci/run_local.sh"
+    "ci": "bash ci/run_local.sh",
+    "guarded": "node scripts/memguard.mjs --"
   },
   "dependencies": {
     "@streamdown/math": "^1.0.3",
