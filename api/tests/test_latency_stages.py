@@ -26,8 +26,8 @@ def test_stages_present_and_sum_to_total():
     assert list(stages) == list(STAGES)
     assert all(isinstance(v, int) and v >= 0 for v in stages.values())
     assert stages["plan"] > 0, "simulated model turns count as planning"
-    # every instant belongs to one stage: the sum covers the run (rounding + the pre-analyzer start)
-    assert abs(sum(stages.values()) - latency["totalMs"]) <= len(STAGES) + 5
+    # every instant belongs to one stage: exactly, under any load (api.live.partition_ms)
+    assert sum(stages.values()) == latency["totalMs"]
     _validator("MessageEnd").validate(end)
 
 

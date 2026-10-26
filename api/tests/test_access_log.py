@@ -12,6 +12,7 @@ import pytest
 
 from api.app import create_app
 from api.redact import ACCESS_FILTER, mask_client, path_shape
+from api.tests.timing import budget, load_factor
 
 ROOT = Path(__file__).resolve().parents[2]
 STATIC = frozenset({"api", "shared", "conversations", "messages", "feedback", "download", "chat", "stream", "share"})
@@ -70,22 +71,22 @@ def test_real_uvicorn_access_log_is_redacted():
                              "--port", str(port)], cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     secrets_in_paths = ["sh_ZZsecretTOKEN-_9876543210", "c_conv12345678", "Jane", "123-45-6789"]
     try:
-        for _ in range(100):
+        for _ in range(int(100 * load_factor())):
             try:
-                urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=1)
+                urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=budget(1))
                 break
             except OSError:
                 time.sleep(0.1)
         for path in ["/api/shared/sh_ZZsecretTOKEN-_9876543210", "/api/conversations/c_conv12345678?q=Jane",
                      "/api/download/123-45-6789"]:
             try:
-                urllib.request.urlopen(f"http://127.0.0.1:{port}{path}", timeout=2)
+                urllib.request.urlopen(f"http://127.0.0.1:{port}{path}", timeout=budget(2))
             except OSError:
                 pass  # 401/404 are fine; we only care what got logged
         time.sleep(0.3)
     finally:
         proc.terminate()
-        out, _ = proc.communicate(timeout=10)
+        out, _ = proc.communicate(timeout=budget(10))
     access = [line for line in out.splitlines() if '"GET ' in line]
     assert len(access) >= 4, out
     assert any("/api/shared/:id" in line for line in access), access
