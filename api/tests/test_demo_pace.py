@@ -46,16 +46,36 @@ def _ask(client, text):
     return time.perf_counter() - t0, events(r)
 
 
-def test_paced_answer_streams_over_time():
+def _recording_sleep(monkeypatch):
+    """Record every time.sleep(seconds) while still sleeping. Asserting on the requested sleeps, not wall time, keeps
+    this deterministic on a loaded box (a sleep can overshoot under load, never undershoot)."""
+    real, calls = time.sleep, []
+
+    def sleep(seconds):
+        calls.append(seconds)
+        real(seconds)
+    monkeypatch.setattr(time, "sleep", sleep)
+    return calls
+
+
+def test_paced_answer_streams_over_time(monkeypatch):
+    calls = _recording_sleep(monkeypatch)
     client = TestClient(create_app(settings=Settings(heartbeat_seconds=5, model_delay_seconds=0.05,
                                                      stream_delay_seconds=0.002, demo_pace=True)))
     paced, evs = _ask(client, "How many claims?")
     assert evs[-1]["type"] == "message.end"
-    assert sum(e["type"] == "text.delta" for e in evs) > 1
+    deltas = sum(e["type"] == "text.delta" for e in evs)
+    assert deltas > 1
+    model = sum(c for c in calls if c != 0.002)
+    assert model >= 0.045, "model-latency pauses (cancel-aware, sliced into <= 0.05 s sleeps)"
+    assert calls.count(0.002) >= 1, "a pause per streamed text chunk"
+    # lower bound only: sleeps cannot finish early, however loaded the box is
+    assert paced >= sum(calls) * 0.9
+    calls.clear()
     client0 = TestClient(create_app(settings=Settings(heartbeat_seconds=5, model_delay_seconds=0,
                                                       stream_delay_seconds=0, demo_pace=False)))
-    unpaced, _ = _ask(client0, "How many claims?")
-    assert paced > unpaced + 0.04
+    _ask(client0, "How many claims?")
+    assert sum(calls) < 0.01, "no pacing when it is off"
 
 
 def test_slow_scenario_has_a_floor_so_it_can_be_stopped():
