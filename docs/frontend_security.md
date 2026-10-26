@@ -72,3 +72,10 @@ Content-Length over the limit is refused unread, and chunked bodies are counted.
 `rate_limited` with `Retry-After: 3`, which the web client already auto-retries. Nothing is stored or run, and the audit
 event `chat_rate_limited` (reason `concurrent_runs`) carries no question text. Other users are unaffected. Tests:
 `api/tests/test_concurrent_runs.py`.
+
+## Download filenames
+
+API CSV downloads use the client's name, `claimclarity_<slug>_<yyyy-mm-dd>.csv` (UTC date). The slug comes from the part
+title, never from row values or question text. `api/store.py csv_filename` and `web/src/lib/csv.ts csvFilename` share the
+test vectors in `web/src/lib/csvFilename.vectors.json`. The Content-Disposition value goes through `_safe_filename`
+([A-Za-z0-9._-] only), so a name can't inject a header or a path.

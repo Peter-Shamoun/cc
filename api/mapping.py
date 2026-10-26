@@ -15,7 +15,7 @@ from analyzer.answer import AnalyzerAnswer
 from analyzer.tools import is_phi_column
 
 from api.ids import new_id
-from api.store import DownloadRegistry, Principal
+from api.store import DownloadRegistry, Principal, csv_filename
 
 PREVIEW_ROWS = 50
 CHART_MAX_ROWS = 5000
@@ -245,7 +245,7 @@ def answer_parts(answer: AnalyzerAnswer, principal: Principal, downloads: Downlo
     if names:
         cols = columns_for(names, rows)
         sensitivity = "limited" if phi_cols else "deidentified"
-        dl = downloads.put(principal, "result.csv", names, [[_jsonable(v) for v in r] for r in rows])
+        dl = downloads.put(principal, csv_filename("Result"), names, [[_jsonable(v) for v in r] for r in rows])
         table = {"type": "table", "id": new_id("p_"), "title": "Result", "columns": cols,
                  "rows": [[_jsonable(v) for v in r] for r in rows[:PREVIEW_ROWS]], "rowCount": len(rows),
                  "csvFileId": dl.id, "resultId": dl.id, "sensitivity": sensitivity,
@@ -254,7 +254,7 @@ def answer_parts(answer: AnalyzerAnswer, principal: Principal, downloads: Downlo
             table["sqlPartId"] = sql_id
         parts.append(table)
         if len(rows) > PREVIEW_ROWS:
-            parts.append({"type": "file", "id": new_id("p_"), "fileId": dl.id, "name": "result.csv",
+            parts.append({"type": "file", "id": new_id("p_"), "fileId": dl.id, "name": dl.name,
                           "mime": "text/csv", "sizeBytes": len(dl.csv_bytes()), "rowCount": len(rows),
                           "previewable": True, "sensitivity": sensitivity})
         chart = chart_for(cols, rows)
