@@ -102,6 +102,7 @@ main() {
       step "web: build" npx vite build
       step "web: bundle-size budget" node scripts/bundle_budget.mjs
       step "web: mock build (dist-mock)" env CC_PREVIEW=1 npx vite build --mode mock --outDir dist-mock
+      step "web: Subresource Integrity (dist, dist-mock)" node scripts/sri_check.mjs dist dist-mock
       if start_preview; then
         step "web: CSP check (every fixture, headless Chrome)" env CSP_MODE=mock node scripts/csp_check.mjs "http://127.0.0.1:$PORT/" "$LOGS/shots"
         step "web: response-header check (preview)" node scripts/header_check.mjs "http://127.0.0.1:$PORT/"
