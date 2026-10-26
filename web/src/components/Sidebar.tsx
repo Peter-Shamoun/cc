@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Ellipsis, Keyboard, MessageSquarePlus, PanelLeft, Pencil, Pin, PinOff, Search, Settings, ShieldCheck, Share, SquarePen, Trash2, X } from 'lucide-react';
+import { Ellipsis, Filter, Keyboard, MessageSquarePlus, PanelLeft, Pencil, Pin, PinOff, Search, Settings, ShieldCheck, Share, SquarePen, Trash2, X } from 'lucide-react';
 import clsx from 'clsx';
 import { IconButton } from './ui';
 import { Menu, modKey, useMenu, type MenuItem } from '../shell/primitives';
@@ -29,6 +29,16 @@ export function groupThreads(threads: ThreadSummary[], now = new Date()): [strin
   return [...groups.entries()];
 }
 
+/** Case- and accent-insensitive title match for the inline filter. */
+const fold = (x: string) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+export function filterThreads(threads: ThreadSummary[], q: string): ThreadSummary[] {
+  const words = fold(q).split(/\s+/).filter(Boolean);
+  if (!words.length) return threads;
+  return threads.filter((t) => { const title = fold(t.title || ''); return words.every((w) => title.includes(w)); });
+}
+/** The inline filter appears once the list is long enough to need it. */
+export const FILTER_AT = 6;
+
 export interface SidebarProps {
   threads: ThreadSummary[];
   activeId?: string | null;
@@ -52,7 +62,15 @@ export function Sidebar(p: SidebarProps) {
   const [renaming, setRenaming] = useState<string | null>(null);
   const list = useRef<HTMLDivElement>(null);
   const account = useMenu();
-  const groups = groupThreads(p.threads);
+  const [q, setQ] = useState('');
+  const showFilter = p.threads.length >= FILTER_AT;
+  const shown = showFilter ? filterThreads(p.threads, q) : p.threads;
+  const groups = groupThreads(shown);
+  const filterKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape' && q) { e.preventDefault(); e.stopPropagation(); setQ(''); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); list.current?.querySelector<HTMLElement>('[data-thread-link]')?.focus(); }
+    else if (e.key === 'Enter') { const first = shown[0]; if (first && q) { e.preventDefault(); e.currentTarget.blur(); p.onSelect(first.id); } }
+  };
   // Roving focus: one tab stop for the whole list; arrows move between chats.
   const onListKey = (e: React.KeyboardEvent) => {
     if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key) || (e.target as HTMLElement).tagName === 'INPUT') return;
@@ -62,7 +80,7 @@ export function Sidebar(p: SidebarProps) {
     e.preventDefault();
     items[n]?.focus();
   };
-  const activeOrFirst = p.threads.some((t) => t.id === p.activeId) ? p.activeId : p.threads[0]?.id;
+  const activeOrFirst = shown.some((t) => t.id === p.activeId) ? p.activeId : shown[0]?.id;
   const accountItems: MenuItem[] = [
     { label: 'Settings', icon: <Settings size={16} />, onSelect: p.onSettings, shortcut: `${modKey()} ,` },
     { label: 'Keyboard shortcuts', icon: <Keyboard size={16} />, onSelect: p.onShortcuts, shortcut: `${modKey()} /` },
@@ -88,9 +106,29 @@ export function Sidebar(p: SidebarProps) {
           <kbd className="hidden font-sans text-xs text-fg-subtle group-hover/nav:inline">{modKey()} K</kbd>
         </button>
       </nav>
+      {showFilter && (
+        <div className="relative mx-2 mt-3" role="search">
+          <Filter size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-subtle" aria-hidden />
+          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={filterKey} aria-label="Filter chats by title"
+            aria-controls="sidebar-chat-list" placeholder="Filter chats" autoComplete="off" spellCheck={false} data-testid="sidebar-filter"
+            className="h-8 w-full rounded-lg border border-transparent bg-transparent pl-8 pr-7 text-sm placeholder:text-fg-subtle hover:bg-hover focus:border-line focus:bg-bg focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)] [&::-webkit-search-cancel-button]:hidden" />
+          {q && (
+            <button type="button" onClick={() => setQ('')} aria-label="Clear filter" className="absolute right-1.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-fg-subtle hover:bg-hover hover:text-fg">
+              <X size={13} />
+            </button>
+          )}
+          <span className="sr-only" aria-live="polite">{q ? `${shown.length} ${shown.length === 1 ? 'chat' : 'chats'} match` : ''}</span>
+        </div>
+      )}
       {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- arrow-key navigation delegated from focused chat links */}
-      <div ref={list} onKeyDown={onListKey} className="scrollbar-thin mt-4 flex-1 overflow-y-auto px-2 text-sm" aria-label="Chats" role="navigation">
+      <div ref={list} id="sidebar-chat-list" onKeyDown={onListKey} className={clsx('scrollbar-thin flex-1 overflow-y-auto px-2 text-sm', showFilter ? 'mt-2' : 'mt-4')} aria-label="Chats" role="navigation">
         {p.threads.length === 0 && <div className="px-2.5 text-xs text-fg-subtle">No chats yet</div>}
+        {p.threads.length > 0 && shown.length === 0 && (
+          <div className="px-2.5 py-1 text-xs text-fg-subtle" data-testid="filter-empty">
+            No chat titles match “{q}”.{' '}
+            <button type="button" onClick={p.onSearch} className="font-medium text-fg-muted underline underline-offset-2 hover:text-fg">Search messages</button>
+          </div>
+        )}
         {groups.map(([g, items]) => (
           <section key={g} className="mb-5" aria-label={g}>
             <h3 className="sticky top-0 z-[1] bg-sidebar px-2.5 pb-1 pt-1 text-xs font-medium text-fg-subtle after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-2 after:bg-linear-to-b after:from-sidebar after:to-transparent">{g}</h3>
