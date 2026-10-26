@@ -37,3 +37,29 @@ test.describe('focus on touch (mock) @mobile', () => {
     await expect(composer(page)).not.toBeFocused();
   });
 });
+
+test.describe('focus on chat open (mock) @desktop', () => {
+  test('picking a chat in the sidebar puts focus in the composer, ready for a follow-up', async ({ page }) => {
+    await open(page, MOCK);
+    await ask(page, 'What was our denial rate by payer last quarter?');
+    await page.keyboard.press('Control+Shift+O');
+    await expect(page.getByTestId('msg-user')).toHaveCount(0);
+    await page.getByTestId('sidebar').getByRole('link', { name: /denial/i }).or(page.getByTestId('sidebar').getByRole('button', { name: /denial/i })).first().click();
+    await expect(page.getByTestId('msg-user')).toHaveCount(1);
+    await expect(composer(page)).toBeFocused();
+  });
+});
+
+test.describe('chat open on touch (mock) @mobile', () => {
+  test('picking a chat from the drawer does not raise the keyboard', async ({ page }) => {
+    await open(page, MOCK);
+    await ask(page, 'What was our denial rate by payer last quarter?');
+    await page.keyboard.press('Control+Shift+O');
+    await expect(page.getByTestId('msg-user')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Open sidebar' }).click();
+    await page.getByTestId('sidebar').getByRole('link', { name: /denial/i }).or(page.getByTestId('sidebar').getByRole('button', { name: /denial/i })).first().click();
+    await expect(page.getByTestId('msg-user')).toHaveCount(1);
+    await expect(page.getByTestId('sidebar')).toBeHidden();
+    await expect(composer(page)).not.toBeFocused();
+  });
+});
