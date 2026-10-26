@@ -40,11 +40,11 @@ export function CodeBlock({ code, language, title, onOpen, tall }: { code: strin
       <div className="flex items-center justify-between px-4 pt-2 text-xs text-fg-subtle">
         <span>{title ? `${language} · ${title}` : language}</span>
         <div className="flex items-center gap-0.5">
-          <IconButton label="Download" className="h-7 w-7 opacity-0 group-hover/code:opacity-100 focus:opacity-100" onClick={() => downloadText(title ?? `snippet.${EXT[language] ?? 'txt'}`, code, 'text/plain')}>
+          <IconButton label="Download" className="h-7 w-7 opacity-0 group-hover/code:opacity-100 focus:opacity-100 [@media(hover:none)]:opacity-100" onClick={() => downloadText(title ?? `snippet.${EXT[language] ?? 'txt'}`, code, 'text/plain')}>
             <Download size={14} />
           </IconButton>
           {onOpen && (
-            <IconButton label="Open in panel" onClick={onOpen} className="h-7 w-7 opacity-0 group-hover/code:opacity-100 focus:opacity-100">
+            <IconButton label="Open in panel" onClick={onOpen} className="h-7 w-7 opacity-0 group-hover/code:opacity-100 focus:opacity-100 [@media(hover:none)]:opacity-100">
               <Maximize2 size={14} />
             </IconButton>
           )}

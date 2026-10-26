@@ -62,7 +62,7 @@ export function UserBubble({ msg, onEdit, version, onVersion, disabled }: { msg:
   return (
     <div className="group flex flex-col items-end" data-testid="msg-user">
       <div className="max-w-[70%] whitespace-pre-wrap rounded-[18px] bg-muted px-4 py-2.5 leading-normal">{msg.text}</div>
-      <div className={clsx('mt-1 flex items-center gap-0.5 transition-opacity group-hover:opacity-100 focus-within:opacity-100', version ? 'opacity-100' : 'opacity-0')}>
+      <div className={clsx('mt-1 flex items-center gap-0.5 transition-opacity group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100', version ? 'opacity-100' : 'opacity-0')}>
         <CopyButton text={msg.text} />
         {onEdit && <IconButton label="Edit message" disabled={disabled} onClick={() => { setValue(msg.text); setEditing(true); }}><Pencil size={15} /></IconButton>}
         {version && onVersion && (
@@ -137,7 +137,7 @@ export function AssistantTurn({ msg: view, isLast, onOpen, onRegenerate, onEdit,
       )}
       {!msg.streaming && msg.finishReason === 'aborted' && <StoppedNote onRetry={isLast ? onRegenerate : undefined} />}
       {!msg.streaming && !empty && (
-        <div className={clsx('-ml-2 mt-2 flex flex-wrap items-center gap-0.5 transition-opacity', isLast ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100')} data-testid="msg-actions">
+        <div className={clsx('-ml-2 mt-2 flex flex-wrap items-center gap-0.5 transition-opacity', isLast ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100')} data-testid="msg-actions">
           <CopyButton text={() => messageMarkdown(view)} tip />
           <IconButton tip label="Good response" aria-pressed={vote === 'up'} onClick={() => setVote(vote === 'up' ? null : 'up')}><ThumbsUp size={16} fill={vote === 'up' ? 'currentColor' : 'none'} /></IconButton>
           <IconButton tip label="Bad response" aria-pressed={vote === 'down'} onClick={() => { const next = vote === 'down' ? null : 'down'; setVote(next); setFeedbackOpen(next === 'down'); setFeedbackSent(false); }}><ThumbsDown size={16} fill={vote === 'down' ? 'currentColor' : 'none'} /></IconButton>
