@@ -1,0 +1,14 @@
+{
+  "$comment": "Lighthouse lab budgets for the cold load of the production (mock) build served by vite preview. Baseline 2026-10-25: desktop perf 1.00, LCP 0.58 s, TBT 5 ms; mobile perf 0.92, LCP 2.65 s, TBT 118 ms; 296 KB transferred. Budgets leave headroom for CI variance; tighten, don't loosen (docs/frontend_ci.md).",
+  "lighthouse": "12.8.2",
+  "presets": {
+    "desktop": {
+      "categories": { "performance": 0.95, "accessibility": 1, "best-practices": 0.95 },
+      "metrics": { "first-contentful-paint": 1000, "largest-contentful-paint": 1200, "total-blocking-time": 150, "cumulative-layout-shift": 0.02, "interactive": 1500, "total-byte-weight": 358400 }
+    },
+    "mobile": {
+      "categories": { "performance": 0.85, "accessibility": 1, "best-practices": 0.95 },
+      "metrics": { "first-contentful-paint": 3200, "largest-contentful-paint": 3500, "total-blocking-time": 300, "cumulative-layout-shift": 0.02, "interactive": 4000, "total-byte-weight": 358400 }
+    }
+  }
+}
