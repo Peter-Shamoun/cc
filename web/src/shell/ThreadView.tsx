@@ -1,6 +1,6 @@
 import { memo, useRef, type CSSProperties, type MutableRefObject, type RefObject } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { AssistantTurn, REFINE_PROMPT, UserBubble, type Artifact } from '../components/Message';
+import { AssistantTurn, REFINE_PROMPT, UserBubble, messageMarkdown, type Artifact } from '../components/Message';
 import type { ViewMessage } from '../lib/useChat';
 import type { AnyView } from '../components/answer/normalize';
 import type { OnReply } from '../components/answer/States';
@@ -62,6 +62,45 @@ const Row = memo(function Row({ msg, index, isLast, reserve, lazy, busy, vCur, v
   );
 });
 
+/** Plain, searchable text for a turn (markdown syntax stripped). Cached per message object. */
+const plainCache = new WeakMap<object, string>();
+export function plainText(m: ViewMessage): string {
+  const hit = plainCache.get(m);
+  if (hit !== undefined) return hit;
+  let raw = '';
+  try { raw = m.role === 'user' ? m.text : messageMarkdown(m as AnyView); } catch { raw = ''; }
+  const out = raw
+    .replace(/```[^\n]*\n?/g, '')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+/gm, '')
+    .replace(/^\s*\|?\s*:?-{2,}.*$/gm, '')
+    .replace(/\|/g, ' ')
+    .replace(/[*_`~]+/g, '')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/^ +| +$/gm, '')
+    .trim();
+  plainCache.set(m, out);
+  return out;
+}
+
+/**
+ * QA-S13: a virtualized turn outside the window isn't in the DOM, so the browser's find (Ctrl+F)
+ * can't reach it. Each such turn keeps a lightweight text "shadow" at its virtual position: plain
+ * text, no React subtree, skipped by layout until near (content-visibility). Find matches it and
+ * scrolls there, the window moves, and the full turn replaces it. Hidden from assistive tech (the
+ * full row is the accessible one), inert to pointer events.
+ */
+const Shadow = memo(function Shadow({ msg, start, size }: { msg: ViewMessage; start: number; size: number }) {
+  return (
+    <div aria-hidden="true" data-find-shadow={msg.id}
+      className={`pointer-events-none absolute left-0 top-0 w-full overflow-hidden whitespace-pre-wrap break-words pb-6 text-[15px] leading-7 text-[var(--fg)] ${msg.role === 'user' ? 'pl-[20%] text-right' : ''}`}
+      style={{ transform: `translateY(${start}px)`, height: size, contentVisibility: 'auto', containIntrinsicSize: `auto ${size}px` } as CSSProperties}>
+      {plainText(msg)}
+    </div>
+  );
+});
+
 function auditVisit(count: number) {
   if (typeof window === 'undefined' || !new URLSearchParams(window.location.search).has('audit')) return;
   const stats = (window.__ccRenderStats ??= { commits: 0, actual: 0, worst: 0, children: 0 });
@@ -117,8 +156,14 @@ export function ThreadView({ messages, busy, actions, scrollRef, scrollToIndexRe
     );
   }
 
+  const shown = new Set(items.map((it) => it.index));
+  const all = virtualizer.measurementsCache;
   return (
     <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
+      {all.map((it) => {
+        const m = messages[it.index];
+        return m && !shown.has(it.index) ? <Shadow key={`s-${String(it.key)}`} msg={m} start={it.start} size={it.size} /> : null;
+      })}
       {items.map((item) => {
         const m = messages[item.index];
         if (!m) return null;
