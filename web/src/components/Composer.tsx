@@ -61,10 +61,15 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
     ref.current?.focus();
   };
   const pasteSeq = useRef(0);
-  const setValue = (t: string) => { setValueState(t); if (draftKey) setDraft(draftKey, t); };
-  useEffect(() => { setValueState(draftKey ? getDraft(draftKey) : ''); setPastes([]); setNotice(''); }, [draftKey]);
+  // Every value change re-arms the slash menu (first row, not dismissed unless still a command).
+  const setText = (t: string) => { setValueState(t); setSlashIdx(0); if (!t.startsWith('/')) setSlashDismissed(false); };
+  const setValue = (t: string) => { setText(t); if (draftKey) setDraft(draftKey, t); };
+  // Switching chats swaps in that chat's draft while rendering (React's "adjust state on prop change").
+  const [shownKey, setShownKey] = useState(draftKey);
+  if (shownKey !== draftKey) { setShownKey(draftKey); setText(draftKey ? getDraft(draftKey) : ''); setPastes([]); setNotice(''); }
   useEffect(() => {
     if (initial !== undefined) {
+      // oxlint-disable-next-line react/set-state-in-effect -- text pushed in from outside (edit into composer) also needs focus and caret, a DOM effect
       setValue(initial.text);
       const el = ref.current;
       el?.focus();
@@ -78,7 +83,6 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
     el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
   }, [value]);
   const slash = slashDismissed ? null : matchSlash(value);
-  useEffect(() => { setSlashIdx(0); if (!value.startsWith('/')) setSlashDismissed(false); }, [value]);
   const runCommand = (c: SlashCommand) => {
     if (c.insert) { setValue(c.insert); ref.current?.focus(); }
     else { setValue(''); onCommand?.(c); }
@@ -96,7 +100,7 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
   return ( // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- click-to-focus convenience; the textarea is the keyboard path
     <form
       onSubmit={(e) => { e.preventDefault(); submit(); }}
-      className="relative w-full cursor-text rounded-[28px] bg-elev data-[dragging]:shadow-[0_0_0_2px_var(--focus)] data-[dragging]:bg-hover p-2.5 font-sans shadow-[var(--shadow-composer)] transition-shadow duration-150 focus-within:shadow-[0_0_0_2px_var(--focus),0_6px_20px_rgba(0,0,0,0.08)]"
+      className="relative w-full cursor-text rounded-[28px] bg-elev data-[dragging]:shadow-[0_0_0_2px_var(--focus)] data-[dragging]:bg-hover p-2.5 font-sans shadow-[var(--shadow-composer)] transition-shadow duration-150 cc-composer"
       onClick={(e) => { if (e.target === e.currentTarget) ref.current?.focus(); }}
       onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDragging(true); } }}
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false); }}

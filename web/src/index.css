@@ -182,3 +182,13 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -
   .prose-chat pre, .prose-chat table, figure { break-inside: avoid; }
   a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.85em; color: #555; }
 }
+
+/*
+ * QA-S15: the composer's focus state is a soft border/shadow lift (ChatGPT/Claude), not a blue ring,
+ * because a text field always matches :focus-visible and the composer is focused most of the time.
+ * Keyboard navigation (html[data-kbd], set on Tab by lib/inputModality) still gets the strong ring,
+ * and forced-colors mode gets a system outline, so focus stays visible (WCAG 2.4.7).
+ */
+.cc-composer:focus-within { box-shadow: 0 0 0 1px var(--border-strong), 0 6px 20px rgba(0, 0, 0, 0.08); }
+html[data-kbd] .cc-composer:focus-within { box-shadow: 0 0 0 2px var(--focus), 0 6px 20px rgba(0, 0, 0, 0.08); }
+@media (forced-colors: active) { .cc-composer:focus-within { outline: 2px solid Highlight; outline-offset: 1px; } }
