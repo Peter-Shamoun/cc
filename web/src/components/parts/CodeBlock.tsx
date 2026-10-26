@@ -51,7 +51,7 @@ export function CodeBlock({ code, language, title, onOpen, tall }: { code: strin
           <CopyButton text={code} label="Copy code" className="h-7 w-7" />
         </div>
       </div>
-      <div className={tall ? 'shiki-wrap' : 'shiki-wrap max-h-[480px] overflow-auto'}>
+      <div tabIndex={0} aria-label={`${language} code`} className={tall ? 'shiki-wrap overflow-auto' : 'shiki-wrap max-h-[480px] overflow-auto'}>
         {html ? <div dangerouslySetInnerHTML={{ __html: html }} /> : <pre className="font-mono"><code>{code}</code></pre>}
       </div>
     </div>

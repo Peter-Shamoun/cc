@@ -72,7 +72,7 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
   return (
     <form
       onSubmit={(e) => { e.preventDefault(); submit(); }}
-      className="relative w-full cursor-text rounded-[28px] bg-elev p-2.5 font-sans shadow-[var(--shadow-composer)] transition-shadow duration-150 focus-within:shadow-[0_0_0_1px_var(--border-strong),0_6px_20px_rgba(0,0,0,0.08)]"
+      className="relative w-full cursor-text rounded-[28px] bg-elev p-2.5 font-sans shadow-[var(--shadow-composer)] transition-shadow duration-150 focus-within:shadow-[0_0_0_2px_var(--focus),0_6px_20px_rgba(0,0,0,0.08)]"
       onClick={(e) => { if (e.target === e.currentTarget) ref.current?.focus(); }}
       data-testid="composer"
     >

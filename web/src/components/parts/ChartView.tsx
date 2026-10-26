@@ -102,7 +102,7 @@ export function ChartView({ part, onOpen, full, onShowSpec }: { part: ChartPart;
     <figure className="group/chart my-4 overflow-hidden rounded-xl border border-line bg-elev" data-testid="chart" aria-label={part.alt}>
       <div className="flex items-start justify-between gap-2 px-3 pt-2 pb-1">
         <figcaption className="min-w-0 break-words text-[13px] font-medium leading-snug text-fg-muted">{part.title}</figcaption>
-        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/chart:opacity-100 group-focus-within/chart:opacity-100 [@media(hover:none)]:opacity-100">
+        <div className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover/chart:opacity-100 group-focus-within/chart:opacity-100 [@media(hover:none)]:opacity-100">
           <IconButton label="Download PNG" className="h-7 w-7" onClick={() => dl('png')}><Download size={15} /></IconButton>
           <button type="button" onClick={() => dl('svg')} className="rounded-md px-1.5 py-1 text-xs text-fg-muted hover:bg-hover">SVG</button>
           <button type="button" onClick={dlData} className="rounded-md px-1.5 py-1 text-xs text-fg-muted hover:bg-hover">CSV</button>
