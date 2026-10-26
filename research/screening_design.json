@@ -1,0 +1,356 @@
+{
+ "design": "2^(7-3) resolution IV, generators E=ABC F=BCD G=ACD",
+ "factors": {
+  "A_semantic_layer": [
+   {},
+   {
+    "enable_metrics": true,
+    "enable_lookup": true
+   }
+  ],
+  "B_glossary": [
+   {
+    "glossary": "basic"
+   },
+   {
+    "glossary": "pitfalls"
+   }
+  ],
+  "C_dictionary_profile": [
+   {},
+   {
+    "data_dictionary": true,
+    "data_profile": true
+   }
+  ],
+  "D_examples": [
+   {},
+   {
+    "enable_examples": true
+   }
+  ],
+  "E_result_signals": [
+   {},
+   {
+    "sql_error_hints": true,
+    "result_checks": true
+   }
+  ],
+  "F_effort": [
+   {
+    "effort": "low"
+   },
+   {
+    "effort": "high"
+   }
+  ],
+  "G_context_style": [
+   {
+    "context_style": "goal"
+   },
+   {
+    "context_style": "procedural"
+   }
+  ]
+ },
+ "runs": [
+  {
+   "config": "s0000000",
+   "A_semantic_layer": 0,
+   "B_glossary": 0,
+   "C_dictionary_profile": 0,
+   "D_examples": 0,
+   "E_result_signals": 0,
+   "F_effort": 0,
+   "G_context_style": 0
+  },
+  {
+   "config": "s0001011",
+   "A_semantic_layer": 0,
+   "B_glossary": 0,
+   "C_dictionary_profile": 0,
+   "D_examples": 1,
+   "E_result_signals": 0,
+   "F_effort": 1,
+   "G_context_style": 1
+  },
+  {
+   "config": "s0010111",
+   "A_semantic_layer": 0,
+   "B_glossary": 0,
+   "C_dictionary_profile": 1,
+   "D_examples": 0,
+   "E_result_signals": 1,
+   "F_effort": 1,
+   "G_context_style": 1
+  },
+  {
+   "config": "s0011100",
+   "A_semantic_layer": 0,
+   "B_glossary": 0,
+   "C_dictionary_profile": 1,
+   "D_examples": 1,
+   "E_result_signals": 1,
+   "F_effort": 0,
+   "G_context_style": 0
+  },
+  {
+   "config": "s0100110",
+   "A_semantic_layer": 0,
+   "B_glossary": 1,
+   "C_dictionary_profile": 0,
+   "D_examples": 0,
+   "E_result_signals": 1,
+   "F_effort": 1,
+   "G_context_style": 0
+  },
+  {
+   "config": "s0101101",
+   "A_semantic_layer": 0,
+   "B_glossary": 1,
+   "C_dictionary_profile": 0,
+   "D_examples": 1,
+   "E_result_signals": 1,
+   "F_effort": 0,
+   "G_context_style": 1
+  },
+  {
+   "config": "s0110001",
+   "A_semantic_layer": 0,
+   "B_glossary": 1,
+   "C_dictionary_profile": 1,
+   "D_examples": 0,
+   "E_result_signals": 0,
+   "F_effort": 0,
+   "G_context_style": 1
+  },
+  {
+   "config": "s0111010",
+   "A_semantic_layer": 0,
+   "B_glossary": 1,
+   "C_dictionary_profile": 1,
+   "D_examples": 1,
+   "E_result_signals": 0,
+   "F_effort": 1,
+   "G_context_style": 0
+  },
+  {
+   "config": "s1000101",
+   "A_semantic_layer": 1,
+   "B_glossary": 0,
+   "C_dictionary_profile": 0,
+   "D_examples": 0,
+   "E_result_signals": 1,
+   "F_effort": 0,
+   "G_context_style": 1
+  },
+  {
+   "config": "s1001110",
+   "A_semantic_layer": 1,
+   "B_glossary": 0,
+   "C_dictionary_profile": 0,
+   "D_examples": 1,
+   "E_result_signals": 1,
+   "F_effort": 1,
+   "G_context_style": 0
+  },
+  {
+   "config": "s1010010",
+   "A_semantic_layer": 1,
+   "B_glossary": 0,
+   "C_dictionary_profile": 1,
+   "D_examples": 0,
+   "E_result_signals": 0,
+   "F_effort": 1,
+   "G_context_style": 0
+  },
+  {
+   "config": "s1011001",
+   "A_semantic_layer": 1,
+   "B_glossary": 0,
+   "C_dictionary_profile": 1,
+   "D_examples": 1,
+   "E_result_signals": 0,
+   "F_effort": 0,
+   "G_context_style": 1
+  },
+  {
+   "config": "s1100011",
+   "A_semantic_layer": 1,
+   "B_glossary": 1,
+   "C_dictionary_profile": 0,
+   "D_examples": 0,
+   "E_result_signals": 0,
+   "F_effort": 1,
+   "G_context_style": 1
+  },
+  {
+   "config": "s1101000",
+   "A_semantic_layer": 1,
+   "B_glossary": 1,
+   "C_dictionary_profile": 0,
+   "D_examples": 1,
+   "E_result_signals": 0,
+   "F_effort": 0,
+   "G_context_style": 0
+  },
+  {
+   "config": "s1110100",
+   "A_semantic_layer": 1,
+   "B_glossary": 1,
+   "C_dictionary_profile": 1,
+   "D_examples": 0,
+   "E_result_signals": 1,
+   "F_effort": 0,
+   "G_context_style": 0
+  },
+  {
+   "config": "s1111111",
+   "A_semantic_layer": 1,
+   "B_glossary": 1,
+   "C_dictionary_profile": 1,
+   "D_examples": 1,
+   "E_result_signals": 1,
+   "F_effort": 1,
+   "G_context_style": 1
+  }
+ ],
+ "configs": {
+  "s0000000": {
+   "glossary": "basic",
+   "effort": "low",
+   "context_style": "goal"
+  },
+  "s0001011": {
+   "glossary": "basic",
+   "enable_examples": true,
+   "effort": "high",
+   "context_style": "procedural"
+  },
+  "s0010111": {
+   "glossary": "basic",
+   "data_dictionary": true,
+   "data_profile": true,
+   "sql_error_hints": true,
+   "result_checks": true,
+   "effort": "high",
+   "context_style": "procedural"
+  },
+  "s0011100": {
+   "glossary": "basic",
+   "data_dictionary": true,
+   "data_profile": true,
+   "enable_examples": true,
+   "sql_error_hints": true,
+   "result_checks": true,
+   "effort": "low",
+   "context_style": "goal"
+  },
+  "s0100110": {
+   "glossary": "pitfalls",
+   "sql_error_hints": true,
+   "result_checks": true,
+   "effort": "high",
+   "context_style": "goal"
+  },
+  "s0101101": {
+   "glossary": "pitfalls",
+   "enable_examples": true,
+   "sql_error_hints": true,
+   "result_checks": true,
+   "effort": "low",
+   "context_style": "procedural"
+  },
+  "s0110001": {
+   "glossary": "pitfalls",
+   "data_dictionary": true,
+   "data_profile": true,
+   "effort": "low",
+   "context_style": "procedural"
+  },
+  "s0111010": {
+   "glossary": "pitfalls",
+   "data_dictionary": true,
+   "data_profile": true,
+   "enable_examples": true,
+   "effort": "high",
+   "context_style": "goal"
+  },
+  "s1000101": {
+   "enable_metrics": true,
+   "enable_lookup": true,
+   "glossary": "basic",
+   "sql_error_hints": true,
+   "result_checks": true,
+   "effort": "low",
+   "context_style": "procedural"
+  },
+  "s1001110": {
+   "enable_metrics": true,
+   "enable_lookup": true,
+   "glossary": "basic",
+   "enable_examples": true,
+   "sql_error_hints": true,
+   "result_checks": true,
+   "effort": "high",
+   "context_style": "goal"
+  },
+  "s1010010": {
+   "enable_metrics": true,
+   "enable_lookup": true,
+   "glossary": "basic",
+   "data_dictionary": true,
+   "data_profile": true,
+   "effort": "high",
+   "context_style": "goal"
+  },
+  "s1011001": {
+   "enable_metrics": true,
+   "enable_lookup": true,
+   "glossary": "basic",
+   "data_dictionary": true,
+   "data_profile": true,
+   "enable_examples": true,
+   "effort": "low",
+   "context_style": "procedural"
+  },
+  "s1100011": {
+   "enable_metrics": true,
+   "enable_lookup": true,
+   "glossary": "pitfalls",
+   "effort": "high",
+   "context_style": "procedural"
+  },
+  "s1101000": {
+   "enable_metrics": true,
+   "enable_lookup": true,
+   "glossary": "pitfalls",
+   "enable_examples": true,
+   "effort": "low",
+   "context_style": "goal"
+  },
+  "s1110100": {
+   "enable_metrics": true,
+   "enable_lookup": true,
+   "glossary": "pitfalls",
+   "data_dictionary": true,
+   "data_profile": true,
+   "sql_error_hints": true,
+   "result_checks": true,
+   "effort": "low",
+   "context_style": "goal"
+  },
+  "s1111111": {
+   "enable_metrics": true,
+   "enable_lookup": true,
+   "glossary": "pitfalls",
+   "data_dictionary": true,
+   "data_profile": true,
+   "enable_examples": true,
+   "sql_error_hints": true,
+   "result_checks": true,
+   "effort": "high",
+   "context_style": "procedural"
+  }
+ }
+}

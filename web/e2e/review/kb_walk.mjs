@@ -1,0 +1,32 @@
+import { chromium } from 'playwright';
+import fs from 'node:fs';
+import { distRoutes, LIVE } from '../static.mjs';
+const out = process.argv[2];
+const b = await chromium.launch({ executablePath: '/usr/bin/google-chrome' });
+const ctx = await b.newContext({ viewport: { width: 1440, height: 900 } }); await distRoutes(ctx);
+const p = await ctx.newPage(); await p.goto(LIVE); await p.waitForTimeout(800);
+const desc = () => p.evaluate(() => { const e = document.activeElement; if (!e || e === document.body) return 'BODY';
+  const cs = getComputedStyle(e); const ring = (cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0) || (cs.boxShadow && cs.boxShadow !== 'none');
+  const lm = e.closest('nav,header,main,aside,footer,[role=dialog],[role=menu]'); const r = e.getBoundingClientRect();
+  return `${e.tagName.toLowerCase()}${e.getAttribute('role') ? '[' + e.getAttribute('role') + ']' : ''} "${(e.getAttribute('aria-label') || e.textContent || e.getAttribute('placeholder') || '').trim().slice(0, 40)}" in=${lm ? lm.tagName.toLowerCase() + (lm.getAttribute('role') ? ':' + lm.getAttribute('role') : '') : '-'} ring=${ring ? 'Y' : 'N'} vis=${r.width > 0 && r.bottom > 0 && r.top < innerHeight ? 'Y' : 'N'}`; });
+const log = [];
+const step = async (k, label) => { await p.keyboard.press(k); await p.waitForTimeout(120); const d = await desc(); log.push(`${label || k}: ${d}`); return d; };
+log.push('load: ' + await desc());
+for (let i = 0; i < 25; i++) await step('Tab');
+// ask via keyboard
+await p.keyboard.press('Control+Shift+O'); await p.waitForTimeout(300); log.push('newchat: ' + await desc());
+await p.keyboard.type('Which CARC codes drive denials?'); await p.keyboard.press('Enter');
+await p.getByRole('button', { name: 'Send message' }).waitFor({ timeout: 60000 }); await p.waitForTimeout(400);
+log.push('after answer: ' + await desc());
+for (let i = 0; i < 30; i++) await step('Shift+Tab', 'S-Tab');
+await p.screenshot({ path: `${out}/kb-answer-shifttab.png` });
+// Ctrl+K
+await p.keyboard.press('Control+k'); await p.waitForTimeout(300); log.push('ctrl+k: ' + await desc());
+await step('Escape', 'Esc after ctrl+k');
+await p.keyboard.press('Control+/'); await p.waitForTimeout(300); log.push('ctrl+/: ' + await desc());
+await step('Escape', 'Esc after ctrl+/');
+await p.keyboard.press('Control+,'); await p.waitForTimeout(300); log.push('ctrl+,: ' + await desc());
+for (let i = 0; i < 6; i++) await step('Tab', 'settings Tab');
+await step('Escape', 'Esc after settings');
+fs.writeFileSync(`${out}/kb_walk.txt`, log.join('\n')); console.log(log.join('\n'));
+await b.close();

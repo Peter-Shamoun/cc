@@ -1,0 +1,613 @@
+# EDI realism calibration spec: clinical reference lab, 837P (005010X222A1) out, 835 (005010X221A1) in
+# Target: one tenant = mid/large regional reference lab producing ~5 MB of raw EDI per business day.
+# Researched 2026-10-25. Every target has a source and a confidence:
+#   high   = primary source (CMS file, SEC filing, TR3/CMS companion guide) or a direct computation from one
+#   medium = vendor benchmark (XiFin, Optum), or payer guidance generalized across payers
+#   low    = estimate or extrapolation; no public measurement found. Treat these as tunable defaults.
+# Distributions: {min, typical, max} = a plausible range around the mode; "weights" are relative.
+# "current" shows what ccsim/edi_mock.py v2.0 does today, where it differs.
+
+meta:
+  generator_version_reviewed: "2.0 (ccsim/edi_mock.py)"
+  as_of: "2026-10-25"
+  sources:
+    xifin_2026: "https://media.xifin.com/prod/uploads/EWC-2026-XiFin-2026-Payor-Denial-Impact-Report.pdf  (2025 DOS, >30M claims, XiFin clients)"
+    xifin_2025_blog: "https://www.xifin.com/resource/blog-post/understanding-the-latest-denial-trends-in-revenue-cycle-management/"
+    xifin_2021: "https://www.xifin.com/resource/blog-post/denial-trends-by-payor-group-and-market-segment/ ; https://www.captodayonline.com/2023/Whitepapers/XIFIN_CurrentTrendsInDenials.pdf"
+    xifin_2021_carc: "https://www.xifin.com/resource/blog-post/laboratory-test-claim-denials-and-appeals-trends/"
+    clfs_2026: "https://www.cms.gov/medicare/payment/fee-schedules/clinical-laboratory-fee-schedule-clfs/files  (file 26CLABQ4: https://www.cms.gov/files/zip/26clabq4.zip)"
+    medicare_mup_2024: "https://data.cms.gov/data-api/v1/dataset/6fea9d79-0129-4e4c-b1b8-23cd86a4f435/data  (Medicare Physician & Other Practitioners by Geography and Service, CY2024, National rows; Tot_Srvcs, Tot_Bene_Day_Srvcs, Avg_Sbmtd_Chrg, Avg_Mdcr_Alowd_Amt)"
+    oig_2024_lab: "https://www.oig.hhs.gov/documents/evaluation/11454/OEI-09-25-00330-highlights.pdf"
+    quest_10k_2025: "https://www.sec.gov/Archives/edgar/data/1022079/000102207926000015/dgx-20251231.htm"
+    labcorp_10k_2013: "https://www.sec.gov/Archives/edgar/data/0000920148/000092014814000021/lh10-k2013.htm"
+    labcorp_q4_2025: "https://www.labcorp.com/education-events/press-releases/labcorp-announces-2025-fourth-quarter-and-full-year-results"
+    kff_ma_2025: "https://homehealthcarenews.com/2025/07/medicare-advantage-enrollment-reaches-54-in-2025-drives-rising-federal-spending/ (KFF MA 2025 update)"
+    kff_mco: "https://www.kff.org/medicaid/state-indicator/total-medicaid-mco-enrollment/"
+    kff_ehbs_2025: "https://www.kff.org/health-costs/2025-employer-health-benefits-survey/"
+    kff_aca_denials: "https://www.kff.org/private-insurance/claims-denials-and-appeals-in-aca-marketplace-plans-in-2023/"
+    optum_denials_2024: "https://marketplace.optum.com/content/dam/change-healthcare/marketplace-assets/outcomes-and-insights/2024-denials-index.pdf"
+    experian_soc_2025: "https://www.experian.com/healthcare/resources-insights/thought-leadership/white-papers-insights/state-claims-report"
+    medicare_floor: "https://palmettogba.com/palmetto/rr.nsf/DID/9N7QFB4135 ; https://cgsmedicare.com/jb/claims/sub/claimform.html"
+    medicare_interest: "https://cgsmedicare.com/hhh/pubs/news/2026/07/news-206334.html"
+    sequestration: "https://med.noridianmedicare.com/web/jfb/fees-news/fee-schedules/mpfs/sequestration"
+    mue_carc: "https://www.cms.gov/regulations-and-guidance/guidance/transmittals/2018downloads/r4188cp.pdf ; https://cgsmedicare.com/jc/pubs/news/2013/0113/cope21091.html"
+    pecos_edit: "https://cgsmedicare.com/jc/claims/denials/ordrefjobaid.html ; https://med.noridianmedicare.com/web/jfb/topics/claim-submission/pecos"
+    clia_b7: "https://medicare.fcso.com/claims/denials-tips/co-pr-b7 ; https://med.noridianmedicare.com/web/jfb/article-detail/-/view/10534/clinical-lab-claims-denied-in-error"
+    clia_ref_x4: "https://x12.org/resources/requests-for-interpretation/rfi-1742-service-level-clia-837p ; https://providernews.anthem.com/georgia/article/additional-information-about-clinical-laboratory-improvement-amendments-clia-number"
+    clm_5000: "https://x12.org/resources/requests-for-interpretation/rfi-2334-5010-837-pid-clm-limit ; https://iedi.optum.com/iedi/enspublic/Download/content/837P%205010A1%20Claim%20Companion%20Guide_v2%201.pdf"
+    cms_835_cg: "https://cms.gov/medicare/billing/electronicbillingeditrans/downloads/5010a1835cg.pdf"
+    cms_partb_835_cd: "https://www.cms.gov/files/document/partb835cdpdf"
+    uhc_plb: "https://ams-gateway.uhcprovider.com/content/dam/provider/docs/public/resources/edi/EDI-835-Provider-Level-Adjustments.pdf"
+    bcbstx_plb: "https://hp-es.bcbstx.com/provider/pdf/interpreting_plb_segment_835_remittance_advice.pdf"
+    x12_clp19: "https://x12.org/resources/requests-for-interpretation/rfi-2025-835837payer-crossover-process"
+    payer_ids: "https://support.drchrono.com/home/218407898-are-payer-ids-specific-to-the-clearinghouse-or-the-insurance-company"
+    trn03_conventions: "https://www.medicaid.nv.gov/Downloads/provider/companionguide835.pdf ; https://reports.mha.ohio.gov/macsis/claims/835.claim.pay.advice.npi.v2.pdf"
+    nc_checkwrite: "https://medicaid.ncdhhs.gov/documents/providers/claims-billing/2020-checkwrite-schedule-dhb-final/open"
+    core_370: "https://leadingageny.org/providers/nursing-homes/reimbursement1/medicaid/doh-announces-change-in-medicaid-electronic-remittances-release-dates/"
+    medicaid_upper_limit: "https://www.hhs.gov/sites/default/files/static/dab/decisions/board-decisions/1990/dab1206.html ; https://www.xifin.com/billing-beat/ihcp-revise-rates-select-clinical-laboratory-services-based-2018"
+    avalere_2013: "https://www.acla.com/wp-content/uploads/2013/12/ACLA-Avalere-Study-Press-Release-12-04-2013.pdf"
+    hcci_lab: "https://healthcostinstitute.org/hcci-research/price-markups-for-clinical-labs"
+    athena_payerview_2014: "https://www.beckershospitalreview.com/healthcare-information-technology/5-takeaways-from-athenahealth-s-2014-payerview-report/"
+    fha_days_to_pay: "https://fha.org/common/Uploaded%20files/FHA/FHA-Holding-Payers-Accountable.pdf"
+    urmc_resp: "https://www.urmc.rochester.edu/MediaLibraries/URMCMedia/urmc-labs/clinical/documents/Weekly-Respiratory-Surveillance-2026-Week-6.pdf"
+    nucc_taxonomy: "https://taxonomy.nucc.org/ (291U00000X Clinical Medical Laboratory)"
+    cms_pos: "https://www.cms.gov/medicare/coding-billing/place-of-service-codes/code-sets (POS 81 Independent Laboratory)"
+    carc_rarc: "https://x12.org/codes/claim-adjustment-reason-codes ; https://x12.org/codes/remittance-advice-remark-codes"
+    tr3: "ASC X12 TR3 005010X222A1 / 005010X221A1 (paywalled; facts quoted via X12 RFIs and CMS companion guides above)"
+
+# ---------------------------------------------------------------------------------------------------
+# 1. VOLUME AND SIZE: 5 MB/day/customer -> claims/day and 835 files/day
+# ---------------------------------------------------------------------------------------------------
+size_model:
+  method: >
+    Built realistic segment lists for one claim (scratch script; field widths taken from real-looking
+    values: 14-char PCN, 40-char addresses, 10-char NPI, 9-digit ZIP, CLIA REF*X4, REF*D9, REF*6R per line),
+    no line breaks, '~' terminator. Bytes are linear in service lines.
+  confidence: high   # arithmetic; segment choices are medium
+  bytes_837_claim: {fixed: 398, per_line: 80, formula: "398 + 80*lines",
+                    adders: {dependent_2000C: 142, cob_2320_2330_per_claim: 300, cob_svd_per_line: 52, prior_auth_ref_g1: 20},
+                    examples: {1: 478, 2: 558, 4: 718, 6: 878, 8: 1038, 12: 1361}}
+  bytes_835_clp:  {fixed: 213, per_line: 109, formula: "213 + 109*lines (Medicare; +~10% commercial for PR CAS/LQ/AMT*AU)",
+                   claim_level_denial_no_svc: 254, examples: {1: 322, 2: 431, 4: 649, 6: 867, 8: 1085}}
+  bytes_envelope: {"837_file": 620, "835_transaction": 659}
+  line_endings: "add 1 byte/segment for LF or 2 for CRLF if the sender wraps (about 30 segments/claim, so +30 to +60 B)"
+  current_generator: {bytes_per_837_claim: 467, segs_per_837_claim: 19.4, bytes_per_835_clp: 403, segs_per_clp: 17.4,
+                      mean_lines_per_claim: "~2.1"}
+  per_claim_all_in:
+    lines_mean: 4.9
+    bytes_837: 835          # incl. 20% dependents, 4% COB, 3% G1
+    clp_per_claim: 1.10     # initial + secondary + reversal/correction + corrected-claim adjudications
+    bytes_835: 848
+    total: 1684
+  mapping_5MB:
+    interpretation_A_both_directions: {bytes_per_day: 5000000, claims_per_business_day: {min: 2700, typical: 3000, max: 3300},
+                                       split: "about 50% 837 / 50% 835 by bytes", confidence: medium}
+    interpretation_B_837_only: {claims_per_business_day: {min: 5500, typical: 6000, max: 6500}, confidence: medium}
+    calendar_vs_business_day: "if 5 MB is a 7-day average, multiply business-day volume by 7/5 = 1.4"
+    sanity_check: >
+      Quest: ~244M requisitions/yr, 60% insurance-billed (43% insurers + 17% government) -> ~146M claims/yr,
+      ~580k/business day. A 3,000-claim/day tenant is about 1/190 of Quest, i.e. ~5,000 requisitions/day
+      (40% client-billed, never on an 837): a mid/large regional reference lab.
+    source: quest_10k_2025
+  recommended_tenant: {claims_per_business_day: 3000, saturday_claims_share_of_weekday: 0.0,
+                       note: "billing systems batch Mon-Fri; Saturday DOS gets billed Monday"}
+  volume_scale_needed_with_current_code: "~25x acme_labs (120/day) before realism fixes; ~13x after lines/claim fix"
+
+volume:
+  requisitions_to_claims:
+    insurance_billed_share_of_requisitions: {value: 0.60, source: quest_10k_2025, confidence: high,
+      detail: "2025 DIS volume: healthcare insurers 43%, government 17%, client payers 37% (never 837), patients 1%"}
+    labcorp_2013_requisition_mix: {medicare_medicaid: 0.151, managed_care: 0.487, client: 0.345, source: labcorp_10k_2013, confidence: high}
+  net_revenue_per_requisition_usd: {value: 44.2, source: quest_10k_2025, confidence: high,
+      derivation: "DIS revenue $10,785M / 244M requisitions; all payers including client bill. Use as a check on mean paid per claim (~$35-60 routine mix)."}
+  lines_per_claim:
+    distribution_weights: {1: 17, 2: 13, 3: 12, 4: 12, 5: 11, 6: 9, 7: 7, 8: 6, "9-12": 8, "13-18": 4, "19-30": 1}
+    mean: {min: 3.5, typical: 4.9, max: 6.5}
+    hard_max: 50       # 837P 2400 loop repeat
+    by_payer_class: {medicare: 6.0, medicare_advantage: 5.5, commercial: 4.3, medicaid: 4.0}
+    evidence: >
+      Medicare 2024: 318M CLFS-code lines (distinct bene x day x code) vs 40.3M venipuncture (36415) bene-days
+      = 7.9 codes per blood-draw day across all labs; non-blood-draw encounters (urine, swab) pull the per-claim
+      mean down. Commercial patients are younger with smaller panels.
+    source: medicare_mup_2024
+    confidence: medium
+    current: "1-4 lines, mean ~2.1"
+  units_per_line:
+    default: 1
+    overall_mean: {value: 1.08, source: medicare_mup_2024, confidence: high}
+    code_specific_mean_units: {"87798": 10.3, "87150": 8.4, "87481": 3.1, "87801": 2.3, "88305": 1.7, "87186": 1.29,
+                               "87077": 1.08, "87088": 1.04, "82570": 1.01}
+    note: "87798/87150 carry many targets on ONE line (units 4-25); this is what MUE (CO-151) edits hit"
+    source: medicare_mup_2024
+    confidence: high
+    current: "87798 units 1-3"
+  claims_per_patient:
+    medicare_blood_draw_days_per_tested_bene_per_year: {value: 2.7, source: medicare_mup_2024, confidence: high,
+      derivation: "36415 Tot_Bene_Day_Srvcs 40.26M / Tot_Benes 14.92M"}
+    panel_repeat_per_year: {"80053": 2.08, "80307": 2.46, "G0483": 2.12, "81528": 1.00, "81479": 1.25}
+    commercial_claims_per_patient_per_year: {min: 1.3, typical: 1.8, max: 2.5, confidence: low}
+    within_30_day_window: {typical_claims_per_distinct_patient: 1.15, max: 1.4, confidence: low,
+      note: "drug-monitoring and anticoagulation patients are the repeaters (weekly/monthly)"}
+    current: "patient pool = 0.35 x claims -> ~2.9 claims per patient in 30 days (too many repeats)"
+  dos_to_submission_days:
+    routine: {min: 1, typical: 2, max: 7}
+    molecular_genetic: {min: 5, typical: 14, max: 45}
+    held_for_missing_info_share: {value: 0.05, typical_hold_days: 10}
+    confidence: low
+  daily_pattern:
+    business_days_only_for_837: true
+    weekday_index_837: {Mon: 1.30, Tue: 1.10, Wed: 1.00, Thu: 0.95, Fri: 0.85}   # Mon carries Sat DOS
+    dos_weekday_share: {Mon: 0.20, Tue: 0.19, Wed: 0.18, Thu: 0.18, Fri: 0.17, Sat: 0.06, Sun: 0.02}
+    daily_noise_cv: 0.08
+    confidence: low
+    current: "Mon 1.3, Fri 0.9, uniform 0.8-1.2 noise (cv ~0.12)"
+  holidays:
+    us_federal: [new_years, mlk, presidents, memorial, juneteenth, independence, labor, columbus, veterans, thanksgiving, christmas]
+    no_835_or_eft_on_federal_holidays: {value: true, confidence: high, note: "ACH does not settle; MACs do not issue"}
+    day_after_holiday_837_volume_index: 1.5
+    thanksgiving_and_christmas_weeks_dos_volume_index: 0.75
+    confidence: medium
+  seasonality_monthly_dos_index:   # routine x respiratory overlay
+    routine: {Jan: 1.05, Feb: 1.00, Mar: 1.05, Apr: 1.00, May: 1.00, Jun: 0.95, Jul: 0.93, Aug: 1.00, Sep: 1.00, Oct: 1.03, Nov: 0.97, Dec: 0.90}
+    respiratory_panels_87631_87637_0241U_87798resp: {Oct: 1.3, Nov: 2.0, Dec: 3.0, Jan: 3.2, Feb: 2.5, Mar: 1.6, Apr: 0.9, May: 0.6, Jun: 0.5, Jul: 0.6, Aug: 0.7, Sep: 0.9}
+    evidence: "URMC weekly respiratory surveillance shows winter peak specimen counts; Labcorp attributes quarterly swings to weather/respiratory season"
+    source: [urmc_resp, labcorp_q4_2025]
+    confidence: low
+  month_and_year_effects:
+    jan_mar_deductible_reset: "PR share of allowed jumps (see patient_responsibility); patient-pay share highest Q1"
+    medicare_fiscal_year_end_hold: {probability_per_year: 0.2, note: "occasional CMS payment hold last days of Sept; low confidence"}
+    medicaid_state_fiscal_year_end_skip: {value: "NC skips last checkwrite of June and of December", source: nc_checkwrite, confidence: high}
+
+# ---------------------------------------------------------------------------------------------------
+# 2. PAYER MIX AND IDENTIFIERS
+# ---------------------------------------------------------------------------------------------------
+payer_mix:
+  share_of_insurance_billed_claims:
+    medicare_ffs_mac: {min: 0.15, typical: 0.20, max: 0.28}
+    medicare_advantage: {min: 0.12, typical: 0.16, max: 0.22}
+    medicaid_managed_care: {min: 0.08, typical: 0.11, max: 0.16}
+    medicaid_ffs_state: {min: 0.02, typical: 0.03, max: 0.05}
+    commercial_bcbs: {min: 0.15, typical: 0.20, max: 0.28}
+    commercial_national_uhc_aetna_cigna_humana: {min: 0.15, typical: 0.21, max: 0.28}
+    commercial_regional_tpa_other: {min: 0.05, typical: 0.07, max: 0.12}
+    tricare_workcomp_other: {min: 0.01, typical: 0.02, max: 0.04}
+    derivation: >
+      Quest volume: government 17/60 = 28% of insurance-billed (Medicare FFS + Medicaid FFS; MA and Medicaid MCOs
+      sit inside 'healthcare insurers'). MA = 54% of eligible beneficiaries (KFF 2025) so MA ~ Medicare FFS volume;
+      Medicaid MCO = 78% of Medicaid enrollees (KFF 2024). Labcorp 2013: Medicare+Medicaid 15.1% of requisitions.
+    source: [quest_10k_2025, labcorp_10k_2013, kff_ma_2025, kff_mco]
+    confidence: medium
+    current: "6 payers; no Medicare FFS at all; MA 15%, Medicaid 10%, commercial 75%"
+  number_of_payers:
+    distinct_837_payer_ids_per_month: {min: 150, typical: 300, max: 600}
+    head_concentration: "top 10 payer IDs = ~70% of claims; Zipf-like tail (s ~1.1); ~40% of payer IDs see <5 claims/month"
+    ma_concentration: {UHC: 0.29, Humana: 0.17, source: kff_ma_2025, confidence: high}
+    confidence: low
+  payer_id_conventions:
+    medicare_mac_payer_id: "5-digit MAC contract/workload number of the jurisdiction where the LAB is located (independent labs bill their own MAC)"
+    example_mac_ids: {palmetto_jm_nc_partb: "11502", novitas_jl_nj: "12402", noridian_je_ca_south: "01182", ngs_j6_il: "06102",
+                      fcso_jn_fl: "09102", cgs_j15_oh: "15202", wps_j5_ia: "05102"}
+    example_mac_ids_confidence: low  # pattern is right; verify specific numbers per MAC EDI page
+    national_commercial_ids: {UHC: "87726", Aetna: "60054", Cigna: "62308", Humana: "61101", source: payer_ids, confidence: medium}
+    clearinghouse_specific_ids: "many regional/Blues/Medicaid MCO IDs differ by clearinghouse; Aetna Better Health uses state IDs like 128MI"
+    837_2010BB: "NM1*PR*2*<payer name as in clearinghouse list>*****PI*<payer id>"
+    835_identification:
+      N1_PR_name: "payer's own legal/processing name; often differs from the 837 name (e.g. 837 'UNITEDHEALTHCARE', 835 'UNITEDHEALTHCARE INSURANCE COMPANY' or 'UMR'; 837 'MEDICARE PART B', 835 'PALMETTO GBA')"
+      N1_PR_N103_N104: "XV + CMS PlanID rarely; many payers omit N103/N104 entirely"
+      TRN03: "'1' + payer EIN (10 chars) is the common convention; some state Medicaids send bare payer id"
+      REF_2U: "payer id (Medicare: MAC contract number); present on ~50% of commercial 835s"
+      isa06_sender: "clearinghouse ISA id (lab receives 835s through its clearinghouse), not the payer id"
+    probability_835_name_differs_from_837: {value: 0.6, confidence: low}
+    probability_835_payer_id_absent_or_different: {value: 0.35, confidence: low, note: "parser must resolve by TRN03/REF*2U/name alias"}
+    source: [trn03_conventions, cms_835_cg, payer_ids]
+
+# ---------------------------------------------------------------------------------------------------
+# 3. CPT/HCPCS MIX, CHARGES AND ALLOWED AMOUNTS
+# ---------------------------------------------------------------------------------------------------
+cpt_mix:
+  method: >
+    Medicare CY2024 national rows (all rendering providers incl. independent labs). line_share = share of
+    all CLFS-code lines (distinct bene/day/code). charge = national average submitted charge (a proxy for
+    lab chargemasters). medicare_allowed = 2024 average allowed. clfs_2026 = CY2026 Q4 national limit.
+    Commercial-only menus (STI NAATs, prenatal, drug testing) are under-represented in Medicare data; the
+    commercial_line_share column re-weights for a commercial-heavy reference lab (low confidence).
+  source: [medicare_mup_2024, clfs_2026]
+  confidence: high   # for medicare columns; commercial_line_share is low
+  codes:   # code: [description, medicare_line_share_pct, commercial_line_share_pct, mean_units, avg_charge_usd, medicare_allowed_usd, clfs_2026_usd]
+    "36415": ["venipuncture", 12.65, 13.0, 1.00, 21.81, 8.49, 9.34]
+    "80053": ["comprehensive metabolic panel", 8.55, 8.0, 1.00, 61.44, 10.33, 10.56]
+    "85025": ["CBC w/ auto diff", 8.23, 8.5, 1.00, 37.12, 7.59, 7.77]
+    "80061": ["lipid panel", 5.45, 5.5, 1.00, 96.05, 13.09, 13.39]
+    "83036": ["hemoglobin A1c", 4.58, 4.0, 1.00, 58.04, 9.49, 9.71]
+    "84443": ["TSH", 4.36, 4.5, 1.00, 95.89, 16.44, 16.80]
+    "82306": ["vitamin D 25-OH", 2.02, 2.5, 1.00, 184.26, 28.96, 29.60]
+    "81001": ["urinalysis auto w/ micro", 1.99, 2.0, 1.00, 31.94, 3.10, 3.17]
+    "81003": ["urinalysis auto w/o micro", 1.79, 1.5, 1.00, 15.18, 2.19, 2.25]
+    "82570": ["creatinine, urine", 1.73, 1.0, 1.01, 45.67, 5.06, 5.18]
+    "84439": ["free T4", 1.71, 1.5, 1.00, 87.19, 8.82, 9.02]
+    "80048": ["basic metabolic panel", 1.61, 1.2, 1.00, 47.96, 8.27, 8.46]
+    "82607": ["vitamin B12", 1.47, 1.2, 1.00, 88.01, 14.75, 15.08]
+    "82043": ["urine microalbumin", 1.40, 0.8, 1.00, 57.23, 5.64, 5.78]
+    "87086": ["urine culture colony count", 1.39, 1.5, 1.00, 51.07, 7.90, 8.07]
+    "83540": ["iron", 1.12, 1.0, 1.00, 32.90, 6.33, 6.47]
+    "82728": ["ferritin", 1.08, 1.2, 1.00, 78.74, 13.33, 13.63]
+    "85027": ["CBC w/o diff", 1.05, 0.8, 1.00, 31.98, 6.33, 6.47]
+    "84153": ["PSA total", 1.03, 0.6, 1.00, 102.68, 17.98, 18.39]
+    "85610": ["prothrombin time", 1.02, 0.5, 1.00, 27.42, 4.19, 4.29]
+    "87088": ["urine culture ID", 0.67, 0.8, 1.04, 31.20, 7.92, 8.09]
+    "87186": ["susceptibility MIC", 0.67, 0.7, 1.29, 55.03, 8.47, 8.65]
+    "87077": ["aerobic isolate ID", 0.56, 0.6, 1.08, 32.76, 7.91, 8.08]
+    "80307": ["presumptive drug screen, analyzer", 0.60, 1.5, 1.00, 211.28, 60.30, 62.14]
+    "G0480": ["definitive drug 1-7 classes", 0.19, 0.4, 1.00, 287.96, 110.22, 114.43]
+    "G0481": ["definitive drug 8-14 classes", 0.15, 0.3, 1.00, 416.89, 152.42, 156.59]
+    "G0482": ["definitive drug 15-21 classes", 0.16, 0.3, 1.00, 509.81, 193.41, 198.74]
+    "G0483": ["definitive drug 22+ classes", 0.17, 0.4, 1.00, 636.79, 240.68, 246.92]
+    "87491": ["chlamydia NAAT", 0.08, 2.2, 1.00, 87.08, 34.34, 35.09]
+    "87591": ["gonorrhea NAAT", 0.08, 2.2, 1.00, 84.82, 34.34, 35.09]
+    "87661": ["trichomonas NAAT", 0.06, 0.8, 1.00, 104.15, 34.29, 35.09]
+    "87801": ["multiple organisms NAAT (STI ceiling code)", 0.22, 0.4, 2.27, 155.55, 68.66, 70.20]
+    "87624": ["HPV high-risk", 0.07, 0.8, 1.00, 140.57, 34.29, 35.09]
+    "86803": ["hepatitis C antibody", 0.16, 0.5, 1.00, 115.58, 13.93, 14.27]
+    "87389": ["HIV-1/2 Ag/Ab", 0.06, 0.6, 1.00, 124.40, 23.56, 24.08]
+    "87798": ["NAAT NOS (per target)", 0.39, 0.5, 10.32, 63.45, 34.35, 35.09]
+    "87481": ["candida NAAT", 0.30, 0.3, 3.11, 60.27, 34.05, 35.09]
+    "87631": ["resp virus 3-5 targets", 0.08, 0.3, 1.00, 241.64, 139.39, 142.63]
+    "87637": ["SARS-CoV-2 + flu A/B + RSV", 0.09, 0.4, 1.00, 291.40, 139.02, 142.63]
+    "0241U": ["SARS-CoV-2/flu/RSV PLA", 0.06, 0.2, 1.00, 295.97, 138.81, null]
+    "81528": ["stool DNA CRC screen", 0.20, 0.2, 1.00, 680.46, 498.54, 508.87]
+    "81479": ["unlisted molecular pathology (carrier-priced, not on CLFS)", 0.07, 0.05, 1.01, 5989.99, 2457.65, null]
+    "88305": ["surgical pathology level IV (PFS, not CLFS)", null, 0.5, 1.70, 186.06, 50.74, null]
+  long_tail: {medicare_line_share_not_listed_pct: 30.7, commercial_line_share_not_listed_pct: 24.3, distinct_codes_per_month: {min: 400, typical: 900, max: 1500},
+              note: "fill with the remaining CLFS codes weighted by Medicare line volume; 2,243 codes on the CY2026 CLFS", source: [medicare_mup_2024, clfs_2026], confidence: high}
+  per_tenant_chargemaster_variation: {lognormal_sigma: 0.25, note: "lab-to-lab price differences; keep fixed per tenant x code"}
+  charge_to_medicare_allowed_ratio: {routine_chemistry_hematology: {min: 4.0, typical: 6.0, max: 11.0},
+                                     infectious_naat: {min: 1.8, typical: 2.5, max: 4.1},
+                                     drug_definitive: {min: 2.5, typical: 2.6, max: 3.0},
+                                     molecular_genetic: {min: 1.2, typical: 1.8, max: 2.5},
+                                     venipuncture: 2.6, source: medicare_mup_2024, confidence: high}
+  top_by_medicare_allowed_dollars_2024: ["87798 6.1%", "36415 4.8%", "81528 4.4%", "80053 3.9%", "84443 3.2%", "80061 3.2%", "85025 2.8%", "82306 2.6%", "83036 1.9%", "G0483 1.8%", "80307 1.6%", "87481 1.4%"]
+  genetic_tests: {share_of_part_b_lab_tests: 0.05, share_of_part_b_lab_dollars: 0.43, top_test_median_payment: 447, source: oig_2024_lab, confidence: high}
+  code_validity_notes:
+    - "0240U is not on the CY2026 CLFS file: replace with 87637 or 0241U for 2026 DOS (high)"
+    - "81479 has no national CLFS rate; MAC-priced, expect wide allowed variance and frequent 16/N350 (missing description) or 197 (high)"
+    - "87801 is treated by most payers as a bundled ceiling code; billing individual STI NAATs together triggers recode to 87801 (xifin_2026, medium)"
+  order_profiles:   # replace ORDERS; each claim = one requisition. weights are share of claims
+    routine_blood:   {weight: 46, always: ["36415"], panel_menu: {"80053": 0.55, "85025": 0.55, "80061": 0.35, "83036": 0.30, "84443": 0.30, "82306": 0.12, "80048": 0.10, "84439": 0.12, "82607": 0.10, "82728": 0.08, "83540": 0.07, "84153": 0.06, "85610": 0.04}}
+    routine_urine:   {weight: 10, panel_menu: {"81001": 0.5, "81003": 0.35, "87086": 0.45, "82570": 0.15, "82043": 0.15}, culture_reflex: {"87088": 0.35, "87077": 0.25, "87186": 0.25}}
+    sti_womens:      {weight: 10, panel_menu: {"87491": 0.9, "87591": 0.9, "87661": 0.4, "87624": 0.25, "87389": 0.15, "86803": 0.10}}
+    respiratory:     {weight: 6, seasonal: true, panel_menu: {"87637": 0.55, "87631": 0.15, "0241U": 0.15, "87798": 0.15}}
+    pcr_panels:      {weight: 4, panel_menu: {"87798": 1.0, "87481": 0.5, "87150": 0.2}, units_87798: {min: 3, typical: 10, max: 25}}
+    drug_monitoring: {weight: 12, panel_menu: {"80307": 0.85, "G0480": 0.20, "G0481": 0.15, "G0482": 0.12, "G0483": 0.15}, note: "one definitive G048x per DOS max"}
+    molecular:       {weight: 2, panel_menu: {"81528": 0.4, "81479": 0.15, "81225": 0.1, "81226": 0.1, "81162": 0.05, "0037U": 0.05}}
+    pathology:       {weight: 2, panel_menu: {"88305": 1.0, "88342": 0.15, "88312": 0.10}, modifiers: {"26": 0.3, "TC": 0.1}}
+    mixed_blood_plus_urine: {weight: 8, combine: [routine_blood, routine_urine]}
+    confidence: low
+  modifiers:
+    "91": {use: "repeat clinical lab test same day", line_rate: 0.005}
+    "90": {use: "reference (outside) lab", line_rate: 0.01, note: "only when billing for another lab's test"}
+    "QW": {use: "CLIA-waived test", line_rate: 0.02}
+    "59_or_XU": {use: "distinct procedural service (NCCI bypass)", line_rate: 0.03}
+    "GA": {use: "ABN on file (Medicare) -> PR-50 if denied", line_rate_medicare: 0.02}
+    "GZ": {use: "ABN expected denial not on file -> CO-50", line_rate_medicare: 0.003}
+    "GY": {use: "statutorily excluded (screening) -> PR-96/204", line_rate_medicare: 0.005}
+    "26_TC": {use: "pathology professional/technical", line_rate_pathology: 0.4}
+    confidence: low
+
+pricing:
+  allowed_model: "allowed = CLFS_2026[code] * payer_multiplier * contract_noise  (NOT charge * ratio)"
+  payer_multiplier_vs_clfs:
+    medicare_ffs: {value: 1.00, note: "paid = allowed - 2% sequestration (CO-253)", source: clfs_2026, confidence: high}
+    medicare_advantage: {min: 0.95, typical: 1.00, max: 1.05, confidence: medium}
+    medicaid: {min: 0.55, typical: 0.80, max: 1.00, hard_cap: 1.00, note: "SSA 1903(i)(7): Medicaid may not exceed Medicare CLFS; many states pay 60-90% (KY 80053 = $10.56 = CLFS)",
+               source: medicaid_upper_limit, confidence: high}
+    commercial_contracted: {min: 0.80, typical: 1.15, max: 2.00, note: "PAMA set CLFS from the weighted median of 2016 private-payer rates, so contracted commercial clusters near CLFS; pre-PAMA commercial CBC $20.26 vs Medicare $11.02",
+                            source: [avalere_2013, hcci_lab], confidence: low}
+    commercial_out_of_network: {pct_of_billed: {min: 0.25, typical: 0.45, max: 0.80}, share_of_commercial_claims: 0.08, confidence: low}
+    contract_noise: {lognormal_sigma: 0.08, keyed_by: "payer x code (stable)"}
+  current: "allowed = charge * fee_ratio(0.30-0.62) -> 80053 allowed ~$35 vs CLFS $10.56 (3x too high); routine allowed/charge should be ~0.15-0.25"
+
+# ---------------------------------------------------------------------------------------------------
+# 4. DENIALS
+# ---------------------------------------------------------------------------------------------------
+denials:
+  definition_note: "XiFin = % of claims with a denial (any line, payer-reported, before appeal)"
+  overall_claim_denial_rate:
+    all_lab_segments_2025: {value: 0.112, source: xifin_2026, confidence: medium}
+    all_lab_segments_2024: {value: 0.080, source: xifin_2025_blog, confidence: medium}
+    all_lab_segments_2023: {value: 0.099, source: xifin_2025_blog, confidence: medium}
+    clinical_and_outreach_2024: {value: 0.065, source: xifin_2025_blog, confidence: medium}
+    molecular_2024: {value: 0.329, source: xifin_2025_blog, confidence: medium}
+    clinical_2021: {value: 0.136, molecular_2021: 0.272, pathology_2021: 0.198, source: xifin_2021, confidence: medium}
+    hospital_all_claims_2023: {value: 0.12, source: optum_denials_2024, confidence: medium}
+    aca_marketplace_in_network_2023: {value: 0.19, source: kff_aca_denials, confidence: medium}
+    recommended_targets: {routine_clinical: {min: 0.05, typical: 0.08, max: 0.14}, molecular_genetic: {min: 0.25, typical: 0.32, max: 0.40},
+                          drug_testing: {min: 0.10, typical: 0.18, max: 0.30}, pathology: {min: 0.08, typical: 0.12, max: 0.20},
+                          blended_tenant: {min: 0.07, typical: 0.10, max: 0.14}}
+  by_payer_class_multiplier:   # relative to the blended rate
+    medicare_ffs: {value: 0.6, confidence: low}
+    medicare_advantage: {value: 1.3, confidence: low}
+    medicaid_mco: {value: 1.5, confidence: low}
+    medicaid_ffs: {value: 1.3, confidence: low}
+    commercial_contracted: {value: 1.0, confidence: medium, evidence: "contracted 21.2% vs non-contracted 32.7% (XiFin 2021, ratio 1.54)"}
+    commercial_non_contracted: {value: 1.55, source: xifin_2021, confidence: medium}
+  denial_category_mix_clinical_2025:   # % of denials, clinical (non-hospital) lab, XiFin 2026 report
+    source: xifin_2026
+    confidence: medium
+    categories:
+      procedure_not_paid_separately: {share: 0.594, carcs: {"97": 0.55, "234": 0.15, "236": 0.20, "B15": 0.10}, rarc: {"M15": 0.4, "N19": 0.3, "M80": 0.1, "N20": 0.2},
+                                      typical_targets: "36415 with in-office draw, 85027 with 85025, 82947 with 80053, components of panels, 87801 vs individual NAATs, 81003 with 81001"}
+      duplicate: {share: 0.152, carcs: {"18": 1.0}, group: {"CO": 0.6, "OA": 0.4}, rarc: {"N111": 0.3, "N522": 0.2, "": 0.5}}
+      non_covered: {share: 0.066, carcs: {"96": 0.5, "204": 0.35, "B1": 0.05, "N/A_PR-96_screening": 0.10}, rarc: {"N130": 0.5, "N425": 0.2, "M76": 0.1, "": 0.2}}
+      prior_authorization: {share: 0.035, carcs: {"197": 0.7, "15": 0.15, "198": 0.15}, rarc: {"N54": 0.4, "M62": 0.3, "": 0.3}}
+      modifier_inconsistent_or_missing: {share: 0.032, carcs: {"4": 1.0}, rarc: {"N519": 0.3, "M20": 0.3, "N657": 0.1, "": 0.3}}
+      coordination_of_benefits: {share: 0.021, carcs: {"22": 0.8, "23": 0.0, "24": 0.2}, rarc: {"MA04": 0.3, "N479": 0.2, "": 0.5}}
+      experimental_investigational: {share: 0.018, carcs: {"55": 1.0}, rarc: {"N386": 0.4, "": 0.6}}
+      hsa_fsa: {share: 0.005, carcs: {"PR-B9": 1.0}}
+      incorrect_payer: {share: 0.004, carcs: {"109": 1.0}, rarc: {"N418": 0.5, "": 0.5}}
+      unlisted_remainder_other: {share: 0.073, carcs: {"16": 0.35, "50": 0.25, "11": 0.10, "167": 0.08, "27": 0.07, "29": 0.05, "151": 0.05, "183": 0.03, "B7": 0.02},
+                                 note: "XiFin top-9 categories sum to 92.7%; remainder modeled as information/medical necessity/eligibility/timely filing"}
+  denial_category_mix_molecular_2025:
+    source: xifin_2026
+    confidence: medium
+    categories: {prior_authorization: 0.276, duplicate: 0.163, experimental_investigational: 0.145, procedure_not_paid_separately: 0.142,
+                 non_covered: 0.046, coordination_of_benefits: 0.034, out_of_network_pcp: 0.021, not_authorized_by_network: 0.010, incorrect_payer: 0.009, other: 0.154}
+  denial_category_mix_pathology_2025:
+    source: xifin_2026
+    confidence: medium
+    categories: {duplicate: 0.355, procedure_not_paid_separately: 0.230, coordination_of_benefits: 0.150, experimental_investigational: 0.064,
+                 non_covered: 0.052, prior_authorization: 0.049, modifier: 0.029, incorrect_payer: 0.016, out_of_network: 0.014, other: 0.041}
+  pathology_top_carcs_2021_ranked: {order: ["151", "252", "96", "50", "55"], source: xifin_2021_carc, confidence: medium}
+  medicare_specific_edits:   # Medicare FFS lab claims
+    mue_units: {carc: "151", group: "CO", rarc: "N362", scope: "whole line denied when units exceed MUE", line_rate: {min: 0.002, typical: 0.005, max: 0.02},
+                hot_codes: ["87798", "87150", "87481", "87186"], source: mue_carc, confidence: high}
+    ncci_ptp: {carc: "236", group: "CO", line_rate: 0.004, source: mue_carc, confidence: high}
+    ordering_provider_pecos: {carc: "183 (or 16)", group: "CO", rarc: ["N574", "N264", "N265", "N575", "MA13"], claim_rate: {min: 0.002, typical: 0.006, max: 0.02},
+                              note: "ordering NM1 must be a person (NM102=1) enrolled in PECOS", source: pecos_edit, confidence: high}
+    clia_scope_or_certificate: {carc: "B7", group: "CO", rarc: ["N95", "MA120"], claim_rate: 0.002, note: "Noridian mass B7 errors Sep 2024 and Oct-Dec 2025 then mass-adjusted (reversal+correction waves)", source: clia_b7, confidence: high}
+    lcd_ncd_medical_necessity: {carc: "50", group: "CO (PR when GA modifier)", rarc: ["N386", "N115"], line_rate: {min: 0.01, typical: 0.02, max: 0.05},
+                                hot_codes: ["82306", "83036", "84443", "80061", "84153", "85610"], dx_driven: true, confidence: medium}
+    screening_not_covered: {carc: "204 or 96", group: "PR when GY", rarc: "N425", confidence: medium}
+  claim_vs_line_level:
+    medicare_carrier_claim_level_cas: {value: 0.0, note: "Medicare Part B reports all adjustments at line level; claim CAS 'does not apply to carriers'", source: cms_partb_835_cd, confidence: high}
+    commercial_full_denial_at_claim_level_only: {min: 0.05, typical: 0.15, max: 0.50, note: "claim CAS with no SVC loops; common for eligibility/COB/duplicate/timely filing", confidence: low}
+    partial_claims_share_of_denied_claims: {min: 0.45, typical: 0.60, max: 0.75, note: "most lab 'denials' are one or two lines (bundling, MUE, med-nec) on a paid claim", confidence: low}
+    current: "partial line denial 6% of claims; full denials dominate"
+  status_code_representation:
+    full_denial_clp02_4_share: {value: 0.55, confidence: low}
+    full_denial_clp02_1_zero_paid_share: {value: 0.45, confidence: low, note: "payers commonly report 'processed as primary' with $0 and CO CAS"}
+    current: "p_signal_v3_vs_recorded = 0.40 (fine)"
+  rework:
+    corrected_or_resubmitted_claims_share_of_837_volume: {min: 0.02, typical: 0.04, max: 0.08, confidence: low}
+    freq7_vs_new_original_after_denial: {freq7: 0.55, new_claim_freq1: 0.45, note: "Medicare MACs want a NEW claim (not freq 7) for PECOS/CO-16 fixes; Part B uses reopenings, not 7s, for many fixes", source: pecos_edit, confidence: medium}
+    days_denial_to_resubmission: {min: 2, typical: 12, max: 60}
+    share_of_denials_worked: {routine_low_dollar: 0.35, molecular: 0.85, confidence: low}
+    appeal_success: {clinical_additional_information_first_attempt: 0.364, clinical_medical_necessity: 0.097, molecular_prior_auth: 0.164, source: xifin_2026, confidence: medium}
+    avg_payment_per_successful_appeal_usd: {clinical: 171, molecular: 1684, pathology: 235, source: xifin_2026, confidence: medium}
+    appeal_payments_pct_of_insurance_payments: {clinical: 0.0035, molecular: 0.093, pathology: 0.0141, source: xifin_2026, confidence: medium}
+  current_generator_differences:
+    - "denial driven by max per-CPT base rate x payer mult; real clinical mix is 59% bundling (CO-97/234/236) + 15% duplicate (18)"
+    - "no CARC 151, 236, 234, 183, B7, 22, 55, 253; 97 only on 36415 partials"
+
+# ---------------------------------------------------------------------------------------------------
+# 5. PAYMENT TIMING, INTEREST, PLB, REVERSALS
+# ---------------------------------------------------------------------------------------------------
+payment_timing:
+  days_receipt_to_835:
+    medicare_ffs: {min: 14, typical: 15, max: 30, note: "electronic clean claims not paid before day 14 (13-day floor); interest after day 30", source: medicare_floor, confidence: high}
+    medicare_advantage: {min: 7, typical: 16, max: 45, confidence: low}
+    commercial_national: {min: 5, typical: 12, max: 35, confidence: low}
+    commercial_bcbs: {min: 7, typical: 14, max: 40, confidence: low}
+    medicaid_mco: {min: 10, typical: 22, max: 60, confidence: low}
+    medicaid_ffs_state: {min: 7, typical: 14, max: 45, note: "weekly checkwrite; adjudicated week N, 835 Wed of week N+1", source: nc_checkwrite, confidence: medium}
+    pended_tail: {share_over_60_days: 0.05, share_over_90_days: 0.02, confidence: low,
+                  evidence: "FHA (hospital) 49% commercial/46% MA/55% Medicaid MCO unpaid at 90d; athenahealth 2014 Medicaid 44 vs all-payer 26 days in AR (physician)", source: [fha_days_to_pay, athena_payerview_2014]}
+  ar_days_reference: {quest_dso: 48, source: quest_10k_2025, confidence: high}
+  remittance_cadence:
+    medicare_mac: {cycle: "every business day", files_per_day: 1, note: "one 835 per payee NPI per cycle", confidence: high}
+    medicaid_ffs: {cycle: "weekly (fixed weekday); AL biweekly", skip: "last cycle of June and December in NC", source: nc_checkwrite, confidence: high}
+    national_commercial: {cycle: "daily to 2x weekly", typical_files_per_week: 3, confidence: low}
+    bcbs_plans: {cycle: "weekly to 2x weekly", confidence: low}
+    small_payers_tpas: {cycle: "weekly to monthly; ~30% still paper/no ERA", era_share: 0.7, confidence: low}
+    era_eft_alignment: {rule: "CORE 370: 835 no more than 3 business days before EFT; BPR16 = EFT effective date >= DTM*405 production date", source: core_370}
+    weekends_and_federal_holidays: "no 835 production dates or BPR16 dates"
+  files_835_per_business_day_for_3000_claim_tenant: {min: 25, typical: 45, max: 80, confidence: low,
+      derivation: "~300 payer ids/month, ~40% remit weekly, Zipf tail -> 30-60 distinct 835 files on a typical day, Medicare file is the largest"}
+  claims_per_835_transaction: {median: 6, p90: 120, max: 3000, medicare_daily_file: {min: 300, typical: 600, max: 1500}, confidence: low}
+  bytes_per_835_file: {median_kb: 5, p90_kb: 90, medicare_daily_kb: {min: 200, typical: 420, max: 1100}}
+  multi_st_per_file: {share_of_files: 0.10, note: "clearinghouses concatenate payers into one ISA or several ISAs in one file", confidence: low}
+  zero_pay_835s:
+    share_of_835_transactions: {min: 0.03, typical: 0.08, max: 0.15, note: "BPR01=H, BPR04=NON when all denied or fully offset", confidence: low}
+  interest:
+    medicare: {plb_code: "L6", rate_2026H1: 0.04125, rate_2026H2: 0.0475, applies_after_day: 30, not_on_full_denials: true, source: medicare_interest, confidence: high,
+               claim_level: "Medicare reports CLP-level AMT*I and the PLB L6 sum (UHC: L6 = sum of AMT*I)"}
+    commercial_prompt_pay: {plb_code: "L6", share_of_835s_with_l6: 0.02, state_law_days: {min: 15, typical: 30, max: 45}, confidence: low}
+  plb_frequency_per_835_transaction:
+    WO_overpayment_recovery: {rate: 0.06, amount: {min: 5, typical: 40, max: 2500}, reference: "UHC: DOS + patient account; Medicare: FCN (17) + MBI", source: uhc_plb, confidence: medium}
+    "72_authorized_return": {rate: 0.005, pairs_with: "WO (offsetting)", source: [uhc_plb, bcbstx_plb], confidence: medium}
+    FB_forward_balance: {rate: 0.01, sign: "negative = moved forward; positive = applied from prior", reference: "TRN02 of the 835 where it originated", source: uhc_plb, confidence: high}
+    L6_interest: {rate: 0.03, confidence: low}
+    J1_nonreimbursable: {rate: 0.005, note: "suppressed payment below threshold; positive", source: uhc_plb, confidence: medium}
+    CS_adjustment: {rate: 0.01, note: "FEP/Blues claim-adjustment overpayment", source: bcbstx_plb, confidence: medium}
+    IR_irs_withholding: {rate: 0.0005, confidence: medium}
+    current: "p_plb_recoupment 0.05 WO; L6 only Medicaid; FB for negatives"
+  reversals_and_corrections:
+    clp02_22_share_of_clps: {min: 0.005, typical: 0.015, max: 0.04, confidence: low}
+    reversal_and_correction_same_835: {value: 0.7, confidence: low}
+    split_across_835s_with_wo_offset: {value: 0.3, note: "UHC: reversal 835 carries negative WO, correction 835 positive WO", source: uhc_plb, confidence: medium}
+    mass_adjustment_waves: {per_year_per_mac: {min: 0, typical: 2, max: 5}, claims_affected: "all claims for an edit/date range (e.g. Noridian B7 2024, 2025)", source: clia_b7, confidence: medium}
+    current: "rev 1.5% + revcor 2.5% + void 0.4% of claims = 4.4% (high)"
+
+# ---------------------------------------------------------------------------------------------------
+# 6. PATIENT RESPONSIBILITY AND COB
+# ---------------------------------------------------------------------------------------------------
+patient_responsibility:
+  medicare_part_b_clfs_tests: {deductible: 0, coinsurance: 0, note: "no cost sharing for CLFS tests; pathology (PFS, e.g. 88305) has deductible + 20%", source: quest_10k_2025, confidence: high}
+  medicare_advantage_labs: {copay_zero_share: 0.85, copay_when_present: {min: 5, typical: 10, max: 40}, confidence: low}
+  medicaid: {pr: 0, confidence: high}
+  commercial:
+    share_with_deductible: 0.88
+    avg_single_deductible_2025: 1886
+    share_deductible_2000_plus: 0.34
+    source: kff_ehbs_2025
+    confidence: high
+    plan_distribution: {ppo_deductible_1000_2000: 0.45, hdhp_3000_plus: 0.30, hmo_copay: 0.15, zero_deductible: 0.10}
+    lab_coinsurance: {min: 0.0, typical: 0.2, max: 0.3}
+    preventive_lipid_a1c_screening_zero_cost_share: true
+  share_of_claims_with_any_pr: {value_2025: 0.30, value_2023: 0.26, source: xifin_2026, confidence: medium}
+  pr_share_of_allowed_commercial_by_month: {Jan: 0.45, Feb: 0.42, Mar: 0.38, Apr: 0.33, May: 0.30, Jun: 0.27, Jul: 0.24, Aug: 0.22, Sep: 0.20, Oct: 0.18, Nov: 0.16, Dec: 0.15, confidence: low}
+  patients_share_of_net_ar: {value: 0.20, source: quest_10k_2025, confidence: high}
+cob:
+  claims_billed_to_secondary_via_837: {min: 0.02, typical: 0.04, max: 0.08, confidence: low,
+    note: "Medicare primary CLFS claims leave $0 PR, so no Medigap/Medicaid payment; COB billing is mostly commercial->commercial and commercial->Medicaid"}
+  medicare_crossover:
+    mechanism: "COBA automatic crossover: lab does NOT send an 837 to the supplemental payer"
+    clp02: "19 (processed as primary, forwarded)"
+    segments: "NM1*TT crossover carrier name; MOA remark MA18 (N89 if more than one)"
+    share_of_medicare_claims_crossed: {value: 0.20, confidence: low}
+    source: [x12_clp19, cms_835_cg]
+  secondary_835: {clp02: "2", cas: "OA-23 for primary payment; PR/CO for remainder", confidence: high}
+  cob_denial_carc_22_share_of_denials: {clinical: 0.021, pathology: 0.15, molecular: 0.034, source: xifin_2026, confidence: medium}
+  current: "p_secondary_coverage 0.12, secondary billed by 837 for every PR>0"
+
+# ---------------------------------------------------------------------------------------------------
+# 7. X12 CONVENTIONS REAL SENDERS USE
+# ---------------------------------------------------------------------------------------------------
+x12_837p:
+  envelope:
+    delimiters: {element: "*", component: [":", ">"], repetition: "^", segment: "~", mix: {":": 0.75, ">": 0.25}, confidence: medium}
+    line_breaks: {none: 0.6, lf: 0.3, crlf: 0.1, confidence: low}
+    isa: {ISA05_07: "ZZ (most); 30 = FEIN; 27/28 Medicare", ISA14_ack_requested: "1 (expects TA1) 0.4 / 0 0.6", ISA15: "P", ISA11: "^"}
+    gs: {GS01: "HC", GS08: "005010X222A1", GS02_GS03: "sender/receiver application codes (may differ from ISA ids)"}
+    st03: "005010X222A1 required"
+    bht: "BHT*0019*00*<batch id>*CCYYMMDD*HHMM*CH  (CH chargeable; RP for encounters)"
+    max_claims_per_st: 5000
+    claims_per_file: {min: 200, typical: 1500, max: 5000}
+    files_per_business_day: {min: 1, typical: 3, max: 10, note: "split by clearinghouse batch run, by payer/product (Medicare direct vs clearinghouse), or by size"}
+    source: clm_5000
+    confidence: medium
+  billing_provider_2010AA:
+    prv: "PRV*BI*PXC*291U00000X (Clinical Medical Laboratory)"
+    nm1_85: "organization, XX NPI (Luhn)"
+    n4_zip: "9 digits required, no PO box"
+    ref_ei: "required (TIN)"
+    source: [nucc_taxonomy, tr3]
+  claim_2300:
+    clm05: "81:B:1 (POS 81 independent laboratory; facility code qualifier B; frequency 1/7/8)"
+    pos_mix: {"81": 0.92, "11": 0.03, "12_home": 0.02, "19_22_hospital_outpatient": 0.02, "other": 0.01}
+    clm_freq_mix: {"1": 0.955, "7": 0.035, "8": 0.010}
+    ref_x4_clia: {required: true, rate: 0.995, note: "missing CLIA rejects at front end (Anthem); line-level REF*X4 allowed when lines differ", source: clia_ref_x4, confidence: high}
+    ref_g1_prior_auth: {rate_molecular: 0.6, rate_other: 0.005}
+    ref_f8_original_icn: "required on freq 7/8"
+    ref_d9_clearinghouse_trace: {rate: 0.5}
+    hi: {codes_per_claim: {1: 0.35, 2: 0.28, 3: 0.17, 4: 0.12, "5-12": 0.08}, qualifiers: "ABK first, ABF rest", no_decimal: true}
+    nte: {rate: 0.03, use: "NTE*ADD for unlisted test description (81479 requires description in SV101-7 or NTE)"}
+    pwk: {rate: 0.002}
+    amt_f5_patient_paid: {rate: 0.01}
+    referring_ordering:
+      loop_2310A_DN_referring: {rate: 0.97, nm102: "1 (person) always"}
+      loop_2420E_DK_ordering: {rate: 0.25, note: "some labs send ordering at line level instead of/in addition to 2310A"}
+      loop_2310C_77_service_facility: {rate: 0.15, note: "when performing site differs from billing address"}
+  service_line_2400:
+    sv1: "SV1*HC:<code>[:mod1:mod2:mod3:mod4][:::::description for unlisted]*charge*UN*units***1[:2:3:4]"
+    dx_pointer: "SV107 up to 4 pointers; generator should point to the dx that justifies the test"
+    dtp_472: "D8 single date (RD8 range rare: 0.5%)"
+    ref_6r: {rate: 0.85, note: "line item control number; payers echo it only if sent"}
+    ref_x4_line: {rate: 0.02}
+    svd_cas_dtp573: "on COB claims only"
+x12_835:
+  envelope:
+    st_per_payment: "one ST per BPR/TRN (one payee, one payment)"
+    lx: "Medicare MCS: LX*000000 / 000001 style; FISS: TTYYMM; commercial: LX*1 or by claim type"
+    bpr: {I_ACH_CCP: 0.80, I_CHK: 0.10, H_NON: 0.08, other: 0.02}
+    trn: "TRN*1*<EFT trace or check #>*1<payer EIN>"
+    dtm_405: "production date"
+    n1_pr_ref_2u: "see payer_id_conventions"
+    per_cx_bl: "PER*CX (claims contact) and PER*BL (technical) both common"
+    source: cms_835_cg
+  medicare_specific:
+    clp06: "MB (Part B)"
+    cas_groups_allowed: ["CO", "OA", "PR"]   # PI never on Medicare
+    claim_level_cas: "not used by carriers"
+    nm1_qc_id: "MI + MBI (11 char, e.g. 1EG4TE5MK73); confidence medium"
+    nm1_il_insured: "not used"
+    moa: "MOA***<RARC>... required whenever any claim-level remark (MA01 appeal rights, MA18 crossover, N89)"
+    co_253_sequestration: {rate: "every paid line", amount: "2% of (allowed - PR)", source: sequestration, confidence: high}
+    ref_lu_lcd_ncd: "REF (2110) Health Care Policy Identification carries LCD/NCD id on med-nec denials"
+    source: [cms_835_cg, cms_partb_835_cd]
+  commercial_variants:
+    clp06: {"12": 0.45, "CI": 0.25, "HM": 0.10, "BL": 0.10, "MC": 0.05, "16": 0.05}
+    cas_group_usage_share_of_cas_triplets: {CO: 0.62, PR: 0.25, OA: 0.10, PI: 0.03, CR: 0.0, note: "CR is obsolete in 5010", confidence: low}
+    svc06_present_when_recoded: {rate_of_lines: 0.01, note: "panel unbundle/downcode, 87801 ceiling recode"}
+    svc07_original_units: "when units reduced (MUE-style), SVC05 paid units vs SVC07 billed units"
+    amt_b6: {rate_of_paid_lines: 0.85}
+    ref_6r_echo: {rate_when_sent: 0.92}
+    lq_he: {rate_of_adjusted_lines: 0.4}
+    ref_1l_group: {rate: 0.3}
+    amt_au_coverage_amount: {rate: 0.3}
+    dtm_050_received: {rate: 0.6}
+    dtm_232_233_claim_dates: {rate: 0.7}
+    split_lines: {rate: 0.005, note: "one billed line returned as 2 SVCs sharing REF*6R"}
+    bundled_lines: {rate: 0.01, note: "payer folds lines into one SVC with SVC06 billed code; others CO-97 $0"}
+  acknowledgments_not_in_scope_but_real: ["TA1", "999 (accept/reject per ST)", "277CA (claim acceptance; ~2-5% front-end rejects)"]
+
+# ---------------------------------------------------------------------------------------------------
+# 8. DATA QUALITY QUIRKS A PARSER MUST SURVIVE (rates per file unless noted)
+# ---------------------------------------------------------------------------------------------------
+quirks:   # confidence: low for rates; all patterns are observed in production feeds
+  envelope:
+    wrapped_80_char_lines: 0.02
+    multiple_isa_in_one_file: 0.05
+    utf8_bom_or_leading_whitespace: 0.01
+    trailing_nulls_or_ctrl_z: 0.005
+    mixed_line_endings: 0.01
+    lowercase_segment_content: 0.002
+    isa_id_not_padded_to_15: 0.003   # breaks fixed-width ISA parsers; real
+    se01_count_off_by_one: 0.002
+    duplicate_isa13_control_number_across_days: 0.01
+    byte_identical_redelivery: 0.03
+    truncated_mid_segment: 0.005
+    non_x12_file_in_drop (pdf/csv/html error page): 0.005
+  "835_content":
+    clp01_altered_by_payer: {rate_of_clps: 0.02, forms: ["uppercased", "truncated to 17 or 20 chars", "leading zeros stripped", "special chars removed"]}
+    clp07_icn_reused_on_adjustment: 0.3   # of reversal/correction pairs
+    missing_svc_dtm472_uses_claim_dtm232: 0.05
+    amounts_with_trailing_zeros_or_plus: 0.01     # "10.50", "10.5", "+10.5" all appear
+    negative_zero: 0.001
+    cas_more_than_6_triplets_split: "always when needed"
+    same_carc_under_two_groups_on_one_line: 0.005
+    plb_with_multiple_adjustment_pairs: 0.2   # of PLB segments
+    plb03_composite_reference_patient_account: 0.5
+    unbalanced_835_from_payer_bug: 0.0005
+    nm1_qc_name_differs_from_837 (nickname/hyphen/order): 0.03
+    member_id_with_prefix_suffix: 0.1   # e.g. 'XYZ' alpha prefix, '01' suffix
+    payer_name_changes_mid_month (merger/rebrand/platform): 0.01
+  "837_content":
+    names_with_apostrophe_hyphen_suffix: 0.06
+    dob_1900_or_placeholder: 0.0005
+    gender_u: 0.003
+    zip5_for_patient: 0.2
+    long_pcn_up_to_38: 0.05
+
+# ---------------------------------------------------------------------------------------------------
+# 9. SCENARIO KNOB TARGETS (direct mapping to Scenario fields)
+# ---------------------------------------------------------------------------------------------------
+scenario_targets:
+  p_never_remitted: {value: 0.03, note: "within 60 days; includes paper-remit payers and pended claims", confidence: low}
+  p_zero_pay_fee_schedule: {value: 0.01, confidence: low}
+  p_partial_line_denial: {value: 0.06, note: "~60% of denied claims are partial", confidence: low}
+  p_reversal_no_correction: {value: 0.004, confidence: low}
+  p_reversal_correction: {value: 0.010, confidence: low}
+  p_void: {value: 0.002, confidence: low}
+  p_resubmit_after_co16: {value: 0.6, confidence: low}
+  p_signal_v3_vs_recorded: {value: 0.45, confidence: low}
+  p_late_submission: {value: 0.005, timely_filing_days: {medicare: 365, ma: 365, commercial: {min: 90, typical: 180, max: 365}, medicaid: {min: 90, typical: 180, max: 365}}, confidence: medium}
+  p_dependent: {value: 0.22, note: "commercial only; Medicare/Medicaid are always self", confidence: low}
+  p_secondary_coverage: {value: 0.06, confidence: low}
+  p_risky_provider: {value: 0.08, confidence: low}
+  p_duplicate_835_file: {value: 0.02, confidence: low}
+  p_corrupt_file: {value: 0.01, confidence: low}
+  p_plb_recoupment: {value: 0.06, confidence: medium}
+  p_duplicate_submission: {value: 0.01, note: "real feeds DO have accidental resends; duplicate is #2 clinical denial category (15%)", source: xifin_2026, confidence: medium}
+  claims_per_day: 3000
+  skip_weekends: true
+  skip_federal_holidays: true

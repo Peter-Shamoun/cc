@@ -1,0 +1,237 @@
+import { useEffect, useRef, useState } from 'react';
+import { AlertTriangle, ChevronDown, ChevronRight, Download, FileSpreadsheet, Info, Lightbulb, Loader2, Maximize2, ShieldCheck, Wrench, Check, X, Database, List, BarChart3, ListChecks, Search, RotateCcw, Code2, Table2, Image as ImageIcon, FileText, FileBox } from 'lucide-react';
+import clsx from 'clsx';
+import type { ArtifactPart, CalloutPart, ErrorPart, FilePart, ImagePart, Part, ReasoningPart, ToolCallPart } from '../../lib/contract';
+import { downloadBlob } from '../../lib/csv';
+import { IconButton } from '../ui';
+import { useAdapter, useBlobUrl } from '../../adapters/context';
+import { CodeBlock } from './CodeBlock';
+import { imageDisplayBox } from '../../render/imageFrame';
+import { fmtMs } from '../answer/normalize';
+import { useExpired } from '../../lib/useExpired';
+
+function fmtBytes(n: number) {
+  return n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/** Inline markdown (lazy, see ./Markdown). Re-exported for existing importers. */
+import { Inline } from './Markdown';
+export { Inline };
+
+export function FileCard({ part, onPreview }: { part: FilePart; onPreview?: () => void }) {
+  const adapter = useAdapter();
+  const expired = useExpired(part.expiresAt);
+  const isCsv = part.mime === 'text/csv';
+  const download = async () => {
+    if (!adapter || expired) return;
+    downloadBlob(part.name, await adapter.fetchBlob(part.fileId));
+  };
+  return (
+    <div className="my-3 flex w-[300px] max-w-full items-center gap-3 rounded-xl border border-line bg-elev p-2 pr-2" data-testid="file-card">
+      <button type="button" onClick={onPreview} disabled={!onPreview} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+        <span className={clsx('flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-white', isCsv ? 'bg-[#10a37f]' : 'bg-[#5b8def]')}>
+          {isCsv ? <FileSpreadsheet size={20} /> : <FileText size={20} />}
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-medium">{part.name}</span>
+          <span className="block text-xs text-fg-subtle">
+            {expired ? 'Expired, re-run to regenerate' : <>{isCsv ? 'CSV' : 'File'}{part.rowCount !== undefined && ` · ${part.rowCount.toLocaleString()} rows`} · {fmtBytes(part.sizeBytes)}</>}
+          </span>
+        </span>
+      </button>
+      <IconButton label={`Download ${part.name}`} onClick={download} disabled={expired}><Download size={16} /></IconButton>
+    </div>
+  );
+}
+
+export function ImageView({ part, onOpen }: { part: ImagePart; onOpen?: () => void }) {
+  const { url, err } = useBlobUrl(part.blobId);
+  const [lightbox, setLightbox] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const adapter = useAdapter();
+  const box = imageDisplayBox(part.width, part.height);
+  // Fixed box reserves space (no layout jump); on narrow screens it shrinks to the column width and the
+  // aspect ratio keeps the height proportional instead of overflowing sideways.
+  const frame = { width: box.width, height: box.height, aspectRatio: `${box.width} / ${box.height}` };
+  useEffect(() => {
+    if (!lightbox) return;
+    dialogRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); setLightbox(false); } };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [lightbox]);
+  return (
+    <figure className="group/img relative my-4 max-w-full" data-testid="image" style={{ width: box.width }}>
+      <div data-testid="image-frame" className="max-w-full h-auto!" style={frame}>
+        {err ? (
+          <div className="flex h-full w-full items-center justify-center rounded-xl border border-line text-sm text-fg-subtle">Image unavailable</div>
+        ) : url ? ( // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- mouse shortcut; the Expand image button is the keyboard path
+          <img src={url} alt={part.alt} onClick={() => setLightbox(true)} className="h-full w-full cursor-zoom-in rounded-xl border border-line bg-white object-contain" />
+        ) : (
+          <div className="h-full w-full animate-pulse rounded-xl bg-muted" data-testid="image-skeleton" />
+        )}
+      </div>
+      <div className="absolute right-2 top-2 flex gap-1 opacity-0 group-hover/img:opacity-100 group-focus-within/img:opacity-100 [@media(hover:none)]:opacity-100">
+        <IconButton label="Download image" className="bg-elev/90 shadow" onClick={async () => adapter && downloadBlob(`cc_figure.${part.mime === 'image/svg+xml' ? 'svg' : 'png'}`, await adapter.fetchBlob(part.blobId))}><Download size={15} /></IconButton>
+        <IconButton label="Expand image" className="bg-elev/90 shadow" onClick={onOpen ?? (() => setLightbox(true))}><Maximize2 size={14} /></IconButton>
+      </div>
+      {part.caption && <figcaption className="mt-1.5 text-xs text-fg-subtle">{part.caption}</figcaption>}
+      {lightbox && url && ( // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdrop click; Escape and the Close button are the keyboard path
+        <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={part.alt} onClick={() => setLightbox(false)} tabIndex={-1} className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-8">
+          <img src={url} alt={part.alt} className="max-h-full max-w-full rounded-lg bg-white" />
+          <IconButton label="Close" className="absolute right-4 top-4 bg-white/90 text-black" onClick={() => setLightbox(false)}><X size={18} /></IconButton>
+        </div>
+      )}
+    </figure>
+  );
+}
+
+// Fidelity (10:48 directive): callouts read like a quoted note in Claude/ChatGPT prose: a hairline rule, muted text,
+// no tinted card. Only caveats tint their icon (amber) so "check before using" still stands out a little.
+const CALLOUT = {
+  assumption: { icon: Lightbulb, tone: 'text-fg-subtle' },
+  info: { icon: Info, tone: 'text-fg-subtle' },
+  caveat: { icon: AlertTriangle, tone: 'text-[#b7791f] dark:text-[#e8b339]' },
+  data_quality: { icon: AlertTriangle, tone: 'text-[#b7791f] dark:text-[#e8b339]' },
+  phi_redaction: { icon: ShieldCheck, tone: 'text-fg-subtle' },
+} as const;
+
+export function Callout({ part, onEdit }: { part: CalloutPart; onEdit?: (text: string) => void }) {
+  const { icon: Icon, tone } = CALLOUT[part.variant] ?? CALLOUT.info;
+  const [open, setOpen] = useState(part.items.length <= 4);
+  return (
+    <div className="my-4 border-l-2 border-line-strong py-0.5 pl-4 font-sans text-sm text-fg-muted" role="note" data-testid="callout" data-variant={part.variant}>
+      <button type="button" onClick={() => setOpen((o) => !o)} className="mb-1 flex items-center gap-1.5 font-medium text-fg" aria-expanded={open}>
+        <Icon size={14} className={tone} aria-hidden /> {part.title ?? part.variant}
+        {part.items.length > 4 && (open ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
+      </button>
+      {open && (
+        <ul className="list-disc space-y-1 pl-5 leading-relaxed marker:text-fg-subtle">
+          {part.items.map((it) => (
+            <li key={it.id}>
+              <Inline text={it.text} />
+              {it.editable && onEdit && (
+                <button type="button" data-print-hide onClick={() => onEdit('Instead, assume ')} className="ml-2 text-xs text-fg-muted underline underline-offset-2 hover:text-fg">Change</button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+export function ReasoningView({ part, running }: { part: ReasoningPart; running: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="my-2 font-sans text-sm first:mt-0" data-testid="reasoning">
+      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="inline-flex items-center gap-1 text-fg-muted hover:text-fg">
+        <span>{running ? 'Thinking' : `Thought for ${fmtMs(part.durationMs ?? 1000)}`}</span>
+        {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+      </button>
+      {open && <div className="mt-1.5 border-l-2 border-line pl-4 leading-relaxed text-fg-muted">{part.summary}</div>}
+    </div>
+  );
+}
+
+const TOOL_ICON: Record<string, typeof Wrench> = { run_sql: Database, describe_view: List, list_views: List, make_chart: BarChart3, verify: ListChecks, search_examples: Search };
+
+export function ToolRow({ part }: { part: ToolCallPart }) {
+  const [open, setOpen] = useState(false);
+  const Icon = TOOL_ICON[part.tool] ?? Wrench;
+  const meta = [part.output?.rowCount !== undefined && `${part.output.rowCount.toLocaleString()} rows`, part.durationMs !== undefined && fmtMs(part.durationMs)].filter(Boolean).join(' · ');
+  return (
+    <div className="font-sans text-sm" data-testid="tool-call" data-state={part.state}>
+      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="group inline-flex max-w-full items-center gap-2 rounded-md py-1 text-left text-fg-muted hover:text-fg">
+        <Icon size={14} className="shrink-0" />
+        <span className="truncate">{part.label}</span>
+        {part.state === 'running' && <Loader2 size={13} className="shrink-0 animate-spin" />}
+        {part.state === 'ok' && <Check size={13} className="shrink-0 text-fg-subtle" />}
+        {part.state === 'error' && <X size={13} className="shrink-0 text-danger" />}
+        {meta && <span className="shrink-0 text-xs text-fg-subtle">{meta}</span>}
+        {part.agent && <span className="shrink-0 text-xs text-fg-subtle"><span aria-hidden>· </span><span>{part.agent}</span></span>}
+        {open ? <ChevronDown size={13} className="shrink-0" /> : <ChevronRight size={13} className="shrink-0" />}
+      </button>
+      {open && (
+        <div className="mb-2 ml-1.5 border-l-2 border-line pl-4 text-fg-muted">
+          {part.input?.sql && <CodeBlock code={part.input.sql} language="sql" title="input" />}
+          {part.input?.args && <CodeBlock code={JSON.stringify(part.input.args, null, 2)} language="json" title="args" />}
+          {part.output?.message && <div className="py-1">{part.output.message}</div>}
+          <div className="py-1 text-xs text-fg-subtle">Result rows are not shown here</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Groups consecutive tool calls: "Used 3 tools ▸" when more than 2 (spec §4.8). */
+export function ToolGroup({ parts }: { parts: ToolCallPart[] }) {
+  const running = parts.some((p) => p.state === 'running');
+  const [open, setOpen] = useState(false);
+  if (parts.length <= 2) return <div className="my-2">{parts.map((p) => <ToolRow key={p.id} part={p} />)}</div>;
+  return (
+    <div className="my-2 font-sans text-sm">
+      <button type="button" aria-expanded={open || running} onClick={() => setOpen((o) => !o)} className="inline-flex items-center gap-1.5 py-1 text-fg-muted hover:text-fg">
+        <Wrench size={14} /> <span>{running ? `Using ${parts.length} tools…` : `Used ${parts.length} tools`}</span>
+        {open || running ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+      </button>
+      {(open || running) && <div className="ml-1.5 border-l-2 border-line pl-3">{parts.map((p) => <ToolRow key={p.id} part={p} />)}</div>}
+    </div>
+  );
+}
+
+export function ErrorView({ part, onRetry }: { part: ErrorPart; onRetry?: () => void }) {
+  const [details, setDetails] = useState(false);
+  return (
+    // Like ChatGPT/Claude: a plain line in the answer column (small red icon, no tinted box) with one quiet Retry.
+    <div className="my-3 font-sans text-sm" role="alert" data-testid="error">
+      <div className="flex items-start gap-2">
+        <AlertTriangle size={15} className="mt-0.5 shrink-0 text-danger" aria-hidden />
+        <div className="min-w-0 flex-1">
+          <div className="font-medium text-fg">{part.title}</div>
+          <p className="mt-0.5 text-fg-muted">{part.message}</p>
+        </div>
+      </div>
+      <div data-print-hide className={clsx('flex items-center gap-3 pl-[23px] text-xs', ((part.retryable && onRetry) || part.details) && 'mt-2')}>
+        {part.retryable && onRetry && (
+          <button type="button" onClick={onRetry} className="-ml-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-fg-muted hover:bg-hover hover:text-fg" data-testid="error-retry"><RotateCcw size={12} aria-hidden /> Retry</button>
+        )}
+        {part.details && <button type="button" onClick={() => setDetails((d) => !d)} className="text-fg-muted underline underline-offset-2">{details ? 'Hide details' : 'Details'}</button>}
+      </div>
+      {details && part.details && <pre className="mt-2 whitespace-pre-wrap rounded-md bg-[var(--code-bg)] p-2 font-mono text-xs text-fg-muted">{part.details}</pre>}
+    </div>
+  );
+}
+
+const KIND_ICON: Record<string, typeof FileText> = { table: Table2, chart: BarChart3, code: Code2, image: ImageIcon, report: FileText };
+/** `ArtifactPart.kind` is an open enum: a kind this build doesn't know yet gets a generic artifact icon and label. */
+export const artifactIcon = (kind: string) => (Object.hasOwn(KIND_ICON, kind) ? KIND_ICON[kind] : FileBox);
+function ArtifactKindIcon({ kind }: { kind: string }) {
+  switch (kind) {
+    case 'table': return <Table2 size={18} aria-hidden />;
+    case 'chart': return <BarChart3 size={18} aria-hidden />;
+    case 'code': return <Code2 size={18} aria-hidden />;
+    case 'image': return <ImageIcon size={18} aria-hidden />;
+    case 'report': return <FileText size={18} aria-hidden />;
+    default: return <FileBox size={18} aria-hidden />;
+  }
+}
+const artifactKindLabel = (kind: string) => (kind === 'report' ? 'Document' : Object.hasOwn(KIND_ICON, kind) ? kind : 'Artifact');
+
+/** Claude-style in-thread artifact card (spec §4.10). */
+export function ArtifactCard({ part, onOpen }: { part: ArtifactPart; onOpen: () => void }) {
+  return (
+    <button type="button" onClick={onOpen} className="my-4 flex w-full max-w-md items-center gap-3 rounded-xl border border-line bg-elev p-3 text-left font-sans hover:border-line-strong hover:bg-hover" data-testid="artifact-card" data-artifact-id={part.artifactId} aria-label={`Open ${part.title}, version ${part.version}`}>
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-line bg-bg" data-testid="artifact-kind-icon" data-kind-known={Object.hasOwn(KIND_ICON, String(part.kind)) || undefined}><ArtifactKindIcon kind={String(part.kind)} /></span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium">{part.title}</span>
+        <span className="block text-xs text-fg-subtle"><span className="capitalize">{artifactKindLabel(String(part.kind))}</span> · Click to open</span>
+      </span>
+      <span className="shrink-0 rounded-md border border-line px-1.5 py-0.5 text-[11px] tabular-nums text-fg-muted" data-testid="artifact-version">v{part.version}</span>
+    </button>
+  );
+}
+
+export function Unsupported({ part }: { part: Part }) {
+  return <span className="my-2 inline-block rounded-full border border-line px-2.5 py-1 font-sans text-xs text-fg-subtle" data-testid="unsupported">Unsupported content ({(part as { type: string }).type})</span>;
+}

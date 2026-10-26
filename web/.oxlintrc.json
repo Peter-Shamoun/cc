@@ -1,0 +1,122 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "typescript",
+    "react",
+    "jsx-a11y",
+    "oxc",
+    "unicorn"
+  ],
+  "categories": {
+    "correctness": "error"
+  },
+  "env": {
+    "browser": true,
+    "es2024": true
+  },
+  "ignorePatterns": [
+    "dist/**",
+    "dist-*/**",
+    "node_modules/**",
+    "test-results/**",
+    "playwright-report/**"
+  ],
+  "rules": {
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "error",
+    "no-eval": "error",
+    "no-new-func": "error",
+    "no-implied-eval": "error",
+    "no-console": "error",
+    "no-restricted-globals": [
+      "error",
+      {
+        "name": "localStorage",
+        "message": "PHI rule: no web storage (docs/frontend_security.md)."
+      },
+      {
+        "name": "sessionStorage",
+        "message": "PHI rule: no web storage (docs/frontend_security.md)."
+      },
+      {
+        "name": "indexedDB",
+        "message": "PHI rule: no client persistence (docs/frontend_security.md)."
+      }
+    ],
+    "jsx-a11y/alt-text": "error",
+    "jsx-a11y/anchor-is-valid": "error",
+    "jsx-a11y/aria-props": "error",
+    "jsx-a11y/aria-role": "error",
+    "jsx-a11y/role-has-required-aria-props": "error",
+    "jsx-a11y/no-autofocus": "off",
+    "react/jsx-no-target-blank": "error",
+    "react/no-danger": "error",
+    "react/set-state-in-effect": "error",
+    "react/refs": "error",
+    "react/purity": "error",
+    "react/use-memo": "error",
+    "react/immutability": "error",
+    "react/incompatible-library": "off",
+    "jsx-a11y/prefer-tag-over-role": "off",
+    "jsx-a11y/no-noninteractive-element-interactions": "error",
+    "jsx-a11y/click-events-have-key-events": "error",
+    "jsx-a11y/no-noninteractive-tabindex": "off",
+    "jsx-a11y/no-noninteractive-element-to-interactive-role": "error",
+    "jsx-a11y/interactive-supports-focus": "error",
+    "jsx-a11y/no-static-element-interactions": "error",
+    "jsx-a11y/control-has-associated-label": "error",
+    "no-unused-vars": "error"
+  },
+  "overrides": [
+    {
+      "files": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "src/test/**",
+        "e2e/**",
+        "scripts/**",
+        "ci/**",
+        "*.config.ts",
+        "*.config.mjs"
+      ],
+      "rules": {
+        "no-console": "off",
+        "no-restricted-globals": "off",
+        "react/no-danger": "off"
+      }
+    },
+    {
+      "files": [
+        "src/lib/prefs.ts",
+        "public/theme-init.js"
+      ],
+      "rules": {
+        "no-restricted-globals": "off"
+      }
+    },
+    {
+      "files": [
+        "src/components/parts/CodeBlock.tsx"
+      ],
+      "rules": {
+        "react/no-danger": "off"
+      }
+    },
+    {
+      "files": [
+        "src/shell/SettingsDialog.tsx"
+      ],
+      "rules": {
+        "react/jsx-key": "off"
+      }
+    },
+    {
+      "files": [
+        "e2e/**"
+      ],
+      "rules": {
+        "react-hooks/rules-of-hooks": "off"
+      }
+    }
+  ]
+}

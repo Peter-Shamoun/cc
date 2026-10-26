@@ -1,0 +1,2584 @@
+[
+ {
+  "name": "ok_minimal",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 1
+   }
+  ],
+  "expect": []
+ },
+ {
+  "name": "ok_full",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "step.sql_running",
+    "stepId": "s1",
+    "sql": "SELECT 1",
+    "purpose": "answer",
+    "attempt": 1,
+    "seq": 1
+   },
+   {
+    "type": "step.sql_result",
+    "stepId": "s1",
+    "ok": false,
+    "elapsedMs": 1,
+    "seq": 2
+   },
+   {
+    "type": "step.repair_attempt",
+    "stepId": "s2",
+    "failedStepId": "s1",
+    "attempt": 1,
+    "error": "e",
+    "revisedSql": "x",
+    "seq": 3
+   },
+   {
+    "type": "step.sql_running",
+    "stepId": "s3",
+    "sql": "SELECT 1",
+    "purpose": "repair",
+    "attempt": 1,
+    "repairOf": "s2",
+    "seq": 4
+   },
+   {
+    "type": "step.sql_result",
+    "stepId": "s3",
+    "ok": true,
+    "elapsedMs": 1,
+    "seq": 5
+   },
+   {
+    "type": "heartbeat"
+   },
+   {
+    "type": "table.start",
+    "partId": "p1",
+    "columns": [],
+    "seq": 6
+   },
+   {
+    "type": "table.rows",
+    "partId": "p1",
+    "offset": 0,
+    "rows": [],
+    "seq": 7
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "table",
+     "id": "p1",
+     "sqlPartId": null
+    },
+    "seq": 8
+   },
+   {
+    "type": "text.start",
+    "partId": "p2",
+    "seq": 9
+   },
+   {
+    "type": "text.delta",
+    "partId": "p2",
+    "delta": "x",
+    "seq": 10
+   },
+   {
+    "type": "text.end",
+    "partId": "p2",
+    "seq": 11
+   },
+   {
+    "type": "step.check",
+    "stepId": "s4",
+    "check": "c",
+    "verdict": "pass",
+    "message": "m",
+    "targetStepId": "s3",
+    "seq": 12
+   },
+   {
+    "type": "part.patch",
+    "partId": "p1",
+    "patch": {
+     "title": "t"
+    },
+    "seq": 13
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 14
+   }
+  ],
+  "expect": []
+ },
+ {
+  "name": "ok_aborted_mid_text",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "text.start",
+    "partId": "p1",
+    "seq": 1
+   },
+   {
+    "type": "text.delta",
+    "partId": "p1",
+    "delta": "x",
+    "seq": 2
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "aborted",
+    "usage": {},
+    "seq": 3
+   }
+  ],
+  "expect": []
+ },
+ {
+  "name": "ok_clarify",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "clarification",
+     "id": "p1"
+    },
+    "seq": 1
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "needs_input",
+    "usage": {},
+    "seq": 2
+   }
+  ],
+  "expect": []
+ },
+ {
+  "name": "empty",
+  "events": [],
+  "expect": [
+   "end.last",
+   "end.once",
+   "start.first",
+   "start.once"
+  ]
+ },
+ {
+  "name": "not_a_list_item",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   "oops",
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 1
+   }
+  ],
+  "expect": [
+   "event.shape"
+  ]
+ },
+ {
+  "name": "missing_end",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   }
+  ],
+  "expect": [
+   "end.last",
+   "end.once"
+  ]
+ },
+ {
+  "name": "event_after_end",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 1
+   },
+   {
+    "type": "text.start",
+    "partId": "p1",
+    "seq": 2
+   }
+  ],
+  "expect": [
+   "end.last",
+   "text.span"
+  ]
+ },
+ {
+  "name": "two_starts",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 1
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 2
+   }
+  ],
+  "expect": [
+   "start.once"
+  ]
+ },
+ {
+  "name": "seq_gap",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 2
+   }
+  ],
+  "expect": [
+   "seq.gapless"
+  ]
+ },
+ {
+  "name": "seq_string",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": "0"
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 1
+   }
+  ],
+  "expect": [
+   "seq.gapless"
+  ]
+ },
+ {
+  "name": "message_id_mismatch",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "message.end",
+    "messageId": "m2",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 1
+   }
+  ],
+  "expect": [
+   "message.same_id"
+  ]
+ },
+ {
+  "name": "unknown_finish",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "done",
+    "usage": {},
+    "seq": 1
+   }
+  ],
+  "expect": [
+   "finish.known"
+  ]
+ },
+ {
+  "name": "result_before_running",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "step.sql_result",
+    "stepId": "s1",
+    "ok": true,
+    "elapsedMs": 1,
+    "seq": 1
+   },
+   {
+    "type": "step.sql_running",
+    "stepId": "s1",
+    "sql": "SELECT 1",
+    "purpose": "answer",
+    "attempt": 1,
+    "seq": 2
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 3
+   }
+  ],
+  "expect": [
+   "sql.paired",
+   "sql.paired"
+  ]
+ },
+ {
+  "name": "sql_never_finishes",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "step.sql_running",
+    "stepId": "s1",
+    "sql": "SELECT 1",
+    "purpose": "answer",
+    "attempt": 1,
+    "seq": 1
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 2
+   }
+  ],
+  "expect": [
+   "sql.paired"
+  ]
+ },
+ {
+  "name": "duplicate_step_id",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "step.sql_running",
+    "stepId": "s1",
+    "sql": "SELECT 1",
+    "purpose": "answer",
+    "attempt": 1,
+    "seq": 1
+   },
+   {
+    "type": "step.sql_result",
+    "stepId": "s1",
+    "ok": true,
+    "elapsedMs": 1,
+    "seq": 2
+   },
+   {
+    "type": "step.sql_running",
+    "stepId": "s1",
+    "sql": "SELECT 1",
+    "purpose": "answer",
+    "attempt": 1,
+    "seq": 3
+   },
+   {
+    "type": "step.sql_result",
+    "stepId": "s1",
+    "ok": true,
+    "elapsedMs": 1,
+    "seq": 4
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 5
+   }
+  ],
+  "expect": [
+   "sql.paired",
+   "sql.paired",
+   "step.unique"
+  ]
+ },
+ {
+  "name": "repair_of_ok_step",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "step.sql_running",
+    "stepId": "s1",
+    "sql": "SELECT 1",
+    "purpose": "answer",
+    "attempt": 1,
+    "seq": 1
+   },
+   {
+    "type": "step.sql_result",
+    "stepId": "s1",
+    "ok": true,
+    "elapsedMs": 1,
+    "seq": 2
+   },
+   {
+    "type": "step.repair_attempt",
+    "stepId": "s2",
+    "failedStepId": "s1",
+    "attempt": 1,
+    "error": "e",
+    "revisedSql": "x",
+    "seq": 3
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 4
+   }
+  ],
+  "expect": [
+   "repair.target"
+  ]
+ },
+ {
+  "name": "check_unknown_target",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "step.check",
+    "stepId": "s1",
+    "check": "c",
+    "verdict": "pass",
+    "message": "m",
+    "targetStepId": "s9",
+    "seq": 1
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 2
+   }
+  ],
+  "expect": [
+   "check.target"
+  ]
+ },
+ {
+  "name": "delta_before_start",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "text.delta",
+    "partId": "p1",
+    "delta": "x",
+    "seq": 1
+   },
+   {
+    "type": "text.start",
+    "partId": "p1",
+    "seq": 2
+   },
+   {
+    "type": "text.end",
+    "partId": "p1",
+    "seq": 3
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 4
+   }
+  ],
+  "expect": [
+   "text.span"
+  ]
+ },
+ {
+  "name": "delta_after_end",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "text.start",
+    "partId": "p1",
+    "seq": 1
+   },
+   {
+    "type": "text.end",
+    "partId": "p1",
+    "seq": 2
+   },
+   {
+    "type": "text.delta",
+    "partId": "p1",
+    "delta": "x",
+    "seq": 3
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 4
+   }
+  ],
+  "expect": [
+   "text.span"
+  ]
+ },
+ {
+  "name": "text_never_closed",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "text.start",
+    "partId": "p1",
+    "seq": 1
+   },
+   {
+    "type": "text.delta",
+    "partId": "p1",
+    "delta": "x",
+    "seq": 2
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 3
+   }
+  ],
+  "expect": [
+   "text.span"
+  ]
+ },
+ {
+  "name": "rows_without_table_start",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "table.rows",
+    "partId": "p1",
+    "offset": 0,
+    "rows": [],
+    "seq": 1
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 2
+   }
+  ],
+  "expect": [
+   "table.span"
+  ]
+ },
+ {
+  "name": "table_never_completed",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "table.start",
+    "partId": "p1",
+    "columns": [],
+    "seq": 1
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 2
+   }
+  ],
+  "expect": [
+   "table.span"
+  ]
+ },
+ {
+  "name": "patch_unknown_part",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "part.patch",
+    "partId": "p9",
+    "patch": {},
+    "seq": 1
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 2
+   }
+  ],
+  "expect": [
+   "patch.target"
+  ]
+ },
+ {
+  "name": "step_after_answer",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "text.start",
+    "partId": "p1",
+    "seq": 1
+   },
+   {
+    "type": "text.end",
+    "partId": "p1",
+    "seq": 2
+   },
+   {
+    "type": "step.sql_running",
+    "stepId": "s1",
+    "sql": "SELECT 1",
+    "purpose": "answer",
+    "attempt": 1,
+    "seq": 3
+   },
+   {
+    "type": "step.sql_result",
+    "stepId": "s1",
+    "ok": true,
+    "elapsedMs": 1,
+    "seq": 4
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 5
+   }
+  ],
+  "expect": [
+   "answer.after_steps",
+   "answer.after_steps"
+  ]
+ },
+ {
+  "name": "escalation_after_answer",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "callout",
+     "id": "p1"
+    },
+    "seq": 1
+   },
+   {
+    "type": "escalation",
+    "from": {},
+    "to": {},
+    "reason": "r",
+    "seq": 2
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 3
+   }
+  ],
+  "expect": [
+   "answer.after_steps"
+  ]
+ },
+ {
+  "name": "sql_part_unknown",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "table",
+     "id": "p1",
+     "sqlPartId": "p9"
+    },
+    "seq": 1
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 2
+   }
+  ],
+  "expect": [
+   "sql_part.target"
+  ]
+ },
+ {
+  "name": "repair_of_unknown",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "step.sql_running",
+    "stepId": "s1",
+    "sql": "SELECT 1",
+    "purpose": "repair",
+    "attempt": 1,
+    "repairOf": "s9",
+    "seq": 1
+   },
+   {
+    "type": "step.sql_result",
+    "stepId": "s1",
+    "ok": true,
+    "elapsedMs": 1,
+    "seq": 2
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 3
+   }
+  ],
+  "expect": [
+   "repair.of"
+  ]
+ },
+ {
+  "name": "needs_input_without_clarification",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "needs_input",
+    "usage": {},
+    "seq": 1
+   }
+  ],
+  "expect": [
+   "clarify.needs_input"
+  ]
+ },
+ {
+  "name": "ok_chart_stream",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "table",
+     "id": "t1",
+     "rows": [
+      [
+       "A",
+       1
+      ],
+      [
+       "B",
+       2
+      ]
+     ],
+     "rowCount": 2
+    },
+    "seq": 1
+   },
+   {
+    "type": "chart.start",
+    "partId": "c1",
+    "plot": {
+     "v": 1,
+     "kind": "bar",
+     "title": "Paid by payer",
+     "x": {
+      "field": "payer",
+      "type": "nominal",
+      "title": "Payer"
+     },
+     "y": {
+      "field": "paid",
+      "type": "quantitative",
+      "title": "Paid"
+     }
+    },
+    "tablePartId": "t1",
+    "seq": 2
+   },
+   {
+    "type": "chart.points",
+    "partId": "c1",
+    "offset": 0,
+    "rows": [
+     {
+      "payer": "A",
+      "paid": 1
+     }
+    ],
+    "seq": 3
+   },
+   {
+    "type": "chart.points",
+    "partId": "c1",
+    "offset": 1,
+    "rows": [
+     {
+      "payer": "B",
+      "paid": 2
+     }
+    ],
+    "seq": 4
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "chart",
+     "id": "c1",
+     "library": "vega-lite",
+     "spec": {},
+     "alt": "a",
+     "tablePartId": "t1",
+     "plot": {
+      "v": 1,
+      "kind": "bar",
+      "title": "Paid by payer",
+      "x": {
+       "field": "payer",
+       "type": "nominal",
+       "title": "Payer"
+      },
+      "y": {
+       "field": "paid",
+       "type": "quantitative",
+       "title": "Paid"
+      },
+      "data": [
+       {
+        "payer": "A",
+        "paid": 1
+       },
+       {
+        "payer": "B",
+        "paid": 2
+       }
+      ]
+     }
+    },
+    "seq": 5
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 6
+   }
+  ],
+  "expect": []
+ },
+ {
+  "name": "ok_chart_replay_overlaps",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "table",
+     "id": "t1",
+     "rows": [
+      [
+       "A",
+       1
+      ],
+      [
+       "B",
+       2
+      ]
+     ],
+     "rowCount": 2
+    },
+    "seq": 1
+   },
+   {
+    "type": "chart.start",
+    "partId": "c1",
+    "plot": {
+     "v": 1,
+     "kind": "bar",
+     "title": "Paid by payer",
+     "x": {
+      "field": "payer",
+      "type": "nominal",
+      "title": "Payer"
+     },
+     "y": {
+      "field": "paid",
+      "type": "quantitative",
+      "title": "Paid"
+     }
+    },
+    "tablePartId": "t1",
+    "seq": 2
+   },
+   {
+    "type": "chart.points",
+    "partId": "c1",
+    "offset": 0,
+    "rows": [
+     {
+      "payer": "A",
+      "paid": 1
+     },
+     {
+      "payer": "B",
+      "paid": 2
+     }
+    ],
+    "seq": 3
+   },
+   {
+    "type": "chart.points",
+    "partId": "c1",
+    "offset": 0,
+    "rows": [
+     {
+      "payer": "A",
+      "paid": 1
+     }
+    ],
+    "seq": 4
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "chart",
+     "id": "c1",
+     "library": "vega-lite",
+     "spec": {},
+     "alt": "a",
+     "tablePartId": "t1",
+     "plot": {
+      "v": 1,
+      "kind": "bar",
+      "title": "Paid by payer",
+      "x": {
+       "field": "payer",
+       "type": "nominal",
+       "title": "Payer"
+      },
+      "y": {
+       "field": "paid",
+       "type": "quantitative",
+       "title": "Paid"
+      },
+      "data": [
+       {
+        "payer": "A",
+        "paid": 1
+       },
+       {
+        "payer": "B",
+        "paid": 2
+       }
+      ]
+     }
+    },
+    "seq": 5
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 6
+   }
+  ],
+  "expect": []
+ },
+ {
+  "name": "ok_chart_aborted_mid_points",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "table",
+     "id": "t1",
+     "rows": [
+      [
+       "A",
+       1
+      ],
+      [
+       "B",
+       2
+      ]
+     ],
+     "rowCount": 2
+    },
+    "seq": 1
+   },
+   {
+    "type": "chart.start",
+    "partId": "c1",
+    "plot": {
+     "v": 1,
+     "kind": "bar",
+     "title": "Paid by payer",
+     "x": {
+      "field": "payer",
+      "type": "nominal",
+      "title": "Payer"
+     },
+     "y": {
+      "field": "paid",
+      "type": "quantitative",
+      "title": "Paid"
+     }
+    },
+    "tablePartId": "t1",
+    "seq": 2
+   },
+   {
+    "type": "chart.points",
+    "partId": "c1",
+    "offset": 0,
+    "rows": [
+     {
+      "payer": "A",
+      "paid": 1
+     }
+    ],
+    "seq": 3
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "aborted",
+    "usage": {},
+    "seq": 4
+   }
+  ],
+  "expect": []
+ },
+ {
+  "name": "ok_chart_without_stream",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "table",
+     "id": "t1",
+     "rows": [
+      [
+       "A",
+       1
+      ],
+      [
+       "B",
+       2
+      ]
+     ],
+     "rowCount": 2
+    },
+    "seq": 1
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "chart",
+     "id": "c1",
+     "library": "vega-lite",
+     "spec": {},
+     "alt": "a",
+     "tablePartId": "t1",
+     "plot": {
+      "v": 1,
+      "kind": "bar",
+      "title": "Paid by payer",
+      "x": {
+       "field": "payer",
+       "type": "nominal",
+       "title": "Payer"
+      },
+      "y": {
+       "field": "paid",
+       "type": "quantitative",
+       "title": "Paid"
+      },
+      "data": [
+       {
+        "payer": "A",
+        "paid": 1
+       },
+       {
+        "payer": "B",
+        "paid": 2
+       }
+      ]
+     }
+    },
+    "seq": 2
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 3
+   }
+  ],
+  "expect": []
+ },
+ {
+  "name": "ok_legacy_chart_without_plot",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "chart",
+     "id": "c1",
+     "library": "vega-lite",
+     "spec": {},
+     "alt": "a"
+    },
+    "seq": 1
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 2
+   }
+  ],
+  "expect": []
+ },
+ {
+  "name": "chart_never_completed",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "table",
+     "id": "t1",
+     "rows": [
+      [
+       "A",
+       1
+      ],
+      [
+       "B",
+       2
+      ]
+     ],
+     "rowCount": 2
+    },
+    "seq": 1
+   },
+   {
+    "type": "chart.start",
+    "partId": "c1",
+    "plot": {
+     "v": 1,
+     "kind": "bar",
+     "title": "Paid by payer",
+     "x": {
+      "field": "payer",
+      "type": "nominal",
+      "title": "Payer"
+     },
+     "y": {
+      "field": "paid",
+      "type": "quantitative",
+      "title": "Paid"
+     }
+    },
+    "tablePartId": "t1",
+    "seq": 2
+   },
+   {
+    "type": "chart.points",
+    "partId": "c1",
+    "offset": 0,
+    "rows": [
+     {
+      "payer": "A",
+      "paid": 1
+     },
+     {
+      "payer": "B",
+      "paid": 2
+     }
+    ],
+    "seq": 3
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 4
+   }
+  ],
+  "expect": [
+   "chart.span"
+  ]
+ },
+ {
+  "name": "points_without_start",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "table",
+     "id": "t1",
+     "rows": [
+      [
+       "A",
+       1
+      ],
+      [
+       "B",
+       2
+      ]
+     ],
+     "rowCount": 2
+    },
+    "seq": 1
+   },
+   {
+    "type": "chart.points",
+    "partId": "c1",
+    "offset": 0,
+    "rows": [
+     {
+      "payer": "A",
+      "paid": 1
+     },
+     {
+      "payer": "B",
+      "paid": 2
+     }
+    ],
+    "seq": 2
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "chart",
+     "id": "c1",
+     "library": "vega-lite",
+     "spec": {},
+     "alt": "a",
+     "tablePartId": "t1",
+     "plot": {
+      "v": 1,
+      "kind": "bar",
+      "title": "Paid by payer",
+      "x": {
+       "field": "payer",
+       "type": "nominal",
+       "title": "Payer"
+      },
+      "y": {
+       "field": "paid",
+       "type": "quantitative",
+       "title": "Paid"
+      },
+      "data": [
+       {
+        "payer": "A",
+        "paid": 1
+       },
+       {
+        "payer": "B",
+        "paid": 2
+       }
+      ]
+     }
+    },
+    "seq": 3
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 4
+   }
+  ],
+  "expect": [
+   "chart.span"
+  ]
+ },
+ {
+  "name": "points_gap",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "table",
+     "id": "t1",
+     "rows": [
+      [
+       "A",
+       1
+      ],
+      [
+       "B",
+       2
+      ]
+     ],
+     "rowCount": 2
+    },
+    "seq": 1
+   },
+   {
+    "type": "chart.start",
+    "partId": "c1",
+    "plot": {
+     "v": 1,
+     "kind": "bar",
+     "title": "Paid by payer",
+     "x": {
+      "field": "payer",
+      "type": "nominal",
+      "title": "Payer"
+     },
+     "y": {
+      "field": "paid",
+      "type": "quantitative",
+      "title": "Paid"
+     }
+    },
+    "tablePartId": "t1",
+    "seq": 2
+   },
+   {
+    "type": "chart.points",
+    "partId": "c1",
+    "offset": 0,
+    "rows": [
+     {
+      "payer": "A",
+      "paid": 1
+     }
+    ],
+    "seq": 3
+   },
+   {
+    "type": "chart.points",
+    "partId": "c1",
+    "offset": 5,
+    "rows": [
+     {
+      "payer": "B",
+      "paid": 2
+     }
+    ],
+    "seq": 4
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "chart",
+     "id": "c1",
+     "library": "vega-lite",
+     "spec": {},
+     "alt": "a",
+     "tablePartId": "t1",
+     "plot": {
+      "v": 1,
+      "kind": "bar",
+      "title": "Paid by payer",
+      "x": {
+       "field": "payer",
+       "type": "nominal",
+       "title": "Payer"
+      },
+      "y": {
+       "field": "paid",
+       "type": "quantitative",
+       "title": "Paid"
+      },
+      "data": [
+       {
+        "payer": "A",
+        "paid": 1
+       },
+       {
+        "payer": "B",
+        "paid": 2
+       }
+      ]
+     }
+    },
+    "seq": 5
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 6
+   }
+  ],
+  "expect": [
+   "rows.contiguous"
+  ]
+ },
+ {
+  "name": "table_rows_gap",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "table.start",
+    "partId": "t1",
+    "columns": [],
+    "seq": 1
+   },
+   {
+    "type": "table.rows",
+    "partId": "t1",
+    "offset": 2,
+    "rows": [
+     [
+      "a"
+     ]
+    ],
+    "seq": 2
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "table",
+     "id": "t1",
+     "rows": [
+      [
+       "a"
+      ]
+     ],
+     "rowCount": 1
+    },
+    "seq": 3
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 4
+   }
+  ],
+  "expect": [
+   "rows.contiguous"
+  ]
+ },
+ {
+  "name": "table_rows_bad_offset",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "table.start",
+    "partId": "t1",
+    "columns": [],
+    "seq": 1
+   },
+   {
+    "type": "table.rows",
+    "partId": "t1",
+    "offset": -1,
+    "rows": [],
+    "seq": 2
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "table",
+     "id": "t1",
+     "rows": [],
+     "rowCount": 0
+    },
+    "seq": 3
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 4
+   }
+  ],
+  "expect": [
+   "rows.contiguous"
+  ]
+ },
+ {
+  "name": "table_rows_differ_from_part",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "table.start",
+    "partId": "t1",
+    "columns": [],
+    "seq": 1
+   },
+   {
+    "type": "table.rows",
+    "partId": "t1",
+    "offset": 0,
+    "rows": [
+     [
+      "a"
+     ]
+    ],
+    "seq": 2
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "table",
+     "id": "t1",
+     "rows": [
+      [
+       "b"
+      ]
+     ],
+     "rowCount": 1
+    },
+    "seq": 3
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 4
+   }
+  ],
+  "expect": [
+   "table.rows.final"
+  ]
+ },
+ {
+  "name": "points_differ_from_part",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "table",
+     "id": "t1",
+     "rows": [
+      [
+       "A",
+       1
+      ],
+      [
+       "B",
+       2
+      ]
+     ],
+     "rowCount": 2
+    },
+    "seq": 1
+   },
+   {
+    "type": "chart.start",
+    "partId": "c1",
+    "plot": {
+     "v": 1,
+     "kind": "bar",
+     "title": "Paid by payer",
+     "x": {
+      "field": "payer",
+      "type": "nominal",
+      "title": "Payer"
+     },
+     "y": {
+      "field": "paid",
+      "type": "quantitative",
+      "title": "Paid"
+     }
+    },
+    "tablePartId": "t1",
+    "seq": 2
+   },
+   {
+    "type": "chart.points",
+    "partId": "c1",
+    "offset": 0,
+    "rows": [
+     {
+      "payer": "Z",
+      "paid": 9
+     }
+    ],
+    "seq": 3
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "chart",
+     "id": "c1",
+     "library": "vega-lite",
+     "spec": {},
+     "alt": "a",
+     "tablePartId": "t1",
+     "plot": {
+      "v": 1,
+      "kind": "bar",
+      "title": "Paid by payer",
+      "x": {
+       "field": "payer",
+       "type": "nominal",
+       "title": "Payer"
+      },
+      "y": {
+       "field": "paid",
+       "type": "quantitative",
+       "title": "Paid"
+      },
+      "data": [
+       {
+        "payer": "A",
+        "paid": 1
+       },
+       {
+        "payer": "B",
+        "paid": 2
+       }
+      ]
+     }
+    },
+    "seq": 4
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 5
+   }
+  ],
+  "expect": [
+   "chart.points.final"
+  ]
+ },
+ {
+  "name": "header_differs_from_part",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "table",
+     "id": "t1",
+     "rows": [
+      [
+       "A",
+       1
+      ],
+      [
+       "B",
+       2
+      ]
+     ],
+     "rowCount": 2
+    },
+    "seq": 1
+   },
+   {
+    "type": "chart.start",
+    "partId": "c1",
+    "plot": {
+     "v": 1,
+     "kind": "bar",
+     "title": "Other",
+     "x": {
+      "field": "payer",
+      "type": "nominal",
+      "title": "Payer"
+     },
+     "y": {
+      "field": "paid",
+      "type": "quantitative",
+      "title": "Paid"
+     }
+    },
+    "tablePartId": "t1",
+    "seq": 2
+   },
+   {
+    "type": "chart.points",
+    "partId": "c1",
+    "offset": 0,
+    "rows": [
+     {
+      "payer": "A",
+      "paid": 1
+     },
+     {
+      "payer": "B",
+      "paid": 2
+     }
+    ],
+    "seq": 3
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "chart",
+     "id": "c1",
+     "library": "vega-lite",
+     "spec": {},
+     "alt": "a",
+     "tablePartId": "t1",
+     "plot": {
+      "v": 1,
+      "kind": "bar",
+      "title": "Paid by payer",
+      "x": {
+       "field": "payer",
+       "type": "nominal",
+       "title": "Payer"
+      },
+      "y": {
+       "field": "paid",
+       "type": "quantitative",
+       "title": "Paid"
+      },
+      "data": [
+       {
+        "payer": "A",
+        "paid": 1
+       },
+       {
+        "payer": "B",
+        "paid": 2
+       }
+      ]
+     }
+    },
+    "seq": 4
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 5
+   }
+  ],
+  "expect": [
+   "chart.header.final"
+  ]
+ },
+ {
+  "name": "bad_header",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "table",
+     "id": "t1",
+     "rows": [
+      [
+       "A",
+       1
+      ],
+      [
+       "B",
+       2
+      ]
+     ],
+     "rowCount": 2
+    },
+    "seq": 1
+   },
+   {
+    "type": "chart.start",
+    "partId": "c1",
+    "plot": {
+     "v": 1,
+     "kind": "pie",
+     "title": "Paid by payer",
+     "x": {
+      "field": "payer",
+      "type": "nominal",
+      "title": "Payer"
+     },
+     "y": {
+      "field": "paid",
+      "type": "quantitative",
+      "title": "Paid"
+     }
+    },
+    "tablePartId": "t1",
+    "seq": 2
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "chart",
+     "id": "c1",
+     "library": "vega-lite",
+     "spec": {},
+     "alt": "a",
+     "tablePartId": "t1",
+     "plot": {
+      "v": 1,
+      "kind": "bar",
+      "title": "Paid by payer",
+      "x": {
+       "field": "payer",
+       "type": "nominal",
+       "title": "Payer"
+      },
+      "y": {
+       "field": "paid",
+       "type": "quantitative",
+       "title": "Paid"
+      },
+      "data": [
+       {
+        "payer": "A",
+        "paid": 1
+       },
+       {
+        "payer": "B",
+        "paid": 2
+       }
+      ]
+     }
+    },
+    "seq": 3
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 4
+   }
+  ],
+  "expect": [
+   "chart.header.final",
+   "chart.start.plot"
+  ]
+ },
+ {
+  "name": "bad_plot_in_part",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "table",
+     "id": "t1",
+     "rows": [
+      [
+       "A",
+       1
+      ],
+      [
+       "B",
+       2
+      ]
+     ],
+     "rowCount": 2
+    },
+    "seq": 1
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "chart",
+     "id": "c1",
+     "library": "vega-lite",
+     "spec": {},
+     "alt": "a",
+     "tablePartId": "t1",
+     "plot": {
+      "v": 1,
+      "kind": "bar",
+      "title": "Paid by payer",
+      "x": {
+       "field": "payer",
+       "type": "nominal",
+       "title": "Payer"
+      },
+      "y": {
+       "field": "paid",
+       "type": "quantitative",
+       "title": "Paid"
+      },
+      "data": []
+     }
+    },
+    "seq": 2
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 3
+   }
+  ],
+  "expect": [
+   "chart.part.plot"
+  ]
+ },
+ {
+  "name": "chart_table_unknown",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "chart",
+     "id": "c1",
+     "library": "vega-lite",
+     "spec": {},
+     "alt": "a",
+     "tablePartId": "t9",
+     "plot": {
+      "v": 1,
+      "kind": "bar",
+      "title": "Paid by payer",
+      "x": {
+       "field": "payer",
+       "type": "nominal",
+       "title": "Payer"
+      },
+      "y": {
+       "field": "paid",
+       "type": "quantitative",
+       "title": "Paid"
+      },
+      "data": [
+       {
+        "payer": "A",
+        "paid": 1
+       },
+       {
+        "payer": "B",
+        "paid": 2
+       }
+      ]
+     }
+    },
+    "seq": 1
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 2
+   }
+  ],
+  "expect": [
+   "chart.table.target"
+  ]
+ },
+ {
+  "name": "chart_start_table_unknown",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "table",
+     "id": "t1",
+     "rows": [
+      [
+       "A",
+       1
+      ],
+      [
+       "B",
+       2
+      ]
+     ],
+     "rowCount": 2
+    },
+    "seq": 1
+   },
+   {
+    "type": "chart.start",
+    "partId": "c1",
+    "plot": {
+     "v": 1,
+     "kind": "bar",
+     "title": "Paid by payer",
+     "x": {
+      "field": "payer",
+      "type": "nominal",
+      "title": "Payer"
+     },
+     "y": {
+      "field": "paid",
+      "type": "quantitative",
+      "title": "Paid"
+     }
+    },
+    "tablePartId": "t9",
+    "seq": 2
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "chart",
+     "id": "c1",
+     "library": "vega-lite",
+     "spec": {},
+     "alt": "a",
+     "tablePartId": "t1",
+     "plot": {
+      "v": 1,
+      "kind": "bar",
+      "title": "Paid by payer",
+      "x": {
+       "field": "payer",
+       "type": "nominal",
+       "title": "Payer"
+      },
+      "y": {
+       "field": "paid",
+       "type": "quantitative",
+       "title": "Paid"
+      },
+      "data": [
+       {
+        "payer": "A",
+        "paid": 1
+       },
+       {
+        "payer": "B",
+        "paid": 2
+       }
+      ]
+     }
+    },
+    "seq": 3
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 4
+   }
+  ],
+  "expect": [
+   "chart.start.table"
+  ]
+ },
+ {
+  "name": "chart_start_after_steps_rule",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "table",
+     "id": "t1",
+     "rows": [
+      [
+       "A",
+       1
+      ],
+      [
+       "B",
+       2
+      ]
+     ],
+     "rowCount": 2
+    },
+    "seq": 1
+   },
+   {
+    "type": "chart.start",
+    "partId": "c1",
+    "plot": {
+     "v": 1,
+     "kind": "bar",
+     "title": "Paid by payer",
+     "x": {
+      "field": "payer",
+      "type": "nominal",
+      "title": "Payer"
+     },
+     "y": {
+      "field": "paid",
+      "type": "quantitative",
+      "title": "Paid"
+     }
+    },
+    "tablePartId": "t1",
+    "seq": 2
+   },
+   {
+    "type": "part",
+    "part": {
+     "type": "chart",
+     "id": "c1",
+     "library": "vega-lite",
+     "spec": {},
+     "alt": "a",
+     "tablePartId": "t1",
+     "plot": {
+      "v": 1,
+      "kind": "bar",
+      "title": "Paid by payer",
+      "x": {
+       "field": "payer",
+       "type": "nominal",
+       "title": "Payer"
+      },
+      "y": {
+       "field": "paid",
+       "type": "quantitative",
+       "title": "Paid"
+      },
+      "data": [
+       {
+        "payer": "A",
+        "paid": 1
+       },
+       {
+        "payer": "B",
+        "paid": 2
+       }
+      ]
+     }
+    },
+    "seq": 3
+   },
+   {
+    "type": "step.sql_running",
+    "stepId": "s1",
+    "sql": "SELECT 1",
+    "purpose": "answer",
+    "attempt": 1,
+    "seq": 4
+   },
+   {
+    "type": "step.sql_result",
+    "stepId": "s1",
+    "ok": true,
+    "elapsedMs": 1,
+    "seq": 5
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 6
+   }
+  ],
+  "expect": [
+   "answer.after_steps",
+   "answer.after_steps"
+  ]
+ },
+ {
+  "name": "object_ids_never_crash",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "part",
+    "part": {
+     "id": {
+      "a": 1
+     },
+     "type": "table",
+     "sqlPartId": [
+      "x"
+     ]
+    },
+    "seq": 1
+   },
+   {
+    "type": "part.patch",
+    "partId": {
+     "b": 1
+    },
+    "seq": 2
+   },
+   {
+    "type": "table.rows",
+    "partId": {
+     "b": 1
+    },
+    "offset": 0,
+    "rows": [],
+    "seq": 3
+   },
+   {
+    "type": "chart.points",
+    "partId": [
+     1
+    ],
+    "offset": 0,
+    "rows": [],
+    "seq": 4
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 5
+   }
+  ],
+  "expect": [
+   "chart.span",
+   "patch.target",
+   "sql_part.target",
+   "table.span"
+  ]
+ },
+ {
+  "name": "seq_as_integral_float",
+  "events": [
+   {
+    "type": "message.start",
+    "messageId": "m1",
+    "conversationId": "c1",
+    "contractVersion": "1.12.0",
+    "seq": 0
+   },
+   {
+    "type": "message.end",
+    "messageId": "m1",
+    "finishReason": "stop",
+    "usage": {},
+    "seq": 1.0
+   }
+  ],
+  "expect": []
+ }
+]

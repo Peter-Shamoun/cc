@@ -1,0 +1,265 @@
+@import "tailwindcss";
+@source "../node_modules/streamdown/dist/*.js";
+@plugin "@tailwindcss/typography";
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Design tokens from docs/frontend-spec.md §2 (observed/estimated; no proprietary assets). */
+:root, [data-palette="neutral"] {
+  --bg: #ffffff; --bg-sidebar: #f9f9f9; --bg-elev: #ffffff; --bg-muted: #f4f4f4; --bg-hover: rgba(0,0,0,0.05); --bg-active: rgba(0,0,0,0.09);
+  --fg: #0d0d0d; --fg-muted: #5d5d5d; --fg-subtle: #6b6b6b; /* 5.33:1 on white, 5.06:1 on the sidebar */
+  --border: rgba(0,0,0,0.1); --border-strong: #e6e6e6;
+  --accent: #0d0d0d; --accent-fg: #ffffff; --link: #2964aa; --focus: #0285ff; --danger: #e02e2a;
+  --callout-bg: #fff8e6; --callout-bar: #e8b339; --code-bg: #f3f3f3;
+  --font-prose: var(--font-sans); --prose-size: 16px; --prose-lh: 1.7; --p-gap: 0.9em;
+  --shadow-composer: 0 0 0 1px var(--border), 0 4px 16px rgba(0,0,0,0.05);
+  /* QA-S28: hairline border + a soft, short shadow (Claude/ChatGPT); no 30-70px drop shadows. */
+  --shadow-menu: 0 4px 24px rgba(0,0,0,0.10); --shadow-dialog: 0 8px 32px rgba(0,0,0,0.12);
+  --heading-font: var(--font-sans); --empty-size: 28px; --empty-weight: 500;
+}
+.dark, .dark[data-palette="neutral"] {
+  --bg: #212121; --bg-sidebar: #181818; --bg-elev: #303030; --bg-muted: #303030; --bg-hover: rgba(255,255,255,0.05); --bg-active: rgba(255,255,255,0.11);
+  --fg: #ececec; --fg-muted: #b4b4b4; --fg-subtle: #a3a3a3; /* 5.23:1 on #303030 */
+  --border: rgba(255,255,255,0.1); --border-strong: #424242;
+  --accent: #ffffff; --accent-fg: #0d0d0d; --link: #7ab7ff; --danger: #ff6b6b;
+  --callout-bg: #3a3020; --callout-bar: #c9952b; --code-bg: #171717;
+  --shadow-composer: 0 0 0 1px var(--border), 0 4px 16px rgba(0,0,0,0.3);
+}
+[data-palette="paper"] {
+  --bg: #f5f4ed; --bg-sidebar: #efede5; --bg-elev: #faf9f5; --bg-muted: #e8e6dc; --bg-hover: rgba(0,0,0,0.04); --bg-active: rgba(0,0,0,0.08);
+  --fg: #141413; --fg-muted: #5e5d59; --fg-subtle: #65645f; /* 4.74:1 on paper muted #e8e6dc */
+  --border: rgba(0,0,0,0.1); --border-strong: #e8e6dc;
+  --accent: #d97757; --accent-fg: #141413; --link: #a84b2a; --focus: #3898ec; --danger: #b53333;
+  --callout-bg: #f7eed9; --callout-bar: #d97757; --code-bg: #faf9f5;
+  --font-prose: "Source Serif 4", Georgia, "Times New Roman", serif; --prose-size: 16.5px; --prose-lh: 1.7; --p-gap: 1em;
+  --shadow-composer: 0 0 0 1px var(--border), 0 4px 16px rgba(40,30,20,0.06);
+  --heading-font: "Source Serif 4", Georgia, serif; --empty-size: 32px; --empty-weight: 400;
+}
+.dark[data-palette="paper"] {
+  --bg: #262624; --bg-sidebar: #1f1e1d; --bg-elev: #30302e; --bg-muted: #141413; --bg-hover: rgba(255,255,255,0.05); --bg-active: rgba(255,255,255,0.11);
+  --fg: #faf9f5; --fg-muted: #b0aea5; --fg-subtle: #aea99c; --link: #f0b9a4;
+  --accent: #d97757; --accent-fg: #141413;
+  --border: rgba(255,255,255,0.08); --border-strong: #3d3d3a;
+  --danger: #e26d6d; --callout-bg: #3a3326; --code-bg: #1f1e1d;
+  --shadow-composer: 0 0 0 1px var(--border), 0 4px 16px rgba(0,0,0,0.3);
+}
+
+/* QA-S30: Claude/ChatGPT glyphs read lighter than lucide's default 2. One stroke for every icon; the send arrow
+   on its filled button keeps 2 (.cc-icon-bold). */
+svg.lucide { stroke-width: 1.75; }
+svg.lucide.cc-icon-bold { stroke-width: 2; }
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-sidebar: var(--bg-sidebar);
+  --color-elev: var(--bg-elev);
+  --color-muted: var(--bg-muted);
+  --color-hover: var(--bg-hover);
+  --color-active: var(--bg-active); /* QA-S33: the open chat's row, a step past hover */
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-danger: var(--danger);
+  --font-sans: ui-sans-serif, -apple-system, system-ui, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+html, body, #root { height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+
+.prose-chat {
+  font-family: var(--font-prose); font-size: var(--prose-size); line-height: var(--prose-lh);
+  overflow-wrap: anywhere; word-break: break-word; max-width: 100%; min-width: 0;
+  unicode-bidi: isolate;
+}
+.prose-chat :where(a, code) { overflow-wrap: anywhere; }
+.prose-chat .overflow-x-auto { max-width: 100%; }
+.prose-chat .katex-display { display: block; margin: 0.75em 0; padding: 0.125em 0; text-align: center; overflow-x: auto; overflow-y: hidden; max-width: 100%; overflow-wrap: normal; word-break: normal; }
+.prose-chat .katex-display > .katex { display: inline-block; white-space: nowrap; text-align: initial; }
+.prose-chat :where(p) { margin: 0 0 var(--p-gap); }
+.prose-chat :where(ul, ol) { margin: 0.4em 0 var(--p-gap); padding-inline-start: 1.5em; }
+.prose-chat :where(ul) { list-style: disc; }
+.prose-chat :where(ol) { list-style: decimal; }
+.prose-chat :where(li) { margin: 0.3em 0; }
+.prose-chat :where(li > p) { margin: 0; }
+.prose-chat :where(li > :is(ul, ol)) { margin: 0.2em 0; }
+/* Streamdown gives each block its own dir="auto": an RTL item inside an LTR list would hang its marker off
+   the right edge of the column (outside the list's start padding). Keep the marker inside the item. */
+.prose-chat :where(li[dir="rtl"]) { list-style-position: inside; }
+.prose-chat :where(h1, h2, h3) { font-family: var(--heading-font); font-weight: 600; line-height: 1.33; margin: 1.4em 0 0.45em; }
+/* A heading right after a heading or at a list's head should not open a double gap. */
+.prose-chat :where(h1, h2, h3) + :where(h2, h3) { margin-top: 0.5em; }
+.prose-chat :where(h1) { font-size: 24px; }
+.prose-chat :where(h2) { font-size: 20px; }
+.prose-chat :where(h3) { font-size: 18px; }
+.prose-chat :where(strong) { font-weight: 600; }
+.prose-chat :where(a) {
+  color: var(--link); text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px;
+  /* Claude/ChatGPT: a quiet underline that firms up on hover, not a heavy full-strength rule. */
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  transition: text-decoration-color var(--dur-fast, 120ms) ease-out;
+}
+.prose-chat :where(a:hover, a:focus-visible) { text-decoration-color: currentColor; }
+.prose-chat :where(:not(pre) > code) { font-family: var(--font-mono); font-size: 0.875em; font-weight: 500; background: var(--bg-muted); padding: 0.125em 0.3em; border-radius: 0.3rem; overflow-wrap: anywhere; }
+.prose-chat :where(table) { width: 100%; border-collapse: collapse; margin: 0.75em 0 1.25em; font-size: 14px; font-family: var(--font-sans); font-variant-numeric: tabular-nums; line-height: 1.5; }
+.prose-chat :where(th) { text-align: start; font-weight: 600; border-bottom: 1px solid var(--border-strong); padding: 0.5em 0.75em; }
+.prose-chat :where(td) { border-bottom: 1px solid var(--border); padding: 0.5em 0.75em; }
+.prose-chat :where(blockquote) { border-inline-start: 2px solid var(--border-strong); padding-inline-start: 1em; color: var(--fg-muted); margin: 0 0 var(--p-gap); }
+/* Prose fidelity (Claude/ChatGPT): nested bullets step disc → circle → square; h4–h6 stay body-sized but bold (Tailwind's
+   preflight would leave them as plain text); a rule is a hairline in the border tone with room around it, not currentColor. */
+.prose-chat :where(ul ul) { list-style: circle; }
+.prose-chat :where(ul ul ul) { list-style: square; }
+.prose-chat :where(h4, h5, h6) { font-size: 1em; font-weight: 600; line-height: 1.5; margin: 1.2em 0 0.35em; }
+.prose-chat :where(hr) { border: 0; border-top: 1px solid var(--border); margin: 1.5em 0; height: 0; }
+.prose-chat > :first-child { margin-top: 0; }
+.prose-chat > :last-child { margin-bottom: 0; }
+
+/* Streaming edge (ChatGPT hands-on 2026-10-26): no caret. The trailing lines of the last block fade from muted to full
+   colour as text arrives; when the stream ends the class goes and the text is uniform. A static mask, not motion, so
+   reduced motion keeps it. `.streaming-caret` stays the hook (e2e waitIdle, action-row hiding). The only dot left is
+   the empty-answer placeholder, before any text exists. */
+.streaming-caret > div > div:last-child {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 3em), rgb(0 0 0 / 0.35) 100%);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 3em), rgb(0 0 0 / 0.35) 100%);
+}
+.streaming-caret:empty::after {
+  content: ""; display: inline-block; width: 8px; height: 8px;
+  border-radius: 9999px; background: var(--fg); vertical-align: middle;
+  animation: cc-pulse 1s ease-in-out infinite;
+}
+/* New blocks fade in lightly while an answer streams (ChatGPT's soft reveal; Claude streams plainly, so keep
+   it short). Only blocks that mount during streaming animate; the class goes away at message end, which
+   never replays it. Reduced motion turns it off with every other animation. */
+.streaming-caret > div > div { animation: cc-fade 160ms ease-out both; }
+/* ChatGPT/Claude: the action row and Sources appear once the text has finished arriving on screen, not while paced
+   text is still flowing in after the stream ended. visibility keeps their space (no jump) and takes them out of tab order. */
+[data-testid="msg-assistant"]:has(.streaming-caret) :is([data-testid="msg-actions"], [data-testid="sources-chip"]) { visibility: hidden; }
+@keyframes cc-pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.8); } }
+
+.shiki-wrap pre { margin: 0; padding: 1rem; overflow: visible; font-size: 13px; line-height: 1.6; background: transparent !important; }
+.shiki-wrap[data-wrap] pre, .shiki-wrap[data-wrap] code { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
+.dark .shiki, .dark .shiki span { color: var(--shiki-dark) !important; }
+.vega-embed { width: 100%; }
+.vega-embed summary { opacity: 0.6; }
+
+@layer base { :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; } }
+/* Answer surface (Team B): step enter, skeleton shimmer. */
+.step-enter { animation: cc-step-in 180ms ease-out both; }
+@keyframes cc-step-in { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+.skeleton { background: linear-gradient(90deg, var(--bg-muted) 0%, var(--bg-hover) 50%, var(--bg-muted) 100%); background-size: 200% 100%; animation: cc-skeleton 1.4s linear infinite; }
+@keyframes cc-skeleton { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+/* ---- shell motion tokens (observed: ChatGPT/Claude use short, ease-out, mostly opacity/transform) ---- */
+:root { --ease-out: cubic-bezier(.2,.8,.2,1); --dur-fast: 120ms; --dur-med: 200ms; }
+@keyframes cc-fade { from { opacity: 0 } to { opacity: 1 } }
+/* Live thinking header: a new step line fades in softly (no shimmer, no spinner). */
+.cc-step-fade { animation: cc-fade 200ms ease-out both; }
+@keyframes cc-pop { from { opacity: 0; transform: scale(.97) translateY(4px) } to { opacity: 1; transform: none } }
+@keyframes cc-rise { from { transform: translateY(8px) } to { transform: none } }
+@keyframes cc-drop { from { opacity: 0; transform: translateY(-8px) } to { opacity: 1; transform: none } }
+@keyframes cc-lift { to { opacity: 0; transform: translateY(-6px) scale(.98) } }
+@keyframes cc-drawer { from { transform: translateX(-100%) } to { transform: none } }
+.theme-switching, .theme-switching * { transition: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+.scrollbar-thin { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+/* Answer team: message-action tooltips (observed ChatGPT/Claude: small dark pill under the icon, ~150ms delay). */
+.cc-tip { position: relative; }
+.cc-tip::after {
+  content: attr(data-tip); position: absolute; top: calc(100% + 4px); left: 50%; z-index: 40;
+  transform: translate(-50%, -2px); white-space: nowrap; pointer-events: none;
+  background: #0d0d0d; color: #fff; font: 500 12px/1.2 var(--font-sans, system-ui); padding: 5px 8px; border-radius: 8px;
+  opacity: 0; transition: opacity var(--dur-fast, 120ms) ease-out, transform var(--dur-fast, 120ms) ease-out;
+}
+.dark .cc-tip::after { background: #000; box-shadow: 0 0 0 1px rgba(255,255,255,.12); }
+@media (hover: hover) { .cc-tip:hover::after { opacity: 1; transform: translate(-50%, 0); transition-delay: 150ms; } }
+.cc-tip:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+.cc-tip-end::after { left: auto; right: 0; transform: translate(0, -2px); }
+@media (hover: hover) { .cc-tip-end:hover::after { transform: none; } }
+.cc-tip-end:focus-visible::after { transform: none; }
+.cc-tip-right::after { top: 50%; left: calc(100% + 6px); transform: translate(-2px, -50%); }
+@media (hover: hover) { .cc-tip-right:hover::after { transform: translate(0, -50%); } }
+.cc-tip-right:focus-visible::after { transform: translate(0, -50%); }
+
+/* Vega tooltip. The library's injected <style> is disabled for the strict CSP; this is our own theme. */
+#vg-tooltip-element {
+  visibility: hidden; position: fixed; z-index: 1000; padding: 6px 8px; max-width: 320px;
+  font: 12px/1.4 var(--font-sans, sans-serif); white-space: pre-line; pointer-events: none;
+  background: var(--bg-elev); color: var(--fg); border: 1px solid var(--border-strong, rgba(0,0,0,0.15));
+  border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+#vg-tooltip-element.visible { visibility: visible; }
+#vg-tooltip-element h2 { margin: 0 0 6px; font-size: 13px; font-weight: 600; }
+#vg-tooltip-element table { border-spacing: 0; }
+#vg-tooltip-element td { padding: 1px 0; vertical-align: top; overflow: hidden; text-overflow: ellipsis; }
+#vg-tooltip-element td.key { color: var(--fg-muted); padding-right: 8px; text-align: right; max-width: 150px; }
+#vg-tooltip-element td.value { max-width: 240px; text-align: left; font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+/* Print / Save as PDF (Share dialog): just the conversation, light, full length. No sidebar, header, composer,
+   per-message actions or toasts; the scroll container lets the thread flow across pages. */
+@media print {
+  html, body, #root { height: auto !important; overflow: visible !important; background: #fff !important; }
+  [data-testid="sidebar"], [data-testid="sidebar-rail"], [data-testid="app-header"], #composer, [data-testid="msg-actions"],
+  [data-testid="toasts"], [data-testid="jump-latest"], [data-testid="offline-banner"], .cc-tip { display: none !important; }
+  #root > div, main, [data-testid="thread-scroller"] { display: block !important; height: auto !important; overflow: visible !important; }
+  @page { margin: 16mm 14mm; }
+  [data-message-id] { min-height: 0 !important; content-visibility: visible !important; contain: none !important; }
+  [data-testid="msg-user"] { break-inside: avoid-page; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  [data-testid="print-title"] { padding-left: 1rem; padding-right: 1rem; }
+  .prose-chat pre, .prose-chat table, figure { break-inside: avoid; }
+  a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.85em; color: #555; }
+  /*
+   * Paper fidelity (Claude/ChatGPT print): flat, black-on-white, nothing clipped.
+   * Chrome lays print out at the paper width without a resize event, so anything sized in pixels at screen width
+   * (Vega charts, images) is scaled to the column instead of being cut off at the right edge.
+   */
+  [data-testid="chart"] svg.marks, [data-testid="chart"] canvas.marks, figure img, .prose-chat img { max-width: 100% !important; height: auto !important; }
+  /* Code and SQL wrap instead of running off the page (horizontal scrollers don't exist on paper). */
+  .prose-chat pre, .prose-chat pre code, [data-testid="table-sql"] pre { white-space: pre-wrap !important; overflow-wrap: anywhere; overflow: visible !important; max-height: none !important; }
+  /* Tables: no sticky header (it can float over rows); repeat the header row on every page instead. */
+  thead { position: static !important; display: table-header-group; }
+  tr { break-inside: avoid; }
+  /* Flat: no elevation on paper. */
+  *, *::before, *::after { box-shadow: none !important; text-shadow: none !important; }
+  h1, h2, h3, h4, figcaption { break-after: avoid-page; }
+  p, li { orphans: 3; widows: 3; }
+  /* Screen-only affordances inside answers: download, expand, copy, "Change", "Open full table". */
+  [data-testid="msg-assistant"] button[aria-label^="Download"], [data-testid="msg-assistant"] button[aria-label^="Expand"],
+  [data-testid="msg-assistant"] button[aria-label^="Copy"], [data-testid="msg-assistant"] button[aria-label^="View spec"],
+  [data-testid="chart"] figcaption + div, [data-testid="user-actions"], [data-print-hide] { display: none !important; }
+  /* "Print this answer": only the marked question + answer. */
+  body[data-print-one] [data-message-id]:not([data-print-keep]) { display: none !important; }
+  body[data-print-one] [data-message-id] { min-height: 0 !important; }
+  /* "Print report" in the artifact panel: just the report document. */
+  body[data-print-report] main, body[data-print-report] [data-testid="artifact-panel"] > header,
+  body[data-print-report] [data-testid="artifact-panel"] > [role="separator"] { display: none !important; }
+  body[data-print-report] [data-testid="artifact-panel"] { position: static !important; width: auto !important; height: auto !important; border: 0 !important; background: #fff !important; display: block !important; }
+  body[data-print-report] [data-testid="artifact-panel"] * { overflow: visible !important; }
+  body[data-print-report] [data-testid="artifact-panel"] > div, body[data-print-report] [data-testid="artifact-panel"] > div > div { border: 0 !important; padding: 0 !important; height: auto !important; }
+}
+
+/*
+ * QA-S15: the composer's focus state is a soft border/shadow lift (ChatGPT/Claude), not a blue ring,
+ * because a text field always matches :focus-visible and the composer is focused most of the time.
+ * Keyboard navigation (html[data-kbd], set on Tab by lib/inputModality) still gets the strong ring,
+ * and forced-colors mode gets a system outline, so focus stays visible (WCAG 2.4.7).
+ */
+.cc-composer:focus-within { box-shadow: 0 0 0 1px var(--border-strong), 0 6px 20px rgba(0, 0, 0, 0.08); }
+/* QA-A27: the panel focuses its Preview tab when it opens (so Esc and Tab start there); without keyboard use
+ * that programmatic focus shows no ring. Tab navigation (html[data-kbd]) still gets the standard ring. */
+html:not([data-kbd]) .cc-quiet-focus:focus-visible { outline: none; }
+html[data-kbd] .cc-composer:focus-within { box-shadow: 0 0 0 2px var(--focus), 0 6px 20px rgba(0, 0, 0, 0.08); }
+@media (forced-colors: active) { .cc-composer:focus-within { outline: 2px solid Highlight; outline-offset: 1px; } }
+
+/* Phone drawer + scrim: the browser keeps vertical scrolling; horizontal drags reach the swipe-to-close handler.
+   Set on every descendant because a nested scroller (the chat list) would otherwise reset it to auto. */
+.cc-pan-y, .cc-pan-y * { touch-action: pan-y; }

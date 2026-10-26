@@ -1,0 +1,12 @@
+{"type":"message.start","messageId":"m_1","conversationId":"c_1","contractVersion":"1.24.0","model":"scripted","parentId":"u_1","seq":0}
+{"type":"status","label":"Thinking","seq":1}
+{"type":"reasoning.delta","partId":"p_1","delta":"Checking the claims view.","seq":2}
+{"type":"status","label":"Exploring sem.claims","seq":3}
+{"type":"step.explore","stepId":"s_1","probe":"describe_view","summary":"8 columns","elapsedMs":3,"target":"sem.claims","seq":4}
+{"type":"step.sql_running","stepId":"s_2","sql":"SELECT payer_name, SUM(paid_amount) AS paid_amount, COUNT(*) AS claims\nFROM sem.claims\nGROUP BY 1\nORDER BY paid_amount DESC","attempt":1,"purpose":"answer","label":"Running query","seq":5}
+{"type":"status","label":"Running query","seq":6}
+{"type":"step.sql_result","stepId":"s_2","ok":false,"elapsedMs":4,"error":{"code":"cancelled","message":"Stopped by the user."},"seq":7}
+{"type":"reasoning.end","partId":"p_1","durationMs":358,"seq":8}
+{"type":"status","label":null,"seq":9}
+{"type":"status","label":null,"seq":10}
+{"type":"message.end","messageId":"m_1","finishReason":"aborted","usage":{"queries":1,"elapsedMs":710,"latency":{"totalMs":710,"modelMs":700,"sqlMs":0,"stages":{"plan":706,"sql":4,"repair":0,"checks":0,"render":0},"firstEventMs":0,"firstStepMs":356},"costIsEstimate":true,"costUsd":0.002276,"tokens":{"input":1981,"output":59},"models":[{"model":"claude-haiku-5-5","role":"analyst","inputTokens":1981,"outputTokens":59,"costUsd":0.002276,"calls":2}]},"seq":11}

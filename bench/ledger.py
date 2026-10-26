@@ -1,0 +1,233 @@
+"""Expected answers computed from the generator's ledger (`edi_mock.load_truth`), never from the parser or SQL views.
+
+Each function takes one tenant's ledger and returns rows in the same column order as the question's gold
+SQL. The window starts in steady state, so the ledger also holds claims billed before it that the window's 835s
+answered: claim-level questions (what we billed) count the claims with an 837 in the window (`_billed`), money and
+denial questions count every 835 event the window received. The self-test requires gold SQL == ledger answer for every question that has one; a mismatch means
+the semantic layer (or the parser) disagrees with the business rules, which is a data-layer finding, not
+an agent error.
+"""
+from __future__ import annotations
+
+from collections import defaultdict
+from datetime import date
+from decimal import ROUND_HALF_UP, Decimal
+from fractions import Fraction
+
+
+def _claims(T):
+    return T["claims"].values()
+
+
+def _billed(T):
+    """Claims with an 837 inside the window (what sem.claims shows)."""
+    return [c for c in _claims(T) if c["submissions"]]
+
+
+def _billed_to(c, a, seq=0) -> bool:
+    """The claim was billed inside the window to this adjudication's payer at this payer sequence (the
+    sem.claims payer_responsibility = 'P' join on claim and payer)."""
+    return any(s["seq"] == seq and s["payer_id"] == a["payer_id"] for s in c["submissions"])
+
+
+def _adj(T, seq=None):
+    """(claim, adjudication) for every claim+payer the payer ever answered."""
+    for c in _claims(T):
+        for a in c["adjudications"].values():
+            if seq is None or a["seq"] == seq:
+                yield c, a
+
+
+def _current(T, seq=None):
+    return [(c, a) for c, a in _adj(T, seq) if a["remitted_current"]]
+
+
+def _cur_event(a):
+    """The current adjudication: the latest event per claim+payer that is not a duplicate-claim denial (a CARC-18
+    denial of an accidental resend does not undo the original adjudication), unless only duplicates exist."""
+    real = [e for e in a["events"] if not e.get("duplicate_denial")]
+    return (real or a["events"])[-1]
+
+
+def _rate(pairs, key, min_n=1, r=4):
+    agg = defaultdict(lambda: [0, 0])
+    for c, a in pairs:
+        for k in key(c, a):
+            agg[k][0] += 1
+            agg[k][1] += a["denied"]
+    return [(k, _round_half_up(Fraction(d, n), r), n) for k, (n, d) in agg.items() if n >= min_n]
+
+
+def _round_half_up(x: Fraction, digits: int) -> float:
+    """Round an exact ratio the way SQL round() does (half away from zero), not Python's float round: a mean of
+    22.25 days is 22.3 in the gold SQL, and round(22.25, 1) is 22.2 in Python."""
+    return float((Decimal(x.numerator) / Decimal(x.denominator)).quantize(Decimal(1).scaleb(-digits), ROUND_HALF_UP))
+
+
+def _title(name):
+    return name.title()
+
+
+def claims_submitted(T):
+    return [(len(_billed(T)),)]
+
+
+def total_billed(T):
+    return [(round(sum(c["charge"] for c in _billed(T)), 2),)]
+
+
+def total_paid(T):
+    return [(round(sum(a["paid_current"] for _, a in _adj(T)), 2),)]
+
+
+def paid_by_payment_month(T):
+    m = defaultdict(float)
+    for _, a in _current(T):
+        d = date.fromisoformat(_cur_event(a)["date"])
+        m[date(d.year, d.month, 1)] += a["paid_current"]
+    return sorted((k, round(v, 2)) for k, v in m.items())
+
+
+def payments_count(T):
+    return [(sum(len(f["trns"]) for f in T["files"] if f["kind"] == "835" and f["expect"] == "parsed"),)]
+
+
+def interest_paid(T):
+    return [(round(-sum(p["amount"] for p in T["plb"] if p["code"] == "L6"), 2),)]
+
+
+def denial_rate(T):
+    cur = _current(T)
+    return [(_round_half_up(Fraction(sum(a["denied"] for _, a in cur), len(cur)), 4),)]
+
+
+def denial_rate_by_payer(T):
+    return [(p, r) for p, r, _ in _rate(_current(T), lambda c, a: [_title(a["payer"])])]
+
+
+def denials_by_type(T):
+    cur = _current(T)
+    return [(sum(a["denied_recorded"] for _, a in cur), sum(a["denied_signal_v3"] for _, a in cur))]
+
+
+def top_denial_carcs(T, denial_carcs):
+    n = defaultdict(int)
+    for _, a in _current(T):
+        if a["denied"]:
+            for k in set(_cur_event(a)["co_carcs"]) & set(denial_carcs):
+                n[k] += 1
+    return sorted(n.items(), key=lambda kv: (-kv[1], kv[0]))
+
+
+def cpt_denial_rate_min20(T):
+    pairs = [(c, a) for c, a in _current(T) if c["submissions"]]
+    return [(cpt, r, n) for cpt, r, n in _rate(pairs, lambda c, a: sorted(set(c["cpts"])), min_n=20)]
+
+
+def _current_billed_primary(T):
+    return [(c, a) for c, a in _current(T, seq=0) if _billed_to(c, a)]
+
+
+def referring_provider_denials(T):
+    rows = _rate(_current_billed_primary(T), lambda c, a: [c["referring_npi"]], min_n=15)
+    return sorted(rows, key=lambda r: (-r[1], r[0]))
+
+
+def principal_dx_denials(T):
+    return [(dx, r, n) for dx, r, n in _rate(_current_billed_primary(T), lambda c, a: [c["principal_dx"]], min_n=30)]
+
+
+def zero_paid_not_denied(T):
+    return [(sum(1 for _, a in _current(T) if a["paid_current"] == 0 and not a["denied"]),)]
+
+
+def partial_line_denials(T):
+    return [(sum(sum(1 for ln in _cur_event(a)["lines"] if ln["denied"]) for _, a in _current(T) if not a["denied"]),)]
+
+
+def denied_charges_by_payer(T):
+    m = defaultdict(float)
+    for _, a in _current(T):
+        if a["denied"]:
+            m[_title(a["payer"])] += _cur_event(a)["charge"]
+    return [(k, round(v, 2)) for k, v in m.items()]
+
+
+def resubmitted(T):
+    return [(sum(c["resubmitted"] for c in _billed(T)),)]
+
+
+def voided(T):
+    return [(sum(c["voided"] for c in _billed(T)),)]
+
+
+def reversed_no_correction(T):
+    return [(sum(1 for _, a in _adj(T) if a["ever_reversed"] and not a["remitted_current"]),)]
+
+
+def never_remitted(T):
+    return [(sum(1 for c in _billed(T) if not c["adjudications"]),)]
+
+
+def timely_filing_denials(T):
+    return [(sum(1 for _, a in _current(T) if a["denied"] and "29" in _cur_event(a)["co_carcs"]),)]
+
+
+def days_to_first_primary_remit(T):
+    m = defaultdict(list)
+    for c, a in _adj(T, seq=0):
+        if not _billed_to(c, a):
+            continue
+        first_sub = min(date.fromisoformat(s["date"]) for s in c["submissions"]
+                        if s["seq"] == 0 and s["payer_id"] == a["payer_id"])
+        first_remit = min(date.fromisoformat(e["date"]) for e in a["events"])
+        m[_title(a["payer"])].append((first_remit - first_sub).days)
+    return [(k, _round_half_up(Fraction(sum(v), len(v)), 1)) for k, v in m.items()]
+
+
+def secondary_paid_claims(T):
+    cur = _current(T, seq=1)
+    return [(sum(1 for _, a in cur if a["paid_current"] > 0), round(sum(a["paid_current"] for _, a in cur), 2))]
+
+
+def primary_patient_responsibility(T):
+    return [(round(sum(_cur_event(a)["pr"] for _, a in _current_billed_primary(T)), 2),)]
+
+
+def primary_deductible(T):
+    return [(round(sum(_cur_event(a)["cas"].get("PR-1", 0) for _, a in _current_billed_primary(T)), 2),)]
+
+
+def payers_remitting(T):
+    return [(len({a["payer_id"] for _, a in _adj(T)}),)]
+
+
+def unbalanced_payments(T):
+    """Re-derive each delivered 835 transaction's total from the ledger's own events and PLBs and compare it with
+    the BPR total the generator wrote: BPR02 = sum(CLP04) - sum(PLB)."""
+    paid, plb = defaultdict(float), defaultdict(float)
+    for c in _claims(T):
+        for a in c["adjudications"].values():
+            for e in a["events"]:
+                paid[e["trn"]] += e["paid"]
+    for p in T["plb"]:
+        plb[p["trn"]] += p["amount"]
+    bad = 0
+    for f in T["files"]:
+        if f["kind"] == "835" and f["expect"] == "parsed":
+            for trn, total in zip(f["trns"], f["totals"]):
+                bad += round(paid[trn] - plb[trn], 2) != round(total, 2)
+    return [(bad,)]
+
+
+def rejected_files(T):
+    return [(sum(f["expect"] == "rejected" for f in T["files"]),)]
+
+
+def modifier_59_claims(T):
+    return [(sum(1 for c in _billed(T) if any("59" in m for m in c["modifiers"])),)]
+
+
+def answer(name: str, T: dict, truth: dict):
+    fn = globals()[name]
+    return fn(T, truth["denial_carcs"]) if name == "top_denial_carcs" else fn(T)
