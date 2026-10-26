@@ -6,6 +6,7 @@ import { Markdown } from '../parts/Markdown';
 import { Inline } from '../parts/misc';
 import { modelName } from './normalize';
 import type { AbstainPart, ClarificationPart, EscalationEvent } from './provisional';
+import { useExpired } from '../../lib/useExpired';
 
 export type Resume = NonNullable<ChatRequest['resume']>;
 /** Send a new user turn; `resume` answers a pending clarification (CONTRACT.md §6). */
@@ -53,7 +54,7 @@ export function ClarifyCard({ part, onReply, active }: { part: ClarificationPart
   const [answer, setAnswer] = useState<string | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
   const [text, setText] = useState('');
-  const expired = !!part.expiresAt && Date.parse(part.expiresAt) < Date.now();
+  const expired = useExpired(part.expiresAt);
   const done = answer !== null || !!part.answered || !active || expired;
   const choices = part.choices ?? [];
   const submit = (ids: string[], free?: string) => {
