@@ -47,10 +47,12 @@ export function ChartView({ part, onOpen, full, onShowSpec }: { part: ChartPart;
         return embed(ref.current, buildSpec(part) as never, {
           actions: false,
           renderer: chartRenderer(part),
-          // vega-interpreter: no Function/eval on model-authored expressions (spec §6.9).
+          // vega-interpreter: no Function/eval on model-authored expressions (spec §6.9) and no 'unsafe-eval' in the CSP.
           ast: true,
           loader: remoteBlockedLoader(),
-          tooltip: { theme: dark ? 'dark' : 'light' },
+          // Strict CSP (no inline <style>): no injected stylesheets; the tooltip is themed in index.css (#vg-tooltip-element).
+          defaultStyle: false,
+          tooltip: { theme: dark ? 'dark' : 'light', disableDefaultStyle: true },
           config: {
             background: 'transparent',
             font: v('--font-sans') || 'sans-serif',
