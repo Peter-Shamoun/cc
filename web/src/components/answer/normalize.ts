@@ -1,5 +1,10 @@
 import type { AssistantView, ToolCallPart } from '../../lib/contract';
-import type { AnyPart, CheckResult, Candidate, Step, StepKind, UsageDetail } from './provisional';
+import type { AssistantViewV1, EscalationEvent, Part as PartV1, StepEvent, StepView, Usage } from '../../api/contract';
+import type { CheckResult, Candidate, Step, StepKind, UsageView } from './provisional';
+
+/** Either message view: the legacy reducer's or the v1 reducer's. */
+export type AnyView = AssistantView | AssistantViewV1;
+export const partsOf = (m: AnyView) => m.parts as PartV1[];
 
 const KIND: Record<string, StepKind> = {
   run_sql: 'sql', sql: 'sql', query: 'sql',
@@ -12,6 +17,7 @@ const KIND: Record<string, StepKind> = {
 
 type Loose = ToolCallPart & { kind?: string; error?: string; previousSql?: string; attempt?: number; checks?: CheckResult[]; candidates?: Candidate[]; output?: ToolCallPart['output'] & { resultId?: string; checks?: CheckResult[]; candidates?: Candidate[] } };
 
+/** Legacy `tool_call` part -> Step (still valid in v1, CONTRACT.md §5). */
 export function toStep(p: ToolCallPart): Step {
   const l = p as Loose;
   const args = (p.input?.args ?? {}) as Record<string, unknown>;
@@ -34,10 +40,115 @@ export function toStep(p: ToolCallPart): Step {
   };
 }
 
-export function stepsOf(m: AssistantView): Step[] {
-  const steps = (m.parts as AnyPart[]).filter((p): p is ToolCallPart => p.type === 'tool_call').map(toStep);
-  return m.streaming ? steps : steps.map((s) => (s.state === 'running' ? { ...s, state: 'cancelled' as const } : s));
+// ------------------------------------------------------------------ v1 step events -> Step
+
+const PROBE: Record<string, string> = {
+  list_views: 'Listed views', describe_view: 'Read schema', sample_values: 'Sampled values', lookup_glossary: 'Looked up glossary',
+  lookup_dictionary: 'Looked up data dictionary', search_examples: 'Searched examples', profile: 'Profiled',
+};
+const PURPOSE: Record<string, string> = { explore: 'Probed the data', answer: 'Ran query', candidate: 'Ran candidate query', repair: 'Re-ran repaired query', check: 'Ran check query' };
+const CHECK: Record<string, string> = { verifier: 'Verifier', row_count: 'Row count', null_share: 'Null share', join_fanout: 'Join fan-out', date_range: 'Date range', definition: 'Metric definition' };
+const humanize = (s: string) => (CHECK[s] ?? s.replace(/[_-]+/g, ' ').replace(/^./, (c) => c.toUpperCase()));
+export const modelName = (m: string) => m.replace(/^claude-/, '').replace(/-\d{6,8}$/, '').replace(/(\d)-(\d)/g, '$1.$2').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+const find = <T extends StepEvent['type']>(v: StepView, t: T) => v.events.find((e) => e.type === t) as Extract<StepEvent, { type: T }> | undefined;
+
+function sqlOf(views: StepView[], stepId: string): string | undefined {
+  const v = views.find((x) => x.stepId === stepId);
+  return v && find(v, 'step.sql_running')?.sql;
 }
+
+function fromView(v: StepView, all: StepView[], finished: boolean, aborted: boolean): Step | null {
+  const base = { id: v.stepId };
+  const state: Step['state'] = v.state;
+  switch (v.kind) {
+    case 'sql': {
+      const run = find(v, 'step.sql_running');
+      const res = find(v, 'step.sql_result');
+      const purpose = run?.purpose ?? 'answer';
+      const label = run?.label ?? (purpose === 'candidate' && run?.candidateId ? `Ran candidate ${run.candidateId}` : PURPOSE[purpose] ?? 'Ran query');
+      return {
+        ...base, kind: purpose === 'explore' ? 'explore' : 'sql', label,
+        state: !res && (aborted || !finished) ? (finished ? 'cancelled' : 'running') : state,
+        sql: run?.sql, rowCount: res?.rowCount, truncated: res?.truncated, durationMs: res?.elapsedMs,
+        columns: res?.columns?.map((c) => c.name), error: res?.error?.message,
+        attempt: run && run.attempt > 1 ? run.attempt : undefined,
+      };
+    }
+    case 'repair': {
+      const r = find(v, 'step.repair_attempt');
+      if (!r) return null;
+      const rerun = all.find((x) => x.kind === 'sql' && find(x, 'step.sql_running')?.repairOf === v.stepId);
+      const rr = rerun && find(rerun, 'step.sql_result');
+      const rstate: Step['state'] = rr ? (rr.ok ? 'ok' : 'error') : finished ? (rerun ? 'cancelled' : 'ok') : 'running';
+      return {
+        ...base, kind: 'repair', label: r.explanation ? `Repairing: ${r.explanation}` : 'Repairing the query', state: rstate,
+        error: r.error.message, previousSql: sqlOf(all, r.failedStepId), sql: r.revisedSql, attempt: r.attempt, maxAttempts: r.maxAttempts,
+      };
+    }
+    case 'check': {
+      const cs = v.events.filter((e): e is Extract<StepEvent, { type: 'step.check' }> => e.type === 'step.check');
+      const checks: CheckResult[] = cs.map((c) => ({ name: humanize(c.check), passed: c.verdict === 'pass', verdict: c.verdict, detail: c.message }));
+      const label = cs.length === 1 ? `Checked: ${checks[0].name.toLowerCase()}` : `Ran ${cs.length} checks`;
+      return { ...base, kind: 'check', label, state, checks };
+    }
+    case 'explore': {
+      const e = find(v, 'step.explore');
+      if (!e) return null;
+      return { ...base, kind: 'explore', label: `${PROBE[e.probe] ?? humanize(e.probe)}${e.target ? ` · ${e.target}` : ''}`, state: 'ok', message: e.summary, durationMs: e.elapsedMs };
+    }
+    case 'candidates': {
+      const c = find(v, 'step.candidates');
+      if (!c) return null;
+      const candidates: Candidate[] = c.candidates.map((x) => ({
+        id: x.candidateId, label: x.label ?? x.candidateId, sql: x.sql, rowCount: x.rowCount, score: x.score, ok: x.ok,
+        chosen: x.candidateId === c.chosenId,
+        note: !x.ok ? 'failed' : x.agreesWith?.length ? `agrees with ${x.agreesWith.join(', ')}` : undefined,
+      }));
+      const method = humanize(c.method).toLowerCase();
+      return { ...base, kind: 'candidates', label: `Compared ${candidates.length} candidates · ${method}`, state, candidates, message: c.rationale };
+    }
+    default:
+      return null;
+  }
+}
+
+function escalationStep(e: EscalationEvent, i: number): Step {
+  return { id: `esc-step-${i}`, kind: 'escalation', label: `Handed off to ${modelName(e.to.model)}`, state: 'ok', message: e.reason, agent: modelName(e.from.model) };
+}
+
+/** Groups consecutive single-check steps into one "Ran N checks" row (less noise, like Claude). */
+function mergeChecks(steps: Step[]): Step[] {
+  const out: Step[] = [];
+  for (const s of steps) {
+    const prev = out[out.length - 1];
+    if (s.kind === 'check' && prev?.kind === 'check' && s.checks && prev.checks) {
+      const checks = [...prev.checks, ...s.checks];
+      const worst = checks.some((c) => c.verdict === 'fail' || (!c.verdict && !c.passed)) ? 'error' : checks.some((c) => c.verdict === 'warn') ? 'warn' : 'ok';
+      out[out.length - 1] = { ...prev, label: `Ran ${checks.length} checks`, checks, state: worst };
+    } else out.push(s);
+  }
+  return out;
+}
+
+export function stepsOf(m: AnyView): Step[] {
+  const finished = !m.streaming;
+  const aborted = m.finishReason === 'aborted';
+  const v1 = 'steps' in m ? m.steps : [];
+  const steps: Step[] = [];
+  let esc = 0;
+  for (const v of v1) {
+    // Escalations are rendered from m.escalations (they may share a stepId with a check).
+    const s = v.kind === 'escalation' ? null : fromView({ ...v, events: v.events.filter((e) => e.type !== 'escalation') } as StepView, v1, finished, aborted);
+    if (s) steps.push(s);
+    for (const e of v.events) if (e.type === 'escalation') steps.push(escalationStep(e, esc++));
+  }
+  const legacy = partsOf(m).filter((p): p is ToolCallPart => p.type === 'tool_call').map(toStep);
+  const all = mergeChecks([...steps, ...legacy]);
+  return finished ? all.map((s) => (s.state === 'running' ? { ...s, state: 'cancelled' as const } : s)) : all;
+}
+
+export const escalationsOf = (m: AnyView): EscalationEvent[] => ('escalations' in m ? m.escalations : []);
 
 /** Failed steps that no later repair step fixed. */
 export function unresolvedFailures(steps: Step[]): number {
@@ -56,11 +167,12 @@ export function fmtMs(ms: number): string {
 /** "Ran 3 queries, 1 repair, 2 checks · 12s" (Claude-style one-line summary). */
 export function summarize(steps: Step[], elapsedMs?: number): string {
   const n = (k: StepKind) => steps.filter((s) => s.kind === k).length;
+  const checks = steps.filter((s) => s.kind === 'check').reduce((a, s) => a + (s.checks?.length || 1), 0);
   const bits: string[] = [];
   const q = n('sql') + n('explore');
   if (q) bits.push(plural(q, 'query', 'queries'));
   if (n('repair')) bits.push(plural(n('repair'), 'repair'));
-  if (n('check')) bits.push(plural(n('check'), 'check'));
+  if (checks) bits.push(plural(checks, 'check'));
   if (n('candidates')) bits.push('compared candidates');
   if (n('schema') + n('search')) bits.push(plural(n('schema') + n('search'), 'lookup'));
   if (n('chart')) bits.push(plural(n('chart'), 'chart'));
@@ -83,4 +195,27 @@ export function fmtTokens(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n);
 }
 
-export const usage = (m: AssistantView) => m.usage as UsageDetail | undefined;
+/** v1 `Usage` (or legacy {queries, elapsedMs}) -> footer view. */
+export function usageOf(m: AnyView): UsageView | undefined {
+  const u = m.usage as (Usage & { model?: string }) | undefined;
+  if (!u) return undefined;
+  const l = u.latency;
+  let timing: UsageView['timing'];
+  if (l) {
+    const parts = [
+      { label: 'Queue', ms: l.queueMs ?? 0 },
+      { label: 'Model', ms: l.modelMs ?? 0 },
+      { label: 'SQL', ms: l.sqlMs ?? 0 },
+    ].filter((p) => p.ms > 0);
+    const other = l.totalMs - parts.reduce((a, p) => a + p.ms, 0);
+    if (parts.length && other > 50) parts.push({ label: 'Other', ms: other });
+    timing = parts.length ? parts : undefined;
+  }
+  const models = u.models?.length ? u.models : undefined;
+  return {
+    queries: u.queries, elapsedMs: l?.totalMs ?? u.elapsedMs,
+    model: u.model ?? (models ? modelName(models[models.length - 1].model) : undefined),
+    inputTokens: u.tokens?.input, outputTokens: u.tokens?.output, cacheRead: u.tokens?.cacheRead,
+    costUsd: u.costUsd, costIsEstimate: u.costIsEstimate, firstTokenMs: l?.firstTokenMs, timing, models,
+  };
+}

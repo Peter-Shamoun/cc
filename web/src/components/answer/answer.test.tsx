@@ -6,6 +6,9 @@ import { AssistantTurn } from '../Message';
 import { stepsOf, summarize, toStep, fmtUsd } from './normalize';
 import { queriesOf } from './SqlInspector';
 import { ANSWER_FIXTURES } from '../../fixtures/answer';
+import { DUP_V1_ANSWER, DUP_V1_STEPS } from '../../fixtures/answerV1';
+import { newAssistantViewV1, reduceV1, type AssistantViewV1, type StreamEvent as V1Event } from '../../api/contract';
+import { ClarifyCard } from './States';
 
 vi.mock('../../adapters/mock', async (orig) => {
   const m = await orig<typeof import('../../adapters/mock')>();
@@ -31,7 +34,7 @@ describe('answer surface: normalize', () => {
     expect(steps[2].error).toMatch(/Binder Error/);
     expect(steps[3].candidates).toHaveLength(3);
     expect(steps[4].checks?.filter((c) => !c.passed)).toHaveLength(1);
-    expect(summarize(steps, 12000)).toBe('Ran 2 queries, 1 repair, 1 check, compared candidates · 12s');
+    expect(summarize(steps, 12000)).toBe('Ran 2 queries, 1 repair, 4 checks, compared candidates · 12s');
   });
   it('keeps unknown tools as "other" and formats money', () => {
     expect(toStep({ type: 'tool_call', id: 'x', tool: 'mystery', label: 'L', state: 'ok' } as ToolCallPart).kind).toBe('other');
@@ -57,7 +60,7 @@ describe('answer surface: components', () => {
     expect(screen.getByTestId('step-summary')).toHaveAttribute('aria-expanded', 'true');
     rerender(<AssistantTurn msg={viewOf('dup-denials')} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} />);
     expect(screen.getByTestId('step-summary')).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getByTestId('step-summary').textContent).toMatch(/^Ran 2 queries, 1 repair, 1 check, compared candidates · 8\.4s/);
+    expect(screen.getByTestId('step-summary').textContent).toMatch(/^Ran 2 queries, 1 repair, 4 checks, compared candidates · 8\.4s/);
     fireEvent.click(screen.getByTestId('step-summary'));
     expect(screen.getByTestId('repair-preview')).toHaveTextContent('Binder Error');
     const rows = screen.getAllByTestId('step');
@@ -66,14 +69,14 @@ describe('answer surface: components', () => {
     fireEvent.click(within(rows[3]).getAllByRole('button')[0]);
     expect(screen.getByTestId('candidates')).toHaveTextContent('chosen');
   });
-  it('shows escalation, SQL under the table, inspector and cost footer', () => {
+  it('shows SQL under the table, inspector and cost footer', () => {
     render(<AssistantTurn msg={viewOf('dup-denials')} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} />);
-    expect(screen.getByTestId('escalation')).toHaveTextContent('Haiku → Sonnet');
     fireEvent.click(within(screen.getByTestId('table-sql')).getByRole('button'));
     expect(screen.getByTestId('table-sql')).toHaveTextContent('COUNT(*) FILTER');
-    expect(screen.getByTestId('meta-line')).toHaveTextContent('3 queries · 8.4s · $0.04');
+    expect(screen.getByTestId('meta-line')).toHaveTextContent('3 queries · 8.4s · ~$0.04');
     fireEvent.click(screen.getByTestId('meta-line'));
     expect(screen.getByTestId('meta-popover')).toHaveTextContent('18k in');
+    expect(screen.getByTestId('meta-models')).toHaveTextContent('Sonnet 4.5');
     fireEvent.click(screen.getByTestId('open-sql'));
     const insp = screen.getByTestId('sql-inspector');
     expect(within(insp).getAllByRole('tab').length).toBe(3);
@@ -83,7 +86,8 @@ describe('answer surface: components', () => {
     const onSend = vi.fn();
     render(<AssistantTurn msg={viewOf('abstain')} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} onSend={onSend} />);
     expect(screen.queryByRole('alert')).toBeNull();
-    expect(screen.getByTestId('abstain')).toHaveTextContent('What would be needed');
+    expect(screen.getByTestId('abstain')).toHaveAttribute('data-category', 'data_unavailable');
+    expect(screen.getByTestId('abstain-details')).toHaveTextContent('What would be needed');
     fireEvent.click(screen.getAllByTestId('rephrase-chip')[0]);
     expect(onSend).toHaveBeenCalledWith('Which clinics have the highest denial rate?');
   });
@@ -99,6 +103,65 @@ describe('answer surface: components', () => {
     render(<AssistantTurn msg={v} isLast onOpen={noop} onRegenerate={onRegenerate} onEdit={noop} />);
     fireEvent.click(within(screen.getByTestId('stopped')).getByRole('button', { name: /Retry/ }));
     expect(onRegenerate).toHaveBeenCalled();
+  });
+});
+
+const v1 = (evs: V1Event[]) => evs.reduce((m, e) => reduceV1(m, e), newAssistantViewV1('a1') as AssistantViewV1);
+
+describe('answer surface: contract v1 events', () => {
+  it('maps step.* events into the timeline, merges checks, and pairs repair with its re-run', () => {
+    const steps = stepsOf(v1([...DUP_V1_STEPS, ...DUP_V1_ANSWER]));
+    expect(steps.map((s) => s.kind)).toEqual(['explore', 'explore', 'sql', 'repair', 'sql', 'sql', 'candidates', 'check', 'escalation']);
+    const repair = steps[3];
+    expect(repair.state).toBe('ok');
+    expect(repair.previousSql).toMatch(/month, COUNT/);
+    expect(repair.error).toMatch(/Binder Error/);
+    expect(steps[7].checks).toHaveLength(3);
+    expect(steps[7].state).toBe('warn');
+    expect(steps[6].candidates?.find((c) => c.chosen)?.id).toBe('a');
+    expect(summarize(steps, 8400)).toBe('Ran 5 queries, 1 repair, 3 checks, compared candidates · 8.4s');
+  });
+  it('renders live steps, then escalation pill, v1 table link and rich usage', () => {
+    const { rerender } = render(<AssistantTurn msg={v1(DUP_V1_STEPS.slice(0, 8))} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} />);
+    expect(screen.getByTestId('step-timeline')).toHaveAttribute('data-live', 'true');
+    expect(screen.getByTestId('step-summary')).toHaveTextContent('Re-ran repaired query…');
+    expect(screen.getByTestId('table-skeleton')).toBeInTheDocument();
+    rerender(<AssistantTurn msg={v1([...DUP_V1_STEPS, ...DUP_V1_ANSWER])} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} />);
+    expect(screen.getByTestId('step-summary')).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByTestId('escalation')).toHaveTextContent('Escalated to Sonnet 4.5');
+    fireEvent.click(within(screen.getByTestId('escalation')).getByRole('button'));
+    expect(screen.getByTestId('escalation')).toHaveTextContent('Haiku 4.5 → Sonnet 4.5');
+    fireEvent.click(within(screen.getByTestId('table-sql')).getByRole('button'));
+    expect(screen.getByTestId('table-sql')).toHaveTextContent('COUNT(*) FILTER');
+    expect(screen.getByTestId('meta-line')).toHaveTextContent('4 queries · 8.4s · ~$0.04');
+    fireEvent.click(screen.getByTestId('meta-line'));
+    const pop = screen.getByTestId('meta-popover');
+    expect(pop).toHaveTextContent('First token');
+    expect(pop).toHaveTextContent('Model');
+    expect(pop).toHaveTextContent('est.');
+    fireEvent.click(screen.getByTestId('open-sql'));
+    expect(screen.getByTestId('sql-inspector')).toHaveTextContent('produced “Duplicate-claim denial rate by provider, Q3 2026”');
+  });
+  it('aborted v1 runs mark in-flight steps as stopped', () => {
+    const evs = [...DUP_V1_STEPS.slice(0, 5), { type: 'message.end', messageId: 'm-v1', finishReason: 'aborted', usage: { queries: 1, elapsedMs: 900 }, seq: 99 } as V1Event];
+    render(<AssistantTurn msg={v1(evs)} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} />);
+    expect(screen.getByTestId('step-summary').textContent).toMatch(/1 stopped/);
+    expect(screen.getByTestId('stopped')).toBeInTheDocument();
+  });
+  it('clarification replies carry ChatRequest.resume (single and multi-select)', () => {
+    const onReply = vi.fn();
+    const part = { type: 'clarification' as const, id: 'c', clarificationId: 'clar-1', question: 'Which payers?', allowFreeText: true, multiSelect: true, choices: [{ id: 'p1', label: 'Medicare' }, { id: 'p2', label: 'Medicaid' }] };
+    render(<ClarifyCard part={part} onReply={onReply} active />);
+    const chips = screen.getAllByTestId('clarify-chip');
+    fireEvent.click(chips[0]); fireEvent.click(chips[1]);
+    fireEvent.click(screen.getByTestId('clarify-submit'));
+    expect(onReply).toHaveBeenCalledWith('Medicare, Medicaid', { clarificationId: 'clar-1', choiceIds: ['p1', 'p2'] });
+    cleanup();
+    const one = vi.fn();
+    render(<ClarifyCard part={{ ...part, multiSelect: false }} onReply={one} active />);
+    fireEvent.change(screen.getByLabelText('Answer in your own words'), { target: { value: 'Commercial only' } });
+    fireEvent.submit(screen.getByLabelText('Answer in your own words').closest('form')!);
+    expect(one).toHaveBeenCalledWith('Commercial only', { clarificationId: 'clar-1', text: 'Commercial only' });
   });
 });
 

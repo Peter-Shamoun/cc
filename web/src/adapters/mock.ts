@@ -34,7 +34,7 @@ export class MockAnalystAdapter implements AnalystAdapter {
     const t0 = Date.now();
     try {
       for (const step of fixture.steps) yield* this.emit(step, signal);
-      yield { type: 'message.end', messageId, finishReason: 'stop', usage: { ...fixture.usage, queries: fixture.queries, elapsedMs: fixture.usage?.timing ? fixture.usage.timing.reduce((a, b) => a + b.ms, 0) : Date.now() - t0 } as { queries: number; elapsedMs: number } };
+      yield { type: 'message.end', messageId, finishReason: 'stop', usage: { ...fixture.usage, queries: fixture.queries, elapsedMs: fixture.usage?.latency?.totalMs ?? Date.now() - t0 } as { queries: number; elapsedMs: number } };
     } catch (e) {
       if ((e as Error).name !== 'AbortError') throw e;
       yield { type: 'message.end', messageId, finishReason: 'aborted' };
