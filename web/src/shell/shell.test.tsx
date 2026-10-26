@@ -134,5 +134,13 @@ describe('shell QA-S1..S8', () => {
     const follow = screen.getByRole('textbox', { name: 'Message' });
     fireEvent.keyDown(follow, { key: 'ArrowUp' });
     await waitFor(() => expect(screen.getByTestId('msg-user-editing')).toBeTruthy());
+    // header title menu renames the open chat everywhere (Claude-style)
+    fireEvent.click(screen.getByRole('button', { name: /^Chat options: / }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
+    const ren = await screen.findByRole('textbox', { name: 'Rename chat' });
+    fireEvent.change(ren, { target: { value: 'Payer denials Q3' } });
+    fireEvent.keyDown(ren, { key: 'Enter' });
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Payer denials Q3' })).toBeTruthy());
+    expect(screen.getByRole('button', { name: 'Chat options: Payer denials Q3' })).toBeTruthy();
   }, 120000);
 });
