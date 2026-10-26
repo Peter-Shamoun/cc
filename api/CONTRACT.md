@@ -157,9 +157,18 @@ Realistic timing for UI work: `CC_API_MODEL_DELAY_SECONDS=0.6 CC_API_STREAM_DELA
 * No PHI in URLs: only opaque ids in paths; never query strings with data.
 * The client never writes rows, SQL results, step payloads or message text to `localStorage`, `sessionStorage`
   or IndexedDB. Transcripts persist only through the server transcript store. UI prefs (theme, density) are fine.
-* Responses: `Cache-Control: no-store`, `Content-Security-Policy` (strict, `default-src 'none'` on the API),
+* API responses (every route, errors and SSE included; `api/security.py`, tested in `test_security_headers.py`):
+  `Cache-Control: no-store`, `Pragma: no-cache`,
+  `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`,
   `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`,
-  `Permissions-Policy` locked down, `Cross-Origin-Opener-Policy: same-origin`.
+  `Permissions-Policy` locked down, `Cross-Origin-Opener-Policy`/`Cross-Origin-Resource-Policy: same-origin`,
+  HSTS; no `Server` header; no `/openapi.json` or `/docs`.
+* Web app (`web/src/lib/securityHeaders.ts`, applied by `vite dev` and `vite preview`; production hosting must
+  send the same): `script-src 'self'` (no inline script, no eval; charts use Vega's CSP-safe interpreter,
+  `ast: true`), `style-src 'self' 'unsafe-inline'` (style attributes from Shiki/Vega/KaTeX), `connect-src 'self'`,
+  `img-src 'self' data: blob:`, `object-src 'none'`, `frame-ancestors 'none'`, plus the same no-store and
+  hardening headers. Dev only adds `'unsafe-inline'` scripts (React refresh preamble) and `ws:` for HMR.
+  Don't add inline `<script>` to index.html; put it in `web/public/` instead.
 * `error.details` and `step.*.error.message` are scrubbed (quoted literals and long digit runs masked) and ≤500 chars.
 
 ## Changelog
