@@ -25,7 +25,7 @@ for (const k of want) {
   await step('05-regenerate', async () => { await p.getByTestId('msg-assistant').last().hover(); await p.getByRole('button', { name: 'Regenerate' }).last().click(); await send.waitFor({ timeout: 60000 }); await p.getByTestId('msg-assistant').last().hover(); await shot('05-regenerated-pager'); });
   await step('06-feedback', async () => { await p.getByTestId('msg-assistant').last().hover(); await p.getByRole('button', { name: 'Bad response' }).last().click(); await shot('06-feedback'); });
   await step('07-more-menu', async () => { await p.getByTestId('msg-assistant').last().hover(); await p.getByRole('button', { name: 'More actions' }).last().click(); await shot('07-more-menu'); });
-  await step('08-chat-options', async () => { await p.getByRole('button', { name: /^Chat options/ }).first().click(); await shot('08-chat-options'); });
+  await step('08-chat-options', async () => { if (m) { await p.getByRole('button', { name: 'Open sidebar' }).click(); await p.waitForTimeout(300); } await p.getByRole('button', { name: /^Chat options/ }).first().click(); await shot('08-chat-options'); });
   await step('09-share', async () => { await p.getByRole('button', { name: /^Share/ }).first().click(); await shot('09-share'); });
   await step('10-search', async () => { if (m) { await p.getByRole('button', { name: 'Open sidebar' }).click(); await p.waitForTimeout(300); } await p.getByRole('button', { name: 'Search chats' }).first().click(); await tb.page().keyboard.type('denial'); await shot('10-search'); });
   await step('11-shortcuts', async () => { if (m) return; await p.keyboard.press('Control+/'); await shot('11-shortcuts'); });
@@ -42,7 +42,7 @@ for (const k of want) {
   await step('18-long-user', async () => { await ask('Please look at '.repeat(40) + 'the paid amount by payer, and also explain each step you take in detail so that I can follow along.'); await shot('18-long-user'); });
   await step('19-404', async () => { await p.goto(LIVE + 'definitely/not/here'); await p.waitForTimeout(800); await shot('19-404'); });
   await fresh();
-  await step('20-temporary', async () => { const t = p.getByRole('button', { name: /temporary/i }).first(); await t.click(); await shot('20-temporary'); });
+  await step('20-temporary', async () => { await fresh(); const t = p.getByTestId('temporary-toggle').first(); await t.click(); await shot('20-temporary'); });
   await step('21-offline', async () => { await fresh(); await ctx.setOffline(true); await p.waitForTimeout(600); await tb.fill('hello'); await shot('21-offline'); await ctx.setOffline(false); });
   await ctx.close();
 }
