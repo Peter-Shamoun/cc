@@ -4,14 +4,60 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CC</title>
-    <script>
-      // Theme only (no PHI): read before paint to avoid a flash.
-      try { var t = localStorage.getItem('cc.pref.theme'), p = localStorage.getItem('cc.pref.palette'); if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('dark'); document.documentElement.dataset.palette = p === 'paper' ? 'paper' : 'neutral'; } catch (e) {}
-    </script>
+    <script src="/theme-init.js"></script>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23111'/%3E%3Ctext x='16' y='21' font-family='sans-serif' font-size='13' font-weight='700' fill='white' text-anchor='middle'%3ECC%3C/text%3E%3C/svg%3E" />
+    <!-- Boot shell (QA-P8): paints with the HTML alone, before the stylesheet and JS arrive. Geometry matches the
+         React empty state at 1440x900 and 390x844 so the hand-off does not shift layout. Static text only, no PHI. -->
+    <style>
+      :root, [data-palette="neutral"] { --ccb-bg: #fff; --ccb-side: #f9f9f9; --ccb-elev: #fff; --ccb-fg: #0d0d0d; --ccb-muted: #6b6b6b; --ccb-line: rgba(0,0,0,.1); --ccb-bar: #f4f4f4; --ccb-shadow: 0 4px 16px rgba(0,0,0,.05); --ccb-hfont: inherit; --ccb-hsize: 28px; --ccb-hweight: 500; }
+      .dark, .dark[data-palette="neutral"] { --ccb-bg: #212121; --ccb-side: #181818; --ccb-elev: #303030; --ccb-fg: #ececec; --ccb-muted: #a3a3a3; --ccb-line: rgba(255,255,255,.1); --ccb-bar: #303030; --ccb-shadow: 0 4px 16px rgba(0,0,0,.3); }
+      [data-palette="paper"] { --ccb-bg: #f5f4ed; --ccb-side: #efede5; --ccb-elev: #faf9f5; --ccb-fg: #141413; --ccb-muted: #65645f; --ccb-bar: #e8e6dc; --ccb-shadow: 0 4px 16px rgba(40,30,20,.06); --ccb-hfont: "Source Serif 4", Georgia, serif; --ccb-hsize: 32px; --ccb-hweight: 400; }
+      .dark[data-palette="paper"] { --ccb-bg: #262624; --ccb-side: #1f1e1d; --ccb-elev: #30302e; --ccb-fg: #faf9f5; --ccb-muted: #aea99c; --ccb-line: rgba(255,255,255,.08); --ccb-bar: #30302e; --ccb-shadow: 0 4px 16px rgba(0,0,0,.3); }
+      html, body, #root { height: 100%; margin: 0; }
+      body { background: var(--ccb-bg); color: var(--ccb-fg); font: 16px/1.5 ui-sans-serif, -apple-system, system-ui, "Segoe UI", Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+      .ccb { display: flex; height: 100%; overflow: hidden; }
+      .ccb-side { width: 260px; flex-shrink: 0; background: var(--ccb-side); }
+      [data-boot-sidebar="collapsed"] .ccb-side { width: 51px; border-right: 1px solid var(--ccb-line); }
+      .ccb-main { display: flex; flex: 1; min-width: 0; flex-direction: column; }
+      .ccb-head { height: 52px; flex-shrink: 0; }
+      .ccb-empty { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; padding: 0 16px 12vh; }
+      .ccb-h1 { margin: 0 0 28px; text-align: center; letter-spacing: -0.025em; font-family: var(--ccb-hfont); font-size: var(--ccb-hsize); font-weight: var(--ccb-hweight); line-height: 1.5; }
+      .ccb-col { display: flex; width: 100%; max-width: 48rem; flex-direction: column; }
+      .ccb-comp { box-sizing: border-box; height: 94px; padding: 10px; border-radius: 28px; background: var(--ccb-elev); box-shadow: 0 0 0 1px var(--ccb-line), var(--ccb-shadow); }
+      .ccb-comp textarea { display: block; box-sizing: border-box; width: 100%; height: 38px; margin: 0; padding: 6px 12px 8px; border: 0; outline: 0; resize: none; background: transparent; color: inherit; font: inherit; }
+      .ccb-comp textarea::placeholder { color: var(--ccb-muted); opacity: 1; }
+      .ccb-cards { height: 139px; margin-top: 16px; }
+      .ccb-thread { display: none; flex: 1; flex-direction: column; gap: 14px; width: 100%; max-width: 48rem; margin: 0 auto; padding: 16px 24px; box-sizing: border-box; }
+      .ccb-bar { height: 14px; border-radius: 7px; background: var(--ccb-bar); }
+      [data-boot-route="chat"] .ccb-empty { display: none; }
+      [data-boot-route="chat"] .ccb-thread { display: flex; }
+      @media (max-width: 767.98px) { .ccb-side { display: none; } }
+      @media (max-width: 639.98px) {
+        .ccb-empty { justify-content: flex-end; padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+        .ccb-h1 { margin: auto 0; }
+        .ccb-cards { order: -1; height: 70px; margin: 0 0 11px; }
+        .ccb-thread { padding: 16px; }
+      }
+      @media (prefers-reduced-motion: no-preference) { .ccb-bar { animation: ccb-pulse 1.6s ease-in-out infinite; } }
+      @keyframes ccb-pulse { 50% { opacity: .55; } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="ccb" id="cc-boot" data-testid="boot-shell" aria-busy="true">
+      <div class="ccb-side" aria-hidden="true"></div>
+      <main class="ccb-main" aria-label="Chat">
+        <div class="ccb-head" aria-hidden="true"></div>
+        <div class="ccb-empty">
+          <h1 class="ccb-h1">What should we look into?</h1>
+          <div class="ccb-col">
+            <div class="ccb-comp"><textarea id="cc-boot-input" aria-label="Message" placeholder="Ask about your claims" rows="1" autocomplete="off" autofocus></textarea></div>
+            <div class="ccb-cards" aria-hidden="true"></div>
+          </div>
+        </div>
+        <div class="ccb-thread" aria-hidden="true"><div class="ccb-bar" style="width:38%;align-self:flex-end"></div><div class="ccb-bar" style="width:92%"></div><div class="ccb-bar" style="width:84%"></div><div class="ccb-bar" style="width:61%"></div></div>
+      </main>
+    </div></div>
+    <noscript><p style="padding:16px">CC needs JavaScript.</p></noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

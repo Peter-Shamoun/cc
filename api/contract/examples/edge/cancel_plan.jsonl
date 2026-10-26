@@ -1,0 +1,5 @@
+{"type":"message.start","messageId":"m_1","conversationId":"c_1","contractVersion":"1.23.0","model":"scripted","parentId":"u_1","strategy":"tool_loop","seq":0}
+{"type":"status","label":"Thinking","seq":1}
+{"type":"status","label":null,"seq":2}
+{"type":"status","label":null,"seq":3}
+{"type":"message.end","messageId":"m_1","finishReason":"aborted","usage":{"queries":0,"elapsedMs":1,"latency":{"totalMs":1,"modelMs":0,"sqlMs":0,"stages":{"plan":1,"sql":0,"repair":0,"checks":0,"render":0},"firstEventMs":0},"costIsEstimate":true,"costUsd":0.0},"seq":4}

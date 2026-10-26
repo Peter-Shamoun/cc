@@ -1,4 +1,8 @@
 import json
+import os
+
+# Tests run unpaced unless a test opts in (api/app.py demo pacing, QA-P1).
+os.environ.setdefault("CC_API_DEMO_PACE", "0")
 
 import pytest
 from fastapi.testclient import TestClient

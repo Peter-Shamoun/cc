@@ -4,9 +4,11 @@ import re
 from api.tests.conftest import LABS, ask, parts
 
 KNOWN = {"text", "reasoning", "status", "tool_call", "table", "file", "image", "chart", "code", "callout",
-         "artifact", "error"}
+         "artifact", "error", "abstain", "clarification"}
 EVENT_TYPES = {"message.start", "text.start", "text.delta", "text.end", "reasoning.delta", "reasoning.end",
-               "code.delta", "part", "part.patch", "status", "message.end", "heartbeat"}
+               "code.delta", "part", "part.patch", "status", "message.end", "heartbeat", "step.sql_running",
+               "step.sql_result", "step.repair_attempt", "step.check", "step.explore", "step.candidates", "escalation",
+               "table.start", "table.rows", "chart.start", "chart.points"}
 
 
 def reduce(evs):
@@ -33,7 +35,8 @@ def test_envelope_and_order(client):
     assert evs[0]["type"] == "message.start" and evs[0]["conversationId"]
     assert evs[-1]["type"] == "message.end" and evs[-1]["finishReason"] == "stop"
     assert evs[-1]["messageId"] == evs[0]["messageId"]
-    assert set(evs[-1]["usage"]) == {"queries", "elapsedMs"}
+    assert {"queries", "elapsedMs", "latency", "costUsd", "tokens"} <= set(evs[-1]["usage"])
+    assert [e["seq"] for e in evs] == list(range(len(evs)))
     ids = re.findall(r"^id: (\S+)$", response.text, re.M)
     assert ids and all(i.startswith(evs[0]["messageId"] + ":") for i in ids)
     assert all(p["type"] in KNOWN and p["id"] for p in parts(evs))
@@ -43,7 +46,6 @@ def test_time_series_maps_to_text_sql_table_chart_assumptions(client):
     _, evs = ask(client, "Paid amount trend by month")
     message = reduce(evs)
     kinds = [p["type"] for p in message]
-    assert kinds[0] == "tool_call"
     assert kinds.index("text") < kinds.index("code") < kinds.index("table") < kinds.index("chart")
     text = next(p for p in message if p["type"] == "text")
     assert text["text"] == "Paid amount by service month."
@@ -78,7 +80,7 @@ def test_large_result_is_capped_with_download_id(client):
     assert table["rowCount"] == 1200 and len(table["rows"]) == 50
     file = next(p for p in parts(evs) if p["type"] == "file")
     assert file["fileId"] == table["csvFileId"] and file["mime"] == "text/csv" and file["rowCount"] == 1200
-    assert file["name"] == "result.csv"
+    assert re.fullmatch(r"cc_result_\d{4}-\d{2}-\d{2}\.csv", file["name"])
     assert not any(p["type"] == "chart" for p in parts(evs)), "row-level listings are not charted"
     for ev in evs:
         assert "\n" not in str(ev.get("part", {}).get("rows", "")), "no inline CSV"
@@ -86,19 +88,29 @@ def test_large_result_is_capped_with_download_id(client):
 
 def test_tool_steps_carry_sql_but_no_rows(client):
     _, evs = ask(client, "How many claims?")
-    steps = [p for p in parts(evs) if p["type"] == "tool_call"]
-    assert [s["tool"] for s in steps] == ["describe_view", "run_sql"]
-    assert all(s["state"] == "ok" for s in steps)
-    assert "sem.claims" in steps[1]["input"]["sql"]
-    assert all("preview" not in s.get("output", {}) for s in steps)
+    steps = [e for e in evs if e["type"].startswith("step.")]
+    assert [s["type"] for s in steps] == ["step.explore", "step.sql_running", "step.sql_result", "step.sql_running",
+                                          "step.sql_result", "step.check"]
+    assert steps[0]["probe"] == "describe_view" and steps[0]["target"] == "sem.claims"
+    assert "sem.claims" in steps[1]["sql"] and steps[2]["ok"] and steps[2]["rowCount"] == 1
+    assert all("rows" not in s and "preview" not in s for s in steps)
+    assert not any(p["type"] == "tool_call" for p in parts(evs)), "v1 streams steps, not tool_call parts"
 
 
-def test_refusal_is_plain_text(client):
+def test_legacy_tool_parts_on_request(client):
+    body = {"messages": [{"role": "user", "text": "How many claims?"}], "options": {"legacyToolParts": True}}
+    evs = [__import__("json").loads(line[6:]) for line in client.post("/api/chat", json=body, headers=LABS).text.splitlines()
+           if line.startswith("data: ")]
+    assert [p["tool"] for p in parts(evs) if p["type"] == "tool_call"] == ["describe_view", "run_sql"]
+
+
+def test_refusal_is_an_abstain_outcome(client):
     _, evs = ask(client, "Give me the patient names on denied claims")
     message = reduce(evs)
-    assert [p["type"] for p in message] == ["text"]
-    assert "can't" in message[0]["text"]
-    assert evs[-1]["usage"]["queries"] == 0
+    assert [p["type"] for p in message] == ["abstain"]
+    assert message[0]["category"] == "phi_request" and "can't" in message[0]["reason"]
+    assert message[0]["suggestions"]
+    assert evs[-1]["finishReason"] == "abstain" and evs[-1]["usage"]["queries"] == 0
 
 
 def test_validation_and_auth(client):
