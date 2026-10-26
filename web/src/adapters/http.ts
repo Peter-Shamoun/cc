@@ -1,6 +1,6 @@
 import { noteServerDate, serverNow } from '../lib/serverClock';
 import { getShare, loadShared, revokeShare, setShare } from '../contract/share';
-import type { ShareLink, SharedConversation } from '../contract/v1.gen';
+import type { ShareExpiryDays, ShareLink, SharedConversation } from '../contract/v1.gen';
 import type { ErrorPart, StreamEvent } from '../lib/contract';
 import { asSession, type AuthSession } from '../auth/session';
 import type { HttpError } from '../api/contract';
@@ -372,7 +372,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
   /** Contract 1.11.0 §17: org-scoped, read-only share links. Auth (and the CSRF header on cookie sessions) come from the session. */
   private shareOpts() { return { base: this.base, init: { credentials: 'same-origin' as const, cache: 'no-store' as const, headers: this.headers() } }; }
   getShare(conversationId: string): Promise<ShareLink | null> { return getShare(conversationId, this.shareOpts()); }
-  setShare(conversationId: string, includeData: boolean): Promise<ShareLink> { return setShare(conversationId, includeData, this.shareOpts()); }
+  setShare(conversationId: string, includeData: boolean, expiresInDays?: ShareExpiryDays): Promise<ShareLink> { return setShare(conversationId, includeData, { ...this.shareOpts(), expiresInDays }); }
   revokeShare(conversationId: string): Promise<boolean> { return revokeShare(conversationId, this.shareOpts()); }
   loadShared(shareId: string): Promise<SharedConversation | null> { return loadShared(shareId, this.shareOpts()); }
 
