@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Code2 } from 'lucide-react';
-import { fmtMs, fmtTokens, fmtUsd } from './normalize';
-import type { UsageDetail } from './provisional';
+import { fmtMs, fmtTokens, fmtUsd, modelName } from './normalize';
+import type { UsageView } from './provisional';
 
 const BAR = ['#7c9cbf', '#10a37f', '#e8b339', '#b58cd9', '#d97757'];
 
@@ -9,7 +9,7 @@ const BAR = ['#7c9cbf', '#10a37f', '#e8b339', '#b58cd9', '#d97757'];
  * Per-answer metadata in the action row: subtle "3 queries · 12s · $0.004" (ChatGPT-style message
  * metadata). Click or focus opens a small popover with model, tokens and the time breakdown.
  */
-export function AnswerMeta({ usage, queries, onSql, sqlOpen }: { usage?: UsageDetail; queries: number; onSql?: () => void; sqlOpen?: boolean }) {
+export function AnswerMeta({ usage, queries, repairs = 0, onSql, sqlOpen }: { usage?: UsageView; queries: number; repairs?: number; onSql?: () => void; sqlOpen?: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
@@ -23,7 +23,7 @@ export function AnswerMeta({ usage, queries, onSql, sqlOpen }: { usage?: UsageDe
   const bits = [
     queries > 0 && `${queries} ${queries === 1 ? 'query' : 'queries'}`,
     usage?.elapsedMs !== undefined && fmtMs(usage.elapsedMs),
-    usage?.costUsd !== undefined && fmtUsd(usage.costUsd),
+    usage?.costUsd !== undefined && `${usage.costIsEstimate ? '~' : ''}${fmtUsd(usage.costUsd)}`,
   ].filter(Boolean) as string[];
   const total = usage?.timing?.reduce((a, b) => a + b.ms, 0) ?? 0;
   return (
@@ -41,12 +41,27 @@ export function AnswerMeta({ usage, queries, onSql, sqlOpen }: { usage?: UsageDe
       {open && usage && (
         <div id={id} role="dialog" aria-label="Answer details" className="absolute bottom-full left-0 z-20 mb-2 w-72 rounded-xl border border-line bg-elev p-3 text-fg-muted shadow-lg step-enter" data-testid="meta-popover">
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-            {usage.model && <><dt>Model</dt><dd className="text-right text-fg">{usage.model}</dd></>}
-            {usage.inputTokens !== undefined && <><dt>Tokens</dt><dd className="text-right tabular-nums text-fg">{fmtTokens(usage.inputTokens)} in · {fmtTokens(usage.outputTokens ?? 0)} out</dd></>}
-            {usage.costUsd !== undefined && <><dt>Cost</dt><dd className="text-right tabular-nums text-fg">{fmtUsd(usage.costUsd)}</dd></>}
-            <dt>Queries</dt><dd className="text-right tabular-nums text-fg">{queries}{usage.repairs ? ` · ${usage.repairs} repaired` : ''}</dd>
+            {usage.model && !(usage.models && usage.models.length > 1) && <><dt>Model</dt><dd className="text-right text-fg">{usage.model}</dd></>}
+            {usage.inputTokens !== undefined && <><dt>Tokens</dt><dd className="text-right tabular-nums text-fg">{fmtTokens(usage.inputTokens)} in · {fmtTokens(usage.outputTokens ?? 0)} out{usage.cacheRead ? ` · ${fmtTokens(usage.cacheRead)} cached` : ''}</dd></>}
+            {usage.costUsd !== undefined && <><dt>Cost</dt><dd className="text-right tabular-nums text-fg">{fmtUsd(usage.costUsd)}{usage.costIsEstimate && <span className="text-fg-subtle"> est.</span>}</dd></>}
+            <dt>Queries</dt><dd className="text-right tabular-nums text-fg">{queries}{repairs ? ` · ${repairs} repaired` : ''}</dd>
+            {usage.firstTokenMs !== undefined && <><dt>First token</dt><dd className="text-right tabular-nums text-fg">{fmtMs(usage.firstTokenMs)}</dd></>}
             <dt>Total time</dt><dd className="text-right tabular-nums text-fg">{fmtMs(usage.elapsedMs)}</dd>
           </dl>
+          {usage.models && usage.models.length > 1 && (
+            <table className="mt-3 w-full text-[11.5px]" data-testid="meta-models">
+              <thead className="text-left text-fg-subtle"><tr><th className="font-normal">Model</th><th className="text-right font-normal">Tokens</th><th className="text-right font-normal">Cost</th></tr></thead>
+              <tbody>
+                {usage.models.map((x) => (
+                  <tr key={x.model + (x.role ?? '')} className="text-fg">
+                    <td className="py-0.5">{modelName(x.model)}{x.role && <span className="text-fg-subtle"> · {x.role}</span>}</td>
+                    <td className="text-right tabular-nums">{fmtTokens(x.inputTokens + x.outputTokens)}</td>
+                    <td className="text-right tabular-nums">{x.costUsd !== undefined ? fmtUsd(x.costUsd) : '–'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
           {usage.timing && total > 0 && (
             <>
               <div className="mt-3 flex h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden>
@@ -59,7 +74,7 @@ export function AnswerMeta({ usage, queries, onSql, sqlOpen }: { usage?: UsageDe
               </ul>
             </>
           )}
-          <p className="mt-2 border-t border-line pt-2 text-[11px] leading-snug">Demo backend: costs are estimates from the scripted run, no paid model calls.</p>
+          <p className="mt-2 border-t border-line pt-2 text-[11px] leading-snug">{usage.costIsEstimate !== false ? 'Demo backend: cost is an estimate from a static price table; no paid model calls.' : 'Billed cost for this answer.'}</p>
         </div>
       )}
     </div>

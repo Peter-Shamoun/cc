@@ -52,7 +52,8 @@ await shot(pg, '04_sql_inspector_meta', true);
 // 5. dark: escalation + expanded
 pg = await page({ theme: 'dark' });
 await ask(pg, DUP);
-await pg.getByTestId('escalation').getByRole('button').click();
+// escalation pill appears once the mock replays v1 `escalation` events
+if (await pg.getByTestId('escalation').count()) await pg.getByTestId('escalation').getByRole('button').click();
 await pg.getByTestId('step-summary').click();
 await pg.waitForTimeout(400);
 await shot(pg, '05_dark_escalation_steps', true);

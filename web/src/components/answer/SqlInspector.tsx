@@ -1,28 +1,36 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, Code2, Table2 } from 'lucide-react';
 import clsx from 'clsx';
-import type { AssistantView, CodePart, TablePart } from '../../lib/contract';
+import type { CodePart, TablePart } from '../../lib/contract';
 import { CodeBlock } from '../parts/CodeBlock';
-import { fmtMs, stepsOf } from './normalize';
+import { fmtMs, partsOf, stepsOf, type AnyView } from './normalize';
+import type { Step } from './provisional';
 
-export interface QueryInfo { id: string; label: string; sql: string; rowCount?: number; durationMs?: number; state?: 'running' | 'ok' | 'error' | 'cancelled'; produces: string[] }
+export interface QueryInfo { id: string; label: string; sql: string; rowCount?: number; durationMs?: number; state?: Step['state']; produces: string[] }
 
 /**
  * Every SQL statement behind an answer, and which table each produced. Sources: tool steps with
  * SQL (in run order) and `code` parts with role=query; a table links to its query by `sqlPartId`
- * (code part or tool step id) or by `resultId`.
+ * (code part or tool step id), by v1 `stepId`, or by `resultId`.
  */
-export function queriesOf(m: AssistantView): QueryInfo[] {
-  const tables = m.parts.filter((p): p is TablePart => p.type === 'table');
-  const producedBy = (ids: (string | undefined)[]) => tables.filter((t) => ids.some((id) => id && (t.sqlPartId === id || t.resultId === id))).map((t) => t.title ?? 'Result');
+type LinkedTable = TablePart & { stepId?: string };
+type LinkedCode = CodePart & { stepId?: string };
+export function queriesOf(m: AnyView): QueryInfo[] {
+  const parts = partsOf(m) as unknown as (LinkedTable | LinkedCode | { type: string })[];
+  const tables = parts.filter((p): p is LinkedTable => p.type === 'table');
+  const codes = parts.filter((p): p is LinkedCode => p.type === 'code' && (p as CodePart).language === 'sql' && (p as CodePart).role === 'query');
+  const producedBy = (ids: (string | undefined)[]) => tables.filter((t) => ids.some((id) => id && (t.sqlPartId === id || t.resultId === id || t.stepId === id || codes.some((c) => c.stepId === id && c.id === t.sqlPartId)))).map((t) => t.title ?? 'Result');
   const out: QueryInfo[] = [];
-  const seen = new Set<string>();
-  for (const s of stepsOf(m)) {
-    if (!s.sql || s.state === 'running') continue;
-    out.push({ id: s.id, label: s.label, sql: s.sql, rowCount: s.rowCount, durationMs: s.durationMs, state: s.state, produces: producedBy([s.id, s.resultId]) });
-    seen.add(s.sql.trim());
-  }
-  for (const c of m.parts.filter((p): p is CodePart => p.type === 'code' && p.language === 'sql' && p.role === 'query')) {
+  const steps = stepsOf(m).filter((s) => s.sql && s.state !== 'running');
+  steps.forEach((s, i) => {
+    // A v1 repair carries the revised SQL that then re-runs as its own step: list it once.
+    if (s.kind === 'repair' && steps.slice(i + 1).some((x) => x.sql?.trim() === s.sql!.trim())) return;
+    const dup = out.find((q) => q.sql.trim() === s.sql!.trim());
+    const prod = producedBy([s.id, s.resultId]);
+    if (dup) { dup.produces = [...new Set([...dup.produces, ...prod])]; return; }
+    out.push({ id: s.id, label: s.label, sql: s.sql!, rowCount: s.rowCount, durationMs: s.durationMs, state: s.state, produces: prod });
+  });
+  for (const c of codes) {
     const prod = producedBy([c.id]);
     const dup = out.find((q) => q.sql.trim() === c.code.trim());
     if (dup) { dup.produces = [...new Set([...dup.produces, ...prod])]; continue; }
@@ -32,9 +40,12 @@ export function queriesOf(m: AssistantView): QueryInfo[] {
 }
 
 /** The query that produced `t`, if known. */
-export function queryForTable(m: AssistantView, t: TablePart): QueryInfo | undefined {
+export function queryForTable(m: AnyView, t: TablePart): QueryInfo | undefined {
   const qs = queriesOf(m);
-  return qs.find((q) => q.produces.includes(t.title ?? 'Result') && (q.id === t.sqlPartId || q.id === t.resultId)) ?? qs.find((q) => q.id === t.sqlPartId) ?? qs.find((q) => q.produces.includes(t.title ?? 'Result'));
+  const sid = (t as LinkedTable).stepId;
+  const code = (partsOf(m) as unknown as LinkedCode[]).find((c) => c.type === 'code' && c.id === t.sqlPartId);
+  const ids = [t.sqlPartId, t.resultId, sid, code?.stepId].filter(Boolean);
+  return qs.find((q) => ids.includes(q.id)) ?? qs.find((q) => q.produces.includes(t.title ?? 'Result'));
 }
 
 /** Inline "Query ▸" disclosure under a table, ChatGPT "View analysis" style. */
