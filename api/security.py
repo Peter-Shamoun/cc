@@ -186,3 +186,37 @@ class CsrfMiddleware:
                 await send({"type": "http.response.body", "body": body})
                 return
         await self.app(scope, receive, send)
+
+
+class HeadMiddleware:
+    """RFC 9110 §9.3.2: HEAD is GET without a body. FastAPI registers GET routes for GET only, so HEAD was 405.
+
+    A HEAD request runs the GET handler, with the same auth, headers, status and Content-Length, and the body is
+    dropped. SSE routes (``…/stream``) are excluded: a HEAD there would attach to a live run and look like a dropped
+    viewer, so they keep answering 405.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or scope.get("method") != "HEAD" or scope.get("path", "").endswith("/stream"):
+            await self.app(scope, receive, send)
+            return
+        started = done = False
+
+        async def send_headers_only(message):
+            nonlocal started, done
+            if message["type"] == "http.response.start":
+                started = True
+                await send(message)
+            elif message["type"] == "http.response.body":
+                if not done and not message.get("more_body", False):
+                    done = True
+                    await send({"type": "http.response.body", "body": b"", "more_body": False})
+            else:
+                await send(message)
+
+        await self.app({**scope, "method": "GET"}, receive, send_headers_only)
+        if started and not done:  # the app ended without a final body message; close the response
+            await send({"type": "http.response.body", "body": b"", "more_body": False})
