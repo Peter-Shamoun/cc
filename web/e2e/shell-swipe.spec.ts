@@ -17,7 +17,8 @@ async function drag(page: Page, from: [number, number], to: [number, number], st
 }
 
 test.describe('phone drawer gestures @mobile', () => {
-  test('swipe left closes the drawer; a short drag springs back; an edge swipe opens it', async ({ page }) => {
+  test('swipe left closes the drawer; a short drag springs back; an edge swipe opens it', async ({ page, browserName }) => {
+    test.skip(browserName !== 'chromium', 'real touch sequences are driven through CDP (Chromium only)');
     await open(page, MOCK);
     const sidebar = page.getByTestId('sidebar');
     await page.getByRole('button', { name: 'Open sidebar' }).click();

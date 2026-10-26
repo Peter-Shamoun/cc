@@ -24,8 +24,8 @@ test.describe('share & export (live) @desktop', () => {
 });
 
 test.describe('share links (live, contract 1.11.0) @desktop', () => {
-  test('create a link (data off by default) → read-only /shared page → stop sharing → link is gone', async ({ page, context }) => {
-    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  test('create a link (data off by default) → read-only /shared page → stop sharing → link is gone', async ({ page, context, browserName }) => {
+    if (browserName === 'chromium') await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await open(page, LIVE);
     await ask(page, 'Total paid by payer');
     await page.getByTestId('share-button').click();

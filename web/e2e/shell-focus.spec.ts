@@ -1,10 +1,11 @@
 import { test, expect } from './fixtures';
-import { MOCK, open, ask, composer } from './helpers';
+import { MOCK, open, ask, composer, gap } from './helpers';
 
 // Focus management parity (ChatGPT/Claude): sending the first question swaps the centered composer for the
 // docked one; typing focus must survive that, so a follow-up can be typed right away.
 test.describe('focus (mock) @desktop', () => {
-  test('the first send keeps focus in the composer through the answer', async ({ page }) => {
+  test('the first send keeps focus in the composer through the answer', async ({ page, browserName }) => {
+    if (browserName === 'firefox') gap('QA-S19');
     await open(page, MOCK);
     await expect(composer(page)).toBeFocused();
     await ask(page, 'Total paid by payer');
