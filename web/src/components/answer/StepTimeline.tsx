@@ -37,6 +37,8 @@ export function StepTimeline({ steps, live, elapsedMs }: { steps: Step[]; live: 
   const bodyId = useId();
   const current = [...steps].reverse().find((s) => s.state === 'running') ?? (live ? steps[steps.length - 1] : undefined);
   const errors = unresolvedFailures(steps);
+  // Agent tags only help when more than one agent/model worked on the answer (QA-A6).
+  const multiAgent = new Set(steps.map((s) => s.agent).filter(Boolean)).size > 1 || steps.some((s) => s.kind === 'escalation');
   const repaired = steps.filter((s) => s.kind === 'repair' && s.state === 'ok').length;
   const header = live
     ? `${current?.label ?? 'Working'}…`
@@ -55,14 +57,14 @@ export function StepTimeline({ steps, live, elapsedMs }: { steps: Step[]; live: 
       </button>
       <div id={bodyId} hidden={!open} className="step-body">
         <ol className="relative ml-[6px] mt-1 border-l border-line pl-5" aria-live={live ? 'polite' : undefined}>
-          {steps.map((s, i) => <StepRow key={s.id} step={s} last={i === steps.length - 1} />)}
+          {steps.map((s, i) => <StepRow key={s.id} step={s} last={i === steps.length - 1} showAgent={multiAgent} />)}
         </ol>
       </div>
     </section>
   );
 }
 
-function StepRow({ step, last }: { step: Step; last: boolean }) {
+function StepRow({ step, last, showAgent }: { step: Step; last: boolean; showAgent: boolean }) {
   const hasDetail = !!(step.sql || step.error || step.checks?.length || step.candidates?.length || step.message);
   const [open, setOpen] = useState(false);
   const Icon = ICON[step.kind];
@@ -84,7 +86,7 @@ function StepRow({ step, last }: { step: Step; last: boolean }) {
         {step.state === 'warn' && <AlertTriangle size={13} className="shrink-0 text-[#b7791f] dark:text-[#e8b339]" aria-label="warning" />}
         {step.state === 'cancelled' && <span className="shrink-0 text-xs text-fg-subtle">stopped</span>}
         {meta && <span className="shrink-0 tabular-nums text-xs text-fg-subtle">{meta}</span>}
-        {step.agent && <span className="shrink-0 rounded-full border border-line px-1.5 text-[11px] text-fg-subtle">{step.agent}</span>}
+        {showAgent && step.agent && <span className="shrink-0 rounded-full border border-line px-1.5 text-[11px] text-fg-subtle">{step.agent}</span>}
         {hasDetail && (open ? <ChevronDown size={13} className="shrink-0" /> : <ChevronRight size={13} className="shrink-0" />)}
       </button>
       {!open && step.kind === 'repair' && step.error && (

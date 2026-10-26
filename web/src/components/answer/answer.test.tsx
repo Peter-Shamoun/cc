@@ -9,6 +9,7 @@ import { ANSWER_FIXTURES } from '../../fixtures/answer';
 import { DUP_V1_ANSWER, DUP_V1_STEPS } from '../../fixtures/answerV1';
 import { newAssistantViewV1, reduceV1, type AssistantViewV1, type StreamEvent as V1Event } from '../../api/contract';
 import { ClarifyCard } from './States';
+import { StepTimeline } from './StepTimeline';
 
 vi.mock('../../adapters/mock', async (orig) => {
   const m = await orig<typeof import('../../adapters/mock')>();
@@ -155,6 +156,14 @@ describe('answer surface: contract v1 events', () => {
     expect(unresolvedFailures([st('sql', 'ok'), st('sql', 'error')])).toBe(1);
     expect(summarize([{ id: 'e', kind: 'explore', state: 'ok', label: 'Read schema', durationMs: 13 }])).toBe('Explored the data · 13 ms');
   });
+  it('agent tags only show when more than one agent worked on the answer (QA-A6)', () => {
+    const row = (id: string, agent: string) => ({ id, kind: 'sql' as const, state: 'ok' as const, label: 'Ran query', agent });
+    render(<StepTimeline steps={[row('a', 'analyst'), row('b', 'analyst')]} live />);
+    expect(screen.queryByText('analyst')).toBeNull();
+    cleanup();
+    render(<StepTimeline steps={[row('a', 'Haiku 4.5'), row('b', 'Sonnet 4.5')]} live />);
+    expect(screen.getByText('Sonnet 4.5')).toBeInTheDocument();
+  });
   it('server present-tense labels read as past tense once a step finishes', () => {
     const base = [{ type: 'message.start', messageId: 'm', conversationId: 'c', contractVersion: '1.0.0', seq: 0 }, { type: 'step.sql_running', stepId: 's', sql: 'SELECT 1', purpose: 'answer', attempt: 1, label: 'Running query', seq: 1 }] as V1Event[];
     expect(stepsOf(v1(base))[0].label).toBe('Running query');
@@ -172,6 +181,7 @@ describe('answer surface: contract v1 events', () => {
     const part = { type: 'clarification' as const, id: 'c', clarificationId: 'clar-1', question: 'Which payers?', allowFreeText: true, multiSelect: true, choices: [{ id: 'p1', label: 'Medicare' }, { id: 'p2', label: 'Medicaid' }] };
     render(<ClarifyCard part={part} onReply={onReply} active />);
     const chips = screen.getAllByTestId('clarify-chip');
+    expect(screen.getByRole('button', { name: 'Medicare' })).toBe(chips[0]);
     fireEvent.click(chips[0]); fireEvent.click(chips[1]);
     fireEvent.click(screen.getByTestId('clarify-submit'));
     expect(onReply).toHaveBeenCalledWith('Medicare, Medicaid', { clarificationId: 'clar-1', choiceIds: ['p1', 'p2'] });
