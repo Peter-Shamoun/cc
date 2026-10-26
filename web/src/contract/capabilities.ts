@@ -6,7 +6,7 @@
  * api/contract/examples/capabilities.json (`python -m api.contract.gen_examples`).
  */
 import { CONTRACT_VERSION } from '../api/contract';
-import type { Capabilities, ModelOption, StrategyOption } from './v1.gen';
+import type { Capabilities, FeedbackRating, FeedbackReason, ModelOption, StrategyOption } from './v1.gen';
 
 export const DEMO_CAPABILITIES: Capabilities = {
   contractVersion: CONTRACT_VERSION,
@@ -87,6 +87,53 @@ export const DEMO_CAPABILITIES: Capabilities = {
       "available": true
     }
   ],
+  "feedbackReasons": [
+    {
+      "id": "correct",
+      "label": "Correct",
+      "rating": "up"
+    },
+    {
+      "id": "clear",
+      "label": "Easy to understand",
+      "rating": "up"
+    },
+    {
+      "id": "fast",
+      "label": "Fast",
+      "rating": "up"
+    },
+    {
+      "id": "wrong_numbers",
+      "label": "Numbers look wrong",
+      "rating": "down"
+    },
+    {
+      "id": "wrong_query",
+      "label": "Wrong filters or SQL",
+      "rating": "down"
+    },
+    {
+      "id": "misunderstood",
+      "label": "Misunderstood the question",
+      "rating": "down"
+    },
+    {
+      "id": "missing_data",
+      "label": "Missing data",
+      "rating": "down"
+    },
+    {
+      "id": "too_slow",
+      "label": "Too slow",
+      "rating": "down"
+    },
+    {
+      "id": "other",
+      "label": "Something else",
+      "rating": "down"
+    }
+  ],
 };
 
 export async function loadCapabilities(base = '', fetchImpl: typeof fetch = (...a) => fetch(...a)): Promise<Capabilities> {
@@ -116,3 +163,7 @@ export function runOptions(c: Capabilities, strategy?: string, model?: string): 
   if (model && model !== c.defaults.model) out.model = model;
   return out;
 }
+
+/** 1.7.0 (§13): the reason chips for one rating, in server order. Empty when the server predates feedback. */
+export const feedbackReasonsFor = (c: Capabilities, rating: FeedbackRating): FeedbackReason[] =>
+  (c.feedbackReasons ?? []).filter((r) => r.rating === rating);

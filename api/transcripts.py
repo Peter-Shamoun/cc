@@ -33,6 +33,7 @@ from pathlib import Path
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from api.feedback import apply as apply_feedback
 from api.store import DEFAULT_TITLE, InMemoryTranscriptStore, Principal, _iso, clean_title, page
 
 TRANSCRIPT_RETENTION_DAYS = 90
@@ -236,6 +237,17 @@ class SealedTranscriptStore:
             conv["title"] = clean_title(title)
             self._save(principal, conv)
             return True
+
+    def set_feedback(self, principal, conversation_id, message_id, feedback):
+        """Same as the in-memory store; the feedback (and its comment) is sealed with the transcript."""
+        with self._lock:
+            conv = self._load(principal, conversation_id)
+            if conv is None:
+                return "missing"
+            result = apply_feedback(conv, message_id, feedback)
+            if result == "ok":
+                self._save(principal, conv)
+            return result
 
     def delete_conversation(self, principal, conversation_id):
         if not _SAFE.match(conversation_id or ""):
