@@ -52,8 +52,9 @@ export function SearchDialog({ threads, search, onOpen, onNew, onClose }: { thre
             if (e.key === 'Enter') { e.preventDefault(); pick(rows[active]); }
           }}
           className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-fg-subtle focus-visible:outline-none" />
+        <button type="button" onClick={onClose} className="shrink-0 rounded-md px-2 py-1 text-sm font-medium text-fg-muted hover:bg-hover hover:text-fg sm:hidden">Cancel</button>
       </div>
-      <ul id={lid} role="listbox" aria-label="Results" className="scrollbar-thin max-h-[min(440px,60vh)] overflow-y-auto p-2 text-sm">
+      <ul id={lid} role="listbox" aria-label="Results" className="scrollbar-thin max-h-[min(440px,60vh)] overflow-y-auto p-2 text-sm max-sm:max-h-none max-sm:flex-1">
         {hits && hits.length === 0 && <li className="px-3 py-8 text-center text-fg-subtle" role="presentation">No chats match “{q}”</li>}
         {rows.map((r, i) => (
           <li key={r.key} role="presentation">
