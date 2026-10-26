@@ -12,6 +12,7 @@ export function rateLimitLabel(msLeft: number): string {
 }
 import { shortTitle } from '../shell/title';
 import { frameBatch } from './frameBatch';
+import { createTableReveal, prefersReducedMotion } from './tableReveal';
 import { foldThread } from './threadTree';
 
 const uid = (p: string) => `${p}_${Math.random().toString(36).slice(2, 10)}`;
@@ -109,9 +110,21 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     const token = ++runRef.current;
     const current = () => runRef.current === token;
     // Stream batching (lib/frameBatch): one render per animation frame for text/reasoning deltas.
-    const batch = frameBatch(() => { if (current()) setMessages([...history, view]); });
+    // Partial-table streaming (lib/tableReveal): a table that arrives mid-answer grows over a few frames.
+    const reveal = createTableReveal();
+    // While a table is still growing the answer counts as streaming (no actions/footer yet), even if
+    // message.end already arrived; the turn is released once it is fully shown.
+    const shown = () => (reveal.active ? { ...view, streaming: true, parts: reveal.apply(view.parts) } : view);
+    const batch = frameBatch(() => { if (current()) setMessages([...history, shown()]); });
     const set = batch.now;
     const schedule = batch.schedule;
+    let drained: (() => void) | null = null;
+    const revealLoop = frameBatch(() => {
+      if (!current() || ctrl.signal.aborted) { reveal.finish(); drained?.(); return; }
+      if (reveal.step()) revealLoop.schedule();
+      else drained?.();
+      batch.now(); // already inside a frame: paint this step (and any queued text) now
+    });
     set();
     setBusy(true);
     const wire = history.map((m) => ({ id: m.id, role: m.role, text: m.role === 'user' ? m.text : m.parts.map((p) => (p.type === 'text' ? p.text : '')).join('\n'), ...(m.role === 'user' && m.parentId ? { parentId: m.parentId } : {}) }));
@@ -144,6 +157,7 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     try {
       for await (const ev of adapter.streamTurn({ conversationId: cid, messages: wire, signal: ctrl.signal, ...(opts.resume ? { resume: opts.resume } : {}), ...(opts.regenerate ? { regenerate: opts.regenerate } : {}), onConnection })) {
         view = reduceV1(view, ev);
+        if (ev.type === 'part' && ev.part.type === 'table' && !prefersReducedMotion() && reveal.note(view.parts) && !revealLoop.pending) revealLoop.schedule();
         // Text and reasoning deltas are batched; structural events (start, parts, steps, end) paint at once.
         if (ev.type === 'text.delta' || ev.type === 'reasoning.delta') schedule();
         else set();
@@ -156,6 +170,12 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
       }
     }
     stopCountdown();
+    // A table that came in with the last events finishes growing (<= ~400 ms) before the turn is
+    // released, so the next send/regenerate never starts from a half-shown table.
+    if (reveal.active && current() && !ctrl.signal.aborted) {
+      await new Promise<void>((resolve) => { drained = resolve; if (!revealLoop.pending) revealLoop.schedule(); setTimeout(resolve, 1000); });
+    }
+    reveal.finish();
     // Stopped before the server's aborted message.end arrived: keep what ran (queries, time) on the answer.
     if (ctrl.signal.aborted && view.streaming) view = reduceV1(view, { type: 'message.end', messageId: view.id, finishReason: 'aborted', usage: partialUsage(view, startedAt) } as never);
     view = { ...view, streaming: false, status: null, openText: [] };
