@@ -14,25 +14,13 @@ const lastUserText = (b: Record<string, unknown>) => {
 };
 
 test.describe('composer features (live) @both', () => {
-  test('scope chip opens the Data scope popover; Esc closes it and returns focus', async ({ page }) => {
+  test('no data-source picker anywhere: composer is attach / text / send (Peter 11:57 PM)', async ({ page }) => {
     await open(page, LIVE);
-    const chip = page.getByTestId('scope-chip');
-    await chip.click();
-    const pop = page.getByTestId('scope-popover');
-    await expect(pop).toBeVisible();
-    await expect(chip).toHaveAttribute('aria-expanded', 'true');
-    await expect(pop.getByRole('radio', { name: /Claims lake/ })).toHaveAttribute('aria-checked', 'true');
-    await expect(pop.getByRole('radio', { name: /Raw EDI/ })).toHaveAttribute('aria-disabled', 'true');
-    await expect(pop).toContainText('sem.claims');
-    // The popover sits fully inside the viewport (phones included).
-    const box = (await pop.boundingBox())!;
-    const vp = page.viewportSize()!;
-    expect(box.x).toBeGreaterThanOrEqual(0);
-    expect(box.x + box.width).toBeLessThanOrEqual(vp.width);
-    expect(box.y).toBeGreaterThanOrEqual(0);
+    await expect(page.getByTestId('scope-chip')).toHaveCount(0);
+    await expect(page.getByText(/Claims lake|sem\.\*/)).toHaveCount(0);
+    await page.getByTestId('product-menu').click();
+    await expect(page.getByRole('menu')).not.toContainText(/scope|claims lake|sem\./i);
     await page.keyboard.press('Escape');
-    await expect(pop).toHaveCount(0);
-    await expect(chip).toBeFocused();
   });
 
   test('a long paste becomes a chip, is removable, and rides along with the question', async ({ page, browserName }) => {

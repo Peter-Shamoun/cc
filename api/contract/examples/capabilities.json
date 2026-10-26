@@ -1,5 +1,5 @@
 {
-  "contractVersion": "1.19.0",
+  "contractVersion": "1.20.1",
   "demo": true,
   "scope": "public",
   "defaults": {
@@ -133,5 +133,8 @@
     ],
     "default": 30
   },
-  "pinArchive": true
+  "pinArchive": true,
+  "temporaryChat": {
+    "ttlSeconds": 3600
+  }
 }

@@ -103,6 +103,7 @@ From [the share security review](frontend_share_security_review.md). The demo AP
 | `CC_API_MAX_CONCURRENT_RUNS` | `3` unfinished runs per user | keep, or size to capacity |
 | `CC_API_HEARTBEAT_SECONDS` | `15` | must be below every proxy idle timeout (ALB default 60 s) |
 | `CC_API_DISCONNECT_GRACE_SECONDS` | `10` | keep |
+| `CC_API_TEMPORARY_TTL_SECONDS` | `3600` | idle lifetime of a temporary chat's in-memory history (contract 1.20, §11.1); `0` turns temporary chat off (no `Capabilities.temporaryChat`, `temporary: true` is 422) |
 | `CC_API_DEMO_PACE`, `CC_API_STREAM_DELAY_SECONDS`, `CC_API_MODEL_DELAY_SECONDS` | demo pacing | `0` / unset |
 | `CC_API_ORG_POLICY` | unset | per-customer model and strategy policy (JSON) |
 | `CC_TRANSCRIPT_MODE` | `ephemeral` | the decided retention mode ([frontend_transcripts.md](frontend_transcripts.md)) |

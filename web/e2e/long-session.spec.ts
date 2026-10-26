@@ -47,11 +47,11 @@ test('220-turn chat: opens fast, stays windowed, first/last turn reachable, no y
 
   // The first turn is reachable (scroll to top; the virtualizer mounts it).
   const sc = page.getByTestId('thread-scroller');
-  for (let i = 0; i < 40 && !(await page.getByTestId('msg-user').filter({ hasText: /#0$/ }).count()); i++) {
+  for (let i = 0; i < 40 && !(await page.getByTestId('msg-user').filter({ has: page.getByText(/#0$/) }).count()); i++) {
     await sc.evaluate((el) => { el.scrollTop = 0; el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1000, bubbles: true })); });
     await page.waitForTimeout(100);
   }
-  await expect(page.getByTestId('msg-user').filter({ hasText: /#0$/ }).first()).toBeVisible();
+  await expect(page.getByTestId('msg-user').filter({ has: page.getByText(/#0$/) }).first()).toBeVisible();
 
   // Back to the bottom, ask live; mid-stream the reader scrolls up and the viewport must hold still.
   inflate = false;
