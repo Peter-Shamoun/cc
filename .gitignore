@@ -6,3 +6,4 @@ __pycache__/
 build/
 .ccsim/
 .claude/worktrees/
+.claude/settings.local.json
