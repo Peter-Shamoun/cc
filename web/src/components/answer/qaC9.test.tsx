@@ -57,3 +57,17 @@ describe('QA C9 fidelity (F1, F2, F7, F9, F10)', () => {
     expect(readFileSync('src/components/ArtifactPanel.tsx', 'utf8')).toMatch(/role="tab".*cc-quiet-focus/);
   });
 });
+
+describe('table header weight: data tables match markdown tables', () => {
+  it('600 weight, the stronger header rule, hairline body rules, same padding', () => {
+    render(<DataTable part={{ type: 'table', id: 'h', columns: [{ key: 'a', label: 'Payer', type: 'string' }], rows: [['Synthetic A']], rowCount: 1 } as unknown as TablePart} />);
+    const th = screen.getByRole('columnheader', { name: /Payer/ });
+    expect(th.className).toMatch(/\bfont-semibold\b/);
+    expect(th.className).toMatch(/\bborder-line-strong\b/);
+    expect(th.className).toMatch(/\bpx-3 py-2\b/);
+    expect(screen.getByRole('cell', { name: 'Synthetic A' }).className).toMatch(/\bborder-line\b(?!-)/);
+    const css = readFileSync('src/index.css', 'utf8');
+    expect(css).toMatch(/\.prose-chat :where\(th\) \{[^}]*font-weight: 600;[^}]*border-bottom: 1px solid var\(--border-strong\)/);
+    expect(css).toMatch(/\.prose-chat :where\(th\) \{[^}]*padding: 0\.5em 0\.75em/);
+  });
+});
