@@ -21,7 +21,7 @@ export type {
   Sensitivity, StatusPart, TablePart, TextPart, ToolCallPart, ArtifactPart, PartBase,
 };
 
-export const CONTRACT_VERSION = '1.10.0';
+export const CONTRACT_VERSION = '1.11.0';
 export const CONTRACT_MAJOR = 1;
 
 // ---------------------------------------------------------------- new parts (v1)
@@ -184,6 +184,8 @@ export type { Capabilities, StrategyOption, ModelOption, CostTier } from '../con
 export type { Feedback, FeedbackRating, FeedbackReason, FeedbackRequest } from '../contract/v1.gen';
 /** 1.8.0: citations (§14) and conversation export (§15). */
 export type { Source, ConversationExport } from '../contract/v1.gen';
+/** 1.11.0: share (CONTRACT.md §17). Helpers: `src/contract/share.ts`. */
+export type { ShareLink, ShareRequest, SharedConversation } from '../contract/v1.gen';
 
 // ---------------------------------------------------------------- requests
 
