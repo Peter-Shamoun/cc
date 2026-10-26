@@ -13,6 +13,7 @@ sequence drifts from these files.
 | `abstain.jsonl` | abstain | `abstain` | one `abstain` part (`category`, `reason`, `suggestions[]`); no table, no error |
 | `clarify.jsonl` | clarifying question | `needs_input` | one `clarification` part (`choices[]`, `allowFreeText`) |
 | `clarify_resume.jsonl` | answer after picking the first choice | `stop` | `message.start.resumeOf = {clarificationId, messageId}` of `clarify.jsonl` |
+| `regenerate_concise.jsonl` | "More concise" on `answer.jsonl` (1.10.0, CONTRACT.md §8.1) | `stop` | `message.start.regenerateOf` = the answer's id, `regenerateStyle: "concise"`; first sentence, no chart; table, SQL and callouts kept |
 | `escalation.jsonl` | small → large model | `stop` | `escalation {from, to, reason, trigger}`; `usage.models[]` has both models |
 | `chart.jsonl` | trend | `stop` | Vega-Lite `chart` part with inline data |
 | `candidates.jsonl` | multi-candidate | `stop` | candidate SQL steps + `step.candidates {chosenId, method, rationale}` |

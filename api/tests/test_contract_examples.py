@@ -10,7 +10,7 @@ from api.tests.test_contract import check_invariants
 
 FINISH = {"answer": "stop", "tool_steps": "stop", "abstain": "abstain", "clarify": "needs_input",
           "clarify_resume": "stop", "escalation": "stop", "chart": "stop", "candidates": "stop", "error": "error",
-          "report": "stop"}
+          "report": "stop", "regenerate_concise": "stop"}
 REQUIRED_BY_QA = ("answer", "tool_steps", "abstain", "clarify", "escalation")
 
 
@@ -35,7 +35,7 @@ def test_example_is_on_contract(outcome):
 def test_qa_outcomes_published():
     for outcome in REQUIRED_BY_QA:
         assert (gen_examples.EXAMPLES / f"{outcome}.jsonl").exists(), outcome
-    assert set(FINISH) == set(gen_examples.OUTCOMES) | {gen_examples.RESUME}
+    assert set(FINISH) == set(gen_examples.OUTCOMES) | {gen_examples.RESUME, gen_examples.REGENERATE}
 
 
 def test_examples_cover_the_contract_outcomes():
