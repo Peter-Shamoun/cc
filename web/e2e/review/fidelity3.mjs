@@ -26,7 +26,6 @@ for (const k of want) {
   await step('06-feedback', async () => { await p.getByTestId('msg-assistant').last().hover(); await p.getByRole('button', { name: 'Bad response' }).last().click(); await shot('06-feedback'); });
   await step('07-more-menu', async () => { await p.getByTestId('msg-assistant').last().hover(); await p.getByRole('button', { name: 'More actions' }).last().click(); await shot('07-more-menu'); });
   await step('08-chat-options', async () => { if (m) { await p.getByRole('button', { name: 'Open sidebar' }).click(); await p.waitForTimeout(300); } await p.getByRole('button', { name: /^Chat options/ }).first().click(); await shot('08-chat-options'); });
-  await step('09-share', async () => { await p.getByRole('button', { name: /^Share/ }).first().click(); await shot('09-share'); });
   await step('10-search', async () => { if (m) { await p.getByRole('button', { name: 'Open sidebar' }).click(); await p.waitForTimeout(300); } await p.getByRole('button', { name: 'Search chats' }).first().click(); await tb.page().keyboard.type('denial'); await shot('10-search'); });
   await step('11-shortcuts', async () => { if (m) return; await p.keyboard.press('Control+/'); await shot('11-shortcuts'); });
   await step('12-account-menu', async () => { if (m) { await p.getByRole('button', { name: 'Open sidebar' }).click(); await p.waitForTimeout(300); } await p.getByRole('button', { name: /Demo user/ }).first().click(); await shot('12-account-menu'); });

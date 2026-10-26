@@ -73,7 +73,6 @@ const screens = [
   ['settings', async (p) => { await p.keyboard.press('Control+,'); }],
   ['search', async (p) => { await p.keyboard.press('Control+k'); }],
   ['shortcuts', async (p) => { await p.keyboard.press('Control+/'); }],
-  ['share', async (p) => { await send(p, 'Total paid by payer'); await p.getByTestId('share-button').click(); }],
   ['drawer', async (p) => { const o = p.getByRole('button', { name: 'Open sidebar' }); if (await o.count() && await o.isVisible()) await o.click(); }],
 ];
 async function send(p, q) { const box = p.getByRole('textbox', { name: 'Message' }); await box.fill(q); await box.press('Enter'); await p.getByRole('button', { name: 'Send message' }).waitFor({ timeout: 60000 }); await p.waitForTimeout(500); }

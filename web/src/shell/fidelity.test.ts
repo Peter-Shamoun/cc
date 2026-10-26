@@ -28,8 +28,8 @@ describe('fidelity (QA C9)', () => {
     const heavy = files.filter((f) => /strokeWidth=\{(2\.[5-9]|3)\}/.test(readFileSync(f, 'utf8')));
     expect(heavy).toEqual([]);
   });
-  it('S31: the thread, docked composer and shared page give content a 48rem (768px) column after padding', () => {
-    for (const f of ['shell/AppShell.tsx', 'shell/SharedView.tsx']) {
+  it('S31: the thread and docked composer give content a 48rem (768px) column after padding', () => {
+    for (const f of ['shell/AppShell.tsx']) {
       const s = readFileSync(join(src, f), 'utf8');
       // 51rem minus md:px-6 (2 x 1.5rem) = 48rem
       expect(s).not.toMatch(/max-w-\[48rem\][^"]*md:px-6/);

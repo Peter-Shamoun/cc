@@ -26,7 +26,7 @@ const BANNED: [string, RegExp][] = [
 ];
 
 describe('shell slop guard (Claude/ChatGPT restraint)', () => {
-  it('scans the shell sources', () => expect(files.length).toBeGreaterThan(10));
+  it('scans the shell sources', () => expect(files.length).toBeGreaterThan(5)); // fewer files since sharing was removed (12:15 AM)
   for (const [name, re] of BANNED) {
     it(`no ${name}`, () => {
       const hits = files.flatMap((f) => readFileSync(f, 'utf8').split('\n').flatMap((l, i) => (re.test(l) && !/slop-ok/.test(l) ? [`${f.slice(root.length + 1)}:${i + 1}`] : [])));
