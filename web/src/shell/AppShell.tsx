@@ -118,7 +118,7 @@ export function AppShell() {
                     ) : (
                       // The newest answer reserves most of a viewport so the pinned question can sit at the top.
                       <div key={m.id} style={i === messages.length - 1 && messages.length > 2 ? { minHeight: 'calc(100dvh - 330px)' } : undefined}>
-                        <AssistantTurn msg={m} isLast={i === messages.length - 1} onOpen={setArtifact} onRegenerate={chat.regenerate} onEdit={edit} />
+                        <AssistantTurn msg={m} isLast={i === messages.length - 1} onOpen={setArtifact} onRegenerate={chat.regenerate} onEdit={edit} onSend={(t) => { setAtBottom(true); chat.send(t); }} />
                       </div>
                     ),
                   )}

@@ -1,14 +1,20 @@
 import { useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, Pencil, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react';
 import clsx from 'clsx';
-import type { AssistantView, ChartPart, CodePart, ImagePart, Part, TablePart, ToolCallPart, UserMessage } from '../lib/contract';
+import type { AssistantView, ChartPart, CodePart, ImagePart, Part, TablePart, UserMessage } from '../lib/contract';
 import { KNOWN_PART_TYPES } from '../lib/contract';
 import { Markdown } from './parts/Markdown';
 import { CodePartView } from './parts/CodeBlock';
 import { DataTable } from './parts/DataTable';
 import { ChartView } from './parts/ChartView';
-import { ArtifactCard, Callout, ErrorView, FileCard, ImageView, ReasoningView, ToolGroup, Unsupported } from './parts/misc';
+import { ArtifactCard, Callout, ErrorView, FileCard, ImageView, ReasoningView, Unsupported } from './parts/misc';
 import { CopyButton, IconButton } from './ui';
+import { StepTimeline } from './answer/StepTimeline';
+import { queriesOf, queryForTable, SqlInspector, TableSql } from './answer/SqlInspector';
+import { AbstainCard, ClarifyCard, EscalationNote, StoppedNote, TableSkeleton } from './answer/States';
+import { AnswerMeta } from './answer/AnswerMeta';
+import { stepsOf, usage as usageOf } from './answer/normalize';
+import type { AbstainPart, AnyPart, ClarifyPart, EscalationPart } from './answer/provisional';
 import { tableToTsv, visible } from '../lib/csv';
 
 export type Artifact = { part: TablePart | ChartPart | CodePart | ImagePart; title: string; version?: number; related: Part[] };
@@ -69,27 +75,46 @@ export function UserBubble({ msg, onEdit, version, onVersion, disabled }: { msg:
   );
 }
 
-export function AssistantTurn({ msg, isLast, onOpen, onRegenerate, onEdit }: { msg: AssistantView; isLast: boolean; onOpen: (a: Artifact) => void; onRegenerate: () => void; onEdit: (t: string) => void }) {
+export function AssistantTurn({ msg, isLast, onOpen, onRegenerate, onEdit, onSend }: { msg: AssistantView; isLast: boolean; onOpen: (a: Artifact) => void; onRegenerate: () => void; onEdit: (t: string) => void; onSend?: (t: string) => void }) {
   const [vote, setVote] = useState<'up' | 'down' | null>(msg.feedback ?? null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState(false);
+  const [sqlOpen, setSqlOpen] = useState(false);
   const open = (part: Artifact['part'], title?: string, version?: number) => onOpen({ part, title: title ?? ((('title' in part && part.title) || (part.type === 'image' ? part.alt : 'Artifact')) as string), version, related: msg.parts });
 
-  // Group consecutive tool calls into one disclosure.
+  // All tool steps render as one live timeline at the position of the first step (Claude/ChatGPT).
+  const steps = stepsOf(msg);
+  const usage = usageOf(msg);
+  const queries = queriesOf(msg);
+  const tables = msg.parts.filter((p): p is TablePart => p.type === 'table');
+  const linkedSql = new Set(tables.map((t) => t.sqlPartId).filter(Boolean));
+  const sqlRunning = msg.streaming && steps.some((s) => s.state === 'running' && (s.kind === 'sql' || s.kind === 'repair'));
+  // Live until answer text starts after the last step; then it collapses to its summary line.
+  const lastTool = msg.parts.map((p) => p.type).lastIndexOf('tool_call');
+  const answering = msg.parts.some((p, i) => i > lastTool && (p.type === 'text' || (p.type as string) === 'abstain' || (p.type as string) === 'clarify'));
+  const timelineLive = msg.streaming && !answering;
   const blocks: ReactNode[] = [];
-  let tools: ToolCallPart[] = [];
-  const flush = () => {
-    if (tools.length) blocks.push(<ToolGroup key={`tg-${tools[0].id}`} parts={tools} />);
-    tools = [];
-  };
-  for (const p of msg.parts) {
-    if (p.type === 'tool_call') { tools.push(p); continue; }
-    flush();
-    blocks.push(<PartView key={p.id} part={p} msg={msg} open={open} onRetry={onRegenerate} onEdit={onEdit} />);
+  let timelineDone = false;
+  for (const p of msg.parts as AnyPart[]) {
+    if (p.type === 'tool_call') {
+      if (!timelineDone) blocks.push(<StepTimeline key="timeline" steps={steps} live={timelineLive} elapsedMs={usage?.elapsedMs} />);
+      timelineDone = true;
+      continue;
+    }
+    if (p.type === 'code' && p.role === 'query' && linkedSql.has(p.id)) continue; // shown under its table
+    if (p.type === 'abstain') { blocks.push(<AbstainCard key={p.id} part={p as AbstainPart} onSend={onSend} />); continue; }
+    if (p.type === 'clarify') { blocks.push(<ClarifyCard key={p.id} part={p as ClarifyPart} onSend={onSend} active={isLast && !msg.streaming} />); continue; }
+    if (p.type === 'escalation') { blocks.push(<EscalationNote key={p.id} part={p as EscalationPart} />); continue; }
+    blocks.push(<PartView key={p.id} part={p as Part} msg={msg} open={open} onRetry={onRegenerate} onEdit={onEdit} />);
+    if (p.type === 'table') {
+      const q = queryForTable(msg, p);
+      if (q) blocks.push(<TableSql key={`sql-${p.id}`} query={q} />);
+    }
   }
-  flush();
+  if (sqlRunning) blocks.push(<TableSkeleton key="skeleton" />);
 
   const empty = msg.parts.length === 0;
+  const nQueries = usage?.queries ?? queries.length;
   return (
     <div className="group" data-testid="msg-assistant" aria-live={msg.streaming ? 'polite' : undefined} aria-busy={msg.streaming}>
       {blocks}
@@ -98,17 +123,18 @@ export function AssistantTurn({ msg, isLast, onOpen, onRegenerate, onEdit }: { m
           {empty && !msg.status ? <span className="streaming-caret prose-chat" /> : <span className="shimmer">{msg.status}</span>}
         </div>
       )}
+      {!msg.streaming && msg.finishReason === 'aborted' && <StoppedNote onRetry={isLast ? onRegenerate : undefined} />}
       {!msg.streaming && !empty && (
-        <div className={clsx('-ml-2 mt-2 flex items-center gap-0.5 transition-opacity', isLast ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100')} data-testid="msg-actions">
+        <div className={clsx('-ml-2 mt-2 flex flex-wrap items-center gap-0.5 transition-opacity', isLast ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100')} data-testid="msg-actions">
           <CopyButton text={() => messageMarkdown(msg)} />
           <IconButton label="Good response" aria-pressed={vote === 'up'} onClick={() => setVote(vote === 'up' ? null : 'up')}><ThumbsUp size={16} fill={vote === 'up' ? 'currentColor' : 'none'} /></IconButton>
           <IconButton label="Bad response" aria-pressed={vote === 'down'} onClick={() => { const next = vote === 'down' ? null : 'down'; setVote(next); setFeedbackOpen(next === 'down'); setFeedbackSent(false); }}><ThumbsDown size={16} fill={vote === 'down' ? 'currentColor' : 'none'} /></IconButton>
           {isLast && <IconButton label="Regenerate" onClick={onRegenerate}><RefreshCw size={16} /></IconButton>}
-          {msg.usage && msg.usage.queries > 0 && <span className="ml-2 font-sans text-xs text-fg-subtle">{msg.usage.queries} {msg.usage.queries === 1 ? 'query' : 'queries'} · {(msg.usage.elapsedMs / 1000).toFixed(1)} s</span>}
-          {msg.finishReason === 'aborted' && <span className="ml-2 font-sans text-xs text-fg-subtle">Stopped</span>}
+          <AnswerMeta usage={usage && (usage.queries > 0 || usage.costUsd !== undefined) ? usage : undefined} queries={queries.length ? nQueries : 0} onSql={queries.length ? () => setSqlOpen((o) => !o) : undefined} sqlOpen={sqlOpen} />
           {feedbackSent && <span className="ml-2 font-sans text-xs text-fg-subtle">Thanks for the feedback</span>}
         </div>
       )}
+      {sqlOpen && <SqlInspector queries={queries} onClose={() => setSqlOpen(false)} />}
       {feedbackOpen && <FeedbackPanel onClose={() => setFeedbackOpen(false)} onSubmit={() => { setFeedbackOpen(false); setFeedbackSent(true); }} />}
     </div>
   );
