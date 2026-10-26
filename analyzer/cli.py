@@ -81,6 +81,14 @@ def _interpretation_path(session_dir: Path) -> Path:
     return session_dir / "interpretation.jsonl"
 
 
+def _query_seconds_spent(session_dir: Path) -> float:
+    """Model SQL time earlier commands of this session spent: every guarded query's audit record carries seconds."""
+    path = _audit_path(session_dir)
+    if not path.exists():
+        return 0.0
+    return sum(json.loads(line).get("seconds", 0.0) for line in path.read_text().splitlines() if line.strip())
+
+
 def _load_escalated(session_dir: Path) -> bool:
     path = _escalation_path(session_dir)
     if not path.exists():
@@ -111,7 +119,8 @@ def _tools(session_dir: Path) -> tuple[ToolLayer, dict]:
 
     tools = ToolLayer(SnapshotOpener(meta["snapshot_path"]), config, question_id=meta.get("question_id"),
                       question_family=meta.get("question_family"), audit_sink=sink,
-                      restored_escalation=_load_escalated(session_dir))
+                      restored_escalation=_load_escalated(session_dir),
+                      restored_query_seconds=_query_seconds_spent(session_dir))
     prior = [call for call in _read_calls(session_dir) if call.get("command") in INVESTIGATIVE_COMMANDS
              and call.get("command") not in UNCHARGED_COMMANDS and call.get("ok")]
     tools._tool_calls_used = len(prior)

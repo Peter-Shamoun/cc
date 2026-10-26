@@ -1,7 +1,11 @@
 """SQL guard for agent queries: exactly one read-only SELECT over the agent's schemas, no table functions
 that touch files, the network, secrets or settings. Runs before DuckDB, which is itself sandboxed;
-this is the layer that turns "the agent tried something dangerous" into a clear, scorable error."""
+this is the layer that turns "the agent tried something dangerous" into a clear, scorable error.
+check_plan_cost then reads DuckDB's EXPLAIN of the guarded SQL and refuses a keyless join of large inputs before
+it runs, with a message that says what to change."""
 from __future__ import annotations
+
+import json
 
 import sqlglot
 from sqlglot import exp
@@ -115,3 +119,43 @@ def guard(sql: str, row_limit: int = 1000, escalate: bool = False) -> str:
         if banned:
             raise GuardError(f"function {banned}() is not allowed")
     return f"SELECT * FROM ({tree.sql(dialect='duckdb')}) AS agent_query LIMIT {row_limit}"
+
+
+# Joins DuckDB plans without an equality key: every left row is paired with every right row.
+JOINS_WITHOUT_EQUALITY_KEY = frozenset({"CROSS_PRODUCT", "NESTED_LOOP_JOIN", "BLOCKWISE_NL_JOIN",
+                                        "PIECEWISE_MERGE_JOIN"})
+# About a second of DuckDB work on the sandbox (4 threads); the largest such join any past session ran had 88,663
+# pairs. Hash-join estimates are not checked: on the bench data they ran 600,000x over and 1,400x under the real
+# row count, so a threshold on them would block correct queries and still miss key fan-out.
+MAX_ROW_PAIRS_WITHOUT_JOIN_KEY = 100_000_000
+
+
+def explain_statement(guarded_sql: str) -> str:
+    """The statement whose single result cell is the JSON plan that check_plan_cost reads."""
+    return f"EXPLAIN (FORMAT JSON) {guarded_sql}"
+
+
+def check_plan_cost(plan_json: str) -> None:
+    """Refuse, before execution, a plan that joins two multi-row inputs without a key and pairs more than
+    MAX_ROW_PAIRS_WITHOUT_JOIN_KEY rows. A one-row side (a totals or bounds CTE) is a scan, not a cartesian join."""
+    for root in json.loads(plan_json):
+        _estimated_rows(root)
+
+
+def _estimated_rows(node: dict) -> float:
+    child_rows = [_estimated_rows(child) for child in node.get("children", [])]
+    if node["name"] in JOINS_WITHOUT_EQUALITY_KEY and len(child_rows) == 2:
+        smaller_side, larger_side = sorted(child_rows)
+        row_pairs = smaller_side * larger_side
+        if smaller_side > 1 and row_pairs > MAX_ROW_PAIRS_WITHOUT_JOIN_KEY:
+            raise GuardError(
+                f"query is too expensive to run: a join without an equality key pairs ~{smaller_side:,.0f} rows "
+                f"with ~{larger_side:,.0f} rows (~{row_pairs:,.0f} row pairs, limit "
+                f"{MAX_ROW_PAIRS_WITHOUT_JOIN_KEY:,}). Join on a shared key (ON a.claim_key = b.claim_key), filter "
+                "both sides first, or aggregate one side down to a few rows before joining.")
+    estimate = (node.get("extra_info") or {}).get("Estimated Cardinality")
+    if estimate is not None:
+        return float(estimate)
+    if node["name"] == "CROSS_PRODUCT":                       # DuckDB leaves the cross product's own estimate out
+        return child_rows[0] * child_rows[1]
+    return max(child_rows, default=0.0)

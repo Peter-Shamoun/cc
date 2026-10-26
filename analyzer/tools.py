@@ -19,7 +19,7 @@ from decimal import Decimal
 from typing import Any, Callable
 
 from bench.agents import GLOSSARY
-from bench.guard import GuardError, guard
+from bench.guard import GuardError, check_plan_cost, explain_statement, guard
 
 from analyzer.checks import PITFALLS, result_warnings, sql_error_message
 from analyzer.config import AnalyzerConfig
@@ -37,6 +37,10 @@ _PHI_NAME = re.compile(
     re.IGNORECASE)
 _RELATION = re.compile(r"^(sem|lossless)\.([A-Za-z_][A-Za-z0-9_]*)$")
 _IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+# Model SQL time per session (per question), on top of the per-query time limit. The tool-call budget does not
+# bound it: answer and probe are uncharged, and the CLI does not charge failed (timed-out) queries. Past B1 sessions
+# spent at most 0.44 s in total.
+MAX_TOTAL_QUERY_SECONDS_PER_SESSION = 60.0
 _HIGH_CARDINALITY_COLUMNS = frozenset({
     "claim_key", "claim_id", "remit_claim_id", "payer_claim_control_number", "check_or_eft_number",
     "billing_npi", "rendering_npi", "referring_npi",
@@ -196,7 +200,7 @@ class ToolLayer:
     def __init__(self, opener: SessionOpener, config: AnalyzerConfig | None = None, *,
                  question_id: str | None = None, question_family: str | None = None,
                  example_library: list | None = None, audit_sink: Callable[[dict], None] | None = None,
-                 restored_escalation: bool = False):
+                 restored_escalation: bool = False, restored_query_seconds: float = 0.0):
         self.opener = opener
         self.config = config or AnalyzerConfig()
         self.question_id = question_id
@@ -209,6 +213,7 @@ class ToolLayer:
         self._semantic = None
         self._model = None
         self._tool_calls_used = 0
+        self.query_seconds_used = restored_query_seconds
         self.session = opener.open(restored_escalation)
         self.escalated = restored_escalation
         self._audit("session_open", restored_escalation=restored_escalation)
@@ -404,25 +409,37 @@ class ToolLayer:
 
     def _execute_guarded(self, sql: str, *, audit_event: str, relation: str | None = None,
                          include_all_rows: bool = False) -> dict:
+        remaining_seconds = MAX_TOTAL_QUERY_SECONDS_PER_SESSION - self.query_seconds_used
+        if remaining_seconds <= 0:
+            message = (f"the {MAX_TOTAL_QUERY_SECONDS_PER_SESSION:g} s of query time for this question are used up "
+                       f"({self.query_seconds_used:.1f} s spent), so no more SQL will run. Refuse, saying the "
+                       "question needs a narrower query.")
+            self._audit(audit_event, ok=False, sql=sql[:500], error=message, relation=relation,
+                        escalated=self.escalated, seconds=0.0)
+            raise ToolError(message)
+        time_limit_seconds = min(self.config.time_limit_seconds, remaining_seconds)
         started = time.perf_counter()
         try:
             safe = guard(sql, self.config.row_limit, self.escalated)
-            cursor = execute_with_time_limit(self.session.con, safe, self.config.time_limit_seconds)
+            check_plan_cost(execute_with_time_limit(self.session.con, explain_statement(safe),
+                                                    time_limit_seconds).fetchall()[0][1])
+            cursor = execute_with_time_limit(self.session.con, safe, time_limit_seconds)
             columns = [item[0] for item in cursor.description]
             fetched = cursor.fetchall()
         except (GuardError, QueryTimeout, Exception) as exc:  # noqa: BLE001 - the model sees the message
+            elapsed = self._charge_query_seconds(started)
             message = sql_error_message(exc, self.config.sql_error_hints and self.config.self_correct != "none")
             if self.config.actionable_errors:
                 message += self._actionable_error_suffix(message, sql)
             self._audit(audit_event, ok=False, sql=sql[:500], error=message, relation=relation,
-                        escalated=self.escalated)
+                        escalated=self.escalated, seconds=elapsed)
             raise ToolError(message) from None
+        elapsed = self._charge_query_seconds(started)
         columns, fetched, redacted = _redact(columns, fetched)
         warnings = result_warnings(sql, columns, fetched, self.config.result_checks)
         warnings.extend(redacted)
         full_rows = [jsonable(row) for row in fetched]
         shown = full_rows[:self.config.rows_shown_to_model]
-        elapsed = round(time.perf_counter() - started, 4)
         self._audit(audit_event, ok=True, sql=sql[:500], row_count=len(fetched), relation=relation,
                     escalated=self.escalated, seconds=elapsed)
         digest = {"columns": columns, "rows": shown, "row_count": len(fetched),
@@ -439,6 +456,11 @@ class ToolLayer:
         elif redacted:
             digest["warnings"] = redacted
         return digest
+
+    def _charge_query_seconds(self, started: float) -> float:
+        elapsed = round(time.perf_counter() - started, 4)
+        self.query_seconds_used += elapsed
+        return elapsed
 
     def _actionable_error_suffix(self, message: str, sql: str) -> str:
         """#19: name what to use instead. Reads only the session's own catalog."""

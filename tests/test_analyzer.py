@@ -16,7 +16,7 @@ from analyzer.config import HAIKU_MODEL, SONNET_MODEL, AnalyzerConfig
 from analyzer.llm import AnthropicLLM, BedrockLLM, PaidAPIDisabled, ScriptedLLM, anthropic_request_kwargs, bedrock_request_body
 from analyzer.loop import Analyzer
 from analyzer.opener import SessionHandle, SnapshotOpener
-from analyzer.tools import ToolError, ToolLayer, execute_with_time_limit
+from analyzer.tools import MAX_TOTAL_QUERY_SECONDS_PER_SESSION, ToolError, ToolLayer, execute_with_time_limit
 from bench.agent_session import score_session
 from bench.compare import match
 
@@ -109,6 +109,45 @@ def test_run_sql_is_guarded_limited_and_redacts_phi():
     assert any("redacted" in warning for warning in digest["warnings"])
     assert tools.audit[-1]["customer"] == "acme_labs"
     assert "rows" not in tools.audit[-1]
+
+
+def test_run_sql_refuses_a_cartesian_join_before_running_it_and_says_what_to_change():
+    con = duckdb.connect()
+    con.execute("CREATE SCHEMA sem")
+    con.execute("CREATE TABLE sem.claims AS SELECT 'C' || i AS claim_key, i * 1.0 AS charge_amount FROM range(20000) t(i)")
+    executed = []
+
+    class Recording:
+        def execute(self, sql, *params):
+            executed.append(sql)
+            return con.execute(sql, *params)
+
+        def interrupt(self):
+            con.interrupt()
+
+    tools = ToolLayer(MemoryOpener(Recording()), _quiet())
+    with pytest.raises(ToolError) as refused:
+        tools.run_sql("SELECT count(*) FROM sem.claims a, sem.claims b")
+    assert "too expensive" in str(refused.value) and "Join on a shared key" in str(refused.value)
+    assert all(statement.startswith("EXPLAIN") for statement in executed)
+    assert tools.audit[-1]["ok"] is False and "too expensive" in tools.audit[-1]["error"]
+    keyed = tools.run_sql("SELECT count(*) FROM sem.claims a JOIN sem.claims b USING (claim_key)")
+    assert keyed["rows"] == [[20000]]
+
+
+def test_query_time_per_session_is_capped_counted_and_restorable():
+    con = _claims_db([("LB1", 10.0, "Ada")])
+    tools = ToolLayer(MemoryOpener(con), _quiet())
+    tools.run_sql("SELECT count(*) FROM sem.claims")
+    with pytest.raises(ToolError):
+        tools.run_sql("SELECT * FROM sem.not_a_view")
+    assert tools.query_seconds_used > 0
+    assert all("seconds" in record for record in tools.audit if record["event"] == "sql")
+    spent = ToolLayer(MemoryOpener(con), _quiet(), restored_query_seconds=MAX_TOTAL_QUERY_SECONDS_PER_SESSION)
+    with pytest.raises(ToolError) as exhausted:
+        spent.run_sql("SELECT count(*) FROM sem.claims")
+    assert f"{MAX_TOTAL_QUERY_SECONDS_PER_SESSION:g} s of query time" in str(exhausted.value)
+    assert "Refuse" in str(exhausted.value)
 
 
 def test_escalation_is_an_audited_reopen():
@@ -303,6 +342,21 @@ def test_cli_escalation_is_sticky_and_audited(tmp_path, capsys, monkeypatch):
     assert run("answer", "--sql", "SELECT count(*) FROM lossless.edi_source_file WHERE parse_status = 'REJECTED'",
                "--text", "1 rejected file")[0] == 0
     assert json.loads((session / "final.json").read_text())["kind"] == "answer"
+
+
+def test_cli_query_time_is_summed_across_commands(tmp_path, capsys, monkeypatch):
+    from analyzer.cli import main
+    from bench.agent_session import create_session
+    monkeypatch.setattr("bench.agent_session.SESSIONS_ROOT", tmp_path / "sessions")
+    session = create_session(_write_snapshot(tmp_path / "snap"), {"id": "q", "question": "How many claims?"}, {},
+                             "haiku", "pytest-cli")
+    assert main(["--session", str(session), "sql", "SELECT count(*) FROM sem.claims"]) == 0
+    with open(session / "audit.jsonl", "a") as handle:
+        handle.write(json.dumps({"event": "sql", "ok": True, "seconds": MAX_TOTAL_QUERY_SECONDS_PER_SESSION}) + "\n")
+    capsys.readouterr()
+    assert main(["--session", str(session), "answer", "--sql", "SELECT count(*) FROM sem.claims", "--text", "2"]) == 1
+    assert "of query time for this question are used up" in capsys.readouterr().out
+    assert not (session / "final.json").exists()
 
 
 def test_dictionary_and_profile_land_in_the_prompt():

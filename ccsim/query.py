@@ -20,7 +20,7 @@ from pathlib import Path
 
 import duckdb
 
-from bench.guard import GuardError, guard
+from bench.guard import GuardError, check_plan_cost, explain_statement, guard
 
 from .aws.errors import ExpiredToken
 from .infra import BUCKET, SESSION_SECONDS, Deployment
@@ -109,12 +109,14 @@ def run_agent_sql(session: QuerySession, sql: str, row_limit: int = 1000):
         raise ExpiredToken("reader credentials have expired")
     try:
         guarded = guard(sql, row_limit=row_limit, escalate=session.escalated)
+        # DuckDB estimates a multi-file scan as (rows of the first listed file) x (file count). The zero-row schema
+        # file is listed first, so every scan here estimates 0 rows and this check cannot fire on the S3 path yet.
+        check_plan_cost(session.con.execute(explain_statement(guarded)).fetchall()[0][1])
+        cur = session.con.execute(guarded)
+        rows = cur.fetchall()
     except GuardError as e:
         session.audit.append({**base, "outcome": "blocked", "error": str(e)[:300]})
         raise
-    try:
-        cur = session.con.execute(guarded)
-        rows = cur.fetchall()
     except Exception as e:
         session.audit.append({**base, "outcome": "error", "error": f"{type(e).__name__}: {str(e).splitlines()[0][:240]}"})
         raise

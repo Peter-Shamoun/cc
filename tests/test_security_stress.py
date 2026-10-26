@@ -15,7 +15,7 @@ from pathlib import Path
 import duckdb
 import pytest
 
-from bench.guard import MAX_SQL_CHARS, GuardError, guard
+from bench.guard import MAX_ROW_PAIRS_WITHOUT_JOIN_KEY, MAX_SQL_CHARS, GuardError, check_plan_cost, explain_statement, guard
 from ccsim.audit_chain import AuditTamper
 from ccsim.aws import LocalAWS
 from ccsim.aws.errors import AccessDenied, AuthError, ExpiredToken, InvalidIdentityToken
@@ -259,6 +259,57 @@ def test_unnest_and_ordinary_analysis_sql_still_pass():
         guard("SELECT 1", row_limit=True)  # type: ignore[arg-type]
     with pytest.raises(GuardError):
         guard("SELECT " + ("1," * (MAX_SQL_CHARS + 10)) + "1")
+
+
+def _cost_check_db():
+    """Inputs big enough that a keyless join of two of them passes MAX_ROW_PAIRS_WITHOUT_JOIN_KEY."""
+    con = duckdb.connect()
+    con.execute("CREATE SCHEMA sem")
+    con.execute("CREATE TABLE sem.claim_lines AS SELECT 'C' || (i % 4000) AS claim_key, i % 90 AS payer_key, "
+                "DATE '2026-01-01' + CAST(i % 300 AS INTEGER) AS service_date, i * 1.5 AS line_charge_amount "
+                "FROM range(20000) t(i)")
+    con.execute("CREATE TABLE sem.remit_lines AS SELECT * FROM sem.claim_lines")
+    con.execute("CREATE TABLE sem.claims AS SELECT * FROM sem.claim_lines LIMIT 600")
+    con.execute("CREATE TABLE sem.payers AS SELECT i AS payer_key, 'P' || i AS payer_name FROM range(90) t(i)")
+    return con
+
+
+def _check_cost(con, sql):
+    check_plan_cost(con.execute(explain_statement(guard(sql))).fetchall()[0][1])
+
+
+@pytest.mark.parametrize("sql", [
+    "SELECT count(*) FROM sem.claim_lines a, sem.remit_lines b",
+    "SELECT a.claim_key, sum(b.line_charge_amount) FROM sem.claim_lines a CROSS JOIN sem.remit_lines b GROUP BY 1",
+    "SELECT count(*) FROM sem.claim_lines a JOIN sem.remit_lines b ON a.service_date <= b.service_date",
+    "SELECT count(*) FROM sem.claim_lines a JOIN sem.remit_lines b ON a.claim_key = b.claim_key OR a.payer_key = b.payer_key",
+    "SELECT count(*) FROM sem.claims a, sem.claims b, sem.claims c",
+    "WITH x AS (SELECT * FROM sem.claim_lines) SELECT count(*) FROM x, sem.remit_lines",
+])
+def test_plan_cost_refuses_keyless_joins_of_large_inputs_with_a_fix(sql):
+    with pytest.raises(GuardError) as refused:
+        _check_cost(_cost_check_db(), sql)
+    message = str(refused.value)
+    assert "too expensive" in message and f"{MAX_ROW_PAIRS_WITHOUT_JOIN_KEY:,}" in message
+    assert "Join on a shared key" in message and "aggregate one side" in message
+
+
+@pytest.mark.parametrize("sql", [
+    # one-row totals or bounds CTE joined to every row (past B1 answers use this shape)
+    "WITH bounds AS (SELECT max(service_date) AS as_of FROM sem.claim_lines) "
+    "SELECT count(*) FROM sem.claim_lines l CROSS JOIN bounds b WHERE b.as_of - l.service_date > 30",
+    "WITH total AS (SELECT sum(line_charge_amount) AS t FROM sem.claim_lines) "
+    "SELECT payer_key, sum(line_charge_amount) / any_value(total.t) FROM sem.claim_lines, total GROUP BY 1",
+    # a small dimension against a large table, and a key join of two large tables
+    "SELECT p.payer_name, count(*) FROM sem.payers p, sem.claim_lines l WHERE l.payer_key < p.payer_key GROUP BY 1",
+    "SELECT count(*) FROM sem.claim_lines a JOIN sem.remit_lines b USING (claim_key)",
+    # trailing-window self join of a per-day aggregate (s4_test B1 answer shape)
+    "WITH daily AS (SELECT service_date, sum(line_charge_amount) AS paid FROM sem.claim_lines GROUP BY 1) "
+    "SELECT d.service_date, sum(w.paid) FROM daily d JOIN daily w "
+    "ON w.service_date BETWEEN d.service_date - 6 AND d.service_date GROUP BY 1",
+])
+def test_plan_cost_passes_one_row_small_dimension_and_keyed_joins(sql):
+    _check_cost(_cost_check_db(), sql)
 
 
 def test_escape_hatch_does_not_suppress_small_cells():
@@ -533,6 +584,63 @@ def test_escalation_strips_direct_identifiers_and_phi_ref_qualifiers(world):
     assert opens and opens[0]["escalate"] is True and opens[0]["user"] == "ana@xifin.example"
     with pytest.raises(GuardError):
         run_agent_sql(_session(world), "SELECT count(*) FROM lossless.edi_entity")
+
+
+# Correct B1 answers from s1r2 / s4_test whose plans hold the keyless joins the cost check inspects.
+_HISTORICAL_B1_ANSWERS = [
+    # g1_ar_open_30 (s1r2): CROSS_PRODUCT of a one-row as-of CTE with every open claim
+    "with as_of_cte as (select max(payment_date) as as_of_date from sem.payments), prim as (select distinct claim_key, "
+    "payer_key, payer_class from sem.claims where payer_responsibility = 'P'), first_prim as (select c.claim_key, "
+    "c.payer_key, min(c.submission_date) as first_submission_date from sem.claims c join prim using (claim_key, "
+    "payer_key) group by 1, 2), latest as (select claim_key, charge_amount from sem.claims where is_latest_submission "
+    "and frequency_code <> '8'), cur as (select distinct claim_key, payer_key from sem.remit_claims where "
+    "is_current_adjudication), open_claims as (select p.claim_key, p.payer_class, f.first_submission_date, "
+    "l.charge_amount from prim p join first_prim f using (claim_key, payer_key) join latest l using (claim_key) left "
+    "join cur c using (claim_key, payer_key) where c.claim_key is null), aged as (select o.payer_class, case when "
+    "a.as_of_date - o.first_submission_date <= 30 then '0-30' when a.as_of_date - o.first_submission_date <= 60 then "
+    "'31-60' when a.as_of_date - o.first_submission_date <= 90 then '61-90' else '91+' end as bucket, o.charge_amount "
+    "from open_claims o cross join as_of_cte a) select payer_class, bucket, count(*) as open_claims, "
+    "round(sum(charge_amount), 2) as billed_charge from aged group by 1, 2 order by 1, 2",
+    # a_16d4f6eb2a (s4_test): NESTED_LOOP_JOIN trailing 7-day window over daily totals
+    "with daily as (select payment_date, sum(paid_amount) as day_paid_amount from sem.remit_claims where "
+    "is_current_adjudication and payment_date is not null group by 1), first_day as (select min(payment_date) as "
+    "first_payment_date from daily) select d.payment_date, round(d.day_paid_amount,2) as day_paid_amount, "
+    "round(sum(w.day_paid_amount),2) as trailing_7_day_paid_total, round(sum(w.day_paid_amount)/7,2) as "
+    "trailing_7_day_avg_daily_paid from daily d cross join first_day f join daily w on w.payment_date between "
+    "d.payment_date - 6 and d.payment_date where d.payment_date >= f.first_payment_date + 6 group by d.payment_date, "
+    "d.day_paid_amount order by d.payment_date",
+    # a_44c58c858b (s1r2): the largest plan estimate among correct B1 answers
+    "WITH oa AS (SELECT remit_claim_id, SUM(adjustment_amount) AS oa23_amount FROM sem.adjustments WHERE "
+    "is_current_adjudication AND group_code = 'OA' AND carc_code = '23' GROUP BY 1), grp AS (SELECT remit_claim_id, "
+    "SUM(CASE WHEN group_code = 'CO' THEN adjustment_amount ELSE 0 END) AS co_amount, SUM(CASE WHEN group_code = 'PR' "
+    "THEN adjustment_amount ELSE 0 END) AS pr_amount FROM sem.adjustments WHERE is_current_adjudication GROUP BY 1), "
+    "sec AS (SELECT r.payer_class, r.paid_amount, r.charge_amount - COALESCE(oa.oa23_amount, 0) AS "
+    "balance_after_primary, COALESCE(g.co_amount, 0) AS co_amount, COALESCE(g.pr_amount, 0) AS pr_amount FROM "
+    "sem.remit_claims r LEFT JOIN oa ON oa.remit_claim_id = r.remit_claim_id LEFT JOIN grp g ON g.remit_claim_id = "
+    "r.remit_claim_id WHERE r.is_current_adjudication AND r.claim_status = 'Processed as secondary') SELECT "
+    "payer_class, COUNT(*) AS adjudications, ROUND(SUM(balance_after_primary), 2) AS balance_after_primary, "
+    "ROUND(100.0 * SUM(paid_amount) / SUM(balance_after_primary), 2) AS paid_pct_of_balance FROM sec GROUP BY 1 "
+    "ORDER BY 1",
+]
+
+
+def test_cost_check_passes_past_b1_answers_on_the_semantic_layer(world):
+    """The reader session's scans estimate 0 rows (see run_agent_sql), so copy its sem.* rows into tables, whose
+    estimates are exact, as in the bench snapshot the B1 workers query."""
+    session = _session(world)
+    tables = duckdb.connect()
+    tables.execute("CREATE SCHEMA sem")
+    for relation in _relations(session):
+        rows = session.con.sql(f"SELECT * FROM {relation}").to_arrow_table()
+        tables.execute(f"CREATE TABLE {relation} AS SELECT * FROM rows")
+    for sql in _HISTORICAL_B1_ANSWERS:
+        _check_cost(tables, sql)
+        tables.execute(guard(sql)).fetchall()      # the 3-day world has no 7-day window: rows may be empty
+    lines = tables.execute("SELECT count(*) FROM sem.claim_lines").fetchone()[0]
+    assert lines ** 4 > MAX_ROW_PAIRS_WITHOUT_JOIN_KEY             # the stress world is small: four copies
+    with pytest.raises(GuardError, match="too expensive"):
+        _check_cost(tables, "SELECT count(*) FROM sem.claim_lines a, sem.claim_lines b, sem.claim_lines c, "
+                            "sem.claim_lines d")
 
 
 def test_agent_query_audit_is_attributable_and_tamper_evident(world):
