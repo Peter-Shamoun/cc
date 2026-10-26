@@ -102,6 +102,13 @@ function ShellInner() {
   const convRef = useRef(chat.convId);
   useLayoutEffect(() => { convRef.current = chat.convId; });
   useEffect(() => { setFeedbackCapabilities(strategy.caps); }, [strategy.caps]);
+  // Contract 1.17.0: pins and archives live on the server when it says so; re-list so the sidebar uses the archived filter.
+  const pinArchive = !!strategy.caps.pinArchive;
+  useEffect(() => {
+    if (!(store instanceof HttpTranscriptStore)) return;
+    store.enablePinArchive(pinArchive);
+    if (pinArchive) void chat.refresh();
+  }, [pinArchive]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!(adapter instanceof HttpAnalystAdapter)) return;
     setFeedbackSink(async (f) => {
@@ -198,15 +205,17 @@ function ShellInner() {
   const requestArchive = useCallback((id: string) => {
     const title = chat.threads.find((t) => t.id === id)?.title ?? 'Chat';
     const wasOpen = chat.convId === id;
-    void chat.archive(id, true);
+    // Optimistic: the row leaves now; if the server refuses it comes back and we say so (no Undo for a no-op).
+    void chat.archive(id, true).catch(() => toast({ text: 'Couldn’t archive that chat. Try again.' }));
     if (wasOpen) { chat.newChat(); requestAnimationFrame(focusComposer); }
     toast({
       text: `Archived “${title.length > 32 ? `${title.slice(0, 32)}…` : title}”`,
       ms: UNDO_MS,
-      action: { label: 'Undo', run: () => { void chat.archive(id, false); if (wasOpen) void chat.open(id); } },
+      action: { label: 'Undo', run: () => { void chat.archive(id, false).catch(() => toast({ text: 'Couldn’t restore that chat. Try again.' })); if (wasOpen) void chat.open(id); } },
     });
   }, [chat, toast]);
-  const unarchive = useCallback((id: string) => { void chat.archive(id, false); }, [chat]);
+  const unarchive = useCallback((id: string) => { void chat.archive(id, false).catch(() => toast({ text: 'Couldn’t restore that chat. Try again.' })); }, [chat, toast]);
+  const pinChat = useCallback((id: string, pinned: boolean) => chat.pin(id, pinned).catch(() => toast({ text: pinned ? 'Couldn’t pin that chat. Try again.' : 'Couldn’t unpin that chat. Try again.' })), [chat, toast]);
 
   // ---- routing (#/c/<id>) ----
   const routing = useRef(false);
@@ -591,7 +600,7 @@ function ShellInner() {
     threads, activeId: chat.convId, storeMode: store.mode, canPin: chat.canPin,
     onSelect: (id: string) => { closeDrawer(); void openChat(id).then(focusAfterOpen); },
     onNew: () => { if (isTempChat) void tempStore?.discardTemporary(); chat.newChat(); closeDrawer(); if (!coarse()) requestAnimationFrame(focusComposer); },
-    onDelete: requestDelete, onRename: chat.rename, onPin: chat.pin, onExport: exportThread,
+    onDelete: requestDelete, onRename: chat.rename, onPin: pinChat, onExport: exportThread,
     onArchive: chat.canArchive ? requestArchive : undefined,
     onCollapse: () => setSidebar(false), onSearch: () => setDialog('search'),
     onSettings: () => setDialog('settings'), onShortcuts: () => setDialog('shortcuts'),

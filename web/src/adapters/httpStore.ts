@@ -35,9 +35,10 @@ const TITLE_FETCH = { limit: 12, concurrency: 4, waitMs: 1500 };
  * localStorage, URLs or logs. The short title is shown instead of the server's generic
  * "New analysis" until the user renames the chat (a rename is sent to the server).
  *
- * Not on the server yet (contract follow-up): pins, truncate/replace for regenerate/edit branches
- * (the server records those as appended messages with parentId). Those are no-ops here and the UI
- * hides Pin because `setPinned` is absent.
+ * Pin/archive (contract 1.17.0) are server-side once `enablePinArchive(true)` is called for a server whose
+ * Capabilities.pinArchive is true; until then `setPinned`/`setArchived` are absent and the UI hides them.
+ * Truncate/replace for regenerate/edit branches stay no-ops (the server records those as appended
+ * messages with parentId).
  */
 export class HttpTranscriptStore implements TranscriptStore {
   mode: TranscriptStore['mode'] = 'ephemeral';
@@ -49,6 +50,22 @@ export class HttpTranscriptStore implements TranscriptStore {
   private known = new Set<ID>();
   /** Conversation the server refused (shredded key etc.); surfaced by the UI as an error later. */
   lastError: ConversationsApiError | null = null;
+  /** Present only when the server persists pins/archives (1.17.0, Capabilities.pinArchive). */
+  setPinned?: (id: ID, pinned: boolean) => Promise<void>;
+  setArchived?: (id: ID, archived: boolean) => Promise<void>;
+  private pinArchive = false;
+
+  /** Turn server-side pin/archive on or off (from Capabilities.pinArchive). */
+  enablePinArchive(on: boolean) {
+    this.pinArchive = on;
+    if (on) {
+      this.setPinned = async (id, pinned) => { await this.api.setPinned(id, pinned); };
+      this.setArchived = async (id, archived) => { await this.api.setArchived(id, archived); };
+    } else {
+      delete this.setPinned;
+      delete this.setArchived;
+    }
+  }
 
   constructor(base = '', auth?: string | AuthSession, fetchImpl?: typeof fetch) {
     this.api = new ConversationsApi(base, auth, fetchImpl);
@@ -64,10 +81,20 @@ export class HttpTranscriptStore implements TranscriptStore {
 
   async listConversations(cursor?: string): Promise<{ items: ThreadSummary[]; next?: string }> {
     let page: Awaited<ReturnType<ConversationsApi['list']>> = { items: [] };
-    try { page = await this.api.list(cursor); this.lastError = null; }
-    catch (e) { if (!(e instanceof ConversationsApiError)) throw e; this.lastError = e; }
+    try {
+      if (this.pinArchive) {
+        // 1.17.0: the sidebar page excludes archived chats (pins first, server order); Settings → Archived chats
+        // reads the archived ones from the same thread list, so the first page also fetches `only`.
+        const [main, archived] = await Promise.all([this.api.list(cursor, 'exclude'), cursor ? undefined : this.api.list(undefined, 'only')]);
+        page = { items: [...main.items, ...(archived?.items ?? [])], next: main.next };
+      } else page = await this.api.list(cursor);
+      this.lastError = null;
+    } catch (e) { if (!(e instanceof ConversationsApiError)) throw e; this.lastError = e; }
     await this.deriveTitles(page.items.filter((c) => c.title === SERVER_DEFAULT_TITLE).map((c) => c.id));
-    const items: ThreadSummary[] = page.items.map((c) => ({ id: c.id, title: this.title(c.id, c.title), updatedAt: c.updatedAt }));
+    const items: ThreadSummary[] = page.items.map((c) => ({
+      id: c.id, title: this.title(c.id, c.title), updatedAt: c.updatedAt,
+      ...(this.pinArchive ? { pinned: !!c.pinned, archived: !!c.archived } : {}),
+    }));
     for (const id of items.map((i) => i.id)) { this.pending.delete(id); this.known.add(id); }
     // chats the server hasn't recorded yet (first turn still connecting) go on top
     if (!cursor) items.unshift(...[...this.pending.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
