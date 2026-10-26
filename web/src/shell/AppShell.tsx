@@ -508,6 +508,17 @@ function ShellInner() {
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [chat.busy]);
 
+  /** Deadline (ms) during which a send keeps typing focus: any commit that leaves focus on <body> (the centred
+   *  composer unmounting, the docked one mounting, the first answer rows) puts it back in the composer. It never
+   *  steals focus from an element the user picked, so it is safe to leave armed for the whole window. */
+  const refocusUntil = useRef(0);
+  const refocusIfLost = () => {
+    if (performance.now() > refocusUntil.current) return;
+    const a = document.activeElement;
+    if (!a || a === document.body) focusComposer();
+  };
+  // Runs after every commit; a no-op unless a send is waiting to get focus back.
+  useLayoutEffect(() => { refocusIfLost(); });
   const edit = (t: string) => setDraftPush((d) => ({ text: t, n: (d?.n ?? 0) + 1 }));
   const empty = messages.length === 0 && !opening;
   const draftKey = chat.convId ?? NEW_CHAT_KEY;
@@ -518,7 +529,11 @@ function ShellInner() {
     const a = document.activeElement;
     const keep = a?.matches('textarea[aria-label="Message"]') || (!!a?.closest('[data-testid="starter-cards"]') && !coarse());
     atBottomRef.current = true; setAtBottom(true); chat.send(t, resume ? { resume } : undefined);
-    if (keep) requestAnimationFrame(() => { if (!document.activeElement || document.activeElement === document.body) focusComposer(); });
+    if (!keep) return;
+    // QA-S19: Firefox can run this frame before React commits the docked composer, so the refocus also runs
+    // in a layout effect after the commit (below); this frame is the backstop for a send that doesn't remount.
+    refocusUntil.current = performance.now() + 1500;
+    requestAnimationFrame(refocusIfLost);
   };
   /** Up-arrow in an empty composer edits the last question in place (ChatGPT behaviour, QA-S8). */
   const editLast = () => {
