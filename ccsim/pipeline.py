@@ -22,16 +22,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import duckdb
-import pyarrow as pa
 
 from . import edi_mock
 from .infra import SESSION_SECONDS
 from .lake import (COMMIT_TABLE, BatchLock, Silver, Store, check_manifest, gold_key, manifest_files, manifest_key, publish,
                    read_current, read_manifest, run_month, silver_state)
-from .parser import TABLES, ParseError, parse_file
+from .parser import DDL_LOSSLESS, TABLES
+from .silver_staging import RawFile, SilverBatch, file_id_of
 
 ROOT = Path(__file__).resolve().parent.parent
-DDL_LOSSLESS = (ROOT / "claude/schema/01_lossless_edi_schema.sql").read_text()
 DDL_SEMANTIC = (ROOT / "claude/schema/02_semantic_layer_views.sql").read_text()
 SEM_TABLES = ["remit_claims", "remit_lines", "claims", "claim_lines", "adjustments", "remarks", "payments",
               "provider_adjustments", "diagnoses", "payers"]
@@ -95,21 +94,11 @@ def seed_ref(con: duckdb.DuckDBPyConnection):
                      for code, cpt in edi_mock.CPTS.items()])
 
 
-def _insert(con, table: str, rows: list[dict]):
-    if not rows:
-        return
-    # Columns are the union of every row's keys: pa.Table.from_pylist infers them from the first row only and
-    # would silently drop fields the first row lacks (an HL-20 has no SBR, a submitter NM1 has no address).
-    keys = list(dict.fromkeys(k for r in rows for k in r))
-    con.register("_rows", pa.table({k: [r.get(k) for r in rows] for k in keys}))
-    con.execute(f"INSERT INTO {table} BY NAME SELECT * FROM _rows")
-    con.unregister("_rows")
-
-
 # --- lake configuration -----------------------------------------------------------------------------------------
 # Pipeline configuration (task-definition environment):
 #   GOLD_MODE=incremental (default)  recompute only the claims the new batch touched, rewrite only their partitions
 #   GOLD_MODE=full                   rebuild all of gold from all of silver every batch (what a rules change does)
+#   PARSE_WORKERS=1 (default)        parser processes; set it to the task's vCPUs (docs/data-backend/parser-optimization.md)
 PARQUET = "FORMAT parquet, COMPRESSION zstd"         # silver: default row groups keep lookups by file_id selective
 GOLD_PARQUET = PARQUET + ", ROW_GROUP_SIZE 1048576"   # gold: fewer, larger row groups = fewer range requests per query
 GOLD_LAYOUT = "cohort-tiered-4"
@@ -215,46 +204,34 @@ def _parse_batch_locked(env, store: Store, lock: BatchLock) -> dict:
             if dup is None:
                 known_sha.setdefault(sha, fid)
 
-    con = duckdb.connect()
-    con.execute(DDL_LOSSLESS)
-    batch_rows = {t: [] for t in TABLES}
-    _insert(con, "edi.ingest_run", [dict(ingest_run_id=run_id, started_at=started, status="SUCCEEDED",
-                                          parser_name="ccsim.parser", parser_version=PARSER_VERSION, schema_version="1",
-                                          triggered_by=env.task_arn, notes=e.get("EVENT_ID"))])
-    for key in raw:
-        head = s3.head_object(Bucket=B, Key=key)
-        vid = head.get("VersionId")
-        if (key, vid) in loaded:
-            stats["skipped"] += 1
-            continue
-        obj = s3.get_object(Bucket=B, Key=key, VersionId=vid) if vid else s3.get_object(Bucket=B, Key=key)
-        body = obj["Body"].read()
-        sha = hashlib.sha256(body).hexdigest()
-        file_id = hashlib.sha1(f"{key}#{vid}".encode()).hexdigest()[:16]
-        meta = dict(s3_uri=f"s3://{B}/{key}", s3_bucket=B, s3_key=key, s3_version_id=vid, s3_etag=head["ETag"].strip('"'),
-                    s3_last_modified=datetime.fromtimestamp(head["LastModified"].timestamp(), UTC).replace(tzinfo=None),
-                    s3_region="us-west-2", kms_key_arn=head.get("SSEKMSKeyId"), original_filename=key.rsplit("/", 1)[-1],
-                    source_system="sftp", size_bytes=len(body), sha256=sha, received_at=datetime.fromisoformat(day),
-                    character_encoding="ascii")
-        try:
-            text = body[3:].decode("ascii") if body.startswith(b"\xef\xbb\xbf") else body.decode("ascii")   # UTF-8 BOM
-            rows = parse_file(text, file_id, c, meta, run_id, started)
-        except (ParseError, UnicodeDecodeError, IndexError, ValueError, KeyError, TypeError) as err:
-            stats["rejected"] += 1
-            store.put(f"{c}/quarantine/{run_id}/{key.rsplit('/', 1)[-1]}", body)
-            batch_rows["edi.source_file"].append(dict(file_id=file_id, tenant_code=c, file_kind="UNKNOWN",
-                                                      ingest_run_id=run_id, ingested_at=started, parse_status="REJECTED",
-                                                      parse_messages=[f"{type(err).__name__}: {err}"[:500]], **meta))
-            continue
-        if sha in known_sha:
-            rows["edi.source_file"][0]["duplicate_of_file_id"] = known_sha[sha]
+    batch = SilverBatch(run_id, started, triggered_by=env.task_arn, notes=e.get("EVENT_ID"),
+                        parser_version=PARSER_VERSION, workers=int(e.get("PARSE_WORKERS", "1")))
+
+    def new_raw_files():
+        for key in raw:
+            head = s3.head_object(Bucket=B, Key=key)
+            vid = head.get("VersionId")
+            if (key, vid) in loaded:
+                stats["skipped"] += 1
+                continue
+            obj = s3.get_object(Bucket=B, Key=key, VersionId=vid) if vid else s3.get_object(Bucket=B, Key=key)
+            body = obj["Body"].read()
+            meta = dict(s3_uri=f"s3://{B}/{key}", s3_bucket=B, s3_key=key, s3_version_id=vid,
+                        s3_etag=head["ETag"].strip('"'),
+                        s3_last_modified=datetime.fromtimestamp(head["LastModified"].timestamp(), UTC).replace(tzinfo=None),
+                        s3_region="us-west-2", kms_key_arn=head.get("SSEKMSKeyId"),
+                        original_filename=key.rsplit("/", 1)[-1], source_system="sftp", size_bytes=len(body),
+                        sha256=hashlib.sha256(body).hexdigest(), received_at=datetime.fromisoformat(day),
+                        character_encoding="ascii")
+            yield RawFile(key, body, file_id_of(key, vid), meta)
+
+    for f, was_loaded in batch.add_raw_files(new_raw_files(), c, known_sha):
+        if was_loaded:
+            stats["loaded"] += 1
         else:
-            known_sha[sha] = file_id
-        for t in TABLES:
-            batch_rows[t] += rows.get(t, [])
-        stats["loaded"] += 1
-    for t in TABLES:                                  # one insert per table: ~40% less than one per file and table
-        _insert(con, t, batch_rows[t])
+            stats["rejected"] += 1
+            store.put(f"{c}/quarantine/{run_id}/{f.key.rsplit('/', 1)[-1]}", f.body)
+    con = batch.finish()
     if stats["loaded"] == 0 and stats["rejected"] == 0:
         if not _gold_is_behind(store, silver):
             return dict(stats, status="noop")                    # duplicate delivery: nothing new
@@ -279,18 +256,25 @@ def _parse_batch_locked(env, store: Store, lock: BatchLock) -> dict:
     return dict(stats, status="ok")
 
 
+def silver_part_files(con, directory):
+    """Write each staged table to <directory>/<table>.parquet, the commit table (edi.source_file) last. Yields
+    (table, path) after each write, path None for an empty table (no part is published for it)."""
+    for t in [t for t in SILVER_TABLES if t != COMMIT_TABLE] + [COMMIT_TABLE]:
+        p = Path(directory) / f"{t}.parquet"
+        yield t, (p if _copy(con, f"SELECT * FROM {t}", p) else None)
+
+
 def write_silver(con, store: Store, run_id: str, month: str, lock: BatchLock):
     """One part per non-empty table, straight into silver; the commit table (edi.source_file) goes last, and only
     while this task still holds the lock (a task that overran its lease must not commit parts a successor may
     already have deleted as garbage)."""
-    order = [t for t in SILVER_TABLES if t != COMMIT_TABLE] + [COMMIT_TABLE]
     with tempfile.TemporaryDirectory() as tmp:
-        for t in order:
-            p = Path(tmp) / f"{t}.parquet"
+        for t, p in silver_part_files(con, tmp):
             if t == COMMIT_TABLE:
                 lock.renew()
-            if _copy(con, f"SELECT * FROM {t}", p):
-                store.put(f"{store.root}parquet/{t}/received_month={month}/part-{run_id}.parquet", p.read_bytes())
+            if p is None:
+                continue
+            store.put(f"{store.root}parquet/{t}/received_month={month}/part-{run_id}.parquet", p.read_bytes())
 
 
 def compact_silver(con, store: Store, silver: Silver, before_month: str):
