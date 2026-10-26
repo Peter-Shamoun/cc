@@ -397,6 +397,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 finish = "error"
             if run.cancelled.is_set():
                 finish = "aborted"
+            if tap is not None:
+                tap.enter("render")
             emit({"type": "status", "label": "Writing answer" if finish == "stop" else None})
             for part in parts:
                 if run.cancelled.is_set():

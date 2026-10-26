@@ -20,7 +20,7 @@ export type {
   Sensitivity, StatusPart, TablePart, TextPart, ToolCallPart, ArtifactPart, PartBase,
 };
 
-export const CONTRACT_VERSION = '1.5.0';
+export const CONTRACT_VERSION = '1.6.0';
 export const CONTRACT_MAJOR = 1;
 
 // ---------------------------------------------------------------- new parts (v1)
@@ -58,6 +58,9 @@ export interface ColumnSummary { name: string; type?: ColumnType }
 export interface StepError { code: string; message: string }
 export interface ModelRef { model: string; tier?: 'small' | 'medium' | 'large'; provider?: string }
 
+/** 1.6.0 (CONTRACT.md §7): where the run's wall time went. Unknown extra stages may appear; ignore them. */
+export interface LatencyStages { plan: number; sql: number; repair: number; checks: number; render: number }
+
 export interface Usage {
   queries: number;
   elapsedMs: number;
@@ -65,7 +68,11 @@ export interface Usage {
   costUsd?: number;
   /** true when costUsd is computed from a price table rather than billed. Demo mode: always true. */
   costIsEstimate?: boolean;
-  latency?: { firstEventMs?: number; firstStepMs?: number; firstTokenMs?: number; modelMs?: number; sqlMs?: number; queueMs?: number; totalMs: number };
+  latency?: {
+    firstEventMs?: number; firstStepMs?: number; firstTokenMs?: number; modelMs?: number; sqlMs?: number; queueMs?: number; totalMs: number;
+    /** 1.6.0: wall-clock ms per stage; they sum to about totalMs. */
+    stages?: LatencyStages;
+  };
   models?: { model: string; role?: string; inputTokens: number; outputTokens: number; costUsd?: number; calls?: number }[];
 }
 
