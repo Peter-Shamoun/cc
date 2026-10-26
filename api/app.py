@@ -442,7 +442,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 ctx = authed(request, new_id("r"))
             except AuthError:
                 return unauthorized()
-            after = int(seq) if seq.isascii() and seq.isdigit() else -1
+            after = _last_event_sequence_number(seq)
             if run is None and stored_run_events(ctx.principal, mid):
                 return _stream_stored(ctx.principal, mid, after, request)
             if run is None or run.principal != ctx.principal:
@@ -855,7 +855,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         run = runs.get(message_id)
         last_event = request.headers.get("last-event-id") or ""
         mid, _, seq = last_event.rpartition(":")
-        after = int(seq) if mid == message_id and seq.isascii() and seq.isdigit() else -1
+        after = _last_event_sequence_number(seq) if mid == message_id else -1
         if run is None and stored_run_events(ctx.principal, message_id):
             return _stream_stored(ctx.principal, message_id, after, request)
         if run is None or run.principal != ctx.principal:
@@ -1094,6 +1094,17 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
 def _error(code: str, title: str, message: str, retryable: bool) -> dict:
     return {"type": "error", "id": new_id("p_"), "code": code, "title": title, "message": message,
             "retryable": retryable}
+
+
+#: a Last-Event-ID sequence number longer than this is invalid (int() refuses > 4300 digits with a ValueError)
+MAX_LAST_EVENT_SEQUENCE_DIGITS = 18
+
+
+def _last_event_sequence_number(text: str) -> int:
+    """The ``seq`` part of a ``Last-Event-ID`` (``{messageId}:{seq}``), or -1 (replay everything) when invalid."""
+    if text.isascii() and text.isdigit() and len(text) <= MAX_LAST_EVENT_SEQUENCE_DIGITS:
+        return int(text)
+    return -1
 
 
 def _sse(event_id: str | None, payload: dict) -> str:
