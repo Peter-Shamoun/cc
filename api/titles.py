@@ -15,7 +15,7 @@ from analyzer.tools import is_phi_column
 from api.mapping import ACRONYMS
 
 MAX_DIMS = 2
-_IDENT = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*$")
+_IDENT = re.compile(r"[a-z][a-z0-9]*(_[a-z0-9]+)*")
 _NUMERIC = {"integer", "number", "currency", "percent"}
 _ACRONYMS = ACRONYMS | {"ar", "los"}
 
@@ -32,7 +32,7 @@ VOCAB = frozenset("""
 
 def _words(key: str) -> list[str] | None:
     key = key.strip().lower()
-    if not _IDENT.match(key) or is_phi_column(key):
+    if not _IDENT.fullmatch(key) or is_phi_column(key):
         return None
     words = [w.upper() if w in _ACRONYMS else w for w in key.split("_")]
     return words if all(w.lower() in VOCAB or w.isdigit() for w in words) else None

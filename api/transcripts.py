@@ -39,7 +39,7 @@ from api.store import (DEFAULT_TITLE, InMemoryTranscriptStore, Principal, _iso, 
                        unarchive_on_user_message)
 
 TRANSCRIPT_RETENTION_DAYS = 90
-_SAFE = re.compile(r"^[A-Za-z0-9_:.-]{1,128}$")
+_SAFE = re.compile(r"[A-Za-z0-9_:.-]{1,128}")  # always fullmatch: `$` would accept a trailing "\n"
 _USER_PREFIX = re.compile(r"^[A-Za-z0-9_:.-]{1,128}/transcripts/users/[0-9a-f]{32}/")
 
 
@@ -259,7 +259,7 @@ class SealedTranscriptStore:
             return result
 
     def delete_conversation(self, principal, conversation_id):
-        if not _SAFE.match(conversation_id or ""):
+        if not _SAFE.fullmatch(conversation_id or ""):
             return False
         with self._lock:
             prefix = self._prefix(principal)
@@ -316,7 +316,7 @@ class SealedTranscriptStore:
         return None
 
     def owned_by_other(self, principal, conversation_id) -> bool:
-        if not _SAFE.match(conversation_id or ""):
+        if not _SAFE.fullmatch(conversation_id or ""):
             return False
         mine = f"{self._prefix(principal)}meta/{conversation_id}.json"
         return any(k.endswith(f"/meta/{conversation_id}.json") and k != mine for k in self.blobs.list(""))
@@ -331,7 +331,7 @@ class SealedTranscriptStore:
         return hashlib.sha256(f"{principal.customer}\x00{principal.user}".encode()).hexdigest()[:32]
 
     def _prefix(self, principal) -> str:
-        if not _SAFE.match(principal.customer):
+        if not _SAFE.fullmatch(principal.customer):
             raise ValueError("bad customer id")
         return f"{principal.customer}/transcripts/users/{self._user_hash(principal)}/"
 
@@ -367,7 +367,7 @@ class SealedTranscriptStore:
         self.blobs.put(f"{prefix}meta/{conv['id']}.json", json.dumps(meta).encode())
 
     def _load(self, principal, conversation_id) -> dict | None:
-        if not _SAFE.match(conversation_id or ""):
+        if not _SAFE.fullmatch(conversation_id or ""):
             return None
         prefix = self._prefix(principal)
         meta_raw = self.blobs.get(f"{prefix}meta/{conversation_id}.json")
@@ -415,5 +415,5 @@ class SealedTranscriptStore:
 
 
 def _check_id(value: str) -> None:
-    if not _SAFE.match(value or ""):
+    if not _SAFE.fullmatch(value or ""):
         raise ValueError("bad conversation id")

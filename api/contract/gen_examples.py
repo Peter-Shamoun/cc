@@ -54,6 +54,7 @@ NESTED_PICKS = ("By billed dollars", "Last 90 days")
 #: extra example: the answer that follows picking the first clarify choice (message.start.resumeOf).
 RESUME = "clarify_resume"
 REGENERATE = "regenerate_concise"  # 1.10.0: "More concise" on the `answer` example (CONTRACT.md §8.1)
+REPORT_V2 = "report_v2"  # 1.19.0 (QA-C1): a follow-up on `report` revises its artifacts (same artifactId, v2)
 #: simulated per-turn model latency (s) when writing examples, so usage/latency look like a real run.
 REALISTIC_MODEL_DELAY = 0.35
 
@@ -115,6 +116,10 @@ def capture(model_delay: float = 0.0) -> dict[str, list[dict]]:
                      "resume": {"clarificationId": clar["clarificationId"],
                                 **({"choiceIds": [choice["id"]]} if "id" in choice else {})}}
             out[RESUME] = _post(client, reply)
+        if outcome == "report":
+            out[REPORT_V2] = _post(client, {"messages": [{"id": "u_2", "role": "user", "parentId": evs[0]["messageId"],
+                                                          "text": "Update the report: paid amount by month, 2026 only"}],
+                                            "conversationId": evs[0]["conversationId"], "scenario": "report"})
         if outcome == "answer":
             out[REGENERATE] = _post(client, {"messages": [], "conversationId": evs[0]["conversationId"],
                                              "regenerate": {"messageId": evs[0]["messageId"], "style": "concise"}})
@@ -123,7 +128,10 @@ def capture(model_delay: float = 0.0) -> dict[str, list[dict]]:
     out["clarify"], out[RESUME] = pair[: len(out["clarify"])], pair[len(out["clarify"]):]
     pair = normalise(out["answer"] + out[REGENERATE])  # so regenerateOf points at the answer's message id
     out["answer"], out[REGENERATE] = pair[: len(out["answer"])], pair[len(out["answer"]):]
-    return {k: (v if k in ("clarify", RESUME, "answer", REGENERATE) else normalise(v)) for k, v in out.items()}
+    pair = normalise(out["report"] + out[REPORT_V2])  # so v2's artifactId and parentId line up with v1
+    out["report"], out[REPORT_V2] = pair[: len(out["report"])], pair[len(out["report"]):]
+    return {k: (v if k in ("clarify", RESUME, "answer", REGENERATE, "report", REPORT_V2) else normalise(v))
+            for k, v in out.items()}
 
 
 def capture_edge(model_delay: float = 0.0) -> dict[str, list[dict]]:
