@@ -69,11 +69,11 @@ export function ClarifyCard({ part, onReply, active }: { part: ClarificationPart
       <div className="flex items-start gap-2 text-fg"><HelpCircle size={16} className="mt-0.5 shrink-0 text-fg-muted" aria-hidden /><span className="font-medium leading-snug">{part.question}</span></div>
       {part.multiSelect && !done && <div className="mt-1 pl-6 text-xs text-fg-subtle">Choose one or more</div>}
       {choices.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2" role="list">
+        <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Choices">
           {choices.map((o) => {
             const on = part.multiSelect ? picked.includes(o.id) : answer === o.label;
             return (
-              <button key={o.id} type="button" role="listitem" disabled={done} aria-pressed={on} onClick={() => chip(o.id)} title={o.description}
+              <button key={o.id} type="button" disabled={done} aria-pressed={on} onClick={() => chip(o.id)} title={o.description}
                 className={clsx('inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-left text-[13px] transition-colors', on ? 'border-fg bg-fg text-bg' : 'border-line bg-bg text-fg enabled:hover:bg-hover disabled:opacity-50')} data-testid="clarify-chip">
                 {part.multiSelect && on && <Check size={12} aria-hidden />}
                 {o.label}{o.description && <span className={clsx('ml-1', on ? 'text-bg/70' : 'text-fg-subtle')}>· {o.description}</span>}
