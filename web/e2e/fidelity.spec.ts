@@ -61,7 +61,6 @@ test.describe('fidelity: thread chrome (ChatGPT)', () => {
     const j = (await jump.boundingBox())!;
     const c = (await page.locator('#composer form').first().boundingBox())!;
     expect(Math.abs(j.x + j.width / 2 - (c.x + c.width / 2))).toBeLessThanOrEqual(2);
-    gap('QA-S32');
     expect(c.y - (j.y + j.height), 'gap between the button and the composer top').toBeGreaterThanOrEqual(8);
   });
 
