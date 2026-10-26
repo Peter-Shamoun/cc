@@ -163,7 +163,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const timers = useRef(new Map<number, { handle?: number; left: number; since: number }>());
   const paused = useRef(false);
   const toastsRef = useRef(toasts);
-  toastsRef.current = toasts;
+  useLayoutEffect(() => { toastsRef.current = toasts; });
   const resumeRef = useRef(() => {});
   const dismiss = useCallback((id: number, expired: boolean) => {
     const t = toastsRef.current.find((x) => x.id === id);
@@ -199,9 +199,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     if (!paused.current) return;
     paused.current = false;
     // Give at least a beat after the pointer leaves, so an expiring Undo doesn't disappear under the cursor.
+    // oxlint-disable-next-line react/immutability -- timer records live in a ref'd Map, mutated only from events
     for (const [id, t] of timers.current) { t.left = Math.max(t.left, 1500); arm(id); }
   };
-  resumeRef.current = resume;
+  useLayoutEffect(() => { resumeRef.current = resume; });
   return (
     <ToastCtx.Provider value={push}>
       {children}

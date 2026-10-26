@@ -14,12 +14,14 @@ type Row = { key: string; kind: 'new' } | { key: string; kind: 'thread'; hit: Se
  */
 export function SearchDialog({ threads, search, onOpen, onNew, onClose }: { threads: ThreadSummary[]; search?: (q: string) => Promise<SearchHit[]>; onOpen: (id: string, messageId?: string) => void; onNew: () => void; onClose: () => void }) {
   const [q, setQ] = useState('');
-  const [hits, setHits] = useState<SearchHit[] | null>(null);
+  const [found, setHits] = useState<SearchHit[] | null>(null);
+  // An empty query shows recent chats; stale results from the last query are derived away, not reset in the effect.
+  const hits = q.trim() ? found : null;
   const [active, setActive] = useState(0);
   const lid = useId();
   useEffect(() => {
     const query = q.trim();
-    if (!query) { setHits(null); return; }
+    if (!query) return;
     let live = true;
     const id = window.setTimeout(async () => {
       const r = search ? await search(query) : threads.filter((t) => t.title.toLowerCase().includes(query.toLowerCase())).map((t) => ({ ...t, snippet: t.title, matchStart: t.title.toLowerCase().indexOf(query.toLowerCase()), matchLength: query.length }));
