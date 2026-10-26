@@ -78,8 +78,14 @@ class _LockedDB:
             return list(self._rows)
 
     def __init__(self, path, lock):
+        self._path, self._lock = path, lock
         self._con = sqlite3.connect(path, check_same_thread=False, isolation_level=None)
-        self._lock = lock
+
+    def __getstate__(self):                       # a pickled world (bench/lake_bench.py snapshots) reopens the file
+        return {"path": self._path, "lock": self._lock}
+
+    def __setstate__(self, state):
+        self.__init__(state["path"], state["lock"])
 
     def execute(self, sql, params=()):
         with self._lock:

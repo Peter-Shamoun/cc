@@ -21,16 +21,20 @@ Output: .ccsim/bench/lake/<label>-<days>d.json and .md
 from __future__ import annotations
 
 import argparse
+import copyreg
 import fnmatch
 import json
 import shutil
 import statistics
+import subprocess
 import sys
 import tempfile
+import threading
 import time
 from datetime import date
 from pathlib import Path
 
+import dill
 import duckdb
 import yaml
 
@@ -249,20 +253,100 @@ def checkpoint(aws, dep, customers: list[str], n_batches: int, queries: bool) ->
     return out
 
 
+SNAPSHOT_EVERY = 20     # batches between world snapshots, so a long run survives the machine restarting
+
+
+def _load_rsa_pem(pem: bytes):
+    from cryptography.hazmat.primitives import serialization
+    return serialization.load_pem_private_key(pem, password=None)
+
+
+def _reduce_rsa_key(key):
+    from cryptography.hazmat.primitives import serialization
+    return _load_rsa_pem, (key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                             serialization.NoEncryption()),)
+
+
+def _save_rlock(pickler, lock):
+    # dill 0.3.9 restores an unlocked RLock (owner 0) as acquired, which deadlocks the restored world. A snapshot is
+    # taken between batches, so every lock must be free; restore it free.
+    if lock._is_owned() or "count=0" not in repr(lock):
+        raise RuntimeError(f"snapshot taken while a lock is held: {lock!r}")
+    pickler.save_reduce(threading.RLock, (), obj=lock)
+
+
+def _pickle_world_types():
+    """The simulated identity provider signs tokens with RSA keys, which do not pickle; round-trip them as PEM."""
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    copyreg.pickle(type(rsa.generate_private_key(public_exponent=65537, key_size=1024)), _reduce_rsa_key)
+    dill.register(type(threading.RLock()))(_save_rlock)
+
+
+def save_snapshot(snap: Path, aws, dep, batches: list, cps: list) -> None:
+    """The world at a batch boundary: in-memory state (IAM, KMS key material, clock, queues) pickled, S3 blobs
+    hard-linked (they are write-once), the S3 index copied, and the append-only audit logs' lengths."""
+    aws.shutdown()
+    tmp = snap.with_name(snap.name + ".tmp")
+    shutil.rmtree(tmp, ignore_errors=True)
+    tmp.mkdir(parents=True)
+    logs = {}
+    for log in (aws.trail, aws.agent_audit):
+        log._fh.flush()
+        logs[str(log.path)] = log.path.stat().st_size
+    subprocess.run(["cp", "-al", str(aws.root / "s3data"), str(tmp / "s3data")], check=True)
+    shutil.copy2(aws.root / "s3.sqlite", tmp / "s3.sqlite")
+    (tmp / "logs.json").write_text(json.dumps(logs))
+    (tmp / "world.dill").write_bytes(dill.dumps(dict(aws=aws, dep=dep, batches=batches, checkpoints=cps)))
+    shutil.rmtree(snap, ignore_errors=True)
+    tmp.rename(snap)
+
+
+def load_snapshot(snap: Path, aws_root: Path):
+    """Put the disk back to the snapshot (newer blobs, index rows and log lines are dropped), then unpickle."""
+    shutil.rmtree(aws_root / "s3data", ignore_errors=True)
+    aws_root.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["cp", "-al", str(snap / "s3data"), str(aws_root / "s3data")], check=True)
+    shutil.copy2(snap / "s3.sqlite", aws_root / "s3.sqlite")
+    for path, size in json.loads((snap / "logs.json").read_text()).items():
+        with open(path, "a+b") as fh:
+            if fh.tell() < size:
+                raise RuntimeError(f"{path} is shorter than at the snapshot; cannot resume")
+            fh.truncate(size)
+    state = dill.loads((snap / "world.dill").read_bytes())
+    return state["aws"], state["dep"], state["batches"], state["checkpoints"]
+
+
 def stream(root: Path, customers: list[str], scenario: edi_mock.Scenario, pipeline_env: dict, purge_raw: bool,
-           checkpoints: set[int], queries: bool, progress_every: int = 10, partial_path: Path | None = None) -> tuple:
-    """checkpoints: business-day counts (of the first customer) after which to inventory and run the workload."""
-    reset(root)
-    aws = LocalAWS(root / "aws")
+           checkpoints: set[int], queries: bool, progress_every: int = 10, partial_path: Path | None = None,
+           resume: bool = False) -> tuple:
+    """checkpoints: business-day counts (of the first customer) after which to inventory and run the workload.
+    resume: continue from the last snapshot of this root if there is one (the generator replays the days already
+    ingested, deterministically, and they are skipped)."""
+    _pickle_world_types()
+    snap = root.with_name(root.name + ".snapshot")
+    if resume and (snap / "world.dill").exists():
+        aws, dep, batches, cps = load_snapshot(snap, root / "aws")
+        shutil.rmtree(root / "sftp", ignore_errors=True)
+        print(f"resumed after batch {len(batches)}", flush=True)
+    else:
+        reset(root)
+        shutil.rmtree(snap, ignore_errors=True)
+        aws = LocalAWS(root / "aws")
+        aws.serve()
+        dep = provision(aws, customers, parse_batch, pipeline_env=pipeline_env)
+        aws.events.auto_drain = False
+        for upn, c in DEFAULT_USERS.items():
+            if c in customers:
+                add_user(aws, upn, c)
+        batches, cps = [], []
     ep = aws.serve()
-    dep = provision(aws, customers, parse_batch, pipeline_env=pipeline_env)
-    aws.events.auto_drain = False
-    for upn, c in DEFAULT_USERS.items():
-        if c in customers:
-            add_user(aws, upn, c)
-    batches, cps = [], []
+    skip = len(batches)
     t_start = time.perf_counter()
     for dd in edi_mock.generate_days(root / "sftp", scenario, customers):
+        if skip:
+            skip -= 1
+            shutil.rmtree(dd.path)
+            continue
         day = dd.day.isoformat()
         sftp_drop(aws, dep, dd.tenant, dd.path, day)
         shutil.rmtree(dd.path)
@@ -295,6 +379,9 @@ def stream(root: Path, customers: list[str], scenario: edi_mock.Scenario, pipeli
             print(render_checkpoint(cps[-1]), flush=True)
         if partial_path and len(batches) % progress_every == 0:   # long runs: keep what we have if killed later
             partial_path.write_text(json.dumps(dict(batches=batches, checkpoints=cps), indent=1))
+        if len(batches) % SNAPSHOT_EVERY == 0:
+            save_snapshot(snap, aws, dep, batches, cps)
+            ep = aws.serve()
         if len(batches) % progress_every == 0:
             b = batches[-1]
             print(f"[{time.perf_counter() - t_start:7.0f}s] batch {len(batches)} {b['customer']} {day}: {b['s']} s, "
@@ -304,17 +391,19 @@ def stream(root: Path, customers: list[str], scenario: edi_mock.Scenario, pipeli
     if n_first not in {cp["batches"] for cp in cps}:
         cps.append(checkpoint(aws, dep, customers, n_first, queries))
         print(render_checkpoint(cps[-1]), flush=True)
+    shutil.rmtree(snap, ignore_errors=True)
     return aws, dep, batches, cps
 
 
 def main(days: int, customers: list[str], mb_per_day: float, label: str, pipeline_env: dict, purge_raw: bool,
-         queries: bool, start: date, keep_world: bool, checkpoints: set[int], export: Path | None = None) -> dict:
+         queries: bool, start: date, keep_world: bool, checkpoints: set[int], export: Path | None = None,
+         resume: bool = False) -> dict:
     root = ROOT / ".ccsim" / f"lake-{label}-{days}d"
     sc = edi_mock.Scenario(start=start, days=days, target_mb_per_day=mb_per_day)
     t0 = time.perf_counter()
     OUT.mkdir(parents=True, exist_ok=True)
     aws, dep, batches, cps = stream(root, customers, sc, pipeline_env, purge_raw, checkpoints, queries,
-                                    partial_path=OUT / f"{label}-{days}d.partial.json")
+                                    partial_path=OUT / f"{label}-{days}d.partial.json", resume=resume)
     res = dict(label=label, days=days, customers=customers, mb_per_day=mb_per_day, pipeline_env=pipeline_env,
                ingest_wall_s=round(time.perf_counter() - t0, 1), batches=batches, checkpoints=cps)
     if export:
@@ -398,8 +487,9 @@ if __name__ == "__main__":
     ap.add_argument("--no-queries", action="store_true")
     ap.add_argument("--keep-world", action="store_true")
     ap.add_argument("--export-gold", type=Path, help="write a plaintext copy of the final gold here (layout_bench)")
+    ap.add_argument("--resume", action="store_true", help="continue from this run's last snapshot, if any")
     ap.add_argument("--checkpoints", default="20,60,120,250,500,750", help="business days at which to run the workload")
     a = ap.parse_args()
     env = dict(kv.split("=", 1) for kv in a.env.split(",") if kv)
     main(a.days, a.customers.split(","), a.mb_per_day, a.label, env, a.purge_raw, not a.no_queries,
-         date.fromisoformat(a.start), a.keep_world, {int(x) for x in a.checkpoints.split(",") if x}, a.export_gold)
+         date.fromisoformat(a.start), a.keep_world, {int(x) for x in a.checkpoints.split(",") if x}, a.export_gold, a.resume)
