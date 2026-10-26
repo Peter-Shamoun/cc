@@ -40,7 +40,8 @@ def worker_command(session: str, model: str, effort: str) -> list[str]:
     prompt = ("Run this command with the Bash tool and follow the instructions it prints exactly:\n"
               f"python3 -m analyzer.cli --session {session} briefing\n"
               "Run each command exactly as printed, one command per Bash call: no shell variables, loops, pipes "
-              "or redirection. Put any argument that contains a $ sign (dollar amounts) in single quotes.")
+              "or redirection. Put any argument that contains a $ sign (dollar amounts) in single quotes. A denied "
+              "command is not final: fix its quoting and run it again.")
     command = ["claude", "-p", prompt, "--model", model, "--permission-mode", "dontAsk",
                "--allowedTools", "Bash(python3 -m analyzer.cli:*)", "Bash(cd:*)", "--add-dir", "/tmp", str(ROOT),   # cd outside the start directory needs the directory added
                "--disallowedTools", *DISALLOWED_TOOLS,
@@ -51,10 +52,23 @@ def worker_command(session: str, model: str, effort: str) -> list[str]:
 
 
 SESSION_OUTPUT_FILES = ("audit.jsonl", "calls.jsonl", "final.json", "claude_print.json")
+ATTEMPTS_ON_DENIAL = 3
 
 
 def run_worker(action: dict) -> dict:
-    # an unfinished run (killed, interrupted) may have left calls behind; every run starts from the prepared session
+    """A run the sandbox blocked (a permission denial) is the harness's failure, not the model's: run the session
+    again from its prepared state, up to ATTEMPTS_ON_DENIAL times, and keep only the last attempt."""
+    for attempt in range(1, ATTEMPTS_ON_DENIAL + 1):
+        record = _run_once(action)
+        record["attempt"] = attempt
+        if not record.get("permission_denials"):
+            break
+    Path(action["session"], "claude_print.json").write_text(json.dumps(record, indent=1))
+    return record
+
+
+def _run_once(action: dict) -> dict:
+    # an unfinished run (killed, interrupted, denied) may have left calls behind: start from the prepared session
     for name in SESSION_OUTPUT_FILES:
         Path(action["session"], name).unlink(missing_ok=True)
     WORKER_DIRECTORY.mkdir(exist_ok=True)
@@ -72,7 +86,6 @@ def run_worker(action: dict) -> dict:
         record.update(json.loads(output))
     except json.JSONDecodeError:
         record.update(is_error=True, result=output[-2000:])
-    Path(action["session"], "claude_print.json").write_text(json.dumps(record, indent=1))
     return record
 
 
