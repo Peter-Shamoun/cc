@@ -40,6 +40,7 @@ from api.capabilities import DEFAULT_STRATEGY, capabilities as capabilities_body
 from api.export import FORMATS as EXPORT_FORMATS, as_json as export_json, as_markdown as export_markdown, filename as export_filename
 from api.share import ShareRegistry, link as share_link, shared_view
 from api.sources import sources_for
+from api.stream_parts import emit_parts
 from api.styles import apply_style
 from api.titles import title_from_parts
 from api.transcripts import CustomerKeyDisabled, make_store
@@ -47,7 +48,6 @@ from api.transcripts import CustomerKeyDisabled, make_store
 log = logging.getLogger("cc.api")
 _SAFE_KEY = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,40}")
 #: rows per ``table.rows`` event (contract 1.9.0)
-TABLE_CHUNK_ROWS = 10
 NO_STORE = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
 
 
@@ -457,22 +457,6 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             run.events.append((seq, event))
             run.notify()
 
-        def stream_table(part: dict):
-            """1.9.0 (§5.1): announce the table, then its preview rows in chunks. The complete ``part`` follows."""
-            start = {"type": "table.start", "partId": part["id"], "columns": part["columns"]}
-            for key in ("title", "sensitivity", "stepId", "sqlPartId"):
-                if part.get(key) is not None:
-                    start[key] = part[key]
-            emit(start)
-            rows = part["rows"]
-            for offset in range(0, len(rows), TABLE_CHUNK_ROWS):
-                if run.cancelled.is_set():
-                    return
-                emit({"type": "table.rows", "partId": part["id"], "offset": offset,
-                      "rows": rows[offset:offset + TABLE_CHUNK_ROWS]})
-                if settings.stream_delay_seconds:
-                    time.sleep(settings.stream_delay_seconds)
-
         def work():
             parts: list[dict] = []
             finish = "stop"
@@ -520,28 +504,16 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             if tap is not None:
                 tap.enter("render")
             emit({"type": "status", "label": "Writing answer" if finish == "stop" else None})
-            for part in parts:
-                if run.cancelled.is_set():
-                    finish = "aborted"
-                    break
-                if part["type"] == "text":
-                    emit({"type": "text.start", "partId": part["id"]})
-                    for chunk in _chunks(part["text"]):
-                        if run.cancelled.is_set():
-                            break
-                        emit({"type": "text.delta", "partId": part["id"], "delta": chunk})
-                        if settings.stream_delay_seconds:
-                            time.sleep(settings.stream_delay_seconds)
-                    emit({"type": "text.end", "partId": part["id"]})
-                else:
-                    if part["type"] == "table" and part.get("rows"):
-                        stream_table(part)
-                    emit({"type": "part", "part": part})
-                    if part["type"] == "clarification" and not run.discarded.is_set():
-                        clarifications[part["clarificationId"]] = {
-                            "principal": ctx.principal, "conversation_id": conversation_id, "question": question,
-                            "message_id": message_id, "choices": part.get("choices", []), "scenario": scenario,
-                            "expires": time.time() + settings.clarification_ttl_seconds}
+            def remember_clarification(part: dict):
+                if part["type"] == "clarification" and not run.discarded.is_set():
+                    clarifications[part["clarificationId"]] = {
+                        "principal": ctx.principal, "conversation_id": conversation_id, "question": question,
+                        "message_id": message_id, "choices": part.get("choices", []), "scenario": scenario,
+                        "expires": time.time() + settings.clarification_ttl_seconds}
+
+            if not emit_parts(parts, emit, cancelled=run.cancelled, delay=settings.stream_delay_seconds,
+                              on_part=remember_clarification):
+                finish = "aborted"
             elapsed = int((time.perf_counter() - started) * 1000)
             emit({"type": "status", "label": None})
             usage = (tap.usage(elapsed, marks.get("first_event"), marks.get("first_token")) if tap is not None
@@ -928,20 +900,6 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
 def _error(code: str, title: str, message: str, retryable: bool) -> dict:
     return {"type": "error", "id": new_id("p_"), "code": code, "title": title, "message": message,
             "retryable": retryable}
-
-
-def _chunks(text: str, size: int = 24):
-    words = text.split(" ")
-    buf = ""
-    for word in words:
-        piece = word if not buf else " " + word
-        if len(buf) + len(piece) > size and buf:
-            yield buf
-            buf = " " + word
-        else:
-            buf += piece
-    if buf:
-        yield buf
 
 
 def _sse(event_id: str | None, payload: dict) -> str:

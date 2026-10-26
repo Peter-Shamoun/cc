@@ -1,0 +1,90 @@
+{
+ "question": "Average paid amount by payer, double-check",
+ "multiCandidate": true,
+ "calls": [
+  {
+   "model": "claude-haiku-5-5",
+   "candidate": 0,
+   "tool_results": [],
+   "completion": {
+    "text": "",
+    "tool_calls": [
+     {
+      "name": "final_answer",
+      "arguments": {
+       "sql": "SELECT payer_name, SUM(paid_amount) AS paid_amount, COUNT(*) AS claims\nFROM sem.claims\nGROUP BY 1\nORDER BY paid_amount DESC",
+       "answer": "Paid by payer."
+      },
+      "id": "a1"
+     }
+    ]
+   }
+  },
+  {
+   "model": "claude-haiku-5-5",
+   "candidate": 1,
+   "tool_results": [],
+   "completion": {
+    "text": "",
+    "tool_calls": [
+     {
+      "name": "final_answer",
+      "arguments": {
+       "sql": "SELECT payer_name, SUM(paid_amount) AS paid_amount, COUNT(*) AS claims\nFROM sem.claims\nGROUP BY 1\nORDER BY paid_amount DESC",
+       "answer": "Paid by payer."
+      },
+      "id": "b1"
+     }
+    ]
+   }
+  }
+ ],
+ "answer": {
+  "kind": "answer",
+  "model": "claude-haiku-5-5",
+  "text": "Paid by payer.",
+  "sql": "SELECT payer_name, SUM(paid_amount) AS paid_amount, COUNT(*) AS claims\nFROM sem.claims\nGROUP BY 1\nORDER BY paid_amount DESC",
+  "rows": [
+   [
+    "Synthetic Payer A",
+    15234.5,
+    120
+   ],
+   [
+    "Synthetic Payer B",
+    9876.25,
+    88
+   ],
+   [
+    "Synthetic Payer C",
+    4410.0,
+    41
+   ]
+  ],
+  "columns": [
+   "payer_name",
+   "paid_amount",
+   "claims"
+  ],
+  "candidate_index": 0,
+  "selection": {
+   "mode": "vote",
+   "candidates": 2,
+   "answered": 2
+  },
+  "candidate_results": [
+   {
+    "candidate_index": 0,
+    "kind": "answer",
+    "sql": "SELECT payer_name, SUM(paid_amount) AS paid_amount, COUNT(*) AS claims\nFROM sem.claims\nGROUP BY 1\nORDER BY paid_amount DESC",
+    "row_count": 3
+   },
+   {
+    "candidate_index": 1,
+    "kind": "answer",
+    "sql": "SELECT payer_name, SUM(paid_amount) AS paid_amount, COUNT(*) AS claims\nFROM sem.claims\nGROUP BY 1\nORDER BY paid_amount DESC",
+    "row_count": 3
+   }
+  ]
+ }
+}
