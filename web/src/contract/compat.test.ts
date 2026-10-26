@@ -71,7 +71,7 @@ same<H.ChatRequest, G.ChatRequest>(true);
 same<H.RegenerateStyle, G.RegenerateStyle>(true);
 same<H.HttpError, G.HttpError>(true);
 
-// capabilities (1.4.0): re-exported from the generated file, so only check the request side and the export
+// capabilities: re-exported from the generated file
 same<H.Capabilities, G.Capabilities>(true);
 
 // conversation REST (1.3.0): the history client's shapes match the schema

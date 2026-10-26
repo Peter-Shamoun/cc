@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Code2 } from 'lucide-react';
-import { fmtMs, fmtTokens, fmtUsd, fmtUsdShort, modelName } from './normalize';
+import { fmtMs, fmtTokens, fmtUsd, fmtUsdShort } from './normalize';
 import type { UsageView } from './provisional';
 
 // One restrained hue stepped in lightness (no rainbow of accents).
@@ -8,7 +8,7 @@ const BAR = [70, 48, 32, 20, 12].map((p) => `color-mix(in srgb, var(--fg) ${p}%,
 
 /**
  * Per-answer metadata in the action row: subtle "3 queries · 12s · $0.004" (ChatGPT-style message
- * metadata). Click or focus opens a small popover with model, tokens and the time breakdown.
+ * metadata). Click or focus opens a small popover with tokens, cost and the time breakdown (no model: the server runs one configuration).
  */
 export function AnswerMeta({ usage, queries, repairs = 0, onSql, sqlOpen }: { usage?: UsageView; queries: number; repairs?: number; onSql?: () => void; sqlOpen?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -42,27 +42,12 @@ export function AnswerMeta({ usage, queries, repairs = 0, onSql, sqlOpen }: { us
       {open && usage && (
         <div id={id} role="dialog" aria-label="Answer details" className="absolute bottom-full left-0 z-20 mb-2 w-72 max-sm:fixed max-sm:inset-x-3 max-sm:bottom-24 max-sm:left-3 max-sm:w-auto rounded-xl border border-line bg-elev p-3 text-fg-muted shadow-[0_4px_16px_rgba(0,0,0,0.08)] step-enter" data-testid="meta-popover">
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-            {usage.model && !(usage.models && usage.models.length > 1) && <><dt>Model</dt><dd className="text-right text-fg">{usage.model}</dd></>}
             {usage.inputTokens !== undefined && <><dt>Tokens</dt><dd className="text-right tabular-nums text-fg">{fmtTokens(usage.inputTokens)} in · {fmtTokens(usage.outputTokens ?? 0)} out{usage.cacheRead ? ` · ${fmtTokens(usage.cacheRead)} cached` : ''}</dd></>}
             {usage.costUsd !== undefined && <><dt>Cost</dt><dd className="text-right tabular-nums text-fg">{fmtUsd(usage.costUsd)}{usage.costIsEstimate && <span className="text-fg-subtle"> est.</span>}</dd></>}
             <dt>Queries</dt><dd className="text-right tabular-nums text-fg">{queries}{repairs ? ` · ${repairs} repaired` : ''}</dd>
             {usage.firstTokenMs !== undefined && <><dt>First token</dt><dd className="text-right tabular-nums text-fg">{fmtMs(usage.firstTokenMs)}</dd></>}
             <dt>Total time</dt><dd className="text-right tabular-nums text-fg">{fmtMs(usage.elapsedMs)}</dd>
           </dl>
-          {usage.models && usage.models.length > 1 && (
-            <table className="mt-3 w-full text-[11.5px]" data-testid="meta-models">
-              <thead className="text-left text-fg-subtle"><tr><th className="font-normal">Model</th><th className="text-right font-normal">Tokens</th><th className="text-right font-normal">Cost</th></tr></thead>
-              <tbody>
-                {usage.models.map((x) => (
-                  <tr key={x.model + (x.role ?? '')} className="text-fg">
-                    <td className="py-0.5">{modelName(x.model)}{x.role && <span className="text-fg-subtle"> · {x.role}</span>}</td>
-                    <td className="text-right tabular-nums">{fmtTokens(x.inputTokens + x.outputTokens)}</td>
-                    <td className="text-right tabular-nums">{x.costUsd !== undefined ? fmtUsd(x.costUsd) : '–'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
           {usage.timing && total > 0 && (
             <>
               <div className="mt-3 flex h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden>

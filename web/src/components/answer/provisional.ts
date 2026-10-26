@@ -5,7 +5,6 @@
  * contract (web/src/api/contract.ts, v1) and the legacy `tool_call` parts, and maps both here.
  */
 import type { ID } from '../../lib/contract';
-import type { Usage } from '../../api/contract';
 export type { AbstainPart, ClarificationPart, EscalationEvent, Usage } from '../../api/contract';
 
 export type StepKind = 'sql' | 'repair' | 'check' | 'explore' | 'candidates' | 'escalation' | 'chart' | 'schema' | 'search' | 'other';
@@ -46,7 +45,6 @@ export interface Step {
 export interface UsageView {
   queries: number;
   elapsedMs: number;
-  model?: string;
   inputTokens?: number;
   outputTokens?: number;
   cacheRead?: number;
@@ -55,5 +53,4 @@ export interface UsageView {
   firstTokenMs?: number;
   /** Phase breakdown, ms. */
   timing?: { label: string; ms: number }[];
-  models?: NonNullable<Usage['models']>;
 }

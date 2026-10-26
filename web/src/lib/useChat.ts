@@ -91,10 +91,7 @@ export function partialUsage(view: AssistantViewV1, startedAt: number): Usage {
 /** Short client-side title (shell/title.ts) until the server returns a PHI-scrubbed one (spec §6.5). */
 const draftTitle = (text: string) => shortTitle(text);
 
-export function useChat(adapter: AnalystAdapter, store: TranscriptStore, getOptions?: () => ChatRequest['options'] | undefined) {
-  // Read at send time (strategy/model picker) without re-creating every callback.
-  const optionsRef = useRef(getOptions);
-  useLayoutEffect(() => { optionsRef.current = getOptions; }, [getOptions]);
+export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [convId, setConvId] = useState<ID | null>(null);
   const [messages, setMessages] = useState<ViewMessage[]>([]);
@@ -217,7 +214,7 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore, getOpti
     };
     let reloaded = false;
     try {
-      for await (const ev of adapter.streamTurn({ conversationId: cid, messages: wire, signal: ctrl.signal, ...(opts.resume ? { resume: opts.resume } : {}), ...(opts.regenerate ? { regenerate: opts.regenerate } : {}), options: optionsRef.current?.(), onConnection })) {
+      for await (const ev of adapter.streamTurn({ conversationId: cid, messages: wire, signal: ctrl.signal, ...(opts.resume ? { resume: opts.resume } : {}), ...(opts.regenerate ? { regenerate: opts.regenerate } : {}), onConnection })) {
         view = reduceV1(view, ev);
         if (ev.type === 'message.start') {
           const rs = (ev as { regenerateStyle?: RegenerateStyle }).regenerateStyle;

@@ -14,9 +14,9 @@ describe('regenerate styles (1.10.0)', () => {
       conversationId: 'c_1', messages: [], regenerate: { messageId: 'm_1', style: 'concise' },
     });
   });
-  it('omits style for default and carries options', () => {
-    expect(regenerateRequest('c_1', 'm_1', 'default', { strategy: 'tool_loop' })).toEqual({
-      conversationId: 'c_1', messages: [], regenerate: { messageId: 'm_1' }, options: { strategy: 'tool_loop' },
+  it('omits style for default', () => {
+    expect(regenerateRequest('c_1', 'm_1', 'default')).toEqual({
+      conversationId: 'c_1', messages: [], regenerate: { messageId: 'm_1' },
     });
   });
 });

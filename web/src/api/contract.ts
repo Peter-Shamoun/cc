@@ -23,7 +23,7 @@ export type {
   Sensitivity, StatusPart, TablePart, TextPart, ToolCallPart, ArtifactPart, PartBase,
 };
 
-export const CONTRACT_VERSION = '1.23.0';
+export const CONTRACT_VERSION = '1.24.0';
 export const CONTRACT_MAJOR = 1;
 
 // ---------------------------------------------------------------- new parts (v1)
@@ -108,7 +108,7 @@ interface Seq { seq: number }
 
 export interface MessageStartEvent extends Seq {
   type: 'message.start'; messageId: ID; conversationId: ID; contractVersion: string;
-  model?: string; strategy?: string; parentId?: ID;
+  model?: string; parentId?: ID;
   resumeOf?: { clarificationId: ID; messageId: ID };
   regenerateOf?: ID;
   /** 1.10.0: echoes `regenerate.style` when it is not `default`. */
@@ -204,10 +204,10 @@ export function isStepEvent(ev: { type: string }): ev is StepEvent {
   return STEP_TYPES.has(ev.type);
 }
 
-// ---------------------------------------------------------------- capabilities (1.4.0)
+// ---------------------------------------------------------------- capabilities
 
-/** GET /api/capabilities: strategies + models for a picker. Generated from the schema (single source of truth). */
-export type { Capabilities, StrategyOption, ModelOption, CostTier } from '../contract/v1.gen';
+/** GET /api/capabilities: what the server offers (no strategy/model choice since 1.24.0). Generated from the schema. */
+export type { Capabilities } from '../contract/v1.gen';
 /** 1.18.0: the strict plot spec (validator, Vega-Lite derivation: src/contract/plot.ts). */
 export type { PlotSpec, PlotHeader, PlotRow, PlotKind, PlotFormat } from '../contract/v1.gen';
 /** 1.7.0: answer feedback (CONTRACT.md §13). Client: src/contract/feedback.ts. */
@@ -226,12 +226,12 @@ export interface ChatRequest {
   conversationId?: ID;
   /** `editOf`: id of an earlier user message this one replaces (its sibling; editing the first question makes a new root). */
   messages: { id?: ID; role: 'user'; text: string; parentId?: ID; editOf?: ID }[];
-  /** 1.4.0: `strategy` / `model` are ids from GET /api/capabilities (see `Capabilities`). */
   /**
    * 1.21.0 (CONTRACT.md §2.1): options tune how the answer is produced, never which data it reads. The customer,
    * database, schema and tables come from the sign-in; an `IdentityScopedKey` here or at the top level is 422.
+   * 1.24.0: no strategy/model choice; `strategy` or `model` here is 422. The app sends no options.
    */
-  options?: { strategy?: string; model?: string; [k: string]: unknown };
+  options?: Record<string, unknown>;
   /** Answer a ClarificationPart. `messages` carries the user's reply as a normal user turn. */
   /** 1.23.0: `answers` replies to `ClarificationPart.questions` (empty = skip all); 422 for a part without questions. */
   resume?: { clarificationId: ID; choiceIds?: ID[]; text?: string; answers?: ClarifyAnswer[] };

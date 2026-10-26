@@ -18,9 +18,8 @@ test.describe('composer features (live) @both', () => {
     await open(page, LIVE);
     await expect(page.getByTestId('scope-chip')).toHaveCount(0);
     await expect(page.getByText(/Claims lake|sem\.\*/)).toHaveCount(0);
-    await page.getByTestId('product-menu').click();
-    await expect(page.getByRole('menu')).not.toContainText(/scope|claims lake|sem\./i);
-    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('product-menu')).toHaveCount(0);
+    await expect(page.getByTestId('product-name')).toHaveText('CC Analyst');
   });
 
   test('a long paste becomes a chip, is removable, and rides along with the question', async ({ page, browserName }) => {

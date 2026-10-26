@@ -141,7 +141,7 @@ export type Part =
   | ImagePart | ChartPart | CodePart | CalloutPart | ArtifactPart | ErrorPart;
 
 export type StreamEvent =
-  | { type: 'message.start'; messageId: ID; conversationId: ID; model?: string; strategy?: string }
+  | { type: 'message.start'; messageId: ID; conversationId: ID; model?: string }
   | { type: 'text.start'; partId: ID }
   | { type: 'text.delta'; partId: ID; delta: string }
   | { type: 'text.end'; partId: ID }

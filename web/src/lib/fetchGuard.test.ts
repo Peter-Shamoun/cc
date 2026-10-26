@@ -74,7 +74,7 @@ describe('callers', () => {
 
   it('capabilities: a 429 is waited out instead of silently falling back to the demo set', async () => {
     vi.useFakeTimers();
-    const real = { ...DEMO_CAPABILITIES, strategies: [...DEMO_CAPABILITIES.strategies], models: [] };
+    const real = { ...DEMO_CAPABILITIES, demo: false, feedbackReasons: [] };
     const seq = [r429({ 'retry-after': '1' }), ok(real)];
     const p = loadCapabilities('', (async () => seq.shift()!) as never);
     await vi.advanceTimersByTimeAsync(1000);

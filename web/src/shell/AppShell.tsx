@@ -17,7 +17,8 @@ import { ThreadView, type ThreadActions } from './ThreadView';
 import { ArtifactPanel } from '../components/ArtifactPanel';
 import { StarterCards } from './StarterCards';
 import { Header } from './Header';
-import { useStrategy } from './useStrategy';
+import { DEMO_CAPABILITIES } from '../contract/capabilities';
+import type { Capabilities } from '../contract/v1.gen';
 import { setFeedbackCapabilities, setFeedbackSink, toFeedbackRequest } from '../lib/feedback';
 import { OfflineBanner } from './OfflineBanner';
 import { useOnline, useSettledOnline } from '../lib/useOnline';
@@ -87,6 +88,18 @@ const focusComposer = () => document.querySelector<HTMLTextAreaElement>('textare
 /** Touch-first device: don't raise the on-screen keyboard unasked. */
 const coarse = () => !!window.matchMedia?.('(pointer: coarse)').matches;
 
+/** GET /api/capabilities on the live API (feedback reasons, pin/archive, temporary chat); mock mode and errors use DEMO_CAPABILITIES. */
+function useCapabilities(adapter: AnalystAdapter): Capabilities {
+  const [caps, setCaps] = useState<Capabilities>(DEMO_CAPABILITIES);
+  useEffect(() => {
+    if (!(adapter instanceof HttpAnalystAdapter)) return;
+    let on = true;
+    void adapter.capabilities().then((c) => { if (on) setCaps(c); }, () => undefined);
+    return () => { on = false; };
+  }, [adapter]);
+  return caps;
+}
+
 function ShellInner() {
   const auditOn = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('audit');
   const renderStart = useRef(0);
@@ -94,16 +107,15 @@ function ShellInner() {
   if (auditOn) renderStart.current = performance.now();
   const adapter = useMemo(() => makeAdapter(), []);
   const store = useMemo(() => makeStore(adapter), [adapter]);
-  const loadCaps = useMemo(() => (adapter instanceof HttpAnalystAdapter ? () => adapter.capabilities() : undefined), [adapter]);
-  const strategy = useStrategy(loadCaps);
-  const chat = useChat(adapter, store, strategy.options);
+  const caps = useCapabilities(adapter);
+  const chat = useChat(adapter, store);
   // Contract 1.7.0 (§13): thumbs, reason ids and the comment go to the server for server-known answers
   // (never our 'a_' placeholders). Reason chips follow the server's Capabilities.feedbackReasons.
   const convRef = useRef(chat.convId);
   useLayoutEffect(() => { convRef.current = chat.convId; });
-  useEffect(() => { setFeedbackCapabilities(strategy.caps); }, [strategy.caps]);
+  useEffect(() => { setFeedbackCapabilities(caps); }, [caps]);
   // Contract 1.17.0: pins and archives live on the server when it says so; re-list so the sidebar uses the archived filter.
-  const pinArchive = !!strategy.caps.pinArchive;
+  const pinArchive = !!caps.pinArchive;
   useEffect(() => {
     if (!(store instanceof HttpTranscriptStore)) return;
     store.enablePinArchive(pinArchive);
@@ -631,7 +643,7 @@ function ShellInner() {
         {!sidebarVisible && !mobile && <SidebarRail onExpand={() => setSidebar(true)} onNew={sidebarProps.onNew} onSearch={() => setDialog('search')} onSettings={sidebarProps.onSettings} onShortcuts={sidebarProps.onShortcuts} onSignOut={sidebarProps.onSignOut} />}
         <main className="relative flex min-w-0 flex-1 flex-col font-sans md:min-w-[400px]" aria-label="Chat">
           {!empty && <p className="hidden pb-4 text-lg font-semibold print:block" data-testid="print-title">{currentTitle}</p>}
-          <Header strategy={strategy} showNav={mobile} onOpenSidebar={() => setSidebar(true)} onNewChat={sidebarProps.onNew}
+          <Header showNav={mobile} onOpenSidebar={() => setSidebar(true)} onNewChat={sidebarProps.onNew}
             hasChat={!empty} onDownloadJson={serverExport && !isTempChat ? () => serverExport('json') : undefined}
             temporary={temporary} onTemporary={tempStore && (empty || temporary) ? setTemporary : undefined} onCopyMarkdown={copyCurrent} onDownloadMarkdown={exportCurrent} onSettings={() => setDialog('settings')} onShortcuts={() => setDialog('shortcuts')}
             title={chat.convId ? threads.find((t) => t.id === chat.convId)?.title : undefined}

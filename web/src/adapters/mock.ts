@@ -34,7 +34,7 @@ export class MockAnalystAdapter implements AnalystAdapter {
     let seq = 0;
     // Every event carries a monotonically increasing seq, as the v1 server does (CONTRACT.md §3).
     const stamp = (e: object) => ({ ...e, seq: seq++ }) as unknown as AnyStreamEvent;
-    yield stamp({ type: 'message.start', messageId, conversationId, contractVersion: CONTRACT_VERSION, strategy: 'mock-replay' });
+    yield stamp({ type: 'message.start', messageId, conversationId, contractVersion: CONTRACT_VERSION });
     const t0 = Date.now();
     let ran = 0; // SQL that finished before a Stop, so a stopped answer keeps its query count
     try {
