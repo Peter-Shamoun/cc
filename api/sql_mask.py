@@ -11,10 +11,12 @@ event/part carries ``maskedLiterals: <count>``. Policies (``Capabilities.sqlLite
 * ``"all"``: mask every string literal and every number compared with a column (``LIMIT`` and ordinals stay).
 * ``"off"``: show SQL verbatim (pre-1.14 behaviour).
 
-A small lexer (strings with ``''`` escapes, quoted identifiers, comments, numbers) finds literals, then walks back
+A small lexer (strings with ``''`` escapes, dollar-quoted strings ``$$…$$`` / ``$tag$…$tag$``, quoted identifiers,
+comments, numbers) finds literals, then walks back
 over ``IN (...)``, ``BETWEEN x AND``, ``LIKE``, ``NOT`` and comparison operators to the compared column. Masking is
 idempotent (``?`` is not a literal) and fails closed: SQL the lexer cannot tokenize (an unterminated string) is
-replaced by a fixed placeholder under ``phi``/``all``.
+replaced by a fixed placeholder under ``phi``/``all``. Comments can hold anything the model wrote, so under
+``phi``/``all`` their text is replaced too (``-- ?``, ``/* ? */``), counted like a literal.
 """
 from __future__ import annotations
 
@@ -45,6 +47,7 @@ _TOKEN = re.compile(r"""
     (?P<ws>\s+)
   | (?P<comment>--[^\n]*|/\*.*?\*/)
   | (?P<string>[EeNn]?'(?:[^']|'')*')
+  | (?P<dollar_string>\$(?P<dollar_tag>[A-Za-z_][A-Za-z0-9_]*|)\$.*?\$(?P=dollar_tag)\$)
   | (?P<qident>"(?:[^"]|"")*"|`[^`]*`|\[[^\]]*\])
   | (?P<number>(?<![\w.])\d+(?:\.\d+)?(?:[eE][-+]?\d+)?(?![\w.]))
   | (?P<ident>[A-Za-z_][\w$]*(?:\.[A-Za-z_"][\w$"]*)*)
@@ -71,8 +74,10 @@ def _lex(sql: str) -> list[tuple[str, str]]:
         if m.start() != pos:
             raise _Unparseable
         kind = m.lastgroup
-        if kind == "other" and m.group() == "'":
-            raise _Unparseable          # an unterminated string literal
+        if kind == "other" and m.group() in ("'", "$"):
+            raise _Unparseable          # an unterminated string literal (or a dollar sign it can't place)
+        if kind == "dollar_string":
+            kind = "string"             # DuckDB / Postgres dollar quoting: a string literal like '…'
         out.append((kind, m.group()))
         pos = m.end()
     if pos != len(sql):
@@ -163,6 +168,12 @@ def mask_sql(sql: str, policy: str = DEFAULT_POLICY) -> tuple[str, int]:
         return UNPARSEABLE, 1
     count = 0
     for i, (kind, text) in enumerate(toks):
+        if kind == "comment":
+            masked_comment = _mask_comment(text)
+            if masked_comment != text:
+                toks[i] = (kind, masked_comment)
+                count += 1
+            continue
         if kind not in ("string", "number"):
             continue
         column, compared, safe = _context(toks, i)
@@ -171,7 +182,7 @@ def mask_sql(sql: str, policy: str = DEFAULT_POLICY) -> tuple[str, int]:
             compared = compared or column is not None
         if safe:
             continue
-        value = text[text.index("'") + 1:-1].replace("''", "'") if kind == "string" else text
+        value = _string_value(text) if kind == "string" else text
         if policy == "all":
             hit = kind == "string" or compared
         else:
@@ -180,6 +191,20 @@ def mask_sql(sql: str, policy: str = DEFAULT_POLICY) -> tuple[str, int]:
             toks[i] = (kind, "?")
             count += 1
     return "".join(t for _, t in toks), count
+
+
+def _string_value(text: str) -> str:
+    if text.startswith("$"):
+        delimiter_length = text.index("$", 1) + 1   # "$$" or "$tag$"
+        return text[delimiter_length:-delimiter_length]
+    return text[text.index("'") + 1:-1].replace("''", "'")
+
+
+def _mask_comment(text: str) -> str:
+    """A comment with its text replaced by ``?`` (already masked or empty: unchanged, so masking is idempotent)."""
+    if text.startswith("--"):
+        return text if text[2:].strip() in ("", "?") else "-- ?"
+    return text if text[2:-2].strip() in ("", "?") else "/* ? */"
 
 
 def _mask_field(obj: dict, key: str, policy: str) -> int:
