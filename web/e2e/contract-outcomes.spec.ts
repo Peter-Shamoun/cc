@@ -114,7 +114,6 @@ test.describe('contract v1 outcomes, live demo @both', () => {
   });
 
   test('stop on a slow run: server-side cancel, Stopped marker', async ({ page }) => {
-    test.skip(true, 'gap QA-P4: demo "slow" scenario is instant when CC_API_MODEL_DELAY_SECONDS=0 (default), so there is nothing to stop');
     await open(page, LIVE);
     const stops: string[] = [];
     page.on('request', (r) => { if (/\/api\/chat\/[^/]+\/stop$/.test(r.url())) stops.push(r.url()); });
