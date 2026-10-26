@@ -5,6 +5,7 @@
  * PUT replaces it); `DELETE` on the same path clears it. The stored value comes back on `StoredMessage.feedback`.
  * The comment is user text: never log it, and never put it in a URL or localStorage.
  */
+import { fetchRetrying } from '../lib/fetchGuard';
 import type { Feedback, FeedbackRequest } from './v1.gen';
 
 export const MAX_FEEDBACK_COMMENT = 1000;
@@ -31,7 +32,7 @@ export async function sendFeedback(
     { base?: string; init?: RequestInit; fetchImpl?: typeof fetch } = {},
 ): Promise<Feedback | null> {
   const headers = { ...(init.headers as Record<string, string> | undefined), 'Content-Type': 'application/json' };
-  const res = await fetchImpl(feedbackUrl(conversationId, messageId, base), req
+  const res = await fetchRetrying(fetchImpl, feedbackUrl(conversationId, messageId, base), req
     ? { ...init, method: 'PUT', headers, body: JSON.stringify(feedbackBody(req)) }
     : { ...init, method: 'DELETE', headers });
   if (!res.ok) throw new Error(`feedback failed: ${res.status}`);

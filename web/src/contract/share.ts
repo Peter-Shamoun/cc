@@ -11,6 +11,7 @@
  * `includeData` on issues a NEW id and revokes the old one (`ShareLink.rotated`), so show the new link. With data
  * off, SQL is withheld too (`SharedConversation.sqlWithheld`).
  */
+import { fetchRetrying, readJsonCapped } from '../lib/fetchGuard';
 import type { ShareExpiryDays, ShareLink, SharedConversation } from './v1.gen';
 
 export const SHARE_EXPIRY_DAYS: readonly ShareExpiryDays[] = [7, 30, 90];
@@ -36,10 +37,10 @@ export function shareIdFromPath(path: string): string | null {
 }
 
 async function call<T>(url: string, init: RequestInit, fetchImpl: typeof fetch, notFound: T): Promise<T> {
-  const res = await fetchImpl(url, init);
+  const res = await fetchRetrying(fetchImpl, url, init); // 429: wait out Retry-After, then the same request again
   if (res.status === 404) return notFound;
   if (!res.ok) throw new Error(`share request failed: ${res.status}`);
-  return (await res.json()) as T;
+  return readJsonCapped<T>(res); // a shared chat over 32 MiB is refused, not parsed
 }
 
 const defaults = (o: Opts) => ({

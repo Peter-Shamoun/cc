@@ -35,15 +35,26 @@ test.describe('composer features (live) @both', () => {
     await expect(chip).toBeFocused();
   });
 
-  test('a long paste becomes a chip, is removable, and rides along with the question', async ({ page }) => {
+  test('a long paste becomes a chip, is removable, and rides along with the question', async ({ page, browserName }) => {
     const bodies = chatPosts(page);
     await open(page, LIVE);
     const long = Array.from({ length: 30 }, (_, i) => `row ${i},CO-45,denied`).join('\n');
-    const paste = (text: string) => composer(page).evaluate((el, t) => {
-      const dt = new DataTransfer();
-      dt.setData('text/plain', t);
-      el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
-    }, text);
+    // Firefox drops clipboardData from a synthetic ClipboardEvent, so there we do a real copy + paste.
+    const paste = browserName === 'firefox'
+      ? async (text: string) => {
+        await page.evaluate((t) => {
+          const ta = document.createElement('textarea'); ta.id = 'qa-clip'; ta.value = t; document.body.appendChild(ta); ta.select();
+        }, text);
+        await page.keyboard.press('ControlOrMeta+c');
+        await page.evaluate(() => document.getElementById('qa-clip')?.remove());
+        await composer(page).focus();
+        await page.keyboard.press('ControlOrMeta+v');
+      }
+      : (text: string) => composer(page).evaluate((el, t) => {
+        const dt = new DataTransfer();
+        dt.setData('text/plain', t);
+        el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+      }, text);
     await composer(page).focus();
     await paste(long);
     const chips = page.getByTestId('paste-chips');

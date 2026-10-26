@@ -10,13 +10,26 @@ const active = (page: Page) => page.evaluate(() => {
 });
 
 test.describe('keyboard walkthrough @desktop', () => {
-  test('Tab from load reaches skip link, sidebar, header and composer with no trap', async ({ page }) => {
+  test('Tab from load reaches skip link, sidebar, header and composer with no trap', async ({ page, browserName }) => {
     await open(page, LIVE);
     const seen: string[] = [await active(page)]; // the composer has focus on load
     // The sidebar lists every chat the shared demo server holds (two stops per row), so allow plenty of presses.
-    for (let i = 0; i < 120 && !seen.includes('button:More options'); i++) { await page.keyboard.press('Tab'); seen.push(await active(page)); }
+    for (let i = 0; i < 120 && !seen.includes('button:More options'); i++) {
+      await page.keyboard.press('Tab');
+      const cur = await active(page);
+      // Firefox hands focus to the browser chrome after the last stop instead of wrapping (the document loses focus
+      // while activeElement stays put); bring focus back to the top of the document and keep walking.
+      if (browserName === 'firefox' && (cur === 'BODY' || cur === seen[seen.length - 1])) {
+        await page.evaluate(() => {
+          const b = document.body; const had = b.getAttribute('tabindex');
+          b.setAttribute('tabindex', '-1'); b.focus();
+          if (had === null) b.removeAttribute('tabindex'); else b.setAttribute('tabindex', had);
+        });
+      }
+      seen.push(cur);
+    }
     const text = seen.join('\n');
-    for (const want of [/Skip to message box/, /New chat/, /Search chats/, /More options/, /textarea:Message/, /Attach text files/]) expect(text).toMatch(want);
+    for (const want of [/Skip to message box/, /New chat/, /Search chats/, /More options/, /textarea:Message/, /Attach text files/]) expect(text, `tab stops:\n${text}`).toMatch(want);
     expect(new Set(seen).size).toBeGreaterThan(8);
   });
 

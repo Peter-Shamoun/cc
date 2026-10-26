@@ -83,3 +83,15 @@ describe('QA-A22: failed turns', () => {
     expect(screen.getByTestId('step-summary').textContent).toMatch(/s, all failures repaired/);
   });
 });
+
+// QA no-slop audit (PETER DIRECTIVE 10:06 PM): no sparkle icons in UI chrome.
+import { describe as d2, it as i2, expect as e2 } from 'vitest';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+d2('no-slop: banned chrome icons', () => {
+  i2('no Sparkles / Wand icons anywhere in src', () => {
+    const walk = (dir: string): string[] => readdirSync(dir).flatMap((f) => { const p = join(dir, f); return statSync(p).isDirectory() ? walk(p) : /\.(tsx?)$/.test(f) && !/\.test\./.test(f) ? [p] : []; });
+    const hits = walk(join(__dirname, '..', '..')).filter((f) => /\b(Sparkles?|WandSparkles|Wand2)\b/.test(readFileSync(f, 'utf8')));
+    e2(hits).toEqual([]);
+  });
+});

@@ -24,3 +24,18 @@ export function setPref(key: PrefKey, value: string): void {
     /* storage disabled: fine */
   }
 }
+
+/**
+ * Another tab changed a pref (the `storage` event only fires in the *other* tabs, and only when the value actually
+ * changes, so two tabs can't ping-pong). `fn` gets the new value, or null when it was removed or storage cleared.
+ */
+export function onPrefChange(key: PrefKey, fn: (value: string | null) => void): () => void {
+  if (!PREF_KEYS.includes(key)) throw new Error(`pref key not allowed: ${key}`);
+  if (typeof window === 'undefined') return () => {};
+  const on = (e: StorageEvent) => {
+    if (e.storageArea !== null && e.storageArea !== window.localStorage) return;
+    if (e.key === PREFIX + key || e.key === null) fn(e.key === null ? null : e.newValue);
+  };
+  window.addEventListener('storage', on);
+  return () => window.removeEventListener('storage', on);
+}

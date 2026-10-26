@@ -35,3 +35,19 @@ describe('UserBubble long questions', () => {
     expect(screen.getByTestId('user-actions').className).not.toContain('absolute');
   });
 });
+
+describe('UserBubble send time (QA-S23)', () => {
+  it('shows a muted <time> in the hover actions with the full date as tooltip', () => {
+    render(<UserBubble msg={msg('Top denial reasons?')} onEdit={() => {}} />);
+    const t = screen.getByTestId('msg-time');
+    expect(t.tagName).toBe('TIME');
+    expect(t.getAttribute('datetime')).toBe('2026-01-01T00:00:00Z');
+    expect(t.getAttribute('title')).toMatch(/2025|2026/);
+    expect(screen.getByTestId('user-actions').contains(t)).toBe(true);
+    expect(t.className).toContain('text-fg-subtle');
+  });
+  it('renders nothing for a missing or invalid createdAt', () => {
+    render(<UserBubble msg={{ ...msg('Q'), createdAt: 'nope' }} />);
+    expect(screen.queryByTestId('msg-time')).toBeNull();
+  });
+});

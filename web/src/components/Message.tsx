@@ -25,6 +25,7 @@ import { isTransportStatus, transportAnnouncement } from '../lib/useChat';
 
 export type { Artifact } from './artifacts';
 import { toArtifact, type Artifact } from './artifacts';
+import { messageTime } from '../lib/messageTime';
 
 /** Markdown export for Copy (§4.12): text, tables as GFM (PHI columns dropped), SQL, callouts. */
 export function messageMarkdown(m: AnyView): string {
@@ -92,6 +93,13 @@ export function refocusInRow(from: Element | null, pick: (row: HTMLElement) => H
 }
 const enabled = (el: HTMLButtonElement | null | undefined) => (el && !el.disabled ? el : null);
 
+/** QA-S23: muted send time at the start of the hover actions (Claude-style); full date in the tooltip. */
+function MessageTime({ iso }: { iso?: string }) {
+  const t = messageTime(iso);
+  if (!t) return null;
+  return <time dateTime={iso} title={t.full} data-testid="msg-time" className="px-1.5 font-sans text-xs tabular-nums text-fg-subtle">{t.label}</time>;
+}
+
 export const UserBubble = memo(function UserBubble({ msg, onEdit, version, onVersion, disabled }: { msg: UserMessage; onEdit?: (t: string) => void; version?: { current: number; total: number }; onVersion?: (k: number) => void; disabled?: boolean }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(msg.text);
@@ -135,6 +143,7 @@ export const UserBubble = memo(function UserBubble({ msg, onEdit, version, onVer
       {/* Hover actions overlay the space under the bubble instead of reserving a row, so the answer starts
           right below the question (ChatGPT/Claude spacing). With version arrows the row stays in flow. */}
       <div className={clsx('flex items-center gap-0.5 rounded-full bg-bg transition-opacity group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100', version ? 'mt-1 opacity-100' : 'absolute right-0 top-full z-10 mt-0.5 opacity-0 [@media(hover:none)]:static [@media(hover:none)]:mt-1')} data-testid="user-actions" ref={actionsRef}>
+        <MessageTime iso={msg.createdAt} />
         <CopyButton text={msg.text} />
         {onEdit && <IconButton label="Edit message" disabled={disabled} onClick={() => { setValue(msg.text); setEditing(true); }}><Pencil size={15} /></IconButton>}
         {version && onVersion && <VersionNav version={version} onVersion={onVersion} disabled={disabled} />}
