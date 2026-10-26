@@ -49,7 +49,7 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
   const fileInput = useRef<HTMLInputElement>(null);
   const addFiles = async (files: FileList | File[]) => {
     const skipped: string[] = [];
-    for (const f of [...files]) {
+    for (const f of files) {
       if (!(f.type.startsWith('text/') || f.type === 'application/json' || TEXT_EXT.test(f.name))) { skipped.push(`${f.name} isn't a text file`); continue; }
       if (f.size > ATTACH_MAX) { skipped.push(`${f.name} is over 256 KB`); continue; }
       const text = await f.text();
@@ -91,7 +91,7 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
   };
   const canSend = (!!value.trim() || pastes.length > 0) && !offline;
   const removePaste = (id: number) => { setPastes((ps) => ps.filter((x) => x.id !== id)); ref.current?.focus(); };
-  return (
+  return ( // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- click-to-focus convenience; the textarea is the keyboard path
     <form
       onSubmit={(e) => { e.preventDefault(); submit(); }}
       className="relative w-full cursor-text rounded-[28px] bg-elev data-[dragging]:shadow-[0_0_0_2px_var(--focus)] data-[dragging]:bg-hover p-2.5 font-sans shadow-[var(--shadow-composer)] transition-shadow duration-150 focus-within:shadow-[0_0_0_2px_var(--focus),0_6px_20px_rgba(0,0,0,0.08)]"
@@ -102,9 +102,9 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
       data-dragging={dragging || undefined}
       data-testid="composer"
     >
-      {slash && slash.length > 0 && (
+      {slash && slash.length > 0 && ( // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-to-interactive-role -- combobox popup; driven from the textarea via aria-activedescendant
         <ul id={lid} role="listbox" aria-label="Commands" className="absolute inset-x-2 bottom-full z-20 mb-2 max-h-72 overflow-y-auto rounded-2xl border border-line bg-elev p-1.5 text-sm shadow-[0_8px_30px_rgba(0,0,0,0.14)] motion-safe:animate-[cc-rise_120ms_ease-out]" data-testid="slash-menu">
-          {slash.map((c, i) => (
+          {slash.map((c, i) => ( // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-to-interactive-role -- combobox option; driven from the textarea via aria-activedescendant
             <li key={c.name} id={`${lid}-${i}`} role="option" aria-selected={i === slashIdx} onMouseDown={(e) => { e.preventDefault(); runCommand(c); }} onMouseMove={() => setSlashIdx(i)}
               className={clsx('flex cursor-pointer items-baseline gap-3 rounded-lg px-3 py-2', i === slashIdx && 'bg-hover')}>
               <span className="font-medium">/{c.name}</span>

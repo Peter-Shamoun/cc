@@ -26,7 +26,7 @@ export function AnswerMeta({ usage, queries, repairs = 0, onSql, sqlOpen }: { us
     usage?.costUsd !== undefined && `${usage.costIsEstimate ? '~' : ''}${fmtUsd(usage.costUsd)}`,
   ].filter(Boolean) as string[];
   const total = usage?.timing?.reduce((a, b) => a + b.ms, 0) ?? 0;
-  return (
+  return ( // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- Escape delegated from focused children
     <div ref={ref} className="relative ml-1 flex items-center gap-0.5 font-sans text-xs text-fg-subtle" data-testid="answer-meta" onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false); }}>
       {onSql && queries > 0 && (
         <button type="button" onClick={onSql} aria-pressed={sqlOpen} aria-label="Show SQL" title="Show SQL" className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-fg-muted hover:bg-hover hover:text-fg" data-testid="open-sql">

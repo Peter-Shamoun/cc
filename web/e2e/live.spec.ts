@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures';
 import fs from 'node:fs';
-import { LIVE, open, ask, lastAssistant, waitIdle, composer, stopBtn, gap } from './helpers';
+import { LIVE, open, ask, lastAssistant, waitIdle, composer, stopBtn } from './helpers';
 
 // Live round trip: browser -> vite proxy -> FastAPI /api/chat SSE -> ScriptedLLM -> synthetic DuckDB.
 test.describe('live demo backend @both', () => {

@@ -15,6 +15,7 @@ export function SettingsDialog({ onClose, initialTab = 'general', storeMode, ent
   return (
     <Dialog title="Settings" onClose={onClose} testId="settings-dialog">
       <div className="flex min-h-[380px] flex-col gap-2 px-3 pb-4 pt-2 sm:flex-row">
+        {/* oxlint-disable-next-line jsx-a11y/interactive-supports-focus -- arrow keys delegated from the focused tab (roving tabindex) */}
         <div role="tablist" aria-orientation="vertical" aria-label="Settings sections" className="flex shrink-0 gap-1 overflow-x-auto scrollbar-none max-sm:p-1 sm:w-44 sm:flex-col"
           onKeyDown={(e) => {
             const order = tabs.map((t) => t[0]);

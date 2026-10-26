@@ -69,7 +69,7 @@ export function SqlInspector({ queries, onClose }: { queries: QueryInfo[]; onClo
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { ref.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }); }, []);
   if (!q) return null;
-  return (
+  return ( // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Escape delegated from focused children
     <div ref={ref} className="mt-2 rounded-xl border border-line bg-elev p-3 font-sans text-sm step-enter" role="region" aria-label="SQL inspector" data-testid="sql-inspector"
       onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}>
       <div className="flex items-center justify-between gap-2">
