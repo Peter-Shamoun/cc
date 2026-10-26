@@ -59,7 +59,7 @@ export function SharedView({ shareId }: { shareId: string }) {
         </header>
         <div className="flex min-h-0 flex-1">
           <main className="min-w-0 flex-1 overflow-y-auto" aria-labelledby="shared-title">
-            <div className="mx-auto flex max-w-[48rem] flex-col gap-6 px-4 pb-16 pt-8 md:px-6">
+            <div className="mx-auto flex max-w-[51rem] flex-col gap-6 px-4 pb-16 pt-8 md:px-6">
               {state.kind === 'loading' && <ThreadSkeleton />}
               {state.kind !== 'loading' && state.kind !== 'ok' && <Unavailable kind={state.kind} />}
               {state.kind === 'ok' && (

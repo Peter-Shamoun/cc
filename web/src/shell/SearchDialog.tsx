@@ -93,7 +93,7 @@ function Marked({ text, start, length }: { text: string; start: number; length: 
   if (start < 0 || length <= 0 || start >= text.length) return <>{text}</>;
   return (
     <>
-      {text.slice(0, start)}<mark className="rounded-sm bg-[#ffd84d]/45 px-0.5 text-fg dark:bg-[#ffd84d]/25" data-testid="search-mark">{text.slice(start, start + length)}</mark>{text.slice(start + length)}
+      {text.slice(0, start)}<mark className="bg-transparent font-semibold text-fg" data-testid="search-mark">{text.slice(start, start + length)}</mark>{text.slice(start + length)}
     </>
   );
 }

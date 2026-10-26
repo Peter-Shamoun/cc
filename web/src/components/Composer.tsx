@@ -109,7 +109,7 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
       data-testid="composer"
     >
       {slash && slash.length > 0 && ( // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-to-interactive-role -- combobox popup; driven from the textarea via aria-activedescendant
-        <ul id={lid} role="listbox" aria-label="Commands" className="absolute inset-x-2 bottom-full z-20 mb-2 max-h-72 overflow-y-auto rounded-2xl border border-line bg-elev p-1.5 text-sm shadow-[0_8px_30px_rgba(0,0,0,0.14)] motion-safe:animate-[cc-rise_120ms_ease-out]" data-testid="slash-menu">
+        <ul id={lid} role="listbox" aria-label="Commands" className="absolute inset-x-2 bottom-full z-20 mb-2 max-h-72 overflow-y-auto rounded-2xl border border-line bg-elev p-1.5 text-sm shadow-[var(--shadow-menu)] motion-safe:animate-[cc-rise_120ms_ease-out]" data-testid="slash-menu">
           {slash.map((c, i) => ( // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-to-interactive-role -- combobox option; driven from the textarea via aria-activedescendant
             <li key={c.name} id={`${lid}-${i}`} role="option" aria-selected={i === slashIdx} onMouseDown={(e) => { e.preventDefault(); runCommand(c); }} onMouseMove={() => setSlashIdx(i)}
               className={clsx('flex cursor-pointer items-baseline gap-3 rounded-lg px-3 py-2', i === slashIdx && 'bg-hover')}>
@@ -131,7 +131,7 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
                 <span className="sr-only">{x.name ? `File ${x.name}` : 'Pasted text'}, {lines} lines, {x.text.length} characters</span>
                 <button type="button" onClick={() => removePaste(x.id)} aria-label={x.name ? `Remove ${x.name}` : `Remove pasted text (${lines} lines)`}
                   className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full border border-line bg-elev text-fg-muted opacity-0 shadow-sm hover:text-fg focus-visible:opacity-100 group-hover/chip:opacity-100 max-md:opacity-100">
-                  <X size={12} strokeWidth={2.5} />
+                  <X size={12} />
                 </button>
               </li>
             );
@@ -196,7 +196,7 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
           ) : (
             <button key="send" type="submit" aria-label="Send message" disabled={!canSend} title={offline ? "You're offline" : undefined}
               className={clsx('absolute inset-0 flex items-center justify-center rounded-full bg-accent text-accent-fg transition-[opacity,transform] duration-150', canSend ? 'opacity-100 active:scale-95' : 'opacity-30')}>
-              <ArrowUp size={18} strokeWidth={2.5} />
+              <ArrowUp size={18} className="cc-icon-bold" />
             </button>
           )}
         </div>

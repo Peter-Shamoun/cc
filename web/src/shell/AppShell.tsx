@@ -34,7 +34,8 @@ import { useTheme } from '../lib/theme';
 import { scrollBehavior } from '../lib/motion';
 import { copyText, downloadText } from '../lib/csv';
 import { getPref, setPref } from '../lib/prefs';
-import { sessionFromEnv } from '../auth/session';
+import { sessionFromEnv, signOut } from '../auth/session';
+import { signedOutUrl } from './routes';
 import { trackInputModality } from '../lib/inputModality';
 import type { AssistantView } from '../lib/contract';
 import type { AssistantViewV1, ChatRequest } from '../api/contract';
@@ -101,6 +102,13 @@ function ShellInner() {
   const convRef = useRef(chat.convId);
   useLayoutEffect(() => { convRef.current = chat.convId; });
   useEffect(() => { setFeedbackCapabilities(strategy.caps); }, [strategy.caps]);
+  // Contract 1.17.0: pins and archives live on the server when it says so; re-list so the sidebar uses the archived filter.
+  const pinArchive = !!strategy.caps.pinArchive;
+  useEffect(() => {
+    if (!(store instanceof HttpTranscriptStore)) return;
+    store.enablePinArchive(pinArchive);
+    if (pinArchive) void chat.refresh();
+  }, [pinArchive]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!(adapter instanceof HttpAnalystAdapter)) return;
     setFeedbackSink(async (f) => {
@@ -197,15 +205,17 @@ function ShellInner() {
   const requestArchive = useCallback((id: string) => {
     const title = chat.threads.find((t) => t.id === id)?.title ?? 'Chat';
     const wasOpen = chat.convId === id;
-    void chat.archive(id, true);
+    // Optimistic: the row leaves now; if the server refuses it comes back and we say so (no Undo for a no-op).
+    void chat.archive(id, true).catch(() => toast({ text: 'Couldn’t archive that chat. Try again.' }));
     if (wasOpen) { chat.newChat(); requestAnimationFrame(focusComposer); }
     toast({
       text: `Archived “${title.length > 32 ? `${title.slice(0, 32)}…` : title}”`,
       ms: UNDO_MS,
-      action: { label: 'Undo', run: () => { void chat.archive(id, false); if (wasOpen) void chat.open(id); } },
+      action: { label: 'Undo', run: () => { void chat.archive(id, false).catch(() => toast({ text: 'Couldn’t restore that chat. Try again.' })); if (wasOpen) void chat.open(id); } },
     });
   }, [chat, toast]);
-  const unarchive = useCallback((id: string) => { void chat.archive(id, false); }, [chat]);
+  const unarchive = useCallback((id: string) => { void chat.archive(id, false).catch(() => toast({ text: 'Couldn’t restore that chat. Try again.' })); }, [chat, toast]);
+  const pinChat = useCallback((id: string, pinned: boolean) => chat.pin(id, pinned).catch(() => toast({ text: pinned ? 'Couldn’t pin that chat. Try again.' : 'Couldn’t unpin that chat. Try again.' })), [chat, toast]);
 
   // ---- routing (#/c/<id>) ----
   const routing = useRef(false);
@@ -508,6 +518,17 @@ function ShellInner() {
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [chat.busy]);
 
+  /** Deadline (ms) during which a send keeps typing focus: any commit that leaves focus on <body> (the centred
+   *  composer unmounting, the docked one mounting, the first answer rows) puts it back in the composer. It never
+   *  steals focus from an element the user picked, so it is safe to leave armed for the whole window. */
+  const refocusUntil = useRef(0);
+  const refocusIfLost = () => {
+    if (performance.now() > refocusUntil.current) return;
+    const a = document.activeElement;
+    if (!a || a === document.body) focusComposer();
+  };
+  // Runs after every commit; a no-op unless a send is waiting to get focus back.
+  useLayoutEffect(() => { refocusIfLost(); });
   const edit = (t: string) => setDraftPush((d) => ({ text: t, n: (d?.n ?? 0) + 1 }));
   const empty = messages.length === 0 && !opening;
   const draftKey = chat.convId ?? NEW_CHAT_KEY;
@@ -518,7 +539,11 @@ function ShellInner() {
     const a = document.activeElement;
     const keep = a?.matches('textarea[aria-label="Message"]') || (!!a?.closest('[data-testid="starter-cards"]') && !coarse());
     atBottomRef.current = true; setAtBottom(true); chat.send(t, resume ? { resume } : undefined);
-    if (keep) requestAnimationFrame(() => { if (!document.activeElement || document.activeElement === document.body) focusComposer(); });
+    if (!keep) return;
+    // QA-S19: Firefox can run this frame before React commits the docked composer, so the refocus also runs
+    // in a layout effect after the commit (below); this frame is the backstop for a send that doesn't remount.
+    refocusUntil.current = performance.now() + 1500;
+    requestAnimationFrame(refocusIfLost);
   };
   /** Up-arrow in an empty composer edits the last question in place (ChatGPT behaviour, QA-S8). */
   const editLast = () => {
@@ -575,10 +600,16 @@ function ShellInner() {
     threads, activeId: chat.convId, storeMode: store.mode, canPin: chat.canPin,
     onSelect: (id: string) => { closeDrawer(); void openChat(id).then(focusAfterOpen); },
     onNew: () => { if (isTempChat) void tempStore?.discardTemporary(); chat.newChat(); closeDrawer(); if (!coarse()) requestAnimationFrame(focusComposer); },
-    onDelete: requestDelete, onRename: chat.rename, onPin: chat.pin, onExport: exportThread,
+    onDelete: requestDelete, onRename: chat.rename, onPin: pinChat, onExport: exportThread,
     onArchive: chat.canArchive ? requestArchive : undefined,
     onCollapse: () => setSidebar(false), onSearch: () => setDialog('search'),
     onSettings: () => setDialog('settings'), onShortcuts: () => setDialog('shortcuts'),
+    onSignOut: session.kind === 'none' ? undefined : () => {
+      const base = import.meta.env.VITE_ANALYST_BASE as string | undefined;
+      void signOut(!base || base === '/' ? '' : base.replace(/\/$/, ''), session, {
+        signInUrl: (import.meta.env.VITE_SIGN_IN_URL as string | undefined) || signedOutUrl(import.meta.env.BASE_URL),
+      });
+    },
   };
 
   return (
@@ -616,16 +647,16 @@ function ShellInner() {
             <>
               {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- scroll-intent tracking on a focusable scroll region */}
               <div ref={scroller} tabIndex={0} role="region" aria-label="Conversation" onScroll={(e) => onScroll(e.currentTarget)} onWheel={(e) => markUserScroll(e)} onTouchMove={() => markUserScroll()} onPointerDown={() => markUserScroll()} onKeyDown={() => markUserScroll()} className="flex-1 overflow-y-auto [overflow-anchor:none] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--focus)]" data-testid="thread-scroller">
-                <div ref={content} className="mx-auto flex max-w-[48rem] flex-col gap-6 px-4 pb-10 pt-4 md:px-6" data-testid="thread-content">
+                <div ref={content} className="mx-auto flex max-w-[51rem] flex-col gap-6 px-4 pb-10 pt-4 md:px-6" data-testid="thread-content">
                   <h1 className="sr-only" data-testid="thread-title">{currentTitle}</h1>
                   {opening ? <ThreadSkeleton /> : <ThreadView messages={messages} busy={chat.busy} actions={threadActions} scrollRef={scroller} scrollToIndexRef={scrollToIndexRef} renderAll={printing} />}
                 </div>
               </div>
-              <div className="relative mx-auto w-full max-w-[48rem] px-4 md:px-6" id="composer">
+              <div className="relative mx-auto w-full max-w-[51rem] px-4 md:px-6" id="composer">
                 {/* Content scrolls under a soft fade instead of a hard edge above the composer. */}
                 <div className="pointer-events-none absolute inset-x-0 -top-6 h-6 bg-linear-to-b from-transparent to-bg" aria-hidden />
                 <button type="button" aria-label="Jump to latest" tabIndex={atBottom ? -1 : 0} aria-hidden={atBottom} onClick={jumpToLatest} data-testid="jump-latest"
-                  className={clsx('absolute -top-[18px] left-1/2 z-10 flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full border border-line bg-bg text-fg shadow-md transition-[opacity,transform] duration-200',
+                  className={clsx('absolute -top-12 left-1/2 z-10 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full border border-line bg-bg text-fg-muted shadow-sm transition-[opacity,transform] duration-150 hover:text-fg',
                     atBottom ? 'pointer-events-none translate-y-2 opacity-0' : 'opacity-100')}>
                   <ArrowDown size={16} />
                 </button>
