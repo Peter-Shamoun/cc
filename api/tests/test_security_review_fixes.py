@@ -156,13 +156,6 @@ def test_ids_must_start_alphanumeric(tmp_path, bad_id):
     assert r.status_code == 422
 
 
-@pytest.mark.parametrize("options", [{"strategy": ["auto"]}, {"model": {"id": "auto"}}, {"strategy": 1}])
-def test_non_string_options_are_422_not_500(options):
-    client = TestClient(create_app(settings=Settings(heartbeat_seconds=5)), raise_server_exceptions=False)
-    r = client.post("/api/chat", json={"messages": [{"role": "user", "text": "q"}], "options": options}, headers=LABS)
-    assert r.status_code == 422 and r.json()["error"]["code"] == "validation"
-
-
 def test_huge_last_event_id_is_treated_as_invalid():
     client = TestClient(create_app(settings=Settings(heartbeat_seconds=5)), raise_server_exceptions=False)
     huge = "m_x:" + "9" * 5000

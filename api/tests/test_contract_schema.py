@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SQL = "SELECT payer_name, COUNT(*) AS claims FROM sem.claims GROUP BY 1"
 EXAMPLES = [
     {"type": "message.start", "seq": 0, "messageId": "m_1", "conversationId": "c_1", "contractVersion": "1.0.0",
-     "model": "scripted", "strategy": "tool_loop"},
+     "model": "scripted"},
     {"type": "status", "seq": 1, "label": "Exploring the schema"},
     {"type": "status", "seq": 2, "label": None},
     {"type": "step.explore", "seq": 3, "stepId": "s1", "probe": "describe_view", "target": "sem.claims",

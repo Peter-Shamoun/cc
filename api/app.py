@@ -43,7 +43,7 @@ from api.security import (MAX_BODY_BYTES, SESSION_COOKIE, BodyLimitMiddleware, C
 from api.store import DownloadRegistry, Principal
 from api.feedback import MAX_COMMENT, check as check_feedback, record as feedback_record
 from api.clarify import legacy_answers, summary as clarify_summary, validate_answers
-from api.capabilities import DEFAULT_STRATEGY, capabilities as capabilities_body, check_options
+from api.capabilities import REMOVED_RUN_OPTION_KEYS, capabilities as capabilities_body
 from api.export import FORMATS as EXPORT_FORMATS, as_json as export_json, as_markdown as export_markdown, filename as export_filename
 from api.sources import sources_for
 from api.sql_mask import POLICIES as SQL_MASK_POLICIES, mask_event, mask_part, policy_from_env as sql_mask_policy_from_env
@@ -417,14 +417,9 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                              "paidApis": False}, headers=NO_STORE)
 
     @app.get("/api/capabilities")
-    def capabilities(request: Request):
-        """Strategies and models for a picker (contract 1.4.0). Signed in (1.5.0): per-organization ``available``.
-        Signed out it still answers (no user data), without org-specific flags."""
-        try:
-            customer = authed(request, new_id("r")).principal.customer if _token(request) else None
-        except AuthError:
-            customer = None
-        return JSONResponse(capabilities_body(CONTRACT_VERSION, demo=scripted_demo, customer=customer,
+    def capabilities():
+        """What this server offers (no user data, so no sign-in needed). No strategy/model choice (1.24.0)."""
+        return JSONResponse(capabilities_body(CONTRACT_VERSION, demo=scripted_demo,
                                               sql_literal_masking=settings.sql_literal_masking,
                                               temporary_ttl_seconds=settings.temporary_ttl_seconds), headers=NO_STORE)
 
@@ -494,6 +489,10 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             if run is None or run.principal != ctx.principal:
                 return error_json("stream_gone", "Nothing to resume.", 404)
             return _stream(run, after, request)
+        if any(key in body.options for key in REMOVED_RUN_OPTION_KEYS):
+            # 1.24.0: the server runs one shipped analyzer configuration; a request can't pick a strategy or model
+            return error_json("validation", "This server runs one analyzer configuration; options.strategy and "
+                                            "options.model are not accepted.", 422)
         scoped = sorted(IDENTITY_SCOPED_KEYS & (set(body.model_extra or {}) | set(body.options)))
         if scoped:
             # the client can't pick a customer, database, schema or tables: they come from the sign-in (§2.1)
@@ -506,12 +505,6 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             ctx = authed(request, message_id[-8:])
         except AuthError:
             return unauthorized()
-        bad_option = check_options(body.options, ctx.principal.customer)
-        if bad_option:
-            return error_json("validation", bad_option, 422)
-        if cli_driver is not None and (body.options.get("strategy", DEFAULT_STRATEGY) != DEFAULT_STRATEGY
-                                       or body.options.get("model", "auto") != "auto"):
-            return error_json("validation", "This server runs the shipped analyzer configuration only.", 422)
         conversation_id = body.conversationId or new_id("c_")
         if not _SAFE_ID.fullmatch(conversation_id) or store.owned_by_other(ctx.principal, conversation_id) \
                 or temp_chats.owned_by_other(ctx.principal, conversation_id):
@@ -679,8 +672,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 delay = max(delay, SLOW_FLOOR_SECONDS)
             emit({"type": "message.start", "messageId": message_id, "conversationId": conversation_id,
                   "contractVersion": CONTRACT_VERSION, "model": cli_driver.model_label if cli_driver else settings.llm,
-                  "parentId": user_msg["id"],
-                  "strategy": body.options.get("strategy", DEFAULT_STRATEGY), **start_extra,
+                  "parentId": user_msg["id"], **start_extra,
                   **({"temporary": True} if temporary else {})})
             emit({"type": "status", "label": "Thinking"})
             tap = None

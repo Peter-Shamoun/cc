@@ -16,8 +16,8 @@ CONTRACT_MD = (ROOT / "api" / "CONTRACT.md").read_text()
 
 #: Enums that stay closed: a new value is a major change (security, outcome or protocol semantics).
 CLOSED = {"Sensitivity", "MessageEnd.finishReason", "StoredMessage.finishReason", "StoredMessage.role",
-          "ChatRequest.messages.role", "ChatRequest.scenario", "Capabilities.scope", "RegenerateStyle", "FeedbackRating",
-          "ImagePart.mime", "TranscriptsInfo.mode", "CostTier", "StrategyOption.latencyTier", "ModelOption.tier",
+          "ChatRequest.messages.role", "ChatRequest.scenario", "RegenerateStyle", "FeedbackRating",
+          "ImagePart.mime", "TranscriptsInfo.mode",
           "Source.role", "ToolCallPart.state", "StepCheck.verdict",
           "ConversationArchivedFilter",
           # 1.18.0: the PlotSpec is strict by design; a client drops a plot it does not know (the table stays)

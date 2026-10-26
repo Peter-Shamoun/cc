@@ -1,4 +1,4 @@
-"""Adapter R2 (reasoning PHI policy), R4 (strategy → AnalyzerConfig) and R7 (analyst model shims).
+"""Adapter R2 (reasoning PHI policy) and R7 (analyst model shims).
 
 Fixtures and synthetic data only: no model, network or paid API. analyzer/, analyst/ and bench/ are imported
 read-only. Every PHI-looking value here is invented (see fixtures/analyzer_runs/phi_reasoning.json)."""
@@ -7,16 +7,12 @@ import pathlib
 
 import pytest
 
-from analyzer.config import AnalyzerConfig
 from analyzer.llm import Completion, ToolCall
 from api.analyst_shim import SingleShotShim, TextRoleShim, ToolLoopShim
 from api.analyzer_adapter import Recording, answer_from_bench, events_for_recording, run_to_events
-from api.capabilities import STRATEGIES
 from api.contract.conformance import check
 from api.live import scrub
 from api.reasoning_policy import DEFAULT_POLICY, POLICIES, ReasoningPolicy, phi_findings
-from api.strategy_config import (FACTORS, FLAGS, GENERATIONS, all_grid_cells, grid_overrides, normalize_cell,
-                                 strategy_config)
 from api.tests.test_titles import _validator
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -169,106 +165,6 @@ def test_demo_app_path_is_unchanged():
     assert "reasoning_policy" not in src and "ReasoningPolicy" not in src
 
 
-# -- R4: strategy → AnalyzerConfig ---------------------------------------------------------------------------------
-
-def test_grid_has_384_cells_and_known_factor_names():
-    cells = all_grid_cells()
-    assert len(cells) == 384 == len(GENERATIONS) * 2 ** len(FLAGS)
-    assert len({json.dumps(c, sort_keys=True) for c in cells}) == 384
-    assert set(FACTORS) == {"generation", *FLAGS}
-    assert FLAGS == ("fewshot", "explore", "candidates3", "verifier", "repair", "assumptions", "multiagent")
-
-
-def test_factor_names_match_the_research_grid_read_only():
-    design = ROOT / "research" / "grid" / "design.json"
-    if not design.exists():
-        pytest.skip("research grid not checked out")
-    rows = json.loads(design.read_text())
-    for row in rows:
-        assert set(row) - {"id"} == set(FACTORS)
-        normalize_cell(row)
-    sample = ROOT / "research" / "grid" / "C000.json"
-    if sample.exists():
-        normalize_cell(json.loads(sample.read_text())["config"])
-
-
-@pytest.mark.parametrize("strategy", [s["id"] for s in STRATEGIES])
-def test_every_cell_builds_a_valid_analyzer_config(strategy):
-    for cell in all_grid_cells():
-        if strategy == "candidates" and not cell["candidates3"]:
-            with pytest.raises(ValueError, match="contradicts"):
-                strategy_config(strategy, grid=cell)
-            continue
-        cfg = strategy_config(strategy, grid=cell)
-        AnalyzerConfig(**cfg.overrides)
-        AnalyzerConfig.from_technique(cfg.overrides)
-        assert set(cfg.fidelity) == set(FACTORS)
-
-
-@pytest.mark.parametrize("strategy", [s["id"] for s in STRATEGIES])
-def test_strategies_without_grid_match_capabilities(strategy):
-    spec = next(s for s in STRATEGIES if s["id"] == strategy)
-    cfg = strategy_config(strategy)
-    assert cfg.overrides == spec["config"] and cfg.fidelity == {}
-    AnalyzerConfig(**cfg.overrides)
-
-
-def test_model_choice_and_validation():
-    assert strategy_config("tool_loop", "claude-sonnet-5-5").overrides == {"model": "claude-sonnet-5-5"}
-    assert "model" not in strategy_config("tool_loop", "auto").overrides
-    with pytest.raises(ValueError):
-        strategy_config("nope")
-    with pytest.raises(ValueError):
-        strategy_config("cascade", "claude-haiku-5-5")      # cascade picks its own models
-    with pytest.raises(ValueError):
-        strategy_config("candidates", customer="acme_diagnostics")   # disabled by org policy
-
-
-def test_factor_levels_map_to_documented_fields():
-    base = {"generation": "direct_sql", **{f: False for f in FLAGS}}
-    o, fid, _ = grid_overrides(base)
-    assert o == {"enable_examples": False, "data_profile": False, "enable_lookup": False, "candidates": 1,
-                 "verify": False, "self_correct": "none", "max_repairs": 0}
-    assert set(fid.values()) <= {"exact", "approximate"}
-    on = {"generation": "metric_spec", **{f: True for f in FLAGS}}
-    o, fid, notes = grid_overrides(on)
-    assert o["enable_metrics"] is True and o["candidates"] == 3 and o["candidate_selection"] == "execution_vote"
-    assert o["self_correct"] == "errors+result_signals" and o["max_repairs"] == 2 and o["verify"] is True
-    assert fid["multiagent"] == "unsupported" and fid["generation"] == "approximate"
-    assert set(notes) == {k for k, v in fid.items() if v != "exact"}
-
-
-def test_unsupported_factors_are_reported_or_rejected():
-    cell = {"generation": "decompose_cte", **{f: False for f in FLAGS}, "multiagent": 1}
-    cfg = strategy_config("tool_loop", grid=cell)
-    assert cfg.unsupported == ("generation", "multiagent")
-    with pytest.raises(ValueError, match="not supported"):
-        strategy_config("tool_loop", grid=cell, strict=True)
-
-
-def test_verifier_without_repair_is_flagged_as_inert():
-    cell = {"generation": "direct_sql", **{f: False for f in FLAGS}, "verifier": True}
-    assert "inert" in strategy_config("tool_loop", grid=cell).notes["verifier"]
-
-
-@pytest.mark.parametrize("bad", [{"generation": "sql"}, {"fewshot": 2}, {"bogus": 1}, {"repair": 0.5}])
-def test_bad_cells_are_rejected(bad):
-    cell = {"generation": "direct_sql", **{f: False for f in FLAGS}, **bad}
-    with pytest.raises(ValueError):
-        normalize_cell(cell)
-    with pytest.raises(ValueError, match="missing"):
-        normalize_cell({"generation": "direct_sql"})
-
-
-def test_mapping_is_pure():
-    cell = {"generation": "direct_sql", **{f: True for f in FLAGS}}
-    before = json.dumps(cell)
-    a, b = strategy_config("tool_loop", grid=cell), strategy_config("tool_loop", grid=cell)
-    assert a == b and json.dumps(cell) == before
-    a.overrides["candidates"] = 5
-    assert next(s for s in STRATEGIES if s["id"] == "tool_loop")["config"] == {}
-
-
 # -- R7: analyst shims ---------------------------------------------------------------------------------------------
 
 SQL = "SELECT payer_name, SUM(paid_amount) AS paid_amount FROM sem.claims GROUP BY 1"
@@ -418,7 +314,7 @@ def test_single_shot_shim(call, expect):
 
 def test_shims_are_not_wired_and_do_not_build_backends():
     src = (ROOT / "api" / "app.py").read_text()
-    assert "analyst_shim" not in src and "strategy_config" not in src
+    assert "analyst_shim" not in src
     import ast
     tree = ast.parse((ROOT / "api" / "analyst_shim.py").read_text())
     used = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)} | \

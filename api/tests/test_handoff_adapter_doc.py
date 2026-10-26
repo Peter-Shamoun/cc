@@ -12,14 +12,14 @@ SECTION = DOC[DOC.index("<!-- SECTION: contract (analyzer adapter)"): DOC.index(
 
 def test_section_replaced_placeholder():
     assert "Until the Contract team's section lands" not in DOC
-    for heading in ("5.2 Functions", "5.4 The paid switch", "5.5 Environment variables", "5.6 Strategy mapping",
+    for heading in ("5.2 Functions", "5.4 The paid switch", "5.5 Environment variables", "5.6 Analyzer configuration",
                     "5.7", "5.8"):
         assert heading in SECTION
 
 
 def test_every_named_function_exists_in_its_file():
     rows = re.findall(r"^\| `([A-Za-z_]+)[^`]*`(?:, `[^`]+`)* \| `([a-z_]+)\.py` \|", SECTION, re.M)
-    assert len(rows) >= 9
+    assert len(rows) >= 8
     for name, mod in rows:
         assert hasattr(importlib.import_module(f"api.{mod}"), name), (name, mod)
 

@@ -1,4 +1,4 @@
-{"type":"message.start","messageId":"m_1","conversationId":"c_1","contractVersion":"1.23.0","model":"scripted","parentId":"u_1","strategy":"tool_loop","seq":0}
+{"type":"message.start","messageId":"m_1","conversationId":"c_1","contractVersion":"1.24.0","model":"scripted","parentId":"u_1","seq":0}
 {"type":"status","label":"Thinking","seq":1}
 {"type":"step.sql_running","stepId":"s_1","sql":"SELECT payer_name, AVG(paid_amount) AS avg_paid_amount, COUNT(*) AS claims\nFROM sem.claims\nGROUP BY 1\nORDER BY 2 DESC","attempt":1,"purpose":"candidate","label":"Running query","candidateId":"k1","seq":2}
 {"type":"status","label":"Running query","seq":3}

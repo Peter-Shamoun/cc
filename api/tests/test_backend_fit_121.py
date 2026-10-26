@@ -15,7 +15,7 @@ from api.tests.conftest import DX, LABS, events, parts
 
 Q = {"messages": [{"role": "user", "text": "Paid amount by payer"}]}
 #: response-only fields that happen to use one of the names; none is a choice the client makes
-RESPONSE_ONLY = {"Capabilities.scope", "TablePart.source"}  # TablePart.source: provenance (views read)
+RESPONSE_ONLY = {"TablePart.source"}  # TablePart.source: provenance (views read)
 
 
 @pytest.fixture

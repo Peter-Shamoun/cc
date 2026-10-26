@@ -1,4 +1,4 @@
-{"type":"message.start","messageId":"m_3","conversationId":"c_1","contractVersion":"1.23.0","model":"scripted","parentId":"u_3","strategy":"tool_loop","resumeOf":{"clarificationId":"q_2","messageId":"m_2"},"seq":0}
+{"type":"message.start","messageId":"m_3","conversationId":"c_1","contractVersion":"1.24.0","model":"scripted","parentId":"u_3","resumeOf":{"clarificationId":"q_2","messageId":"m_2"},"seq":0}
 {"type":"status","label":"Thinking","seq":1}
 {"type":"step.sql_running","stepId":"s_2","sql":"SELECT payer_name, SUM(CASE WHEN status = 'denied' THEN charge_amount ELSE 0 END) / SUM(charge_amount) AS denied_dollar_rate, SUM(charge_amount) AS charge_amount\nFROM sem.claims\nWHERE service_date >= (SELECT MAX(service_date) - INTERVAL 90 DAY FROM sem.claims)\nGROUP BY 1\nORDER BY 2 DESC","attempt":1,"purpose":"answer","label":"Running query","seq":2}
 {"type":"status","label":"Running query","seq":3}
