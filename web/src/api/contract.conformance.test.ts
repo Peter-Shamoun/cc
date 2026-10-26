@@ -147,7 +147,7 @@ describe('reduceV1: one typed path per contract event', () => {
   for (const [type, fn] of Object.entries(CASES)) it(type, fn);
 
   it('forward compatible: unknown event types and part types do not throw', () => {
-    const v = run([start(), { type: 'step.future_thing', stepId: 'z', seq: 1 }, s({ type: 'part', part: { type: 'hologram', id: 'h' } as never })]);
+    const v = run([start(), ({ type: 'step.future_thing', stepId: 'z', seq: 1 } as Ev), s({ type: 'part', part: { type: 'hologram', id: 'h' } as never })]);
     expect(v.streaming).toBe(true);
     expect(v.lastSeq).toBe(n - 1);
   });
