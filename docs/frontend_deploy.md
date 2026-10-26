@@ -99,8 +99,8 @@ Peter decided on 2026-10-26 to remove sharing entirely. The API has no share rou
 | `CC_API_MODE` | demo | not `sim` (the ccsim world) |
 | `CC_API_LLM` | `scripted` | `scripted` until sign-off (§6) |
 | `CC_API_ALLOW_PAID_API` | unset | unset unless approved (§6) |
-| `CC_API_ANALYZER_INTERACTION` | `model_api` | how the analyzer reaches its model: `model_api` (in-process loop, client from `CC_API_LLM`) or `claude_code_cli` (shipped bundle B1 through local `claude -p`; dev and mock runs only, demo auth only) |
-| `CC_API_ANALYZER_SNAPSHOT` | unset | `claude_code_cli` only: the bench snapshot directory it queries; unset in production |
+| `CC_API_ANALYZER_INTERACTION` | `model_api` | how the analyzer reaches its model: `model_api` (in-process loop, client from `CC_API_LLM`) or `claude_code_cli` (shipped bundle B1 through local `claude -p`; dev and mock runs only). With demo auth it queries the bench snapshot; with `SimAuth` (`python -m api.sim_server`) it queries the signed-in customer's lake through the request's opener, served to the worker's `analyzer.cli` over a run-scoped unix socket (`analyzer/run_channel.py`); any other auth is refused. The worker gets an allowlisted environment (no `ANTHROPIC_*`, `CLAUDE_CODE_USE_*`, `AWS_*`, `CC_*`), its process group is killed on Stop, run end and API shutdown, and its session folder (question text) is removed once the message is persisted (a sweep removes leftovers after 10 min) |
+| `CC_API_ANALYZER_SNAPSHOT` | unset | `claude_code_cli` only: the bench snapshot directory: the briefing's TRAIN example library and playbook source, and with demo auth the data it queries; unset in production |
 | `CC_API_SQL_LITERAL_MASKING` | `phi` | `phi` or `all`; never `off` (shown SQL would carry PHI literals; contract 1.14.0 §10) |
 | `CC_API_HOST` / `CC_API_PORT` | `127.0.0.1` / `8787` | behind the proxy |
 | `CC_API_MAX_BODY_BYTES` | 1 MiB | keep; set the proxy's body limit ≥ this so oversize requests get the API's 413 `payload_too_large` |

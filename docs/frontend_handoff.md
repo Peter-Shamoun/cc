@@ -240,8 +240,12 @@ above, client from `CC_API_LLM`) or `claude_code_cli` (`api/claude_code_cli_driv
 playbook v1, invariants glossary, dictionary with derivations, enum profile, value lookup, 3 BM25 TRAIN examples, free
 SQL over `sem.*`, one candidate, no repair) run by local headless Claude Code exactly as the benchmark runs it, on the
 signed-in user's subscription. Steps stream from the session's calls.jsonl, Stop kills the worker, the final SQL is
-re-executed in the sandbox. It refuses any auth but `DemoAuth` (its data is the bench snapshot, not the customer's
-lake), any strategy/model option but the defaults, and the `escalate` command. No live clarification: B1 has `ask`
+re-executed in the sandbox. With `DemoAuth` the data is the bench snapshot; with `SimAuth` (`python -m api.sim_server
+--world-dir DIR --tokens-file FILE`: ccsim Cognito/STS/S3 with acme_labs and acme_diagnostics) every command runs in the
+API process against the signed-in customer's reader session (`QueryPathOpener`, opened once per run), reached by the
+worker's `analyzer.cli` over a run-scoped unix socket with a one-run capability (`analyzer/run_channel.py`): no
+credential reaches the worker or the disk, and the customer comes only from the token. Other auth backends are refused,
+as are any strategy/model option but the defaults and the `escalate` command. No live clarification: B1 has `ask`
 off, and multi-question clarify still needs the analyzer `ask` spec change (5.7).
 
 ```bash
