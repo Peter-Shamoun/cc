@@ -625,7 +625,7 @@ function ShellInner() {
         {sidebarVisible && !mobile && <Sidebar {...sidebarProps} />}
         {/* Phone: a thin left-edge strip where a rightward swipe opens the drawer (the page itself keeps native panning). */}
         {mobile && !drawerOpen && !dialog && <div className="cc-pan-y fixed bottom-0 left-0 top-[52px] z-20 w-3" aria-hidden data-testid="drawer-edge" />}
-        {!sidebarVisible && !mobile && <SidebarRail onExpand={() => setSidebar(true)} onNew={sidebarProps.onNew} onSearch={() => setDialog('search')} onSettings={() => setDialog('settings')} />}
+        {!sidebarVisible && !mobile && <SidebarRail onExpand={() => setSidebar(true)} onNew={sidebarProps.onNew} onSearch={() => setDialog('search')} onSettings={sidebarProps.onSettings} onShortcuts={sidebarProps.onShortcuts} onSignOut={sidebarProps.onSignOut} />}
         <main className="relative flex min-w-0 flex-1 flex-col font-sans md:min-w-[400px]" aria-label="Chat">
           {!empty && <p className="hidden pb-4 text-lg font-semibold print:block" data-testid="print-title">{currentTitle}</p>}
           <Header strategy={strategy} showNav={mobile} onOpenSidebar={() => setSidebar(true)} onNewChat={sidebarProps.onNew} adapterName={adapter.name}
