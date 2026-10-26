@@ -59,8 +59,10 @@ export function ArtifactPanel({ artifact, onClose }: { artifact: Artifact; onClo
   // On phones the panel is a full-screen sheet (Claude/ChatGPT mobile): no split view, no resize handle.
   const full = fullPref || phone;
   const tabs = tabsFor(artifact);
-  const [tab, setTab] = useState(tabs[0].id);
-  useEffect(() => setTab(tabsFor(artifact)[0].id), [artifact]);
+  // The chosen tab belongs to one artifact; a new artifact starts on its first tab (derived, no reset effect).
+  const [picked, setPicked] = useState<{ artifact: Artifact; tab: string }>({ artifact, tab: tabs[0].id });
+  const tab = picked.artifact === artifact ? picked.tab : tabs[0].id;
+  const setTab = (id: string) => setPicked({ artifact, tab: id });
   const ref = useRef<HTMLElement>(null);
   useFocusTrap(ref, phone);
   const setWidth = useCallback((next: number | ((w: number) => number)) => {
