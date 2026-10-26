@@ -1,5 +1,10 @@
 import type { ID, ISODate, Message } from '../lib/contract';
 import { asSession, type AuthSession } from '../auth/session';
+import { fetchRetrying, readJsonCapped, ResponseTooLargeError } from '../lib/fetchGuard';
+
+/** Body caps: a page of summaries is small; one conversation can hold large tables. */
+const LIST_MAX_BYTES = 8 * 1024 * 1024;
+const DETAIL_MAX_BYTES = 32 * 1024 * 1024;
 
 /**
  * Client for the server chat-history endpoints (api/app.py, docs/frontend_transcripts.md).
@@ -22,11 +27,12 @@ export class ConversationsApi {
     this.auth = asSession(auth);
   }
 
-  private async call<T>(method: string, path: string, body?: unknown): Promise<T> {
+  private async call<T>(method: string, path: string, body?: unknown, maxBytes = LIST_MAX_BYTES): Promise<T> {
     const headers: Record<string, string> = { accept: 'application/json' };
     if (body !== undefined) headers['content-type'] = 'application/json';
     Object.assign(headers, this.auth.headers());
-    const res = await this.fetchImpl(`${this.base}${path}`, {
+    // 429: the server did nothing, so waiting out Retry-After and sending the same request again is safe.
+    const res = await fetchRetrying(this.fetchImpl, `${this.base}${path}`, {
       method, headers, credentials: 'same-origin', cache: 'no-store',
       body: body === undefined ? undefined : JSON.stringify(body),
     });
@@ -35,7 +41,8 @@ export class ConversationsApi {
       const code = await res.json().then((j: { error?: { code?: string } }) => j?.error?.code ?? 'error', () => 'error');
       throw new ConversationsApiError(res.status, code);
     }
-    return res.json() as Promise<T>;
+    try { return await readJsonCapped<T>(res, maxBytes); }
+    catch (e) { if (e instanceof ResponseTooLargeError) throw new ConversationsApiError(res.status, 'response_too_large'); throw e; }
   }
 
   info() { return this.call<TranscriptInfo>('GET', '/api/transcripts'); }
@@ -44,7 +51,7 @@ export class ConversationsApi {
   }
   search(q: string, cursor?: string) { return this.call<ConversationPage>('POST', '/api/conversations/search', { q, cursor }); }
   async get(id: ID): Promise<ConversationDetail | undefined> {
-    try { return await this.call<ConversationDetail>('GET', `/api/conversations/${encodeURIComponent(id)}`); }
+    try { return await this.call<ConversationDetail>('GET', `/api/conversations/${encodeURIComponent(id)}`, undefined, DETAIL_MAX_BYTES); }
     catch (e) { if (e instanceof ConversationsApiError && e.status === 404) return undefined; throw e; }
   }
   rename(id: ID, title: string) { return this.call<{ id: ID; title: string; updatedAt: ISODate }>('PATCH', `/api/conversations/${encodeURIComponent(id)}`, { title }); }
