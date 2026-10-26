@@ -8,7 +8,7 @@ Owner: platform team (frontend SOTA sprint). Source of truth:
 
 | Header | Value |
 |---|---|
-| Content-Security-Policy | `default-src 'self'; script-src 'self' 'nonce-…' 'wasm-unsafe-eval'; style-src 'self' 'nonce-…'; style-src-elem 'self' 'nonce-…'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; media-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-src 'none'; frame-ancestors 'none'; upgrade-insecure-requests` |
+| Content-Security-Policy | `default-src 'self'; script-src 'self' 'nonce-…'; style-src 'self' 'nonce-…'; style-src-elem 'self' 'nonce-…'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; media-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-src 'none'; frame-ancestors 'none'; upgrade-insecure-requests` |
 | Cache-Control | `no-store` on HTML (and everything outside `/assets/`); hashed `/assets/*` are `public, max-age=31536000, immutable` |
 | Referrer-Policy | `no-referrer` |
 | X-Content-Type-Options | `nosniff` |
@@ -21,7 +21,7 @@ Why each relaxation exists:
 * **No `'unsafe-inline'` / `'unsafe-eval'` for scripts.** The pre-paint theme script moved to
   `web/public/theme-init.js`. Vega used `new Function` for expressions; `ChartView` now passes `ast: true`
   so vega-embed uses `vega-interpreter`.
-* **`'wasm-unsafe-eval'`** lets Shiki's regex engine compile WebAssembly. It does not allow JS eval.
+* **No `'wasm-unsafe-eval'`.** Shiki runs its JavaScript regex engine (fine-grained imports in CodeBlock.tsx), so no WebAssembly is compiled.
 * **`style-src-attr 'unsafe-inline'`** only. Shiki token colours, KaTeX layout and Vega SVG set inline
   `style` attributes; these cannot be hashed. `<style>` elements still need `'self'` or the nonce.
   vega-embed's and vega-tooltip's injected stylesheets are disabled (`defaultStyle: false`,

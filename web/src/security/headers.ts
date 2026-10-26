@@ -3,7 +3,7 @@
  * Pure module: imported by vite.config.ts and by tests. Keep in step with api/security.py.
  *
  * Scripts: 'self' + a per-response nonce. No 'unsafe-inline', no 'unsafe-eval' (Vega runs on the
- * AST interpreter). 'wasm-unsafe-eval' is allowed for Shiki's regex engine only.
+ * AST interpreter). No 'wasm-unsafe-eval': Shiki uses its JavaScript regex engine.
  * Styles: <style>/<link> elements need 'self' or the nonce; inline style *attributes* are allowed via
  * style-src-attr because Shiki/KaTeX/Vega emit per-token colours and positions that cannot be hashed.
  */
@@ -20,7 +20,7 @@ export function contentSecurityPolicy(nonce: string, opts: { dev?: boolean; conn
   const connect = ["'self'", ...(opts.connect ?? []), ...(opts.dev ? ['ws:', 'wss:'] : [])];
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'wasm-unsafe-eval'`,
+    `script-src 'self' 'nonce-${nonce}'`,
     `style-src 'self' 'nonce-${nonce}'`,
     `style-src-elem 'self' 'nonce-${nonce}'`,
     "style-src-attr 'unsafe-inline'",
