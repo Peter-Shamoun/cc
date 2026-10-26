@@ -6,7 +6,7 @@ Claude, picking up the repo) to run, test, ship and connect the real analyzer. W
 file says what you need and links the rest.
 
 State at handoff: branch `grokbot/frontend-sota`, contract version in `api/contract/__init__.py: CONTRACT_VERSION`
-(**1.22.0** at handoff: 1.21 added BACKEND-FIT, 1.22 removed sharing). Everything runs offline in **demo mode**:
+(**1.23.0** at handoff: 1.21 added BACKEND-FIT, 1.22 removed sharing, 1.23 added multi-question clarify, which is additive). Everything runs offline in **demo mode**:
 `ScriptedLLM`, synthetic DuckDB data, no paid model API, no network.
 
 ## 0. Ground rules that still apply
