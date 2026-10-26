@@ -171,6 +171,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
     let messageId: string | null = null;
     let lastSeq = -1;
     let retries = 0;
+    let backOnline = false; // set after waiting out an offline period; buys one free reconnect try
     let dropped = false; // between a drop and the first replayed event
     let resumeFallback = !!resume;
     let rateRetries = 0;
@@ -203,7 +204,10 @@ export class HttpAnalystAdapter implements AnalystAdapter {
             });
         } catch (e) {
           if (wire.signal.aborted || signal.aborted) throw abortError();
-          if (messageId !== null && isOffline()) { onConnection?.('offline'); dropped = true; await this.waitOnline(signal); continue; } // offline: wait, don't burn retries
+          if (messageId !== null && isOffline()) { onConnection?.('offline'); dropped = true; await this.waitOnline(signal); backOnline = true; continue; } // offline: wait, don't burn retries
+          // Just came back online: the browser fires 'online' before the link carries traffic. One free, backed-off
+          // try per real offline period (so it stays bounded), instead of spending the reconnect budget on a flap.
+          if (messageId !== null && backOnline) { backOnline = false; onConnection?.('reconnecting'); dropped = true; await this.backoff(1, signal); continue; }
           if (messageId !== null && retries < this.opts.maxRetries) { onConnection?.('reconnecting'); dropped = true; await this.backoff(++retries, signal); continue; }
           if (messageId !== null) throw e;
           // Never reached the server: say why, as a retryable error part (Retry = regenerate).
@@ -277,6 +281,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
             }
             if (ev.type === 'message.start') this.current = messageId = ev.messageId;
             retries = 0;
+            backOnline = false;
             if (dropped) { dropped = false; onConnection?.('live'); }
             yield ev;
             if (ev.type === 'message.end') return;
@@ -298,7 +303,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
         }
         // The stream closed without message.end: a dropped connection.
         if (signal.aborted) throw abortError();
-        if (isOffline()) { onConnection?.('offline'); dropped = true; await this.waitOnline(signal); continue; }
+        if (isOffline()) { onConnection?.('offline'); dropped = true; await this.waitOnline(signal); backOnline = true; continue; }
         if (messageId === null || retries >= this.opts.maxRetries) throw new Error('stream dropped');
         onConnection?.('reconnecting');
         dropped = true;
