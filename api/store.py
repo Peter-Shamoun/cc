@@ -14,7 +14,9 @@ Titles are generic until the user renames them: a question can hold PHI, so it i
 from __future__ import annotations
 
 import csv
+import datetime
 import io
+import re
 import threading
 import time
 from dataclasses import dataclass
@@ -214,6 +216,16 @@ class InMemoryTranscriptStore:
             for cid in [cid for cid, c in self._items.items()
                         if self._owners[cid] == principal and c["updatedAt"] < cutoff]:
                 del self._items[cid], self._owners[cid]
+
+
+def csv_filename(title: str | None, when: float | None = None) -> str:
+    """Same name the web client gives a CSV (web/src/lib/csv.ts csvFilename): cc_<slug>_<yyyy-mm-dd>.csv.
+    The slug comes from a part title (e.g. "Result"), never from row values or question text, so there's no PHI in names.
+    The date is UTC, like the client's toISOString(). Shared vectors: web/src/lib/csvFilename.vectors.json."""
+    slug = re.sub(r"[^a-z0-9]+", "_", (title or "table").lower())
+    slug = re.sub(r"^_|_$", "", slug)[:48] or "table"
+    day = datetime.datetime.fromtimestamp(time.time() if when is None else when, datetime.timezone.utc).date()
+    return f"cc_{slug}_{day.isoformat()}.csv"
 
 
 _FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
