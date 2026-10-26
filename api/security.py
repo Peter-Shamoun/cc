@@ -56,7 +56,9 @@ class SecurityHeadersMiddleware:
 #: Request bodies are small JSON (chat turns carry history as text, <= 8000 chars per message). 1 MiB is far above any
 #: legitimate body and stops a client from making the API buffer and parse megabytes of JSON.
 MAX_BODY_BYTES = 1 << 20
-_TOO_LARGE = b'{"error":{"code":"validation","message":"Request body is too large."}}'
+#: contract 1.5.0: dedicated code; ``legacyCode`` keeps clients that branched on the pre-1.5 ``validation`` working.
+_TOO_LARGE = (b'{"error":{"code":"payload_too_large","legacyCode":"validation",'
+              b'"message":"Request body is too large.","maxBytes":%d}}')
 
 
 class BodyLimitMiddleware:
@@ -72,9 +74,10 @@ class BodyLimitMiddleware:
         self.max_bytes = max_bytes
 
     async def _reject(self, send):
+        body = _TOO_LARGE % self.max_bytes
         await send({"type": "http.response.start", "status": 413,
-                    "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(_TOO_LARGE)).encode())]})
-        await send({"type": "http.response.body", "body": _TOO_LARGE})
+                    "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode())]})
+        await send({"type": "http.response.body", "body": body})
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http" or scope.get("method") in ("GET", "HEAD", "OPTIONS"):

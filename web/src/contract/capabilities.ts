@@ -11,6 +11,7 @@ import type { Capabilities, ModelOption, StrategyOption } from './v1.gen';
 export const DEMO_CAPABILITIES: Capabilities = {
   contractVersion: CONTRACT_VERSION,
   "demo": true,
+  "scope": "public",
   "defaults": {
     "strategy": "tool_loop",
     "model": "auto"
@@ -62,7 +63,8 @@ export const DEMO_CAPABILITIES: Capabilities = {
       "label": "Auto",
       "description": "The server picks the model for the strategy.",
       "costTier": "low",
-      "default": true
+      "default": true,
+      "available": true
     },
     {
       "id": "claude-haiku-5-5",
@@ -71,7 +73,8 @@ export const DEMO_CAPABILITIES: Capabilities = {
       "tier": "small",
       "provider": "anthropic",
       "costTier": "low",
-      "default": false
+      "default": false,
+      "available": true
     },
     {
       "id": "claude-sonnet-5-5",
@@ -80,7 +83,8 @@ export const DEMO_CAPABILITIES: Capabilities = {
       "tier": "medium",
       "provider": "anthropic",
       "costTier": "medium",
-      "default": false
+      "default": false,
+      "available": true
     }
   ],
 };

@@ -205,9 +205,15 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                              "paidApis": False}, headers=NO_STORE)
 
     @app.get("/api/capabilities")
-    def capabilities():
-        """Strategies and models for a picker (contract 1.4.0). Public like /api/contract: no user data."""
-        return JSONResponse(capabilities_body(CONTRACT_VERSION, demo=settings.llm == "scripted"), headers=NO_STORE)
+    def capabilities(request: Request):
+        """Strategies and models for a picker (contract 1.4.0). Signed in (1.5.0): per-organization ``available``.
+        Signed out it still answers (no user data), without org-specific flags."""
+        try:
+            customer = authed(request, new_id("r")).principal.customer if _token(request) else None
+        except AuthError:
+            customer = None
+        return JSONResponse(capabilities_body(CONTRACT_VERSION, demo=settings.llm == "scripted", customer=customer),
+                            headers=NO_STORE)
 
     @app.get("/api/contract")
     def contract():
@@ -241,7 +247,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             ctx = authed(request, message_id[-8:])
         except AuthError:
             return unauthorized()
-        bad_option = check_options(body.options)
+        bad_option = check_options(body.options, ctx.principal.customer)
         if bad_option:
             return error_json("validation", bad_option, 422)
         conversation_id = body.conversationId or new_id("c_")
