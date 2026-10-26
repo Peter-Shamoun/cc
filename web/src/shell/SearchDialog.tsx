@@ -19,6 +19,7 @@ export function SearchDialog({ threads, search, onOpen, onNew, onClose }: { thre
   const lid = useId();
   useEffect(() => {
     const query = q.trim();
+    // oxlint-disable-next-line react/set-state-in-effect -- clearing the box drops stale hits at once (no debounce)
     if (!query) { setHits(null); return; }
     let live = true;
     const id = window.setTimeout(async () => {

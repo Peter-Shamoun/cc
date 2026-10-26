@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, X } from 'lucide-react';
+import { useLatest } from '../lib/useLatest';
 import clsx from 'clsx';
 import { IconButton } from '../components/ui';
 
@@ -162,8 +163,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   // toast must not vanish while someone is reading it or reaching for the button).
   const timers = useRef(new Map<number, { handle?: number; left: number; since: number }>());
   const paused = useRef(false);
-  const toastsRef = useRef(toasts);
-  toastsRef.current = toasts;
+  const toastsRef = useLatest(toasts);
   const resumeRef = useRef(() => {});
   const dismiss = useCallback((id: number, expired: boolean) => {
     const t = toastsRef.current.find((x) => x.id === id);
@@ -176,7 +176,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     timers.current.delete(id);
     // The hovered toast can vanish (Undo/Dismiss clicked) without a mouseleave: don't leave the rest frozen.
     if (paused.current) queueMicrotask(() => resumeRef.current());
-  }, []);
+  }, [toastsRef]);
   const arm = useCallback((id: number) => {
     const t = timers.current.get(id);
     if (!t) return;
@@ -199,9 +199,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     if (!paused.current) return;
     paused.current = false;
     // Give at least a beat after the pointer leaves, so an expiring Undo doesn't disappear under the cursor.
+    // oxlint-disable-next-line react/immutability -- timer bookkeeping lives in a ref (never rendered); resume runs from events only
     for (const [id, t] of timers.current) { t.left = Math.max(t.left, 1500); arm(id); }
   };
-  resumeRef.current = resume;
+  useLayoutEffect(() => { resumeRef.current = resume; });
   return (
     <ToastCtx.Provider value={push}>
       {children}
