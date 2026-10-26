@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ArrowDown, ArrowUp, Download, Maximize2, ShieldAlert } from 'lucide-react';
 import clsx from 'clsx';
@@ -48,6 +48,13 @@ export const DataTable = memo(function DataTable({ part, onOpen, full }: { part:
   const [filter, setFilter] = useState('');
   // Column widths the reader dragged (index → px); unset columns size to content.
   const [widths, setWidths] = useState<Record<number, number>>({});
+  // A focusable separator needs aria-valuenow (axe aria-required-attr): report the natural width until the user resizes.
+  const headRef = useRef<HTMLTableSectionElement>(null);
+  const [natural, setNatural] = useState<number[]>([]);
+  useLayoutEffect(() => {
+    const ths = headRef.current?.querySelectorAll('th');
+    if (ths) setNatural(Array.from(ths, (th) => Math.round(th.getBoundingClientRect().width)));
+  }, [part.columns]);
   const setWidth = (i: number, w: number | null) => setWidths((cur) => { const next = { ...cur }; if (w === null) delete next[i]; else next[i] = clampCol(w); return next; });
   const startResize = (i: number) => (e: React.PointerEvent<HTMLElement>) => {
     e.preventDefault();
@@ -163,7 +170,7 @@ export const DataTable = memo(function DataTable({ part, onOpen, full }: { part:
         data-virtual={virtual || undefined}
       >
         <table className="w-max min-w-full border-collapse font-sans text-sm">
-          <thead className="sticky top-0 z-[1] bg-elev">
+          <thead ref={headRef} className="sticky top-0 z-[1] bg-elev">
             <tr>
               {part.columns.map((col, i) => {
                 const numeric = isNumeric(col);
@@ -178,7 +185,7 @@ export const DataTable = memo(function DataTable({ part, onOpen, full }: { part:
                     </button>
                     {/* Drag (or ←/→, Shift for bigger steps; Home/double-click resets) to resize, like Sheets/ChatGPT tables. */}
                     <span role="separator" aria-orientation="vertical" aria-label={`Resize column ${col.label}`} tabIndex={0}
-                      aria-valuenow={widths[i]} aria-valuemin={MIN_COL} aria-valuemax={MAX_COL}
+                      aria-valuenow={Math.round(widths[i] ?? natural[i] ?? MIN_COL)} aria-valuemin={MIN_COL} aria-valuemax={MAX_COL}
                       onPointerDown={startResize(i)} onKeyDown={keyResize(i)} onDoubleClick={() => setWidth(i, null)} onClick={(e) => e.stopPropagation()}
                       className="absolute inset-y-0 right-0 z-[2] w-2 cursor-col-resize touch-none select-none opacity-0 transition-opacity after:absolute after:inset-y-2 after:right-0 after:w-px after:bg-fg-subtle group-hover/th:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:after:w-0.5 focus-visible:after:bg-[var(--focus)]"
                       data-testid="col-resize" />
