@@ -101,16 +101,26 @@ function ShellInner() {
   const threads = chat.threads.filter((t) => !pendingDelete.has(t.id));
   const requestDelete = useCallback((id: string) => {
     const title = chat.threads.find((t) => t.id === id)?.title ?? 'Chat';
+    const wasOpen = chat.convId === id;
+    // Keyboard users keep their place: focus moves to the next row (or the previous one, or the composer).
+    const links = [...document.querySelectorAll<HTMLElement>('[data-thread-link]')];
+    const at = links.findIndex((l) => l.dataset.threadLink === id);
+    const nextId = (links[at + 1] ?? links[at - 1])?.dataset.threadLink;
     setPendingDelete((s) => new Set(s).add(id));
-    if (chat.convId === id) chat.newChat();
+    if (wasOpen) chat.newChat();
+    requestAnimationFrame(() => {
+      const next = nextId && !wasOpen ? document.querySelector<HTMLElement>(`[data-thread-link="${CSS.escape(nextId)}"]`) : null;
+      if (next) next.focus(); else focusComposer();
+    });
     const forget = () => setPendingDelete((s) => { const n = new Set(s); n.delete(id); return n; });
     toast({
       text: `Deleted “${title.length > 32 ? `${title.slice(0, 32)}…` : title}”`,
       ms: UNDO_MS,
-      action: { label: 'Undo', run: forget },
+      // Undo puts the chat back where it was, and reopens it if it was the open one.
+      action: { label: 'Undo', run: () => { forget(); if (wasOpen) void chat.open(id); } },
       onExpire: () => { chat.remove(id).then(forget); },
     });
-  }, [chat, toast]);
+  }, [chat, toast]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- routing (#/c/<id>) ----
   const routing = useRef(false);
