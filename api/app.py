@@ -21,25 +21,44 @@ from analyzer.config import AnalyzerConfig
 from analyzer.llm import PaidAPIDisabled
 from analyzer.loop import Analyzer
 
-from api.backends import AuthError, DemoAuth, make_llm
+from api.backends import SCENARIO_CONFIG, AuthError, DemoAuth, detect_scenario, make_llm
+from api.contract import CONTRACT_VERSION, schema as contract_schema
 from api.ids import new_id
-from api.mapping import answer_parts
+from api.live import Cancelled, LiveTap
+from api.mapping import outcome_parts
 from api.store import DownloadRegistry, InMemoryTranscriptStore, Principal
 
 log = logging.getLogger("cc.api")
 NO_STORE = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
 
 
+_ID = r"^[A-Za-z0-9_:.-]{1,128}$"
+
+
 class ChatMessageIn(BaseModel):
-    id: str | None = None
+    id: str | None = Field(default=None, pattern=_ID)
     role: str = "user"
     text: str = Field(default="", max_length=8000)
+    parentId: str | None = Field(default=None, pattern=_ID)
+
+
+class ResumeIn(BaseModel):
+    clarificationId: str = Field(pattern=_ID)
+    choiceIds: list[str] = Field(default_factory=list, max_length=8)
+    text: str | None = Field(default=None, max_length=2000)
+
+
+class RegenerateIn(BaseModel):
+    messageId: str = Field(pattern=_ID)
 
 
 class ChatRequest(BaseModel):
-    conversationId: str | None = None
+    conversationId: str | None = Field(default=None, pattern=_ID)
     messages: list[ChatMessageIn] = Field(default_factory=list)
     options: dict = Field(default_factory=dict)
+    resume: ResumeIn | None = None
+    regenerate: RegenerateIn | None = None
+    scenario: str | None = Field(default=None, max_length=32)
 
 
 @dataclass
@@ -47,7 +66,10 @@ class Settings:
     llm: str = os.environ.get("CC_API_LLM", "scripted")
     heartbeat_seconds: float = float(os.environ.get("CC_API_HEARTBEAT_SECONDS", "15"))
     resume_seconds: float = 60.0
-    stream_delay_seconds: float = 0.0
+    stream_delay_seconds: float = float(os.environ.get("CC_API_STREAM_DELAY_SECONDS", "0"))
+    #: simulated model latency per analyzer turn in demo mode (realistic streaming); tests use 0
+    model_delay_seconds: float = float(os.environ.get("CC_API_MODEL_DELAY_SECONDS", "0"))
+    clarification_ttl_seconds: float = 1800.0
     analyzer_overrides: dict = field(default_factory=lambda: {
         "glossary": "basic", "data_dictionary": False, "data_profile": False, "row_limit": 5000,
         "candidates": 1, "cascade": "off"})
@@ -57,7 +79,7 @@ class AuditLog:
     """Structured audit events. Field allowlist: no SQL text, no row values, no question text."""
 
     ALLOWED = {"customer", "user", "file_id", "row_count", "conversation_id", "message_id", "parts",
-               "queries", "elapsed_ms", "finish", "kind", "reason", "status"}
+               "queries", "elapsed_ms", "finish", "kind", "reason", "status", "scenario", "steps"}
 
     def __init__(self):
         self.events: list[dict] = []
@@ -115,6 +137,16 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         return JSONResponse({"status": "ok", "mode": getattr(auth, "mode", "custom"), "llm": settings.llm,
                              "paidApis": False}, headers=NO_STORE)
 
+    @app.get("/api/contract")
+    def contract():
+        return JSONResponse({"version": CONTRACT_VERSION, "schema": contract_schema()}, headers=NO_STORE)
+
+    clarifications: dict[str, dict] = {}
+    app.state.clarifications = clarifications
+
+    def error_json(code: str, message: str, status: int):
+        return JSONResponse({"error": {"code": code, "message": message}}, status, headers=NO_STORE)
+
     @app.post("/api/chat")
     async def chat(body: ChatRequest, request: Request):
         gc_runs()
@@ -127,12 +159,11 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             except AuthError:
                 return unauthorized()
             if run is None or run.principal != ctx.principal:
-                return JSONResponse({"error": {"code": "validation", "message": "Nothing to resume."}}, 404,
-                                    headers=NO_STORE)
+                return error_json("validation", "Nothing to resume.", 404)
             return _stream(run, after=int(seq) if seq.isdigit() else -1)
         users = [m for m in body.messages if m.role == "user" and m.text.strip()]
-        if not users:
-            return JSONResponse({"error": {"code": "validation", "message": "Send a question."}}, 422, headers=NO_STORE)
+        if not users and not body.regenerate:
+            return error_json("validation", "Send a question.", 422)
         message_id = new_id("m_")
         try:
             ctx = authed(request, message_id[-8:])
@@ -141,44 +172,113 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         conversation_id = body.conversationId or new_id("c_")
         owner = getattr(store, "owner_of", lambda _cid: None)(conversation_id)
         if owner is not None and owner != ctx.principal:
-            return JSONResponse({"error": {"code": "access_denied", "message": "Not found."}}, 404, headers=NO_STORE)
-        question = users[-1].text.strip()
-        user_msg = {"id": users[-1].id or new_id("m_"), "role": "user", "text": question,
-                    "createdAt": _iso(time.time())}
-        store.append_message(ctx.principal, conversation_id, user_msg)
+            return error_json("access_denied", "Not found.", 404)
+        demo = getattr(auth, "mode", "") == "demo"
+        start_extra: dict = {}
+        scenario_hint = body.scenario if demo else None
+        if body.regenerate:
+            conv = store.get_conversation(ctx.principal, conversation_id) if body.conversationId else None
+            msgs = (conv or {}).get("messages", [])
+            target = next((m for m in msgs if m.get("id") == body.regenerate.messageId and m.get("role") == "assistant"), None)
+            parent = next((m for m in msgs if target and m.get("id") == target.get("parentId")), None)
+            if parent is None:
+                return error_json("validation", "Nothing to regenerate.", 404)
+            question = parent.get("analyzerQuestion") or parent["text"]
+            user_msg = parent
+            start_extra["regenerateOf"] = body.regenerate.messageId
+            scenario_hint = scenario_hint or parent.get("scenario")
+        else:
+            reply = users[-1].text.strip()
+            question = reply
+            if body.resume:
+                now = time.time()
+                for key in [k for k, v in clarifications.items() if v["expires"] < now]:
+                    del clarifications[key]
+                pending = clarifications.get(body.resume.clarificationId)
+                if pending is None or pending["principal"] != ctx.principal or pending["conversation_id"] != conversation_id:
+                    return error_json("clarification_expired", "That question has expired; send it as a new question.", 409)
+                del clarifications[body.resume.clarificationId]
+                labels = [c["label"] for c in pending["choices"] if c["id"] in set(body.resume.choiceIds)]
+                answer_text = "; ".join(labels) or (body.resume.text or reply)
+                question = f"{pending['question']}\nClarification: {answer_text}"
+                start_extra["resumeOf"] = {"clarificationId": body.resume.clarificationId,
+                                           "messageId": pending["message_id"]}
+                scenario_hint = scenario_hint or pending.get("scenario")
+            user_msg = {"id": users[-1].id or new_id("m_"), "role": "user", "text": reply,
+                        "createdAt": _iso(time.time())}
+            if users[-1].parentId:
+                user_msg["parentId"] = users[-1].parentId
+            if question != reply:
+                user_msg["analyzerQuestion"] = question
+            store.append_message(ctx.principal, conversation_id, user_msg)
+        scenario = detect_scenario(question, scenario_hint) if demo else None
+        if scenario and "scenario" not in user_msg and isinstance(user_msg, dict):
+            user_msg["scenario"] = scenario
+        legacy_tools = bool(body.options.get("legacyToolParts"))
         run = _Run(message_id, ctx.principal)
         runs[message_id] = run
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue = asyncio.Queue()
+        started = time.perf_counter()
+        marks: dict = {}
+        persisted_steps: list = []
+        reasoning: dict = {}
 
         def emit(payload: dict):
             seq = len(run.events)
-            run.events.append((seq, payload))
-            loop.call_soon_threadsafe(queue.put_nowait, (seq, payload))
+            event = {**payload, "seq": seq}
+            if "first_event" not in marks:
+                marks["first_event"] = int((time.perf_counter() - started) * 1000)
+            t = event["type"]
+            if t.startswith("step.") or t == "escalation":
+                persisted_steps.append(event)
+            elif t == "reasoning.delta":
+                reasoning.setdefault(event["partId"], {"type": "reasoning", "id": event["partId"], "summary": ""})
+                reasoning[event["partId"]]["summary"] += event["delta"]
+            elif t == "reasoning.end" and event["partId"] in reasoning:
+                reasoning[event["partId"]]["durationMs"] = event["durationMs"]
+            elif t == "text.delta" and "first_token" not in marks:
+                marks["first_token"] = int((time.perf_counter() - started) * 1000)
+            run.events.append((seq, event))
+            loop.call_soon_threadsafe(queue.put_nowait, (seq, event))
 
         def work():
-            started = time.perf_counter()
             parts: list[dict] = []
             finish = "stop"
-            queries = 0
+            overrides = {**settings.analyzer_overrides, **SCENARIO_CONFIG.get(scenario or "", {})}
+            delay = settings.model_delay_seconds * (4 if scenario == "slow" else 1)
             emit({"type": "message.start", "messageId": message_id, "conversationId": conversation_id,
-                  "model": settings.llm, "strategy": body.options.get("strategy", "tool_loop")})
-            emit({"type": "status", "label": "Analyzing"})
+                  "contractVersion": CONTRACT_VERSION, "model": settings.llm, "parentId": user_msg["id"],
+                  "strategy": body.options.get("strategy", "tool_loop"), **start_extra})
+            emit({"type": "status", "label": "Thinking"})
+            tap = None
+            answer = None
             try:
-                config = AnalyzerConfig(**settings.analyzer_overrides)
-                llm = llm_factory() if llm_factory else make_llm(settings.llm)
-                analyzer = Analyzer(ctx.opener, llm, config)
+                config = AnalyzerConfig(**overrides)
+                inner = llm_factory() if llm_factory else make_llm(settings.llm, scenario)
+                tap = LiveTap(inner, emit, cancelled=run.cancelled, model_delay=delay, started=started,
+                              multi_candidate=config.candidates > 1)
+                analyzer = Analyzer(ctx.opener, tap, config)
                 answer = analyzer.answer(question)
-                queries = sum(1 for a in answer.audit if a.get("event") == "sql")
+                tap.finish(answer)
                 elapsed = int((time.perf_counter() - started) * 1000)
-                parts = answer_parts(answer, ctx.principal, downloads, elapsed_ms=elapsed)
+                parts, finish = outcome_parts(answer, ctx.principal, downloads, elapsed_ms=elapsed, question=question,
+                                              ask_args=tap.ask_args, refuse_args=tap.refuse_args,
+                                              legacy_tools=legacy_tools)
+            except Cancelled:
+                finish = "aborted"
             except PaidAPIDisabled:
                 parts = [_error("internal", "Model unavailable", "Paid model APIs are disabled on this server.", False)]
                 finish = "error"
             except Exception as exc:  # noqa: BLE001 - never echo internals or data to the client or log
                 log.warning("chat failed: %s", type(exc).__name__)
+                if tap is not None:
+                    tap.finish(None)
                 parts = [_error("internal", "Something went wrong", "The analysis failed. Try again.", True)]
                 finish = "error"
+            if run.cancelled.is_set():
+                finish = "aborted"
+            emit({"type": "status", "label": "Writing answer" if finish == "stop" else None})
             for part in parts:
                 if run.cancelled.is_set():
                     finish = "aborted"
@@ -186,23 +286,34 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 if part["type"] == "text":
                     emit({"type": "text.start", "partId": part["id"]})
                     for chunk in _chunks(part["text"]):
+                        if run.cancelled.is_set():
+                            break
                         emit({"type": "text.delta", "partId": part["id"], "delta": chunk})
                         if settings.stream_delay_seconds:
                             time.sleep(settings.stream_delay_seconds)
                     emit({"type": "text.end", "partId": part["id"]})
                 else:
                     emit({"type": "part", "part": part})
+                    if part["type"] == "clarification":
+                        clarifications[part["clarificationId"]] = {
+                            "principal": ctx.principal, "conversation_id": conversation_id, "question": question,
+                            "message_id": message_id, "choices": part.get("choices", []), "scenario": scenario,
+                            "expires": time.time() + settings.clarification_ttl_seconds}
             elapsed = int((time.perf_counter() - started) * 1000)
             emit({"type": "status", "label": None})
-            emit({"type": "message.end", "messageId": message_id, "finishReason": finish,
-                  "usage": {"queries": queries, "elapsedMs": elapsed}})
-            kept = parts if finish != "aborted" else parts[:0]
-            store.append_message(ctx.principal, conversation_id, {
-                "id": message_id, "role": "assistant", "parts": kept, "createdAt": _iso(time.time()),
-                "parentId": user_msg["id"]})
+            usage = (tap.usage(elapsed, marks.get("first_event"), marks.get("first_token")) if tap is not None
+                     else {"queries": 0, "elapsedMs": elapsed})
+            emit({"type": "message.end", "messageId": message_id, "finishReason": finish, "usage": usage})
+            kept = list(reasoning.values()) + parts if finish != "aborted" else []
+            record = {"id": message_id, "role": "assistant", "parts": kept, "createdAt": _iso(time.time()),
+                      "parentId": user_msg["id"], "finishReason": finish, "usage": usage,
+                      "steps": persisted_steps if finish != "aborted" else []}
+            if start_extra.get("regenerateOf"):
+                record["regenerateOf"] = start_extra["regenerateOf"]
+            store.append_message(ctx.principal, conversation_id, record)
             audit("chat_message", customer=ctx.principal.customer, user=ctx.principal.user,
-                  conversation_id=conversation_id, message_id=message_id, parts=len(parts), queries=queries,
-                  elapsed_ms=elapsed, finish=finish)
+                  conversation_id=conversation_id, message_id=message_id, parts=len(parts), queries=usage["queries"],
+                  elapsed_ms=elapsed, finish=finish, scenario=scenario, steps=len(persisted_steps))
             run.done = True
             run.finished_at = time.time()
             loop.call_soon_threadsafe(queue.put_nowait, None)
@@ -214,7 +325,10 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 try:
                     item = await asyncio.wait_for(queue.get(), timeout=settings.heartbeat_seconds)
                 except asyncio.TimeoutError:
-                    yield _sse(None, {"type": "heartbeat"})
+                    if await request.is_disconnected():
+                        run.cancelled.set()
+                        return
+                    yield _sse(None, {"type": "heartbeat", "at": _iso(time.time())})
                     continue
                 if item is None:
                     return

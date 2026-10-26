@@ -57,8 +57,8 @@ def test_chat_over_query_path_is_scoped_and_never_escalates(world, monkeypatch):
         assert evs[-1]["finishReason"] == "stop", evs
         table = next(p for p in parts(evs) if p["type"] == "table")
         assert table["rowCount"] == 1 and table["rows"][0][0] > 0
-        escalation = [p for p in parts(evs) if p["type"] == "tool_call" and p["tool"] == "request_escalation"]
-        assert escalation and escalation[0]["state"] == "error"
+        escalation = [e for e in evs if e["type"] == "step.explore" and e["probe"] == "request_escalation"]
+        assert escalation and escalation[0]["summary"].startswith("Failed")
         csv = client.get(f"/api/download/{table['csvFileId']}", headers=headers)
         assert csv.status_code == 200 and csv.text.startswith("claims\r\n")
     assert calls and not any(calls)

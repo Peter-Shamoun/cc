@@ -166,9 +166,59 @@ def _views(sql: str) -> list[str]:
     return sorted(set(re.findall(r"\b((?:sem|lossless)\.[A-Za-z_][A-Za-z0-9_]*)", sql or "")))
 
 
+_PHI_ASK = re.compile(r"\b(patient|member|ssn|social security|date of birth|dob|home address|identif\w*)\b", re.I)
+_ABSTAIN_SUGGESTIONS = {
+    "phi_request": ["How many denied claims are there by payer?", "Paid amount by month", "Denial rate by payer"],
+    "data_unavailable": ["Denial rate by payer", "Paid amount trend by month", "Top denial reason codes (CARC)"],
+    "low_confidence": ["Paid amount by payer", "How many claims are there?", "Denial rate by payer"],
+    "out_of_scope": ["Denial rate by payer", "Paid amount trend by month", "How many claims are there?"],
+}
+_CATEGORIES = {"out_of_scope", "phi_request", "data_unavailable", "ambiguous", "low_confidence", "unsupported", "policy"}
+
+
+def abstain_part(category: str, reason: str, details: str | None = None) -> dict:
+    category = category if category in _CATEGORIES else "out_of_scope"
+    part = {"type": "abstain", "id": new_id("p_"), "category": category, "reason": reason.strip() or
+            "I can't answer that reliably with this data.",
+            "suggestions": [{"id": new_id("g_"), "text": t} for t in _ABSTAIN_SUGGESTIONS.get(category, [])[:3]]}
+    if details:
+        part["details"] = _scrub(details)
+    return part
+
+
+def outcome_parts(answer: AnalyzerAnswer, principal: Principal, downloads: DownloadRegistry, *,
+                  elapsed_ms: int | None = None, question: str = "", ask_args: dict | None = None,
+                  refuse_args: dict | None = None, legacy_tools: bool = False) -> tuple[list[dict], str]:
+    """Contract v1: parts + finishReason. Tool steps travel as live ``step.*`` events, so ``tool_call``
+    parts are only included when ``legacy_tools`` is set (pre-v1 UI)."""
+    prefix = tool_parts(answer.trace or []) if legacy_tools else []
+    if answer.kind == "refusal":
+        category = str((refuse_args or {}).get("category") or "")
+        if category not in _CATEGORIES:
+            category = "phi_request" if _PHI_ASK.search(question) or _PHI_ASK.search(answer.text or "") else "out_of_scope"
+        return prefix + [abstain_part(category, answer.text or "")], "abstain"
+    if answer.kind == "abstain":
+        return prefix + [abstain_part("low_confidence", "I'm not confident enough to answer: the approaches I tried "
+                                      "**disagreed**. Try narrowing the question (a payer, a date range or a metric "
+                                      "definition).", details=answer.text)], "abstain"
+    if answer.kind == "clarification":
+        args = ask_args or {}
+        choices = [{"id": str(c.get("id") or f"c{i}")[:64], "label": str(c.get("label") or "")[:200],
+                    **({"description": str(c["description"])} if c.get("description") else {})}
+                   for i, c in enumerate(args.get("choices") or []) if isinstance(c, dict) and c.get("label")]
+        part = {"type": "clarification", "id": new_id("p_"), "clarificationId": new_id("q_"),
+                "question": answer.text or str(args.get("question") or ""), "allowFreeText": True}
+        if choices:
+            part["choices"] = choices[:8]
+        return prefix + [part], "needs_input"
+    if answer.kind != "answer":
+        return prefix + answer_parts(answer, principal, downloads, elapsed_ms, include_tools=False), "error"
+    return prefix + answer_parts(answer, principal, downloads, elapsed_ms, include_tools=False), "stop"
+
+
 def answer_parts(answer: AnalyzerAnswer, principal: Principal, downloads: DownloadRegistry,
-                 elapsed_ms: int | None = None) -> list[dict]:
-    parts = tool_parts(answer.trace or [])
+                 elapsed_ms: int | None = None, include_tools: bool = True) -> list[dict]:
+    parts = tool_parts(answer.trace or []) if include_tools else []
     if answer.kind != "answer":
         variant = {"refusal": "info", "clarification": "info"}.get(answer.kind)
         if variant:
