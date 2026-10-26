@@ -2,13 +2,14 @@ import type { Message, Part } from '../lib/contract';
 import type { AssistantView } from '../lib/contract';
 import type { AssistantViewV1 } from '../api/contract';
 import { messageMarkdown } from '../components/Message';
+import { localYmd } from '../lib/dates';
 
 /**
  * Transcript → Markdown for Share/Export. Reuses the per-answer Copy serialiser (which drops
  * PHI-flagged table columns), so an export never contains more than Copy would.
  */
 export function transcriptMarkdown(title: string, messages: (Message | AssistantView | AssistantViewV1)[], when = new Date()): string {
-  const out = [`# ${title.replace(/\n/g, ' ')}`, '', `_Exported from CC Analyst on ${when.toISOString().slice(0, 10)}. Synthetic demo data._`, ''];
+  const out = [`# ${title.replace(/\n/g, ' ')}`, '', `_Exported from CC Analyst on ${localYmd(when)}. Synthetic demo data._`, ''];
   for (const m of messages) {
     if (m.role === 'user') out.push('## You', '', m.text, '');
     else {

@@ -116,6 +116,8 @@ export function formatCell(v: unknown, c: Column, allowPhi = false): string {
 /** Spec §4.2 filename: cc_<slug>_<yyyy-mm-dd>.csv (no PHI in names). */
 export function csvFilename(title: string | undefined, d = new Date()) {
   const slug = (title ?? 'table').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 48) || 'table';
+  // UTC day on purpose: csvFilename.vectors.json is shared with api/tests/test_csv_filename.py, so a client export and
+  // an API download of the same table get the same name (the server doesn't know the user's zone).
   return `cc_${slug}_${d.toISOString().slice(0, 10)}.csv`;
 }
 
