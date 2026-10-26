@@ -15,3 +15,4 @@ PREVIEW=$!
 trap 'kill $PREVIEW 2>/dev/null || true' EXIT
 for _ in $(seq 60); do curl -sf -o /dev/null "http://127.0.0.1:$PORT/" && break; sleep 1; done
 CSP_MODE=mock node scripts/csp_check.mjs "http://127.0.0.1:$PORT/"
+node scripts/header_check.mjs "http://127.0.0.1:$PORT/"

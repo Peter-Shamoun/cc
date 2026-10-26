@@ -50,6 +50,7 @@ jobs:
           npx vite preview --outDir dist-mock --port 5231 --strictPort &
           for i in $(seq 60); do curl -sf -o /dev/null http://127.0.0.1:5231/ && break; sleep 1; done
           node scripts/csp_check.mjs http://127.0.0.1:5231/ "$RUNNER_TEMP/shots"
+          node scripts/header_check.mjs http://127.0.0.1:5231/
       - if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -74,3 +75,12 @@ jobs:
           CC_API_MODE: demo
           CC_API_LLM: scripted
         run: pytest api/tests -q
+      - name: API response headers (python -m api, no Server header)
+        env:
+          CC_API_MODE: demo
+          CC_API_LLM: scripted
+          CC_API_PORT: "8131"
+        run: |
+          python -m api &
+          for i in $(seq 60); do curl -sf -o /dev/null http://127.0.0.1:8131/api/health && break; sleep 1; done
+          node web/scripts/header_check.mjs none --api http://127.0.0.1:8131

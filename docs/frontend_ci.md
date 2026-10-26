@@ -48,3 +48,29 @@ TypeScript 7 yet; oxlint parses TS/JSX natively and runs in under a second. Erro
 The React-Compiler-style rules (`react/refs`, `set-state-in-effect`, `purity`…) and the opinionated a11y rules are warnings
 for now: about 70 hits across shell/answer code. Teams should burn them down and then promote them to errors. Tests, e2e and
 scripts may use console.
+
+## Response-header check (QA)
+
+`node scripts/header_check.mjs [base|none] [--api URL] [--json]` (`npm run check:headers`) checks a running preview build
+and, optionally, the API:
+- **CSP:** a fresh nonce on every HTML response that matches every inline or nonced tag, with no placeholder left; no
+  `unsafe-inline`, `unsafe-eval`, `wasm-unsafe-eval` or wildcard script sources; `frame-ancestors`, `object-src` and `base-uri`
+  are `'none'`, and the API uses `default-src 'none'`.
+- **Caching:** `no-store` on HTML and API responses, and immutable or no-store on assets.
+- **Other headers:** `nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, a restrictive Permissions-Policy,
+  and no `Server` header on the API.
+- **Missing assets** must 404, not fall back to `index.html`.
+
+The rules live in `scripts/header_rules.mjs` and are unit-tested in `src/security/headerRules.test.ts`. Because of the
+one-server rule, run it one server at a time:
+
+```bash
+npx vite build && npx vite preview --port 5231 --strictPort &   # then:
+node scripts/header_check.mjs http://127.0.0.1:5231/
+python -m api --port 8131 &                                       # from the repo root, demo mode; then:
+node web/scripts/header_check.mjs none --api http://127.0.0.1:8131
+```
+
+CI runs both: after the CSP check in the web job, and in the api job. Launch the API with `python -m api` (or
+`uvicorn … --no-server-header`). uvicorn's own `server: uvicorn` header is added below the app, so middleware can't
+remove it.
