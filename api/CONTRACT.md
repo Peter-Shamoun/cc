@@ -34,9 +34,22 @@ The frontend builds against this document only; the analyzer adapts to it.
   with a native `EventSource` (cookie auth), whose automatic reconnect sends `Last-Event-ID` for you.
 * Each SSE frame is `id: <messageId>:<seq>` + `data: <one JSON StreamEvent>`. Heartbeats have no `id:`.
 * Auth: httpOnly `cc_session` cookie (prod) or `Authorization: Bearer demo:<customer>:<user>` (demo mode).
-* Non-stream failures (401, 404, 409, 422) return `HttpError` JSON: `{"error": {"code", "message"}}`. Codes the UI
-  should branch on: `auth_expired` (401), `access_denied` (404), `stream_gone` (404: nothing to resume, the run
-  finished > 60 s ago or never existed), `clarification_expired` (409), `validation` (422).
+* Non-stream failures return `HttpError` JSON: `{"error": {"code", "message"}}`. Statuses and the codes the UI
+  should branch on:
+
+  | Status | `code` | When | Client |
+  |---|---|---|---|
+  | 401 | `auth_expired` | session gone | sign in again |
+  | 404 | `access_denied` / `not_found` | unknown or another user's conversation (never 403) | "not available" |
+  | 404 | `stream_gone` | nothing to resume: the run finished > 60 s ago or never existed | reload the conversation |
+  | 404 | `validation` | `regenerate` / `editOf` points at nothing | |
+  | 409 | `clarification_expired` | the clarification can no longer be answered | ask again |
+  | 410 | `transcripts_unavailable` | the customer key was destroyed (§11) | history gone |
+  | 413 | `validation` | request body over **1 MiB** (`CC_API_MAX_BODY_BYTES`), rejected before parsing | "message too long" |
+  | 422 | `validation` / `invalid_title` | bad body, bad `options` (§12), bad title | show `message` |
+  | 429 | `rate_limited` | more than **3 unfinished runs** per user (`CC_API_MAX_CONCURRENT_RUNS`) | wait `Retry-After` seconds (sent, currently 3), then retry |
+
+  Every error response still carries the security headers in §10 (the 413 included).
 * Every response carries `Cache-Control: no-store` and the security headers in §10.
 
 ## 2. Ids and ordering guarantees
@@ -187,16 +200,20 @@ from the demo backend by `python -m api.contract.gen_examples` and checked by `a
   or IndexedDB. Transcripts persist only through the server transcript store. UI prefs (theme, density) are fine.
 * API responses (every route, errors and SSE included; `api/security.py`, tested in `test_security_headers.py`):
   `Cache-Control: no-store`, `Pragma: no-cache`,
-  `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`,
+  `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; sandbox`,
   `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`,
   `Permissions-Policy` locked down, `Cross-Origin-Opener-Policy`/`Cross-Origin-Resource-Policy: same-origin`,
   HSTS; no `Server` header; no `/openapi.json` or `/docs`.
-* Web app (`web/src/lib/securityHeaders.ts`, applied by `vite dev` and `vite preview`; production hosting must
-  send the same): `script-src 'self'` (no inline script, no eval; charts use Vega's CSP-safe interpreter,
-  `ast: true`), `style-src 'self' 'unsafe-inline'` (style attributes from Shiki/Vega/KaTeX), `connect-src 'self'`,
-  `img-src 'self' data: blob:`, `object-src 'none'`, `frame-ancestors 'none'`, plus the same no-store and
-  hardening headers. Dev only adds `'unsafe-inline'` scripts (React refresh preamble) and `ws:` for HMR.
-  Don't add inline `<script>` to index.html; put it in `web/public/` instead.
+* Web app CSP (`web/src/security/headers.ts`; applied by `vite dev` and `vite preview`, and production hosting must
+  send the same) is a **per-response nonce** policy: `default-src 'self'`; `script-src 'self' 'nonce-<n>'` (no
+  `'unsafe-inline'`, no `'unsafe-eval'`, no `'wasm-unsafe-eval'`: Vega runs on its AST interpreter and Shiki on its JS
+  regex engine); `style-src` / `style-src-elem 'self' 'nonce-<n>'`; `style-src-attr 'unsafe-inline'` only (style
+  *attributes* from Shiki/KaTeX/Vega); `img-src 'self' data: blob:`; `font-src 'self' data:`; `connect-src 'self'`
+  (dev adds `ws: wss:` for HMR); `worker-src`/`media-src 'self' blob:`; `object-src`/`frame-src 'none'`;
+  `base-uri 'none'`; `form-action 'self'`; `frame-ancestors 'none'`; `upgrade-insecure-requests` outside dev.
+  The server replaces `__CC_CSP_NONCE__` in `index.html` with a fresh nonce per HTML response; dev uses one nonce per
+  server start. No inline `<script>` or `<style>` without the nonce. Tests that inject CSS must use constructed
+  stylesheets (`document.adoptedStyleSheets`), not `addStyleTag`.
 * `error.details` and `step.*.error.message` are scrubbed (quoted literals and long digit runs masked) and ≤500 chars.
 
 ## 11. Conversation history (REST)
@@ -260,7 +277,8 @@ A picker reads what the server can run. The body is `Capabilities` (no user data
 
 * **1.4.0** (2026-10-25) — `GET /api/capabilities` (`Capabilities`, `StrategyOption`, `ModelOption`, `CostTier`) and
   typed `ChatRequest.options.{strategy, model}` with 422 validation (§12). Additive; requests without options are
-  unchanged.
+  unchanged. Docs: §1 error table now lists 410, 413 (1 MiB body cap) and 429 `rate_limited` (3 concurrent runs,
+  `Retry-After`); §10 describes the nonce CSP from #98/#139. Example streams regenerated (upper-case acronym labels).
 
 * **1.3.0** (2026-10-25) — `message.end.conversationTitle` (PHI-free server title, §11); conversation REST shapes as
   schema `$defs` (`ConversationSummary`, `ConversationPage`, `Conversation`, `StoredMessage`, `TranscriptsInfo`,
