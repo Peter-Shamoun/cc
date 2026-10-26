@@ -174,3 +174,9 @@ Recommendation: keep the Vite app (structure already mirrors the template, small
 - An ESLint rule banning direct `localStorage` use outside `prefs.ts`, and axe-core checks.
 - Shiki currently ships its full language bundle as lazy chunks. Switch to `shiki/core` with only sql, python, json and bash.
 - Playwright visual comparisons against logged-in reference screenshots.
+
+## Offline/online flapping
+
+- The browser fires `online` before the link actually carries traffic, so the first reconnect after an offline period often fails. `HttpAnalystAdapter` gives that one try for free (a 250 ms backoff that doesn't count against `maxRetries`). It gets one per real offline period, which keeps it bounded. Replayed events are still de-duplicated by `seq`.
+- The offline banner uses `useSettledOnline()` (`lib/useOnline.ts`): offline shows only after 1 s of continuous offline, and the banner hides as soon as the connection is back. The Send button still follows the raw `navigator.onLine`, so nothing is sent into a blip.
+- Tests: `adapters/http.flapping.test.ts`.
