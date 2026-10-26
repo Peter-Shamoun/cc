@@ -20,13 +20,12 @@ MISSING = "c_missing00000000"
 
 
 def _seed(c):
-    """One synthetic answer with a table (CSV file part) and a share link."""
+    """One synthetic answer with a table (CSV file part) and no share link (sharing was removed in 1.22.0)."""
     r = c.post("/api/chat", headers=LABS, json={"messages": [{"id": "u1", "role": "user", "text": "list all claims"}]})
     evs = events(r)
     cid, mid = evs[0]["conversationId"], evs[0]["messageId"]
     file_id = next(e["part"]["fileId"] for e in evs if e["type"] == "part" and e["part"]["type"] == "file")
-    share = c.put(f"/api/conversations/{cid}/share", headers=LABS, json={}).json()["shareId"]
-    return {"cid": cid, "mid": mid, "file": file_id, "share": share}
+    return {"cid": cid, "mid": mid, "file": file_id}
 
 
 def _chat(c, s):
@@ -68,15 +67,7 @@ ROUTES = {
     ("DELETE", "/api/conversations/{conversation_id}/messages/{message_id}/feedback"): lambda c, s: [
         c.delete(f"/api/conversations/{s['cid']}/messages/{s['mid']}/feedback", headers=LABS),
         c.delete(f"/api/conversations/{MISSING}/messages/m_x/feedback", headers=LABS)],
-    ("GET", "/api/conversations/{conversation_id}/share"): lambda c, s: [c.get(f"/api/conversations/{s['cid']}/share", headers=LABS),
-                                                                        c.get(f"/api/conversations/{MISSING}/share", headers=LABS)],
-    ("PUT", "/api/conversations/{conversation_id}/share"): lambda c, s: [c.put(f"/api/conversations/{s['cid']}/share", headers=LABS, json={"includeData": False}),
-                                                                        c.put(f"/api/conversations/{MISSING}/share", headers=LABS, json={})],
-    ("GET", "/api/shared/{share_id}"): lambda c, s: [c.get(f"/api/shared/{s['share']}", headers=COLLEAGUE),
-                                                    c.get(f"/api/shared/{s['share']}"), c.get("/api/shared/s_missing", headers=COLLEAGUE)],
     # Destructive routes last: each removes what it is given.
-    ("DELETE", "/api/conversations/{conversation_id}/share"): lambda c, s: [c.delete(f"/api/conversations/{s['cid']}/share", headers=LABS),
-                                                                           c.delete(f"/api/conversations/{s['cid']}/share", headers=LABS)],
     ("DELETE", "/api/conversations/{conversation_id}"): lambda c, s: [c.delete(f"/api/conversations/{s['cid']}", headers=LABS),
                                                                      c.delete(f"/api/conversations/{MISSING}", headers=LABS)],
 }

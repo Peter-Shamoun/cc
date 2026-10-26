@@ -62,16 +62,16 @@ Built HTML pins every script and stylesheet with **Subresource Integrity**, and 
 - [ ] Build the web app with `VITE_AUTH=cookie` and `VITE_SIGN_IN_URL`, and **without**
       `VITE_ANALYST_DEMO_TOKEN`.
 - [ ] Every cookie-authenticated write sends `x-cc-csrf: 1`. The API already enforces this; don't add CORS.
-- [ ] The sign-in URL's `next=` gets only the path. It can carry a share id (`/shared/sh_…`, share review S3), so the
+- [ ] The sign-in URL's `next=` gets only the path. It can carry a conversation id, so the
       IdP must not log or forward `next`.
 
 ## 5. Logs and PHI
 
 - [ ] Run the API through `create_app()` so its log redaction is installed: route-shaped access-log paths
-      (`/api/shared/:id`) and IPs truncated to /24 (IPv4) or /48 (IPv6). Under gunicorn or another server, check
+      (`/api/conversations/:id`) and IPs truncated to /24 (IPv4) or /48 (IPv6). Under gunicorn or another server, check
       that its access logger is `uvicorn.access`, or add `AccessLogFilter` to it.
 - [ ] **Edge and load-balancer access logs** (ALB, CloudFront, nginx) log the full request line, which includes
-      share ids and conversation ids. Either log the route shape, drop the path, or treat those logs as PHI-bearing
+      conversation and download ids. Either log the route shape, drop the path, or treat those logs as PHI-bearing
       (encrypted, access-controlled, with retention ≤ the transcript retention).
 - [ ] Error trackers and APM (Sentry, Datadog…) are off, or set to scrub URLs, request bodies and breadcrumbs. The
       web app sends nothing on its own (`connect-src 'self'`).
@@ -81,13 +81,15 @@ Built HTML pins every script and stylesheet with **Subresource Integrity**, and 
 - [ ] `CC_API_LLM` stays `scripted` until the BAA and model decision are signed off.
 - [ ] `CC_API_ALLOW_PAID_API` is unset everywhere except the one production environment that's approved for it.
 
-## 7. Shares (decided in contract 1.15.0)
+## 7. Sharing: removed (contract 1.22.0)
 
-From [the share security review](frontend_share_security_review.md). The demo API implements both (`api/share.py`, tests in `api/tests/test_share_115.py`). The real backend must keep this behavior:
-- [x] **S1**: turning `includeData` on issues a **new share id** and revokes the old one, so a link sent while data was off never starts showing rows.
-- [x] **S4**: every share expires. `expiresInDays` is 7, 30 or 90 days (default 30 days), counted from the PUT that set it. An expired share reads like a revoked one.
-- [ ] The share registry is persistent, scoped to the same customer key as transcripts, and revoked when the conversation is deleted. The demo keeps shares in memory.
-- [ ] The web share dialog shows the 7/30/90 choice and the expiry date (Shell). Expiry is server time; the client compares it with the server clock (`web/src/lib/serverClock.ts`), not the local clock.
+Peter decided on 2026-10-26 to remove sharing entirely. The API has no share routes, registry, expiry or rotation;
+`/api/conversations/{id}/share`, `/api/shared/*` and any `/api/share*` path return the standard 404 envelope
+(`api/tests/test_share_removed_122.py`). For the real backend:
+- [ ] Don't build a share registry or share links. Conversations stay owner-only (CONTRACT §1).
+- [ ] If an edge or proxy rule was added for `/shared/*` or `/api/shared/*` (e.g. `Referrer-Policy`), remove it, or
+      leave it in place: both paths are plain 404s now.
+- The [share security review](frontend_share_security_review.md) is kept only as history.
 
 ## 8. Environment variables the API reads
 
