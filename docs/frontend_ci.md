@@ -16,6 +16,7 @@ secrets and makes no paid API calls.
 | Unit tests | `npx vitest run --maxWorkers=2` | any test fails, including the guard tests below |
 | Build | `npx vite build` | the build fails |
 | Bundle budget | `node scripts/bundle_budget.mjs` | the gzipped initial JS, initial CSS, largest lazy chunk, total JS or asset count goes over `web/bundle-budget.json`, or any .wasm / WebAssembly-compiling chunk ships (the CSP forbids it) |
+| Subresource Integrity (local gate) | `node scripts/sri_check.mjs dist dist-mock` | an asset tag in index.html has no `integrity`/`crossorigin` or a wrong hash, a JS file in `assets/` is missing from the import map's `integrity`, or the map comes after a module script or has no nonce |
 | CSP check | `CSP_MODE=mock node scripts/csp_check.mjs` against `vite preview` of a mock build | a CSP violation, a console error, a missing security header, or row data in storage, the URL or the console |
 | API tests (separate job) | `pytest api/tests -q` | any API test fails |
 
