@@ -44,8 +44,10 @@ def test_include_data_shares_preview_rows_but_never_the_csv(client):
     cid, _, evs = _answer(client)
     first = _share(client, cid).json()
     again = _share(client, cid, includeData=True).json()
-    assert again["shareId"] == first["shareId"] and again["includeData"] is True  # one share per conversation
-    assert client.get(f"/api/conversations/{cid}/share", headers=LABS).json() == again
+    # 1.15.0 (S1): widening issues a new id and revokes the old one; still one share per conversation
+    assert again["shareId"] != first["shareId"] and again["includeData"] is True and again["rotated"] is True
+    assert client.get(f"/api/shared/{first['shareId']}", headers=COLLEAGUE).status_code == 404
+    assert client.get(f"/api/conversations/{cid}/share", headers=LABS).json()["shareId"] == again["shareId"]
     body = client.get(f"/api/shared/{again['shareId']}", headers=COLLEAGUE).json()
     table = next(p for m in body["messages"] for p in m.get("parts", []) if p["type"] == "table")
     assert table["rows"] and "dataWithheld" not in table and "csvFileId" not in table
