@@ -81,14 +81,13 @@ Built HTML pins every script and stylesheet with **Subresource Integrity**, and 
 - [ ] `CC_API_LLM` stays `scripted` until the BAA and model decision are signed off.
 - [ ] `CC_API_ALLOW_PAID_API` is unset everywhere except the one production environment that's approved for it.
 
-## 7. Shares (pending a contract decision)
+## 7. Shares (decided in contract 1.15.0)
 
-These are tracked from [the share security review](frontend_share_security_review.md) and are now with the Contract
-team:
-- [ ] **S1**: widening a share to include data issues a **new link**, so the old link keeps its narrower scope.
-- [ ] **S4**: shares expire. The default is **30 days**, with 7, 30 and 90 day options shown in the share dialog.
-- [ ] The share registry is persistent, scoped to the same customer key as transcripts, and revoked when the
-      conversation is deleted.
+From [the share security review](frontend_share_security_review.md). The demo API implements both (`api/share.py`, tests in `api/tests/test_share_115.py`). The real backend must keep this behavior:
+- [x] **S1**: turning `includeData` on issues a **new share id** and revokes the old one, so a link sent while data was off never starts showing rows.
+- [x] **S4**: every share expires. `expiresInDays` is 7, 30 or 90 days (default 30 days), counted from the PUT that set it. An expired share reads like a revoked one.
+- [ ] The share registry is persistent, scoped to the same customer key as transcripts, and revoked when the conversation is deleted. The demo keeps shares in memory.
+- [ ] The web share dialog shows the 7/30/90 choice and the expiry date (Shell). Expiry is server time; the client compares it with the server clock (`web/src/lib/serverClock.ts`), not the local clock.
 
 ## 8. Environment variables the API reads
 

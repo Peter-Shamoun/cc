@@ -151,6 +151,7 @@ test vectors in `web/src/lib/csvFilename.vectors.json`. The Content-Disposition 
 - **CSRF:** a cookie-borne sign-out needs `x-cc-csrf: 1` like every write, so a third-party page can't force a sign-out (403, no wipe).
 - **Audit:** `signed_out` is recorded with customer and user only, and only when the token was still valid.
 - **Client:** `signOut(base, session, {signInUrl})` in `web/src/auth/session.ts` POSTs and then navigates to sign-in, or reloads. The navigation also drops in-memory drafts and answers. It navigates away even when the request fails (offline), because the user asked to leave. No UI calls it yet: shell should wire a "Sign out" item once the real backend exists, since demo mode has no sign-in to return to.
+- **Other tabs:** `Clear-Site-Data` empties storage, but another open tab keeps its conversation on screen (in memory) until its next request. `signOut` therefore posts the constant `signed-out` on the `cc-auth` BroadcastChannel (no ids or data). Every cookie session listens (one listener per page) and leaves for sign-in with `next=<path>`, or reloads, which drops what's on screen. The signing-out tab ignores its own echo. Tests: `web/src/auth/crossTabSignOut.test.ts`.
 
 ## Caching and offline
 
