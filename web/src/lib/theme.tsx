@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { getPref, setPref } from './prefs';
+import { getPref, onPrefChange, setPref } from './prefs';
 
 /** Resolved colour mode actually painted. */
 export type Mode = 'light' | 'dark';
@@ -26,7 +26,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     mq.addEventListener?.('change', on);
     return () => mq.removeEventListener?.('change', on);
   }, []);
-  const [palette, setPaletteState] = useState<Palette>(() => (getPref('palette') as Palette) ?? 'neutral');
+  const [palette, setPaletteState] = useState<Palette>(() => { const p = getPref('palette'); return p === 'paper' || p === 'neutral' ? p : 'neutral'; });
+  // Theme or palette changed in another tab: follow it, like ChatGPT/Claude do. Invalid values are ignored.
+  useEffect(() => {
+    const offTheme = onPrefChange('theme', (v) => { if (v === 'light' || v === 'dark' || v === 'system') setPreference(v); });
+    const offPalette = onPrefChange('palette', (v) => { if (v === 'neutral' || v === 'paper') setPaletteState(v); });
+    return () => { offTheme(); offPalette(); };
+  }, []);
   const mode: Mode = preference === 'system' ? (osDark ? 'dark' : 'light') : preference;
   useEffect(() => {
     const el = document.documentElement;
