@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Code2 } from 'lucide-react';
-import { fmtMs, fmtTokens, fmtUsd, modelName } from './normalize';
+import { fmtMs, fmtTokens, fmtUsd, fmtUsdShort, modelName } from './normalize';
 import type { UsageView } from './provisional';
 
 const BAR = ['#7c9cbf', '#10a37f', '#e8b339', '#b58cd9', '#d97757'];
@@ -23,7 +23,7 @@ export function AnswerMeta({ usage, queries, repairs = 0, onSql, sqlOpen }: { us
   const bits = [
     queries > 0 && `${queries} ${queries === 1 ? 'query' : 'queries'}`,
     usage?.elapsedMs !== undefined && fmtMs(usage.elapsedMs),
-    usage?.costUsd !== undefined && `${usage.costIsEstimate ? '~' : ''}${fmtUsd(usage.costUsd)}`,
+    usage?.costUsd !== undefined && ((c) => `${usage.costIsEstimate && !c.startsWith('<') ? '~' : ''}${c}`)(fmtUsdShort(usage.costUsd)),
   ].filter(Boolean) as string[];
   const total = usage?.timing?.reduce((a, b) => a + b.ms, 0) ?? 0;
   return ( // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- Escape delegated from focused children

@@ -111,3 +111,30 @@ export function titledTooltips(spec: Record<string, unknown>): Record<string, un
   });
   return changed ? { ...spec, encoding: { ...enc, tooltip } } : spec;
 }
+
+/**
+ * Dates in answers are calendar dates ("2025-10-01" = October), which Vega parses as UTC midnight.
+ * Shown in local time they slip a day (Sep 30) and a monthly axis/tooltip starts a month early.
+ * Read every temporal field in UTC: `timeUnit` gets its `utc` prefix, positional channels without a
+ * timeUnit get a utc scale, and tooltip entries without one get `utcyearmonthdate`.
+ */
+const POSITIONAL = new Set(['x', 'y', 'x2', 'y2']);
+function utcUnit(u: unknown): unknown {
+  if (typeof u === 'string') return u.startsWith('utc') ? u : `utc${u}`;
+  if (isRecord(u) && typeof u.unit === 'string') return { ...u, unit: utcUnit(u.unit) };
+  return u;
+}
+function utcDef(def: unknown, channel: string): unknown {
+  if (Array.isArray(def)) return def.map((d) => utcDef(d, channel));
+  if (!isRecord(def) || def.type !== 'temporal') return def;
+  if (def.timeUnit !== undefined) return { ...def, timeUnit: utcUnit(def.timeUnit) };
+  if (POSITIONAL.has(channel)) return { ...def, scale: { type: 'utc', ...(isRecord(def.scale) ? def.scale : {}) } };
+  if (channel === 'tooltip') return { ...def, timeUnit: 'utcyearmonthdate' };
+  return def;
+}
+export function utcDates(spec: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...spec };
+  if (isRecord(spec.encoding)) out.encoding = Object.fromEntries(Object.entries(spec.encoding).map(([ch, d]) => [ch, utcDef(d, ch)]));
+  if (Array.isArray(spec.layer)) out.layer = spec.layer.map((l) => (isRecord(l) ? utcDates(l) : l));
+  return out;
+}
