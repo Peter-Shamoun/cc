@@ -1,4 +1,4 @@
-import { memo, useRef, type CSSProperties, type MutableRefObject, type RefObject } from 'react';
+import { memo, useEffect, useRef, type CSSProperties, type MutableRefObject, type RefObject } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { AssistantTurn, UserBubble, messageMarkdown, type Artifact } from '../components/Message';
 import type { ViewMessage } from '../lib/useChat';
@@ -141,6 +141,9 @@ export function ThreadView({ messages, busy, actions, scrollRef, scrollToIndexRe
     // Paint a window before the scrollport is measured, so the first frame is not blank.
     initialRect: { width: 720, height: 800 },
   });
+  // Memory: the closure below holds the virtualizer, whose element cache holds the rendered rows (tables, charts).
+  // Clear it on unmount, or leaving a long chat keeps its whole last window alive as detached DOM (~3k nodes).
+  useEffect(() => () => { if (scrollToIndexRef) scrollToIndexRef.current = null; }, [scrollToIndexRef]);
   if (scrollToIndexRef) {
     scrollToIndexRef.current = virtual
       ? (index) => { virtualizer.scrollToIndex(index, { align: 'start', behavior: 'auto' }); }

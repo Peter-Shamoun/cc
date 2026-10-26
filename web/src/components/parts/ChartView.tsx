@@ -51,6 +51,12 @@ export function ChartView(props: ChartViewProps) {
 function ChartViewInner({ part, onOpen, full, onShowSpec }: ChartViewProps) {
   const ref = useRef<HTMLDivElement>(null);
   const viewRef = useRef<View | null>(null);
+  // Memory: Vega keeps module-level references to the last SVG it drew, and that SVG reaches the View, whose `_el` is
+  // the element we embed into. If that were our React node, its parent chain would keep the whole unmounted
+  // thread window alive (~3k detached nodes after leaving a 25-turn chat). So Vega draws into a host div we
+  // own and detach on unmount; what Vega still holds then ends at that host.
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => () => { hostRef.current?.remove(); hostRef.current = null; }, []);
   const [err, setErr] = useState<string | null>(null);
   // QA-A2: keep a skeleton at the final height until vega has drawn, so the card never shows an empty frame.
   const [ready, setReady] = useState(false);
@@ -120,13 +126,21 @@ function ChartViewInner({ part, onOpen, full, onShowSpec }: ChartViewProps) {
         // 6x CPU: compile + parse + first render was one ~400 ms task mid-stream, with keystrokes stuck behind it.
         // Compile Vega-Lite here, yield to the main thread, then hand Vega the compiled spec: two shorter tasks.
         // Same result as embed's own vega-lite path (config applied by the compiler, Vega parses with {}, no hover).
+        // Swap in a fresh host right before drawing (embed clears its element the same way), so a theme switch
+        // keeps the old chart on screen until the new one is ready.
+        const host = (): HTMLDivElement => {
+          const h = document.createElement('div');
+          ref.current!.replaceChildren(h);
+          hostRef.current = h;
+          return h;
+        };
         if (vegaLite?.compile) {
           const vg = vegaLite.compile(JSON.parse(specKey), { config }).spec;
           await yieldToMain();
           if (!alive || !ref.current) return;
-          return embed(ref.current, vg, { ...base, mode: 'vega', config: {}, hover: false }).then(done);
+          return embed(host(), vg, { ...base, mode: 'vega', config: {}, hover: false }).then(done);
         }
-        return embed(ref.current, JSON.parse(specKey), { ...base, config }).then(done);
+        return embed(host(), JSON.parse(specKey), { ...base, config }).then(done);
       })
       .catch((e) => alive && setErr(String(e?.message ?? e)));
     return () => {
