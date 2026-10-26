@@ -78,7 +78,7 @@ function SourcesPopover({ rows, anchor, onClose }: { rows: SourceRow[]; anchor: 
     // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Escape-to-close on the dialog container (APG dialog pattern)
     <div ref={ref} role="dialog" aria-labelledby={`${id}-t`} tabIndex={-1} data-testid="sources-popover" style={pos ?? { top: -9999, left: -9999 }}
       onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } }}
-      className="fixed z-[60] max-h-[min(24rem,calc(100vh-16px))] w-[min(22rem,calc(100vw-16px))] overflow-auto rounded-2xl border border-line bg-elev p-1.5 font-sans text-sm text-fg shadow-[0_8px_30px_rgba(0,0,0,0.16)] outline-none motion-safe:animate-[cc-pop_120ms_ease-out]">
+      className="fixed z-[60] max-h-[min(24rem,calc(100vh-16px))] w-[min(22rem,calc(100vw-16px))] overflow-auto rounded-2xl border border-line bg-elev p-1.5 font-sans text-sm text-fg shadow-[var(--shadow-menu)] outline-none motion-safe:animate-[cc-pop_120ms_ease-out]">
       <div id={`${id}-t`} className="px-2.5 pb-1 pt-1.5 text-xs font-medium text-fg-subtle">{answer.length ? 'Data this answer used' : 'Data looked at'}</div>
       <ul className="space-y-0.5">{(answer.length ? answer : explored).map((r) => <SourceItem key={r.id} r={r} />)}</ul>
       {answer.length > 0 && explored.length > 0 && (
