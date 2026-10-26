@@ -2,7 +2,8 @@
 
 For each authored question: the author's gold SQL over sem.*, the author's answer-key SQL over ledger.*, and an
 independent verifier's answer-key SQL over ledger.* must all give the same result (bench/compare.py), the result
-must be non-trivial, and the verifier must not have flagged the question as ambiguous. Accepted questions are
+must be non-trivial, and the verifier must not have flagged the question as ambiguous. A question with no verifier
+(a single-author round) needs only the first two to agree, and its source says so. Accepted questions are
 dataset-independent SQL and join the hand-written set via bench/authored_questions.json.
 
     python -m bench.authored_questions ingest WORKFLOW_OUTPUT.json --snapshot DIR
@@ -74,17 +75,18 @@ def judge_question(q: dict, sem, ledger) -> tuple[bool, str]:
     try:
         gold = sem.execute(_strip_limit(q["gold_sql"])).fetchall()
         author_key = ledger.execute(_strip_limit(q["answer_key_sql"])).fetchall()
-        verifier_key = ledger.execute(_strip_limit(q["verifier"]["answer_key_sql"])).fetchall()
+        verifier_key = ledger.execute(_strip_limit(q["verifier"]["answer_key_sql"])).fetchall() if "verifier" in q else None
     except Exception as e:                                             # noqa: BLE001
         return False, f"sql error: {str(e)[:120]}"
     if not gold or all(all((v or 0) == 0 for v in r if not isinstance(v, str)) for r in gold):
         return False, "trivial result"
     spec = {"tol": 0.01}
-    for label, other in (("author answer key", author_key), ("verifier answer key", verifier_key)):
+    keys = [("author answer key", author_key)] + ([("verifier answer key", verifier_key)] if verifier_key is not None else [])
+    for label, other in keys:
         ok, why = match(other, gold, spec)
         if not ok:
             return False, f"gold != {label}: {why}"
-    return True, "three-way agreement"
+    return True, "three-way agreement" if verifier_key is not None else "two-way agreement (single author)"
 
 
 def ingest(workflow_output: Path, snapshot_path: Path, question_set: str | None = None) -> dict:
@@ -106,7 +108,8 @@ def ingest(workflow_output: Path, snapshot_path: Path, question_set: str | None 
             accepted.append(dict(id=qid, category=q["category"].replace(" ", "_"), difficulty=q["difficulty"],
                                  question=q["question"], gold_sql=_strip_limit(q["gold_sql"]),
                                  answer_key_sql=_strip_limit(q["answer_key_sql"]), compare=_compare_spec(q["gold_sql"], sem),
-                                 source="opus-authored, verified by independent answer key", interpretation=q["interpretation"],
+                                 source="opus-authored, verified by independent answer key" if "verifier" in q
+                                 else "opus-authored, single author: gold over sem.* matches its own ledger answer key", interpretation=q["interpretation"],
                                  **({"question_set": question_set} if question_set else {})))
             seen.add(qid)
     ACCEPTED_PATH.write_text(json.dumps(accepted, indent=1))
