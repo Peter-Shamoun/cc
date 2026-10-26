@@ -56,7 +56,6 @@ export function TableSql({ query }: { query: QueryInfo }) {
     <div className="-mt-1 mb-3 font-sans text-xs" data-testid="table-sql">
       <button type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen((o) => !o)} className="inline-flex items-center gap-1 rounded-md py-0.5 text-fg-subtle hover:text-fg">
         <Code2 size={13} aria-hidden /> View SQL {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-        {query.durationMs !== undefined && <span className="tabular-nums">· {fmtMs(query.durationMs)}</span>}
       </button>
       <div id={id} hidden={!open}>{open && <CodeBlock code={query.sql} language="sql" title={query.label} />}</div>
     </div>

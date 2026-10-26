@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import App from '../../App';
 import { reduce, newAssistantView, type AssistantView, type StreamEvent, type ToolCallPart } from '../../lib/contract';
 import { AssistantTurn, messageMarkdown } from '../Message';
-import { pastTense, unresolvedFailures, stepsOf, summarize, toStep, fmtUsd } from './normalize';
+import { pastTense, unresolvedFailures, stepsOf, summarize, toStep, fmtUsd, fmtMs } from './normalize';
 import { queriesOf } from './SqlInspector';
 import { ANSWER_FIXTURES } from '../../fixtures/answer';
 import { DUP_V1_ANSWER, DUP_V1_STEPS } from '../../fixtures/answerV1';
@@ -67,8 +67,12 @@ describe('answer surface: components', () => {
     expect(screen.getByTestId('step-summary')).toHaveAttribute('aria-expanded', 'true');
     rerender(<AssistantTurn msg={viewOf('dup-denials')} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} />);
     expect(screen.getByTestId('step-summary')).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getByTestId('step-summary').textContent).toMatch(/^Ran 2 queries, 1 repair, 4 checks, compared candidates · 8\.4s/);
+    // QA-A10: one "Thought for …" row; the counts join the header once it is expanded.
+    expect(screen.getByTestId('step-summary').textContent).toMatch(/^Thought for \d+(\.\d)?s(all failures repaired)?$/);
+    expect(screen.queryByTestId('reasoning')).toBeNull();
     fireEvent.click(screen.getByTestId('step-summary'));
+    expect(screen.getByTestId('step-summary').textContent).toMatch(/· Ran 2 queries, 1 repair, 4 checks, compared candidates/);
+    expect(screen.getByTestId('reasoning-summary')).toBeInTheDocument();
     expect(screen.getByTestId('repair-preview')).toHaveTextContent('Binder Error');
     const rows = screen.getAllByTestId('step');
     fireEvent.click(within(rows[2]).getAllByRole('button')[0]);
@@ -132,7 +136,10 @@ describe('answer surface: contract v1 events', () => {
   it('renders live steps, then escalation pill, v1 table link and rich usage', () => {
     const { rerender } = render(<AssistantTurn msg={v1(DUP_V1_STEPS.slice(0, 8))} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} />);
     expect(screen.getByTestId('step-timeline')).toHaveAttribute('data-live', 'true');
-    expect(screen.getByTestId('step-summary')).toHaveTextContent('Re-running repaired query…');
+    // QA-A7: the header no longer repeats the running step; the step appears once, as its own row.
+    expect(screen.getByTestId('step-summary').textContent).toMatch(/^Thinking…/);
+    expect(screen.getAllByText(/Re-running repaired query/)).toHaveLength(1);
+    expect(screen.queryByTestId('status')).toBeNull();
     expect(screen.getByTestId('table-skeleton')).toBeInTheDocument();
     rerender(<AssistantTurn msg={v1([...DUP_V1_STEPS, ...DUP_V1_ANSWER])} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} />);
     expect(screen.getByTestId('step-summary')).toHaveAttribute('aria-expanded', 'false');
@@ -154,7 +161,7 @@ describe('answer surface: contract v1 events', () => {
     const st = (kind: string, state: string) => ({ id: kind + state + Math.random(), kind, state, label: kind }) as never;
     expect(unresolvedFailures([st('sql', 'error'), st('repair', 'error'), st('sql', 'error'), st('escalation', 'ok'), st('sql', 'ok')])).toBe(0);
     expect(unresolvedFailures([st('sql', 'ok'), st('sql', 'error')])).toBe(1);
-    expect(summarize([{ id: 'e', kind: 'explore', state: 'ok', label: 'Read schema', durationMs: 13 }])).toBe('Explored the data · 13 ms');
+    expect(summarize([{ id: 'e', kind: 'explore', state: 'ok', label: 'Read schema', durationMs: 13 }])).toBe('Explored the data · 13ms');
   });
   it('agent tags only show when more than one agent worked on the answer (QA-A6)', () => {
     const row = (id: string, agent: string) => ({ id, kind: 'sql' as const, state: 'ok' as const, label: 'Ran query', agent });
@@ -207,5 +214,29 @@ describe('answer surface: clarify flow (App)', () => {
     await waitFor(() => expect(screen.getAllByTestId('msg-user')).toHaveLength(2));
     await waitFor(() => expect(screen.getAllByTestId('data-table').length).toBeGreaterThan(0), { timeout: 5000 });
     expect(screen.getAllByTestId('clarify-chip').every((b) => (b as HTMLButtonElement).disabled)).toBe(true);
+  });
+});
+
+describe('QA C3 polish', () => {
+  it('fmtMs uses one compact format (QA-A14)', () => {
+    expect(fmtMs(7)).toBe('7ms');
+    expect(fmtMs(1000)).toBe('1s');
+    expect(fmtMs(1234)).toBe('1.2s');
+    expect(fmtMs(65_000)).toBe('1m 5s');
+  });
+  it('step timelines are uniquely named groups, not repeated landmarks (QA-A11)', () => {
+    render(<><StepTimeline steps={[{ id: 'a', kind: 'sql', state: 'ok', label: 'Ran query', durationMs: 7 }]} live={false} /><StepTimeline steps={[{ id: 'b', kind: 'sql', state: 'ok', label: 'Ran query', durationMs: 9 }]} live={false} /></>);
+    const groups = screen.getAllByRole('group');
+    expect(groups).toHaveLength(2);
+    expect(screen.queryAllByRole('region')).toHaveLength(0);
+    const ids = groups.map((g) => g.getAttribute('aria-labelledby'));
+    expect(new Set(ids).size).toBe(2);
+    expect(document.getElementById(ids[0]!)?.textContent).toMatch(/^Thought for/);
+  });
+  it('clarify question renders inline markdown, not raw asterisks (QA-A8)', () => {
+    render(<ClarifyCard part={{ type: 'clarification', id: 'c', question: 'By **claim count** or by **billed dollars**?', options: [] } as never} onReply={noop} active />);
+    const q = screen.getByTestId('clarify-question');
+    expect(q.textContent).toBe('By claim count or by billed dollars?');
+    expect(q.querySelectorAll('strong')).toHaveLength(2);
   });
 });
