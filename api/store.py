@@ -39,6 +39,7 @@ class TranscriptStore(Protocol):
     def get_conversation(self, principal: Principal, conversation_id: str) -> dict | None: ...
     def append_message(self, principal: Principal, conversation_id: str, message: dict) -> None: ...
     def rename_conversation(self, principal: Principal, conversation_id: str, title: str) -> dict | None: ...
+    def auto_title(self, principal: Principal, conversation_id: str, title: str) -> bool: ...
     def delete_conversation(self, principal: Principal, conversation_id: str) -> bool: ...
     def delete_all(self, principal: Principal) -> int: ...
     def set_retention(self, principal: Principal, days: int) -> None: ...
@@ -153,6 +154,15 @@ class InMemoryTranscriptStore:
                 return None
             conv["title"] = title
             return {"id": conv["id"], "title": title, "updatedAt": _iso(conv["updatedAt"])}
+
+    def auto_title(self, principal, conversation_id, title):
+        """Server-derived title (api.titles). Only replaces the generic title, so a user rename always wins."""
+        with self._lock:
+            conv = self._mine(principal, conversation_id)
+            if conv is None or conv["title"] != DEFAULT_TITLE:
+                return False
+            conv["title"] = clean_title(title)
+            return True
 
     def owner_of(self, conversation_id):
         with self._lock:

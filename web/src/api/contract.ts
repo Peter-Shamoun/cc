@@ -20,7 +20,7 @@ export type {
   Sensitivity, StatusPart, TablePart, TextPart, ToolCallPart, ArtifactPart, PartBase,
 };
 
-export const CONTRACT_VERSION = '1.2.0';
+export const CONTRACT_VERSION = '1.3.0';
 export const CONTRACT_MAJOR = 1;
 
 // ---------------------------------------------------------------- new parts (v1)
@@ -125,7 +125,11 @@ export interface ReasoningEndEvent extends Seq { type: 'reasoning.end'; partId: 
 export interface CodeDeltaEvent extends Seq { type: 'code.delta'; partId: ID; delta: string }
 export interface PartEvent extends Seq { type: 'part'; part: Part }
 export interface PartPatchEvent extends Seq { type: 'part.patch'; partId: ID; patch: Record<string, unknown> }
-export interface MessageEndEvent extends Seq { type: 'message.end'; messageId: ID; finishReason: FinishReason; usage: Usage }
+export interface MessageEndEvent extends Seq {
+  type: 'message.end'; messageId: ID; finishReason: FinishReason; usage: Usage;
+  /** 1.3.0: PHI-free title the server derived and already stored (first answer, generic title only). */
+  conversationTitle?: string;
+}
 export interface HeartbeatEvent { type: 'heartbeat'; at?: ISODate }
 
 export type StepEvent = StepSqlRunningEvent | StepSqlResultEvent | StepRepairAttemptEvent | StepCheckEvent | StepExploreEvent | StepCandidatesEvent;
