@@ -21,3 +21,4 @@ sequence drifts from these files.
 Ids such as `csvFileId` are normalised, so `/api/download/<id>` will 404 when an example is replayed.
 
 `capabilities.json` is `GET /api/capabilities` from the demo backend (contract 1.4.0, CONTRACT.md §12); `web/src/contract/capabilities.ts` mirrors it for offline/mock mode.
+`feedback.json` is a `PUT …/messages/{id}/feedback` request and response (contract 1.7.0, CONTRACT.md §13), plus the `DELETE` that clears it.

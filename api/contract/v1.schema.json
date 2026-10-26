@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://claimclarity.local/api/contract/v1.schema.json",
   "title": "ClaimClarity chat stream contract",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "One JSON object per SSE data: line. See api/CONTRACT.md. Validate an event against #/$defs/StreamEvent.",
   "$ref": "#/$defs/StreamEvent",
   "$defs": {
@@ -2144,6 +2144,10 @@
         },
         "usage": {
           "$ref": "#/$defs/Usage"
+        },
+        "feedback": {
+          "$ref": "#/$defs/Feedback",
+          "description": "Assistant messages: the user's thumbs up/down (1.7.0)."
         }
       },
       "additionalProperties": true
@@ -2416,6 +2420,13 @@
             "public"
           ],
           "description": "'organization' when the request was signed in, so `available` reflects the caller's organization; 'public' otherwise (everything shows available; the chat request is still checked)."
+        },
+        "feedbackReasons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FeedbackReason"
+          },
+          "description": "1.7.0: reason chips for answer feedback, grouped by rating."
         }
       },
       "additionalProperties": true
@@ -2456,6 +2467,90 @@
         "type": "integer",
         "minimum": 0
       }
+    },
+    "FeedbackRating": {
+      "enum": [
+        "up",
+        "down"
+      ]
+    },
+    "FeedbackReason": {
+      "type": "object",
+      "description": "A reason chip for one rating (1.7.0). Listed in Capabilities.feedbackReasons; ids are stable.",
+      "required": [
+        "id",
+        "label",
+        "rating"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "rating": {
+          "$ref": "#/$defs/FeedbackRating"
+        }
+      },
+      "additionalProperties": true
+    },
+    "FeedbackRequest": {
+      "type": "object",
+      "description": "PUT /api/conversations/{conversationId}/messages/{messageId}/feedback (1.7.0). Assistant messages only. Replaces earlier feedback; DELETE on the same path clears it ({cleared: true}). 422 validation for an unknown reason, a reason of the other rating, or a user message; 404 for an unknown or someone else's message.",
+      "required": [
+        "rating"
+      ],
+      "properties": {
+        "rating": {
+          "$ref": "#/$defs/FeedbackRating"
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 9,
+          "description": "FeedbackReason ids matching the rating."
+        },
+        "comment": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Optional free text. Treated like message text: stored with the transcript, never logged."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Feedback": {
+      "type": "object",
+      "description": "Stored feedback on an answer: the PUT response (with messageId) and StoredMessage.feedback.",
+      "required": [
+        "rating",
+        "reasons",
+        "updatedAt"
+      ],
+      "properties": {
+        "messageId": {
+          "$ref": "#/$defs/ID"
+        },
+        "rating": {
+          "$ref": "#/$defs/FeedbackRating"
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "comment": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO-8601 UTC"
+        }
+      },
+      "additionalProperties": true
     }
   }
 }

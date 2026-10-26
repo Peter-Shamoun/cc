@@ -1,0 +1,26 @@
+{
+  "method": "PUT",
+  "path": "/api/conversations/c_1/messages/m_1/feedback",
+  "request": {
+    "rating": "down",
+    "reasons": [
+      "wrong_numbers"
+    ],
+    "comment": "Totals look high for March."
+  },
+  "response": {
+    "messageId": "m_1",
+    "rating": "down",
+    "reasons": [
+      "wrong_numbers"
+    ],
+    "updatedAt": "2026-10-25T20:00:00Z",
+    "comment": "Totals look high for March."
+  },
+  "clear": {
+    "method": "DELETE",
+    "response": {
+      "cleared": true
+    }
+  }
+}

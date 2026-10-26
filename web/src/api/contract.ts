@@ -20,7 +20,7 @@ export type {
   Sensitivity, StatusPart, TablePart, TextPart, ToolCallPart, ArtifactPart, PartBase,
 };
 
-export const CONTRACT_VERSION = '1.6.0';
+export const CONTRACT_VERSION = '1.7.0';
 export const CONTRACT_MAJOR = 1;
 
 // ---------------------------------------------------------------- new parts (v1)
@@ -166,6 +166,8 @@ export function isStepEvent(ev: { type: string }): ev is StepEvent {
 
 /** GET /api/capabilities: strategies + models for a picker. Generated from the schema (single source of truth). */
 export type { Capabilities, StrategyOption, ModelOption, CostTier } from '../contract/v1.gen';
+/** 1.7.0: answer feedback (CONTRACT.md §13). Client: src/contract/feedback.ts. */
+export type { Feedback, FeedbackRating, FeedbackReason, FeedbackRequest } from '../contract/v1.gen';
 
 // ---------------------------------------------------------------- requests
 

@@ -13,6 +13,7 @@ import re
 import threading
 import time
 from dataclasses import dataclass, field
+from typing import Literal
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
@@ -31,6 +32,7 @@ from api.mapping import outcome_parts
 from api.redact import install_log_redaction
 from api.security import MAX_BODY_BYTES, BodyLimitMiddleware, ErrorShieldMiddleware, SecurityHeadersMiddleware
 from api.store import DownloadRegistry, Principal
+from api.feedback import MAX_COMMENT, check as check_feedback, record as feedback_record
 from api.capabilities import DEFAULT_STRATEGY, capabilities as capabilities_body, check_options
 from api.titles import title_from_parts
 from api.transcripts import CustomerKeyDisabled, make_store
@@ -46,6 +48,12 @@ _SAFE_ID = re.compile(_ID)
 
 class RenameIn(BaseModel):
     title: str = Field(max_length=500)
+
+
+class FeedbackIn(BaseModel):
+    rating: Literal["up", "down"]
+    reasons: list[str] = Field(default_factory=list, max_length=9)
+    comment: str | None = Field(default=None, max_length=MAX_COMMENT)
 
 
 class SearchIn(BaseModel):
@@ -659,6 +667,44 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         audit("conversation_renamed", customer=ctx.principal.customer, user=ctx.principal.user,
               conversation_id=conversation_id)
         return JSONResponse(out, headers=NO_STORE)
+
+    @app.put("/api/conversations/{conversation_id}/messages/{message_id}/feedback")
+    def put_feedback(conversation_id: str, message_id: str, body: FeedbackIn, request: Request):
+        """Thumbs up/down on an assistant answer (contract 1.7.0, §13). Replaces any earlier feedback."""
+        return _feedback(conversation_id, message_id, body, request)
+
+    @app.delete("/api/conversations/{conversation_id}/messages/{message_id}/feedback")
+    def delete_feedback(conversation_id: str, message_id: str, request: Request):
+        return _feedback(conversation_id, message_id, None, request)
+
+    def _feedback(conversation_id: str, message_id: str, body: FeedbackIn | None, request: Request):
+        try:
+            ctx = authed(request, new_id("r"))
+        except AuthError:
+            return unauthorized()
+        if not (_SAFE_ID.match(conversation_id) and _SAFE_ID.match(message_id)):
+            return not_found()
+        record = None
+        if body is not None:
+            problem = check_feedback(body.rating, body.reasons)
+            if problem:
+                return error_json("validation", problem, 422)
+            record = feedback_record(body.rating, body.reasons, body.comment)
+        try:
+            result = store.set_feedback(ctx.principal, conversation_id, message_id, record)
+        except CustomerKeyDisabled:
+            return shredded()
+        if result == "missing":
+            return not_found()
+        if result == "not_assistant":
+            return error_json("validation", "Feedback is for answers, not questions.", 422)
+        # rating + reason ids only: the comment is user text, like a message, and never leaves the transcript
+        audit("answer_feedback", customer=ctx.principal.customer, user=ctx.principal.user,
+              conversation_id=conversation_id, message_id=message_id,
+              kind=record["rating"] if record else "cleared", reason=",".join(record["reasons"]) if record else "")
+        if record is None:
+            return JSONResponse({"cleared": True}, headers=NO_STORE)
+        return JSONResponse({"messageId": message_id, **record}, headers=NO_STORE)
 
     @app.delete("/api/conversations/{conversation_id}")
     def delete_conversation(conversation_id: str, request: Request):

@@ -22,6 +22,7 @@ import time
 from dataclasses import dataclass
 from typing import Protocol
 
+from api.feedback import apply as apply_feedback
 from api.ids import new_id
 
 DEFAULT_TITLE = "New analysis"
@@ -42,6 +43,7 @@ class TranscriptStore(Protocol):
     def append_message(self, principal: Principal, conversation_id: str, message: dict) -> None: ...
     def rename_conversation(self, principal: Principal, conversation_id: str, title: str) -> dict | None: ...
     def auto_title(self, principal: Principal, conversation_id: str, title: str) -> bool: ...
+    def set_feedback(self, principal: Principal, conversation_id: str, message_id: str, feedback: dict | None) -> str: ...
     def delete_conversation(self, principal: Principal, conversation_id: str) -> bool: ...
     def delete_all(self, principal: Principal) -> int: ...
     def set_retention(self, principal: Principal, days: int) -> None: ...
@@ -165,6 +167,12 @@ class InMemoryTranscriptStore:
                 return False
             conv["title"] = clean_title(title)
             return True
+
+    def set_feedback(self, principal, conversation_id, message_id, feedback):
+        """'ok' | 'missing' (no such conversation/message for this user) | 'not_assistant' (api.feedback.apply)."""
+        with self._lock:
+            conv = self._mine(principal, conversation_id)
+            return "missing" if conv is None else apply_feedback(conv, message_id, feedback)
 
     def owner_of(self, conversation_id):
         with self._lock:
