@@ -72,12 +72,15 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -
 .prose-chat .katex-display { display: block; margin: 0.75em 0; padding: 0.125em 0; text-align: center; overflow-x: auto; overflow-y: hidden; max-width: 100%; overflow-wrap: normal; word-break: normal; }
 .prose-chat .katex-display > .katex { display: inline-block; white-space: nowrap; text-align: initial; }
 .prose-chat :where(p) { margin: 0 0 var(--p-gap); }
-.prose-chat :where(ul, ol) { margin: 0.4em 0 var(--p-gap); padding-left: 1.5em; }
+.prose-chat :where(ul, ol) { margin: 0.4em 0 var(--p-gap); padding-inline-start: 1.5em; }
 .prose-chat :where(ul) { list-style: disc; }
 .prose-chat :where(ol) { list-style: decimal; }
 .prose-chat :where(li) { margin: 0.3em 0; }
 .prose-chat :where(li > p) { margin: 0; }
 .prose-chat :where(li > :is(ul, ol)) { margin: 0.2em 0; }
+/* Streamdown gives each block its own dir="auto": an RTL item inside an LTR list would hang its marker off
+   the right edge of the column (outside the list's start padding). Keep the marker inside the item. */
+.prose-chat :where(li[dir="rtl"]) { list-style-position: inside; }
 .prose-chat :where(h1, h2, h3) { font-family: var(--heading-font); font-weight: 600; line-height: 1.33; margin: 1.4em 0 0.45em; }
 /* A heading right after a heading or at a list's head should not open a double gap. */
 .prose-chat :where(h1, h2, h3) + :where(h2, h3) { margin-top: 0.5em; }
@@ -88,9 +91,9 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -
 .prose-chat :where(a) { color: var(--link); text-decoration: underline; text-underline-offset: 2px; }
 .prose-chat :where(:not(pre) > code) { font-family: var(--font-mono); font-size: 0.875em; font-weight: 500; background: var(--bg-muted); padding: 0.125em 0.3em; border-radius: 0.3rem; overflow-wrap: anywhere; }
 .prose-chat :where(table) { width: 100%; border-collapse: collapse; margin: 0.75em 0 1.25em; font-size: 14px; font-family: var(--font-sans); font-variant-numeric: tabular-nums; line-height: 1.5; }
-.prose-chat :where(th) { text-align: left; font-weight: 600; border-bottom: 1px solid var(--border-strong); padding: 0.5em 0.75em; }
+.prose-chat :where(th) { text-align: start; font-weight: 600; border-bottom: 1px solid var(--border-strong); padding: 0.5em 0.75em; }
 .prose-chat :where(td) { border-bottom: 1px solid var(--border); padding: 0.5em 0.75em; }
-.prose-chat :where(blockquote) { border-left: 3px solid var(--border-strong); padding-left: 1em; color: var(--fg-muted); }
+.prose-chat :where(blockquote) { border-inline-start: 3px solid var(--border-strong); padding-inline-start: 1em; color: var(--fg-muted); }
 .prose-chat > :first-child { margin-top: 0; }
 .prose-chat > :last-child { margin-bottom: 0; }
 
