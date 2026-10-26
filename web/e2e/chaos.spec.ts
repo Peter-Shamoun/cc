@@ -26,11 +26,14 @@ test.describe('chaos: stream faults @chaos', () => {
     const errs = crashWatch(page);
     let cut = 0;
     let nextFull = false;
+    // A real server mints a fresh message id per run; the canned example has a fixed one, so re-key it per request.
+    let req = 0;
+    const fresh = (evs: Ev[]) => { const id = `m_chaos_${req++}`; return evs.map((e) => ('messageId' in e ? { ...e, messageId: id } : e)); };
     await page.route('**/api/chat', async (route) => {
       if (route.request().method() !== 'POST') return route.continue();
-      if (nextFull) { nextFull = false; return route.fulfill(fulfillSse(sse(full))); }
+      if (nextFull) { nextFull = false; return route.fulfill(fulfillSse(sse(fresh(full)))); }
       if (cut === 0) return route.abort('connectionreset');
-      return route.fulfill(fulfillSse(sse(full.slice(0, cut))));
+      return route.fulfill(fulfillSse(sse(fresh(full.slice(0, cut)))));
     });
     await open(page, LIVE);
     const bad: string[] = [];
@@ -43,7 +46,18 @@ test.describe('chaos: stream faults @chaos', () => {
       if (!ended && !hasRetry) bad.push(`cut ${cut} (${full[cut - 1]?.type ?? 'pre-request'}): no Retry; text="${txt.slice(0, 60)}"`);
       if (cut % 7 === 3 && hasRetry) {
         nextFull = true;
-        await a.getByRole('button', { name: /^retry/i }).first().click();
+        const ok = await a.getByRole('button', { name: /^retry/i }).first().click({ timeout: 10_000 }).then(() => true, () => false);
+        if (!ok) {
+          const churn = await page.evaluate(async () => {
+            let n = 0; const ex: string[] = [];
+            const mo = new MutationObserver((ms) => { for (const m of ms) { n++; if (ex.length < 6) ex.push(`${m.type} ${(m.target as Element).tagName ?? '#text'}.${String((m.target as Element).className ?? '').slice(0, 50)} +${m.addedNodes.length}-${m.removedNodes.length}`); } });
+            mo.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+            await new Promise((r) => setTimeout(r, 2000)); mo.disconnect(); return `${n} mutations/2s: ${ex.join(' ; ')}`;
+          });
+          bad.push(`cut ${cut}: Retry not clickable (DOM churn ${churn})`);
+          nextFull = false;
+          continue;
+        }
         await waitIdle(page);
         await expect(lastAssistant(page).getByRole('button', { name: /^retry/i })).toHaveCount(0);
       }
@@ -194,7 +208,6 @@ test.describe('chaos: reload at every stage @chaos', () => {
 
 test.describe('chaos: multi-tab @chaos', () => {
   test('a chat created in tab A appears in tab B when B regains focus', async ({ context }) => {
-    gap('QA-S21');
     const a = await context.newPage();
     const b = await context.newPage();
     await open(a, LIVE); await open(b, LIVE);
@@ -215,9 +228,14 @@ test.describe('chaos: multi-tab @chaos', () => {
     b.on('pageerror', (e) => errs.push(e.message));
     await b.goto(url);
     await expect(b.getByTestId('msg-user').first()).toBeVisible();
-    const id = url.split('/').pop()!;
-    const del = await a.request.delete(`${new URL(url).origin}/api/conversations/${id}`);
-    expect(del.ok()).toBeTruthy();
+    // Delete it from tab A's sidebar (the API needs the app's session + CSRF headers, so go through the UI).
+    await a.bringToFront();
+    await a.getByRole('button', { name: /^Options for / }).first().click();
+    await a.getByRole('menuitem', { name: 'Delete' }).click();
+    const confirm = a.getByRole('dialog').getByRole('button', { name: /^Delete/ });
+    if (await confirm.count()) await confirm.click();
+    await expect(a.getByText(/deleted/i).first()).toBeVisible();
+    await a.waitForTimeout(6_000); // let the Undo window lapse so the delete is committed server-side
     await b.bringToFront();
     await ask(b, 'follow-up after delete', { wait: false });
     await expect(stopBtn(b)).toHaveCount(0, { timeout: 20_000 });
