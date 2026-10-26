@@ -1,11 +1,12 @@
 // QA SOTA parity review: screenshot every screen/state and collect measurable rubric signals.
-// Usage: node e2e/review/review.mjs <outDir> [live=http://127.0.0.1:5240/] [mock=http://127.0.0.1:5241/]
+// Usage: node e2e/review/review.mjs <outDir>   (needs the demo API on E2E_API_PORT and builds in e2e/.dist; no web server)
 import { chromium } from 'playwright';
 import AxeBuilder from '@axe-core/playwright';
 import fs from 'node:fs';
 import path from 'node:path';
+import { distRoutes, LIVE, MOCK } from '../static.mjs';
 
-const [out, LIVE = 'http://127.0.0.1:5240/', MOCK = 'http://127.0.0.1:5241/'] = process.argv.slice(2);
+const [out] = process.argv.slice(2);
 fs.mkdirSync(out, { recursive: true });
 const browser = await chromium.launch({ executablePath: fs.existsSync('/usr/bin/google-chrome') ? '/usr/bin/google-chrome' : undefined });
 const report = { shots: [], axe: {}, metrics: {}, console: [], errors: [] };
@@ -13,6 +14,7 @@ const contractDir = path.resolve(path.dirname(new URL(import.meta.url).pathname)
 
 async function newPage(url, { theme = 'light', palette = 'neutral', w = 1440, h = 900, mobile = false, reduced = false } = {}) {
   const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: mobile ? 2 : 1, isMobile: mobile, hasTouch: mobile, reducedMotion: reduced ? 'reduce' : 'no-preference', acceptDownloads: true });
+  await distRoutes(ctx);
   await ctx.addInitScript(([t, p]) => { localStorage.setItem('cc.pref.theme', t); localStorage.setItem('cc.pref.palette', p); }, [theme, palette]);
   const pg = await ctx.newPage();
   pg.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') report.console.push(`${m.type()}: ${m.text().slice(0, 200)}`); });
@@ -193,7 +195,7 @@ await safe('perf', async () => {
 });
 
 // ---------- 8. Contract v1 scenarios on the live demo (C2+). PACED = API with realistic model/stream delays ----------
-const PACED = process.env.REVIEW_PACED_URL ?? LIVE;
+const PACED = LIVE; // run the single API with CC_API_MODEL_DELAY_SECONDS / CC_API_STREAM_DELAY_SECONDS for realistic pacing
 const sse = (evs) => evs.map((e) => `data: ${JSON.stringify(e)}\n\n`).join('');
 await safe('v1 repair paced', async () => {
   const pg = await newPage(PACED);

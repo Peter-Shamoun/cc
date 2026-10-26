@@ -1,8 +1,10 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import AxeBuilder from '@axe-core/playwright';
 import { MOCK, open, ask } from './helpers';
 
 const scan = async (page: import('@playwright/test').Page) => {
+  // Let entry fades finish: axe reads mid-fade opacity as a contrast failure (seen in C2 under load).
+  await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running' || a.effect?.getComputedTiming().iterations === Infinity), undefined, { timeout: 5_000 }).catch(() => {});
   const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
   const serious = r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
   test.info().attachments.push({ name: 'axe.json', contentType: 'application/json', body: Buffer.from(JSON.stringify(r.violations, null, 2)) });
