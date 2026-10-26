@@ -71,13 +71,20 @@ describe('http adapter: auth expiry and rate limits mid-stream', () => {
     const urls: string[] = [];
     vi.stubGlobal('fetch', vi.fn(async (u: string) => { urls.push(u); return res.shift() ?? json(404, 'not_found'); }));
     const { s } = session();
-    const { result } = renderHook(() => useChat(new HttpAnalystAdapter('', s, { retryBaseMs: 1 }), new MemoryTranscriptStore()));
-    act(() => { void result.current.send('q'); });
+    // One adapter and store for the hook's lifetime, and the turn is awaited to the end: an unawaited send could
+    // commit a render after this file's jsdom was torn down ("window is not defined", seen once under load).
+    const adapter = new HttpAnalystAdapter('', s, { retryBaseMs: 1 });
+    const store = new MemoryTranscriptStore();
+    const { result } = renderHook(() => useChat(adapter, store));
+    let done!: Promise<void>;
+    act(() => { done = result.current.send('q'); });
     await waitFor(() => expect((result.current.messages.at(-1) as AssistantMessage | undefined)?.parts?.some((p) => p.type === 'error')).toBe(true), { timeout: 3000 });
     expect(urls).toEqual(['/api/chat', '/api/chat/m1/stream']);
     const last = result.current.messages.at(-1) as AssistantMessage;
     expect(JSON.stringify(last.parts)).toContain('Denials rose 4% in Q3.');
     expect(last.parts.find((p) => p.type === 'error')).toMatchObject({ code: 'auth_expired', retryable: false });
     expect(JSON.stringify(result.current.messages)).not.toContain('Connection lost');
+    await act(async () => { await done; });
+    expect(result.current.busy).toBe(false);
   });
 });
