@@ -21,7 +21,7 @@ Question tags: `screen1` is the 36-question screen (`research/screening_question
 template when that screen drew an instance of it. `heldout` is `heldout_hard_1` (27 questions authored after
 the pitfalls text, by authors who did not see it). Everything else is `other`.
 
-Documents scored: 115 (screen1 36, heldout 27, other 52).
+Documents scored: 205 (screen1 36, heldout 27, other 142).
 
 ## Screen-1 versus held-out overlap
 
@@ -31,8 +31,8 @@ later held-out set.
 
 | section | bullets | flagged | mean recall screen1 | mean recall heldout | mean recall other | screen1 − heldout |
 |---|---|---|---|---|---|---|
-| basic | 8 | 0 | 0.106 | 0.143 | 0.097 | -0.037 |
-| pitfalls | 7 | 0 | 0.029 | 0.052 | 0.029 | -0.023 |
+| basic | 8 | 0 | 0.106 | 0.143 | 0.119 | -0.037 |
+| pitfalls | 7 | 0 | 0.029 | 0.052 | 0.037 | -0.023 |
 
 The pitfalls block's screen−heldout gap is -0.023; the basic glossary's gap is -0.037.
 The pitfalls block does not overlap the screen questions more than the held-out set, and it is not more screen-specific than the basic glossary. Word overlap does not explain the missing Haiku gain: the held-out questions use this vocabulary and Haiku's accuracy still did not move. That is a coverage miss (the block names traps those questions do not turn on), not a copied question.
@@ -41,21 +41,21 @@ The pitfalls block does not overlap the screen questions more than the held-out 
 
 | section | best question | tag | text recall | answer recall | questions ≥ support | flag | bullet |
 |---|---|---|---|---|---|---|
-| basic | `a_439d7186d8` | screen1 | 0.20 | 0.69 | 0 |  | - claim: one patient control number (claim_key). sem.claims has one row per 837 submissio… |
-| basic | `a_7423e6eb91` | other | 0.40 | 0.54 | 4 |  | - adjudication event: one 835 claim payment (CLP) in sem.remit_claims. A claim can have s… |
-| basic | `q09_denials_by_type` | other | 0.42 | 0.46 | 3 |  | - denied (is_denied): recorded denial (claim status 4, is_denied_recorded) OR signal v3 (… |
-| basic | `family:payer_class_denial_rate` | screen1 | 0.89 | 0.56 | 70 |  | - denial rate: denied current adjudications / current adjudications, counting each claim … |
-| basic | `a_d383370345` | other | 0.24 | 0.54 | 0 |  | - primary payer: the payer billed with payer_responsibility = 'P' on sem.claims. payer_se… |
-| basic | `a_9cf81e7511` | heldout | 0.31 | 0.77 | 1 |  | - 835 lines (sem.remit_lines) are missing when a payer denies a whole claim at claim leve… |
-| basic | `a_897326dda6` | heldout | 0.24 | 0.34 | 0 |  | - The data starts with the lab's first delivered file. Claims billed before that appear o… |
-| basic | `q30_phi_names` | screen1 | 0.12 | 0.10 | 0 |  | - Never return patient names, member ids, birth dates or addresses (they are not in these… |
-| pitfalls | `a_82a626d3ea` | heldout | 0.24 | 0.51 | 0 |  | - sem.claims and sem.claim_lines have one row per 837 submission: resubmissions and claim… |
-| pitfalls | `a_923951a050` | screen1 | 0.18 | 0.36 | 0 |  | - Money paid, patient responsibility and denials come from current adjudications only (is… |
-| pitfalls | `q33_write` | other | 0.29 | 0.26 | 0 |  | - Re-delivered 835 files are already de-duplicated in the sem views; do not de-duplicate … |
-| pitfalls | `a_16eb866e01` | heldout | 0.20 | 0.54 | 0 |  | - sem.remit_lines has no rows for claims denied at claim level; billed codes and units ar… |
-| pitfalls | `a_1b7e02d0b0` | other | 0.09 | 0.34 | 0 |  | - Time basis matters: payment_date/payment_month (835), service_date/service_month (date … |
+| basic | `a_a2e0fda4ea` | other | 0.31 | 0.68 | 1 |  | - claim: one patient control number (claim_key). sem.claims has one row per 837 submissio… |
+| basic | `g1_ar_open_30` | other | 0.41 | 0.52 | 9 |  | - adjudication event: one 835 claim payment (CLP) in sem.remit_claims. A claim can have s… |
+| basic | `g1_den_zero_pay_month` | other | 0.66 | 0.60 | 6 |  | - denied (is_denied): recorded denial (claim status 4, is_denied_recorded) OR signal v3 (… |
+| basic | `family:payer_class_denial_rate` | screen1 | 0.89 | 0.54 | 125 |  | - denial rate: denied current adjudications / current adjudications, counting each claim … |
+| basic | `g1_ar_open_30` | other | 0.36 | 0.54 | 1 |  | - primary payer: the payer billed with payer_responsibility = 'P' on sem.claims. payer_se… |
+| basic | `a_9cf81e7511` | heldout | 0.32 | 0.77 | 2 |  | - 835 lines (sem.remit_lines) are missing when a payer denies a whole claim at claim leve… |
+| basic | `g1_ar_open_30` | other | 0.33 | 0.40 | 1 |  | - The data starts with the lab's first delivered file. Claims billed before that appear o… |
+| basic | `q30_phi_names` | screen1 | 0.13 | 0.12 | 0 |  | - Never return patient names, member ids, birth dates or addresses (they are not in these… |
+| pitfalls | `g1_mix_secondary` | other | 0.24 | 0.49 | 0 |  | - sem.claims and sem.claim_lines have one row per 837 submission: resubmissions and claim… |
+| pitfalls | `a_8b0d9d09d4` | other | 0.29 | 0.37 | 0 |  | - Money paid, patient responsibility and denials come from current adjudications only (is… |
+| pitfalls | `q33_write` | other | 0.30 | 0.48 | 0 |  | - Re-delivered 835 files are already de-duplicated in the sem views; do not de-duplicate … |
+| pitfalls | `a_32759ae76a` | other | 0.23 | 0.53 | 0 |  | - sem.remit_lines has no rows for claims denied at claim level; billed codes and units ar… |
+| pitfalls | `a_5084d5c2f0` | other | 0.09 | 0.33 | 0 |  | - Time basis matters: payment_date/payment_month (835), service_date/service_month (date … |
 | pitfalls | `a_a23ce7f1de` | other | 0.18 | 0.18 | 0 |  | - Rates: use 100.0 * x / y for percentages (integer division truncates); round only at th… |
-| pitfalls | `a_d29f83c935` | other | 0.20 | 0.16 | 0 |  | - Ranked questions: ORDER BY the measure (and the stated tie-break) and LIMIT to the numb… |
+| pitfalls | `a_d29f83c935` | other | 0.21 | 0.17 | 0 |  | - Ranked questions: ORDER BY the measure (and the stated tie-break) and LIMIT to the numb… |
 
 ## Question-specific flags
 
@@ -69,8 +69,8 @@ aimed at the traps in a particular set. The gap table is the quantitative check 
 These bullets share a 5-word content span with exactly one question and also match enough
 other questions that the bullet stays a general definition. The span is listed; it is not a flag.
 
-- `basic-03` shares `current adjudication duplicate claim denial` with `a_19b39fa2c7`, and 4 questions reach recall 0.3.
-- `basic-05` shares `denial rate denied current adjudications` with `a_9a8aa51689`, and 70 questions reach recall 0.3.
+- `basic-03` shares `current adjudication duplicate claim denial` with `a_19b39fa2c7`, and 9 questions reach recall 0.3.
+- `basic-05` shares `denial rate denied current adjudications` with `a_9a8aa51689`, and 125 questions reach recall 0.3.
 
 ## Answer leakage
 
