@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
-import { LIVE, open, ask, composer, gap } from './helpers';
+import { LIVE, open, ask, composer, gap, waitIdle } from './helpers';
 
 // QA keyboard-only walkthrough + screen-reader announcement audit (desktop, live demo API).
 const active = (page: Page) => page.evaluate(() => {
@@ -68,7 +68,6 @@ test.describe('keyboard walkthrough @desktop', () => {
   });
 
   test('QA-A21: cancelling an edit with Esc returns focus to the Edit button', async ({ page }) => {
-    gap('QA-A21');
     await open(page, LIVE);
     await ask(page, 'Total paid by payer');
     const edit = page.getByRole('button', { name: 'Edit message' }).last();
@@ -77,6 +76,28 @@ test.describe('keyboard walkthrough @desktop', () => {
     await expect(page.getByRole('textbox', { name: 'Edit message' })).toBeFocused();
     await page.keyboard.press('Escape');
     expect(await active(page)).not.toBe('BODY');
+  });
+
+  test('QA-A21: submitting an edit focuses the composer; version arrows keep focus', async ({ page }) => {
+    await open(page, LIVE);
+    await ask(page, 'What is the denial rate by payer?');
+    const edit = page.getByRole('button', { name: 'Edit message' }).last();
+    await edit.focus();
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('Total paid by payer');
+    await page.keyboard.press('Enter');
+    await expect(composer(page)).toBeFocused();
+    await waitIdle(page);
+    const prev = page.getByRole('button', { name: 'Previous version' }).first();
+    await prev.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('msg-user').first()).toContainText('denial rate');
+    // 1/2: Previous is now disabled, so focus lands on Next (not <body>); Enter goes back to 2/2 and stays on Next.
+    await expect.poll(() => active(page)).toBe('button:Next version');
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('msg-user').first()).toContainText('Total paid');
+    await expect.poll(() => active(page)).not.toBe('BODY');
   });
 });
 

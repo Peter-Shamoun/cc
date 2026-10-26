@@ -66,8 +66,9 @@ export function StepTimeline({ steps, live, elapsedMs, reasoning = [] }: { steps
         {live ? <Loader2 size={14} className="shrink-0 animate-spin" aria-hidden /> : <ListChecks size={14} className="shrink-0" aria-hidden />}
         <span className={clsx('truncate', live && 'shimmer')}>{header}</span>
         {live && <span className="shrink-0 tabular-nums text-xs text-fg-subtle" aria-hidden>{fmtMs(Math.max(ticking, 0))}</span>}
-        {!live && errors > 0 && <span className="shrink-0 rounded-full bg-danger/10 px-1.5 text-[11px] text-danger">{errors} failed</span>}
-        {!live && !errors && repaired > 0 && <span className="sr-only">all failures repaired</span>}
+        {/* QA-A22: separators so the accessible name reads "Thought for 1s, 2 failed", not "1s2 failed". */}
+        {!live && errors > 0 && <span className="shrink-0 rounded-full bg-danger/10 px-1.5 text-[11px] text-danger"><span className="sr-only">, </span>{errors} failed</span>}
+        {!live && !errors && repaired > 0 && <span className="sr-only">, all failures repaired</span>}
         {open ? <ChevronDown size={14} className="shrink-0" aria-hidden /> : <ChevronRight size={14} className="shrink-0" aria-hidden />}
       </button>
       <div id={bodyId} hidden={!open} className="step-body">
