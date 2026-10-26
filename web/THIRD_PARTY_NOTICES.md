@@ -24,6 +24,7 @@ Apache-2.0 packages also need their NOTICE file kept, if they have one.
 | @tanstack/react-virtual | MIT | Tanner Linsley | Virtualised table rows and long threads |
 | lucide-react | ISC | Lucide Contributors (Feather icons: MIT, Cole Bemis) | Icons |
 | clsx | MIT | Luke Edwards | Class names |
+| zod | MIT | Colin McDonnell | Runtime mirror of the contract PlotSpec (`src/contract/plot.ts`) |
 
 ## Transitive runtime packages that are not MIT, ISC or BSD
 

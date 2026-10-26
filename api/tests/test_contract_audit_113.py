@@ -19,7 +19,9 @@ CLOSED = {"Sensitivity", "MessageEnd.finishReason", "StoredMessage.finishReason"
           "ChatRequest.messages.role", "ChatRequest.scenario", "Capabilities.scope", "RegenerateStyle", "FeedbackRating",
           "ImagePart.mime", "TranscriptsInfo.mode", "CostTier", "StrategyOption.latencyTier", "ModelOption.tier",
           "Source.role", "ToolCallPart.state", "StepCheck.verdict",
-          "ShareExpiryDays", "ConversationArchivedFilter",}
+          "ShareExpiryDays", "ConversationArchivedFilter",
+          # 1.18.0: the PlotSpec is strict by design; a client drops a plot it does not know (the table stays)
+          "PlotKind", "PlotFieldType", "PlotFormat", "PlotSort"}
 
 
 def _walk(node, path):

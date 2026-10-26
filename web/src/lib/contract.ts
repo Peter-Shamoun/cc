@@ -3,6 +3,8 @@
  * Follows docs/frontend-spec.md §5. Transport: POST /api/chat -> SSE, one JSON
  * StreamEvent per `data:` line. No PHI in URLs (§6.1).
  */
+import type { PlotSpec } from '../contract/v1.gen';
+
 export type ID = string; // opaque, non-PHI
 export type ISODate = string;
 
@@ -90,6 +92,10 @@ export interface ChartPart extends PartBase {
   staticImageBlobId?: ID;
   title?: string;
   alt: string;
+  /** 1.9.0: the table part this plot was drawn from (same message). */
+  tablePartId?: ID;
+  /** 1.18.0: the strict plot spec (source of truth; `spec`/`data` are derived). Validate with `parsePlot` before rendering. */
+  plot?: PlotSpec;
 }
 
 export interface CodePart extends PartBase {

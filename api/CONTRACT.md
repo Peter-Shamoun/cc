@@ -1,6 +1,6 @@
 # CC chat API — stream contract
 
-**Version: 1.17.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.18.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -147,6 +147,8 @@ streams with `check(events) == []`.** To add a rule, give it an existing `kind` 
 | `code.delta` | streamed code part | `partId`, `delta` |
 | `table.start` | a table starts streaming (1.9, §5.1) | `partId`, `columns`, `title?`, `sensitivity?`, `stepId?`, `sqlPartId?` |
 | `table.rows` | preview rows for it | `partId`, `offset`, `rows` |
+| `chart.start` | a chart starts streaming (1.18, §5.2) | `partId`, `plot` (`PlotHeader`: everything but `data`), `alt?`, `tablePartId?`, `sensitivity?` |
+| `chart.points` | data points for it | `partId`, `offset`, `rows` (`PlotRow[]`) |
 | `part` | a complete part (see §5) | `part` |
 | `part.patch` | update a part | `partId`, `patch` |
 | `message.end` | last | `messageId`, `finishReason`, `usage` (§7), `conversationTitle?` (§11) |
@@ -196,6 +198,31 @@ upserts by id.
   still streaming, for a "loading rows…" hint.
 * A real backend can stream rows as the database returns them, with the same events. The preview cap (≤ 50 rows)
   still applies; the full result stays the CSV.
+
+### 5.2 Progressive charts (1.18.0)
+
+A chart streams like a table (§5.1): `chart.start {partId, plot: PlotHeader, alt?, tablePartId?, sensitivity?}`, then
+`chart.points {partId, offset, rows}` (50 points each), then the **complete `chart` part** with the same id, whose
+`plot` is canonical.
+
+* **What must exist before the first draw.** Everything in the header: `v`, `kind`, `title`, `x`, `y`, plus `series`
+  and `sort` when they apply. `chart.start` carries the whole header, so a client can lay out axes, legend and title
+  at once, then draw from the first point. Nothing in the header changes later; the final `plot` minus `data` equals
+  it (rule `chart.header.final`).
+* A client validates the header (`checkPlot(h, {header: true})`) before it draws. If it fails, it draws nothing for
+  that chart and keeps the table.
+* Points accumulate by `offset`. A replayed chunk overwrites in place and a gap is ignored (`rows.contiguous`). After
+  each chunk the accumulated plot is validated; a chunk that would make it invalid (non-finite, over the 2000-point
+  cap, more than 10 series, wrong type) drops the chart.
+* The final part's `plot.data` starts with exactly the streamed points (`chart.points.final`).
+* If `message.end` arrives before the complete part (aborted or error), drop the partial chart. Partial charts are
+  never persisted.
+* The server validates the whole plot **before** `chart.start`, so a started chart always completes unless the message
+  is cancelled.
+* Clients older than 1.18 ignore both events (§3) and render the final `part` as before.
+* Rules are in `stream_rules.json` (`chart.span`, `rows.contiguous`, `chart.points.final`, `chart.header.final`,
+  `chart.start.plot`, `chart.part.plot`, `chart.table.target`, `chart.start.table`) and run in both the Python and TS
+  conformance runners. Reference reducer: `reduceV1` (`AssistantViewV1.streamingCharts`, `rejectedCharts`).
 
 ## 6. Clarifying questions and resume
 
@@ -557,6 +584,47 @@ re-encode a chart (bar ↔ line, sort) locally from `data.values`; that is a vie
 * Demo: the `report` scenario returns the table, a `chart` artifact (`autoOpen: false`) and a `report` artifact
   (markdown summary, `autoOpen: true`). Example: `examples/report.jsonl`.
 
+### 16.1 Strict plot spec (1.18.0)
+
+Every server `chart` part carries **`plot`**, a closed, versioned `PlotSpec` (schema `$defs.PlotSpec`, `v: 1`). The
+Vega-Lite `spec` and `data.values` are still sent and are **derived from `plot`** (`api/plot.py::to_vega_lite`, mirrored
+by `plotToVegaLite` in `web/src/contract/plot.ts`), so pre-1.18 clients are unchanged. The idea of a closed, typed
+render spec comes from json-render.dev; we borrow only the concept (no dependency, no widget catalog).
+
+```
+PlotSpec = {v: 1, kind, title, x, y, series?, sort?, data}
+  kind   = bar | line | area | point                       (closed; unknown → reject)
+  x      = {field, type: temporal|nominal|ordinal|quantitative, title, format?}
+  y      = {field, type: "quantitative", title, format?}
+  series = {field, title}                                  (colour; ≤ 10 distinct values)
+  sort   = -y | x | none                                   (default: -y for bar, else none)
+  format = currency | percent | integer | number | date | month
+  data   = PlotRow[]  (1..2000 rows; keys are the fields above, values number | string ≤ 200 | null)
+```
+
+Hard caps (`x-caps`, also exported as `PLOT_SCHEMA.caps`): 2000 points, 10 series, title ≤ 120, axis titles ≤ 80,
+string values ≤ 200 (code points), field names `^[A-Za-z_][A-Za-z0-9_]{0,63}$`, every number finite, temporal x values
+ISO dates (`x-temporal`). Every object is closed (`additionalProperties: false`).
+
+**Validation** is two-stage on both sides — structure (the JSON Schema / zod mirror), then semantics (row keys match
+the declared fields, x/y/series present and well typed, finiteness, series count) — and returns stable **rule ids**:
+`plot.closed`, `plot.required`, `plot.type`, `plot.version`, `plot.kind`, `plot.enum`, `plot.label.length`,
+`plot.field.name`, `plot.field.duplicate`, `plot.field.unknown`, `plot.row.missing`, `plot.number.finite`,
+`plot.temporal`, `plot.points.max`, `plot.points.min`, `plot.series.max`. `api/contract/plot_cases.json` (generated by
+`python -m api.contract.make_plot_cases`) is the shared case file; `api/tests/test_plot_118.py` and
+`web/src/contract/plot.test.ts` both assert the exact rule ids for every case.
+
+### 16.2 Server gate and client gate (1.18.0)
+
+* **Server.** `chart_for` builds the plot and returns no chart if it fails. Then, before anything is emitted,
+  `gate_parts` re-checks every chart and chart artifact. An invalid one is **dropped**; if the message has no table
+  the chart was drawn from, a table built from the plot takes its place (same part id), so the numbers are never
+  lost. Each drop is audited as `chart_dropped` with the rule ids only (no titles, no values).
+* **Client.** `reduceV1` validates `chart.start` headers, accumulated points and every final chart/chart-artifact
+  `plot`; an invalid one is removed and listed in `AssistantViewV1.rejectedCharts` (`{partId, rules}`). The renderer
+  (`buildSpec`, `ChartView`) draws only from a valid `plot`; a chart without `plot` (stored before 1.18) still
+  renders from its sanitized `spec`.
+
 ## 17. Share inside the organization (1.11.0)
 
 A share is a **read-only, org-scoped, revocable** link to one conversation. There are no public links: the viewer
@@ -601,6 +669,13 @@ must be signed in to the same organization (customer). A conversation has at mos
 
 ## Changelog
 
+* **1.18.0** (2026-10-25) — Strict plot spec and progressive charts, additive. `ChartPart.plot` (`PlotSpec`, closed,
+  versioned, hard caps; §16.1) with shared validation cases (`plot_cases.json`) run by Python and TS. The server
+  validates before emitting, drops an invalid chart and falls back to a table (§16.2, audit `chart_dropped`). New
+  events `chart.start` / `chart.points` (§5.2) with conformance rules in `stream_rules.json`. TS:
+  `web/src/contract/plot.ts` (zod mirror, generated `PLOT_SCHEMA`), `reduceV1` gains `streamingCharts` and
+  `rejectedCharts`; a replayed `table.rows` chunk no longer truncates later rows. Conformance runners no longer raise
+  on non-string ids and accept integral-float `seq` in both languages.
 * **1.17.0** (2026-10-25) — Pin and archive persisted server-side (shell ask), additive. `PATCH /api/conversations/{id}`
   accepts `pinned` / `archived` (and `title`, at least one); `ConversationSummary`, `Conversation` and `RenameResponse`
   carry both flags; `GET /api/conversations?archived=` and `SearchRequest.archived` filter (`include` default,
