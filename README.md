@@ -50,7 +50,7 @@ CC_API_ANALYZER_SNAPSHOT=$SNAPSHOT CC_AWS_PROFILE=apiservice CC_AWS_REGION=us-ea
 CC_STRANDS_MODEL_ID=us.anthropic.claude-haiku-5-5 CC_API_DEMO_PACE=0 \
 CC_TRANSCRIPT_MODE=persisted CC_TRANSCRIPT_DIR=/tmp/cc-chat/blobs CC_TRANSCRIPT_KEYS_DIR=/tmp/cc-chat/keys \
 python -m api.sim_server --world-dir /tmp/cc-world --tokens-file /tmp/cc-world/tokens.json --port 8787
-cd web && VITE_ANALYST_BASE=/ VITE_ANALYST_DEMO_TOKEN=$(python -c "import json; print(json.load(open('/tmp/cc-world/tokens.json'))['ana@xifin.example']['idToken'])") npm run dev
+cd web && VITE_ANALYST_BASE=/ VITE_AUTH=cookie VITE_SIGN_IN_URL=/api/auth/mock-login npm run dev   # :5173, sends you to the mock sign-in
 ```
 
 One question without the server: `CC_API_ALLOW_PAID_API=i-understand-this-calls-a-paid-model-api python -m api.strands_smoke "Denial rate by payer last month?"`
