@@ -13,14 +13,14 @@ const KIND_LABEL: Record<StepKind, string> = { sql: 'Query', repair: 'Repair', c
 
 /** Ticks while `live`, for the running timer in the header. */
 function useElapsed(live: boolean) {
-  const start = useRef(Date.now());
-  const [now, setNow] = useState(Date.now());
+  const [start] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!live) return;
     const t = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(t);
   }, [live]);
-  return now - start.current;
+  return now - start;
 }
 
 /**
