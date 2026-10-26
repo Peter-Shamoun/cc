@@ -1,0 +1,10 @@
+{"type":"message.start","messageId":"m_1","conversationId":"c_1","contractVersion":"1.0.0","model":"scripted","parentId":"u_1","strategy":"tool_loop","seq":0}
+{"type":"status","label":"Thinking","seq":1}
+{"type":"reasoning.delta","partId":"p_1","delta":"Checking the claims view.","seq":2}
+{"type":"status","label":"Exploring sem.claims","seq":3}
+{"type":"step.explore","stepId":"s_1","probe":"describe_view","summary":"8 columns","elapsedMs":10,"target":"sem.claims","seq":4}
+{"type":"reasoning.end","partId":"p_1","durationMs":362,"seq":5}
+{"type":"status","label":null,"seq":6}
+{"type":"part","part":{"type":"abstain","id":"p_2","category":"data_unavailable","reason":"This data doesn't include **appeals, prior authorizations or forecasts**, so I can't answer that reliably. I can work with claims, payers, service dates, charges, payments and denial codes.","suggestions":[{"id":"g_1","text":"Denial rate by payer"},{"id":"g_2","text":"Paid amount trend by month"},{"id":"g_3","text":"Top denial reason codes (CARC)"}]},"seq":7}
+{"type":"status","label":null,"seq":8}
+{"type":"message.end","messageId":"m_1","finishReason":"abstain","usage":{"queries":0,"elapsedMs":718,"latency":{"totalMs":718,"modelMs":702,"sqlMs":0,"firstEventMs":3,"firstStepMs":367},"costIsEstimate":true,"costUsd":0.0024,"tokens":{"input":1985,"output":83},"models":[{"model":"claude-haiku-5-5","role":"analyst","inputTokens":1985,"outputTokens":83,"costUsd":0.0024,"calls":2}]},"seq":9}
