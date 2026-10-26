@@ -2,7 +2,10 @@ import { test, expect } from './fixtures';
 import { LIVE, open, injectStream, turn, textPart, composer, waitIdle } from './helpers';
 
 /** QA-S13: browser find (Ctrl+F) reaches turns the long-thread virtualizer has scrolled out of the DOM. */
-test('find-in-page reaches virtualized turns out of view @desktop', async ({ page }) => {
+test('find-in-page reaches virtualized turns out of view @desktop', async ({ page, browserName }) => {
+  // window.find() is non-standard; Firefox/WebKit return a match without a selection inside content-visibility
+  // regions, so this probe only means something on Chromium. Real Ctrl+F on FF/Safari: QA-S24 (manual).
+  test.skip(browserName !== 'chromium', 'window.find probe is Chromium-only');
   test.setTimeout(240_000);
   await open(page, LIVE);
   await injectStream(page, (n) => turn(textPart(`t${n}`, `Answer ${n}: denials rose for synthetic payer zeta-${n}.`)));
