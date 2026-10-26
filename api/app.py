@@ -31,7 +31,7 @@ from api.contract import CONTRACT_VERSION, schema as contract_schema
 from api.ids import new_id
 from api.live import Cancelled, LiveTap
 from api.mapping import outcome_parts, report_artifacts
-from api.redact import install_log_redaction
+from api.redact import install_access_log_redaction, install_log_redaction
 from api.security import (MAX_BODY_BYTES, SESSION_COOKIE, BodyLimitMiddleware, CsrfMiddleware, ErrorShieldMiddleware,
                           SecurityHeadersMiddleware)
 from api.store import DownloadRegistry, Principal
@@ -894,6 +894,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
               conversation_id=share.conversation_id, kind="with_data" if share.include_data else "no_data")
         return JSONResponse(shared_view(share, conv), headers={**NO_STORE, "Referrer-Policy": "no-referrer"})
 
+    install_access_log_redaction(app.routes)  # after every route is registered
     return app
 
 
