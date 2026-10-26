@@ -29,7 +29,14 @@ const checks = [
   ['total JS (gz KB)', kb(sum(js)), budget.totalJsGzKb],
   ['asset count', assets.length, budget.maxAssetCount],
 ];
+// The CSP has no 'wasm-unsafe-eval' (#139): a .wasm asset or a chunk that compiles WebAssembly would break at runtime.
+const wasm = assets.filter((a) => a.file.endsWith('.wasm') || (a.file.endsWith('.js')
+  && /WebAssembly\.(?:instantiate|compile|Module)\b/.test(fs.readFileSync(path.join(dist, a.file), 'utf8'))));
 let failed = 0;
+if (wasm.length) {
+  failed++;
+  console.log(`FAIL WebAssembly in the bundle (CSP forbids it): ${wasm.map((a) => a.file).join(', ')}`);
+} else console.log('ok   no WebAssembly in the bundle');
 for (const [name, value, max] of checks) {
   const ok = value <= max;
   if (!ok) failed++;
