@@ -1,6 +1,6 @@
 # CC chat API — stream contract
 
-**Version: 1.7.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.8.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -339,7 +339,51 @@ Thumbs up/down on an **assistant** message, with optional reason chips and a com
 * Example: `examples/feedback.json`. Client: `web/src/contract/feedback.ts` (`sendFeedback`, `feedbackUrl`) and
   `feedbackReasonsFor(capabilities, rating)`.
 
+## 14. Citations: data sources (1.8.0)
+
+`message.end.sources` (and the same list on `StoredMessage.sources`) names the data an answer used. It is built from
+what the run already emitted (SQL steps, explore steps, the answer's SQL and table), so it costs nothing extra. It
+holds schema identifiers only, never row values.
+
+```json
+{"id": "src_1", "kind": "view", "name": "sem.claims", "label": "Claims", "role": "answer",
+ "description": "One row per claim submission with billed, allowed and paid amounts, payer and status.",
+ "stepIds": ["s_1", "s_2"], "partIds": ["p_2", "p_3", "p_4"]}
+```
+
+* `role: "answer"`: the final SQL/table read it. `"explored"`: only looked at while planning. Answer sources come
+  first. An abstain or clarify can carry explored sources only; aborted runs carry none. The field is omitted when
+  empty.
+* `partIds` link to the `code` (SQL), `table` and `chart` parts it fed, so each table can show its own "Sources"
+  chips. `stepIds` link to step rows (`step.sql_running`, `step.explore`).
+* `kind` is an *open* enum: `view` today; `definition` (metric definitions) and `document` are reserved. Show an
+  unknown kind as a plain chip with `label`.
+* `TablePart.source.views` (1.0) stays; `sources` is the richer, message-level list.
+* Inline citation markers inside text (e.g. `[1]`) are **not** in this version. When added, they will reference
+  `Source.id`.
+* Client helpers: `web/src/contract/sources.ts` (`answerSources`, `sourcesForPart`, `sourcesForStep`).
+
+## 15. Export (1.8.0)
+
+`GET /api/conversations/{id}/export?format=markdown|json` (default `markdown`) downloads your own conversation.
+
+* `markdown` (`text/markdown`): the title, then each question and answer: the text, the SQL (fenced), table
+  previews (≤ 50 rows, cells escaped, with a "Showing n of N rows" note), a chart's alt text, callouts,
+  abstain/clarify text, the answer's sources, and your feedback. Reasoning, status and tool parts are left out.
+* `json` (`ConversationExport`): `{format: "cc.conversation", contractVersion, exportedAt, conversation}`,
+  where `conversation` is exactly `GET /api/conversations/{id}`.
+* Both are attachments with `Content-Disposition: attachment; filename="cc_conversation_<yyyy-mm-dd>.<md|json>"`.
+  The title never appears in the filename, because a user rename could hold anything. `Cache-Control: no-store`.
+* Errors: 422 `validation` for any other format; 404 for an unknown or someone else's conversation; 401 when
+  signed out; 410 when shredded. Audit event `conversation_exported` carries the format only.
+* Fetch it with the auth header and save the blob (`exportUrl`, `exportFilename` in `web/src/contract/sources.ts`).
+  Never put the token in the URL. Example: `examples/export.md`.
+* The full table result is still the CSV download (`csvFileId`). Sharing is a separate, later version.
+
 ## Changelog
+
+* **1.8.0** (2026-10-25) — Citations: `Source`, `message.end.sources`, `StoredMessage.sources` (§14). Export:
+  `GET /api/conversations/{id}/export?format=markdown|json`, `ConversationExport` (§15). Additive.
 
 * **1.7.0** (2026-10-25) — Answer feedback (§13): the `PUT`/`DELETE …/messages/{id}/feedback` endpoints,
   `FeedbackRequest`, `Feedback`, `StoredMessage.feedback`, `Capabilities.feedbackReasons`. Additive.
