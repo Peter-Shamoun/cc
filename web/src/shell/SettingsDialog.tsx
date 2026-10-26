@@ -68,23 +68,31 @@ export function SettingsDialog({ onClose, initialTab = 'general', storeMode, ent
   );
 }
 
-export function ShortcutList() {
+export function ShortcutList({ columns = false }: { columns?: boolean }) {
+  const groups = (['Chats', 'Navigation', 'Composer'] as const).map((g) => [g, SHORTCUTS.filter((s) => s.group === g)] as const);
   return (
-    <ul className="divide-y divide-line" data-testid="shortcut-list">
-      {SHORTCUTS.map((s) => (
-        <li key={s.label} className="flex items-center justify-between gap-4 py-2.5">
-          <span>{s.label}</span>
-          <span className="flex shrink-0 gap-1">{s.keys().map((k) => <Kbd key={k}>{k}</Kbd>)}</span>
-        </li>
+    <div className={clsx('grid gap-x-8 gap-y-4', columns && 'md:grid-cols-2')} data-testid="shortcut-list">
+      {groups.map(([g, items]) => (
+        <section key={g} aria-label={g} className={clsx(columns && g === 'Navigation' && 'md:row-span-2')}>
+          <h3 className="pb-1 text-xs font-medium text-fg-subtle">{g}</h3>
+          <ul className="divide-y divide-line/70">
+            {items.map((s) => (
+              <li key={s.label} className="flex items-center justify-between gap-4 py-2">
+                <span>{s.label}</span>
+                <span className="flex shrink-0 gap-1">{s.keys().map((k) => <Kbd key={k}>{k}</Kbd>)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
       ))}
-    </ul>
+    </div>
   );
 }
 
 export function ShortcutsDialog({ onClose }: { onClose: () => void }) {
   return (
-    <Dialog title="Keyboard shortcuts" onClose={onClose} className="max-w-[480px]" testId="shortcuts-dialog">
-      <div className="px-5 pb-4 pt-1 text-sm"><ShortcutList /></div>
+    <Dialog title="Keyboard shortcuts" onClose={onClose} className="max-w-[720px]" testId="shortcuts-dialog">
+      <div className="px-5 pb-5 pt-3 text-sm"><ShortcutList columns /></div>
     </Dialog>
   );
 }
