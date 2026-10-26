@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures';
 import fs from 'node:fs';
-import { LIVE, open, ask, lastAssistant, waitIdle, composer, stopBtn } from './helpers';
+import { LIVE, open, ask, lastAssistant, waitIdle, composer, stopBtn, gap } from './helpers';
 
 // Live round trip: browser -> vite proxy -> FastAPI /api/chat SSE -> ScriptedLLM -> synthetic DuckDB.
 test.describe('live demo backend @both', () => {
@@ -63,6 +63,7 @@ test.describe('live demo backend @both', () => {
   });
 
   test('follow-up keeps the thread and pins the new question', async ({ page }) => {
+    gap('QA-S12: follow-up question scrolls out of view once a long answer (assumptions/checks) finishes (shell)');
     await open(page, LIVE);
     await ask(page, 'What is the denial rate by payer?');
     await ask(page, 'Total paid by payer');
