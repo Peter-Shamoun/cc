@@ -14,3 +14,4 @@ Which write-up each run belongs to:
 | s2 | `research/stage2_3_results.md` |
 | s4_test | `research/stage4_sealed_test.md` (the sealed TEST split, run once) |
 | nm_val, nm_smoke_train | `research/named_metrics_results.md` |
+| clar_val, clar_probe | `research/clarify_results.md` |
