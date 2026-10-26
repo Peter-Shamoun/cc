@@ -1,4 +1,5 @@
 import type { ErrorPart, StreamEvent } from '../lib/contract';
+import { asSession, type AuthSession } from '../auth/session';
 import type { HttpError } from '../api/contract';
 import type { AnalystAdapter, AnyStreamEvent } from './types';
 import { loadCapabilities } from '../contract/capabilities';
@@ -82,16 +83,18 @@ export class HttpAnalystAdapter implements AnalystAdapter {
   readonly name = 'http';
   private current: string | null = null;
   /**
-   * `token` is only for the backend's demo mode (`Bearer demo:<customer>:<user>`, synthetic data).
-   * Real deployments leave it unset and authenticate with the httpOnly `cc_session` cookie.
+   * `auth`: an AuthSession (src/auth/session.ts). A bare string is a demo token (`demo:<customer>:<user>`).
+   * Real deployments use cookieSession(): HttpOnly `cc_session` cookie plus the CSRF header.
    */
-  constructor(private base = '', private token?: string, opts: Partial<HttpAdapterOptions> = {}) {
+  constructor(private base = '', auth?: string | AuthSession, opts: Partial<HttpAdapterOptions> = {}) {
+    this.auth = asSession(auth);
     this.opts = { maxRetries: 4, retryBaseMs: 500, stopGraceMs: 1500, offlineWaitMs: 45_000, maxRateRetries: 2, maxRateWaitMs: 30_000, ...opts };
   }
   private readonly opts: HttpAdapterOptions;
+  private readonly auth: AuthSession;
 
   private headers(extra: Record<string, string> = {}): Record<string, string> {
-    return this.token ? { ...extra, authorization: `Bearer ${this.token}` } : extra;
+    return { ...extra, ...this.auth.headers() };
   }
 
   /** Server-side cancel (POST /api/chat/{messageId}/stop); the fetch abort alone only drops the socket. */
@@ -193,6 +196,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
           if (messageId !== null && res.status >= 500 && retries < this.opts.maxRetries) { onConnection?.('reconnecting'); dropped = true; await this.backoff(++retries, signal); continue; }
           if (messageId !== null && res.status === 404) throw streamGone(); // §8 stream_gone: useChat reloads the stored answer
           if (messageId !== null) throw new Error(`replay ${res.status}`); // the run is gone: useChat shows "Connection lost"
+          if (res.status === 401) this.auth.onExpired();
           yield { type: 'part', part: await httpError(res) };
           yield { type: 'message.end', messageId: '', finishReason: 'error' };
           return;

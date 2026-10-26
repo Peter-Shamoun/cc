@@ -1,4 +1,5 @@
 import type { ID, ISODate, Message } from '../lib/contract';
+import { asSession, type AuthSession } from '../auth/session';
 
 /**
  * Client for the server chat-history endpoints (api/app.py, docs/frontend_transcripts.md).
@@ -16,17 +17,21 @@ export class ConversationsApiError extends Error {
 }
 
 export class ConversationsApi {
-  constructor(private base = '', private token?: string, private fetchImpl: typeof fetch = (...a) => fetch(...a)) {}
+  private readonly auth: AuthSession;
+  constructor(private base = '', auth?: string | AuthSession, private fetchImpl: typeof fetch = (...a) => fetch(...a)) {
+    this.auth = asSession(auth);
+  }
 
   private async call<T>(method: string, path: string, body?: unknown): Promise<T> {
     const headers: Record<string, string> = { accept: 'application/json' };
     if (body !== undefined) headers['content-type'] = 'application/json';
-    if (this.token) headers.authorization = `Bearer ${this.token}`;
+    Object.assign(headers, this.auth.headers());
     const res = await this.fetchImpl(`${this.base}${path}`, {
       method, headers, credentials: 'same-origin', cache: 'no-store',
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     if (!res.ok) {
+      if (res.status === 401) this.auth.onExpired();
       const code = await res.json().then((j: { error?: { code?: string } }) => j?.error?.code ?? 'error', () => 'error');
       throw new ConversationsApiError(res.status, code);
     }

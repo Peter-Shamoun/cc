@@ -31,7 +31,8 @@ from api.ids import new_id
 from api.live import Cancelled, LiveTap
 from api.mapping import outcome_parts
 from api.redact import install_log_redaction
-from api.security import MAX_BODY_BYTES, BodyLimitMiddleware, ErrorShieldMiddleware, SecurityHeadersMiddleware
+from api.security import (MAX_BODY_BYTES, SESSION_COOKIE, BodyLimitMiddleware, CsrfMiddleware, ErrorShieldMiddleware,
+                          SecurityHeadersMiddleware)
 from api.store import DownloadRegistry, Principal
 from api.feedback import MAX_COMMENT, check as check_feedback, record as feedback_record
 from api.capabilities import DEFAULT_STRATEGY, capabilities as capabilities_body, check_options
@@ -139,6 +140,8 @@ class Settings:
     #: background retention sweep (store.purge_expired) interval while the app is running; 0 = off
     transcript_sweep_seconds: float = field(default_factory=lambda: float(os.environ.get("CC_TRANSCRIPT_SWEEP_SECONDS",
                                                                                          "3600")))
+    #: "demo" (default) lets create_app fall back to DemoAuth; anything else requires an explicit auth backend
+    auth_mode: str = field(default_factory=lambda: os.environ.get("CC_API_AUTH", "demo"))
     analyzer_overrides: dict = field(default_factory=lambda: {
         "glossary": "basic", "data_dictionary": False, "data_profile": False, "row_limit": 5000,
         "candidates": 1, "cascade": "off"})
@@ -189,13 +192,17 @@ def _token(request: Request) -> str:
     header = request.headers.get("authorization", "")
     if header.lower().startswith("bearer "):
         return header[7:].strip()
-    return request.cookies.get("cc_session", "")
+    return request.cookies.get(SESSION_COOKIE, "")  # never a query parameter: URLs end up in logs
 
 
 def create_app(auth=None, settings: Settings | None = None, store=None, llm_factory=None) -> FastAPI:
     """``llm_factory`` (no args -> LLM) overrides ``settings.llm``; tests use it to replay a script."""
     settings = settings or Settings()
-    auth = auth or DemoAuth()
+    if auth is None:
+        if settings.auth_mode != "demo":
+            raise RuntimeError(f"CC_API_AUTH={settings.auth_mode!r} needs an explicit auth backend "
+                               "(create_app(auth=...)); refusing to fall back to demo tokens")
+        auth = DemoAuth()
     audit = AuditLog()
     store = store or make_store(audit=audit)
     downloads = DownloadRegistry()
@@ -228,6 +235,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                   lifespan=lifespan)
     install_log_redaction()
     app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_body_bytes)
+    app.add_middleware(CsrfMiddleware)
     app.add_middleware(ErrorShieldMiddleware)  # inside SecurityHeaders: 500s get the headers too
     app.add_middleware(SecurityHeadersMiddleware)  # outermost, so the 413 carries the security headers too
     app.state.audit, app.state.store, app.state.downloads, app.state.runs = audit, store, downloads, runs
