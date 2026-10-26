@@ -3,6 +3,7 @@ import { Download, Maximize2, FileJson } from 'lucide-react';
 import type { ChartPart } from '../../lib/contract';
 import { IconButton } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
+import { onceOk } from '../../lib/onceOk';
 import { tooltipHtml } from '../../security/trustedTypes';
 import { CHART_COLORS, useTheme } from '../../lib/theme';
 import { csvFilename, downloadText, recordsToCsv } from '../../lib/csv';
@@ -11,8 +12,12 @@ import { buildSpec, chartRenderer, readableBars, utcDates, withTooltips } from '
 export { buildSpec };
 
 /** One shared lazy load: remounts (virtual list, reopened chats) redraw without waiting on the import again. */
-let vegaModules: Promise<[typeof import('vega-embed'), typeof import('vega')]> | null = null;
-const loadVega = () => (vegaModules ??= Promise.all([import('vega-embed'), import('vega')]));
+// A failed load is retried on the next chart (lib/onceOk), not cached.
+const loadVega = onceOk(() => Promise.all([import('vega-embed'), import('vega')]));
+/** Idle warm-up from main.tsx (lib/idlePrefetch): the first chart then draws without loading or compiling Vega. */
+const yieldToMain = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
+
+export const preloadCharts = (): Promise<void> => loadVega().then(() => undefined);
 
 type View = { finalize: () => void; toImageURL: (t: 'png' | 'svg', scale?: number) => Promise<string> };
 
@@ -61,8 +66,19 @@ function ChartViewInner({ part, onOpen, full, onShowSpec }: ChartViewProps) {
     const root = document.documentElement;
     root.classList.toggle('dark', mode === 'dark');
     root.dataset.palette = palette;
+    const done = (r: { view: unknown }) => {
+      if (!alive) {
+        (r.view as View).finalize();
+        return;
+      }
+      viewRef.current = r.view as unknown as View;
+      setReady(true);
+    };
     loadVega()
-      .then(([{ default: embed }, { loader: createVegaLoader }]) => {
+      .then(async ([embedMod, { loader: createVegaLoader }]) => {
+        const embed = embedMod.default;
+        // Read vegaLite only if the module exposes it (some vega-embed builds and test doubles don't): then one embed, as before.
+        const vegaLite = 'vegaLite' in embedMod ? embedMod.vegaLite : undefined;
         if (!alive || !ref.current) return;
         const dark = mode === 'dark';
         const css = getComputedStyle(root);
@@ -70,7 +86,23 @@ function ChartViewInner({ part, onOpen, full, onShowSpec }: ChartViewProps) {
         const colors = CHART_COLORS[palette];
         // QA-A3: on narrow cards put the legend under the plot and let it wrap, so series never clip.
         const narrow = (ref.current.clientWidth || window.innerWidth) < 480;
-        return embed(ref.current, JSON.parse(specKey), {
+        const config = {
+          background: 'transparent',
+          font: v('--font-sans') || 'sans-serif',
+          axis: { labelColor: v('--fg-muted'), titleColor: v('--fg'), gridColor: dark ? '#3a3a3a' : '#ececec', domainColor: v('--border-strong'), tickColor: v('--border-strong'), labelFontSize: 12, titleFontSize: 12 },
+          legend: narrow
+            ? { labelColor: v('--fg'), labelFontSize: 11, orient: 'bottom' as const, direction: 'vertical' as const, columns: 1, symbolSize: 60, labelLimit: 0, titleFontSize: 11 }
+            : { labelColor: v('--fg'), labelFontSize: 12 },
+          view: { stroke: null },
+          range: { category: colors },
+          // Single-series marks follow the palette too (Vega's default steelblue reads as off-theme).
+          mark: { color: colors[0] },
+          bar: { color: colors[0], cornerRadiusEnd: 3 },
+          line: { color: colors[0], strokeWidth: 2 },
+          point: { color: colors[0] },
+          area: { color: colors[0] },
+        };
+        const base = {
           actions: false,
           renderer: chartRenderer(part),
           // vega-interpreter: no Function/eval on model-authored expressions (spec §6.9) and no 'unsafe-eval' in the CSP.
@@ -80,30 +112,17 @@ function ChartViewInner({ part, onOpen, full, onShowSpec }: ChartViewProps) {
           defaultStyle: false,
           // Trusted Types: tooltip HTML comes from our escaping formatter, minted by the cc-html policy (security/trustedTypes.ts).
           tooltip: { theme: dark ? 'dark' : 'light', disableDefaultStyle: true, formatTooltip: tooltipHtml },
-          config: {
-            background: 'transparent',
-            font: v('--font-sans') || 'sans-serif',
-            axis: { labelColor: v('--fg-muted'), titleColor: v('--fg'), gridColor: dark ? '#3a3a3a' : '#ececec', domainColor: v('--border-strong'), tickColor: v('--border-strong'), labelFontSize: 12, titleFontSize: 12 },
-            legend: narrow
-              ? { labelColor: v('--fg'), labelFontSize: 11, orient: 'bottom', direction: 'vertical', columns: 1, symbolSize: 60, labelLimit: 0, titleFontSize: 11 }
-              : { labelColor: v('--fg'), labelFontSize: 12 },
-            view: { stroke: null },
-            range: { category: colors },
-            // Single-series marks follow the palette too (Vega's default steelblue reads as off-theme).
-            mark: { color: colors[0] },
-            bar: { color: colors[0], cornerRadiusEnd: 3 },
-            line: { color: colors[0], strokeWidth: 2 },
-            point: { color: colors[0] },
-            area: { color: colors[0] },
-          },
-        }).then((r) => {
-          if (!alive) {
-            r.view.finalize();
-            return;
-          }
-          viewRef.current = r.view as unknown as View;
-          setReady(true);
-        });
+        };
+        // 6x CPU: compile + parse + first render was one ~400 ms task mid-stream, with keystrokes stuck behind it.
+        // Compile Vega-Lite here, yield to the main thread, then hand Vega the compiled spec: two shorter tasks.
+        // Same result as embed's own vega-lite path (config applied by the compiler, Vega parses with {}, no hover).
+        if (vegaLite?.compile) {
+          const vg = vegaLite.compile(JSON.parse(specKey), { config }).spec;
+          await yieldToMain();
+          if (!alive || !ref.current) return;
+          return embed(ref.current, vg, { ...base, mode: 'vega', config: {}, hover: false }).then(done);
+        }
+        return embed(ref.current, JSON.parse(specKey), { ...base, config }).then(done);
       })
       .catch((e) => alive && setErr(String(e?.message ?? e)));
     return () => {

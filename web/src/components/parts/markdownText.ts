@@ -1,3 +1,4 @@
+import { onceOk } from '../../lib/onceOk';
 /**
  * Markdown text helpers with no renderer dependency: kept out of the lazy Streamdown chunk so the
  * entry bundle (and tests) can use them without pulling in the markdown stack (QA-P8).
@@ -11,11 +12,8 @@ export type MathPlugin = typeof import('./mathPlugin').mathPlugin;
 let mathPlugin: MathPlugin | null = null;
 /** The loaded plugin, or null before the first `loadMath()` resolves. */
 export const currentMath = (): MathPlugin | null => mathPlugin;
-let mathLoading: Promise<MathPlugin> | null = null;
-export function loadMath(): Promise<MathPlugin> {
-  mathLoading ??= import('./mathPlugin').then((m) => (mathPlugin = m.mathPlugin));
-  return mathLoading;
-}
+// A failed load is retried on next use (lib/onceOk), not cached.
+export const loadMath: () => Promise<MathPlugin> = onceOk(() => import('./mathPlugin').then((m) => (mathPlugin = m.mathPlugin)));
 /** Unescaped `$` (after protectCurrency) or `\(`/`\[` delimiters mean the text may contain math. */
 export function mayContainMath(protectedText: string): boolean {
   return /(^|[^\\])\$|\\\(|\\\[/.test(protectedText);

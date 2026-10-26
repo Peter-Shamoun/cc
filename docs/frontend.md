@@ -180,3 +180,20 @@ Recommendation: keep the Vite app (structure already mirrors the template, small
 - The browser fires `online` before the link actually carries traffic, so the first reconnect after an offline period often fails. `HttpAnalystAdapter` gives that one try for free (a 250 ms backoff that doesn't count against `maxRetries`). It gets one per real offline period, which keeps it bounded. Replayed events are still de-duplicated by `seq`.
 - The offline banner uses `useSettledOnline()` (`lib/useOnline.ts`): offline shows only after 1 s of continuous offline, and the banner hides as soon as the connection is back. The Send button still follows the raw `navigator.onLine`, so nothing is sent into a blip.
 - Tests: `adapters/http.flapping.test.ts`.
+
+## Slow CPUs (6x throttle)
+
+`web/scripts/cpu_throttle_audit.mjs URL [rate] [out.json]` (Playwright + CDP `Emulation.setCPUThrottlingRate`; `PROMPT=`, `THINK_MS=` env) measures FCP, CLS, long tasks, rAF frame gaps and Event Timing input latency while typing during a streamed answer. Against the mock preview at 6x, warm (median of runs):
+
+| | before | after |
+|---|---|---|
+| FCP / CLS | ~150 ms / 0 | ~160 ms / 0 (unchanged) |
+| CARC table answer: long-task total, frames > 50 ms | 557 ms, 21 | 295 ms, 6 |
+| Chart answer: worst task (= worst keystroke delay) | 370–460 ms | ~270 ms |
+
+What changed:
+- **Idle prefetch** (`lib/idlePrefetch.ts`). The Markdown renderer, KaTeX and Vega chunks are warmed one per idle slot after first paint, while the user is reading or typing, instead of being parsed and evaluated mid-stream. On Save-Data and 2G only the Markdown renderer is warmed.
+- **`onceOk` loaders** (`lib/onceOk.ts`). Before this, a lazy import that failed (offline at prefetch time, or a chunk 404 during a deploy) was cached forever, so charts, math or Markdown stayed broken until reload. A failure is now forgotten, and the next use retries.
+- **The chart's first render takes two tasks.** ChartView compiles Vega-Lite itself, yields a macrotask, then embeds the compiled Vega (`mode:'vega'`, `config:{}`, `hover:false`, the same as vega-embed's own VL path). Renders are pixel-identical (light, dark, 420 px). What's left (~270 ms at 6x, ~45 ms unthrottled) is Vega's own parse, dataflow and first draw.
+
+Test files: `lib/idlePrefetch.test.ts` and `components/parts/chartSplit.test.tsx`. JSONs and shots are in `shots/platform/cpu6/`.
