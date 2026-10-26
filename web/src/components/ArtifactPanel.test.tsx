@@ -32,7 +32,7 @@ describe('ArtifactPanel shell behaviour', () => {
     expect(Object.keys(localStorage)).toEqual(['cc.pref.artifactWidth']);
     cleanup();
     render(<ArtifactPanel artifact={artifact} onClose={() => {}} />);
-    expect(screen.getByRole('separator').getAttribute('aria-valuenow')).toBe('360');
+    expect(screen.getByRole('separator', { name: 'Resize panel' }).getAttribute('aria-valuenow')).toBe('360');
     expect(screen.getByRole('button', { name: 'Full screen' })).toBeTruthy();
   });
 
@@ -42,7 +42,7 @@ describe('ArtifactPanel shell behaviour', () => {
     render(<ArtifactPanel artifact={artifact} onClose={onClose} />);
     const sheet = screen.getByRole('dialog', { name: 'Artifact: Denials by payer' });
     expect(sheet.getAttribute('aria-modal')).toBe('true');
-    expect(screen.queryByRole('separator')).toBeNull();
+    expect(screen.queryByRole('separator', { name: 'Resize panel' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Full screen' })).toBeNull();
     expect(sheet.contains(document.activeElement)).toBe(true);
     fireEvent.keyDown(window, { key: 'Escape' });
