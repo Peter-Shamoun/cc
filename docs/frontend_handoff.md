@@ -488,3 +488,47 @@ Turn chrome: Sources chip ("Looked at sem.claims +N"; only when data was actuall
 ## 11. Final QA score
 
 <!-- SECTION: qa. QA team: final score, method, open findings, and how to re-run the audit. -->
+
+**Overall: 8.71 / 10** across the 12 rubric areas (**8.62** with the 13th "Fidelity / no-slop" area at 7.5).
+That is the last scored cycle (C9, 2026-10-25 22:30 PT), and the trend was 6.46 → 8.71 over 8 cycles. The full table and the
+cycle log are in `QA_SCORECARD.md`, and the rubric is in `QA_RUBRIC.md` (sprint files under `/workspace/cc_fe/`, not in the repo).
+Since C9, the C10 and finalize work fixed findings without re-scoring (S16, S19, A21, A23–A27, S25/S26/S28–S31,
+S37, BF1, sharing removal). So 8.71 is a lower bound for the handed-off build.
+
+**Finalize verification** (2026-10-26 01:20–01:50 PT, `grokbot/frontend-sota` @ `112169a`, after answer #312):
+
+| Gate | Result |
+|---|---|
+| `cd web && npm run ci` (lint, audit, typecheck, vitest, build, bundle/SRI/CSP/header checks, Lighthouse, slow-3G, api pytest, pip-audit) | **PASS** (409 s) |
+| `pytest api/tests` (demo, ScriptedLLM) | **899 passed** |
+| e2e desktop + mobile (`npm run e2e`, `--retries=0`) | **242/242 passed**, including all visual baselines; nothing stale and no flakes on a single no-retry run |
+| Chaos (`npm run e2e:chaos`, 26 tests: stream cut at every event index, malformed streams, HTTP faults, hung server, mash/duplicate sends, reload at 7 stages, multi-tab, 200%/400% zoom, 320 px reflow, RTL, 3 seeded monkeys × 120 actions) | **26/26 passed**, 0 page errors |
+| Cross-browser (`npm run e2e:xb`, last run C9) | Firefox 62/67 → its one real bug QA-S19 (focus lost after first send) was fixed in #277 and the rest were harness fixes. WebKit 65/67 (harness-only). iPhone 13 WebKit 41/42 (the one test needs CDP touch, so it is Chromium-only). Not re-run at finalize. |
+| Sharing removed (QA-SH0) | No share affordance in the UI, menus, keyboard or mobile. `/share/*`, `/shared/*` and `/api/share/*` are plain 404s (guards in `e2e/share-removed.spec.ts`, `api/tests/test_share_removed_122.py`). |
+| Scope picker removed (QA-BF1) | No data-source/scope control (guard in `e2e/backend-fit.spec.ts`). |
+| Dead code / TODOs | No `ShareDialog`/`SharedView`/`ScopePopover`/`readOnly`/`sqlWithheld` code left (removed in #302/#305/#312). No TODOs point at removed features. |
+
+**Open deviations** (none P1; each `gap()` is a ratchet that turns red when the fix lands, so remove it then):
+- **QA-BF2 (P2, shell)**: the header product menu still has a display-only, no-op `Data: Demo data · scripted runs` /
+  `Data: Live API` menu item (`web/src/shell/Header.tsx`). The invented Scope row is gone. Make it a non-interactive
+  caption or drop it. Ratchet: `gap('QA-BF2')` in `e2e/backend-fit.spec.ts`.
+- **QA-S33 (P3, shell)**: active and hovered sidebar rows use the same fill. Ratchet: `gap('QA-S33')` in `e2e/fidelity.spec.ts`.
+- P3, last recorded open and not re-verified at finalize:
+  - QA-S13/S24: browser Ctrl+F in off-screen turns of a long virtualized thread, unverified on Firefox/WebKit.
+  - QA-S17: theme radios are one Tab stop each.
+  - QA-S32: jump-to-latest is close to the composer.
+  - QA-A16: the thinking header duration can be shorter than its longest step.
+  - QA-A17: the jump button can overlap content.
+  - QA-A28: code Copy is icon-only (optional).
+- BACKEND-FIT questionable items for the PM (not bugs; see §8 and the sprint notes `/workspace/cc_fe/NOTES.md`, "BACKEND-FIT"):
+  - BF3: "+" attaches text as context only; the analyzer can't query it.
+  - BF4: the strategy/model picker is validated and echoed but not wired to the scripted run.
+  - BF5/BF6: report versions and multi-question clarify are demo-only until the analyzer emits them.
+
+**How to re-run:**
+- Run `cd web && npm run ci`.
+- Then run `npm run e2e`, `npm run e2e:chaos` and `npm run e2e:xb` (WebKit needs `npx playwright install-deps webkit`).
+- Optionally run `npm run e2e:perf`.
+- All use one demo server and `--workers=1`. After an intended UI change, refresh the baselines with `npm run e2e:update` and review the PNG diffs before committing.
+- Review scripts (side-by-side, slop audit, keyboard/SR walks) are in `web/e2e/review/`.
+- The findings docs are `docs/frontend-fidelity-audit.md`, `docs/frontend-fidelity-behaviour.md`, `docs/frontend-side-by-side.md` and `docs/frontend-parity-checklist.md`.
