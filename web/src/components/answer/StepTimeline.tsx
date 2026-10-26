@@ -75,7 +75,7 @@ export function StepTimeline({ steps, live, elapsedMs, reasoning = [] }: { steps
           <div className="ml-[6px] mt-1.5 whitespace-pre-line border-l-2 border-line pl-5 leading-relaxed text-fg-muted" data-testid="reasoning-summary">{notes.join('\n\n')}</div>
         )}
         {steps.length > 0 && (
-          <ol className="relative ml-[6px] mt-1 border-l border-line pl-5" aria-live={live ? 'polite' : undefined}>
+          <ol className="relative ml-[6px] mt-1 border-l border-line pl-5">
             {steps.map((s, i) => <StepRow key={s.id} step={s} last={i === steps.length - 1} showAgent={multiAgent} />)}
           </ol>
         )}

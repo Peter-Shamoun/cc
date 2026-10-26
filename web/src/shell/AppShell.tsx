@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { ArrowDown } from 'lucide-react';
 import clsx from 'clsx';
 import { useChat } from '../lib/useChat';
@@ -368,7 +369,6 @@ function ShellInner() {
   const messagesRef = useRef(messages);
   const busyRef = useRef(chat.busy);
   useLayoutEffect(() => { messagesRef.current = messages; busyRef.current = chat.busy; });
-  const virtualList = messages.length > 30;
   useEffect(() => {
     const el = scroller.current;
     if (!el) return;
@@ -436,7 +436,7 @@ function ShellInner() {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: scrollBehavior() });
   };
 
-  // ---- screen readers: the log is aria-busy while streaming (one announcement, not per token), then "Answer complete" (QA-S1) ----
+  // ---- screen readers: one polite status region (QA-S1, QA-S16): "answering" → one excerpt → "Answer complete" ----
   const [announce, setAnnounce] = useState('');
   const wasBusy = useRef(false);
   useEffect(() => {
@@ -455,28 +455,25 @@ function ShellInner() {
     setAtBottom(true);
     setAnnounce('');
   }
-  // Streaming text is announced as a suffix on a timer, not on every token. Clearing the timer
-  // from the message effect would reset it at 60fps and the region would stay silent.
-  const announcedLen = useRef(0);
+  // QA-S16: the thread itself is NOT a live region (it announced every token, timer tick, table cell and
+  // axis label). The one polite status region says "answering", then ONE short excerpt of the answer's
+  // opening once there's a sentence to read, then "Answer complete". Same for short and virtualized threads.
   useEffect(() => {
     if (!chat.busy) return;
-    announcedLen.current = 0;
     let timer = 0;
     let cancelled = false;
     const tick = () => {
       timer = window.setTimeout(() => {
         if (cancelled || !busyRef.current) return;
         const last = messagesRef.current[messagesRef.current.length - 1];
-        if (last?.role === 'assistant') {
-          const text = last.parts.flatMap((p) => (p.type === 'text' ? [p.text] : [])).join('\n');
-          if (text.length > announcedLen.current) {
-            const start = Math.max(announcedLen.current, text.length - 240);
-            announcedLen.current = text.length;
-            setAnnounce(`ClaimClarity is answering. ${text.slice(start)}`);
-          }
-        }
-        tick();
-      }, 180);
+        // message.end already arrived (a table may still be revealing): "Answer complete" is next, skip the excerpt.
+        if (last?.role === 'assistant' && !(last as { streaming?: boolean }).streaming) return;
+        const text = last?.role === 'assistant' ? last.parts.flatMap((p) => (p.type === 'text' ? [p.text] : [])).join(' ').replace(/[*_`#>|]+/g, '').replace(/\s+/g, ' ').trim() : '';
+        const sentence = text.match(/^.{20,240}?[.!?](\s|$)/)?.[0] ?? (text.length >= 240 ? `${text.slice(0, 240)}…` : '');
+        // flushSync: commit now, so the excerpt can't be batched into the same paint as "Answer complete".
+        if (sentence) flushSync(() => setAnnounce(`ClaimClarity is answering. ${sentence.trim()}`));
+        else tick();
+      }, 1200);
     };
     tick();
     return () => { cancelled = true; window.clearTimeout(timer); };
@@ -586,7 +583,7 @@ function ShellInner() {
             <>
               {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- scroll-intent tracking on a focusable scroll region */}
               <div ref={scroller} tabIndex={0} role="region" aria-label="Conversation" onScroll={(e) => onScroll(e.currentTarget)} onWheel={(e) => markUserScroll(e)} onTouchMove={() => markUserScroll()} onPointerDown={() => markUserScroll()} onKeyDown={() => markUserScroll()} className="flex-1 overflow-y-auto [overflow-anchor:none] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--focus)]" data-testid="thread-scroller">
-                <div ref={content} className="mx-auto flex max-w-[48rem] flex-col gap-6 px-4 pb-10 pt-4 md:px-6" role={virtualList ? undefined : 'log'} aria-live={virtualList ? undefined : 'polite'} aria-relevant={virtualList ? undefined : 'additions'} aria-busy={virtualList ? undefined : chat.busy} aria-label={virtualList ? undefined : 'Messages'}>
+                <div ref={content} className="mx-auto flex max-w-[48rem] flex-col gap-6 px-4 pb-10 pt-4 md:px-6" data-testid="thread-content">
                   <h1 className="sr-only" data-testid="thread-title">{currentTitle}</h1>
                   {opening ? <ThreadSkeleton /> : <ThreadView messages={messages} busy={chat.busy} actions={threadActions} scrollRef={scroller} scrollToIndexRef={scrollToIndexRef} renderAll={printing} />}
                 </div>
