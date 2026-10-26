@@ -79,3 +79,23 @@ API CSV downloads use the client's name, `cc_<slug>_<yyyy-mm-dd>.csv` (UTC date)
 title, never from row values or question text. `api/store.py csv_filename` and `web/src/lib/csv.ts csvFilename` share the
 test vectors in `web/src/lib/csvFilename.vectors.json`. The Content-Disposition value goes through `_safe_filename`
 ([A-Za-z0-9._-] only), so a name can't inject a header or a path.
+
+## PHI-safe error reporting and logs
+
+**Client.**
+- `web/src/lib/errorReporting.ts` is the only error sink.
+  - `reportError(e, kind, context)` reduces anything thrown to `{name, message, frames, id, at, kind, context}` via `safeError()` and `redact()` (web/src/lib/redact.ts).
+  - Frames are `file:line:col` only. Context is allowlisted (`component`, `action`, `code`, `status`). Thrown non-Errors are never stringified.
+  - Records live in a 20-entry in-memory ring. There's no storage, URL, console or network use.
+  - The later backend plugs in with `setReporter(fn)`, which only ever sees redacted records.
+- `installGlobalErrorHandlers()` (in main.tsx) captures `error` and `unhandledrejection`. In production builds it calls `preventDefault()`, so the browser doesn't print the raw error to the console.
+- `ErrorBoundary` wraps `<App/>`. The fallback shows a generic message and a reference id, never the error text.
+- **Residual:** React 18 still `console.error`s errors that a boundary catches, even in production. React 19's `createRoot({ onCaughtError })` closes this gap; do it on upgrade.
+
+**API.**
+- `api/redact.py` mirrors the client rules (shared vectors: web/src/lib/redact.vectors.json).
+- `install_log_redaction()` runs in `create_app`. It attaches `PhiLogFilter` to root, cc.api, uvicorn*, fastapi and starlette loggers, and their handlers. The filter redacts every message and replaces tracebacks with `Type (message redacted)` plus `file:line in func` frames, with no source text.
+- `ErrorShieldMiddleware` (inside SecurityHeaders) turns any unhandled exception into the contract's 500 envelope, `{"error":{"code":"internal",...}}`. It logs only `Type at file:line` and the route template, and doesn't re-raise, so uvicorn never prints the message.
+- 422s use the contract envelope with field paths only (`Invalid request: messages.0.id.`). User-controlled keys are masked as `*`. FastAPI's default 422 echoed the offending `input` back.
+
+**Heuristics, not de-identification.** Quoted strings, emails, SSNs, phones, dates, 6+ digit numbers and 8+ char alphanumeric ids are masked. A bare unquoted name is not. The primary rule still stands: never pass user text, SQL or row values to a logger or `reportError`.

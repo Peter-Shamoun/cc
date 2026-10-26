@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field
 
 from analyzer.config import AnalyzerConfig
@@ -27,13 +28,15 @@ from api.contract import CONTRACT_VERSION, schema as contract_schema
 from api.ids import new_id
 from api.live import Cancelled, LiveTap
 from api.mapping import outcome_parts
-from api.security import MAX_BODY_BYTES, BodyLimitMiddleware, SecurityHeadersMiddleware
+from api.redact import install_log_redaction
+from api.security import MAX_BODY_BYTES, BodyLimitMiddleware, ErrorShieldMiddleware, SecurityHeadersMiddleware
 from api.store import DownloadRegistry, Principal
 from api.capabilities import DEFAULT_STRATEGY, capabilities as capabilities_body, check_options
 from api.titles import title_from_parts
 from api.transcripts import CustomerKeyDisabled, make_store
 
 log = logging.getLogger("cc.api")
+_SAFE_KEY = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,40}")
 NO_STORE = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
 
 
@@ -183,13 +186,24 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
     downloads = DownloadRegistry()
     runs: dict[str, _Run] = {}
     app = FastAPI(title="CC chat API", version="0.1.0", docs_url=None, redoc_url=None, openapi_url=None)
+    install_log_redaction()
     app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_body_bytes)
+    app.add_middleware(ErrorShieldMiddleware)  # inside SecurityHeaders: 500s get the headers too
     app.add_middleware(SecurityHeadersMiddleware)  # outermost, so the 413 carries the security headers too
     app.state.audit, app.state.store, app.state.downloads, app.state.runs = audit, store, downloads, runs
     app.state.settings, app.state.auth = settings, auth
 
     def authed(request: Request, request_id: str):
         return auth.authenticate(_token(request), request_id)
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error(_request: Request, exc: RequestValidationError):
+        # FastAPI's default 422 echoes the offending ``input`` (it can be PHI) and isn't the contract envelope.
+        # Report field paths only, with user-controlled dict keys masked.
+        fields = sorted({".".join(str(p) if isinstance(p, int) or _SAFE_KEY.fullmatch(str(p)) else "*"
+                                  for p in e.get("loc", ())[1:]) for e in exc.errors()})[:10]
+        msg = "Invalid request" + (f": {', '.join(f for f in fields if f)}." if any(fields) else ".")
+        return error_json("validation", msg, 422)
 
     def unauthorized():
         return JSONResponse({"error": {"code": "auth_expired", "message": "Sign in again."}}, 401, headers=NO_STORE)
