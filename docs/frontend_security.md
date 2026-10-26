@@ -119,3 +119,42 @@ test vectors in `web/src/lib/csvFilename.vectors.json`. The Content-Disposition 
 - With `CC_API_AUTH` set to anything but `demo`, `create_app()` refuses to start without an explicit `auth=` backend. There's no silent fallback to demo tokens.
 - A token baked into the bundle is public. `vite build` and `sessionFromEnv()` refuse a `VITE_ANALYST_DEMO_TOKEN` that isn't the synthetic `demo:<customer>:<user>` shape.
 - `onExpired` for cookie sessions sends the user to `VITE_SIGN_IN_URL?next=<pathname>`, once, with no query or hash.
+
+## Caching and offline
+
+**Decision: no service worker and no offline shell.** The app ships no worker script, manifest, Cache Storage or IndexedDB. `web/src/security/noServiceWorker.test.ts` enforces this.
+
+Why:
+- **PHI stays off disk.** A service worker caches responses in Cache Storage. That puts answers, tables, CSVs, titles and shared views on disk, where they outlive sign-out, retention (`PUT /api/transcripts/retention`), share revocation and customer-key shredding. There is no reliable way to purge copies on a machine that never comes back online. Spec §6.2 allows only allowlisted UI prefs in browser storage.
+- **Shared workstations.** Billing offices share PCs. With `no-store`, the next user of the browser profile finds nothing in its caches.
+- **Blast radius.** A worker is a long-lived script that intercepts every request on the origin, so an XSS that registers one persists after the tab closes. With no worker, an XSS ends with the page. `worker-src` stays limited to `'self' blob:`, which Vega and Shiki need for dedicated workers.
+- **Little to gain.** Every answer needs the server. Offline, the composer keeps its in-memory draft and shows the offline notice; sending waits for reconnect.
+
+What covers fast loads instead:
+- the static boot shell in `index.html`, which paints from the HTML alone (QA-P8, `docs/frontend_a11y_perf.md`)
+- the lazy chunks
+- the browser HTTP cache for content-hashed assets (code, no PHI; `immutable` is allowed by `header_rules.mjs`)
+
+When to revisit: only if a real offline requirement appears. Even then, cache hashed static assets only, never `/api/` or HTML, and send `Clear-Site-Data: "cache", "storage"` on sign-out. The real backend's sign-out route should send that header regardless (see "Session / auth boundary").
+
+### Cache-control audit of every API route
+
+`api/tests/test_cache_audit.py` enumerates `app.routes`, so a new route fails the test until it's added to the table. Every route is exercised on its success path and at least one error path: 401, 404 or 422. Signed-out `health`, `contract` and `capabilities` return generic data with no user data. Framework-level 404/405, OPTIONS and HEAD are covered too. Every response must carry:
+- `Cache-Control: no-store` exactly (no `public`, `max-age` or `immutable`)
+- `Pragma: no-cache`
+- the full `SECURITY_HEADERS` set
+
+No response may carry `ETag`, `Last-Modified`, `Expires` or `Age`, and forged `If-None-Match`/`If-Modified-Since` never produce a 304.
+
+| Route | Data | Result |
+|---|---|---|
+| `GET /api/health`, `/api/contract`, `/api/capabilities` | none / schema / picker options | no-store ✓ |
+| `POST /api/chat`, `GET /api/chat/{id}/stream`, `POST /api/chat/{id}/stop` | answers (SSE) | no-store ✓, `X-Accel-Buffering: no` |
+| `GET /api/download/{id}` | CSV (PHI) | no-store ✓, attachment |
+| `GET /api/transcripts`, `PUT /api/transcripts/retention` | account state | no-store ✓ |
+| `GET`/`DELETE /api/conversations`, `POST /api/conversations/search` | titles, search (POST so text never sits in a URL) | no-store ✓ |
+| `GET`/`PATCH`/`DELETE /api/conversations/{id}`, `GET …/export` | transcripts (PHI) | no-store ✓ |
+| `PUT`/`DELETE …/messages/{mid}/feedback` | feedback | no-store ✓ |
+| `GET`/`PUT`/`DELETE …/share`, `GET /api/shared/{id}` | share link, shared view | no-store ✓, shared view `no-referrer` |
+
+The audit found no gaps: `SecurityHeadersMiddleware` overrides any per-route value on every status. The web side is checked separately by `header_rules.mjs`: HTML is no-store, and hashed assets are no-store or immutable.
