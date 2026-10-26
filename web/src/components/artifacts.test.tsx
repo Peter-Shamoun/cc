@@ -37,6 +37,22 @@ describe('artifact versions + autoOpen (contract 1.9 §16)', () => {
     autoOpenIds(msgs).forEach((id) => seen.add(id));
     expect(nextAutoOpen(msgs, seen)).toBeNull();
   });
+  it('QA-A27: no autoOpen on phones/tablets (coarse pointer or < 768px); the card opens on tap instead', () => {
+    const mm = window.matchMedia;
+    const w = window.innerWidth;
+    try {
+      window.matchMedia = vi.fn().mockImplementation((q: string) => ({ matches: q.includes('coarse'), media: q, addEventListener: vi.fn(), removeEventListener: vi.fn() })) as unknown as typeof window.matchMedia;
+      expect(nextAutoOpen(msgs, new Set())).toBeNull();
+      window.matchMedia = mm;
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+      expect(nextAutoOpen(msgs, new Set())).toBeNull();
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 });
+      expect(nextAutoOpen(msgs, new Set())?.partId).toBe('p_r');
+    } finally {
+      window.matchMedia = mm;
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: w });
+    }
+  });
   it('typing in a non-empty textarea blocks autoOpen; an empty composer does not', () => {
     const ta = document.createElement('textarea');
     document.body.appendChild(ta);

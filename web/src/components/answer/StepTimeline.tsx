@@ -67,7 +67,7 @@ export function StepTimeline({ steps, live, elapsedMs, reasoning = [] }: { steps
         <span className={clsx('truncate', live && 'shimmer')}>{header}</span>
         {live && <span className="shrink-0 tabular-nums text-xs text-fg-subtle" aria-hidden>{fmtMs(Math.max(ticking, 0))}</span>}
         {/* QA-A22: separators so the accessible name reads "Thought for 1s, 2 failed", not "1s2 failed". */}
-        {!live && errors > 0 && <span className="shrink-0 text-xs text-danger"><span className="sr-only">, </span>{errors} failed</span>}
+        {!live && errors > 0 && <span className="shrink-0 text-xs text-fg-subtle" data-testid="step-failed-count"><span className="sr-only">, </span>{errors} failed</span>}
         {!live && !errors && repaired > 0 && <span className="sr-only">, all failures repaired</span>}
         {open ? <ChevronDown size={14} className="shrink-0" aria-hidden /> : <ChevronRight size={14} className="shrink-0" aria-hidden />}
       </button>
@@ -94,7 +94,7 @@ function StepRow({ step, last, showAgent }: { step: Step; last: boolean; showAge
   return (
     <li className={clsx('relative step-enter', !last && 'pb-1')} data-testid="step" data-kind={step.kind} data-state={step.state}>
       <span className={clsx('absolute -left-[26.5px] top-[9px] flex h-[11px] w-[11px] items-center justify-center rounded-full border-2', dot)} aria-hidden>
-        {step.state === 'running' && <span className="h-1 w-1 animate-ping rounded-full bg-fg-subtle" />}
+        {step.state === 'running' && <span className="h-1 w-1 rounded-full bg-fg-subtle" data-testid="step-running-dot" />}
       </span>
       <button type="button" disabled={!hasDetail} aria-expanded={hasDetail ? open : undefined} onClick={() => setOpen((o) => !o)}
         className="flex w-full max-w-full items-center gap-2 rounded-md py-1 text-left text-fg-muted enabled:hover:text-fg">
@@ -125,7 +125,7 @@ function StepRow({ step, last, showAgent }: { step: Step; last: boolean; showAge
           {step.checks && <ChecksList checks={step.checks} />}
           {step.candidates && <CandidateTable candidates={step.candidates} />}
           {step.previousSql && <details className="text-xs"><summary className="cursor-pointer text-fg-subtle hover:text-fg">Previous SQL</summary><CodeBlock code={step.previousSql} language="sql" title="before repair" /></details>}
-          {step.sql && <CodeBlock code={step.sql} language="sql" title={step.kind === 'repair' ? 'revised' : 'query'} />}
+          {step.sql && <CodeBlock code={step.sql} language="sql" title={step.kind === 'repair' ? 'revised' : 'query'} masked={step.maskedLiterals} />}
         </div>
       )}
     </li>
@@ -145,7 +145,7 @@ function ChecksList({ checks }: { checks: CheckResult[] }) {
   );
 }
 
-function CandidateTable({ candidates }: { candidates: { id: string; label: string; rowCount?: number; score?: number; note?: string; chosen?: boolean; sql?: string }[] }) {
+function CandidateTable({ candidates }: { candidates: { id: string; label: string; maskedLiterals?: number; rowCount?: number; score?: number; note?: string; chosen?: boolean; sql?: string }[] }) {
   const [show, setShow] = useState<string | null>(null);
   const shown = candidates.find((c) => c.id === show);
   return (
@@ -168,7 +168,7 @@ function CandidateTable({ candidates }: { candidates: { id: string; label: strin
           </tbody>
         </table>
       </div>
-      {shown?.sql && <CodeBlock code={shown.sql} language="sql" title={shown.label} />}
+      {shown?.sql && <CodeBlock code={shown.sql} language="sql" title={shown.label} masked={shown.maskedLiterals} />}
     </div>
   );
 }

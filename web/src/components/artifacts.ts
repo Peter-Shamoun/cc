@@ -1,4 +1,5 @@
 import type { ArtifactPart, ChartPart, CodePart, ImagePart, Part, TablePart } from '../lib/contract';
+import { sanitizeParts } from './answer/sanitizeParts';
 
 /** A report artifact's content (contract 1.9 §16: `{markdown}`), given a part-like shape for the panel. */
 export type ReportDoc = { type: 'report'; id: string; markdown: string; title?: string };
@@ -22,7 +23,7 @@ export function artifactVersions(messages: readonly Msg[], artifactId: string): 
   const byVersion = new Map<number, Artifact>();
   for (const m of messages) {
     if (m.role !== 'assistant' || !Array.isArray(m.parts)) continue;
-    const parts = m.parts as Part[];
+    const parts = sanitizeParts(m.parts) as Part[];
     for (const p of parts) if (p.type === 'artifact' && p.artifactId === artifactId) byVersion.set(p.version, toArtifact(p, parts));
   }
   return [...byVersion.entries()].sort((a, b) => a[0] - b[0]).map(([, a]) => a);
@@ -33,17 +34,29 @@ export function autoOpenIds(messages: readonly Msg[]): string[] {
   const ids: string[] = [];
   for (const m of messages) {
     if (m.role !== 'assistant' || !Array.isArray(m.parts)) continue;
-    for (const p of m.parts as Part[]) if (p.type === 'artifact' && p.autoOpen) ids.push(p.id);
+    for (const p of sanitizeParts(m.parts) as Part[]) if (p.type === 'artifact' && p.autoOpen) ids.push(p.id);
   }
   return ids;
 }
 
-/** The newest autoOpen artifact part not in `seen`, with its message's parts. */
+/**
+ * autoOpen is a side-by-side affordance. On a phone or tablet (coarse pointer, or narrower than the two-pane
+ * layout) the panel is a full-screen sheet, so opening it unasked would cover the chat mid-answer (QA-A27).
+ * There the artifact card shows inline and opens on tap, as Claude mobile and ChatGPT canvas do.
+ */
+export function canAutoOpen(): boolean {
+  if (typeof window === 'undefined') return false;
+  const coarse = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+  return !coarse && window.innerWidth >= 768;
+}
+
+/** The newest autoOpen artifact part not in `seen`, with its message's parts (null where autoOpen is off). */
 export function nextAutoOpen(messages: readonly Msg[], seen: ReadonlySet<string>): Artifact & { partId: string } | null {
+  if (!canAutoOpen()) return null;
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
     if (m.role !== 'assistant' || !Array.isArray(m.parts)) continue;
-    const parts = m.parts as Part[];
+    const parts = sanitizeParts(m.parts) as Part[];
     for (let j = parts.length - 1; j >= 0; j--) {
       const p = parts[j];
       if (p.type === 'artifact' && p.autoOpen && !seen.has(p.id)) return { ...toArtifact(p, parts), partId: p.id };

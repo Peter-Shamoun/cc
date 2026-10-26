@@ -75,3 +75,26 @@ for (const theme of ['light', 'dark'] as const) {
     });
   });
 }
+
+/** Contract 1.16.0 edge scenarios (EDGE_SCENARIOS): recorded streams, light, 1440 + 390; dark for the busiest two. */
+const EDGE = ['empty', 'multi_table', 'long_sql', 'many_repairs', 'clarify_nested', 'escalation_abstain',
+  'cancel_plan', 'cancel_sql', 'cancel_repair', 'cancel_candidates', 'cancel_escalation', 'cancel_render'];
+test.describe('edge scenarios @both', () => {
+  test.beforeEach(async ({ page }) => { await isolateHistory(page); });
+  for (const name of EDGE) {
+    test(`edge ${name} light`, async ({ page }) => {
+      await open(page, LIVE, 'light');
+      await outcome(page, `edge/${name}`);
+      await shot(page, `edge-${name}-light`);
+    });
+  }
+  for (const name of ['many_repairs', 'cancel_escalation']) {
+    test(`edge ${name} dark (steps open)`, async ({ page }) => {
+      await open(page, LIVE, 'dark');
+      await outcome(page, `edge/${name}`);
+      const s = lastAssistant(page).getByTestId('step-summary').first();
+      if ((await s.getAttribute('aria-expanded')) !== 'true') await s.click();
+      await shot(page, `edge-${name}-dark-open`);
+    });
+  }
+});

@@ -39,7 +39,7 @@ import { foldThread } from './threadTree';
 
 const uid = (p: string) => `${p}_${Math.random().toString(36).slice(2, 10)}`;
 /** `uiKey`: a client-only render key fixed at send, so the row doesn't remount when message.start swaps in the server id (QA-A15: the Thinking row and its timer survive). */
-export type ViewMessage = UserMessage | (AssistantViewV1 & { uiKey?: string; regenerateStyle?: RegenerateStyle });
+export type ViewMessage = UserMessage | (AssistantViewV1 & { uiKey?: string; regenerateStyle?: RegenerateStyle; /** UI-only stub from withInterrupted. */ interrupted?: boolean });
 
 export function toView(m: UserMessage | AssistantMessage): ViewMessage {
   if (m.role === 'user') return m;
@@ -52,6 +52,22 @@ export function toView(m: UserMessage | AssistantMessage): ViewMessage {
  * it renders as answered instead of offering choices again. The server sets `answered` on its own
  * transcript; the memory store does not, so we derive it here too.
  */
+/**
+ * A stored chat that ends on the question has no answer: the page was reloaded or closed mid-answer and the server
+ * cancelled the run after its disconnect grace (CONTRACT.md §8). Show that plainly with Retry (= regenerate, which
+ * re-asks the same question without a second copy of it), never a question hanging with nothing under it.
+ * The placeholder is UI-only ('a_' id, never stored) so Retry sends a fresh run, not `regenerate.messageId`.
+ */
+export function withInterrupted(msgs: ViewMessage[]): ViewMessage[] {
+  const last = msgs[msgs.length - 1];
+  if (!last || last.role !== 'user') return msgs;
+  const id = uid('a');
+  let v = newAssistantViewV1(id) as AssistantViewV1;
+  v = reduceV1(v, { type: 'part', part: { type: 'error', id: uid('err'), code: 'internal', title: 'Response interrupted', message: 'This answer stopped before it finished. Retry to ask again.', retryable: true } } as never);
+  v = reduceV1(v, { type: 'message.end', messageId: id, finishReason: 'error', usage: { queries: 0, elapsedMs: 0 } } as never);
+  return [...msgs, { ...v, streaming: false, status: null, openText: [], uiKey: id, interrupted: true }];
+}
+
 export function markAnswered(msgs: ViewMessage[]): ViewMessage[] {
   return msgs.map((m, i) => {
     if (m.role !== 'assistant' || i === msgs.length - 1) return m;
@@ -116,7 +132,7 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore, getOpti
     // Server transcripts are append-only with parentId links: show the newest path, keep edits as versions.
     const { visible, branches: b } = foldThread(c ? c.messages.map(toView) : []);
     setBranches(b);
-    setMessages(markAnswered(visible));
+    setMessages(withInterrupted(markAnswered(visible)));
   }, [store]);
 
   const newChat = useCallback(() => {
@@ -261,7 +277,8 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore, getOpti
     const prev = messages.slice(lastUserIdx + 1).find((m) => m.role === 'assistant');
     const regen = prev && !prev.id.startsWith('a_') ? (style === 'default' ? { messageId: prev.id } : { messageId: prev.id, style }) : undefined;
     // The old answer stays reachable as a version (ChatGPT/Claude "‹ 2/2 ›"), same arrows as edits.
-    if (prev) {
+    // The "Response interrupted" stub is not an answer: Retry replaces it, it never becomes a version.
+    if (prev && !('interrupted' in prev && prev.interrupted)) {
       const tail = messages.slice(lastUserIdx);
       const b = branches[lastUserIdx] ?? { versions: [tail], idx: 0 };
       const versions = [...b.versions];
