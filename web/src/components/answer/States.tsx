@@ -3,6 +3,7 @@ import { ArrowUp, Check, CircleSlash, HelpCircle, Info, Lock, Sparkles, RotateCc
 import clsx from 'clsx';
 import type { ChatRequest } from '../../api/contract';
 import { Markdown } from '../parts/Markdown';
+import { Inline } from '../parts/misc';
 import { modelName } from './normalize';
 import type { AbstainPart, ClarificationPart, EscalationEvent } from './provisional';
 
@@ -66,7 +67,7 @@ export function ClarifyCard({ part, onReply, active }: { part: ClarificationPart
   const chip = (id: string) => (part.multiSelect ? setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id])) : submit([id]));
   return (
     <div className={clsx('my-4 rounded-2xl border px-4 py-3.5 font-sans text-sm', done ? 'border-line bg-bg' : 'border-line-strong bg-elev shadow-sm')} role="group" aria-label="Clarifying question" data-testid="clarify">
-      <div className="flex items-start gap-2 text-fg"><HelpCircle size={16} className="mt-0.5 shrink-0 text-fg-muted" aria-hidden /><span className="font-medium leading-snug">{part.question}</span></div>
+      <div className="flex items-start gap-2 text-fg"><HelpCircle size={16} className="mt-0.5 shrink-0 text-fg-muted" aria-hidden /><span className="font-medium leading-snug [&_code]:rounded [&_code]:bg-hover [&_code]:px-1 [&_code]:font-mono [&_code]:text-[0.9em]" data-testid="clarify-question"><Inline text={part.question} /></span></div>
       {part.multiSelect && !done && <div className="mt-1 pl-6 text-xs text-fg-subtle">Choose one or more</div>}
       {choices.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Choices">

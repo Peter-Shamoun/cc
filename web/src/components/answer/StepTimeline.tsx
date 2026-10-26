@@ -5,6 +5,9 @@ import { CodeBlock } from '../parts/CodeBlock';
 import { fmtMs, summarize, unresolvedFailures } from './normalize';
 import type { CheckResult, Step, StepKind } from './provisional';
 
+/** Reasoning folded into the timeline (QA-A10): one "Thought for 1.2s" row, like ChatGPT/Claude. */
+export type TimelineReasoning = { summary?: string; durationMs?: number };
+
 const ICON: Record<StepKind, LucideIcon> = { sql: Database, repair: Wrench, check: ListChecks, explore: Telescope, candidates: GitCompare, escalation: Sparkles, chart: BarChart3, schema: List, search: Search, other: Wrench };
 const KIND_LABEL: Record<StepKind, string> = { sql: 'Query', repair: 'Repair', check: 'Check', explore: 'Probe', candidates: 'Candidates', escalation: 'Escalation', chart: 'Chart', schema: 'Schema', search: 'Search', other: 'Step' };
 
@@ -21,46 +24,59 @@ function useElapsed(live: boolean) {
 }
 
 /**
- * Claude/ChatGPT-style activity timeline: live while the answer streams (current step shimmers,
- * timer runs), then auto-collapses to one summary line ("Ran 3 queries, 1 repair · 12s").
+ * Claude/ChatGPT-style activity disclosure: one row for the whole think-and-query phase.
+ * Live: "Thinking…" with a spinner and running timer; the body lists each step as it runs
+ * (each step is a single row keyed by stepId that turns from running to done; QA-A7). Done:
+ * auto-collapses to "Thought for 1.2s"; expanding shows the counts ("Ran 2 queries, 1 check"),
+ * the reasoning summary, then the steps (QA-A10).
  */
-export function StepTimeline({ steps, live, elapsedMs }: { steps: Step[]; live: boolean; elapsedMs?: number }) {
+export function StepTimeline({ steps, live, elapsedMs, reasoning = [] }: { steps: Step[]; live: boolean; elapsedMs?: number; reasoning?: TimelineReasoning[] }) {
   const [open, setOpen] = useState(live);
   const touched = useRef(false);
   const wasLive = useRef(live);
+  const mountedLive = useRef(live);
   useEffect(() => {
     if (wasLive.current && !live && !touched.current) setOpen(false);
     if (!wasLive.current && live && !touched.current) setOpen(true);
     wasLive.current = live;
   }, [live]);
+  // Ticks while live, then freezes: the frozen value is how long this answer "thought".
   const ticking = useElapsed(live);
   const bodyId = useId();
-  const current = [...steps].reverse().find((s) => s.state === 'running') ?? (live ? steps[steps.length - 1] : undefined);
+  const headId = useId();
   const errors = unresolvedFailures(steps);
   // Agent tags only help when more than one agent/model worked on the answer (QA-A6).
   const multiAgent = new Set(steps.map((s) => s.agent).filter(Boolean)).size > 1 || steps.some((s) => s.kind === 'escalation');
   const repaired = steps.filter((s) => s.kind === 'repair' && s.state === 'ok').length;
-  const header = live
-    ? `${current?.label ?? 'Working'}…`
-    : summarize(steps, elapsedMs);
+  const counts = summarize(steps).replace(/ · .*$/, '');
+  const worked = steps.reduce((a, b) => a + (b.durationMs ?? 0), 0) + reasoning.reduce((a, r) => a + (r.durationMs ?? 0), 0);
+  const thoughtMs = mountedLive.current ? Math.max(ticking, 0) : elapsedMs ?? worked;
+  const stopped = steps.filter((x) => x.state === 'cancelled').length;
+  // Collapsed: "Thought for 1.2s" (plus "1 stopped" if any). Expanded: the counts join the header.
+  const header = live ? 'Thinking…' : [`Thought for ${fmtMs(Math.max(thoughtMs, 1000))}`, open && steps.length ? counts : stopped ? `${stopped} stopped` : ''].filter(Boolean).join(' · ');
+  const notes = reasoning.map((r) => r.summary?.trim()).filter(Boolean) as string[];
 
   return (
-    <section className="my-3 font-sans text-sm" data-testid="step-timeline" data-live={live || undefined} aria-label="Analysis steps">
-      <button type="button" aria-expanded={open} aria-controls={bodyId} onClick={() => { touched.current = true; setOpen((o) => !o); }}
+    // QA-A11: a group named by its own header, not N identical "Analysis steps" landmarks per thread.
+    <div role="group" aria-labelledby={headId} className="my-3 font-sans text-sm" data-testid="step-timeline" data-live={live || undefined}>
+      <button type="button" id={headId} aria-expanded={open} aria-controls={bodyId} onClick={() => { touched.current = true; setOpen((o) => !o); }}
         className="group inline-flex max-w-full items-center gap-2 rounded-lg py-1 text-left text-fg-muted transition-colors hover:text-fg" data-testid="step-summary">
         {live ? <Loader2 size={14} className="shrink-0 animate-spin" aria-hidden /> : <ListChecks size={14} className="shrink-0" aria-hidden />}
         <span className={clsx('truncate', live && 'shimmer')}>{header}</span>
-        {live && <span className="shrink-0 tabular-nums text-xs text-fg-subtle" aria-hidden>{fmtMs(Math.max(ticking, 0)).replace(' ms', 'ms')}</span>}
+        {live && <span className="shrink-0 tabular-nums text-xs text-fg-subtle" aria-hidden>{fmtMs(Math.max(ticking, 0))}</span>}
         {!live && errors > 0 && <span className="shrink-0 rounded-full bg-danger/10 px-1.5 text-[11px] text-danger">{errors} failed</span>}
         {!live && !errors && repaired > 0 && <span className="sr-only">all failures repaired</span>}
-        {open ? <ChevronDown size={14} className="shrink-0" /> : <ChevronRight size={14} className="shrink-0" />}
+        {open ? <ChevronDown size={14} className="shrink-0" aria-hidden /> : <ChevronRight size={14} className="shrink-0" aria-hidden />}
       </button>
       <div id={bodyId} hidden={!open} className="step-body">
+        {notes.length > 0 && (
+          <div className="ml-[6px] mt-1.5 whitespace-pre-line border-l-2 border-line pl-5 leading-relaxed text-fg-muted" data-testid="reasoning-summary">{notes.join('\n\n')}</div>
+        )}
         <ol className="relative ml-[6px] mt-1 border-l border-line pl-5" aria-live={live ? 'polite' : undefined}>
           {steps.map((s, i) => <StepRow key={s.id} step={s} last={i === steps.length - 1} showAgent={multiAgent} />)}
         </ol>
       </div>
-    </section>
+    </div>
   );
 }
 
