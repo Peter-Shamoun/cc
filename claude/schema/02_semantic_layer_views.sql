@@ -353,7 +353,9 @@ WITH outcome AS (
            SUM(co_amount)                                              AS remit_co_amount,
            MIN(payment_date)                                           AS first_payment_date,
            MAX(payment_date)                                           AS last_payment_date,
-           arg_max(claim_status, payment_date)                         AS latest_claim_status
+           -- primary and secondary can adjudicate on the same payment date: break the tie as event_rank_desc does
+           arg_max(claim_status, struct_pack(payment_date, file_received_at, file_id, claim_payment_uid))
+                                                                       AS latest_claim_status
     FROM sem_int.remit_event WHERE is_current_adjudication
     GROUP BY claim_key
 ),
