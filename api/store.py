@@ -206,6 +206,17 @@ class InMemoryTranscriptStore:
                 del self._items[cid], self._owners[cid]
 
 
+_FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
+
+
+def defuse_cell(value):
+    """OWASP CSV injection: text starting with = + - @ TAB CR would run as a spreadsheet formula; prefix it with '.
+    Numbers (including negatives) are left numeric."""
+    if isinstance(value, str) and value.startswith(_FORMULA_START):
+        return "'" + value
+    return value
+
+
 @dataclass
 class Download:
     id: str
@@ -218,9 +229,9 @@ class Download:
     def csv_bytes(self) -> bytes:
         buf = io.StringIO()
         writer = csv.writer(buf, lineterminator="\r\n")
-        writer.writerow(self.columns)
+        writer.writerow([defuse_cell(c) for c in self.columns])
         for row in self.rows:
-            writer.writerow(["" if v is None else v for v in row])
+            writer.writerow(["" if v is None else defuse_cell(v) for v in row])
         return buf.getvalue().encode("utf-8")
 
 

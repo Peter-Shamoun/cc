@@ -201,10 +201,10 @@ describe('table fixtures', () => {
 
   it('exports hostile cells as RFC 4180 CSV and aligned TSV, without PHI', async () => {
     const part = tableFixtures.find((f) => f.id === 'csv-hostile')!.part;
-    const csv = 'Note,Paid,Rate\r\n"say ""hi"",\nplease",1234.5,0.5\r\n,0,0\r\n=1+1,-2,1\r\na\tb,3,0.1';
+    const csv = 'Note,Paid,Rate\r\n"say ""hi"",\nplease",1234.5,0.5\r\n,0,0\r\n\'=1+1,-2,1\r\na\tb,3,0.1';
     expect(tableToCsv(part)).toBe(csv);
     expect(tableToCsv(part)).not.toContain('SECRET99');
-    expect(tableToTsv(part)).toBe('Note\tPaid\tRate\nsay "hi", please\t1234.5\t0.5\n\t0\t0\n=1+1\t-2\t1\na b\t3\t0.1');
+    expect(tableToTsv(part)).toBe('Note\tPaid\tRate\nsay "hi", please\t1234.5\t0.5\n\t0\t0\n\'=1+1\t-2\t1\na b\t3\t0.1');
     render(<DataTable part={part} />);
     const downloaded = await withDownload(() => fireEvent.click(screen.getAllByRole('button', { name: 'Download CSV' }).at(-1)!));
     expect(downloaded.body).toBe(csv);

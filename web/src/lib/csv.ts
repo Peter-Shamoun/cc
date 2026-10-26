@@ -7,16 +7,25 @@ export function visible(c: Column, allowPhi = false) {
   return !c.phi || allowPhi;
 }
 
+/**
+ * Spreadsheet formula injection (OWASP "CSV injection"): a text cell starting with = + - @ or a tab/CR runs as a
+ * formula in Excel/Sheets (e.g. =HYPERLINK to exfiltrate neighbouring cells). Prefix such text with ' so it stays text.
+ * Only strings are touched; numbers (including negatives) keep their numeric value.
+ */
+export function defuse(v: unknown): unknown {
+  return typeof v === 'string' && /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+}
+
 function esc(v: unknown): string {
   if (v === null || v === undefined) return '';
-  const s = String(v);
+  const s = String(defuse(v));
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 /** Tabs and newlines would shift columns when pasted into a spreadsheet. */
 function tsvField(v: unknown): string {
   if (v === null || v === undefined) return '';
-  return String(v).replace(/[\t\r\n]+/g, ' ');
+  return String(defuse(v)).replace(/[\t\r\n]+/g, ' ');
 }
 
 /** RFC 4180 CSV of loaded rows with raw values. PHI columns are dropped unless allowed (§6.6). */
