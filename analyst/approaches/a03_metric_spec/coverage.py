@@ -458,6 +458,9 @@ def _load_questions() -> list[dict]:
     return yaml.safe_load(_QUESTIONS.read_text())
 
 
+REVIEWED_QUESTION_SETS = (None, "heldout_hard_1")
+
+
 def _load_authored() -> list[dict]:
     return json.loads(_AUTHORED.read_text())
 
@@ -471,7 +474,10 @@ def coverage_report() -> dict:
     """Counts the spec can be checked against. Compiles every labeled spec first."""
     compile_labeled_specs()
     questions = _load_questions()
-    authored = _load_authored()
+    # The labeled counts cover the rounds whose expressible questions were reviewed; later rounds are reported apart.
+    everything_authored = _load_authored()
+    authored = [q for q in everything_authored if q.get("question_set") in REVIEWED_QUESTION_SETS]
+    later_rounds = sorted({q.get("question_set") for q in everything_authored} - set(REVIEWED_QUESTION_SETS))
     families = _family_ids()
     missing = [q["id"] for q in questions if q["id"] not in HANDWRITTEN_TYPE]
     if missing:
@@ -490,7 +496,7 @@ def coverage_report() -> dict:
     heldout = [q for q in authored if q.get("question_set") == "heldout_hard_1"]
     heldout_types = Counter(classify_gold_sql(q["gold_sql"]) for q in heldout)
     heldout_expressible = sum(heldout_types[name] for name in EXPRESSIBLE_TYPES)
-    screen_authored = [q for q in authored if q.get("question_set") != "heldout_hard_1"]
+    screen_authored = [q for q in authored if not q.get("question_set")]
     screen_types = Counter(classify_gold_sql(q["gold_sql"]) for q in screen_authored)
     screen_expressible = sum(screen_types[name] for name in EXPRESSIBLE_TYPES)
 
@@ -518,4 +524,6 @@ def coverage_report() -> dict:
             "heldout_hard_1": {"questions": len(heldout), "expressible": heldout_expressible,
                                "by_type": dict(heldout_types)},
         },
+        "unreviewed_rounds": {name: dict(Counter(classify_gold_sql(q["gold_sql"]) for q in everything_authored
+                                                 if q.get("question_set") == name)) for name in later_rounds},
     }

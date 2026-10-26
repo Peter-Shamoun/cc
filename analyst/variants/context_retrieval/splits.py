@@ -2,12 +2,12 @@
 
 Validation and test questions are never retrieval candidates. An unrecognized
 question_set fails closed: it is not silently treated as train. The held-out
-set authored after screen 1 (`heldout_hard_1`) is validation. No test set is
+sets authored after screen 1 (`heldout_hard_1`, `step0_hard_1`, `grokbot_r1`) are validation. No test set is
 authored yet; a question_set that starts with ``test`` is reserved for it.
 """
 from __future__ import annotations
 
-VALIDATION_QUESTION_SETS = frozenset({"heldout_hard_1"})
+VALIDATION_QUESTION_SETS = frozenset({"heldout_hard_1", "step0_hard_1", "grokbot_r1"})
 SPLITS = frozenset({"train", "validation", "test"})
 
 

@@ -42,8 +42,11 @@ def _ranking_metric(sql: str, output_columns: list[str]) -> tuple[int, bool]:
     target = key.this
     if isinstance(target, exp.Literal) and target.is_int:
         return int(target.this) - 1, not key.args.get("desc")
-    if isinstance(target, exp.Column) and not target.table and target.name in output_columns:
+    if isinstance(target, exp.Column) and target.name in output_columns:      # alias, or t.col projected as col
         return output_columns.index(target.name), not key.args.get("desc")
+    exact = [i for i, projection in enumerate(tree.selects) if projection.unalias() == target]
+    if len(exact) == 1:                                                   # t.x AS label, ranked by t.x
+        return exact[0], not key.args.get("desc")
     containing = [i for i, projection in enumerate(tree.selects)
                   if any(node == target for node in projection.walk())]
     if len(containing) != 1:

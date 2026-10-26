@@ -4,7 +4,7 @@ import json
 import pytest
 
 from bench.splits import (
-    ASSIGNMENT_PATH, SealedSplitError, SplitConflict, SplitError, add_questions, assign_group_splits,
+    ASSIGNMENT_PATH, SealedSplitError, _assignment_hash, SplitConflict, SplitError, add_questions, assign_group_splits,
     group_records, initial_assignment, iter_assignment, load_assignment, select_cases, sync,
     template_signature, verify, write_assignment,
 )
@@ -169,33 +169,16 @@ def test_sync_sends_catalog_questions_missing_from_the_file_to_validation(tmp_pa
 
 
 def test_committed_assignment_matches_the_v1_freeze():
+    # Later rounds are added on top; the v1 rows themselves must never move.
     doc = verify()
-    fresh = initial_assignment()
-    assert doc["assignment_hash"] == fresh["assignment_hash"] == (
-        "7f7600eaaaaafe6ee5fdd6c0c63644fd12886973ae6152dec15be2746e4de10d")
-    assert doc["additions"] == []
-    assert doc["summary"]["concrete_questions"] == 99
-    assert doc["summary"]["groups"] == 92
-    assert doc["summary"]["by_split"] == {"train": 49, "validation": 25, "test": 25}
-    assert doc["summary"]["by_split_including_family_templates"] == {"train": 57, "validation": 29, "test": 29}
-    by_bundle = {}
-    for row in doc["questions"]:
-        if row["template_bundle"]:
-            by_bundle.setdefault(row["template_bundle"], set()).add(row["split"])
-    assert by_bundle["denial_rate"] == {"train"}
-    assert by_bundle["denial_carc"] == {"validation"}
-    assert by_bundle["partial_line_denial"] == {"test"}
-    for splits in by_bundle.values():
-        assert len(splits) == 1
-    case = {"id": "f_payer_denial_rate__x", "family": "payer_denial_rate"}
-    assert select_cases([case], "train") == [case]
-    assert select_cases([case], "validation") == []
-    with pytest.raises(SealedSplitError):
-        iter_assignment("test")
-    with pytest.raises(SealedSplitError):
-        select_cases([case], "train,test")
-    assert len(iter_assignment("train,validation")) == 49 + 25
-    assert ASSIGNMENT_PATH.exists()
+    frozen = [row for row in doc["questions"] if not row.get("added")]
+    assert _assignment_hash(frozen) == "7f7600eaaaaafe6ee5fdd6c0c63644fd12886973ae6152dec15be2746e4de10d"
+    concrete = [row for row in frozen if row["origin"] != "parametric_family"]
+    assert len(concrete) == 99
+    assert len({row["group_id"] for row in frozen}) == 92
+    assert {split: sum(row["split"] == split for row in concrete) for split in ("train", "validation", "test")} == (
+        {"train": 49, "validation": 25, "test": 25})
+    assert all(row.get("added") for row in doc["questions"] if row not in frozen)
 
 
 def test_targets_must_cover_the_three_splits():

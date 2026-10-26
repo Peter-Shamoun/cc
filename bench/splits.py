@@ -541,8 +541,11 @@ def add_questions(new_questions: list[dict], path: Path | None = None, *, destin
         raw_new.append(record)
     if len({r["id"] for r in raw_new}) != len(raw_new):
         raise SplitError("duplicate ids in the questions being added")
-    prepared_new = _prepare(raw_new, bundles)
-    batch_groups = group_records(raw_new, bundles)
+    # Bundles name catalog questions (checked against the whole catalog above); a batch carries only its own members.
+    new_ids = {r["id"] for r in raw_new}
+    batch_bundles = {name: [m for m in members if m in new_ids] for name, members in bundles.items()}
+    prepared_new = _prepare(raw_new, batch_bundles)
+    batch_groups = group_records(raw_new, batch_bundles)
     touches: dict[str, set[str]] = {}
     direct_groups: dict[str, set[str]] = {}
     for record in prepared_new:

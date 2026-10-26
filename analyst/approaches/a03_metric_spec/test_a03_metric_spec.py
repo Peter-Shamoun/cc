@@ -20,6 +20,7 @@ from analyst.approaches.a03_metric_spec.catalog import POPULATIONS
 from analyst.approaches.a03_metric_spec.compiler import CannotExpress, SpecError, compile_spec
 from analyst.approaches.a03_metric_spec.coverage import (
     HANDWRITTEN_SPECS,
+    REVIEWED_QUESTION_SETS,
     classify_gold_sql,
     coverage_report,
 )
@@ -439,6 +440,7 @@ def test_authored_expressible_ids_stay_reviewed():
     import json as jsonlib
     from pathlib import Path as Pathlib
     authored = jsonlib.loads((ROOT / "bench/authored_questions.json").read_text())
+    authored = [q for q in authored if q.get("question_set") in REVIEWED_QUESTION_SETS]
     expressible = {q["id"] for q in authored if classify_gold_sql(q["gold_sql"]) != "outside_spec"
                    and classify_gold_sql(q["gold_sql"]) != "escalation"}
     assert expressible == {
