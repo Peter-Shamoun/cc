@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, ChevronDown, ChevronRight, Download, FileSpreadsheet, Info, Lightbulb, Loader2, Maximize2, ShieldCheck, Wrench, Check, X, Database, List, BarChart3, ListChecks, Search, RotateCcw, Code2, Table2, Image as ImageIcon, FileText } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, Download, FileSpreadsheet, Info, Lightbulb, Loader2, Maximize2, ShieldCheck, Wrench, Check, X, Database, List, BarChart3, ListChecks, Search, RotateCcw, Code2, Table2, Image as ImageIcon, FileText, FileBox } from 'lucide-react';
 import clsx from 'clsx';
 import type { ArtifactPart, CalloutPart, ErrorPart, FilePart, ImagePart, Part, ReasoningPart, ToolCallPart } from '../../lib/contract';
 import { downloadBlob } from '../../lib/csv';
@@ -201,17 +201,29 @@ export function ErrorView({ part, onRetry }: { part: ErrorPart; onRetry?: () => 
   );
 }
 
-const KIND_ICON = { table: Table2, chart: BarChart3, code: Code2, image: ImageIcon, report: FileText } as const;
+const KIND_ICON: Record<string, typeof FileText> = { table: Table2, chart: BarChart3, code: Code2, image: ImageIcon, report: FileText };
+/** `ArtifactPart.kind` is an open enum: a kind this build doesn't know yet gets a generic artifact icon and label. */
+export const artifactIcon = (kind: string) => (Object.hasOwn(KIND_ICON, kind) ? KIND_ICON[kind] : FileBox);
+function ArtifactKindIcon({ kind }: { kind: string }) {
+  switch (kind) {
+    case 'table': return <Table2 size={18} aria-hidden />;
+    case 'chart': return <BarChart3 size={18} aria-hidden />;
+    case 'code': return <Code2 size={18} aria-hidden />;
+    case 'image': return <ImageIcon size={18} aria-hidden />;
+    case 'report': return <FileText size={18} aria-hidden />;
+    default: return <FileBox size={18} aria-hidden />;
+  }
+}
+const artifactKindLabel = (kind: string) => (kind === 'report' ? 'Document' : Object.hasOwn(KIND_ICON, kind) ? kind : 'Artifact');
 
 /** Claude-style in-thread artifact card (spec §4.10). */
 export function ArtifactCard({ part, onOpen }: { part: ArtifactPart; onOpen: () => void }) {
-  const Icon = KIND_ICON[part.kind];
   return (
     <button type="button" onClick={onOpen} className="my-4 flex w-full max-w-md items-center gap-3 rounded-xl border border-line bg-elev p-3 text-left font-sans hover:border-line-strong hover:bg-hover" data-testid="artifact-card" data-artifact-id={part.artifactId} aria-label={`Open ${part.title}, version ${part.version}`}>
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-line bg-bg"><Icon size={18} /></span>
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-line bg-bg" data-testid="artifact-kind-icon" data-kind-known={Object.hasOwn(KIND_ICON, String(part.kind)) || undefined}><ArtifactKindIcon kind={String(part.kind)} /></span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{part.title}</span>
-        <span className="block text-xs text-fg-subtle"><span className="capitalize">{part.kind === 'report' ? 'Document' : part.kind}</span> · Click to open</span>
+        <span className="block text-xs text-fg-subtle"><span className="capitalize">{artifactKindLabel(String(part.kind))}</span> · Click to open</span>
       </span>
       <span className="shrink-0 rounded-md border border-line px-1.5 py-0.5 text-[11px] tabular-nums text-fg-muted" data-testid="artifact-version">v{part.version}</span>
     </button>

@@ -70,19 +70,59 @@ function UserText({ text }: { text: string }) {
   );
 }
 
+/**
+ * QA-A21: editing and version switches unmount the focused control (the edit box closes; a switched version
+ * is a different message, so its row remounts). Put focus back on the matching control in the row that now
+ * sits at the same position, or on the composer, instead of letting it fall to <body>.
+ */
+export function refocusInRow(from: Element | null, pick: (row: HTMLElement) => HTMLElement | null | undefined, tries = 6) {
+  const row = from?.closest<HTMLElement>('[data-message-id]') ?? null;
+  const rows = () => Array.from(document.querySelectorAll<HTMLElement>('[data-message-id]'));
+  const idx = row ? rows().indexOf(row) : -1;
+  const lost = () => !document.activeElement || document.activeElement === document.body || !document.activeElement.isConnected;
+  const run = (tries: number) => requestAnimationFrame(() => {
+    if (!lost()) return;
+    const now = idx >= 0 ? rows()[idx] : undefined;
+    const target = now ? pick(now) : null;
+    if (target) target.focus({ preventScroll: true });
+    else if (tries > 0) run(tries - 1);
+    else document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message"]')?.focus({ preventScroll: true });
+  });
+  run(tries);
+}
+const enabled = (el: HTMLButtonElement | null | undefined) => (el && !el.disabled ? el : null);
+
 export const UserBubble = memo(function UserBubble({ msg, onEdit, version, onVersion, disabled }: { msg: UserMessage; onEdit?: (t: string) => void; version?: { current: number; total: number }; onVersion?: (k: number) => void; disabled?: boolean }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(msg.text);
+  const actionsRef = useRef<HTMLDivElement>(null);
+  const rowRef = useRef<HTMLDivElement>(null);
+  const backToEdit = useRef(false);
+  // QA-A21: closing the edit box (Esc, Cancel, or an unchanged Send) returns focus to "Edit message".
+  useEffect(() => {
+    if (editing || !backToEdit.current) return;
+    backToEdit.current = false;
+    enabled(actionsRef.current?.querySelector<HTMLButtonElement>('button[aria-label="Edit message"]'))?.focus({ preventScroll: true });
+  }, [editing]);
+  const cancel = () => { backToEdit.current = true; setEditing(false); setValue(msg.text); };
   if (editing) {
-    const submit = () => { setEditing(false); if (value.trim() && value.trim() !== msg.text) onEdit?.(value); };
+    const submit = () => {
+      const changed = !!value.trim() && value.trim() !== msg.text;
+      if (!changed) return cancel();
+      // A real edit becomes a new version (new row) and starts an answer: focus goes to the composer, like after sending.
+      const anchor = rowRef.current;
+      setEditing(false);
+      onEdit?.(value);
+      refocusInRow(anchor, () => null, 0);
+    };
     return (
-      <div className="flex flex-col items-end" data-testid="msg-user-editing">
+      <div className="flex flex-col items-end" data-testid="msg-user-editing" ref={rowRef}>
         <div className="w-full rounded-[18px] bg-muted px-4 py-3">
           <textarea autoFocus value={value} aria-label="Edit message" onChange={(e) => setValue(e.target.value)} rows={Math.min(8, value.split('\n').length + 1)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } if (e.key === 'Escape') setEditing(false); }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancel(); } }}
             className="w-full resize-none bg-transparent leading-normal outline-none" />
           <div className="mt-2 flex justify-end gap-2 font-sans text-sm">
-            <button type="button" onClick={() => { setEditing(false); setValue(msg.text); }} className="rounded-full border border-line bg-bg px-3.5 py-1.5 hover:bg-hover">Cancel</button>
+            <button type="button" onClick={cancel} className="rounded-full border border-line bg-bg px-3.5 py-1.5 hover:bg-hover">Cancel</button>
             <button type="button" onClick={submit} disabled={!value.trim()} className="rounded-full bg-fg px-3.5 py-1.5 text-bg disabled:opacity-40">Send</button>
           </div>
         </div>
@@ -94,7 +134,7 @@ export const UserBubble = memo(function UserBubble({ msg, onEdit, version, onVer
       <UserText text={msg.text} />
       {/* Hover actions overlay the space under the bubble instead of reserving a row, so the answer starts
           right below the question (ChatGPT/Claude spacing). With version arrows the row stays in flow. */}
-      <div className={clsx('flex items-center gap-0.5 rounded-full bg-bg transition-opacity group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100', version ? 'mt-1 opacity-100' : 'absolute right-0 top-full z-10 mt-0.5 opacity-0 [@media(hover:none)]:static [@media(hover:none)]:mt-1')} data-testid="user-actions">
+      <div className={clsx('flex items-center gap-0.5 rounded-full bg-bg transition-opacity group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100', version ? 'mt-1 opacity-100' : 'absolute right-0 top-full z-10 mt-0.5 opacity-0 [@media(hover:none)]:static [@media(hover:none)]:mt-1')} data-testid="user-actions" ref={actionsRef}>
         <CopyButton text={msg.text} />
         {onEdit && <IconButton label="Edit message" disabled={disabled} onClick={() => { setValue(msg.text); setEditing(true); }}><Pencil size={15} /></IconButton>}
         {version && onVersion && <VersionNav version={version} onVersion={onVersion} disabled={disabled} />}
@@ -120,11 +160,23 @@ export function printOne(answer: HTMLElement | null) {
 
 /** "‹ 2/3 ›": under an edited question, or under a regenerated answer (QA-A18). `onVersion(k)` takes a 0-based index. */
 function VersionNav({ version, onVersion, disabled }: { version: { current: number; total: number }; onVersion: (k: number) => void; disabled?: boolean }) {
+  // QA-A21: the switched-to version is another message (its row remounts); keep focus on the same arrow,
+  // or the other one when the end is reached.
+  const go = (e: React.MouseEvent<HTMLButtonElement>, k: number, label: string) => {
+    const from = e.currentTarget;
+    const user = !!from.closest('[data-testid="msg-user"]');
+    onVersion(k);
+    refocusInRow(from, (row) => {
+      const scope = row.querySelector<HTMLElement>(user ? '[data-testid="msg-user"] [data-testid="version-nav"]' : '[data-testid="msg-assistant"] [data-testid="version-nav"]');
+      const other = label === 'Previous version' ? 'Next version' : 'Previous version';
+      return enabled(scope?.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)) ?? enabled(scope?.querySelector<HTMLButtonElement>(`button[aria-label="${other}"]`));
+    });
+  };
   return (
     <div className="flex items-center font-sans text-xs text-fg-muted" data-testid="version-nav">
-      <IconButton label="Previous version" className="h-7 w-7" disabled={disabled || version.current <= 1} onClick={() => onVersion(version.current - 2)}><ChevronLeft size={15} /></IconButton>
+      <IconButton label="Previous version" className="h-7 w-7" disabled={disabled || version.current <= 1} onClick={(e) => go(e, version.current - 2, 'Previous version')}><ChevronLeft size={15} /></IconButton>
       <span className="tabular-nums">{version.current}/{version.total}</span>
-      <IconButton label="Next version" className="h-7 w-7" disabled={disabled || version.current >= version.total} onClick={() => onVersion(version.current)}><ChevronRight size={15} /></IconButton>
+      <IconButton label="Next version" className="h-7 w-7" disabled={disabled || version.current >= version.total} onClick={(e) => go(e, version.current, 'Next version')}><ChevronRight size={15} /></IconButton>
     </div>
   );
 }
@@ -198,6 +250,9 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
   if (sqlRunning) blocks.push(<TableSkeleton key="skeleton" />);
 
   const rootRef = useRef<HTMLDivElement>(null);
+  // QA-A22: a failed turn already has its Retry on the error card; the bar keeps only Copy (ChatGPT/Claude).
+  const cardRetry = parts.some((p) => p.type === 'error' && p.retryable);
+  const failed = parts.some((p) => p.type === 'error') && !parts.some((p) => ['text', 'table', 'chart', 'image', 'artifact'].includes(p.type));
   const empty = parts.length === 0 && steps.length === 0;
   const nQueries = usage?.queries ?? queries.length;
   return (
@@ -211,11 +266,14 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
       )}
       {isLast && <TransportAnnouncer status={msg.streaming ? msg.status : null} />}
       {!msg.streaming && msg.finishReason === 'aborted' && <StoppedNote onRetry={isLast && !readOnly ? onRegenerate : undefined} />}
-      {!msg.streaming && <SourcesChip sources={(view as { sources?: Source[] }).sources} parts={parts} />}
+      {/* A failed turn used no data for an answer: no Sources chip. */}
+      {!msg.streaming && !failed && <SourcesChip sources={(view as { sources?: Source[] }).sources} parts={parts} />}
       {!readOnly && !msg.streaming && !empty && (
         <div className={clsx('-ml-2 mt-2 flex flex-wrap items-center gap-0.5 transition-opacity', isLast ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100')} data-testid="msg-actions">
           {version && onVersion && <VersionNav version={version} onVersion={onVersion} disabled={versionBusy} />}
           <CopyButton text={() => messageMarkdown(view)} tip />
+          {failed && isLast && !cardRetry && <IconButton tip label="Regenerate" onClick={onRegenerate}><RefreshCw size={16} /></IconButton>}
+          {!failed && (<>
           <IconButton tip label="Good response" aria-pressed={vote === 'up'} onClick={() => setVote(vote === 'up' ? null : 'up')}><ThumbsUp size={16} fill={vote === 'up' ? 'currentColor' : 'none'} /></IconButton>
           <IconButton tip label="Bad response" aria-pressed={vote === 'down'} onClick={() => { const next = vote === 'down' ? null : 'down'; setVote(next); setFeedbackOpen(next === 'down'); setFeedbackSent(false); }}><ThumbsDown size={16} fill={vote === 'down' ? 'currentColor' : 'none'} /></IconButton>
           {/* One click regenerates (the earlier answer stays as version 1/2, QA-A18); the chevron holds the styles. */}
@@ -224,6 +282,7 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
           <IconButton tip label="More actions" aria-haspopup="menu" aria-expanded={!!more.anchor} onClick={more.toggle} data-testid="more-actions"><MoreHorizontal size={16} /></IconButton>
           {styleLabel && <span className="mx-1 rounded-full border border-line px-2 py-0.5 font-sans text-[11px] text-fg-subtle" data-testid="regen-style" title="Regenerated with this style">{styleLabel}</span>}
           <AnswerMeta usage={usage && (usage.queries > 0 || usage.costUsd !== undefined) ? usage : undefined} queries={queries.length ? nQueries : 0} repairs={steps.filter((s) => s.kind === 'repair' && s.state === 'ok').length} onSql={queries.length ? () => setSqlOpen((o) => !o) : undefined} sqlOpen={sqlOpen} />
+          </>)}
           {feedbackSent && <span className="ml-2 font-sans text-xs text-fg-subtle">Thanks for the feedback</span>}
         </div>
       )}
