@@ -1,7 +1,7 @@
 import { memo, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, Code2, FileText, Minimize2, MoreHorizontal, Pencil, Plus, Printer, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react';
 import clsx from 'clsx';
-import type { AssistantView, ChartPart, CodePart, ImagePart, Part, TablePart, UserMessage } from '../lib/contract';
+import type { AssistantView, Part, TablePart, UserMessage } from '../lib/contract';
 import { KNOWN_PART_TYPES } from '../lib/contract';
 import { Markdown } from './parts/Markdown';
 import { CodePartView } from './parts/CodeBlock';
@@ -13,16 +13,18 @@ import { StepTimeline } from './answer/StepTimeline';
 import { queriesOf, queryForTable, SqlInspector, TableSql } from './answer/SqlInspector';
 import { AbstainCard, ClarifyCard, EscalationNote, StoppedNote, TableSkeleton } from './answer/States';
 import { AnswerMeta } from './answer/AnswerMeta';
+import { SourcesChip } from './answer/Sources';
 import { escalationsOf, partsOf, stepsOf, usageOf, type AnyView } from './answer/normalize';
 import type { OnReply } from './answer/States';
-import type { RegenerateStyle } from '../api/contract';
+import type { RegenerateStyle, Source } from '../api/contract';
 import { copyText, tableToTsv, visible } from '../lib/csv';
 import { MAX_FEEDBACK_COMMENT } from '../contract/feedback';
 import { feedbackFor, feedbackReasons, recordFeedback, sqlForClipboard, storedVote, type Vote } from '../lib/feedback';
 import { Menu, useMenu, useToast, type MenuItem } from '../shell/primitives';
 import { isTransportStatus, transportAnnouncement } from '../lib/useChat';
 
-export type Artifact = { part: TablePart | ChartPart | CodePart | ImagePart; title: string; version?: number; related: Part[] };
+export type { Artifact } from './artifacts';
+import { toArtifact, type Artifact } from './artifacts';
 
 /** Markdown export for Copy (§4.12): text, tables as GFM (PHI columns dropped), SQL, callouts. */
 export function messageMarkdown(m: AnyView): string {
@@ -132,7 +134,7 @@ export type Refine = Exclude<RegenerateStyle, 'default'>;
 /** Version label for a styled regeneration (`message.start.regenerateStyle` / `StoredMessage.regenerateStyle`). */
 export const STYLE_LABEL: Record<Refine, string> = { concise: 'Concise', detailed: 'Detailed' };
 
-export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, onOpen, onRegenerate, onEdit, onSend, onReply, onRefine, version, onVersion, versionBusy }: { msg: AnyView; isLast: boolean; onOpen: (a: Artifact) => void; onRegenerate: () => void; onEdit: (t: string) => void; onSend?: (t: string) => void; onReply?: OnReply; onRefine?: (style: Refine) => void; version?: { current: number; total: number }; onVersion?: (k: number) => void; versionBusy?: boolean }) {
+export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, onOpen, onRegenerate, onEdit, onSend, onReply, onRefine, version, onVersion, versionBusy, readOnly }: { msg: AnyView; isLast: boolean; onOpen: (a: Artifact) => void; onRegenerate: () => void; onEdit: (t: string) => void; onSend?: (t: string) => void; onReply?: OnReply; onRefine?: (style: Refine) => void; version?: { current: number; total: number }; onVersion?: (k: number) => void; versionBusy?: boolean; /** Shared /shared/:id view: no actions, feedback, retry, edits or replies. */ readOnly?: boolean }) {
   const msg = view as AssistantView; // legacy part renderers; v1-only data is read through `view`
   const regenStyle = (view as { regenerateStyle?: RegenerateStyle }).regenerateStyle;
   const styleLabel = regenStyle && regenStyle !== 'default' ? STYLE_LABEL[regenStyle] : undefined;
@@ -184,9 +186,9 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
     if (p.type !== 'reasoning' && p.type !== 'status') placeTimeline();
     if (p.type === 'reasoning' && timeline) continue; // shown inside the timeline
     if (p.type === 'code' && p.role === 'query' && linkedSql.has(p.id)) continue; // shown under its table
-    if (p.type === 'abstain') { blocks.push(<AbstainCard key={p.id} part={p} onReply={reply} />); continue; }
-    if (p.type === 'clarification') { blocks.push(<ClarifyCard key={p.id} part={p} onReply={reply} active={isLast && !msg.streaming} />); continue; }
-    blocks.push(<PartView key={p.id} part={p as Part} msg={msg} open={open} onRetry={onRegenerate} onEdit={onEdit} />);
+    if (p.type === 'abstain') { blocks.push(<AbstainCard key={p.id} part={p} onReply={readOnly ? undefined : reply} />); continue; }
+    if (p.type === 'clarification') { blocks.push(<ClarifyCard key={p.id} part={p} onReply={readOnly ? undefined : reply} active={!readOnly && isLast && !msg.streaming} />); continue; }
+    blocks.push(<PartView key={p.id} part={p as Part} msg={msg} open={open} openArtifact={onOpen} onRetry={readOnly ? undefined : onRegenerate} onEdit={readOnly ? undefined : onEdit} />);
     if (p.type === 'table') {
       const q = queryForTable(view, p);
       if (q) blocks.push(<TableSql key={`sql-${p.id}`} query={q} />);
@@ -208,8 +210,9 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
         </div>
       )}
       {isLast && <TransportAnnouncer status={msg.streaming ? msg.status : null} />}
-      {!msg.streaming && msg.finishReason === 'aborted' && <StoppedNote onRetry={isLast ? onRegenerate : undefined} />}
-      {!msg.streaming && !empty && (
+      {!msg.streaming && msg.finishReason === 'aborted' && <StoppedNote onRetry={isLast && !readOnly ? onRegenerate : undefined} />}
+      {!msg.streaming && <SourcesChip sources={(view as { sources?: Source[] }).sources} parts={parts} />}
+      {!readOnly && !msg.streaming && !empty && (
         <div className={clsx('-ml-2 mt-2 flex flex-wrap items-center gap-0.5 transition-opacity', isLast ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100')} data-testid="msg-actions">
           {version && onVersion && <VersionNav version={version} onVersion={onVersion} disabled={versionBusy} />}
           <CopyButton text={() => messageMarkdown(view)} tip />
@@ -298,7 +301,7 @@ function FeedbackPanel({ onClose, onSubmit }: { onClose: () => void; onSubmit: (
   );
 }
 
-function PartView({ part, msg, open, onRetry, onEdit }: { part: Part; msg: AssistantView; open: (p: Artifact['part'], title?: string, v?: number) => void; onRetry: () => void; onEdit: (t: string) => void }) {
+function PartView({ part, msg, open, openArtifact, onRetry, onEdit }: { part: Part; msg: AssistantView; open: (p: Artifact['part'], title?: string, v?: number) => void; openArtifact: (a: Artifact) => void; onRetry?: () => void; onEdit?: (t: string) => void }) {
   switch (part.type) {
     case 'text': return <Markdown text={part.text} streaming={msg.openText.includes(part.id)} />;
     case 'reasoning': return <ReasoningView part={part} running={msg.streaming && part.durationMs === undefined} />;
@@ -314,7 +317,7 @@ function PartView({ part, msg, open, onRetry, onEdit }: { part: Part; msg: Assis
     case 'callout': return <Callout part={part} onEdit={onEdit} />;
     case 'error': return <ErrorView part={part} onRetry={onRetry} />;
     case 'artifact':
-      return 'type' in part.content ? <ArtifactCard part={part} onOpen={() => open(part.content as Artifact['part'], part.title, part.version)} /> : <Markdown text={part.content.markdown} />;
+      return <ArtifactCard part={part} onOpen={() => openArtifact(toArtifact(part, msg.parts))} />;
     default:
       return KNOWN_PART_TYPES.includes((part as Part).type) ? null : <Unsupported part={part as Part} />;
   }
