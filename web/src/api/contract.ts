@@ -20,7 +20,7 @@ export type {
   Sensitivity, StatusPart, TablePart, TextPart, ToolCallPart, ArtifactPart, PartBase,
 };
 
-export const CONTRACT_VERSION = '1.1.0';
+export const CONTRACT_VERSION = '1.2.0';
 export const CONTRACT_MAJOR = 1;
 
 // ---------------------------------------------------------------- new parts (v1)
@@ -80,6 +80,8 @@ export interface MessageStartEvent extends Seq {
   model?: string; strategy?: string; parentId?: ID;
   resumeOf?: { clarificationId: ID; messageId: ID };
   regenerateOf?: ID;
+  /** Set when this answer is for an edited question (ChatMessage.editOf). */
+  editOf?: ID;
 }
 export interface StatusEvent extends Seq { type: 'status'; label: string | null }
 
@@ -153,7 +155,8 @@ export function isStepEvent(ev: { type: string }): ev is StepEvent {
 
 export interface ChatRequest {
   conversationId?: ID;
-  messages: { id?: ID; role: 'user'; text: string; parentId?: ID }[];
+  /** `editOf`: id of an earlier user message this one replaces (its sibling; editing the first question makes a new root). */
+  messages: { id?: ID; role: 'user'; text: string; parentId?: ID; editOf?: ID }[];
   options?: Record<string, unknown>;
   /** Answer a ClarificationPart. `messages` carries the user's reply as a normal user turn. */
   resume?: { clarificationId: ID; choiceIds?: ID[]; text?: string };
