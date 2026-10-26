@@ -1,6 +1,6 @@
 # CC chat API — stream contract
 
-**Version: 1.20.1** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.21.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -111,6 +111,25 @@ ids it must violate) and to every golden example. Both are total: malformed inpu
 `stream.list` violations, never an exception. **Any backend, including the real analyzer adapter, must produce
 streams with `check(events) == []`.** To add a rule, give it an existing `kind` in the JSON, add a case to
 `make_cases.py`, then regenerate. A new `kind` needs both runners.
+
+### 2.1 Data scope comes from the identity, never the request (1.21.0, BACKEND-FIT)
+
+The user never picks a database, lake, schema, view or customer, and no client control may offer one.
+* **Production:** each request opens a session server-side from the user's Cognito id token: the `custom:customer`
+  claim names the tenant, and `ccsim.query.open_session` (via `analyzer.opener.QueryPathOpener`) assumes that
+  customer's reader role, reads its semantic-layer manifest and mounts only the `sem.*` relations with per-relation
+  secrets and allowed directories. The analyzer discovers tables itself (`list_relations` over `sem.*`); escalation to
+  `lossless.*` is never granted from chat.
+* **Demo:** the token `demo:<customer>:<user>` stands in for the id token and `api/backends.py: DEMO_DIRECTORY`
+  for the manifest. The session's customer, user and relations come from them; the DuckDB connection holds exactly
+  those relations, can't read files or the network, and has its configuration locked.
+* **Requests:** `ChatRequest` and `ChatRequest.options` must not carry an `IdentityScopedKey` (`customer`, `tenant`,
+  `org`, `database`, `db`, `catalog`, `schema`, `tables`, `relations`, `dataSource`, `source`, `lake`, `warehouse`,
+  `connection`, `scope`, `escalate`, …; the schema's enum is the list). The server answers 422 `validation` ("The data
+  you can query comes from your sign-in; a request can't choose it.") and runs nothing. Headers and query parameters
+  are never read for scope: only the session token (or cookie) is. Other unknown keys are still ignored.
+* Read-only context derived from the session is fine to show (for example the organization in the account menu);
+  `Capabilities.scope` is about which strategies/models show as available, not a data scope.
 
 ## 3. Forward compatibility (client obligations)
 
@@ -690,6 +709,12 @@ must be signed in to the same organization (customer). A conversation has at mos
 
 ## Changelog
 
+* **1.21.0** (2026-10-26) — BACKEND-FIT (§2.1). No field ever let the client choose a data source, scope,
+  schema or customer; this release makes that a rule. New `IdentityScopedKey` enum, enforced with `propertyNames` on
+  `ChatRequest` and `ChatRequest.options`: such a key is 422 `validation` and nothing runs. The demo session's
+  customer and relations now come from the demo token plus `DEMO_DIRECTORY` (the id-token + manifest analogue), and
+  its DuckDB connection has external access off and its configuration locked. `Capabilities.scope` is documented as
+  not being a data scope.
 * **1.20.1** (2026-10-26) — No shape change. **Stop interrupts a running query** (§8): the API wraps the session
   opener and calls `interrupt()` on this run's cursors when the run is cancelled, so `message.end {aborted}` now
   arrives within 1 s during a SQL step too (was: when the query finished, up to the 25 s time limit). Other users'
