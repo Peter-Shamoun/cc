@@ -13,7 +13,7 @@ import { StepTimeline } from './answer/StepTimeline';
 import { queriesOf, queryForTable, SqlInspector, SqlWithheldNote, TableSql } from './answer/SqlInspector';
 import { AbstainCard, ClarifyCard, EscalationNote, StoppedNote, TableSkeleton } from './answer/States';
 import { AnswerMeta } from './answer/AnswerMeta';
-import { SourcesChip } from './answer/Sources';
+import { SourcesChip, consulted } from './answer/Sources';
 import { escalationsOf, partsOf, stepsOf, usageOf, type AnyView } from './answer/normalize';
 import type { OnReply } from './answer/States';
 import type { RegenerateStyle, Source } from '../api/contract';
@@ -286,7 +286,8 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
       {/* ChatGPT/Claude: one retry per turn. With content, Regenerate sits in the action row; the note only carries Retry when nothing came back. */}
       {!msg.streaming && msg.finishReason === 'aborted' && <StoppedNote onRetry={isLast && !readOnly && empty ? onRegenerate : undefined} />}
       {/* A failed turn used no data for an answer: no Sources chip. */}
-      {!msg.streaming && !failed && <SourcesChip sources={(view as { sources?: Source[] }).sources} parts={parts} />}
+      {/* QA-A31: like Claude/ChatGPT, sources only when something was actually consulted (a query ran or data came back), not on a clarify or abstain. */}
+      {!msg.streaming && !failed && consulted((view as { steps?: { kind: string; state: string }[] }).steps, parts) && <SourcesChip sources={(view as { sources?: Source[] }).sources} parts={parts} />}
       {!readOnly && !msg.streaming && !empty && (
         <div className={clsx('-ml-2 mt-2 flex flex-wrap items-center gap-0.5 transition-opacity', isLast ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100')} data-testid="msg-actions">
           {version && onVersion && <VersionNav version={version} onVersion={onVersion} disabled={versionBusy} />}
