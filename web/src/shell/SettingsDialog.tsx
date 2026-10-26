@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Database, Keyboard, Monitor, Moon, Settings2, Sun } from 'lucide-react';
 import clsx from 'clsx';
 import { Dialog, Kbd } from './primitives';
@@ -119,11 +119,25 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
   );
 }
 
+// One radio group, one Tab stop (QA-S17): only the checked radio is tabbable; arrows (and Home/End) move
+// the selection and focus together, wrapping, mirrored in RTL — the native radio-group pattern.
 function Segmented({ value, onChange, options, label }: { value: string; onChange: (v: string) => void; options: [string, string, ReactNode?][]; label: string }) {
+  const values = options.map(([v]) => v);
+  const tabStop = values.includes(value) ? value : values[0];
+  const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
+    const i = Math.max(0, values.indexOf(value));
+    const rtl = getComputedStyle(e.currentTarget).direction === 'rtl';
+    const step = { ArrowDown: 1, ArrowUp: -1, ArrowRight: rtl ? -1 : 1, ArrowLeft: rtl ? 1 : -1 }[e.key];
+    const next = e.key === 'Home' ? 0 : e.key === 'End' ? values.length - 1 : step === undefined ? -1 : (i + step + values.length) % values.length;
+    if (next < 0) return;
+    e.preventDefault();
+    onChange(values[next]);
+    e.currentTarget.parentElement?.querySelectorAll<HTMLElement>('[role="radio"]')[next]?.focus();
+  };
   return (
     <div role="radiogroup" aria-label={label} className="flex rounded-lg bg-muted p-0.5 text-xs">
       {options.map(([v, l, icon]) => (
-        <button key={v} type="button" role="radio" aria-checked={value === v} onClick={() => onChange(v)}
+        <button key={v} type="button" role="radio" aria-checked={value === v} tabIndex={v === tabStop ? 0 : -1} onKeyDown={onKeyDown} onClick={() => onChange(v)}
           className={clsx('flex items-center gap-1.5 rounded-md px-2.5 py-1.5 transition-colors', value === v ? 'bg-elev font-medium shadow-sm' : 'text-fg-muted hover:text-fg')}>
           {icon}{l}
         </button>
