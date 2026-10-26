@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import App from '../App';
 import { bucket, groupThreads } from '../components/Sidebar';
 import { MemoryTranscriptStore } from '../adapters/memoryStore';
@@ -114,4 +114,22 @@ describe('app shell', () => {
     expect(screen.getByTestId('shortcuts-dialog')).toBeInTheDocument();
     expect(Object.keys(localStorage).every((k) => k.startsWith('cc.pref.'))).toBe(true);
   });
+});
+
+describe('shell QA-S1..S8', () => {
+  it('lists a new chat with a short title at once, has an h1, announces completion, and Up edits the last question', async () => {
+    cleanup();
+    render(<App />);
+    const box = screen.getByRole('textbox', { name: 'Message' });
+    fireEvent.change(box, { target: { value: 'What was our denial rate by payer last quarter?' } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    // sidebar shows the chat while the first answer is still streaming
+    await waitFor(() => expect(screen.getAllByText('Denial rate by payer').length).toBeGreaterThan(0));
+    expect(screen.getByRole('log', { name: 'Messages' }).getAttribute('aria-live')).toBe('polite');
+    expect(screen.getByRole('heading', { level: 1, name: 'Denial rate by payer' })).toBeTruthy();
+    await waitFor(() => expect(screen.getByTestId('status-live').textContent).toBe('Answer complete'), { timeout: 60000 });
+    const follow = screen.getByRole('textbox', { name: 'Message' });
+    fireEvent.keyDown(follow, { key: 'ArrowUp' });
+    await waitFor(() => expect(screen.getByTestId('msg-user-editing')).toBeTruthy());
+  }, 120000);
 });
