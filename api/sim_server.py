@@ -24,6 +24,7 @@ import uvicorn
 
 WORLD_SNAPSHOT_NAME = "world-snapshot"
 WORLD_ROOT_NAME = "root"
+SHIPPED_WORLD = Path(__file__).resolve().parent.parent / "mock-data" / "world"   # committed copy of the default world
 
 
 def build_or_load_world(world_dir: Path, rebuild: bool = False):
@@ -34,6 +35,15 @@ def build_or_load_world(world_dir: Path, rebuild: bool = False):
     aws_root = world_dir / WORLD_ROOT_NAME / "aws"
     if rebuild:
         shutil.rmtree(world_dir, ignore_errors=True)
+    if not (snapshot_dir / "world.dill").exists() and not rebuild and (SHIPPED_WORLD / WORLD_SNAPSHOT_NAME).exists():
+        shutil.copytree(SHIPPED_WORLD, world_dir, dirs_exist_ok=True)   # the committed world: no 7-minute build
+        try:
+            aws, deployment, _batches, _checkpoints = load_snapshot(snapshot_dir, aws_root)
+            aws.serve()
+            return aws, deployment
+        except Exception as unreadable:   # e.g. pickled on another Python version: build it here instead
+            print(f"committed world did not load ({type(unreadable).__name__}: {unreadable}); building it", flush=True)
+            shutil.rmtree(world_dir, ignore_errors=True)
     if not (snapshot_dir / "world.dill").exists():
         from bench.dataset import DEFAULT
         from ccsim.edi_mock import Scenario

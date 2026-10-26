@@ -19,6 +19,7 @@ import duckdb
 
 ROOT = Path(__file__).resolve().parent.parent
 CACHE = ROOT / ".ccsim" / "bench"
+SHIPPED = ROOT / "mock-data" / "bench"   # the default snapshot, committed so a fresh clone needn't rebuild it
 DEFAULT = dict(days=45, volume_scale=.6, seed=2026, p_corrupt_file=.1)   # enough quarantined files for q29
 
 
@@ -44,6 +45,9 @@ def snapshot(scenario=None, customer_user="ana@xifin.example", rebuild=False, ca
     cache = Path(cache or CACHE)
     out = cache / did
     if (out / "meta.json").exists() and not rebuild:
+        return out
+    if not rebuild and (SHIPPED / did / "meta.json").exists():   # same id = same generator, parser and schema
+        shutil.copytree(SHIPPED / did, out, dirs_exist_ok=True)
         return out
     shutil.rmtree(out, ignore_errors=True)
     out.mkdir(parents=True)
