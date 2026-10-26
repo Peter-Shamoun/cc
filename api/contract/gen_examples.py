@@ -116,6 +116,15 @@ def feedback_example() -> dict:
             "response": response, "clear": {"method": "DELETE", "response": {"cleared": True}}}
 
 
+def export_example() -> str:
+    """GET /api/conversations/{id}/export?format=markdown for a demo answer (1.8.0); the timestamp is normalised."""
+    client = _client()
+    _post(client, {"messages": [{"id": "u_1", "role": "user", "text": "Paid amount by payer"}],
+                   "conversationId": "c_1", "scenario": "table"})
+    text = client.get("/api/conversations/c_1/export?format=markdown", headers=_HEADERS).text
+    return re.sub(r"on \d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", "on 2026-10-25T20:00:00Z", text)
+
+
 def dump(events: list[dict]) -> str:
     return "".join(json.dumps(e, ensure_ascii=False, separators=(",", ":")) + "\n" for e in events)
 
@@ -145,6 +154,8 @@ def main(argv: list[str]) -> int:
     print("wrote examples/capabilities.json")
     (EXAMPLES / "feedback.json").write_text(json.dumps(feedback_example(), indent=2) + "\n")
     print("wrote examples/feedback.json")
+    (EXAMPLES / "export.md").write_text(export_example())
+    print("wrote examples/export.md")
     for k, v in captured.items():
         (EXAMPLES / f"{k}.jsonl").write_text(dump(v))
         print(f"wrote examples/{k}.jsonl ({len(v)} events)")

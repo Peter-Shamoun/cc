@@ -14,13 +14,14 @@ import type {
   TextPart, ToolCallPart, ArtifactPart, PartBase, StreamEvent as LegacyStreamEvent,
 } from '../lib/contract';
 import { reduce as legacyReduce } from '../lib/contract';
+import type { Source } from '../contract/v1.gen';
 
 export type {
   CalloutPart, ChartPart, CodePart, Column, ColumnType, ErrorPart, FilePart, ID, ImagePart, ISODate, ReasoningPart,
   Sensitivity, StatusPart, TablePart, TextPart, ToolCallPart, ArtifactPart, PartBase,
 };
 
-export const CONTRACT_VERSION = '1.7.0';
+export const CONTRACT_VERSION = '1.8.0';
 export const CONTRACT_MAJOR = 1;
 
 // ---------------------------------------------------------------- new parts (v1)
@@ -136,6 +137,8 @@ export interface MessageEndEvent extends Seq {
   type: 'message.end'; messageId: ID; finishReason: FinishReason; usage: Usage;
   /** 1.3.0: PHI-free title the server derived and already stored (first answer, generic title only). */
   conversationTitle?: string;
+  /** 1.8.0: citations, answer sources first (CONTRACT.md §14). Helpers: src/contract/sources.ts. */
+  sources?: Source[];
 }
 export interface HeartbeatEvent { type: 'heartbeat'; at?: ISODate }
 
@@ -168,6 +171,8 @@ export function isStepEvent(ev: { type: string }): ev is StepEvent {
 export type { Capabilities, StrategyOption, ModelOption, CostTier } from '../contract/v1.gen';
 /** 1.7.0: answer feedback (CONTRACT.md §13). Client: src/contract/feedback.ts. */
 export type { Feedback, FeedbackRating, FeedbackReason, FeedbackRequest } from '../contract/v1.gen';
+/** 1.8.0: citations (§14) and conversation export (§15). */
+export type { Source, ConversationExport } from '../contract/v1.gen';
 
 // ---------------------------------------------------------------- requests
 

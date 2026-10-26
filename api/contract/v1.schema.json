@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://claimclarity.local/api/contract/v1.schema.json",
   "title": "ClaimClarity chat stream contract",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "One JSON object per SSE data: line. See api/CONTRACT.md. Validate an event against #/$defs/StreamEvent.",
   "$ref": "#/$defs/StreamEvent",
   "$defs": {
@@ -1803,6 +1803,13 @@
         "seq": {
           "type": "integer",
           "minimum": 0
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Source"
+          },
+          "description": "1.8.0: citations, answer sources first. Omitted when there are none (aborted runs never have any). An abstain or clarify can list explored sources only."
         }
       },
       "additionalProperties": true
@@ -2148,6 +2155,13 @@
         "feedback": {
           "$ref": "#/$defs/Feedback",
           "description": "Assistant messages: the user's thumbs up/down (1.7.0)."
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Source"
+          },
+          "description": "Assistant messages: same as message.end.sources (1.8.0)."
         }
       },
       "additionalProperties": true
@@ -2548,6 +2562,85 @@
         "updatedAt": {
           "type": "string",
           "description": "ISO-8601 UTC"
+        }
+      },
+      "additionalProperties": true
+    },
+    "Source": {
+      "type": "object",
+      "description": "A data source the answer used or explored (1.8.0, CONTRACT.md §14). Schema identifiers only, never row values.",
+      "required": [
+        "id",
+        "kind",
+        "name",
+        "label",
+        "role"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable within the message: src_1, src_2, …"
+        },
+        "kind": {
+          "type": "string",
+          "description": "Open enum: 'view' today; 'definition' (metric definition) and 'document' are reserved. Unknown kinds render as a plain chip."
+        },
+        "name": {
+          "type": "string",
+          "description": "Fully qualified, e.g. sem.claims."
+        },
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "answer",
+            "explored"
+          ],
+          "description": "'answer': the final SQL/table read it; 'explored': looked at while planning only."
+        },
+        "stepIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ID"
+          },
+          "description": "step.* events that touched it (sql_running, explore)."
+        },
+        "partIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ID"
+          },
+          "description": "Parts built from it (code, table, chart)."
+        }
+      },
+      "additionalProperties": true
+    },
+    "ConversationExport": {
+      "type": "object",
+      "description": "GET /api/conversations/{id}/export?format=json (1.8.0, §15). format=markdown returns text/markdown instead. Both are attachments (Content-Disposition), Cache-Control: no-store.",
+      "required": [
+        "format",
+        "contractVersion",
+        "exportedAt",
+        "conversation"
+      ],
+      "properties": {
+        "format": {
+          "const": "claimclarity.conversation"
+        },
+        "contractVersion": {
+          "type": "string"
+        },
+        "exportedAt": {
+          "type": "string",
+          "description": "ISO-8601 UTC"
+        },
+        "conversation": {
+          "$ref": "#/$defs/Conversation"
         }
       },
       "additionalProperties": true
