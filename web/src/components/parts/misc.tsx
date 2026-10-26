@@ -51,10 +51,12 @@ export function ImageView({ part, onOpen }: { part: ImagePart; onOpen?: () => vo
   const [lightbox, setLightbox] = useState(false);
   const adapter = useAdapter();
   const box = imageDisplayBox(part.width, part.height);
-  const frame = { width: box.width, height: box.height };
+  // Fixed box reserves space (no layout jump); on narrow screens it shrinks to the column width and the
+  // aspect ratio keeps the height proportional instead of overflowing sideways.
+  const frame = { width: box.width, height: box.height, aspectRatio: `${box.width} / ${box.height}` };
   return (
     <figure className="group/img relative my-4 max-w-full" data-testid="image" style={{ width: box.width }}>
-      <div data-testid="image-frame" style={frame}>
+      <div data-testid="image-frame" className="max-w-full h-auto!" style={frame}>
         {err ? (
           <div className="flex h-full w-full items-center justify-center rounded-xl border border-line text-sm text-fg-subtle">Image unavailable</div>
         ) : url ? (
@@ -63,7 +65,7 @@ export function ImageView({ part, onOpen }: { part: ImagePart; onOpen?: () => vo
           <div className="h-full w-full animate-pulse rounded-xl bg-muted" data-testid="image-skeleton" />
         )}
       </div>
-      <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover/img:opacity-100">
+      <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover/img:opacity-100 group-focus-within/img:opacity-100 [@media(hover:none)]:opacity-100">
         <IconButton label="Download image" className="bg-elev/90 shadow" onClick={async () => adapter && downloadBlob(`claimclarity_figure.${part.mime === 'image/svg+xml' ? 'svg' : 'png'}`, await adapter.fetchBlob(part.blobId))}><Download size={15} /></IconButton>
         <IconButton label="Expand image" className="bg-elev/90 shadow" onClick={onOpen ?? (() => setLightbox(true))}><Maximize2 size={14} /></IconButton>
       </div>
