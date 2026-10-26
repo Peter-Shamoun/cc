@@ -192,6 +192,94 @@ await safe('perf', async () => {
   await pg.context().close();
 });
 
+// ---------- 8. Contract v1 scenarios on the live demo (C2+). PACED = API with realistic model/stream delays ----------
+const PACED = process.env.REVIEW_PACED_URL ?? LIVE;
+const sse = (evs) => evs.map((e) => `data: ${JSON.stringify(e)}\n\n`).join('');
+await safe('v1 repair paced', async () => {
+  const pg = await newPage(PACED);
+  const t0 = Date.now();
+  await ask(pg, 'Which CARC codes drive denials?', false);
+  await pg.getByTestId('step-timeline').first().waitFor({ timeout: 15000 }).catch(() => {});
+  report.metrics.firstStepMs = Date.now() - t0;
+  await pg.waitForTimeout(300); await shot(pg, 'v1_repair_live_steps');
+  report.metrics.sidebarDuringStream = await pg.getByTestId('thread-item').count();
+  await pg.getByTestId('markdown').first().waitFor({ timeout: 20000 }).catch(() => {});
+  report.metrics.firstTextMs = Date.now() - t0;
+  await shot(pg, 'v1_repair_text_streaming');
+  await idle(pg); await shot(pg, 'v1_repair_done_collapsed');
+  await safe('expand steps', async () => { await pg.getByTestId('step-summary').first().click(); await pg.waitForTimeout(350); await shot(pg, 'v1_repair_steps_expanded'); });
+  await safe('sql inspector', async () => { await pg.getByTestId('open-sql').first().click(); await pg.waitForTimeout(400); await shot(pg, 'v1_sql_inspector'); await pg.keyboard.press('Escape'); });
+  await pg.context().close();
+});
+await safe('v1 clarify', async () => {
+  const pg = await newPage(LIVE);
+  await ask(pg, 'How bad are our denials?');
+  await shot(pg, 'v1_clarify_card');
+  await axe(pg, 'v1_clarify');
+  await pg.getByTestId('clarify-chip').first().click(); await idle(pg);
+  await shot(pg, 'v1_clarify_resumed');
+  await pg.context().close();
+});
+await safe('v1 abstain', async () => {
+  const pg = await newPage(LIVE);
+  await ask(pg, 'Forecast next quarter denials');
+  await shot(pg, 'v1_abstain_card');
+  await axe(pg, 'v1_abstain');
+  await pg.context().close();
+});
+await safe('v1 escalation + cost', async () => {
+  for (const theme of ['light', 'dark']) {
+    const pg = await newPage(LIVE, { theme });
+    await ask(pg, 'What is our net collection rate by payer?');
+    await shot(pg, `v1_escalation_${theme}`);
+    if (theme === 'light') {
+      const meta = pg.getByTestId('meta-line').or(pg.getByTestId('answer-meta')).first();
+      await meta.hover(); await meta.click().catch(() => {}); await pg.waitForTimeout(300);
+      await shot(pg, 'v1_cost_popover');
+    }
+    await pg.context().close();
+  }
+});
+await safe('v1 candidates', async () => {
+  const pg = await newPage(LIVE);
+  await ask(pg, 'Double check the average paid per claim');
+  if (!(await pg.getByTestId('candidates').count())) await pg.getByTestId('step-summary').first().click().catch(() => {});
+  await pg.waitForTimeout(300); await shot(pg, 'v1_candidates');
+  await pg.context().close();
+});
+await safe('v1 error + slow stop', async () => {
+  const pg = await newPage(LIVE);
+  await ask(pg, 'Simulate an error please'); await shot(pg, 'v1_error_card');
+  await ask(pg, 'Run this slowly: denial rate by payer', false);
+  await pg.waitForTimeout(600); await shot(pg, 'v1_slow_running');
+  await pg.getByRole('button', { name: /stop/i }).click().catch(() => {}); await idle(pg);
+  await shot(pg, 'v1_slow_stopped');
+  await pg.context().close();
+});
+await safe('katex', async () => {
+  const pg = await newPage(LIVE);
+  const md = 'The **denial rate** is\n\n$$\\text{denial rate} = \\frac{\\text{denied claims}}{\\text{adjudicated claims}} = \\frac{1{,}284}{9{,}410} \\approx 13.6\\%$$\n\nInline: $r = d/n$. Currency stays text: Aetna paid $1,250 and $300 in adjustments.';
+  await pg.route('**/api/chat', (r) => r.request().method() === 'POST' ? r.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream' }, body: sse([
+    { type: 'message.start', messageId: 'k1', conversationId: 'ck' }, { type: 'text.start', partId: 't' }, { type: 'text.delta', partId: 't', delta: md }, { type: 'text.end', partId: 't' },
+    { type: 'message.end', messageId: 'k1', finishReason: 'stop', usage: { queries: 0, elapsedMs: 300 } }]) }) : r.continue());
+  await ask(pg, 'How is denial rate defined?');
+  await shot(pg, 'katex_answer');
+  report.metrics.katexNodes = await pg.locator('.katex').count();
+  await pg.context().close();
+});
+await safe('shell v2', async () => {
+  const pg = await newPage(LIVE);
+  await ask(pg, 'Total paid by payer');
+  await ask(pg, 'Show the monthly trend of paid amount');
+  await pg.keyboard.press('Control+/'); await pg.waitForTimeout(300); await shot(pg, 'shell_shortcuts_dialog'); await pg.keyboard.press('Escape');
+  await safe('settings', async () => { await pg.getByRole('button', { name: /settings/i }).first().click().catch(async () => { await pg.getByTestId('account-button').click(); await pg.getByRole('menuitem', { name: /settings/i }).click(); }); await pg.waitForTimeout(300); await shot(pg, 'shell_settings_dialog'); await axe(pg, 'shell_settings'); await pg.keyboard.press('Escape'); });
+  await safe('slash', async () => { await tb(pg).fill('/'); await pg.waitForTimeout(300); await shot(pg, 'shell_slash_menu'); await tb(pg).fill(''); });
+  await safe('search v2', async () => { await pg.keyboard.press('Control+k'); await pg.keyboard.type('paid'); await pg.waitForTimeout(500); await shot(pg, 'shell_search_fulltext'); report.metrics.searchHits = await pg.getByTestId('search-result').count(); await pg.keyboard.press('Escape'); });
+  await safe('thread menu', async () => { const it = pg.getByTestId('thread-item').first(); await it.hover(); await it.getByRole('button').last().click(); await pg.waitForTimeout(250); await shot(pg, 'shell_thread_menu'); await pg.keyboard.press('Escape'); });
+  report.metrics.shell_v2 = await measure(pg);
+  await pg.context().close();
+});
+
 fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify(report, null, 2));
 console.log(JSON.stringify({ shots: report.shots.length, errors: report.errors, axe: Object.fromEntries(Object.entries(report.axe).map(([k, v]) => [k, v.map((x) => `${x.id}:${x.impact}:${x.n}`)])), metrics: report.metrics, console: [...new Set(report.console)].slice(0, 15) }, null, 1));
 await browser.close();

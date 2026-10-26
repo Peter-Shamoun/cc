@@ -22,7 +22,8 @@ test.describe('mock adapter', () => {
     await open(page, MOCK);
     await composer(page).fill('Which CARC codes drive Cascade Medicaid denials?');
     await composer(page).press('Enter');
-    const tool = lastAssistant(page).getByTestId('tool-call').first();
+    const a = lastAssistant(page);
+    const tool = a.getByTestId('step-timeline').or(a.getByTestId('tool-call')).first();
     await expect(tool).toBeVisible();
     await waitIdle(page);
     await expect(tool).toBeVisible();
