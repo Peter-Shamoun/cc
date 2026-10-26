@@ -86,25 +86,27 @@ export function ImageView({ part, onOpen }: { part: ImagePart; onOpen?: () => vo
   );
 }
 
+// Fidelity (10:48 directive): callouts read like a quoted note in Claude/ChatGPT prose: a hairline rule, muted text,
+// no tinted card. Only caveats tint their icon (amber) so "check before using" still stands out a little.
 const CALLOUT = {
-  assumption: { icon: Lightbulb, bar: 'var(--callout-bar)' },
-  info: { icon: Info, bar: 'var(--link)' },
-  caveat: { icon: AlertTriangle, bar: 'var(--callout-bar)' },
-  data_quality: { icon: AlertTriangle, bar: 'var(--callout-bar)' },
-  phi_redaction: { icon: ShieldCheck, bar: 'var(--accent)' },
+  assumption: { icon: Lightbulb, tone: 'text-fg-subtle' },
+  info: { icon: Info, tone: 'text-fg-subtle' },
+  caveat: { icon: AlertTriangle, tone: 'text-[#b7791f] dark:text-[#e8b339]' },
+  data_quality: { icon: AlertTriangle, tone: 'text-[#b7791f] dark:text-[#e8b339]' },
+  phi_redaction: { icon: ShieldCheck, tone: 'text-fg-subtle' },
 } as const;
 
 export function Callout({ part, onEdit }: { part: CalloutPart; onEdit?: (text: string) => void }) {
-  const { icon: Icon, bar } = CALLOUT[part.variant] ?? CALLOUT.info;
+  const { icon: Icon, tone } = CALLOUT[part.variant] ?? CALLOUT.info;
   const [open, setOpen] = useState(part.items.length <= 4);
   return (
-    <div className="my-4 rounded-xl border-l-[3px] bg-[var(--callout-bg)] px-4 py-3 font-sans text-sm" style={{ borderLeftColor: bar }} role="note" data-testid="callout">
-      <button type="button" onClick={() => setOpen((o) => !o)} className="mb-1 flex items-center gap-2 font-semibold" aria-expanded={open}>
-        <Icon size={16} /> {part.title ?? part.variant}
+    <div className="my-4 border-l-2 border-line-strong py-0.5 pl-4 font-sans text-sm text-fg-muted" role="note" data-testid="callout" data-variant={part.variant}>
+      <button type="button" onClick={() => setOpen((o) => !o)} className="mb-1 flex items-center gap-1.5 font-medium text-fg" aria-expanded={open}>
+        <Icon size={14} className={tone} aria-hidden /> {part.title ?? part.variant}
         {part.items.length > 4 && (open ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
       </button>
       {open && (
-        <ul className="list-disc space-y-1 pl-6 leading-relaxed">
+        <ul className="list-disc space-y-1 pl-5 leading-relaxed marker:text-fg-subtle">
           {part.items.map((it) => (
             <li key={it.id}>
               <Inline text={it.text} />

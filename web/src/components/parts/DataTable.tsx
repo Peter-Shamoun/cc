@@ -257,7 +257,7 @@ const DataTableView = memo(function DataTableView({ part, onOpen, full }: DataTa
       <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-xs text-fg-subtle">
         <span>
           {part.source ? <>from <code className="font-mono">{part.source.views.join(', ')}</code> · </> : null}
-          {withheld ? `${rowsLabel} · data not shared` : <>Showing {part.rows.length.toLocaleString()} of {part.rowCount.toLocaleString()} rows</>}
+          {withheld ? `${rowsLabel} · data not shared` : part.rowCount === 0 ? <>No rows</> : <>Showing {part.rows.length.toLocaleString()} of {part.rowCount.toLocaleString()} rows</>}
           {part.source?.elapsedMs !== undefined && ` · ${(part.source.elapsedMs / 1000).toFixed(2)} s`}
           {hasPhi && ' · PHI masked'}
         </span>

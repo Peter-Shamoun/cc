@@ -1,6 +1,6 @@
 // QA cross-browser probe: paste, focus after send, find in virtualized shadows. node e2e/review/xb_probe.mjs firefox|webkit
 import * as pw from 'playwright';
-import { distRoutes, LIVE, MOCK } from '../static.mjs';
+import { distRoutes, MOCK } from '../static.mjs';
 const b = await pw[process.argv[2] || 'firefox'].launch();
 const ctx = await b.newContext({ viewport: { width: 1440, height: 900 } }); await distRoutes(ctx);
 const p = await ctx.newPage();
