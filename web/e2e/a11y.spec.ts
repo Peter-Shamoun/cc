@@ -1,6 +1,7 @@
 import { test, expect } from './fixtures';
 import AxeBuilder from '@axe-core/playwright';
 import { MOCK, open, ask } from './helpers';
+import { distRoutes } from './static.mjs';
 
 const scan = async (page: import('@playwright/test').Page) => {
   // Let entry fades finish: axe reads mid-fade opacity as a contrast failure (seen in C2 under load).
@@ -51,6 +52,7 @@ test('streaming answer is announced to screen readers (aria-live)', async ({ pag
 
 test('reduced motion is respected', async ({ browser }) => {
   const ctx = await browser.newContext({ reducedMotion: 'reduce', viewport: { width: 1440, height: 900 } });
+  await distRoutes(ctx);
   const page = await ctx.newPage();
   await open(page, MOCK);
   await ask(page, 'What was our denial rate by payer last quarter?');
