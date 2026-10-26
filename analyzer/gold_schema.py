@@ -38,7 +38,7 @@ def gold_schema_block(tools: ToolLayer) -> str:
 def render_gold_schema(tools: ToolLayer) -> str:
     model = tools._semantic_model()
     views = model.get("views", {})
-    meanings = {**model.get("dimensions", {}), **model.get("time_dimensions", {})}
+    meanings = {**model.get("columns", {}), **model.get("dimensions", {}), **model.get("time_dimensions", {})}
     lines = ["Gold schema (every sem.* view you can read; generated from the semantic model and the data):"]
     for relation in sorted(name for name in tools.list_relations(charge=False) if name.startswith("sem.")):
         view = views.get(relation, {})

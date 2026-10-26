@@ -422,3 +422,91 @@ verified_requests:
            min_group_size: 20, order_by: [{field: line_denial_rate, direction: desc}], limit: 20}
   - question: How many claims were reversed per month?
     call: {metrics: [reversal_events], group_by: [payment_month], order_by: [{field: payment_month, direction: asc}]}
+
+# -----------------------------------------------------------------------------
+# COLUMNS — meaning of every sem.* column that is not a dimension above. The
+# gold schema block in the agent's prompt shows these (analyzer/gold_schema.py).
+# A name means the same thing in every view it appears in.
+# -----------------------------------------------------------------------------
+columns:
+  adjustment_amount: {description: "Amount of this CAS adjustment (positive reduces payment; negative adds back)."}
+  adjustment_codes: {description: "Sorted distinct group-reason codes (e.g. CO-45, PR-1) on this 835 claim, claim and line level combined."}
+  adjustment_id: {description: "Row id of this adjustment."}
+  adjustment_quantity: {description: "Units the adjustment applies to (CAS quantity), when the payer sent one."}
+  any_payer_denied: {description: "True if any payer's current adjudication of this claim is a denial."}
+  billing_provider_state: {description: "State of the billing provider's address on the 837."}
+  charge_amount: {description: "Total billed charge of the claim: on sem.claims as billed on this 837 submission (CLM02); on sem.remit_claims as the payer echoed it on the 835 (CLP03)."}
+  claim_count: {description: "Number of 835 claim payments (CLP) in this payment."}
+  claim_id: {description: "Row id of the 837 claim submission (unique per submission, not per claim; claim_key identifies the claim)."}
+  claim_is_denied: {description: "True if the claim this row belongs to is denied (its 835 adjudication's is_denied)."}
+  claim_line_id: {description: "Row id of this 837 service line."}
+  claim_payer_key: {description: "claim_key|payer_key: one claim with one payer, the unit a payer adjudicates."}
+  claim_submissions: {description: "Number of 837 claim submissions sent to this payer."}
+  claims_paid_amount: {description: "Sum of paid_amount over the 835 claim payments in this payment."}
+  co_amount: {description: "Sum of CO (contractual obligation) adjustments on this 835 claim, claim and line level."}
+  current_adjudication_count: {description: "Number of current adjudications this claim has across all payers."}
+  days_submission_to_first_remit: {description: "Days from this submission's date to the claim's first 835 payment date (any event, any payer)."}
+  diagnosis_codes: {description: "ICD-10 codes on this submission in claim order."}
+  diagnosis_id: {description: "Row id of this diagnosis code on a submission."}
+  diagnosis_pointers: {description: "Positions (1-based) in the claim's diagnosis list that this line points to."}
+  diagnosis_sequence: {description: "Position of this code in the claim's diagnosis list (1 = first)."}
+  ever_reversed: {description: "True if any 835 event for this claim, from any payer, was a reversal."}
+  first_payment_date: {description: "Earliest payment date over the claim's current adjudications (all payers)."}
+  fiscal_period_date: {description: "Fiscal period end date the payer reported for this provider-level adjustment (PLB02)."}
+  frequency_code: {description: "Claim frequency: 1 original, 7 corrected replacement, 8 void (from the 837, or as echoed on the 835)."}
+  group_description: {description: "Meaning of the CAS group code (CO contractual obligation, PR patient responsibility, OA other adjustment, PI payer initiated)."}
+  ids_as_sent: {description: "Every payer id this payer appeared under in the files."}
+  is_balanced: {description: "True if the payment's total equals its claims' paid amounts minus its provider-level adjustments."}
+  is_denied_recorded: {description: "True if the payer recorded the claim as denied (claim status 4)."}
+  is_denied_signal_v3: {description: "True if the event is a denial by signal: $0 paid, not a reversal, and a CO adjustment with a reviewed denial CARC."}
+  is_principal: {description: "True for the principal diagnosis of the submission."}
+  last_payment_date: {description: "Latest payment date over the claim's current adjudications (all payers)."}
+  latest_claim_status: {description: "Claim status code of the claim's most recent current adjudication (all payers)."}
+  line_adjustment_codes: {description: "Sorted distinct group-reason codes on the 835 service line (on sem.claim_lines: the matched 835 line)."}
+  line_allowed_amount: {description: "Allowed amount for the 835 service line (on sem.claim_lines: the matched 835 line)."}
+  line_charge_amount: {description: "Billed charge of the service line: as billed on the 837 (sem.claim_lines) or as echoed on the 835 (sem.remit_lines)."}
+  line_co_amount: {description: "Sum of CO adjustments on the 835 service line (on sem.claim_lines: the matched 835 line)."}
+  line_count: {description: "Number of service lines on this 837 submission."}
+  line_item_control_number: {description: "Provider's line control number (REF*6R); used to match 835 lines to 837 lines."}
+  line_number: {description: "Service line number on the 837 (LX01)."}
+  line_oa_amount: {description: "Sum of OA adjustments on the 835 service line."}
+  line_paid_amount: {description: "Amount the payer paid on the 835 service line (on sem.claim_lines: the matched 835 line)."}
+  line_pi_amount: {description: "Sum of PI adjustments on the 835 service line."}
+  line_pr_amount: {description: "Sum of PR (patient responsibility) adjustments on the 835 service line (on sem.claim_lines: the matched 835 line)."}
+  line_remark_codes: {description: "RARC remark codes on the 835 service line (on sem.claim_lines: the matched 835 line)."}
+  modifier_2: {description: "Second procedure modifier (on sem.remit_lines: as adjudicated)."}
+  modifier_3: {description: "Third procedure modifier as billed."}
+  modifier_4: {description: "Fourth procedure modifier as billed."}
+  names_as_sent: {description: "Every payer name this payer appeared under in the files."}
+  oa_amount: {description: "Sum of OA (other adjustment) amounts on this 835 claim, claim and line level."}
+  paid_amount: {description: "Amount the payer paid on this 835 claim (CLP04); negative on reversals."}
+  patient_responsibility_amount: {description: "Patient responsibility the payer reported on this 835 claim (CLP05)."}
+  payer_claim_control_number: {description: "The payer's own claim number (CLP07)."}
+  payer_received_date: {description: "Date the payer received the claim, when the 835 reports it (DTM*050)."}
+  payer_responsibility: {description: "Payer's position on this submission: P primary, S secondary, T tertiary (SBR01)."}
+  payment_id: {description: "Row id of the 835 payment (check / EFT / advice) this row belongs to."}
+  payments: {description: "Number of 835 claim payments from this payer."}
+  pi_amount: {description: "Sum of PI (payer initiated) adjustments on this 835 claim, claim and line level."}
+  pr_amount: {description: "Sum of PR (patient responsibility) adjustments on this 835 claim, claim and line level."}
+  procedure_code_type: {description: "Code set of the procedure code (HC = CPT/HCPCS)."}
+  production_date: {description: "Date the payer produced the 835 (DTM*405)."}
+  provider_adjustment_amount: {description: "Provider-level (PLB) adjustment amount; positive reduces the payment. On sem.payments: the sum for the payment."}
+  provider_adjustment_id: {description: "Row id of this provider-level adjustment."}
+  reference_id: {description: "Reference the payer gave for the provider-level adjustment (e.g. the claim or invoice it relates to)."}
+  remark_id: {description: "Row id of this remark."}
+  remark_level: {description: "Where the remark was sent: CLAIM or LINE."}
+  remit_claim_id: {description: "Row id of the 835 claim payment (CLP) this row belongs to."}
+  remit_co_amount: {description: "Sum of co_amount over the claim's current adjudications (all payers)."}
+  remit_line_id: {description: "Row id of the 835 service line this row belongs to (null for claim-level rows)."}
+  remit_match_method: {description: "How the 837 line was matched to its 835 line (e.g. by line control number, or by code and position)."}
+  remit_paid_amount: {description: "Sum of paid_amount over the claim's current adjudications (all payers)."}
+  remit_patient_responsibility_amount: {description: "Sum of patient_responsibility_amount over the claim's current adjudications (all payers)."}
+  responsible_party: {description: "Who bears the adjustment, from its group code (provider, patient, payer)."}
+  reversal_count: {description: "Number of reversal claim payments in this payment."}
+  service_date_to: {description: "Last date of service (equals the first date for single-day services)."}
+  source_file_id: {description: "Id of the delivered EDI file this row came from."}
+  submission_count: {description: "Number of 837 submissions in the data for this claim_key."}
+  total_payment_amount: {description: "Total amount of the payment (BPR02)."}
+  transaction_handling: {description: "Payment handling code: I remittance only, C payment with remittance, H notification only (BPR01)."}
+  units_billed: {description: "Units billed on the service line (on sem.remit_lines: original units as echoed by the payer)."}
+  units_paid: {description: "Units the payer paid on the 835 service line."}
