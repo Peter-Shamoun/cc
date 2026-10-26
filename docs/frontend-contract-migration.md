@@ -1,4 +1,4 @@
-# ClaimClarity chat contract: changelog and migration guide (v1.0 → 1.20.1)
+# ClaimClarity chat contract: changelog and migration guide (v1.0 → 1.21.0)
 
 **For review by Claude.** This is a reading guide to `api/CONTRACT.md`, which stays the normative text, and
 `api/contract/v1.schema.json`. It covers three things:
@@ -10,7 +10,7 @@
 The adapter that produces these events from analyzer and analyst outputs is specified in
 [`frontend-analyzer-adapter.md`](frontend-analyzer-adapter.md).
 
-Every version from 1.0 to 1.20 is **additive**. A 1.0 client keeps working against a 1.20 server, because it ignores
+Every version from 1.0 to 1.21 is **additive**. A 1.0 client keeps working against a 1.21 server, because it ignores
 unknown events, fields and part types (§3). No field was removed or renamed. The one wire-visible tightening is
 1.12's error envelope on 404 and 405, and 1.13's `not_found` for regenerate/edit 404s (below).
 
@@ -40,10 +40,12 @@ unknown events, fields and part types (§3). No field was removed or renamed. Th
 | 1.19 | patterns reject a trailing newline (`(?![\s\S])`, `[0-9]`), shared `pattern_cases.json`; demo follow-up report is v2 (`report_v2.jsonl`) | use `fullmatch` for ids; reuse the branch's `artifactId` with `version + 1` | nothing; the v1/v2 switcher now gets live data |
 | 1.20 | temporary chat: `ChatRequest.temporary`, `MessageStart.temporary`, `Capabilities.temporaryChat` (§11.1) | hold it in memory only (TTL, per-user cap); 404 for list/GET/share/export/feedback; 422 on crossing | offer the toggle only when `temporaryChat` is present; send `temporary: true` every turn; `DELETE` on leaving |
 | 1.20.1 | no shape change: `/stop` interrupts a running query (§8), `aborted` within 1 s during SQL too | wrap the session opener and interrupt this run's cursors on cancel (`api/cancel.py`) | nothing; "Stopping…" is now brief |
+| 1.21 | BACKEND-FIT (§2.1): `IdentityScopedKey`; data scope only from the identity | 422 on a scoped key in `ChatRequest`/`options`; scope only from the token → session opener | remove any database/schema/source picker; never send scope keys |
 
 **Migration notes**
 * **1.19 patterns.** Only ids that were already invalid in JS (a trailing `\n`) are now rejected by the server too.
 * **1.20 temporary chat.** Clients that never send `temporary` see no change. The flag must be repeated on every turn; dropping it mid-chat is a 422, not a silent save.
+* **1.21 data scope.** No released client sends a scoped key, so nothing breaks. A UI that showed a data-source chip ("Claims lake · sem.*") should remove it: it never changed anything server-side.
 * **1.18 plots.** Nothing breaks: `spec` and `data.values` are still sent (now derived from `plot`). A chart
   stored before 1.18 has no `plot` and still renders from its sanitized `spec`. A server-side chart that fails the
   gate is simply absent (a table takes its place if there was none), so never assume a chart follows a table.
