@@ -127,8 +127,12 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
   const answering = parts.some((p, i) => i > lastTool && ANSWER.includes(p.type));
   const timelineLive = msg.streaming && !answering;
   // QA-A10: reasoning folds into the timeline, so the answer has one "Thought for 1.2s" row, not two.
-  const reasoning = steps.length > 0 ? parts.filter((p): p is Extract<typeof p, { type: 'reasoning' }> => p.type === 'reasoning') : [];
-  const timeline = steps.length > 0 ? <StepTimeline key="timeline" steps={steps} live={timelineLive} elapsedMs={usage?.elapsedMs} reasoning={reasoning} /> : null;
+  const reasoningParts = parts.filter((p): p is Extract<typeof p, { type: 'reasoning' }> => p.type === 'reasoning');
+  // QA-A15: one "Thinking…" row (icon + timer) from the moment the question is sent, on live and mock alike.
+  // The same element (key "timeline") then carries the steps, so nothing swaps in place as events arrive.
+  const hasTimeline = steps.length > 0 || reasoningParts.length > 0 || timelineLive;
+  const reasoning = hasTimeline ? reasoningParts : [];
+  const timeline = hasTimeline ? <StepTimeline key="timeline" steps={steps} live={timelineLive} elapsedMs={usage?.elapsedMs} reasoning={reasoning} /> : null;
   const blocks: ReactNode[] = [];
   let timelineDone = false;
   const placeTimeline = () => {
