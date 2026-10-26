@@ -91,12 +91,12 @@ describe('1.16.0 edge scenarios on the answer surface', () => {
   });
 
   const cancels = EDGE_SCENARIOS.filter((s) => s.scenario.startsWith('cancel_')).map((s) => s.scenario as string);
-  it.each(cancels)('%s: one quiet "You stopped this response" note, exactly one retry control; Stop is never a failure', (name) => {
+  it.each(cancels)('%s: one tiny muted "Stopped" line, exactly one retry control; Stop is never a failure', (name) => {
     const { container } = show(name);
     expect(screen.getAllByTestId('stopped')).toHaveLength(1);
     const retries = screen.queryAllByRole('button', { name: /^(Retry|Regenerate)$/ });
     expect(retries).toHaveLength(1);
-    expect(screen.getByTestId('stopped').textContent).toMatch(/You stopped this response/);
+    expect(screen.getByTestId('stopped').textContent).toMatch(/^Stopped/);
     expect(container.querySelector('[data-testid="error-retry"], [role="alert"]')).toBeNull();
     for (const s of screen.queryAllByTestId('step')) {
       if (/stopped/.test(s.textContent ?? '')) {

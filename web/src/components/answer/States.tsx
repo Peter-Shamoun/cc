@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowUp, Check, ChevronRight, CircleSlash, HelpCircle, Lock, RotateCcw, Square } from 'lucide-react';
+import { ArrowUp, Check, ChevronRight, CircleSlash, HelpCircle, Lock, RotateCcw } from 'lucide-react';
 import clsx from 'clsx';
 import type { ChatRequest } from '../../api/contract';
 import { Markdown } from '../parts/Markdown';
@@ -122,12 +122,13 @@ export function EscalationNote({ ev }: { ev: EscalationEvent }) {
   );
 }
 
-/** Stopped by the user: subtle line with Retry, like ChatGPT's "You stopped this response". */
+/** Stopped by the user. ChatGPT just cuts the text; we keep one tiny muted word (no icon, no card) so the cut reads as
+ *  deliberate, plus a quiet Retry only when nothing arrived. */
 export function StoppedNote({ onRetry }: { onRetry?: () => void }) {
   return (
-    <div className="my-2 flex items-center gap-2 font-sans text-sm text-fg-subtle" data-testid="stopped">
-      <Square size={12} aria-hidden /> You stopped this response
-      {onRetry && <button type="button" onClick={onRetry} className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-0.5 text-xs text-fg-muted hover:bg-hover hover:text-fg"><RotateCcw size={11} /> Retry</button>}
+    <div className="mt-1 flex items-center gap-2 font-sans text-xs text-fg-subtle" data-testid="stopped">
+      Stopped
+      {onRetry && <button type="button" onClick={onRetry} className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-fg-muted hover:bg-hover hover:text-fg"><RotateCcw size={11} aria-hidden /> Retry</button>}
     </div>
   );
 }
