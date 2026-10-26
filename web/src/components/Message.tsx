@@ -236,7 +236,7 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
   const timelineLive = msg.streaming && !answering;
   // QA-A10: reasoning folds into the timeline, so the answer has one "Thought for 1.2s" row, not two.
   const reasoningParts = parts.filter((p): p is Extract<typeof p, { type: 'reasoning' }> => p.type === 'reasoning');
-  // QA-A15: one "Thinking…" row (icon + timer) from the moment the question is sent, on live and mock alike.
+  // QA-A15: one collapsed "Thinking" row (static icon, current step as its label) from the moment the question is sent.
   // The same element (key "timeline") then carries the steps, so nothing swaps in place as events arrive.
   const hasTimeline = steps.length > 0 || reasoningParts.length > 0 || timelineLive;
   const reasoning = hasTimeline ? reasoningParts : [];
@@ -279,7 +279,7 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
       {/* QA-A7: while the timeline is live it already says what is happening; only transport states (offline, reconnecting, 429) add a line. */}
       {msg.streaming && (msg.status || empty) && !(timeline && timelineLive && !isTransportStatus(msg.status)) && (
         <div className="my-2 flex items-center gap-2 font-sans text-sm text-fg-muted first:mt-0" data-testid="status">
-          {empty && !msg.status ? <span className="streaming-caret prose-chat" /> : <span className="shimmer" aria-hidden={isTransportStatus(msg.status) || undefined}>{msg.status}</span>}
+          {empty && !msg.status ? <span className="streaming-caret prose-chat" /> : <span aria-hidden={isTransportStatus(msg.status) || undefined}>{msg.status}</span>}
         </div>
       )}
       {isLast && <TransportAnnouncer status={msg.streaming ? msg.status : null} />}

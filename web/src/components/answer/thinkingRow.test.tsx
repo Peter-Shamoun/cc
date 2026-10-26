@@ -13,11 +13,11 @@ const v1 = (evs: V1Event[]) => evs.reduce((m, e) => reduceV1(m, e), newAssistant
 const turn = (m: AssistantViewV1) => <AssistantTurn msg={m} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} />;
 
 describe('QA-A15: one Thinking row from turn start', () => {
-  it('shows the Thinking row (icon + timer) before any event, never a bare caret', () => {
+  it('shows the Thinking row (static icon, no spinner or timer) before any event, never a bare caret', () => {
     render(turn(newAssistantViewV1('a1') as AssistantViewV1));
     const row = screen.getByTestId('step-summary');
-    expect(row.textContent).toMatch(/^Thinking…\d/);
-    expect(row.querySelector('svg.animate-spin')).not.toBeNull();
+    expect(row.textContent).toBe('Thinking');
+    expect(row.querySelector('svg.animate-spin')).toBeNull();
     expect(document.querySelector('.streaming-caret')).toBeNull();
     expect(screen.queryByTestId('status')).toBeNull();
     expect(screen.queryAllByTestId('step')).toHaveLength(0);

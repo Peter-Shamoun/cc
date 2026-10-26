@@ -13,7 +13,7 @@ export type Resume = NonNullable<ChatRequest['resume']>;
 export type OnReply = (text: string, resume?: Resume) => void;
 
 const ABSTAIN_TITLE: Record<string, string> = {
-  out_of_scope: "That's outside what I can answer from this data",
+  out_of_scope: "That's outside what I can answer from the data I can access",
   phi_request: "I can't share patient-identifying details",
   data_unavailable: "The data needed for this isn't available",
   ambiguous: 'I need a clearer question to answer this',

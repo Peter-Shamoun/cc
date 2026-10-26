@@ -85,7 +85,7 @@ export const BLOBS: Record<string, { mime: string; content: string }> = {
   'file_lines_q3': { mime: 'text/csv', content: csvOf(lineCols, lineRows.map((r) => r.map((v, j) => (lineCols[j].phi ? '[masked]' : v)))) },
 };
 
-const SQL_DENIAL = `-- scoped DuckDB session · sem.* views only
+const SQL_DENIAL = `-- semantic views (sem.*)
 SELECT
   payer_name                                         AS payer,
   COUNT(*)                                           AS claims,
