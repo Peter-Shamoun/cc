@@ -12,6 +12,8 @@
   --callout-bg: #fff8e6; --callout-bar: #e8b339; --code-bg: #f3f3f3;
   --font-prose: var(--font-sans); --prose-size: 16px; --prose-lh: 1.7; --p-gap: 0.9em;
   --shadow-composer: 0 0 0 1px var(--border), 0 4px 16px rgba(0,0,0,0.05);
+  /* QA-S28: hairline border + a soft, short shadow (Claude/ChatGPT); no 30-70px drop shadows. */
+  --shadow-menu: 0 4px 24px rgba(0,0,0,0.10); --shadow-dialog: 0 8px 32px rgba(0,0,0,0.12);
   --heading-font: var(--font-sans); --empty-size: 28px; --empty-weight: 500;
 }
 .dark, .dark[data-palette="neutral"] {
@@ -40,6 +42,11 @@
   --danger: #e26d6d; --callout-bg: #3a3326; --code-bg: #1f1e1d;
   --shadow-composer: 0 0 0 1px var(--border), 0 4px 16px rgba(0,0,0,0.3);
 }
+
+/* QA-S30: Claude/ChatGPT glyphs read lighter than lucide's default 2. One stroke for every icon; the send arrow
+   on its filled button keeps 2 (.cc-icon-bold). */
+svg.lucide { stroke-width: 1.75; }
+svg.lucide.cc-icon-bold { stroke-width: 2; }
 
 @theme inline {
   --color-bg: var(--bg);
