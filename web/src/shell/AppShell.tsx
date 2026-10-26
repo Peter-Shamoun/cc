@@ -207,7 +207,9 @@ function ShellInner() {
       const u = users[users.length - 1];
       if (u) {
         pinned.current = true;
-        el.scrollTo({ top: el.scrollTop + u.getBoundingClientRect().top - el.getBoundingClientRect().top - 16, behavior: matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+        const top = el.scrollTop + u.getBoundingClientRect().top - el.getBoundingClientRect().top - 16;
+        if (typeof el.scrollTo === 'function') el.scrollTo({ top, behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+        else el.scrollTop = top;
         return;
       }
     }
