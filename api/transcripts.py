@@ -227,6 +227,16 @@ class SealedTranscriptStore:
             self._save(principal, conv)
             return {"id": conv["id"], "title": title, "updatedAt": _iso(conv["updatedAt"])}
 
+    def auto_title(self, principal, conversation_id, title):
+        """Server-derived title (api.titles). Only replaces the generic title, so a user rename always wins."""
+        with self._lock:
+            conv = self._load(principal, conversation_id)
+            if conv is None or conv["title"] != DEFAULT_TITLE:
+                return False
+            conv["title"] = clean_title(title)
+            self._save(principal, conv)
+            return True
+
     def delete_conversation(self, principal, conversation_id):
         if not _SAFE.match(conversation_id or ""):
             return False

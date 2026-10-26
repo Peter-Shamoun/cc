@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://claimclarity.local/api/contract/v1.schema.json",
   "title": "ClaimClarity chat stream contract",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "One JSON object per SSE data: line. See api/CONTRACT.md. Validate an event against #/$defs/StreamEvent.",
   "$ref": "#/$defs/StreamEvent",
   "$defs": {
@@ -1792,6 +1792,11 @@
         "usage": {
           "$ref": "#/$defs/Usage"
         },
+        "conversationTitle": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "Set once, on the first finished answer of a conversation that still has the generic title: a PHI-free title the server derived from the result's column identifiers (never from the question). The server has already stored it; the client should show it in the thread list. A user rename always wins and is never overwritten."
+        },
         "seq": {
           "type": "integer",
           "minimum": 0
@@ -1994,6 +1999,236 @@
         }
       },
       "additionalProperties": true
+    },
+    "ConversationSummary": {
+      "type": "object",
+      "description": "One row of GET /api/conversations and POST /api/conversations/search.",
+      "required": [
+        "id",
+        "title",
+        "updatedAt",
+        "messageCount"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "title": {
+          "type": "string",
+          "description": "'New analysis' until the user renames it or the server sets message.end.conversationTitle."
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO-8601 UTC, e.g. 2026-10-25T19:00:00Z"
+        },
+        "messageCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "snippet": {
+          "type": "string",
+          "description": "Search only: the first match with some context."
+        }
+      },
+      "additionalProperties": true
+    },
+    "ConversationPage": {
+      "type": "object",
+      "required": [
+        "items"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ConversationSummary"
+          }
+        },
+        "next": {
+          "type": "string",
+          "description": "Opaque cursor for the next page; absent on the last page."
+        }
+      },
+      "additionalProperties": true
+    },
+    "StoredMessage": {
+      "type": "object",
+      "description": "A message as GET /api/conversations/{id} returns it. Assistant `steps` are the flat step.* and escalation events in stream order (canonical; rebuild the timeline with the same reducer as the live stream).",
+      "required": [
+        "id",
+        "role",
+        "createdAt"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "role": {
+          "enum": [
+            "user",
+            "assistant"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO-8601 UTC, e.g. 2026-10-25T19:00:00Z"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "text": {
+          "type": "string",
+          "description": "User messages."
+        },
+        "editOf": {
+          "$ref": "#/$defs/ID",
+          "description": "User messages: the message this one edits (a sibling of it). Without parentId it is a root."
+        },
+        "regenerateOf": {
+          "$ref": "#/$defs/ID",
+          "description": "Assistant messages: the answer this one regenerates."
+        },
+        "parts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Part"
+          }
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "finishReason": {
+          "enum": [
+            "stop",
+            "abstain",
+            "needs_input",
+            "error",
+            "aborted"
+          ]
+        },
+        "usage": {
+          "$ref": "#/$defs/Usage"
+        }
+      },
+      "additionalProperties": true
+    },
+    "Conversation": {
+      "type": "object",
+      "description": "GET /api/conversations/{id}.",
+      "required": [
+        "id",
+        "title",
+        "updatedAt",
+        "messages"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "title": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO-8601 UTC, e.g. 2026-10-25T19:00:00Z"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/StoredMessage"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "TranscriptsInfo": {
+      "type": "object",
+      "description": "GET /api/transcripts.",
+      "required": [
+        "mode",
+        "persisted",
+        "retentionDays"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "ephemeral",
+            "persisted"
+          ]
+        },
+        "persisted": {
+          "type": "boolean"
+        },
+        "retentionDays": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "RenameRequest": {
+      "type": "object",
+      "description": "PATCH /api/conversations/{id}. One line of text; empty resets to the generic title. 422 invalid_title otherwise.",
+      "required": [
+        "title"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": 500
+        }
+      },
+      "additionalProperties": false
+    },
+    "RenameResponse": {
+      "type": "object",
+      "required": [
+        "id",
+        "title",
+        "updatedAt"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "title": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO-8601 UTC, e.g. 2026-10-25T19:00:00Z"
+        }
+      },
+      "additionalProperties": true
+    },
+    "SearchRequest": {
+      "type": "object",
+      "description": "POST /api/conversations/search (POST so search text, possibly PHI, never sits in a URL).",
+      "properties": {
+        "q": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "cursor": {
+          "type": "string",
+          "maxLength": 16
+        }
+      },
+      "additionalProperties": false
     }
   }
 }
