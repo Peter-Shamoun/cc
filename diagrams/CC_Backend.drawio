@@ -1,0 +1,484 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.0.3 Chrome/140.0.7339.249 Electron/38.7.0 Safari/537.36" version="29.0.3" pages="2">
+  <diagram id="data" name="Data backend">
+    <mxGraphModel dx="-1364" dy="-390" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="0" page="0" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="data-t1" value="&lt;b style=&quot;font-size:24px;letter-spacing:0.04em;color:#1C2B57&quot;&gt;CC · DATA BACKEND&lt;/b&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;span style=&quot;font-size:13px&quot;&gt;converged design · Oct 26 2026 · write path (top), read path (bottom)&lt;/span&gt;" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=12;fontColor=#1A1D23;fontFamily=Helvetica;" parent="1" vertex="1">
+          <mxGeometry x="40" y="20" width="1800" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="data-frame2" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#4A6BB0;strokeWidth=1.5;container=1;pointerEvents=0;collapsible=0;" parent="1" vertex="1">
+          <mxGeometry x="40" y="80" width="1000" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="data-ft3" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.06em&quot;&gt;SFTP&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame2" vertex="1">
+          <mxGeometry x="16" y="8" width="968" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box4" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;CUSTOMER A&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;Daily 837 · 835 · 277&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#8A8E95;dashed=1;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame2" vertex="1">
+          <mxGeometry x="40" y="50" width="420" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box5" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;CUSTOMER B&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;Daily 837 · 835 · 277&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#8A8E95;dashed=1;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame2" vertex="1">
+          <mxGeometry x="520" y="50" width="420" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="data-frame6" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#4A6BB0;strokeWidth=1.5;container=1;pointerEvents=0;collapsible=0;" parent="1" vertex="1">
+          <mxGeometry x="40" y="300" width="1000" height="640" as="geometry" />
+        </mxCell>
+        <mxCell id="data-ft7" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.06em&quot;&gt;PROD S3 BUCKET · CC/&lt;/b&gt;&amp;nbsp;&amp;nbsp;&lt;span style=&quot;color:#1A1D23&quot;&gt;one KMS key and one IAM role per customer&lt;/span&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame6" vertex="1">
+          <mxGeometry x="16" y="8" width="968" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="data-frame8" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#1C2B57;dashed=1;dashPattern=6 4;strokeWidth=1.5;container=1;pointerEvents=0;collapsible=0;" parent="data-frame6" vertex="1">
+          <mxGeometry x="30" y="50" width="450" height="560" as="geometry" />
+        </mxCell>
+        <mxCell id="data-ft9" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.06em&quot;&gt;CUSTOMER_A/&lt;/b&gt;&amp;nbsp;&amp;nbsp;&lt;span style=&quot;color:#1A1D23&quot;&gt;Key A · Role A&lt;/span&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame8" vertex="1">
+          <mxGeometry x="16" y="8" width="418" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box12" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;RAW/ · BRONZE&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;received_date=YYYY-MM-DD/ · 837/ 835/ 277/ · _SUCCESS manifest&lt;br&gt;Object Lock: written once, never changed&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame8" vertex="1">
+          <mxGeometry x="20" y="50" width="410" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box13" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;PARQUET/ · SILVER&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;lossless tables as part files per run · edi.segment keeps byte offsets into raw/&lt;br&gt;open months compacted at 4 parts · closed months compacted once&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame8" vertex="1">
+          <mxGeometry x="20" y="190" width="410" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box14" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;SEMANTIC_LAYER/ · GOLD&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;sem.* as Parquet by claim cohort · quarter files for old months&lt;br&gt;manifest per version · CURRENT pointer (compare-and-set) · old versions kept for open readers&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame8" vertex="1">
+          <mxGeometry x="20" y="340" width="410" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box15" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;STAGING/ · QUARANTINE/&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;in-progress loads · files that failed to parse&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame8" vertex="1">
+          <mxGeometry x="20" y="495" width="410" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="data-frame10" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#1C2B57;dashed=1;dashPattern=6 4;strokeWidth=1.5;container=1;pointerEvents=0;collapsible=0;" parent="data-frame6" vertex="1">
+          <mxGeometry x="520" y="50" width="450" height="560" as="geometry" />
+        </mxCell>
+        <mxCell id="data-ft11" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.06em&quot;&gt;CUSTOMER_B/&lt;/b&gt;&amp;nbsp;&amp;nbsp;&lt;span style=&quot;color:#1A1D23&quot;&gt;Key B · Role B&lt;/span&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame10" vertex="1">
+          <mxGeometry x="16" y="8" width="418" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box16" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;RAW/ · BRONZE&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;received_date=YYYY-MM-DD/ · 837/ 835/ 277/ · _SUCCESS manifest&lt;br&gt;Object Lock: written once, never changed&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame10" vertex="1">
+          <mxGeometry x="20" y="50" width="410" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box17" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;PARQUET/ · SILVER&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;lossless tables as part files per run · edi.segment keeps byte offsets into raw/&lt;br&gt;open months compacted at 4 parts · closed months compacted once&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame10" vertex="1">
+          <mxGeometry x="20" y="190" width="410" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box18" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;SEMANTIC_LAYER/ · GOLD&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;sem.* as Parquet by claim cohort · quarter files for old months&lt;br&gt;manifest per version · CURRENT pointer (compare-and-set) · old versions kept for open readers&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame10" vertex="1">
+          <mxGeometry x="20" y="340" width="410" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box19" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;STAGING/ · QUARANTINE/&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;in-progress loads · files that failed to parse&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame10" vertex="1">
+          <mxGeometry x="20" y="495" width="410" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="data-frame20" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#4A6BB0;strokeWidth=1.5;container=1;pointerEvents=0;collapsible=0;" parent="1" vertex="1">
+          <mxGeometry x="1100" y="300" width="620" height="640" as="geometry" />
+        </mxCell>
+        <mxCell id="data-ft21" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.06em&quot;&gt;COMPUTE · WRITE&lt;/b&gt;&amp;nbsp;&amp;nbsp;&lt;span style=&quot;color:#1A1D23&quot;&gt;shown for Customer B · same per customer&lt;/span&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame20" vertex="1">
+          <mxGeometry x="16" y="8" width="588" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box22" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;EVENTBRIDGE&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;On _SUCCESS&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame20" vertex="1">
+          <mxGeometry x="40" y="60" width="540" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box23" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;LAUNCHER · ECS RUNTASK&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;Starts the task as Role B · can&#39;t read data itself&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame20" vertex="1">
+          <mxGeometry x="40" y="160" width="540" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="data-frame24" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#4A6BB0;strokeWidth=1.5;container=1;pointerEvents=0;collapsible=0;" parent="data-frame20" vertex="1">
+          <mxGeometry x="40" y="260" width="540" height="350" as="geometry" />
+        </mxCell>
+        <mxCell id="data-ft25" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.06em&quot;&gt;FARGATE TASK · LIVES FOR ONE BATCH&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame24" vertex="1">
+          <mxGeometry x="16" y="8" width="508" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box26" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;1  START&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;ECS hands it Role B temp creds · takes the customer&#39;s batch lease (fenced)&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame24" vertex="1">
+          <mxGeometry x="16" y="40" width="508" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box27" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;2  PARSE&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;raw/ files in parallel (PARSE_WORKERS = task vCPUs) · streamed, columnar · ~2× faster, flat memory&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame24" vertex="1">
+          <mxGeometry x="16" y="100" width="508" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box28" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;3  SILVER&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;write part files, then edi.source_file last as the commit record · compact a month at 4 parts&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame24" vertex="1">
+          <mxGeometry x="16" y="160" width="508" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box29" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;4  GOLD&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;incremental: only claims the batch touched · rewrite their partitions · new manifest · swap CURRENT&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame24" vertex="1">
+          <mxGeometry x="16" y="220" width="508" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box30" value="&lt;b style=&quot;letter-spacing:0.04em&quot;&gt;5  EXIT&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;lease released · creds expire · container destroyed&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#1C2B57;strokeColor=#1C2B57;fontColor=#FFFFFF;align=left;spacingLeft=14;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame24" vertex="1">
+          <mxGeometry x="16" y="280" width="508" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box31" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;VIEW SQL · GITHUB&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;semantic/views/ · code only · run by the parser each batch&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="1" vertex="1">
+          <mxGeometry x="1780" y="640" width="420" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="data-frame32" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#4A6BB0;strokeWidth=1.5;container=1;pointerEvents=0;collapsible=0;" parent="1" vertex="1">
+          <mxGeometry x="40" y="1000" width="1000" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="data-ft33" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.06em&quot;&gt;ACCESS&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame32" vertex="1">
+          <mxGeometry x="16" y="8" width="968" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box34" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;XIFIN USER&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#8A8E95;dashed=1;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame32" vertex="1">
+          <mxGeometry x="30" y="80" width="170" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box35" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;MICROSOFT ENTRA ID&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;Company login&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame32" vertex="1">
+          <mxGeometry x="250" y="80" width="210" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box36" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;COGNITO&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;Issues token&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame32" vertex="1">
+          <mxGeometry x="510" y="80" width="190" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box37" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;SIGNED TOKEN&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;Names the customer&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame32" vertex="1">
+          <mxGeometry x="750" y="80" width="210" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="data-frame38" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#4A6BB0;strokeWidth=1.5;container=1;pointerEvents=0;collapsible=0;" parent="1" vertex="1">
+          <mxGeometry x="1100" y="1000" width="1100" height="380" as="geometry" />
+        </mxCell>
+        <mxCell id="data-ft39" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.06em&quot;&gt;COMPUTE · READ&lt;/b&gt;&amp;nbsp;&amp;nbsp;&lt;span style=&quot;color:#1A1D23&quot;&gt;the chat backend · detail on page 2&lt;/span&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame38" vertex="1">
+          <mxGeometry x="16" y="8" width="1068" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box40" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;CHAT API + RUN WORKERS&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;ECS Fargate · verifies token, gets creds, streams the run (SSE)&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame38" vertex="1">
+          <mxGeometry x="40" y="70" width="280" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="data-agent41" value="&lt;b style=&quot;font-size:15px;letter-spacing:0.04em&quot;&gt;ANALYZER B1&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px&quot;&gt;Haiku 5.5 · playbook v1 · 3 TRAIN examples&lt;/span&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px&quot;&gt;dictionary + profile · value lookup&lt;/span&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px&quot;&gt;Bedrock under BAA (prod) · claude -p (dev)&lt;/span&gt;" style="shape=hexagon;perimeter=hexagonPerimeter2;size=0.12;whiteSpace=wrap;html=1;fillColor=#1C2B57;strokeColor=#1C2B57;fontColor=#FFFFFF;fontFamily=Helvetica;fontSize=11;" parent="data-frame38" vertex="1">
+          <mxGeometry x="380" y="55" width="330" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box42" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;DUCKDB READER SESSION&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;per request · Role B creds · guarded read-only SQL · audit hash chain&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame38" vertex="1">
+          <mxGeometry x="770" y="70" width="300" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box43" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;STS&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;Temporary Role B creds (15 min)&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame38" vertex="1">
+          <mxGeometry x="40" y="260" width="280" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="data-frame44" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#4A6BB0;strokeWidth=1.5;container=1;pointerEvents=0;collapsible=0;" parent="1" vertex="1">
+          <mxGeometry x="2260" y="1000" width="380" height="240" as="geometry" />
+        </mxCell>
+        <mxCell id="data-ft45" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.06em&quot;&gt;PROD S3 BUCKET · CC/&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame44" vertex="1">
+          <mxGeometry x="16" y="8" width="348" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box46" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;CUSTOMER_A/&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;No access&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#8A8E95;dashed=1;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame44" vertex="1">
+          <mxGeometry x="20" y="50" width="340" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="data-box47" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;CUSTOMER_B/ SEMANTIC_LAYER&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;Read · CURRENT version only&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" parent="data-frame44" vertex="1">
+          <mxGeometry x="20" y="140" width="340" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="data-e48" value="copy script" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="data-box4" target="data-box12" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="data-e49" value="copy script" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="data-box5" target="data-box16" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="data-e50" value="_SUCCESS" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="data-box16" target="data-box22" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="data-e51" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="data-box22" target="data-box23" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="data-e52" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="data-box23" target="data-frame24" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="data-e53" value="materialize sem.*" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="data-box31" target="data-box29" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="data-e54" value="read" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=1;exitY=0.7;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="data-box16" target="data-box27" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1084" y="477" />
+              <mxPoint x="1084" y="727" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="data-e55" value="write" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="data-box28" target="data-box17" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1068" y="747" />
+              <mxPoint x="1068" y="600" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="data-e56" value="write" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="data-box29" target="data-box18" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1052" y="807" />
+              <mxPoint x="1052" y="755" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="data-e57" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="data-box34" target="data-box35" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="data-e58" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="data-box35" target="data-box36" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="data-e59" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="data-box36" target="data-box37" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="data-e60" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="data-box37" target="data-box40" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="data-e61" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="data-box40" target="data-agent41" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="data-e62" value="SQL" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="data-agent41" target="data-box42" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="data-e63" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;startArrow=block;startFill=1;startSize=6;" parent="1" source="data-box40" target="data-box43" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="data-e64" value="read sem.*" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="data-box42" target="data-box47" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="data-gate65" value="1" style="rhombus;html=1;fillColor=#1C2B57;strokeColor=#1C2B57;fontColor=#FFFFFF;fontStyle=1;fontSize=13;fontFamily=Helvetica;" parent="1" vertex="1">
+          <mxGeometry x="1050" y="440" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="data-gl66" value="Rule matches B?" style="text;html=1;align=center;verticalAlign=top;fontSize=12;fontColor=#1C2B57;fontFamily=Helvetica;" parent="1" vertex="1">
+          <mxGeometry x="1003" y="474" width="125" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="data-gate67" value="2" style="rhombus;html=1;fillColor=#1C2B57;strokeColor=#1C2B57;fontColor=#FFFFFF;fontStyle=1;fontSize=13;fontFamily=Helvetica;" parent="1" vertex="1">
+          <mxGeometry x="1450" y="525" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="data-gl68" value="PassRole allowed?" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#1C2B57;fontFamily=Helvetica;" parent="1" vertex="1">
+          <mxGeometry x="1486" y="529" width="139" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="data-gate69" value="3" style="rhombus;html=1;fillColor=#1C2B57;strokeColor=#1C2B57;fontColor=#FFFFFF;fontStyle=1;fontSize=13;fontFamily=Helvetica;" parent="1" vertex="1">
+          <mxGeometry x="1037" y="840" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="data-gl70" value="IAM + KMS allow?" style="text;html=1;align=center;verticalAlign=top;fontSize=12;fontColor=#1C2B57;fontFamily=Helvetica;" parent="1" vertex="1">
+          <mxGeometry x="986" y="874" width="132" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="data-gate71" value="4" style="rhombus;html=1;fillColor=#1C2B57;strokeColor=#1C2B57;fontColor=#FFFFFF;fontStyle=1;fontSize=13;fontFamily=Helvetica;" parent="1" vertex="1">
+          <mxGeometry x="1055" y="1120" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="data-gl72" value="Token valid?" style="text;html=1;align=center;verticalAlign=top;fontSize=12;fontColor=#1C2B57;fontFamily=Helvetica;" parent="1" vertex="1">
+          <mxGeometry x="1018" y="1154" width="104" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="data-gate73" value="5" style="rhombus;html=1;fillColor=#1C2B57;strokeColor=#1C2B57;fontColor=#FFFFFF;fontStyle=1;fontSize=13;fontFamily=Helvetica;" parent="1" vertex="1">
+          <mxGeometry x="1310" y="1185" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="data-gl74" value="Trust policy allows B?" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#1C2B57;fontFamily=Helvetica;" parent="1" vertex="1">
+          <mxGeometry x="1346" y="1189" width="174" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="data-gate75" value="6" style="rhombus;html=1;fillColor=#1C2B57;strokeColor=#1C2B57;fontColor=#FFFFFF;fontStyle=1;fontSize=13;fontFamily=Helvetica;" parent="1" vertex="1">
+          <mxGeometry x="2205" y="1150" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="data-gl76" value="IAM + KMS allow?" style="text;html=1;align=center;verticalAlign=top;fontSize=12;fontColor=#1C2B57;fontFamily=Helvetica;" parent="1" vertex="1">
+          <mxGeometry x="2154" y="1184" width="132" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="data-legend77" value="" style="rounded=0;html=1;fillColor=none;strokeColor=none;container=1;pointerEvents=0;" parent="1" vertex="1">
+          <mxGeometry x="1500" y="1420" width="720" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="data-ls78" value="" style="shape=hexagon;perimeter=hexagonPerimeter2;size=0.2;fillColor=#1C2B57;strokeColor=#1C2B57;html=1;" parent="data-legend77" vertex="1">
+          <mxGeometry y="6" width="26" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="data-lt79" value="AGENT" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#1A1D23;fontStyle=1;fontFamily=Helvetica;" parent="data-legend77" vertex="1">
+          <mxGeometry x="32" y="4" width="105" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="data-ls80" value="" style="fillColor=#EAF0F9;strokeColor=#4A6BB0;html=1;" parent="data-legend77" vertex="1">
+          <mxGeometry x="140" y="6" width="26" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="data-lt81" value="SERVICE" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#1A1D23;fontStyle=1;fontFamily=Helvetica;" parent="data-legend77" vertex="1">
+          <mxGeometry x="172" y="4" width="105" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="data-ls82" value="" style="fillColor=#FFFFFF;strokeColor=#8A8E95;dashed=1;html=1;" parent="data-legend77" vertex="1">
+          <mxGeometry x="280" y="6" width="26" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="data-lt83" value="EXTERNAL" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#1A1D23;fontStyle=1;fontFamily=Helvetica;" parent="data-legend77" vertex="1">
+          <mxGeometry x="312" y="4" width="105" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="data-ls84" value="" style="fillColor=none;strokeColor=#1C2B57;dashed=1;dashPattern=6 4;strokeWidth=1.5;html=1;" parent="data-legend77" vertex="1">
+          <mxGeometry x="420" y="6" width="26" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="data-lt85" value="PHI BOUNDARY" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#1A1D23;fontStyle=1;fontFamily=Helvetica;" parent="data-legend77" vertex="1">
+          <mxGeometry x="452" y="4" width="105" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="data-ls86" value="" style="rhombus;fillColor=#1C2B57;strokeColor=#1C2B57;html=1;" parent="data-legend77" vertex="1">
+          <mxGeometry x="560" y="6" width="26" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="data-lt87" value="AWS GATE" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#1A1D23;fontStyle=1;fontFamily=Helvetica;" parent="data-legend77" vertex="1">
+          <mxGeometry x="592" y="4" width="105" height="22" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="chat" name="Chat backend">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="chat-t1" value="&lt;b style=&quot;font-size:24px;letter-spacing:0.04em;color:#1C2B57&quot;&gt;CC · CHAT BACKEND&lt;/b&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;span style=&quot;font-size:13px&quot;&gt;what the read path&#39;s chat backend expands to · production layout · no DynamoDB&lt;/span&gt;" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=12;fontColor=#1A1D23;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="1800" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-frame2" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#4A6BB0;strokeWidth=1.5;container=1;pointerEvents=0;collapsible=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="2320" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-ft3" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.06em&quot;&gt;EDGE &amp; ENTRY&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" vertex="1" parent="chat-frame2">
+          <mxGeometry x="16" y="8" width="2288" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-box4" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;BROWSER&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;React chat app · SSE client&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#8A8E95;dashed=1;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" vertex="1" parent="chat-frame2">
+          <mxGeometry x="30" y="60" width="230" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-box5" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;CLOUDFRONT + WAF&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;Static app from S3 · rate limits per user and customer&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" vertex="1" parent="chat-frame2">
+          <mxGeometry x="330" y="60" width="290" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-box6" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;COGNITO TOKEN&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;Names the customer · from the access path&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" vertex="1" parent="chat-frame2">
+          <mxGeometry x="690" y="60" width="260" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-box7" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;CHAT API · ECS FARGATE&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;Stateless · accepts a message, starts a run, streams events (SSE) · replays from Last-Event-ID&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" vertex="1" parent="chat-frame2">
+          <mxGeometry x="1030" y="50" width="420" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-box8" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;PER-CUSTOMER LIMITS&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;Run concurrency and token budget · kill switch per customer&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" vertex="1" parent="chat-frame2">
+          <mxGeometry x="1530" y="60" width="340" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-frame9" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#4A6BB0;strokeWidth=1.5;container=1;pointerEvents=0;collapsible=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="320" width="2320" height="440" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-ft10" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.06em&quot;&gt;RUN PATH&lt;/b&gt;&amp;nbsp;&amp;nbsp;&lt;span style=&quot;color:#1A1D23&quot;&gt;one run = one question · run id, budget (turns, tokens, time), cancel signal&lt;/span&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" vertex="1" parent="chat-frame9">
+          <mxGeometry x="16" y="8" width="2288" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-box11" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;SQS RUN QUEUE&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;Back-pressure · per-customer limits enforced by the API&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" vertex="1" parent="chat-frame9">
+          <mxGeometry x="30" y="70" width="270" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-box12" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;RUN WORKERS · ECS&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;Pull a run, open the customer&#39;s reader session, run the analyzer, write events&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" vertex="1" parent="chat-frame9">
+          <mxGeometry x="30" y="240" width="270" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-agent13" value="&lt;b style=&quot;font-size:15px;letter-spacing:0.04em&quot;&gt;ANALYZER · B1 (SHIPPED)&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px&quot;&gt;Haiku 5.5 · one agent · free SQL over sem.*&lt;/span&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px&quot;&gt;Playbook v1 (14 rules from TRAIN misses)&lt;/span&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px&quot;&gt;3 similar solved TRAIN examples (BM25)&lt;/span&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px&quot;&gt;Dictionary with derivations · enum profile · value lookup&lt;/span&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px&quot;&gt;Sealed test 93.8% vs 79.2% base (+14.6 pp)&lt;/span&gt;" style="shape=hexagon;perimeter=hexagonPerimeter2;size=0.12;whiteSpace=wrap;html=1;fillColor=#1C2B57;strokeColor=#1C2B57;fontColor=#FFFFFF;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="chat-frame9">
+          <mxGeometry x="400" y="90" width="540" height="280" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-box14" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;MODEL GATEWAY&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;Prod: Bedrock under BAA · dev and mock run: local claude -p · retries, fallback, prompt cache, cost per answer&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" vertex="1" parent="chat-frame9">
+          <mxGeometry x="1040" y="70" width="420" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-box15" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;READER SESSION · TOOL SANDBOX&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;DuckDB per request · Role B creds (15 min) · guarded read-only SQL · sem.* only · no temp directory&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" vertex="1" parent="chat-frame9">
+          <mxGeometry x="1040" y="250" width="420" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-box16" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;ANSWER CONTRACT 1.23&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;Answer + SQL + result table · clarify · refusal · re-executed by the harness, not trusted from the transcript&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" vertex="1" parent="chat-frame9">
+          <mxGeometry x="1560" y="70" width="400" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-box17" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;RUN EVENT STREAM&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;Steps, SQL, rows, answer · appended in numbered chunks · any API task can replay a run&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" vertex="1" parent="chat-frame9">
+          <mxGeometry x="1560" y="250" width="400" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-frame18" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#1C2B57;dashed=1;dashPattern=6 4;strokeWidth=1.5;container=1;pointerEvents=0;collapsible=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="810" width="2320" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-ft19" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.06em&quot;&gt;STATE · S3 + KMS UNDER THE CUSTOMER&#39;S PREFIX&lt;/b&gt;&amp;nbsp;&amp;nbsp;&lt;span style=&quot;color:#1A1D23&quot;&gt;PHI boundary · no DynamoDB: objects with compare-and-set writes, like the gold CURRENT pointer&lt;/span&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" vertex="1" parent="chat-frame18">
+          <mxGeometry x="16" y="8" width="2288" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-box20" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;CONVERSATIONS&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;One object per conversation · If-Match on the ETag · conversation list = one index object per user&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" vertex="1" parent="chat-frame18">
+          <mxGeometry x="30" y="70" width="340" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-box21" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;RUN EVENTS&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;Numbered chunks per run · reconnect replays, then follows live · expire with the conversation&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" vertex="1" parent="chat-frame18">
+          <mxGeometry x="420" y="70" width="340" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-box22" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;TRANSCRIPTS&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;Design B · own KMS key · readable by the audit role, not the chat API&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" vertex="1" parent="chat-frame18">
+          <mxGeometry x="810" y="70" width="340" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-box23" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;AGENT AUDIT&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;Hash-chained record per SQL call (SQL and row count, never cells) · write-once, 6 years&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" vertex="1" parent="chat-frame18">
+          <mxGeometry x="1200" y="70" width="340" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-box24" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.04em;font-size:14px&quot;&gt;GOLD · SEMANTIC_LAYER&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;Read-only for Role B · versioned by manifest + CURRENT&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" vertex="1" parent="chat-frame18">
+          <mxGeometry x="1590" y="70" width="360" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-frame25" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#4A6BB0;strokeWidth=1.5;container=1;pointerEvents=0;collapsible=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1120" width="2320" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-ft26" value="&lt;b style=&quot;color:#1C2B57;letter-spacing:0.06em&quot;&gt;EVAL LOOP&lt;/b&gt;&amp;nbsp;&amp;nbsp;&lt;span style=&quot;color:#1A1D23&quot;&gt;how the analyzer configuration changes&lt;/span&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;" vertex="1" parent="chat-frame25">
+          <mxGeometry x="16" y="8" width="2288" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-t27" value="Sampled transcripts and thumbs-down answers become candidate benchmark questions (checked against the answer key) → TRAIN misses are the only source for playbook rules and examples → a change ships only if it beats the current config on VAL, then on the sealed TEST split, run once. Stage-1 search: 11 bundles; knowledge (B1) beat compute, cascades, planners and multi-candidate selection at 1/35th of everything-on&#39;s cost." style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=13;fontColor=#1A1D23;fontFamily=Helvetica;" vertex="1" parent="chat-frame25">
+          <mxGeometry x="30" y="45" width="2240" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-e28" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="chat-box4" target="chat-box5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-e29" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="chat-box5" target="chat-box6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-e30" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="chat-box6" target="chat-box7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-e31" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="chat-box7" target="chat-box8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-e32" value="enqueue" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="chat-box7" target="chat-box11">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1135" y="300" />
+              <mxPoint x="205" y="300" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="chat-e33" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="chat-box11" target="chat-box12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-e34" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.7;entryDx=0;entryDy=0;" edge="1" parent="1" source="chat-box12" target="chat-agent13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-e35" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;startArrow=block;startFill=1;startSize=6;" edge="1" parent="1" source="chat-agent13" target="chat-box14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-e36" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;startArrow=block;startFill=1;startSize=6;" edge="1" parent="1" source="chat-agent13" target="chat-box15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-e37" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="chat-box14" target="chat-box16">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-e38" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="chat-box15" target="chat-box17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-e39" value="stream to client" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.75;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="chat-box17" target="chat-box7">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1800" y="560" />
+              <mxPoint x="1385" y="560" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="chat-e40" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="chat-box12" target="chat-box20">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-e41" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="chat-agent13" target="chat-box21">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-e42" value="audit" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=0.4;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="chat-box15" target="chat-box23">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-e43" value="read sem.*" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;exitX=0.8;exitY=1;exitDx=0;exitDy=0;entryX=0.3;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="chat-box15" target="chat-box24">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-gate44" value="4" style="rhombus;html=1;fillColor=#1C2B57;strokeColor=#1C2B57;fontColor=#FFFFFF;fontStyle=1;fontSize=13;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="95" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-gl45" value="Token valid?" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#1C2B57;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="1036" y="99" width="104" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-gate46" value="5" style="rhombus;html=1;fillColor=#1C2B57;strokeColor=#1C2B57;fontColor=#FFFFFF;fontStyle=1;fontSize=13;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="2030" y="590" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-gl47" value="Trust policy allows B? (STS)" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#1C2B57;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="2066" y="594" width="216" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-gate48" value="6" style="rhombus;html=1;fillColor=#1C2B57;strokeColor=#1C2B57;fontColor=#FFFFFF;fontStyle=1;fontSize=13;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="2030" y="945" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-gl49" value="IAM + KMS allow?" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#1C2B57;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="2066" y="949" width="132" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-legend50" value="" style="rounded=0;html=1;fillColor=none;strokeColor=none;container=1;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="1600" y="1290" width="720" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-ls51" value="" style="shape=hexagon;perimeter=hexagonPerimeter2;size=0.2;fillColor=#1C2B57;strokeColor=#1C2B57;html=1;" vertex="1" parent="chat-legend50">
+          <mxGeometry x="0" y="6" width="26" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-lt52" value="AGENT" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#1A1D23;fontStyle=1;fontFamily=Helvetica;" vertex="1" parent="chat-legend50">
+          <mxGeometry x="32" y="4" width="105" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-ls53" value="" style="fillColor=#EAF0F9;strokeColor=#4A6BB0;html=1;" vertex="1" parent="chat-legend50">
+          <mxGeometry x="140" y="6" width="26" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-lt54" value="SERVICE" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#1A1D23;fontStyle=1;fontFamily=Helvetica;" vertex="1" parent="chat-legend50">
+          <mxGeometry x="172" y="4" width="105" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-ls55" value="" style="fillColor=#FFFFFF;strokeColor=#8A8E95;dashed=1;html=1;" vertex="1" parent="chat-legend50">
+          <mxGeometry x="280" y="6" width="26" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-lt56" value="EXTERNAL" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#1A1D23;fontStyle=1;fontFamily=Helvetica;" vertex="1" parent="chat-legend50">
+          <mxGeometry x="312" y="4" width="105" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-ls57" value="" style="fillColor=none;strokeColor=#1C2B57;dashed=1;dashPattern=6 4;strokeWidth=1.5;html=1;" vertex="1" parent="chat-legend50">
+          <mxGeometry x="420" y="6" width="26" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-lt58" value="PHI BOUNDARY" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#1A1D23;fontStyle=1;fontFamily=Helvetica;" vertex="1" parent="chat-legend50">
+          <mxGeometry x="452" y="4" width="105" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-ls59" value="" style="rhombus;fillColor=#1C2B57;strokeColor=#1C2B57;html=1;" vertex="1" parent="chat-legend50">
+          <mxGeometry x="560" y="6" width="26" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="chat-lt60" value="AWS GATE" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#1A1D23;fontStyle=1;fontFamily=Helvetica;" vertex="1" parent="chat-legend50">
+          <mxGeometry x="592" y="4" width="105" height="22" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
