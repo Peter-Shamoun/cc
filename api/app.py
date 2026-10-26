@@ -25,12 +25,10 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
 from analyzer.config import AnalyzerConfig
-from analyzer.llm import PaidAPIDisabled
-from analyzer.loop import Analyzer
 from analyzer.tools import ToolLayer
 
-from api.backends import (CANCEL_AT, MULTI_TABLE_SQL, MULTI_TABLE_TITLES, SCENARIO_CONFIG, AuthError, DemoAuth,
-                          ReasonedEscalationOpener, SimAuth, detect_scenario, make_llm)
+from api.backends import AuthError, DemoAuth, ReasonedEscalationOpener
+from api.demo_model import CANCEL_AT, MULTI_TABLE_SQL, MULTI_TABLE_TITLES, detect_scenario
 from api.contract import CONTRACT_VERSION, schema as contract_schema
 from api.ids import new_id
 from api.live import Cancelled, LiveTap, masked_escalation_reason
@@ -41,6 +39,7 @@ from api.redact import install_access_log_redaction, install_log_redaction, inst
 from api.security import (MAX_BODY_BYTES, SESSION_COOKIE, BodyLimitMiddleware, CsrfMiddleware, ErrorShieldMiddleware,
                           HeadMiddleware, SecurityHeadersMiddleware)
 from api.store import DownloadRegistry, Principal
+from api.strands_analyzer import AnalyzerSettings, StrandsAnalyzer, build_analyzer
 from api.feedback import MAX_COMMENT, check as check_feedback, record as feedback_record
 from api.clarify import legacy_answers, summary as clarify_summary, validate_answers
 from api.capabilities import REMOVED_RUN_OPTION_KEYS, capabilities as capabilities_body
@@ -142,24 +141,16 @@ RUN_EVENT_CHUNK_SECONDS = 1.0
 #: a replay from stored chunks re-reads them this often while the run is still going on another task
 STORED_RUN_POLL_SECONDS = 0.5
 
-#: Demo pacing (QA-P1/P4). With the scripted LLM, answers are paced like a real model so the streaming UI
+#: Demo pacing (QA-P1/P4). With the scripted demo model, answers are paced like a real model so the streaming UI
 #: is actually exercised: a pause per model call and per text chunk. CC_API_DEMO_PACE=0 turns it off (tests),
 #: and explicit CC_API_MODEL_DELAY_SECONDS / CC_API_STREAM_DELAY_SECONDS always win.
 DEMO_PACE_MODEL_SECONDS = 0.25
 DEMO_PACE_CHUNK_SECONDS = 0.02
-#: The "slow" scenario must stay stoppable: at least this long per model call while pacing is on.
-SLOW_FLOOR_SECONDS = 0.8
-
-
-#: How the analyzer reaches its model (CC_API_ANALYZER_INTERACTION). ``model_api``: the in-process loop
-#: (analyzer.loop.Analyzer) with the model client CC_API_LLM names. ``claude_code_cli``: the shipped bundle run by
-#: local headless Claude Code (api/claude_code_cli_driver.py; dev and mock runs). An MCP layer is not built.
-ANALYZER_INTERACTIONS = ("model_api", "claude_code_cli")
 
 
 def demo_pace_enabled() -> bool:
-    return (os.environ.get("CC_API_DEMO_PACE", "1") != "0" and os.environ.get("CC_API_LLM", "scripted") == "scripted"
-            and os.environ.get("CC_API_ANALYZER_INTERACTION", "model_api") == "model_api")
+    return (os.environ.get("CC_API_DEMO_PACE", "1") != "0"
+            and os.environ.get("CC_API_ANALYZER_MODEL", "scripted") == "scripted")
 
 
 def _paced(name: str, paced_default: float) -> float:
@@ -177,11 +168,8 @@ def _safe_filename(name: str) -> str:
 
 @dataclass
 class Settings:
-    llm: str = os.environ.get("CC_API_LLM", "scripted")
-    analyzer_interaction: str = field(default_factory=lambda: os.environ.get("CC_API_ANALYZER_INTERACTION",
-                                                                             "model_api"))
-    #: bench snapshot directory the claude_code_cli layer queries (its data scope; see the driver's docstring)
-    analyzer_snapshot_path: str | None = field(default_factory=lambda: os.environ.get("CC_API_ANALYZER_SNAPSHOT"))
+    #: the analyzer's model and its settings (api/strands_analyzer.py): scripted demo model or Bedrock
+    analyzer: AnalyzerSettings = field(default_factory=AnalyzerSettings)
     heartbeat_seconds: float = float(os.environ.get("CC_API_HEARTBEAT_SECONDS", "15"))
     resume_seconds: float = 60.0
     #: a run whose last client disconnected is cancelled after this grace period unless a client re-attaches
@@ -205,9 +193,6 @@ class Settings:
     auth_mode: str = field(default_factory=lambda: os.environ.get("CC_API_AUTH", "demo"))
     #: 1.14.0: literal masking in *shown* SQL ("phi" default, "all", "off"); an unknown value means "phi" (sql_mask)
     sql_literal_masking: str = field(default_factory=sql_mask_policy_from_env)
-    analyzer_overrides: dict = field(default_factory=lambda: {
-        "glossary": "basic", "data_dictionary": False, "data_profile": False, "row_limit": 5000,
-        "candidates": 1, "cascade": "off"})
 
 
 #: AuditLog keeps only this many recent events in memory (tests read them); the durable record is the log line
@@ -269,50 +254,18 @@ def _token(request: Request) -> str:
     return request.cookies.get(SESSION_COOKIE, "")  # never a query parameter: URLs end up in logs
 
 
-def build_claude_code_cli_driver(settings: Settings, auth):
-    """The claude_code_cli layer's driver, or None for model_api. Refuses what it can't honour."""
-    if settings.analyzer_interaction not in ANALYZER_INTERACTIONS:
-        raise RuntimeError(f"CC_API_ANALYZER_INTERACTION={settings.analyzer_interaction!r}; expected one of "
-                           f"{', '.join(ANALYZER_INTERACTIONS)}")
-    if settings.analyzer_interaction != "claude_code_cli":
-        return None
-    if not settings.analyzer_snapshot_path:
-        raise RuntimeError("claude_code_cli needs CC_API_ANALYZER_SNAPSHOT (a bench snapshot directory: the briefing's "
-                           "example library, and the data itself with demo auth)")
-    from api.claude_code_cli_driver import ClaudeCodeCliDriver
-    # demo auth: the CLI queries the bench snapshot. SimAuth: every query goes through the signed-in user's opener
-    # (the customer comes from the verified token), served to the worker over the run channel.
-    driver = ClaudeCodeCliDriver(Path(settings.analyzer_snapshot_path),
-                                 queries_signed_in_customer=not isinstance(auth, DemoAuth))
-    check_claude_code_cli_auth(driver, auth)
-    return driver
-
-
-def check_claude_code_cli_auth(driver, auth) -> None:
-    """Fail closed on any auth the claude_code_cli path does not support, whoever built the driver: demo auth with
-    the snapshot, SimAuth with the run channel over the signed-in user's opener. Nothing else."""
-    if isinstance(auth, DemoAuth):
-        return
-    if isinstance(auth, SimAuth) and driver.queries_signed_in_customer:
-        return
-    raise RuntimeError("claude_code_cli supports demo auth (bench snapshot) and SimAuth (the signed-in customer's "
-                       f"data over the run channel); not {type(auth).__name__} with this driver")
-
-
-def create_app(auth=None, settings: Settings | None = None, store=None, llm_factory=None,
-               claude_code_cli_driver=None) -> FastAPI:
-    """``llm_factory`` (no args -> LLM) overrides ``settings.llm``; tests use it to replay a script.
-    ``claude_code_cli_driver`` overrides the one built from settings; tests pass one with a fake worker."""
+def create_app(auth=None, settings: Settings | None = None, store=None,
+               analyzer: StrandsAnalyzer | None = None) -> FastAPI:
+    """``analyzer`` overrides the one built from ``settings.analyzer``; tests pass one with a scripted model."""
     settings = settings or Settings()
     if auth is None:
         if settings.auth_mode != "demo":
             raise RuntimeError(f"CC_API_AUTH={settings.auth_mode!r} needs an explicit auth backend "
                                "(create_app(auth=...)); refusing to fall back to demo tokens")
         auth = DemoAuth()
-    cli_driver = claude_code_cli_driver or build_claude_code_cli_driver(settings, auth)
-    if cli_driver is not None:
-        check_claude_code_cli_auth(cli_driver, auth)
-    scripted_demo = settings.llm == "scripted" and cli_driver is None
+    analyzer = analyzer or build_analyzer(settings.analyzer, signed_in_customer_data=not isinstance(auth, DemoAuth),
+                                          demo_pace_seconds=settings.model_delay_seconds)
+    scripted_demo = analyzer.settings.model_kind == "scripted"
     audit = AuditLog()
     store = store or make_store(audit=audit)
     temp_chats = TemporaryChats(settings.temporary_ttl_seconds)  # 1.20.0: never persisted (api/temporary.py)
@@ -330,8 +283,6 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 try:
                     removed = await asyncio.to_thread(store.purge_expired) if purges_store else 0
                     await asyncio.to_thread(temp_chats.purge_expired)
-                    if cli_driver is not None:
-                        await asyncio.to_thread(cli_driver.sweep_expired_sessions)
                     if removed:
                         log.info("retention sweep removed %d conversations", removed)
                 except Exception as exc:  # noqa: BLE001 - keep sweeping
@@ -339,19 +290,14 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
 
         task = None
         purges_store = hasattr(store, "purge_expired")
-        if cli_driver is not None:
-            await asyncio.to_thread(cli_driver.sweep_expired_sessions)  # folders a crashed process left behind
-        if settings.transcript_sweep_seconds > 0 and (purges_store or cli_driver is not None):
-            if purges_store:
-                await asyncio.to_thread(store.purge_expired)  # once at startup: catch up on what expired while down
+        if settings.transcript_sweep_seconds > 0 and purges_store:
+            await asyncio.to_thread(store.purge_expired)  # once at startup: catch up on what expired while down
             task = asyncio.create_task(sweep())
         try:
             yield
         finally:
             if task:
                 task.cancel()
-            if cli_driver is not None:
-                cli_driver.shutdown()  # workers run in their own process groups: they would outlive the API
 
     app = FastAPI(title="CC chat API", version="0.1.0", docs_url=None, redoc_url=None, openapi_url=None,
                   lifespan=lifespan)
@@ -412,9 +358,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
 
     @app.get("/api/health")
     def health():
-        return JSONResponse({"status": "ok", "mode": getattr(auth, "mode", "custom"), "llm": settings.llm,
-                             "analyzerInteraction": "claude_code_cli" if cli_driver else "model_api",
-                             "paidApis": False}, headers=NO_STORE)
+        return JSONResponse({"status": "ok", "mode": getattr(auth, "mode", "custom"), "analyzer": "strands",
+                             "model": analyzer.model_label, "paidApis": analyzer.settings.paid}, headers=NO_STORE)
 
     @app.get("/api/capabilities")
     def capabilities():
@@ -620,7 +565,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 cstore.append_message(ctx.principal, conversation_id, user_msg)
             except CustomerKeyDisabled:
                 return shredded()
-        scenario = detect_scenario(question, scenario_hint) if demo and cli_driver is None else None
+        scenario = detect_scenario(question, scenario_hint) if demo and scripted_demo else None
         if scenario and "scenario" not in user_msg and isinstance(user_msg, dict):
             user_msg["scenario"] = scenario
         prior: dict = {}
@@ -666,18 +611,13 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         def work():
             parts: list[dict] = []
             finish = "stop"
-            overrides = {**settings.analyzer_overrides, **SCENARIO_CONFIG.get(scenario or "", {})}
-            delay = settings.model_delay_seconds * (4 if scenario == "slow" else 1)
-            if scenario == "slow" and settings.demo_pace:
-                delay = max(delay, SLOW_FLOOR_SECONDS)
             emit({"type": "message.start", "messageId": message_id, "conversationId": conversation_id,
-                  "contractVersion": CONTRACT_VERSION, "model": cli_driver.model_label if cli_driver else settings.llm,
+                  "contractVersion": CONTRACT_VERSION, "model": analyzer.model_label,
                   "parentId": user_msg["id"], **start_extra,
                   **({"temporary": True} if temporary else {})})
             emit({"type": "status", "label": "Thinking"})
             tap = None
             answer = None
-            cli_sessions: list = []
             opener = CancellableOpener(ctx.opener, run.cancelled).start()  # Stop interrupts the running SQL
 
             def audit_data_escalation(reason: str):
@@ -688,20 +628,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             # lossless.* only on the analyzer's stated reason, for the same signed-in customer, audited
             session_opener = ReasonedEscalationOpener(opener, on_escalation_granted=audit_data_escalation)
             try:
-                if cli_driver is not None:
-                    tap = LiveTap(None, emit, cancelled=run.cancelled, started=started)
-                    queries_signed_in_customer = cli_driver.queries_signed_in_customer
-                    answer = cli_driver.answer(question, tap, run.cancelled,
-                                               opener=session_opener if queries_signed_in_customer else None,
-                                               prepared_sessions=cli_sessions,
-                                               on_snapshot_escalation=None if queries_signed_in_customer
-                                               else audit_data_escalation)
-                else:
-                    config = AnalyzerConfig(**overrides)
-                    inner = llm_factory() if llm_factory else make_llm(settings.llm, scenario)
-                    tap = LiveTap(inner, emit, cancelled=run.cancelled, model_delay=delay, started=started,
-                                  multi_candidate=config.candidates > 1)
-                    answer = Analyzer(session_opener, tap, config).answer(question)
+                tap = LiveTap(emit, cancelled=run.cancelled, started=started)
+                answer = analyzer.answer(question, tap, run.cancelled, session_opener, scenario)
                 tap.finish(answer)
                 elapsed = int((time.perf_counter() - started) * 1000)
                 parts, finish = outcome_parts(answer, ctx.principal, downloads.scoped(conversation_id), elapsed_ms=elapsed, question=question,
@@ -711,7 +639,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                     parts = report_artifacts(parts, prior)
                 if scenario == "multi_table" and finish == "stop":
                     # 1.16.0 demo: the second query already ran live (its steps streamed); show its rows too
-                    tools = ToolLayer(opener, config)
+                    tools = ToolLayer(opener, AnalyzerConfig())
                     digest = tools.run_sql(MULTI_TABLE_SQL[1], charge=False, include_all_rows=True)
                     parts = [{**p, "title": MULTI_TABLE_TITLES[0]} if p.get("type") == "table" else p for p in parts]
                     parts = multi_table_parts(parts, answer, [(MULTI_TABLE_TITLES[1], MULTI_TABLE_SQL[1], digest)],
@@ -722,9 +650,6 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 finish = "aborted"
                 if tap is not None:
                     tap.abort()
-            except PaidAPIDisabled:
-                parts = [_error("internal", "Model unavailable", "Paid model APIs are disabled on this server.", False)]
-                finish = "error"
             except Exception as exc:  # noqa: BLE001 - never echo internals or data to the client or log
                 log.warning("chat failed: %s", type(exc).__name__)
                 if tap is not None:
@@ -791,11 +716,6 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                   elapsed_ms=elapsed, finish=finish, scenario=scenario, steps=len(persisted_steps),
                   **({"temporary": True} if temporary else {}),
                   **({"interrupts": opener.interrupts} if opener.interrupts else {}))
-            for session_dir in cli_sessions:  # persisted above: the session folder (question text) is not needed
-                try:
-                    cli_driver.discard_session(session_dir)
-                except Exception as exc:  # noqa: BLE001 - the retention sweep removes it later
-                    log.warning("session folder cleanup failed: %s", type(exc).__name__)
             run.finished_at = time.time()
             run.done = True
             run.notify()

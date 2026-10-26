@@ -1,21 +1,17 @@
 """Contract 1.14.0: shown-SQL literal masking (CONTRACT.md §10, api/sql_mask.py). Synthetic values only."""
-import copy
 import json
-import pathlib
 import random
 
 import pytest
 from fastapi.testclient import TestClient
 
-from api.analyzer_adapter import Recording, events_for_recording
 from api.app import Settings, create_app
 from api.contract.conformance import check
 from api.sql_mask import UNPARSEABLE, iter_literals, mask_event, mask_part, mask_sql, policy_from_env
 from api.tests.conftest import LABS, ask, parts
 from api.tests.test_titles import _validator
 
-FIX = pathlib.Path(__file__).with_name("fixtures") / "analyzer_runs"
-# invented values, the same family as fixtures/analyzer_runs/phi_reasoning.json
+# invented values
 PHI = ["Testperson", "00123456", "1980-01-02", "XYZ123456789", "1234567893", "123-45-6789", "jane.t@example.com",
        "555-123-4567", "CLM-0004411"]
 
@@ -113,28 +109,6 @@ def test_event_and_part_helpers_mark_counts_and_copy():
     for e in (out, cands):
         _validator(e["type"] == "step.sql_running" and "StepSqlRunning" or "StepCandidates").validate({**e, "seq": 1})
     _validator("CodePart").validate(code)
-
-
-def _phi_recording():
-    data = json.loads((FIX / "answer.json").read_text())
-    bad = "SELECT payer_name, COUNT(*) AS claims FROM sem.claims WHERE member_id = 'XYZ123456789' GROUP BY 1"
-    for call in data["calls"]:
-        for tc in call["completion"].get("tool_calls") or []:
-            if "sql" in tc["arguments"]:
-                tc["arguments"]["sql"] = bad
-    data["answer"]["sql"] = bad
-    return data
-
-
-@pytest.mark.parametrize("policy", ["phi", "all"])
-def test_adapter_stream_never_shows_the_literal(policy):
-    data = _phi_recording()
-    evs = events_for_recording(Recording.from_json(copy.deepcopy(data)), sql_masking=policy)
-    assert "XYZ123456789" not in json.dumps(evs)
-    assert any(e.get("maskedLiterals") for e in evs if e["type"] == "step.sql_running")
-    assert check(evs) == []
-    off = events_for_recording(Recording.from_json(data), sql_masking="off")
-    assert "XYZ123456789" in json.dumps(off), "the fixture really carries the literal"
 
 
 def test_demo_default_is_phi_and_leaves_demo_sql_readable(client):

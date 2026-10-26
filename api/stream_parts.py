@@ -1,6 +1,6 @@
 """Turn finished message parts into contract stream events (CONTRACT.md §4, §5.1).
 
-The live server (``api.app``) and the analyzer adapter (``api.analyzer_adapter``) share this code, so a real
+The live server (``api.app``) uses this code, so a real
 analyzer run and the demo stream the same way: text as ``text.start``/``text.delta``/``text.end``; a table with
 rows as ``table.start`` + ``table.rows`` chunks, then the complete ``part``; a chart with a ``plot`` (1.18.0) as
 ``chart.start`` (the PlotHeader) + ``chart.points`` chunks, then the complete ``part``; and every other part as one

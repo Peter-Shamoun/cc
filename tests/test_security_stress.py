@@ -344,12 +344,12 @@ def test_semantic_escape_hatch_uses_the_same_guard():
     assert "sem.claims" in ok and "LIMIT" in ok.upper()
 
 
-def test_prompts_treat_cell_text_as_untrusted(tmp_path):
-    from bench.agent_session import build_prompt, create_session
+def test_prompts_treat_cell_text_as_untrusted():
+    from analyzer.b1_commands import B1_CONFIG
+    from analyzer.briefing import static_system_prompt
     root = Path(__file__).resolve().parents[1]
     assert _UNTRUSTED in (root / "claude/schema/05_agent_system_prompt.md").read_text()
-    session = create_session(tmp_path, {"id": "q", "question": "What is the denial rate?"}, {}, "m", "stress-prompt")
-    assert _UNTRUSTED in build_prompt(session)
+    assert _UNTRUSTED in static_system_prompt(B1_CONFIG, "Gold schema: (none)")
 
 
 def test_cloudtrail_hash_chain_detects_an_edit(tmp_path):

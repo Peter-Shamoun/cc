@@ -30,8 +30,7 @@ def world(tmp_path_factory):
 
 def _tools(world, upn):
     opener = QueryPathOpener(world.aws, world.dep, login(world.aws, upn))
-    config = AnalyzerConfig(glossary="basic", data_dictionary=False, data_profile=False, verify=False,
-                            result_checks=False, self_correct="errors_only", max_tool_calls=200, row_limit=5000)
+    config = AnalyzerConfig(max_tool_calls=200, row_limit=5000)
     return ToolLayer(opener, config)
 
 

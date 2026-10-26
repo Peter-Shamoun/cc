@@ -1,7 +1,7 @@
 """``python -m api [--host H] [--port P]``: run the chat API with production-safe uvicorn flags.
 
 uvicorn adds ``server: uvicorn`` below the ASGI app, so SecurityHeadersMiddleware cannot strip it; this launcher turns it
-off (``server_header=False``). Demo mode by default (CC_API_MODE / CC_API_LLM as usual); no paid APIs unless configured.
+off (``server_header=False``). Demo mode by default (scripted Strands model, demo auth); no paid APIs unless CC_API_ANALYZER_MODEL=bedrock.
 Equivalent CLI: ``uvicorn api.app:app --no-server-header``.
 """
 from __future__ import annotations

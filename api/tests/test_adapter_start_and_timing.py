@@ -1,21 +1,8 @@
-"""Adapter ``message.start`` names no strategy (1.24.0); latency stages partition ``totalMs`` exactly; the
-load-tolerant test budget helper."""
-import json
-import pathlib
-
+"""Latency stages partition ``totalMs`` exactly; the load-tolerant test budget helper."""
 import pytest
 
-from api.analyzer_adapter import Recording, events_for_recording
 from api.live import STAGES, partition_ms
 from api.tests import timing
-
-FIX = pathlib.Path(__file__).with_name("fixtures") / "analyzer_runs"
-
-
-@pytest.mark.parametrize("name", sorted(p.stem for p in FIX.glob("*.json")))
-def test_recorded_runs_announce_no_strategy(name):
-    start = events_for_recording(Recording.from_json(json.loads((FIX / f"{name}.json").read_text())))[0]
-    assert start["type"] == "message.start" and "strategy" not in start
 
 
 @pytest.mark.parametrize("raw,total", [

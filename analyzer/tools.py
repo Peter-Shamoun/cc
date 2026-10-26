@@ -1,7 +1,7 @@
 """Tool layer over a per-request session.
 
 Model-written SQL is executed only by ``run_sql`` and ``sample_rows``, and only
-after ``bench.guard.guard``. There is no raw-execute tool. ``request_escalation``
+after ``bench.guard.guard``. There is no raw-execute tool. ``escalate`` (``request_escalation``)
 is the only way to widen the session: it records an audit event, asks the opener
 for a new escalated session (``ccsim.query.open_session(..., escalate=True)`` in
 production), and then the guard is allowed to name ``lossless.*``. Identifier
@@ -10,20 +10,23 @@ columns are redacted on the way out even if a view ever grew one.
 
 from __future__ import annotations
 
-import difflib
+import importlib.util
 import re
+import sys
 import threading
 import time
 from datetime import date, datetime
 from decimal import Decimal
+from pathlib import Path
 from typing import Any, Callable
 
-from bench.agents import GLOSSARY
 from bench.guard import GuardError, check_plan_cost, explain_statement, guard
 
-from analyzer.checks import PITFALLS, result_warnings, sql_error_message
 from analyzer.config import AnalyzerConfig
-from analyzer.opener import SessionHandle, SessionOpener
+from analyzer.opener import SessionOpener
+
+SCHEMA_DIRECTORY = Path(__file__).resolve().parent.parent / "claude" / "schema"
+SEMANTIC_MODEL_PATH = SCHEMA_DIRECTORY / "03_semantic_model.yaml"
 
 PHI_COLUMN_NAMES = frozenset({
     "name_last_or_org", "name_first", "name_middle", "name_prefix", "name_suffix",
@@ -46,26 +49,6 @@ _HIGH_CARDINALITY_COLUMNS = frozenset({
     "billing_npi", "rendering_npi", "referring_npi",
 })
 
-
-# #19 "descriptions" level: what each tool is for and when to use it, instead of what it returns.
-REWRITTEN_TOOL_DESCRIPTIONS = {
-    "list_relations": "Start here only if you do not know which sem.* view holds a fact. Lists every readable view.",
-    "describe_relation": "Before you write SQL on a view: its exact column names and types. Use these names verbatim.",
-    "sample_rows": "See what stored values look like (codes, spellings, flags) before you filter on them.",
-    "run_sql": "Check a draft or an intermediate count. Read the row_count and any warning or lint before you "
-               "trust a number. The SQL you finally submit is re-run and scored.",
-    "request_escalation": "Only when the answer needs a lossless.* relation (raw EDI files, segments). Audited.",
-    "profile": "Which values a low-cardinality column holds and each numeric column's range, without writing SQL.",
-    "lookup_dictionary": "Grain (one row per what) and the meaning of each column. Read it before choosing a view.",
-    "lookup_glossary": "The business definition of a term (denial, current adjudication, primary payer).",
-    "query_metrics": "A typed metric query the compiler turns into SQL; use it for a metric it names.",
-    "lookup_values": "Turn a name in the question (payer, CPT) into the exact stored value before filtering.",
-    "lookup_examples": "Solved questions from the training split with their SQL, for the shape of a query.",
-    "final_answer": "Submit the SQL that computes the answer, once. Every number in the paragraph must come from it.",
-    "refuse": "Decline patient identifiers, another customer's data, or any change to the data.",
-    "ask": "Only when two readings of the question give different numbers, or a required scope is missing: ask "
-           "every clarifying question at once (up to 4), each with 2-4 options.",
-}
 
 # ``ask`` (contract 1.23.0 clarify, api/CONTRACT.md §6.1). One plain ``question`` stays valid; ``questions`` holds 1-4
 # form questions, each with a chip ``header`` and 2-4 ``options``, and ``question`` is then the form's lead-in. The
@@ -101,7 +84,8 @@ def clarification_request(arguments: dict) -> dict:
 
     A plain question gives ``questions == []`` and ``text`` = the question. With ``questions``, every question needs a
     header, a question and 2-4 options with a label and a description; options may be left out only when a single
-    question is asked, which is then a plain question. Ids are q1.. and o1.. so the result is contract-ready.
+    question is asked, which is then a plain question. Ids are q1.. and o1.. (or distinct simple ids the caller
+    gave: the scripted demo names its choices) so the result is contract-ready.
     ``text`` is the lead-in: the given ``question``, else the only question's text, else ASK_DEFAULT_LEAD_IN."""
     lead_in = _one_line(arguments.get("question"))
     raw_questions = arguments.get("questions")
@@ -119,6 +103,7 @@ def clarification_request(arguments: dict) -> dict:
         text = _one_line(raw_questions[0].get("question"))
         return clarification_request({"question": " ".join(part for part in (lead_in, text) if part)})
     questions = []
+    question_ids = _given_ids(raw_questions, "q")
     for question_number, raw in enumerate(raw_questions, start=1):
         header, text = _one_line(raw.get("header")), _one_line(raw.get("question"))
         where = f"question {question_number}"
@@ -131,21 +116,34 @@ def clarification_request(arguments: dict) -> dict:
             raise ToolError(f"{where}: give {ASK_MIN_OPTIONS}-{ASK_MAX_OPTIONS} options (the user can also type "
                             "their own answer or skip)")
         options = []
+        option_ids = _given_ids(raw_options, "o")
         for option_number, option in enumerate(raw_options, start=1):
             label = _one_line(option.get("label")) if isinstance(option, dict) else ""
             description = _one_line(option.get("description")) if isinstance(option, dict) else ""
             if not label or len(label) > ASK_LABEL_MAX or not description or len(description) > ASK_DESCRIPTION_MAX:
                 raise ToolError(f"{where}, option {option_number}: needs a label (at most {ASK_LABEL_MAX} characters) "
                                 f"and a description (at most {ASK_DESCRIPTION_MAX})")
-            options.append({"id": f"o{option_number}", "label": label, "description": description})
+            options.append({"id": option_ids[option_number - 1], "label": label, "description": description})
         if len({option["label"].lower() for option in options}) != len(options):
             raise ToolError(f"{where}: option labels must differ")
-        questions.append({"id": f"q{question_number}", "header": header, "question": text, "options": options,
+        questions.append({"id": question_ids[question_number - 1], "header": header, "question": text, "options": options,
                           **({"multiSelect": True} if raw.get("multiSelect") is True else {})})
     if len(lead_in) > ASK_QUESTION_MAX:
         raise ToolError(f"the lead-in is longer than {ASK_QUESTION_MAX} characters")
     text = lead_in or (questions[0]["question"] if len(questions) == 1 else ASK_DEFAULT_LEAD_IN)
     return {"text": text, "questions": questions}
+
+
+_GIVEN_ID = re.compile(r"[a-z][a-z0-9_]{0,31}")
+
+
+def _given_ids(items: list, prefix: str) -> list[str]:
+    """Contract ids for a list of questions or options: the ids the caller gave when every item has a distinct,
+    simple one (the scripted demo names its choices), else ``<prefix>1``, ``<prefix>2``, ..."""
+    given = [item.get("id") if isinstance(item, dict) else None for item in items]
+    if all(isinstance(value, str) and _GIVEN_ID.fullmatch(value) for value in given) and len(set(given)) == len(given):
+        return given
+    return [f"{prefix}{number}" for number in range(1, len(items) + 1)]
 
 
 class ToolError(ValueError):
@@ -200,90 +198,11 @@ def execute_with_time_limit(connection, sql: str, timeout_seconds: float):
         finished.set()
 
 
-def tool_spec(config: AnalyzerConfig) -> list[dict]:
-    """Anthropic tool definitions for the enabled surface. Final answer tools included."""
-    spec = [
-        {"name": "list_relations", "description": "List the relations this session can read.",
-         "input_schema": {"type": "object", "properties": {}}},
-        {"name": "describe_relation", "description": "Columns and types for one relation.",
-         "input_schema": {"type": "object", "properties": {"relation": {"type": "string"}}, "required": ["relation"]}},
-        {"name": "sample_rows", "description": "Return a few rows from one relation. Identifier columns are redacted.",
-         "input_schema": {"type": "object", "properties": {
-             "relation": {"type": "string"}, "n": {"type": "integer"}}, "required": ["relation"]}},
-        {"name": "run_sql",
-         "description": "Run one read-only DuckDB SELECT over the listed relations. "
-                        "Row and time limits apply. The SQL you submit as the final answer is re-executed.",
-         "input_schema": {"type": "object", "properties": {"sql": {"type": "string"}}, "required": ["sql"]}},
-        {"name": "request_escalation",
-         "description": "Ask for an audited session that can also read PHI-stripped lossless.* relations. "
-                        "Does not run SQL. Patient names, member ids, birth dates, addresses and bank accounts "
-                        "are still absent. Pass a specific reason.",
-         "input_schema": {"type": "object", "properties": {"reason": {"type": "string"}}, "required": ["reason"]}},
-    ]
-    if config.data_profile:
-        spec.append({"name": "profile",
-                     "description": "Low-cardinality values and numeric ranges. Identifier columns are not profiled.",
-                     "input_schema": {"type": "object", "properties": {"relation": {"type": "string"}}}})
-    if config.data_dictionary:
-        spec.append({"name": "lookup_dictionary",
-                     "description": "Grain, purpose, and column descriptions from the semantic model.",
-                     "input_schema": {"type": "object", "properties": {"relation": {"type": "string"}}}})
-    if config.glossary != "none":
-        spec.append({"name": "lookup_glossary",
-                     "description": "Business definitions. Optional term filters the lines.",
-                     "input_schema": {"type": "object", "properties": {"term": {"type": "string"}}}})
-    if config.enable_metrics:
-        spec.append({"name": "query_metrics",
-                     "description": "Typed semantic-layer query. The compiler writes the SQL over sem.*.",
-                     "input_schema": {"type": "object", "properties": {
-                         "metrics": {"type": "array", "items": {"type": "string"}},
-                         "group_by": {"type": "array"},
-                         "filters": {"type": "array"},
-                         "time_range": {"type": "object"},
-                         "order_by": {"type": "array"},
-                         "limit": {"type": "integer"},
-                         "min_group_size": {"type": "integer"}}, "required": ["metrics"]}})
-    if config.enable_lookup:
-        spec.append({"name": "lookup_values",
-                     "description": "Resolve a free-text value to stored dimension values before filtering.",
-                     "input_schema": {"type": "object", "properties": {
-                         "dimension": {"type": "string"}, "search": {"type": "string"}},
-                         "required": ["dimension", "search"]}})
-    if config.enable_examples:
-        spec.append({"name": "lookup_examples",
-                     "description": "Similar solved questions and their SQL. The current question and its family are excluded.",
-                     "input_schema": {"type": "object", "properties": {
-                         "question": {"type": "string"}, "k": {"type": "integer"}}, "required": ["question"]}})
-    spec.append({"name": "final_answer",
-                 "description": "Submit the SQL that computes the answer and a one-paragraph answer for the user. "
-                                "Every number in the paragraph must come from that result.",
-                 "input_schema": {"type": "object", "properties": {
-                     "sql": {"type": "string"},
-                     "answer": {"type": "string"},
-                     "assumptions": {"type": "array", "items": {"type": "string"}}},
-                     "required": ["sql", "answer"]}})
-    spec.append({"name": "refuse",
-                 "description": "Decline a request for patient identifiers, another customer, or a change to the data.",
-                 "input_schema": {"type": "object", "properties": {"reason": {"type": "string"}}, "required": ["reason"]}})
-    if config.enable_ask:
-        spec.append({"name": "ask", "description": ASK_DESCRIPTION, "input_schema": ASK_INPUT_SCHEMA})
-    if not config.enable_sql:
-        spec = [tool for tool in spec if tool["name"] != "run_sql"]
-    if config.rewritten_tool_descriptions:
-        spec = [{**tool, "description": REWRITTEN_TOOL_DESCRIPTIONS[tool["name"]]} for tool in spec]
-    return spec
-
-
 class ToolLayer:
     def __init__(self, opener: SessionOpener, config: AnalyzerConfig | None = None, *,
-                 question_id: str | None = None, question_family: str | None = None,
-                 example_library: list | None = None, audit_sink: Callable[[dict], None] | None = None,
-                 restored_escalation: bool = False, restored_query_seconds: float = 0.0):
+                 audit_sink: Callable[[dict], None] | None = None):
         self.opener = opener
         self.config = config or AnalyzerConfig()
-        self.question_id = question_id
-        self.question_family = question_family
-        self.example_library = example_library or []
         self.audit_sink = audit_sink
         self.audit: list[dict] = []
         self.calls: list[dict] = []
@@ -291,46 +210,9 @@ class ToolLayer:
         self._semantic = None
         self._model = None
         self._tool_calls_used = 0
-        self.query_seconds_used = restored_query_seconds
-        self.session = opener.open(restored_escalation)
-        self.escalated = restored_escalation
-        self._audit("session_open", restored_escalation=restored_escalation)
-
-    def enabled_tool_names(self) -> set[str]:
-        return {tool["name"] for tool in tool_spec(self.config) if tool["name"] not in {"final_answer", "refuse", "ask"}}
-
-    def dispatch(self, name: str, arguments: dict | None) -> dict:
-        arguments = dict(arguments or {})
-        if "charge" in arguments:
-            raise ToolError("charge is not a tool argument")
-        if name not in self.enabled_tool_names():
-            raise ToolError(f"{name} is not enabled in this session")
-        try:
-            if name == "list_relations":
-                return {"relations": self.list_relations()}
-            if name == "describe_relation":
-                return self.describe_relation(arguments["relation"])
-            if name == "sample_rows":
-                return self.sample_rows(arguments["relation"], int(arguments.get("n", self.config.sample_row_limit)))
-            if name == "profile":
-                return self.profile(arguments.get("relation"))
-            if name == "lookup_dictionary":
-                return self.lookup_dictionary(arguments.get("relation"))
-            if name == "lookup_glossary":
-                return self.lookup_glossary(arguments.get("term"))
-            if name == "run_sql":
-                return self.run_sql(arguments["sql"])
-            if name == "request_escalation":
-                return self.request_escalation(arguments.get("reason", ""))
-            if name == "query_metrics":
-                return self.query_metrics(arguments)
-            if name == "lookup_values":
-                return self.lookup_values(arguments["dimension"], arguments["search"])
-            if name == "lookup_examples":
-                return self.lookup_examples(arguments.get("question", ""), int(arguments.get("k", 3)))
-        except KeyError as exc:
-            raise ToolError(f"{name} is missing argument {exc}") from None
-        raise ToolError(f"unknown tool {name}")
+        self.query_seconds_used = 0.0
+        self.session = opener.open(False)
+        self._audit("session_open")
 
     def list_relations(self, *, charge: bool = True) -> list[str]:
         if charge:
@@ -349,71 +231,7 @@ class ToolLayer:
         columns = [{"name": row[0], "type": row[1], "identifier": is_phi_column(row[0])} for row in described]
         return {"relation": relation, "columns": columns}
 
-    def sample_rows(self, relation: str, n: int | None = None, *, charge: bool = True) -> dict:
-        if charge:
-            self._spend("sample_rows")
-        relation = self._check_relation(relation)
-        limit = max(1, min(int(n or self.config.sample_row_limit), self.config.rows_shown_to_model))
-        return self._execute_guarded(f"SELECT * FROM {relation} LIMIT {limit}", audit_event="sample",
-                                     relation=relation)
-
-    def profile(self, relation: str | None = None, *, charge: bool = True) -> dict:
-        if charge and not self.config.data_profile:
-            raise ToolError("profile is not enabled")
-        if charge:
-            self._spend("profile")
-        relations = [self._check_relation(relation)] if relation else [
-            name for name in self.list_relations(charge=False) if name.startswith("sem.")]
-        sections = []
-        for name in relations:
-            sections.append(self._profile_relation(name))
-        return {"profiles": sections}
-
-    def lookup_dictionary(self, relation: str | None = None, *, charge: bool = True) -> dict:
-        if charge and not self.config.data_dictionary:
-            raise ToolError("lookup_dictionary is not enabled")
-        if charge:
-            self._spend("lookup_dictionary")
-        model = self._semantic_model()
-        present = set(self.list_relations(charge=False))
-        views = model.get("views", {})
-        if relation:
-            relation = self._check_relation(relation)
-            names = [relation]
-        else:
-            names = [name for name in views if name in present]
-        dimensions = {**model.get("dimensions", {}), **model.get("time_dimensions", {})}
-        entries = []
-        for name in names:
-            meta = views.get(name, {})
-            described = {row[0]: row[1] for row in self.session.con.execute(f"DESCRIBE {name}").fetchall()}
-            columns = []
-            for column, column_type in described.items():
-                if column in dimensions:
-                    columns.append({"name": column, "type": column_type,
-                                    "description": dimensions[column].get("description", "")})
-            entry = {"relation": name, "grain": meta.get("grain", ""), "use_for": meta.get("use_for", ""),
-                     "default_filter": meta.get("default_filter"), "columns": columns}
-            if self.config.dictionary_detail == "derivations":
-                entry["derivations"] = _metric_derivations(model, name)
-            entries.append(entry)
-        return {"relations": entries}
-
-    def lookup_glossary(self, term: str | None = None, *, charge: bool = True) -> dict:
-        if charge and self.config.glossary == "none":
-            raise ToolError("lookup_glossary is not enabled")
-        if charge:
-            self._spend("lookup_glossary")
-        text = _glossary_body(self.config)
-        if term:
-            needle = term.lower()
-            lines = [line for line in text.splitlines() if needle in line.lower()]
-            text = "\n".join(lines) if lines else f"No glossary line contains {term!r}."
-        return {"glossary": text}
-
     def run_sql(self, sql: str, *, charge: bool = True, include_all_rows: bool = False) -> dict:
-        if not self.config.enable_sql:
-            raise ToolError("run_sql is not enabled")
         if charge:
             self._spend("run_sql")
         return self._execute_guarded(sql, audit_event="sql", include_all_rows=include_all_rows)
@@ -421,7 +239,7 @@ class ToolLayer:
     def request_escalation(self, reason: str, *, charge: bool = True) -> dict:
         reason = (reason or "").strip()
         if not reason:
-            raise ToolError("request_escalation requires a reason")
+            raise ToolError("escalate requires a reason")
         if charge:
             self._spend("request_escalation")
         self._audit("escalation_requested", reason=reason)
@@ -448,22 +266,7 @@ class ToolLayer:
         return {"escalated": True, "already": False, "customer": opened.customer,
                 "relations": self.list_relations(charge=False)}
 
-    def query_metrics(self, request: dict, *, charge: bool = True) -> dict:
-        if charge and not self.config.enable_metrics:
-            raise ToolError("query_metrics is not enabled")
-        if charge:
-            self._spend("query_metrics")
-        api = self._semantic_api()
-        try:
-            result = api.query_metrics(**{key: value for key, value in request.items() if key != "charge"})
-        except Exception as exc:
-            raise ToolError(str(exc)[:600]) from None
-        result["rows"] = result.get("rows", [])[:self.config.rows_shown_to_model]
-        return result
-
     def lookup_values(self, dimension: str, search: str, *, charge: bool = True) -> dict:
-        if charge and not self.config.enable_lookup:
-            raise ToolError("lookup_values is not enabled")
         if charge:
             self._spend("lookup_values")
         api = self._semantic_api()
@@ -471,21 +274,6 @@ class ToolLayer:
             return api.lookup_values(dimension, search)
         except Exception as exc:
             raise ToolError(str(exc)[:600]) from None
-
-    def lookup_examples(self, question: str, k: int = 3, *, charge: bool = True) -> dict:
-        if charge and not self.config.enable_examples:
-            raise ToolError("lookup_examples is not enabled")
-        if charge:
-            self._spend("lookup_examples")
-        library = [example for example in self.example_library
-                   if example.get("id") != self.question_id
-                   and not (example.get("family") and example.get("family") == self.question_family)]
-        words = lambda text: set(re.findall(r"[a-z0-9]+", text.lower()))  # noqa: E731
-        target = words(question)
-        scored = sorted(library, key=lambda example: -len(target & words(example.get("question", "")))
-                        / max(1, len(target | words(example.get("question", "")))))
-        return {"examples": [{"question": example["question"], "sql": example.get("gold_sql") or example.get("sql")}
-                             for example in scored[: max(0, int(k))]]}
 
     def _execute_guarded(self, sql: str, *, audit_event: str, relation: str | None = None,
                          include_all_rows: bool = False) -> dict:
@@ -508,16 +296,12 @@ class ToolLayer:
             fetched = cursor.fetchall()
         except (GuardError, QueryTimeout, Exception) as exc:  # noqa: BLE001 - the model sees the message
             elapsed = self._charge_query_seconds(started)
-            message = sql_error_message(exc, self.config.sql_error_hints and self.config.self_correct != "none")
-            if self.config.actionable_errors:
-                message += self._actionable_error_suffix(message, sql)
+            message = str(exc).splitlines()[0][:500] if str(exc) else type(exc).__name__
             self._audit(audit_event, ok=False, sql=sql[:500], error=message, relation=relation,
                         escalated=self.escalated, seconds=elapsed)
             raise ToolError(message) from None
         elapsed = self._charge_query_seconds(started)
         columns, fetched, redacted = _redact(columns, fetched)
-        warnings = result_warnings(sql, columns, fetched, self.config.result_checks)
-        warnings.extend(redacted)
         full_rows = [jsonable(row) for row in fetched]
         shown = full_rows[:self.config.rows_shown_to_model]
         self._audit(audit_event, ok=True, sql=sql[:500], row_count=len(fetched), relation=relation,
@@ -525,15 +309,9 @@ class ToolLayer:
         digest = {"columns": columns, "rows": shown, "row_count": len(fetched),
                   "truncated": len(fetched) > self.config.rows_shown_to_model,
                   "row_limit": self.config.row_limit, "time_seconds": elapsed}
-        if self.config.digest_results:
-            digest["rows"] = full_rows[:min(DIGEST_ROWS_SHOWN, self.config.rows_shown_to_model)]
-            digest["truncated"] = len(fetched) > len(digest["rows"])
-            digest["column_summary"] = _column_summary(columns, full_rows)
         if include_all_rows:
             digest["all_rows"] = full_rows
-        if self.config.result_checks:
-            digest["warnings"] = warnings
-        elif redacted:
+        if redacted:
             digest["warnings"] = redacted
         return digest
 
@@ -541,69 +319,6 @@ class ToolLayer:
         elapsed = round(time.perf_counter() - started, 4)
         self.query_seconds_used += elapsed
         return elapsed
-
-    def _actionable_error_suffix(self, message: str, sql: str) -> str:
-        """#19: name what to use instead. Reads only the session's own catalog."""
-        relations = self.list_relations(charge=False)
-        named = [name for name in dict.fromkeys(re.findall(r"\b(?:sem|lossless)\.[A-Za-z_][A-Za-z0-9_]*", sql))
-                 if name in relations]
-        if re.search(r"Referenced column|not found in FROM clause|does not have a column|column .* not found",
-                     message, re.IGNORECASE):
-            missing = re.search(r'column "?([A-Za-z_][A-Za-z0-9_]*)"? not found|Referenced column "([^"]+)"', message)
-            missing_name = next((group for group in (missing.groups() if missing else ()) if group), "")
-            parts = []
-            for name in named[:3]:
-                columns = [row[0] for row in self.session.con.execute(f"DESCRIBE {name}").fetchall()]
-                close = difflib.get_close_matches(missing_name, columns, n=3, cutoff=0.5) if missing_name else []
-                parts.append(f"{name} columns: {', '.join(columns)}"
-                             + (f" (closest to {missing_name}: {', '.join(close)})" if close else ""))
-            return " Next step: use a column that exists. " + ("; ".join(parts) if parts else
-                                                               f"Describe one of: {', '.join(relations)}")
-        if re.search(r"Table with name|does not exist|Catalog Error|not allowed|not available", message, re.IGNORECASE):
-            return f" Next step: read only these relations: {', '.join(relations)}."
-        if "GROUP BY" in message:
-            return (" Next step: put every selected column that is not inside an aggregate into GROUP BY, or wrap it "
-                    "in any_value().")
-        if re.search(r"Conversion Error|Could not convert|No function matches|Cannot compare", message, re.IGNORECASE):
-            return (" Next step: CAST one side so both have the same type; compare dates with DATE 'YYYY-MM-DD' and "
-                    "booleans with true/false.")
-        if re.search(r"Parser Error|syntax error", message, re.IGNORECASE):
-            return " Next step: send one SELECT (a WITH ... SELECT is fine) with balanced parentheses and quotes."
-        return " Next step: fix the query and run it again."
-
-    def _profile_relation(self, relation: str) -> dict:
-        described = self.session.con.execute(f"DESCRIBE {relation}").fetchall()
-        row_count = self._guarded_profile(f"SELECT count(*) FROM {relation}").fetchone()[0]
-        columns = []
-        for name, column_type, *_rest in described[:30]:
-            if is_phi_column(name) or name in _HIGH_CARDINALITY_COLUMNS:
-                columns.append({"name": name, "type": column_type, "profile": "not profiled (identifier)"})
-                continue
-            if not _IDENT.fullmatch(name):
-                columns.append({"name": name, "type": column_type, "profile": "skipped"})
-                continue
-            quoted = f'"{name}"'
-            try:
-                if column_type == "VARCHAR" or column_type.startswith("VARCHAR"):
-                    distinct = self._guarded_profile(
-                        f"SELECT count(DISTINCT {quoted}) FROM {relation}").fetchone()[0]
-                    entry = {"name": name, "type": column_type, "distinct": distinct}
-                    if distinct is not None and distinct <= 12:
-                        top = self._guarded_profile(
-                            f"SELECT {quoted}, count(*) AS n FROM {relation} GROUP BY 1 ORDER BY n DESC LIMIT 8").fetchall()
-                        entry["values"] = [{"value": jsonable(value), "rows": count} for value, count in top]
-                    columns.append(entry)
-                elif self.config.profile_detail == "enums":
-                    continue
-                elif column_type in {"DOUBLE", "BIGINT", "INTEGER", "FLOAT", "DATE", "HUGEINT"} or column_type.startswith("DECIMAL"):
-                    low, high = self._guarded_profile(
-                        f"SELECT min({quoted}), max({quoted}) FROM {relation}").fetchone()
-                    columns.append({"name": name, "type": column_type, "min": jsonable(low), "max": jsonable(high)})
-                else:
-                    columns.append({"name": name, "type": column_type})
-            except Exception as exc:  # noqa: BLE001 - one column should not hide the rest of the profile
-                columns.append({"name": name, "type": column_type, "profile": f"unavailable: {str(exc)[:120]}"})
-        return {"relation": relation, "row_count": row_count, "columns": columns}
 
     def _guarded_profile(self, sql: str):
         """Tool-authored profile SQL still passes the guard and the time limit."""
@@ -619,7 +334,7 @@ class ToolLayer:
         if schema not in allowed:
             raise ToolError(
                 f"relation {name} is not available in this session. "
-                "Call request_escalation with a reason to read lossless.*")
+                "Call escalate with a reason to read lossless.*")
         if name not in self.list_relations(charge=False):
             available = ", ".join(self.list_relations(charge=False)) or "(none)"
             raise ToolError(f"relation {name} is not in this session. Available: {available}")
@@ -628,22 +343,19 @@ class ToolLayer:
     def _semantic_model(self) -> dict:
         if self._model is None:
             import yaml
-            from pathlib import Path
-            path = Path(__file__).resolve().parent.parent / "claude/schema/03_semantic_model.yaml"
-            self._model = yaml.safe_load(path.read_text())
+            self._model = yaml.safe_load(SEMANTIC_MODEL_PATH.read_text())
         return self._model
 
     def _semantic_api(self):
+        """The semantic layer's value lookup (``claude/schema/04_agent_interface.py``) on this session."""
         if self._semantic is None:
-            from bench.agent_cli import SEMANTIC_MODEL_PATH, _load_semantic_api_module
-            module = _load_semantic_api_module()
-            self._semantic = module.SemanticAPI(self.session.con, str(SEMANTIC_MODEL_PATH))
+            self._semantic = _agent_interface_module().SemanticAPI(self.session.con, str(SEMANTIC_MODEL_PATH))
         return self._semantic
 
     def _spend(self, name: str):
         if self._tool_calls_used >= self.config.max_tool_calls:
             raise ToolError(f"tool-call budget of {self.config.max_tool_calls} is used up: "
-                            "submit final_answer, refuse, or ask")
+                            "submit answer, refuse, or ask")
         self._tool_calls_used += 1
         self.calls.append({"tool": name})
 
@@ -676,33 +388,14 @@ def _metric_derivations(model: dict, relation: str) -> list[dict]:
     return derivations
 
 
-DIGEST_ROWS_SHOWN = 5
-
-
-def _column_summary(columns: list[str], rows: list) -> dict:
-    """#19 digest: per column, over every returned row, what a reader checks before trusting a number."""
-    summary = {}
-    for index, name in enumerate(columns):
-        values = [row[index] for row in rows]
-        present = [value for value in values if value is not None]
-        entry: dict[str, Any] = {"nulls": len(values) - len(present), "distinct": len({str(v) for v in present})}
-        numbers = [value for value in present if isinstance(value, (int, float)) and not isinstance(value, bool)]
-        if numbers and len(numbers) == len(present):
-            entry.update(min=min(numbers), max=max(numbers), sum=round(sum(numbers), 6))
-        summary[name] = entry
-    return summary
-
-
-def _glossary_body(config: AnalyzerConfig) -> str:
-    if config.glossary == "none":
-        return ""
-    if config.glossary == "invariants":
-        from bench.glossary_versions import render_version
-        return render_version("v002_invariants").strip()
-    text = GLOSSARY.strip()
-    if config.glossary == "pitfalls":
-        text += "\n\n" + PITFALLS.strip()
-    return text
+def _agent_interface_module():
+    module = sys.modules.get("agent_interface")
+    if module is None:
+        spec = importlib.util.spec_from_file_location("agent_interface", SCHEMA_DIRECTORY / "04_agent_interface.py")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules["agent_interface"] = module
+        spec.loader.exec_module(module)
+    return module
 
 
 def _redact(columns: list[str], rows: list) -> tuple[list[str], list, list[str]]:

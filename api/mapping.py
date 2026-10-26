@@ -449,7 +449,7 @@ def multi_table_parts(parts: list[dict], answer: AnalyzerAnswer, extra: list[tup
     added: list[dict] = []
     for title, sql, digest in extra:
         one = AnalyzerAnswer(kind="answer", text="-", sql=sql, rows=digest.get("all_rows", digest.get("rows")),
-                             columns=digest.get("columns"), model=answer.model, candidate_index=0)
+                             columns=digest.get("columns"), model=answer.model)
         for p in answer_parts(one, principal, downloads, elapsed_ms, include_tools=False):
             if p["type"] == "code":
                 added.append({**p, "title": f"SQL: {title}"})

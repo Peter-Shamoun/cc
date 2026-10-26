@@ -1,7 +1,6 @@
-"""The benchmark harness: guard, matcher, and a full self-test on a small dataset."""
+"""The SQL guard every model-written query passes."""
 import pytest
 
-from bench.compare import match
 from bench.guard import GuardError, guard
 
 
@@ -29,53 +28,3 @@ def test_guard_allows_analysis_sql():
     guard("FROM sem.claims SELECT count(*)")
     guard("WITH a AS (SELECT 1 AS v), b AS (SELECT v FROM a) SELECT * FROM b")
     guard("SELECT * FROM lossless.edi_source_file", escalate=True)
-
-
-def test_matcher_accepts_equivalent_answers():
-    from datetime import date
-    assert match([("A", 0.5), ("B", 0.2)], [(0.2, "b"), (0.5, "a")])[0]                     # column order, case
-    assert match([("A", 0.5), ("B", 0.2)], [("Payer A", "a", 0.5), ("Payer B", "b", 0.2)])[0]  # extra label column
-    assert match([(0.25,)], [(25.0,)], {"percent_cols": [0]})[0]
-    assert match([("x", 0.25, 10)], [("x", 0.25)], {"optional_cols": [2]})[0]
-    assert match([(date(2026, 7, 1), 5.0)], [("2026-07", 5)])[0]
-    assert match([(1,)], [(True,)])[0] and match([(0.25,)], [("0.250",)])[0]
-    assert match([(-5.0,)], [(5.0,)], {"sign_cols": [0]})[0]
-    g = [("a", 10)] + [(f"p{i}", 5) for i in range(13)]
-    assert match(g, [("a", 10)] + [(f"p{i}", 5) for i in range(8, 12)], {"order": "topn", "n": 5})[0]
-    # a rate with its optional count in another order, plus an extra supporting count (found in screen 1)
-    spec = {"percent_cols": [1], "optional_cols": [2], "tol": 0.0005}
-    assert match([("Z13220", 0.0465, 86)], [("Z13220", 86, 4, 4.65)], spec)[0]
-    assert match([("a", 0.5, 10)], [("a", 10, 0.5)])[0]
-
-
-@pytest.mark.parametrize("gold,cand,spec", [
-    ([(2500,)], [(2624, 2500, 2624)], {}),                                       # several alternative numbers
-    ([("A", 0.1)], [("A", 0.3, 0.1)], {}),
-    ([(225, 141)], [(141, 225)], {}),                                            # swapped measures
-    ([("a", 0.1), ("b", 0.2)], [("a", 0.1), ("b", 20.0)], {"percent_cols": [1]}),  # mixed scaling in a column
-    ([("x", 0.25, 25)], [("x", 0.25, 2500)], {"percent_cols": [1], "optional_cols": [2]}),  # x100 only on the rate
-    ([(-5.0,)], [(5.0,)], {}),
-    ([("a", 1), ("b", 2)], [("b", 2), ("a", 1)], {"order": "strict"}),
-    ([("A", 1)], [("A", 1), ("A", 1)], {}),
-    ([("x", 10), ("y", 8), ("z", 8), ("w", 5)], [("x", 10), ("w", 5)], {"order": "topn", "n": 2}),
-    ([("a", 10)] + [(f"p{i}", 5) for i in range(13)], [(f"p{i}", 5) for i in range(5)], {"order": "topn", "n": 5}),
-    ([("a", 10)], [("a", 10, 7)], {}),                                           # extra count beside a count answer
-    ([("x", 0.0465, 86)], [("x", 85, 4, 0.0465)], {"optional_cols": [2]}),       # the optional count given, but wrong
-])
-def test_matcher_rejects(gold, cand, spec):
-    assert not match(gold, cand, spec)[0]
-
-
-def test_selftest_on_a_small_dataset(tmp_path):
-    from bench.dataset import snapshot
-    from bench.eval import load_cases, run, selftest
-    from ccsim.edi_mock import Scenario
-    path = snapshot(Scenario(days=20, volume_scale=.3, seed=5), cache=tmp_path)
-    rep = selftest(path, strict=False)                           # small data: some questions cannot discriminate
-    assert rep["sound"] and rep["oracle_accuracy"] == 1.0, rep
-    gold = run("gold", path)
-    assert gold["accuracy"] == 1.0, [r for r in gold["results"] if not r["correct"]]
-    wrong = run("wrong", path)
-    n_wrong = sum(1 for c in load_cases() if c.get("wrong_sql"))
-    missed = {w["id"] for w in rep["wrong_accepted"]}
-    assert sum(not r["correct"] for r in wrong["results"]) >= n_wrong - len(missed)
