@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://claimclarity.local/api/contract/v1.schema.json",
   "title": "ClaimClarity chat stream contract",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "One JSON object per SSE data: line. See api/CONTRACT.md. Validate an event against #/$defs/StreamEvent.",
   "$ref": "#/$defs/StreamEvent",
   "$defs": {
@@ -721,6 +721,10 @@
         },
         "alt": {
           "type": "string"
+        },
+        "tablePartId": {
+          "$ref": "#/$defs/ID",
+          "description": "1.9.0: the table part this plot was drawn from (same message)."
         }
       },
       "additionalProperties": true
@@ -1877,6 +1881,12 @@
           "$ref": "#/$defs/CodeDelta"
         },
         {
+          "$ref": "#/$defs/TableStart"
+        },
+        {
+          "$ref": "#/$defs/TableRows"
+        },
+        {
           "$ref": "#/$defs/PartEvent"
         },
         {
@@ -2641,6 +2651,81 @@
         },
         "conversation": {
           "$ref": "#/$defs/Conversation"
+        }
+      },
+      "additionalProperties": true
+    },
+    "TableStart": {
+      "type": "object",
+      "description": "1.9.0 (§5.1): a table is about to stream. Render the header now, append table.rows, then replace it with the complete `part` that has the same id (that part is canonical). If message.end comes first (aborted), drop the partial table.",
+      "required": [
+        "type",
+        "partId",
+        "columns",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "table.start"
+        },
+        "partId": {
+          "$ref": "#/$defs/ID"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Column"
+          }
+        },
+        "title": {
+          "type": "string"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "stepId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sqlPartId": {
+          "$ref": "#/$defs/ID"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "TableRows": {
+      "type": "object",
+      "description": "1.9.0: preview rows for a streaming table, in order. `offset` is the index of the first row, so a replayed chunk (Last-Event-ID) overwrites rather than duplicates.",
+      "required": [
+        "type",
+        "partId",
+        "offset",
+        "rows",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "table.rows"
+        },
+        "partId": {
+          "$ref": "#/$defs/ID"
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "array"
+          }
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
         }
       },
       "additionalProperties": true

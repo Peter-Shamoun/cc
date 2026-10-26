@@ -57,6 +57,8 @@ same<H.TextEndEvent, G.TextEnd>(true);
 same<H.ReasoningDeltaEvent, G.ReasoningDelta>(true);
 same<H.ReasoningEndEvent, G.ReasoningEnd>(true);
 same<H.CodeDeltaEvent, G.CodeDelta>(true);
+same<H.TableStartEvent, G.TableStart>(true);
+same<H.TableRowsEvent, G.TableRows>(true);
 same<H.PartEvent, G.PartEvent>(true);
 same<H.PartPatchEvent, G.PartPatch>(true);
 same<H.MessageEndEvent, G.MessageEnd>(true);

@@ -182,7 +182,7 @@ def _question(messages: list) -> str:
 
 # ---------------------------------------------------------------- demo scenarios (contract v1 §9)
 
-SCENARIOS = ("table", "chart", "repair", "abstain", "clarify", "escalation", "candidates", "error", "slow")
+SCENARIOS = ("table", "chart", "repair", "abstain", "clarify", "escalation", "candidates", "error", "slow", "report")
 _SCENARIO_WORDS = [
     ("error", re.compile(r"\b(simulate (an )?(error|outage)|fail on purpose)\b", re.I)),
     ("clarify", re.compile(r"\b(how (bad|big) (are|is)|ambiguous|clarify)\b", re.I)),
@@ -191,6 +191,7 @@ _SCENARIO_WORDS = [
     ("candidates", re.compile(r"\b(candidates?|double.?check|cross.?check|average paid)\b", re.I)),
     ("repair", re.compile(r"\b(carc|denial codes?|reason codes?|repair)\b", re.I)),
     ("slow", re.compile(r"\bslow(ly)?\b", re.I)),
+    ("report", re.compile(r"\b(report|artifact)\b", re.I)),
 ]
 #: AnalyzerConfig overrides a scenario needs (the analyzer itself does the candidates/cascade/ask work).
 SCENARIO_CONFIG = {
@@ -337,7 +338,9 @@ def demo_turn(model, messages, candidate_index):
 def make_llm(kind: str = "scripted", scenario: str | None = None):
     """``scripted`` (default) is offline replay. Real models are wired behind config and stay disabled."""
     if kind == "scripted":
-        return ScriptedLLM([scenario_turn(scenario) if scenario else demo_turn] * 8)
+        # "report" (1.9.0) runs the chart script; api.mapping.report_artifacts reshapes the answer into artifacts
+        scripted = "chart" if scenario == "report" else scenario
+        return ScriptedLLM([scenario_turn(scripted) if scripted else demo_turn] * 8)
     if kind == "anthropic":
         return AnthropicLLM()
     if kind == "bedrock":

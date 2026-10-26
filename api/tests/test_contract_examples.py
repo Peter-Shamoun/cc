@@ -9,7 +9,8 @@ from api.contract import gen_examples
 from api.tests.test_contract import check_invariants
 
 FINISH = {"answer": "stop", "tool_steps": "stop", "abstain": "abstain", "clarify": "needs_input",
-          "clarify_resume": "stop", "escalation": "stop", "chart": "stop", "candidates": "stop", "error": "error"}
+          "clarify_resume": "stop", "escalation": "stop", "chart": "stop", "candidates": "stop", "error": "error",
+          "report": "stop"}
 REQUIRED_BY_QA = ("answer", "tool_steps", "abstain", "clarify", "escalation")
 
 
