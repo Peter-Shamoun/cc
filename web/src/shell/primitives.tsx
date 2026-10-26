@@ -7,30 +7,32 @@ import { IconButton } from '../components/ui';
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
 /** Keep Tab inside `ref` and restore focus to whatever opened it on unmount (WAI-ARIA dialog pattern). */
-export function useFocusTrap(ref: RefObject<HTMLElement | null>, active = true) {
+/** `initial: 'container'` focuses the dialog itself when nothing inside asks for focus (no stray ring on a Close button). */
+export function useFocusTrap(ref: RefObject<HTMLElement | null>, active = true, initial: 'first' | 'container' = 'first') {
   useEffect(() => {
     if (!active) return;
     const opener = document.activeElement as HTMLElement | null;
     const el = ref.current;
-    if (el && !el.contains(document.activeElement)) (el.querySelector<HTMLElement>('[autofocus],[data-autofocus]') ?? el.querySelector<HTMLElement>(FOCUSABLE) ?? el).focus();
+    if (el && !el.contains(document.activeElement)) (el.querySelector<HTMLElement>('[autofocus],[data-autofocus]') ?? (initial === 'first' ? el.querySelector<HTMLElement>(FOCUSABLE) : null) ?? el).focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Tab' || !ref.current) return;
       const items = [...ref.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((n) => n.offsetParent !== null || n === document.activeElement);
       if (!items.length) return;
       const first = items[0], last = items[items.length - 1];
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      if (document.activeElement === ref.current) { e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+      else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     };
     document.addEventListener('keydown', onKey);
     return () => { document.removeEventListener('keydown', onKey); if (opener?.isConnected) opener.focus(); };
-  }, [active, ref]);
+  }, [active, ref, initial]);
 }
 
 /** Centered modal (settings, search, shortcuts); a full-screen sheet on phones. Esc and scrim click close it. */
 export function Dialog({ title, onClose, children, className, hideTitle, testId }: { title: string; onClose: () => void; children: ReactNode; className?: string; hideTitle?: boolean; testId?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
-  useFocusTrap(ref);
+  useFocusTrap(ref, true, 'container');
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
     window.addEventListener('keydown', onKey, true);
@@ -39,7 +41,7 @@ export function Dialog({ title, onClose, children, className, hideTitle, testId 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-3 pt-[10vh] font-sans max-sm:p-0 max-sm:pt-0 motion-safe:animate-[cc-fade_120ms_ease-out] dark:bg-black/60" onMouseDown={(e) => e.target === e.currentTarget && onClose()} data-testid={testId ? `${testId}-scrim` : undefined}>
       <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={id} tabIndex={-1} data-testid={testId}
-        className={clsx('relative w-full max-w-[680px] rounded-2xl border border-line bg-elev text-fg shadow-[0_16px_70px_rgba(0,0,0,0.25)] outline-none motion-safe:animate-[cc-pop_160ms_cubic-bezier(.2,.9,.3,1.2)] max-sm:flex max-sm:min-h-full max-sm:flex-col max-sm:rounded-none max-sm:border-0 max-sm:shadow-none max-sm:motion-safe:animate-[cc-rise_200ms_ease-out]', className, 'max-sm:max-w-none')}>
+        className={clsx(!className?.includes('max-w-') && 'max-w-[680px]', 'relative w-full rounded-2xl border border-line bg-elev text-fg shadow-[0_16px_70px_rgba(0,0,0,0.25)] outline-none motion-safe:animate-[cc-pop_160ms_cubic-bezier(.2,.9,.3,1.2)] max-sm:flex max-sm:min-h-full max-sm:flex-col max-sm:rounded-none max-sm:border-0 max-sm:shadow-none max-sm:motion-safe:animate-[cc-rise_200ms_ease-out]', className, 'max-sm:max-w-none')}>
         <div className={clsx('flex items-center justify-between px-5 pt-4', hideTitle && 'sr-only')}>
           <h2 id={id} className="text-lg font-semibold">{title}</h2>
           <IconButton label="Close" onClick={onClose}><X size={18} /></IconButton>

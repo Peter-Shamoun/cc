@@ -92,7 +92,7 @@ export function Sidebar(p: SidebarProps) {
         {p.threads.length === 0 && <div className="px-2.5 text-xs text-fg-subtle">No chats yet</div>}
         {groups.map(([g, items]) => (
           <section key={g} className="mb-5" aria-label={g}>
-            <h3 className="sticky top-0 z-[1] bg-sidebar px-2.5 pb-1 pt-1 text-xs font-medium text-fg-subtle">{g}</h3>
+            <h3 className="sticky top-0 z-[1] bg-sidebar px-2.5 pb-1 pt-1 text-xs font-medium text-fg-subtle after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-2 after:bg-linear-to-b after:from-sidebar after:to-transparent">{g}</h3>
             <ul>
               {items.map((t) => (
                 <ThreadRow key={t.id} t={t} active={t.id === p.activeId} tabStop={t.id === activeOrFirst} renaming={renaming === t.id}
