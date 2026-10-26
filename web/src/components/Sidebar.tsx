@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Archive, Ellipsis, Filter, Keyboard, MessageSquarePlus, PanelLeft, Pencil, Pin, PinOff, Search, Settings, ShieldCheck, Share, SquarePen, Trash2, X } from 'lucide-react';
+import { Archive, Ellipsis, Filter, Keyboard, LogOut, MessageSquarePlus, PanelLeft, Pencil, Pin, PinOff, Search, Settings, ShieldCheck, Share, SquarePen, Trash2, X } from 'lucide-react';
 import clsx from 'clsx';
 import { IconButton } from './ui';
 import { Menu, modKey, useMenu, type MenuItem } from '../shell/primitives';
@@ -61,6 +61,8 @@ export interface SidebarProps {
   onSearch: () => void;
   onSettings: () => void;
   onShortcuts: () => void;
+  /** Present when there is a session to end (cookie or demo token); absent for the offline mock. */
+  onSignOut?: () => void;
 }
 
 /** Full sidebar (ChatGPT/Claude): new chat, search, date-grouped threads with hover "…" menu, account row. */
@@ -90,6 +92,7 @@ export function Sidebar(p: SidebarProps) {
   const accountItems: MenuItem[] = [
     { label: 'Settings', icon: <Settings size={16} />, onSelect: p.onSettings, shortcut: `${modKey()} ,` },
     { label: 'Keyboard shortcuts', icon: <Keyboard size={16} />, onSelect: p.onShortcuts, shortcut: `${modKey()} /` },
+    ...(p.onSignOut ? [{ label: 'Sign out', icon: <LogOut size={16} />, onSelect: p.onSignOut }] : []),
   ];
   const Root = p.drawer ? 'div' : 'aside';
   return (
@@ -128,7 +131,7 @@ export function Sidebar(p: SidebarProps) {
       )}
       {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- arrow-key navigation delegated from focused chat links */}
       <div ref={list} id="sidebar-chat-list" onKeyDown={onListKey} className={clsx('scrollbar-thin flex-1 overflow-y-auto px-2 text-sm', showFilter ? 'mt-2' : 'mt-4')} aria-label="Chats" role="navigation">
-        {p.threads.length === 0 && <div className="px-2.5 text-xs text-fg-subtle">No chats yet</div>}
+        {/* No "No chats yet" line: ChatGPT/Claude leave an empty history quiet. */}
         {p.threads.length > 0 && shown.length === 0 && (
           <div className="px-2.5 py-1 text-xs text-fg-subtle" data-testid="filter-empty">
             No chat titles match “{q}”.{' '}

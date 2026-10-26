@@ -107,8 +107,8 @@ export function cookieSession(signInUrl?: string, nav: (url: string) => void = (
     kind: 'cookie',
     headers: () => ({ [CSRF_HEADER]: '1' }),
     onExpired: once(() => {
-      const url = toSignIn();
-      if (url) leaveSignedOut(nav, url);
+      // No sign-in page configured: the quiet "Your session expired" page (src/shell/StatusPage.tsx).
+      leaveSignedOut(nav, toSignIn() ?? `${import.meta.env.BASE_URL || '/'}signed-out?reason=expired`);
     }),
   };
 }

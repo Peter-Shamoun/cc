@@ -332,15 +332,27 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore, getOpti
     refresh();
   }, [refresh, store]);
 
-  const pin = useCallback(async (id: ID, pinned: boolean) => {
-    await store.setPinned?.(id, pinned);
-    refresh();
-  }, [refresh, store]);
+  /**
+   * Pin/archive are optimistic (the sidebar moves at once, like ChatGPT/Claude) and roll back if the store
+   * refuses; the error is re-thrown so the shell can say so. The local patch mirrors the server rules
+   * (contract 1.17.0): archiving drops the pin, pinning unarchives.
+   */
+  const setFlag = useCallback(async (id: ID, patch: { pinned?: boolean; archived?: boolean }, call: () => Promise<void> | undefined) => {
+    let before: ThreadSummary | undefined;
+    const apply = (t: ThreadSummary): ThreadSummary => ({ ...t, ...patch, ...(patch.archived ? { pinned: false } : {}), ...(patch.pinned ? { archived: false } : {}) });
+    setThreads((all) => all.map((t) => (t.id === id ? ((before = t), apply(t)) : t)));
+    try {
+      await call();
+    } catch (e) {
+      if (before) { const prev = before; setThreads((all) => all.map((t) => (t.id === id ? prev : t))); }
+      throw e;
+    } finally {
+      refresh();
+    }
+  }, [refresh]);
 
-  const archive = useCallback(async (id: ID, archived: boolean) => {
-    await store.setArchived?.(id, archived);
-    refresh();
-  }, [refresh, store]);
+  const pin = useCallback((id: ID, pinned: boolean) => setFlag(id, { pinned }, () => store.setPinned?.(id, pinned)), [setFlag, store]);
+  const archive = useCallback((id: ID, archived: boolean) => setFlag(id, { archived }, () => store.setArchived?.(id, archived)), [setFlag, store]);
 
   /** `{current, total}` for the version arrows under user message `i`, if it was ever edited. */
   const versionOf = (i: number) => {
@@ -415,5 +427,5 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore, getOpti
     return () => { delete window.__ccAudit; };
   }, []);
 
-  return { threads, convId, messages, busy, send, stop, open, newChat, regenerate, remove, editAt, switchVersion, versionOf, rename, pin, canPin: !!store.setPinned, archive, canArchive: !!store.setArchived };
+  return { threads, convId, messages, busy, send, stop, open, newChat, regenerate, remove, editAt, switchVersion, versionOf, rename, pin, canPin: !!store.setPinned, archive, canArchive: !!store.setArchived, refresh };
 }

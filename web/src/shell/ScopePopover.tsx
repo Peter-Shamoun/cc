@@ -34,7 +34,7 @@ export function ScopePopover({ anchor, onClose }: { anchor: HTMLElement; onClose
     // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Escape-to-close on the dialog container (APG dialog pattern)
     <div ref={ref} role="dialog" aria-labelledby={`${id}-t`} data-testid="scope-popover" style={pos ?? { top: -9999, left: -9999 }}
       onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } }}
-      className="fixed z-[60] w-[min(20rem,calc(100vw-16px))] rounded-2xl border border-line bg-elev p-1.5 font-sans text-sm text-fg shadow-[0_8px_30px_rgba(0,0,0,0.16)] motion-safe:animate-[cc-pop_120ms_ease-out]">
+      className="fixed z-[60] w-[min(20rem,calc(100vw-16px))] rounded-2xl border border-line bg-elev p-1.5 font-sans text-sm text-fg shadow-[var(--shadow-menu)] motion-safe:animate-[cc-pop_120ms_ease-out]">
       <div id={`${id}-t`} className="px-2.5 pb-1 pt-1.5 text-xs font-medium text-fg-subtle">Data scope</div>
       <div role="radiogroup" aria-labelledby={`${id}-t`}>
         <div role="radio" aria-checked="true" tabIndex={0} onClick={close} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); close(); } }}
