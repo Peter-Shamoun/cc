@@ -166,6 +166,139 @@ def _question(messages: list) -> str:
     return first if isinstance(first, str) else ""
 
 
+# ---------------------------------------------------------------- demo scenarios (contract v1 §9)
+
+SCENARIOS = ("table", "chart", "repair", "abstain", "clarify", "escalation", "candidates", "error", "slow")
+_SCENARIO_WORDS = [
+    ("error", re.compile(r"\b(simulate (an )?(error|outage)|fail on purpose)\b", re.I)),
+    ("clarify", re.compile(r"\b(how (bad|big) (are|is)|ambiguous|clarify)\b", re.I)),
+    ("abstain", re.compile(r"\b(appeals?|prior auth\w*|forecast|predict\w*|next (month|quarter|year))\b", re.I)),
+    ("escalation", re.compile(r"\b(escalat\w*|net collection rate|hard question)\b", re.I)),
+    ("candidates", re.compile(r"\b(candidates?|double.?check|cross.?check|average paid)\b", re.I)),
+    ("repair", re.compile(r"\b(carc|denial codes?|reason codes?|repair)\b", re.I)),
+    ("slow", re.compile(r"\bslow(ly)?\b", re.I)),
+]
+#: AnalyzerConfig overrides a scenario needs (the analyzer itself does the candidates/cascade/ask work).
+SCENARIO_CONFIG = {
+    "clarify": {"enable_ask": True},
+    "escalation": {"cascade": "haiku_then_sonnet"},
+    "candidates": {"candidates": 3, "candidate_selection": "execution_vote"},
+}
+CLARIFY_QUESTION = "Do you want the denial rate by **claim count** or by **billed dollars**?"
+CLARIFY_CHOICES = [
+    {"id": "count", "label": "By claim count", "description": "Share of claims that were fully denied"},
+    {"id": "dollars", "label": "By billed dollars", "description": "Share of charges on denied claims"},
+]
+ABSTAIN_REASON = ("This data doesn't include **appeals, prior authorizations or forecasts**, so I can't answer "
+                  "that reliably. I can work with claims, payers, service dates, charges, payments and denial codes.")
+
+
+def detect_scenario(question: str, forced: str | None = None) -> str:
+    """``forced`` (ChatRequest.scenario, demo only) wins; otherwise keywords; otherwise ``table``/``chart``."""
+    if forced in SCENARIOS:
+        return forced
+    if _REFUSE.search(question):
+        return "abstain"
+    for name, pattern in _SCENARIO_WORDS:
+        if pattern.search(question) and not (name == "clarify" and "Clarification:" in question):
+            return name
+    return "chart" if DEMO_QUERIES[0][0].search(question) else "table"
+
+
+_CANDIDATE_SQL = [
+    "SELECT payer_name, AVG(paid_amount) AS avg_paid_amount, COUNT(*) AS claims\nFROM sem.claims\nGROUP BY 1\nORDER BY 2 DESC",
+    "SELECT payer_name, AVG(paid_amount) AS avg_paid_amount, COUNT(*) AS claims\nFROM sem.claims\nGROUP BY 1\nORDER BY 2 DESC",
+    "SELECT payer_name, AVG(paid_amount) AS avg_paid_amount, COUNT(*) AS claims\nFROM sem.claims\nWHERE status = 'paid'\nGROUP BY 1\nORDER BY 2 DESC",
+]
+_NCR_BAD = "SELECT payer_name, SUM(net_paid) / SUM(allowed_amount) AS net_collection_rate\nFROM sem.claims\nGROUP BY 1"
+_NCR_BAD2 = "SELECT payer_name, SUM(net_paid) / SUM(charge_amount) AS net_collection_rate\nFROM sem.claims\nGROUP BY 1"
+_NCR = ("SELECT payer_name, SUM(paid_amount) / NULLIF(SUM(charge_amount), 0) AS net_collection_rate, COUNT(*) AS claims\n"
+        "FROM sem.claims\nGROUP BY 1\nORDER BY net_collection_rate DESC")
+_SQL_CARC_BAD = ("SELECT denial_code, COUNT(*) AS claims\nFROM sem.claims\nWHERE status IN ('denied', 'partial')\n"
+             "GROUP BY 1\nORDER BY claims DESC")
+_SQL_CARC = ("SELECT carc_code, COUNT(*) AS claims, SUM(charge_amount) AS charge_amount\nFROM sem.claims\n"
+         "WHERE status IN ('denied', 'partial')\nGROUP BY 1\nORDER BY claims DESC")
+
+
+def _explore():
+    return {"text": "Checking the claims view.", "tool_calls": [
+        {"name": "describe_relation", "arguments": {"relation": "sem.claims"}}]}
+
+
+def _final(sql, answer, assumptions=()):
+    return {"tool_calls": [{"name": "final_answer", "arguments": {"sql": sql, "answer": answer,
+                                                                 "assumptions": list(assumptions)}}]}
+
+
+def scenario_turn(scenario: str):
+    """A ``ScriptedLLM`` turn function for one scenario. Offline; never calls a network."""
+    def turn(model, messages, candidate_index):
+        question = _question(messages)
+        step = sum(1 for m in messages if m["role"] == "assistant")
+        if scenario == "abstain":
+            if _REFUSE.search(question):
+                return {"tool_calls": [{"name": "refuse", "arguments": {"category": "phi_request", "reason":
+                        "I can't return patient-identifying details. I can give counts, rates and dollars instead."}}]}
+            if step == 0:
+                return _explore()
+            return {"tool_calls": [{"name": "refuse", "arguments": {"category": "data_unavailable",
+                                                                    "reason": ABSTAIN_REASON}}]}
+        if scenario == "error":
+            if step == 0:
+                return _explore()
+            raise RuntimeError("simulated model outage")
+        if scenario == "clarify":
+            m = re.search(r"Clarification:\s*(.+)", question)
+            if m is None:
+                if step == 0:
+                    return _explore()
+                return {"tool_calls": [{"name": "ask", "arguments": {"question": CLARIFY_QUESTION,
+                                                                     "choices": CLARIFY_CHOICES}}]}
+            dollars = re.search(r"dollar|charge|amount", m.group(1), re.I)
+            sql = ("SELECT payer_name, SUM(CASE WHEN status = 'denied' THEN charge_amount ELSE 0 END) / SUM(charge_amount)"
+                   " AS denied_dollar_rate, SUM(charge_amount) AS charge_amount\nFROM sem.claims\nGROUP BY 1\nORDER BY 2 DESC"
+                   if dollars else
+                   "SELECT payer_name, AVG(CASE WHEN status = 'denied' THEN 1.0 ELSE 0.0 END) AS denial_rate, COUNT(*) AS claims\n"
+                   "FROM sem.claims\nGROUP BY 1\nORDER BY denial_rate DESC")
+            if step == 0:
+                return {"tool_calls": [{"name": "run_sql", "arguments": {"sql": sql}}]}
+            return _final(sql, "Denial rate by payer, " + ("weighted by billed dollars." if dollars else "by claim count."),
+                          ["Denied means the whole claim was denied; partial payments are not denials."])
+        if scenario == "escalation":
+            small = "haiku" in model.lower()
+            if small:
+                if step == 0:
+                    return _explore()
+                if step == 1:
+                    return {"tool_calls": [{"name": "run_sql", "arguments": {"sql": _NCR_BAD}}]}
+                if step == 2:
+                    return {"tool_calls": [{"name": "run_sql", "arguments": {"sql": _NCR_BAD2}}]}
+                return {"text": "I could not find a working definition of net collection rate."}
+            if step == 0:
+                return {"text": "Net collection rate is paid over charged; this view has no allowed amount.",
+                        "tool_calls": [{"name": "run_sql", "arguments": {"sql": _NCR}}]}
+            return _final(_NCR, "Net collection rate by payer (paid ÷ charged).",
+                          ["There is no allowed-amount column, so this uses charges as the denominator."])
+        if scenario == "candidates":
+            sql = _CANDIDATE_SQL[candidate_index % 3]
+            if step == 0:
+                return {"tool_calls": [{"name": "run_sql", "arguments": {"sql": sql}}]}
+            return _final(sql, "Average paid amount per claim, by payer.",
+                          ["Average over all claims, so denied and pending claims count as $0."])
+        if scenario == "repair":
+            if step == 0:
+                return _explore()
+            if step == 1:
+                return {"tool_calls": [{"name": "run_sql", "arguments": {"sql": _SQL_CARC_BAD}}]}
+            if step == 2:
+                return {"text": "The denial reason column is carc_code; retrying.",
+                        "tool_calls": [{"name": "run_sql", "arguments": {"sql": _SQL_CARC}}]}
+            return _final(_SQL_CARC, "Denied and partially paid claims by CARC code.",
+                          ["Includes partial payments, which carry an adjustment reason."])
+        return demo_turn(model, messages, candidate_index)
+    return turn
+
+
 def demo_turn(model, messages, candidate_index):
     """Scripted analyst: look at the schema, run one query, then answer. Never calls a network."""
     question = _question(messages)
@@ -187,10 +320,10 @@ def demo_turn(model, messages, candidate_index):
                                                                  "assumptions": assumptions}}]}
 
 
-def make_llm(kind: str = "scripted"):
+def make_llm(kind: str = "scripted", scenario: str | None = None):
     """``scripted`` (default) is offline replay. Real models are wired behind config and stay disabled."""
     if kind == "scripted":
-        return ScriptedLLM([demo_turn] * 8)
+        return ScriptedLLM([scenario_turn(scenario) if scenario else demo_turn] * 8)
     if kind == "anthropic":
         return AnthropicLLM()
     if kind == "bedrock":
