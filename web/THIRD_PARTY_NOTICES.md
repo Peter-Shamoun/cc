@@ -21,7 +21,7 @@ Apache-2.0 packages also need their NOTICE file kept, if they have one.
 | remark-gfm | MIT | Titus Wormer | GitHub-flavoured markdown (tables, strikethrough) |
 | shiki | MIT | Pine Wu, Anthony Fu | Code highlighting. Its bundled TextMate grammars and themes keep their upstream licences (see below) |
 | vega, vega-lite, vega-embed | BSD-3-Clause | University of Washington Interactive Data Lab | Charts |
-| @tanstack/react-table, @tanstack/react-virtual | MIT | Tanner Linsley | Result tables and virtualised rows |
+| @tanstack/react-virtual | MIT | Tanner Linsley | Virtualised table rows and long threads |
 | lucide-react | ISC | Lucide Contributors (Feather icons: MIT, Cole Bemis) | Icons |
 | clsx | MIT | Luke Edwards | Class names |
 
