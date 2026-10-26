@@ -21,6 +21,7 @@ _coverage_lines: dict[tuple[str, str], str] = {}
 _schema_blocks_lock = threading.Lock()
 #: (relation, date column, how the user message names it), first one the session has wins
 COVERAGE_DATE_COLUMNS = (("sem.remit_claims", "payment_date", "payment date"),
+                         ("sem.claims", "service_date_from", "service date"),
                          ("sem.claims", "service_date", "service date"))
 
 
@@ -64,11 +65,14 @@ def render_gold_schema(tools: ToolLayer) -> str:
 def allowed_values(tools: ToolLayer, relation: str, column: str, column_type: str) -> list[str] | None:
     """Every non-null value of a low-cardinality text column, sorted; None for any other column. Identifier and
     high-cardinality columns are never read. The query goes through the guard like any tool-authored SQL."""
-    if not column_type.startswith("VARCHAR") or is_phi_column(column) or column in _HIGH_CARDINALITY_COLUMNS \
+    if column_type != "VARCHAR" or is_phi_column(column) or column in _HIGH_CARDINALITY_COLUMNS \
             or not _IDENT.fullmatch(column):
         return None
-    rows = tools._guarded_profile(f'SELECT DISTINCT "{column}" FROM {relation} WHERE "{column}" IS NOT NULL '
-                                  f"LIMIT {MAXIMUM_ALLOWED_VALUES + 1}").fetchall()
+    try:
+        rows = tools._guarded_profile(f'SELECT DISTINCT "{column}" FROM {relation} WHERE "{column}" IS NOT NULL '
+                                      f"LIMIT {MAXIMUM_ALLOWED_VALUES + 1}").fetchall()
+    except Exception:  # noqa: BLE001 - a column that cannot be profiled is listed without its values
+        return None
     if len(rows) > MAXIMUM_ALLOWED_VALUES:
         return None
     return sorted(str(row[0]) for row in rows)
@@ -88,8 +92,10 @@ def data_coverage_line(tools: ToolLayer) -> str:
 def _coverage(tools: ToolLayer) -> str:
     readable = set(tools.list_relations(charge=False))
     for relation, column, label in COVERAGE_DATE_COLUMNS:
-        if relation in readable:
-            earliest, latest = tools._guarded_profile(f"SELECT min({column}), max({column}) FROM {relation}").fetchone()
+        if relation in readable and column in {row[0] for row in
+                                               tools.session.con.execute(f"DESCRIBE {relation}").fetchall()}:
+            earliest, latest = tools._guarded_profile(
+                f"SELECT CAST(min({column}) AS DATE), CAST(max({column}) AS DATE) FROM {relation}").fetchone()
             if earliest is not None:
                 return f"This customer's data covers {earliest} to {latest} (by {label})."
     return "This customer's data has no dated rows."

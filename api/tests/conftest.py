@@ -38,3 +38,26 @@ def app():
 @pytest.fixture
 def client(app):
     return TestClient(app)
+
+
+def cc(*words):
+    """One scripted model turn: the analyzer's ``cc`` tool with this command line."""
+    from analyzer.scripted_model import ScriptedTurn
+    from api.demo_model import command
+    return ScriptedTurn(tool_calls=[("cc", {"command": command(*words)})])
+
+
+def scripted_analyzer(*turns, seconds_per_turn: float = 0.0):
+    """The app's analyzer with a scripted Strands model replaying ``turns`` (fresh for every run), then DONE."""
+    from analyzer.scripted_model import ScriptedModel, scripted_turns
+    from api.strands_analyzer import AnalyzerSettings, StrandsAnalyzer
+    return StrandsAnalyzer(AnalyzerSettings(model_kind="scripted"),
+                           lambda scenario=None: ScriptedModel(scripted_turns(*turns), seconds_per_turn=seconds_per_turn),
+                           "scripted")
+
+
+@pytest.fixture(scope="session")
+def bench_snapshot():
+    """The cached benchmark snapshot (built on first use)."""
+    from bench.dataset import snapshot
+    return snapshot()

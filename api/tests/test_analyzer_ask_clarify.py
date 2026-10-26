@@ -76,19 +76,6 @@ def test_form_reply_becomes_the_clarification_line_the_analyzer_reads():
     assert summary(part["questions"], []) == "Time basis: no preference; Payers: no preference"
 
 
-def test_driver_hands_the_logged_questions_to_the_mapping():
-    """api/claude_code_cli_driver.observe_call_record passes the calls.jsonl argument through to LiveTap.ask_args."""
-    from api.claude_code_cli_driver import observe_call_record
-    from api.live import LiveTap
-    request = clarification_request({"questions": [TIME_BASIS, PAYERS]})
-    argument = {"question": request["text"], "questions": request["questions"]}
-    tap = LiveTap.__new__(LiveTap)
-    seen = []
-    tap.observe_finished_call = lambda name, args, result: seen.append((name, args, result))
-    observe_call_record(tap, {"command": "ask", "ok": True, "argument": argument, "result": "ok"})
-    assert seen == [("ask", argument, None)]
-
-
 def test_questions_the_form_cannot_show_stay_readable_in_the_lead_in():
     answer = SimpleNamespace(kind="clarification", text="A few quick questions first:", trace=[])
     bad = {"questions": [{"header": "H", "question": "Count or dollars?", "options": []}]}

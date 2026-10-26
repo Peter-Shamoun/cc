@@ -7,7 +7,6 @@ import duckdb
 import pytest
 from fastapi.testclient import TestClient
 
-from analyzer.llm import ScriptedLLM
 from api.app import IDENTITY_SCOPED_KEYS, Settings, create_app
 from api.backends import DEMO_DIRECTORY, DEMO_LOSSLESS_RELATIONS, AuthError, DemoAuth, demo_connection
 from api.contract import schema
@@ -69,12 +68,10 @@ def test_no_request_shape_in_the_schema_names_a_data_scope():
     assert found == RESPONSE_ONLY
 
 
-def _min_key_script():
+def _min_key_analyzer():
+    from api.tests.conftest import cc, scripted_analyzer
     sql = "SELECT MIN(claim_key) AS first_claim FROM sem.claims"
-    return ScriptedLLM([
-        {"tool_calls": [{"name": "run_sql", "arguments": {"sql": sql}}]},
-        {"tool_calls": [{"name": "final_answer", "arguments": {"sql": sql, "answer": "First claim."}}]},
-    ])
+    return scripted_analyzer(cc("sql", sql), cc("answer", "--sql", sql, "--text", "First claim."))
 
 
 def _first_claim(client, headers, path="/api/chat"):
@@ -84,7 +81,7 @@ def _first_claim(client, headers, path="/api/chat"):
 
 
 def test_the_customer_comes_from_the_token_not_headers_or_query():
-    client = TestClient(create_app(settings=Settings(heartbeat_seconds=5), llm_factory=_min_key_script))
+    client = TestClient(create_app(settings=Settings(heartbeat_seconds=5), analyzer=_min_key_analyzer()))
     assert _first_claim(client, LABS).startswith("AL")
     assert _first_claim(client, DX).startswith("AD")
     spoof = {**LABS, "X-Customer": "acme_diagnostics", "X-Tenant": "acme_diagnostics", "X-Org": "acme_diagnostics"}

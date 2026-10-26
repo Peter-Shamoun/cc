@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from jsonschema import Draft202012Validator
 
 from api.app import Settings, create_app
-from api.backends import MULTI_CLARIFY, detect_scenario
+from api.demo_model import MULTI_CLARIFY, detect_scenario
 from api.clarify import normalize_questions, summary, validate_answers
 from api.contract import schema
 from api.tests.conftest import LABS, events

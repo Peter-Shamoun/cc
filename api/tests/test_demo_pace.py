@@ -3,12 +3,13 @@ import time
 
 from fastapi.testclient import TestClient
 
-from api.app import DEMO_PACE_CHUNK_SECONDS, DEMO_PACE_MODEL_SECONDS, SLOW_FLOOR_SECONDS, Settings, create_app
+from api.app import DEMO_PACE_CHUNK_SECONDS, DEMO_PACE_MODEL_SECONDS, Settings, create_app
+from api.demo_model import SLOW_FLOOR_SECONDS
 from api.tests.conftest import LABS, events
 
 
 def _clear(monkeypatch):
-    for name in ("CC_API_DEMO_PACE", "CC_API_MODEL_DELAY_SECONDS", "CC_API_STREAM_DELAY_SECONDS", "CC_API_LLM"):
+    for name in ("CC_API_DEMO_PACE", "CC_API_MODEL_DELAY_SECONDS", "CC_API_STREAM_DELAY_SECONDS", "CC_API_ANALYZER_MODEL"):
         monkeypatch.delenv(name, raising=False)
 
 
@@ -32,9 +33,9 @@ def test_pace_off_switch_and_explicit_values_win(monkeypatch):
     assert (s.model_delay_seconds, s.stream_delay_seconds) == (0.5, 0.0)
 
 
-def test_no_pacing_for_a_non_scripted_llm(monkeypatch):
+def test_no_pacing_for_the_bedrock_model(monkeypatch):
     _clear(monkeypatch)
-    monkeypatch.setenv("CC_API_LLM", "anthropic")
+    monkeypatch.setenv("CC_API_ANALYZER_MODEL", "bedrock")
     s = Settings()
     assert (s.demo_pace, s.model_delay_seconds, s.stream_delay_seconds) == (False, 0.0, 0.0)
 

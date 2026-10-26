@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from api.backends import CANCEL_AT, LONG_SQL, SCENARIOS
+from api.demo_model import CANCEL_AT, LONG_SQL, SCENARIOS
 from api.contract import CONTRACT_VERSION, gen_examples
 from api.contract.conformance import check
 from api.tests.test_contract import check_invariants

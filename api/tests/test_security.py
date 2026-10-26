@@ -3,10 +3,9 @@ import logging
 
 import pytest
 
-from analyzer.llm import PaidAPIDisabled
 from analyzer.tools import ToolError
 from api.app import Settings, create_app
-from api.backends import DemoAuth, ReasonedEscalationOpener, make_llm
+from api.backends import DemoAuth, ReasonedEscalationOpener
 from api.tests.conftest import DX, LABS, ask, parts
 from fastapi.testclient import TestClient
 
@@ -35,9 +34,9 @@ def test_download_is_csv_audited_and_owner_bound(client, app):
     assert response.headers["cache-control"] == "no-store"
     lines = response.text.strip().split("\r\n")
     assert lines[0] == "claim_key,payer_name,service_date,status,charge_amount,paid_amount,carc_code"
-    assert len(lines) == 1201
+    assert len(lines) == 1001   # B1's row limit: 1000 rows
     record = [e for e in app.state.audit.events if e["event"] == "download"][-1]
-    assert record["row_count"] == 1200 and record["file_id"] == file_id and record["customer"] == "acme_labs"
+    assert record["row_count"] == 1000 and record["file_id"] == file_id and record["customer"] == "acme_labs"
     assert set(record) <= {"event", "at", "customer", "user", "file_id", "row_count"}
     assert client.get(f"/api/download/{file_id}", headers=DX).status_code == 404
     assert client.get(f"/api/download/{file_id}").status_code == 401
@@ -79,17 +78,6 @@ def test_escalation_needs_a_stated_reason_and_is_audited_masked():
     assert opener.escalated and opener.open(True) == "handle-True"
     assert granted == [opener.escalation_reason]
     assert "123-45-6789" not in granted[0] and "jane@x.com" not in granted[0] and "rejected files" in granted[0]
-
-
-def test_paid_apis_stay_disabled():
-    with pytest.raises(PaidAPIDisabled):
-        make_llm("anthropic").complete(model="m", system="s", messages=[], tools=[], max_tokens=1)
-    with pytest.raises(PaidAPIDisabled):
-        make_llm("bedrock").complete(model="m", system="s", messages=[], tools=[], max_tokens=1)
-    client = TestClient(create_app(settings=Settings(llm="anthropic")))
-    _, evs = ask(client, "How many claims?")
-    error = next(p for p in parts(evs) if p["type"] == "error")
-    assert error["title"] == "Model unavailable" and evs[-1]["finishReason"] == "error"
 
 
 def test_no_row_data_or_sql_in_logs(client, caplog):

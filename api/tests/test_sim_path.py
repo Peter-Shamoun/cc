@@ -2,7 +2,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from analyzer.llm import ScriptedLLM
+from api.tests.conftest import cc, scripted_analyzer
 from api.app import Settings, create_app
 from api.backends import AuthError, SimAuth
 from api.tests.conftest import ask, parts
@@ -25,22 +25,18 @@ def world(tmp_path_factory):
 REJECTED_SQL = "SELECT count(*) AS rejected FROM lossless.edi_source_file WHERE parse_status = 'REJECTED'"
 
 
-def _script():
-    return ScriptedLLM([
-        {"tool_calls": [{"name": "run_sql", "arguments": {"sql": SQL}}]},
-        {"tool_calls": [{"name": "final_answer", "arguments": {"sql": SQL, "answer": "Distinct claims."}}]},
-    ])
+def _analyzer():
+    return scripted_analyzer(cc("sql", SQL), cc("answer", "--sql", SQL, "--text", "Distinct claims."))
 
 
-def _escalating_script():
-    return ScriptedLLM([
-        {"tool_calls": [{"name": "list_relations", "arguments": {}}]},
-        {"tool_calls": [{"name": "run_sql", "arguments": {"sql": REJECTED_SQL}}]},        # refused: not escalated
-        {"tool_calls": [{"name": "request_escalation", "arguments": {"reason": ""}}]},    # refused: no reason
-        {"tool_calls": [{"name": "request_escalation",
-                         "arguments": {"reason": "sem.* has no file parse status (file 123-45-6789)"}}]},
-        {"tool_calls": [{"name": "final_answer", "arguments": {"sql": REJECTED_SQL, "answer": "Rejected files."}}]},
-    ])
+def _escalating_analyzer():
+    return scripted_analyzer(
+        cc("list"),                                                               # refused: not escalated
+        cc("sql", REJECTED_SQL),                                                  # refused: not escalated
+        cc("escalate", ""),                                                       # refused: no reason
+        cc("escalate", "sem.* has no file parse status (file 123-45-6789)"),
+        cc("list"),
+        cc("answer", "--sql", REJECTED_SQL, "--text", "Rejected files."))
 
 
 def test_sim_auth_verifies_cognito_tokens(world):
@@ -62,7 +58,7 @@ def test_chat_over_query_path_is_scoped_and_does_not_escalate_unasked(world, mon
         return real(aws, dep, token, escalate=escalate, **kw)
 
     monkeypatch.setattr(query, "open_session", spy)
-    app = create_app(auth=SimAuth(world.aws, world.dep), settings=Settings(heartbeat_seconds=5), llm_factory=_script)
+    app = create_app(auth=SimAuth(world.aws, world.dep), settings=Settings(heartbeat_seconds=5), analyzer=_analyzer())
     client = TestClient(app)
     for upn, prefix in [("ana@xifin.example", "acme_labs"), ("dev@xifin.example", "acme_diagnostics")]:
         headers = {"Authorization": "Bearer " + login(world.aws, upn)}
@@ -94,7 +90,7 @@ def test_in_process_escalation_is_reasoned_audited_and_same_customer(world, monk
 
     monkeypatch.setattr(query, "open_session", spy)
     app = create_app(auth=SimAuth(world.aws, world.dep), settings=Settings(heartbeat_seconds=5),
-                     llm_factory=_escalating_script)
+                     analyzer=_escalating_analyzer())
     client = TestClient(app)
     token = login(world.aws, "dev@xifin.example")
     expected = real(world.aws, world.dep, token, escalate=True).con.execute(REJECTED_SQL).fetchone()[0]
@@ -104,8 +100,9 @@ def test_in_process_escalation_is_reasoned_audited_and_same_customer(world, monk
     assert check(evs) == []
     assert next(p for p in parts(evs) if p["type"] == "table")["rows"] == [[expected]]
     assert calls == [("acme_diagnostics", False), ("acme_diagnostics", True)]
-    (listed,) = [e for e in evs if e.get("probe") == "list_views"]
-    assert listed["summary"] == "10 views"                                   # sem.* only before the escalation
+    refused_list, listed = [e for e in evs if e.get("probe") == "list_views"]
+    assert refused_list["summary"].startswith("Failed")                      # list is for lossless.*, after escalate
+    assert listed["summary"].endswith("views") and listed["summary"] != "0 views"
     *refused, granted = [e for e in evs if e.get("probe") == "request_escalation"]
     assert [e["summary"].startswith("Failed") for e in refused] == [True]
     assert granted["summary"] == "Reason: sem.* has no file parse status (file …)"

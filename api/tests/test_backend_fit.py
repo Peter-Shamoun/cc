@@ -123,7 +123,7 @@ def world(tmp_path_factory):
 
 def test_sim_path_opens_sessions_from_the_token_only(world, monkeypatch):
     import ccsim.query as query
-    from analyzer.llm import ScriptedLLM
+    from api.tests.conftest import cc, scripted_analyzer
     from ccsim.query import login
     sql = "SELECT COUNT(DISTINCT claim_key) AS claims FROM sem.claims"
     opened = []
@@ -135,11 +135,9 @@ def test_sim_path_opens_sessions_from_the_token_only(world, monkeypatch):
         return s
 
     monkeypatch.setattr(query, "open_session", spy)
-    script = lambda: ScriptedLLM([  # noqa: E731
-        {"tool_calls": [{"name": "run_sql", "arguments": {"sql": sql}}]},
-        {"tool_calls": [{"name": "final_answer", "arguments": {"sql": sql, "answer": "Distinct claims."}}]}])
+    analyzer = scripted_analyzer(cc("sql", sql), cc("answer", "--sql", sql, "--text", "Distinct claims."))
     client = TestClient(create_app(auth=SimAuth(world.aws, world.dep), settings=Settings(heartbeat_seconds=5),
-                                   llm_factory=script))
+                                   analyzer=analyzer))
     headers = {"Authorization": "Bearer " + login(world.aws, "ana@xifin.example"), **HINT_HEADERS}
     body = {"messages": [{"id": "u1", "role": "user", "text": "How many claims?"}], **IGNORED_FIELDS,
             "options": dict(IGNORED_OPTIONS)}

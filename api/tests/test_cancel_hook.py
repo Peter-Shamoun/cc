@@ -11,7 +11,6 @@ import duckdb
 import pytest
 from fastapi.testclient import TestClient
 
-from analyzer.llm import ScriptedLLM
 from api.app import Settings, create_app
 from api.cancel import CancellableOpener
 from api.contract.conformance import check
@@ -121,15 +120,13 @@ def test_handles_without_a_con_are_passed_through():
     assert opener.open(False) == "handle" and opener.interrupt_all() == 0
 
 
-def _slow_script():
-    return ScriptedLLM([
-        {"tool_calls": [{"name": "run_sql", "arguments": {"sql": SLOW}}]},
-        {"tool_calls": [{"name": "final_answer", "arguments": {"sql": FAST, "answer": "Claims."}}]},
-    ])
+def _slow_analyzer():
+    from api.tests.conftest import cc, scripted_analyzer
+    return scripted_analyzer(cc("sql", SLOW), cc("answer", "--sql", FAST, "--text", "Claims."))
 
 
 def test_stop_during_a_long_query_aborts_within_a_second():
-    app = create_app(settings=Settings(heartbeat_seconds=5), llm_factory=_slow_script)
+    app = create_app(settings=Settings(heartbeat_seconds=5), analyzer=_slow_analyzer())
     client = TestClient(app)
     evs, stopped_at = [], None
     body = {"messages": [{"id": "u_1", "role": "user", "text": "How many claims?"}]}
@@ -154,10 +151,9 @@ def test_stop_during_a_long_query_aborts_within_a_second():
 
 
 def test_a_normal_answer_is_untouched():
-    app = create_app(settings=Settings(heartbeat_seconds=5), llm_factory=lambda: ScriptedLLM([
-        {"tool_calls": [{"name": "run_sql", "arguments": {"sql": FAST}}]},
-        {"tool_calls": [{"name": "final_answer", "arguments": {"sql": FAST, "answer": "Claims."}}]},
-    ]))
+    from api.tests.conftest import cc, scripted_analyzer
+    app = create_app(settings=Settings(heartbeat_seconds=5), analyzer=scripted_analyzer(
+        cc("sql", FAST), cc("answer", "--sql", FAST, "--text", "Claims.")))
     r = TestClient(app).post("/api/chat", json={"messages": [{"role": "user", "text": "How many claims?"}]},
                              headers=LABS)
     evs = [json.loads(x[5:]) for x in r.text.splitlines() if x.startswith("data:")]
