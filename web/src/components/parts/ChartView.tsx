@@ -3,6 +3,7 @@ import { Download, Maximize2, FileJson } from 'lucide-react';
 import type { ChartPart } from '../../lib/contract';
 import { IconButton } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
+import { tooltipHtml } from '../../security/trustedTypes';
 import { CHART_COLORS, useTheme } from '../../lib/theme';
 import { csvFilename, downloadText, recordsToCsv } from '../../lib/csv';
 import { buildSpec, chartRenderer, readableBars, utcDates, withTooltips } from '../../render/chartSpec';
@@ -77,7 +78,8 @@ function ChartViewInner({ part, onOpen, full, onShowSpec }: ChartViewProps) {
           loader: remoteBlockedLoader(createVegaLoader),
           // Strict CSP (no inline <style>): no injected stylesheets; the tooltip is themed in index.css (#vg-tooltip-element).
           defaultStyle: false,
-          tooltip: { theme: dark ? 'dark' : 'light', disableDefaultStyle: true },
+          // Trusted Types: tooltip HTML comes from our escaping formatter, minted by the cc-html policy (security/trustedTypes.ts).
+          tooltip: { theme: dark ? 'dark' : 'light', disableDefaultStyle: true, formatTooltip: tooltipHtml },
           config: {
             background: 'transparent',
             font: v('--font-sans') || 'sans-serif',

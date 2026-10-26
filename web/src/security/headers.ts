@@ -7,6 +7,8 @@
  * Styles: <style>/<link> elements need 'self' or the nonce; inline style *attributes* are allowed via
  * style-src-attr because Shiki/KaTeX/Vega emit per-token colours and positions that cannot be hashed.
  */
+import { TT_POLICY } from './trustedTypes';
+
 export const NONCE_PLACEHOLDER = '__CC_CSP_NONCE__';
 
 export const PERMISSIONS_POLICY = [
@@ -35,6 +37,9 @@ export function contentSecurityPolicy(nonce: string, opts: { dev?: boolean; conn
     "form-action 'self'",
     "frame-src 'none'",
     "frame-ancestors 'none'",
+    // Trusted Types (security/trustedTypes.ts): DOM-XSS sinks only take values from the one named policy.
+    "require-trusted-types-for 'script'",
+    `trusted-types ${TT_POLICY} default${opts.dev ? " 'allow-duplicates'" : ''}`,
     ...(opts.dev ? [] : ['upgrade-insecure-requests']),
   ].join('; ');
 }
