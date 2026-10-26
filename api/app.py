@@ -27,7 +27,7 @@ from api.contract import CONTRACT_VERSION, schema as contract_schema
 from api.ids import new_id
 from api.live import Cancelled, LiveTap
 from api.mapping import outcome_parts
-from api.security import SecurityHeadersMiddleware
+from api.security import MAX_BODY_BYTES, BodyLimitMiddleware, SecurityHeadersMiddleware
 from api.store import DownloadRegistry, Principal
 from api.transcripts import CustomerKeyDisabled, make_store
 
@@ -112,6 +112,7 @@ class Settings:
     #: simulated model latency per analyzer turn in demo mode (realistic streaming); tests use 0
     model_delay_seconds: float = field(default_factory=lambda: _paced("CC_API_MODEL_DELAY_SECONDS", DEMO_PACE_MODEL_SECONDS))
     demo_pace: bool = field(default_factory=demo_pace_enabled)
+    max_body_bytes: int = int(os.environ.get("CC_API_MAX_BODY_BYTES", str(MAX_BODY_BYTES)))
     clarification_ttl_seconds: float = 1800.0
     analyzer_overrides: dict = field(default_factory=lambda: {
         "glossary": "basic", "data_dictionary": False, "data_profile": False, "row_limit": 5000,
@@ -172,7 +173,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
     downloads = DownloadRegistry()
     runs: dict[str, _Run] = {}
     app = FastAPI(title="CC chat API", version="0.1.0", docs_url=None, redoc_url=None, openapi_url=None)
-    app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_body_bytes)
+    app.add_middleware(SecurityHeadersMiddleware)  # outermost, so the 413 carries the security headers too
     app.state.audit, app.state.store, app.state.downloads, app.state.runs = audit, store, downloads, runs
     app.state.settings, app.state.auth = settings, auth
 
