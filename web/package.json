@@ -8,7 +8,10 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "shots": "node scripts/screenshots.mjs"
+    "shots": "node scripts/screenshots.mjs",
+    "e2e": "playwright test -c e2e/playwright.config.ts --project=desktop --project=mobile",
+    "e2e:perf": "playwright test -c e2e/playwright.config.ts --project=perf",
+    "e2e:update": "playwright test -c e2e/playwright.config.ts --project=desktop --project=mobile --update-snapshots -g visual"
   },
   "dependencies": {
     "@tanstack/react-table": "^8.21.3",
@@ -26,6 +29,8 @@
     "vega-lite": "^6.4.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/typography": "^0.5.20",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/jest-dom": "^6.9.1",
