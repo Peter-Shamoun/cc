@@ -29,6 +29,28 @@ OUTCOMES: dict[str, tuple[str, str | None]] = {
     "error": ("simulate an error please", "error"),
     "report": ("Paid amount by month as a report", "report"),
 }
+#: 1.16.0 edge cases (CONTRACT.md §9.1), written to examples/edge/<name>.jsonl: name -> (question, scenario, finish).
+#: ``clarify_nested`` is a chain of three streams (ask, ask again, answer): edge/clarify_nested{,_2,_3}.jsonl.
+EDGE: dict[str, tuple[str, str, str]] = {
+    "empty": ("Denied Tricare claims by payer", "empty", "stop"),
+    "multi_table": ("Claims by payer and by status", "multi_table", "stop"),
+    "long_sql": ("Monthly paid and denied claims for every payer", "long_sql", "stop"),
+    "many_repairs": ("Top denial reason codes", "many_repairs", "stop"),
+    "clarify_nested": ("How bad are denials?", "clarify_nested", "needs_input"),
+    "clarify_nested_2": ("", "clarify_nested", "needs_input"),
+    "clarify_nested_3": ("", "clarify_nested", "stop"),
+    "escalation_abstain": ("How many appeals did we win?", "escalation_abstain", "abstain"),
+    "cancel_plan": ("Paid amount by payer", "cancel_plan", "aborted"),
+    "cancel_sql": ("Paid amount by payer", "cancel_sql", "aborted"),
+    "cancel_repair": ("Top denial reason codes", "cancel_repair", "aborted"),
+    "cancel_candidates": ("Average paid per claim by payer", "cancel_candidates", "aborted"),
+    "cancel_escalation": ("What's our net collection rate by payer?", "cancel_escalation", "aborted"),
+    "cancel_render": ("Paid amount by payer", "cancel_render", "aborted"),
+}
+EDGE_DIR = EXAMPLES / "edge"
+#: the choice picked at each nested clarification (by label)
+NESTED_PICKS = ("By billed dollars", "Last 90 days")
+
 #: extra example: the answer that follows picking the first clarify choice (message.start.resumeOf).
 RESUME = "clarify_resume"
 REGENERATE = "regenerate_concise"  # 1.10.0: "More concise" on the `answer` example (CONTRACT.md §8.1)
@@ -104,6 +126,33 @@ def capture(model_delay: float = 0.0) -> dict[str, list[dict]]:
     return {k: (v if k in ("clarify", RESUME, "answer", REGENERATE) else normalise(v)) for k, v in out.items()}
 
 
+def capture_edge(model_delay: float = 0.0) -> dict[str, list[dict]]:
+    """The 1.16.0 edge-case streams. The nested clarify chain is normalised together so ``resumeOf`` ids line up."""
+    client = _client(model_delay)
+    out: dict[str, list[dict]] = {}
+    for name, (question, scenario, _finish) in EDGE.items():
+        if name.startswith("clarify_nested_"):
+            continue
+        out[name] = _post(client, {"messages": [{"id": "u_1", "role": "user", "text": question}], "scenario": scenario})
+    chain = [out["clarify_nested"]]
+    for i, pick in enumerate(NESTED_PICKS):
+        prev = chain[-1]
+        clar = next(e["part"] for e in prev if e["type"] == "part" and e["part"]["type"] == "clarification")
+        choice = next(c for c in clar["choices"] if c["label"] == pick)
+        chain.append(_post(client, {"messages": [{"id": f"u_{i + 2}", "role": "user", "text": pick}],
+                                    "conversationId": prev[0]["conversationId"],
+                                    "resume": {"clarificationId": clar["clarificationId"], "choiceIds": [choice["id"]]}}))
+    flat = normalise([e for stream in chain for e in stream])
+    n = 0
+    for name, stream in zip(("clarify_nested", "clarify_nested_2", "clarify_nested_3"), chain):
+        out[name], n = flat[n: n + len(stream)], n + len(stream)
+    return {k: (v if k.startswith("clarify_nested") else normalise(v)) for k, v in out.items()}
+
+
+def load_edge(name: str) -> list[dict]:
+    return [json.loads(line) for line in (EDGE_DIR / f"{name}.jsonl").read_text().splitlines() if line.strip()]
+
+
 def capabilities_example() -> dict:
     """GET /api/capabilities as the demo backend serves it (web/src/contract/capabilities.ts mirrors it offline)."""
     return _client().get("/api/capabilities").json()
@@ -177,10 +226,12 @@ def main(argv: list[str]) -> int:
     if check:
         drift = [k for k, v in captured.items()
                  if not (EXAMPLES / f"{k}.jsonl").exists() or shape(load(k)) != shape(v)]
+        drift += [f"edge/{k}" for k, v in capture_edge(0.0).items()
+                  if not (EDGE_DIR / f"{k}.jsonl").exists() or shape(load_edge(k)) != shape(v)]
         if drift:
             print("contract examples drifted (run python -m api.contract.gen_examples):", ", ".join(drift))
             return 1
-        print(f"contract examples up to date ({len(captured)})")
+        print(f"contract examples up to date ({len(captured)} + {len(EDGE)} edge)")
         return 0
     EXAMPLES.mkdir(exist_ok=True)
     (EXAMPLES / "capabilities.json").write_text(json.dumps(capabilities_example(), indent=2) + "\n")
@@ -194,6 +245,10 @@ def main(argv: list[str]) -> int:
     for k, v in captured.items():
         (EXAMPLES / f"{k}.jsonl").write_text(dump(v))
         print(f"wrote examples/{k}.jsonl ({len(v)} events)")
+    EDGE_DIR.mkdir(exist_ok=True)
+    for k, v in capture_edge(REALISTIC_MODEL_DELAY).items():
+        (EDGE_DIR / f"{k}.jsonl").write_text(dump(v))
+        print(f"wrote examples/edge/{k}.jsonl ({len(v)} events)")
     return 0
 
 
