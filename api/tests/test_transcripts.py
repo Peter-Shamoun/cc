@@ -87,7 +87,7 @@ def test_sealed_store_writes_no_plaintext(tmp_path):
     s.append_message(A, "c1", {"id": "m1", "role": "user", "text": SECRET})
     s.rename_conversation(A, "c1", "Zelda follow-up")
     files = [p for p in (tmp_path / "blobs").rglob("*") if p.is_file()]
-    assert {p.name for p in files} == {"c1.json", "c1.bin", "dek.bin"}
+    assert {p.name for p in files} == {"c1.json", "c1.bin", "dek.bin", ".lock"}  # .lock: empty, for conditional writes
     for p in files:
         raw = p.read_bytes()
         assert b"Zelda" not in raw and b"99887766" not in raw and b"ana@" not in raw and b"follow-up" not in raw

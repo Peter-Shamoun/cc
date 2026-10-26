@@ -122,7 +122,8 @@ def test_validation_and_auth(client):
 
 def test_health(client):
     body = client.get("/api/health").json()
-    assert body == {"status": "ok", "mode": "demo", "llm": "scripted", "paidApis": False}
+    assert body == {"status": "ok", "mode": "demo", "llm": "scripted", "analyzerInteraction": "model_api",
+                    "paidApis": False}
 
 
 def test_resume_with_last_event_id(client):

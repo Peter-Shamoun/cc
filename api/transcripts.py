@@ -18,12 +18,21 @@ simulator agree):
 
   Retention: ``TRANSCRIPT_RETENTION_DAYS`` (90) unless the user sets a shorter one (persisted as
   ``retention.json``); enforced on access and by ``purge_expired`` (the app's background sweep).
-  ``CC_TRANSCRIPT_DIR`` keeps blobs on disk (files 0600); unset keeps them in memory (tests, demo).
+  ``CC_TRANSCRIPT_S3_BUCKET`` keeps blobs in that S3 bucket (``S3Blobs``; boto3 reads the endpoint and
+  credentials from the usual AWS settings). Otherwise ``CC_TRANSCRIPT_DIR`` keeps them on disk (files 0600); unset
+  keeps them in memory (tests, demo).
+
+  No DynamoDB: the conversation object is the record. Every change to it is a read, change and conditional write
+  (``If-Match`` on the ETag it was read with, ``If-None-Match: *`` for a new one), retried when another API task wrote
+  first. A run's stream events go in numbered, write-once chunk objects
+  ``{customer}/transcripts/users/{user_hash}/runs/{conversation}/{message}/{chunk}.bin`` (sealed like the content),
+  so any API task can replay a run from ``Last-Event-ID``; they are deleted with their conversation.
 
 Nothing here logs text. Audit events carry ids and counts only (``AuditLog`` allowlist).
 """
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import os
@@ -39,6 +48,7 @@ from api.store import (DEFAULT_TITLE, InMemoryTranscriptStore, Principal, _iso, 
                        unarchive_on_user_message)
 
 TRANSCRIPT_RETENTION_DAYS = 90
+CONDITIONAL_WRITE_ATTEMPTS = 8
 _SAFE = re.compile(r"[A-Za-z0-9_:.-]{1,128}")  # always fullmatch: `$` would accept a trailing "\n"
 _USER_PREFIX = re.compile(r"^[A-Za-z0-9_:.-]{1,128}/transcripts/users/[0-9a-f]{32}/")
 
@@ -57,25 +67,51 @@ def resolve_mode(mode: str | None = None) -> str:
 def make_store(mode: str | None = None, audit=None):
     """The store for ``mode`` (or ``CC_TRANSCRIPT_MODE``). Ephemeral unless explicitly persisted."""
     if resolve_mode(mode) == "persisted":
+        bucket = os.environ.get("CC_TRANSCRIPT_S3_BUCKET")
         root = os.environ.get("CC_TRANSCRIPT_DIR")
-        blobs = DirBlobs(Path(root)) if root else MemoryBlobs()
+        if bucket:
+            import boto3
+            blobs = S3Blobs(boto3.client("s3"), bucket)
+        else:
+            blobs = DirBlobs(Path(root)) if root else MemoryBlobs()
         keys_dir = os.environ.get("CC_TRANSCRIPT_KEYS_DIR")
         return SealedTranscriptStore(blobs, Keyring(Path(keys_dir) if keys_dir else None), audit=audit)
     return InMemoryTranscriptStore(audit=audit)
 
+
+class PreconditionFailed(Exception):
+    """A conditional write lost: the object changed since it was read (If-Match) or already exists (If-None-Match)."""
+
+
+class ConcurrentUpdateConflict(RuntimeError):
+    """A conversation kept changing under every retry of a conditional write."""
+
+
+def etag_of(body: bytes) -> str:
+    """The ETag S3 gives a single-part upload without SSE-KMS; local stand-ins use it for compare-and-set."""
+    return hashlib.md5(body).hexdigest()
+
+
+# Blob stores: put / get / get_with_etag / delete / list. ``put`` takes ``if_match`` (an ETag from get_with_etag) or
+# ``if_none_match=True`` (create only) and raises PreconditionFailed when the condition does not hold.
 
 class MemoryBlobs:
     def __init__(self):
         self._data: dict[str, bytes] = {}
         self._lock = threading.Lock()
 
-    def put(self, key: str, body: bytes) -> None:
+    def put(self, key: str, body: bytes, *, if_match: str | None = None, if_none_match: bool = False) -> None:
         with self._lock:
+            _check_condition(self._data.get(key), if_match, if_none_match)
             self._data[key] = bytes(body)
 
     def get(self, key: str) -> bytes | None:
         with self._lock:
             return self._data.get(key)
+
+    def get_with_etag(self, key: str) -> tuple[bytes, str] | None:
+        body = self.get(key)
+        return None if body is None else (body, etag_of(body))
 
     def delete(self, key: str) -> None:
         with self._lock:
@@ -86,12 +122,21 @@ class MemoryBlobs:
             return sorted(k for k in self._data if k.startswith(prefix))
 
 
+def _check_condition(current: bytes | None, if_match: str | None, if_none_match: bool) -> None:
+    if if_none_match and current is not None:
+        raise PreconditionFailed("object exists")
+    if if_match is not None and (current is None or etag_of(current) != if_match):
+        raise PreconditionFailed("object changed")
+
+
 class DirBlobs:
-    """Local-disk stand-in for the S3 prefix. Files are 0600, directories 0700, writes are atomic."""
+    """Local-disk stand-in for the S3 prefix. Files are 0600, directories 0700, writes are atomic. Conditional writes
+    hold an exclusive lock on ``<root>/.lock``, so they are atomic across processes sharing the directory."""
 
     def __init__(self, root: Path):
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        self._lock_path = self.root / ".lock"
 
     def _path(self, key: str) -> Path:
         path = (self.root / key).resolve()
@@ -99,10 +144,23 @@ class DirBlobs:
             raise ValueError("key escapes the transcript root")
         return path
 
-    def put(self, key: str, body: bytes) -> None:
+    def put(self, key: str, body: bytes, *, if_match: str | None = None, if_none_match: bool = False) -> None:
         path = self._path(key)
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        tmp = path.with_suffix(path.suffix + ".tmp")
+        if if_match is None and not if_none_match:
+            self._write(path, body)
+            return
+        fd = os.open(self._lock_path, os.O_WRONLY | os.O_CREAT, 0o600)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            _check_condition(self.get(key), if_match, if_none_match)
+            self._write(path, body)
+        finally:
+            os.close(fd)   # releases the lock
+
+    @staticmethod
+    def _write(path: Path, body: bytes) -> None:
+        tmp = path.with_suffix(path.suffix + f".{os.getpid()}.{threading.get_ident()}.tmp")
         fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "wb") as fh:
             fh.write(body)
@@ -114,6 +172,10 @@ class DirBlobs:
         except FileNotFoundError:
             return None
 
+    def get_with_etag(self, key: str) -> tuple[bytes, str] | None:
+        body = self.get(key)
+        return None if body is None else (body, etag_of(body))
+
     def delete(self, key: str) -> None:
         try:
             self._path(key).unlink()
@@ -123,7 +185,59 @@ class DirBlobs:
     def list(self, prefix: str) -> list[str]:
         base = self.root
         return sorted(str(p.relative_to(base)) for p in base.rglob("*")
-                      if p.is_file() and not p.name.endswith(".tmp") and str(p.relative_to(base)).startswith(prefix))
+                      if p.is_file() and not p.name.endswith(".tmp") and p != self._lock_path
+                      and str(p.relative_to(base)).startswith(prefix))
+
+
+class S3Blobs:
+    """The blob interface on an S3 bucket, through any boto3-shaped client (boto3, or ccsim.aws's in-process one).
+    Conditional writes are S3's own (If-Match / If-None-Match on PutObject). Encryption at rest is the bucket's
+    default SSE-KMS, on top of the store's own envelope encryption."""
+
+    _LOST_RACE_CODES = ("PreconditionFailed", "ConditionalRequestConflict", "NoSuchKey")
+
+    def __init__(self, client, bucket: str):
+        self.client = client
+        self.bucket = bucket
+
+    def put(self, key: str, body: bytes, *, if_match: str | None = None, if_none_match: bool = False) -> None:
+        condition = {"IfMatch": f'"{if_match}"'} if if_match is not None else {"IfNoneMatch": "*"} if if_none_match else {}
+        try:
+            self.client.put_object(Bucket=self.bucket, Key=key, Body=bytes(body), **condition)
+        except Exception as exc:  # noqa: BLE001 - botocore ClientError and ccsim AWSError share .response
+            if condition and _error_code(exc) in self._LOST_RACE_CODES:
+                raise PreconditionFailed(_error_code(exc)) from None
+            raise
+
+    def get(self, key: str) -> bytes | None:
+        found = self.get_with_etag(key)
+        return None if found is None else found[0]
+
+    def get_with_etag(self, key: str) -> tuple[bytes, str] | None:
+        try:
+            response = self.client.get_object(Bucket=self.bucket, Key=key)
+        except Exception as exc:  # noqa: BLE001
+            if _error_code(exc) == "NoSuchKey":
+                return None
+            raise
+        return response["Body"].read(), response["ETag"].strip('"')
+
+    def delete(self, key: str) -> None:
+        self.client.delete_object(Bucket=self.bucket, Key=key)
+
+    def list(self, prefix: str) -> list[str]:
+        keys, token = [], None
+        while True:
+            page_kwargs = {"ContinuationToken": token} if token else {}
+            response = self.client.list_objects_v2(Bucket=self.bucket, Prefix=prefix, **page_kwargs)
+            keys += [item["Key"] for item in response.get("Contents") or []]
+            if not response.get("IsTruncated"):
+                return sorted(keys)
+            token = response["NextContinuationToken"]
+
+
+def _error_code(exc: Exception) -> str | None:
+    return (getattr(exc, "response", None) or {}).get("Error", {}).get("Code")
 
 
 class CustomerKeyDisabled(Exception):
@@ -211,16 +325,16 @@ class SealedTranscriptStore:
 
     def append_message(self, principal, conversation_id, message):
         _check_id(conversation_id)
-        with self._lock:
-            if self.owned_by_other(principal, conversation_id):
-                raise PermissionError("conversation belongs to another principal")
-            conv = self._load(principal, conversation_id) or {
-                "id": conversation_id, "title": DEFAULT_TITLE, "createdAt": time.time(), "updatedAt": time.time(),
-                "messages": []}
+        if self.owned_by_other(principal, conversation_id):
+            raise PermissionError("conversation belongs to another principal")
+
+        def append(conv):
             unarchive_on_user_message(conv, message)
             conv["messages"].append(dict(message))
             conv["updatedAt"] = time.time()
-            self._save(principal, conv)
+            return None, True
+
+        self._change(principal, conversation_id, append, create=True)
 
     def rename_conversation(self, principal, conversation_id, title):
         return self.update_conversation(principal, conversation_id, title=title)
@@ -229,34 +343,25 @@ class SealedTranscriptStore:
         """1.17.0: title / pin / archive. The flags are sealed with the transcript like the title."""
         if title is not None:
             clean_title(title)
-        with self._lock:
-            conv = self._load(principal, conversation_id)
-            if conv is None:
-                return None
-            out = apply_update(conv, title, pinned, archived)
-            self._save(principal, conv)
-            return out
+        return self._change(principal, conversation_id, lambda conv: (apply_update(conv, title, pinned, archived), True))
 
     def auto_title(self, principal, conversation_id, title):
         """Server-derived title (api.titles). Only replaces the generic title, so a user rename always wins."""
-        with self._lock:
-            conv = self._load(principal, conversation_id)
-            if conv is None or conv["title"] != DEFAULT_TITLE:
-                return False
+        def retitle(conv):
+            if conv["title"] != DEFAULT_TITLE:
+                return False, False
             conv["title"] = clean_title(title)
-            self._save(principal, conv)
-            return True
+            return True, True
+
+        return bool(self._change(principal, conversation_id, retitle))
 
     def set_feedback(self, principal, conversation_id, message_id, feedback):
         """Same as the in-memory store; the feedback (and its comment) is sealed with the transcript."""
-        with self._lock:
-            conv = self._load(principal, conversation_id)
-            if conv is None:
-                return "missing"
+        def rate(conv):
             result = apply_feedback(conv, message_id, feedback)
-            if result == "ok":
-                self._save(principal, conv)
-            return result
+            return result, result == "ok"
+
+        return self._change(principal, conversation_id, rate) or "missing"
 
     def delete_conversation(self, principal, conversation_id):
         if not _SAFE.fullmatch(conversation_id or ""):
@@ -265,8 +370,7 @@ class SealedTranscriptStore:
             prefix = self._prefix(principal)
             if self.blobs.get(f"{prefix}meta/{conversation_id}.json") is None:
                 return False
-            self.blobs.delete(f"{prefix}content/{conversation_id}.bin")
-            self.blobs.delete(f"{prefix}meta/{conversation_id}.json")
+            self._delete_objects(prefix, conversation_id)
         self._audit("conversation_deleted", customer=principal.customer, user=principal.user,
                     conversation_id=conversation_id)
         return True
@@ -325,7 +429,61 @@ class SealedTranscriptStore:
         self.keyring.disable(customer)
         self._audit("transcripts_shredded", customer=customer)
 
+    # ---- run events (replay from Last-Event-ID on any API task) ----------------------------------
+    def put_run_events(self, principal, conversation_id, message_id, chunk_number: int, events: list[dict]) -> None:
+        """Chunk ``chunk_number`` of a run's events. Write-once: a second writer of the same chunk is an error."""
+        _check_id(conversation_id)
+        _check_id(message_id)
+        key = f"{self._prefix(principal)}runs/{conversation_id}/{message_id}/{chunk_number:06d}.bin"
+        body = json.dumps(events, separators=(",", ":"), default=str).encode()
+        sealed = _seal(self._dek(principal, create=True), body, self._aad(principal, f"run:{message_id}:{chunk_number}"))
+        self.blobs.put(key, sealed, if_none_match=True)
+
+    def run_events(self, principal, message_id) -> list[dict] | None:
+        """Every stored event of the principal's run ``message_id`` in order, or None when it has no chunk."""
+        if not _SAFE.fullmatch(message_id or ""):
+            return None
+        keys = [k for k in self.blobs.list(f"{self._prefix(principal)}runs/") if f"/{message_id}/" in k]
+        dek = self._dek(principal, create=False) if keys else None
+        if dek is None:
+            return None
+        events = []
+        for key in sorted(keys):
+            chunk_number = int(key.rsplit("/", 1)[1][:-4])
+            blob = self.blobs.get(key)
+            if blob is not None:
+                events += json.loads(_open(dek, blob, self._aad(principal, f"run:{message_id}:{chunk_number}")))
+        return events
+
     # ---- internals -------------------------------------------------------------------------------
+    def _change(self, principal, conversation_id, change, create: bool = False):
+        """Read the conversation object, apply ``change(conv) -> (result, write)`` and write it back with If-Match on
+        the ETag it was read with (If-None-Match for a new one). Another writer in between makes the write fail; it
+        is then re-read and ``change`` runs again. Returns None when the conversation is missing and not created."""
+        for _attempt in range(CONDITIONAL_WRITE_ATTEMPTS):
+            with self._lock:
+                loaded = self._load_versioned(principal, conversation_id)
+                if loaded is None and not create:
+                    return None
+                now = time.time()
+                conv, etag = loaded or ({"id": conversation_id, "title": DEFAULT_TITLE, "createdAt": now,
+                                         "updatedAt": now, "messages": []}, None)
+                result, write = change(conv)
+                if not write:
+                    return result
+                try:
+                    self._save(principal, conv, etag)
+                except PreconditionFailed:
+                    continue
+                return result
+        raise ConcurrentUpdateConflict(f"conversation changed under {CONDITIONAL_WRITE_ATTEMPTS} conditional writes")
+
+    def _delete_objects(self, prefix: str, conversation_id: str) -> None:
+        for key in self.blobs.list(f"{prefix}runs/{conversation_id}/"):
+            self.blobs.delete(key)
+        self.blobs.delete(f"{prefix}content/{conversation_id}.bin")
+        self.blobs.delete(f"{prefix}meta/{conversation_id}.json")
+
     @staticmethod
     def _user_hash(principal) -> str:
         return hashlib.sha256(f"{principal.customer}\x00{principal.user}".encode()).hexdigest()[:32]
@@ -354,35 +512,44 @@ class SealedTranscriptStore:
         self.blobs.put(key, _seal(kek, dek, self._aad(principal, "transcript-dek")))
         return dek
 
-    def _save(self, principal, conv: dict) -> None:
+    def _save(self, principal, conv: dict, etag: str | None) -> None:
+        """The content object conditionally (``etag`` None: create only), then its listing meta (no text)."""
         dek = self._dek(principal, create=True)
         sealed = {"title": conv["title"], "messages": conv["messages"]}
         sealed.update({k: conv[k] for k in ("pinned", "pinnedAt", "archived") if conv.get(k)})  # 1.17.0, sealed too
         body = json.dumps(sealed, separators=(",", ":"), default=str).encode()
         prefix = self._prefix(principal)
         self.blobs.put(f"{prefix}content/{conv['id']}.bin",
-                       _seal(dek, body, self._aad(principal, f"content:{conv['id']}")))
+                       _seal(dek, body, self._aad(principal, f"content:{conv['id']}")),
+                       if_match=etag, if_none_match=etag is None)
         meta = {"id": conv["id"], "customer": principal.customer, "createdAt": conv.get("createdAt", conv["updatedAt"]),
                 "updatedAt": conv["updatedAt"], "messageCount": len(conv["messages"])}
         self.blobs.put(f"{prefix}meta/{conv['id']}.json", json.dumps(meta).encode())
 
     def _load(self, principal, conversation_id) -> dict | None:
+        if not _SAFE.fullmatch(conversation_id or "") or self.blobs.get(f"{self._prefix(principal)}meta/{conversation_id}.json") is None:
+            return None  # not listed: deleted, or a crash between the content and meta writes
+        loaded = self._load_versioned(principal, conversation_id)
+        return loaded and loaded[0]
+
+    def _load_versioned(self, principal, conversation_id) -> tuple[dict, str] | None:
         if not _SAFE.fullmatch(conversation_id or ""):
             return None
         prefix = self._prefix(principal)
-        meta_raw = self.blobs.get(f"{prefix}meta/{conversation_id}.json")
-        blob = self.blobs.get(f"{prefix}content/{conversation_id}.bin")
-        if meta_raw is None or blob is None:
+        found = self.blobs.get_with_etag(f"{prefix}content/{conversation_id}.bin")
+        if found is None:
             return None
+        blob, etag = found
         dek = self._dek(principal, create=False)
         if dek is None:
             return None
         body = json.loads(_open(dek, blob, self._aad(principal, f"content:{conversation_id}")))
-        meta = json.loads(meta_raw)
+        meta_raw = self.blobs.get(f"{prefix}meta/{conversation_id}.json")
+        meta = json.loads(meta_raw) if meta_raw else {"updatedAt": time.time()}
         return {"id": conversation_id, "title": body["title"], "messages": body["messages"],
                 "createdAt": meta.get("createdAt"), "updatedAt": meta["updatedAt"],
                 "pinned": bool(body.get("pinned")), "pinnedAt": body.get("pinnedAt"),
-                "archived": bool(body.get("archived"))}
+                "archived": bool(body.get("archived"))}, etag
 
     def _expire(self, principal) -> None:
         now = time.time()
@@ -402,13 +569,11 @@ class SealedTranscriptStore:
             for key in metas:
                 raw = self.blobs.get(key)
                 if raw and json.loads(raw)["updatedAt"] < cutoff:
-                    cid = key[len(f"{prefix}meta/"):-5]
-                    self.blobs.delete(f"{prefix}content/{cid}.bin")
-                    self.blobs.delete(key)
+                    self._delete_objects(prefix, key[len(f"{prefix}meta/"):-5])
                     removed += 1
             if shred_empty and removed == len(metas) and self.blobs.get(f"{prefix}dek.bin") is not None:
                 # Stray content without meta can't be listed or read anyway; drop it with the key.
-                for key in self.blobs.list(f"{prefix}content/"):
+                for key in self.blobs.list(f"{prefix}content/") + self.blobs.list(f"{prefix}runs/"):
                     self.blobs.delete(key)
                 self.blobs.delete(f"{prefix}dek.bin")
         return removed

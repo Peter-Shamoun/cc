@@ -132,6 +132,13 @@ class ChatRequest(BaseModel):
     temporary: bool = False
 
 
+#: A run's events are also written to the conversation store in numbered chunks when it can hold them (persisted
+#: mode): a chunk is written at message.end, at this many events, or when this long has passed since the last one.
+RUN_EVENT_CHUNK_EVENTS = 64
+RUN_EVENT_CHUNK_SECONDS = 1.0
+#: a replay from stored chunks re-reads them this often while the run is still going on another task
+STORED_RUN_POLL_SECONDS = 0.5
+
 #: Demo pacing (QA-P1/P4). With the scripted LLM, answers are paced like a real model so the streaming UI
 #: is actually exercised: a pause per model call and per text chunk. CC_API_DEMO_PACE=0 turns it off (tests),
 #: and explicit CC_API_MODEL_DELAY_SECONDS / CC_API_STREAM_DELAY_SECONDS always win.
@@ -232,6 +239,10 @@ class _Run:
     conversation_id: str | None = None
     #: set when the conversation is deleted mid-run: the worker must not write it back (no resurrection)
     discarded: threading.Event = field(default_factory=threading.Event)
+    #: events not yet in a stored chunk, chunks written, when the last one was written (RUN_EVENT_CHUNK_*)
+    unstored_events: list = field(default_factory=list)
+    stored_chunks: int = 0
+    last_chunk_at: float = field(default_factory=time.monotonic)
 
     def notify(self):
         """Wake every attached client, each on its own event loop. Thread-safe; never raises."""
@@ -431,9 +442,12 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 ctx = authed(request, new_id("r"))
             except AuthError:
                 return unauthorized()
+            after = int(seq) if seq.isascii() and seq.isdigit() else -1
+            if run is None and stored_run_events(ctx.principal, mid):
+                return _stream_stored(ctx.principal, mid, after, request)
             if run is None or run.principal != ctx.principal:
                 return error_json("stream_gone", "Nothing to resume.", 404)
-            return _stream(run, int(seq) if seq.isascii() and seq.isdigit() else -1, request)
+            return _stream(run, after, request)
         scoped = sorted(IDENTITY_SCOPED_KEYS & (set(body.model_extra or {}) | set(body.options)))
         if scoped:
             # the client can't pick a customer, database, schema or tables: they come from the sign-in (§2.1)
@@ -598,6 +612,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             elif t == "text.delta" and "first_token" not in marks:
                 marks["first_token"] = int((time.perf_counter() - started) * 1000)
             run.events.append((seq, event))
+            if stores_run_events and not temporary:
+                store_run_events(run, event)
             if press_stop_on is not None and not run.cancelled.is_set() and press_stop_on(event):
                 run.cancelled.set()  # 1.16.0 demo cancel_* scenarios: Stop pressed at a known stage
             run.notify()
@@ -724,6 +740,58 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
 
         return _stream(run, -1, request)
 
+    stores_run_events = hasattr(store, "put_run_events")
+
+    def store_run_events(run: _Run, event: dict):
+        """Buffer ``event`` and write a chunk when one is due. A failed write is logged, never breaks the stream."""
+        run.unstored_events.append(event)
+        due = (event["type"] == "message.end" or len(run.unstored_events) >= RUN_EVENT_CHUNK_EVENTS
+               or time.monotonic() - run.last_chunk_at >= RUN_EVENT_CHUNK_SECONDS)
+        if not due or run.discarded.is_set():
+            return
+        try:
+            store.put_run_events(run.principal, run.conversation_id, run.message_id, run.stored_chunks,
+                                 run.unstored_events)
+        except Exception as exc:  # noqa: BLE001 - replay from another task is best effort; this one still streams
+            log.warning("run event chunk write failed: %s", type(exc).__name__)
+            return
+        run.stored_chunks += 1
+        run.unstored_events = []
+        run.last_chunk_at = time.monotonic()
+
+    def stored_run_events(principal, message_id: str) -> list | None:
+        if not stores_run_events:
+            return None
+        try:
+            return store.run_events(principal, message_id)
+        except CustomerKeyDisabled:
+            return None
+
+    def _stream_stored(principal, message_id: str, after: int, request: Request):
+        """Replay a run this task does not hold (another task ran it, or it was collected) from its stored chunks,
+        then follow them until message.end. Ends when nothing new arrives for ``resume_seconds`` (its task died):
+        the client then reloads the saved conversation."""
+        async def gen():
+            sent = after
+            last_new_event = last_beat = time.monotonic()
+            while True:
+                stored = await asyncio.to_thread(stored_run_events, principal, message_id) or []
+                for event in stored:
+                    if event["seq"] > sent:
+                        yield _sse(f"{message_id}:{event['seq']}", event)
+                        sent = event["seq"]
+                        last_new_event = time.monotonic()
+                if (stored and stored[-1]["type"] == "message.end") or \
+                        time.monotonic() - last_new_event > settings.resume_seconds or await request.is_disconnected():
+                    return
+                if time.monotonic() - last_beat >= settings.heartbeat_seconds:
+                    last_beat = time.monotonic()
+                    yield _sse(None, {"type": "heartbeat", "at": _iso(time.time())})
+                await asyncio.sleep(STORED_RUN_POLL_SECONDS)
+
+        return StreamingResponse(gen(), media_type="text/event-stream",
+                                 headers={**NO_STORE, "X-Accel-Buffering": "no"})
+
     def _detach(run: _Run):
         run.attached -= 1
         if run.attached > 0 or run.done:
@@ -785,11 +853,13 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         except AuthError:
             return unauthorized()
         run = runs.get(message_id)
-        if run is None or run.principal != ctx.principal:
-            return error_json("stream_gone", "Nothing to resume.", 404)
         last_event = request.headers.get("last-event-id") or ""
         mid, _, seq = last_event.rpartition(":")
         after = int(seq) if mid == message_id and seq.isascii() and seq.isdigit() else -1
+        if run is None and stored_run_events(ctx.principal, message_id):
+            return _stream_stored(ctx.principal, message_id, after, request)
+        if run is None or run.principal != ctx.principal:
+            return error_json("stream_gone", "Nothing to resume.", 404)
         return _stream(run, after, request)
 
     @app.post("/api/chat/{message_id}/stop")
