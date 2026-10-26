@@ -26,3 +26,11 @@ Guard tests that run inside `npm test`:
 
 Current bundle, as of 2026-10-25: initial JS is 528 KB gz and the largest lazy chunk is Shiki's oniguruma wasm at 225 KB gz. The budgets
 sit slightly above these numbers. Lower a budget whenever the bundle shrinks. A PR that raises one has to say why.
+
+## Demo pacing (QA-P1/P4)
+
+With the scripted demo LLM, the API now paces answers like a real model so the streaming UI is actually exercised:
+0.25 s per model call and 0.02 s per text chunk, and at least 0.8 s per model call for the `slow` scenario (so Stop
+can be tested). `CC_API_DEMO_PACE=0` turns it off; `api/tests/conftest.py` sets that, so pytest stays fast.
+Explicit `CC_API_MODEL_DELAY_SECONDS` / `CC_API_STREAM_DELAY_SECONDS` always win. Pacing never applies to a
+non-scripted LLM.
