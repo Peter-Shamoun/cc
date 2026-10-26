@@ -63,7 +63,6 @@ test.describe('live demo backend @both', () => {
   });
 
   test('follow-up keeps the thread and pins the new question', async ({ page }) => {
-    gap('QA-S12: follow-up question scrolls out of view once a long answer (assumptions/checks) finishes (shell)');
     await open(page, LIVE);
     await ask(page, 'What is the denial rate by payer?');
     await ask(page, 'Total paid by payer');
