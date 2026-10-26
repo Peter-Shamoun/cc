@@ -18,6 +18,8 @@ export interface ThreadActions {
   send: (t: string) => void;
   /** Clarify/abstain replies (answer team: set this to resume-aware send once useChat takes {resume}). */
   reply?: OnReply;
+  /** QA-S41: copy the thread up to answer `i` into a new chat (absent when the store can't). */
+  branch?: (i: number) => void;
 }
 
 /**
@@ -64,7 +66,8 @@ const Row = memo(function Row({ msg, index, isLast, reserve, lazy, busy, vCur, v
         onReply={a.reply ? (t, r) => actions.current.reply?.(t, r) : undefined}
         version={vCur !== undefined && vTotal !== undefined ? { current: vCur, total: vTotal } : undefined} versionBusy={busy}
         onVersion={(k) => actions.current.switchVersion(index - 1, k)}
-        onRefine={isLast ? (style) => actions.current.regenerate(style) : undefined} />
+        onRefine={isLast ? (style) => actions.current.regenerate(style) : undefined}
+        onBranch={a.branch ? () => actions.current.branch?.(index) : undefined} />
     </div>
   );
 });

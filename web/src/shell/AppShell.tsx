@@ -576,6 +576,10 @@ function ShellInner() {
     send,
     // Clarification chips / free text resume the paused run (ChatRequest.resume); abstain rephrasings send plainly.
     reply: (t, resume) => send(t, resume),
+    // Not from a temporary chat: the copy would have to be temporary too, and a branch is meant to be kept.
+    branch: chat.canBranch && !isTempChat ? (i) => {
+      void chat.branchAt(i).then((id) => { if (id) { toast({ text: 'Branched into a new chat' }); if (!coarse()) requestAnimationFrame(focusComposer); } }, () => toast({ text: 'Couldn’t branch this chat. Try again.' }));
+    } : undefined,
   };
   useLayoutEffect(() => {
     if (!auditOn) return;
