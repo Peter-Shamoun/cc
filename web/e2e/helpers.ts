@@ -114,3 +114,29 @@ export function gap(id: string) {
   test.info().annotations.push({ type: 'gap', description: id });
   test.fail(true, id);
 }
+
+/**
+ * The live demo API keeps every chat from earlier tests in memory, so the sidebar's history list depends on
+ * test order. For pixel baselines, hide every conversation that existed before this page first loaded.
+ */
+export async function isolateHistory(page: Page) {
+  let before: Set<string> | null = null;
+  const idOf = (c: unknown) => String((c as { id?: unknown })?.id ?? JSON.stringify(c));
+  await page.route(/\/api\/conversations(\?[^/]*)?$/, async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    let res: Awaited<ReturnType<typeof route.fetch>>;
+    try { res = await route.fetch(); } catch { return; } // the test ended mid-request
+    let body: unknown;
+    try { body = await res.json(); } catch { return route.fulfill({ response: res }).catch(() => {}); }
+    const keep = (a: unknown[]) => { if (!before) before = new Set(a.map(idOf)); return a.filter((c) => !before!.has(idOf(c))); };
+    let out: unknown = body;
+    if (Array.isArray(body)) out = keep(body);
+    else if (body && typeof body === 'object') {
+      const o = { ...(body as Record<string, unknown>) };
+      const k = Object.keys(o).find((x) => Array.isArray(o[x]));
+      if (k) o[k] = keep(o[k] as unknown[]);
+      out = o;
+    }
+    await route.fulfill({ response: res, json: out }).catch(() => {});
+  });
+}
