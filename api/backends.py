@@ -198,7 +198,28 @@ def _question(messages: list) -> str:
 
 # ---------------------------------------------------------------- demo scenarios (contract v1 §9)
 
-SCENARIOS = ("table", "chart", "repair", "abstain", "clarify", "escalation", "candidates", "error", "slow", "report")
+SCENARIOS = ("table", "chart", "repair", "abstain", "clarify", "escalation", "candidates", "error", "slow", "report",
+             # 1.16.0 edge cases (CONTRACT.md §9.1): what the UI must survive, each with an example stream
+             "empty", "multi_table", "long_sql", "many_repairs", "clarify_nested", "escalation_abstain",
+             "cancel_plan", "cancel_sql", "cancel_repair", "cancel_candidates", "cancel_escalation", "cancel_render")
+#: 1.16.0 "cancel at every stage": scenario -> (scripted run it rides on, the event that presses Stop).
+#: The server presses Stop itself the moment that event is emitted, so the aborted stream is deterministic.
+CANCEL_AT = {
+    "cancel_plan": ("table", lambda e: e.get("type") == "status" and e.get("label") == "Thinking"),
+    "cancel_sql": ("table", lambda e: e.get("type") == "step.sql_running"),
+    "cancel_repair": ("repair", lambda e: e.get("type") == "step.repair_attempt"),
+    "cancel_candidates": ("candidates", lambda e: e.get("type") == "step.sql_running" and e.get("candidateId") == "k2"),
+    "cancel_escalation": ("escalation", lambda e: e.get("type") == "escalation"),
+    "cancel_render": ("table", lambda e: e.get("type") in ("text.start", "part")),
+}
+
+
+def scripted_scenario(scenario: str | None) -> str | None:
+    """The ScriptedLLM script a scenario runs (``report`` and the cancel_* scenarios reuse another one)."""
+    if scenario == "report":
+        return "chart"
+    return CANCEL_AT[scenario][0] if scenario in CANCEL_AT else scenario
+
 _SCENARIO_WORDS = [
     ("error", re.compile(r"\b(simulate (an )?(error|outage)|fail on purpose)\b", re.I)),
     ("clarify", re.compile(r"\b(how (bad|big) (are|is)|ambiguous|clarify)\b", re.I)),
@@ -209,11 +230,19 @@ _SCENARIO_WORDS = [
     ("slow", re.compile(r"\bslow(ly)?\b", re.I)),
     ("report", re.compile(r"\b(report|artifact)\b", re.I)),
 ]
+# 1.16.0 edge cases are reached with ChatRequest.scenario only (no keywords), so real questions never hit them.
 #: AnalyzerConfig overrides a scenario needs (the analyzer itself does the candidates/cascade/ask work).
 SCENARIO_CONFIG = {
     "clarify": {"enable_ask": True},
     "escalation": {"cascade": "haiku_then_sonnet"},
     "candidates": {"candidates": 3, "candidate_selection": "execution_vote"},
+    # 1.16.0
+    "empty": {"verify": False},                      # an empty result is the answer, not a reason to revise
+    "many_repairs": {"max_repairs": 6, "max_turns": 10, "max_tool_calls": 14},
+    "clarify_nested": {"enable_ask": True},
+    "escalation_abstain": {"cascade": "haiku_then_sonnet"},
+    "cancel_candidates": {"candidates": 3, "candidate_selection": "execution_vote"},
+    "cancel_escalation": {"cascade": "haiku_then_sonnet"},
 }
 CLARIFY_QUESTION = "Do you want the denial rate by **claim count** or by **billed dollars**?"
 CLARIFY_CHOICES = [
@@ -247,6 +276,58 @@ _NCR = ("SELECT payer_name, SUM(paid_amount) / NULLIF(SUM(charge_amount), 0) AS 
         "FROM sem.claims\nGROUP BY 1\nORDER BY net_collection_rate DESC")
 _SQL_CARC_BAD = ("SELECT denial_code, COUNT(*) AS claims\nFROM sem.claims\nWHERE status IN ('denied', 'partial')\n"
              "GROUP BY 1\nORDER BY claims DESC")
+# ---- 1.16.0 edge-case scripts (synthetic data; every query runs on the demo DuckDB)
+EMPTY_SQL = ("SELECT payer_name, COUNT(*) AS claims, SUM(paid_amount) AS paid_amount\nFROM sem.claims\n"
+             "WHERE payer_name = 'Tricare' AND status = 'denied'\nGROUP BY 1")
+MULTI_TABLE_SQL = (
+    "SELECT payer_name, COUNT(*) AS claims, SUM(paid_amount) AS paid_amount\nFROM sem.claims\nGROUP BY 1\nORDER BY 3 DESC",
+    "SELECT status, COUNT(*) AS claims, SUM(charge_amount) AS charge_amount\nFROM sem.claims\nGROUP BY 1\nORDER BY 2 DESC",
+)
+MULTI_TABLE_TITLES = ("By payer", "By claim status")
+
+
+def _long_sql() -> str:
+    """A realistic but very long query (~9 KB, 150+ lines): one CTE per payer plus a wide pivot."""
+    payers = ["Aetna", "BCBS", "Cigna", "Humana", "Medicare", "Medicaid", "UnitedHealthcare"]
+    ctes = []
+    for p in payers:
+        key = p.lower()
+        ctes.append(
+            f"{key}_monthly AS (\n"
+            f"  SELECT date_trunc('month', service_date)::DATE AS service_month,\n"
+            f"         COUNT(*) AS claims,\n"
+            f"         SUM(charge_amount) AS charge_amount,\n"
+            f"         SUM(paid_amount) AS paid_amount,\n"
+            f"         SUM(CASE WHEN status = 'denied' THEN 1 ELSE 0 END) AS denied_claims,\n"
+            f"         SUM(CASE WHEN status = 'partial' THEN 1 ELSE 0 END) AS partial_claims\n"
+            f"  FROM sem.claims\n"
+            f"  WHERE payer_name = '{p}'\n"
+            f"  GROUP BY 1\n)")
+    cols = ",\n".join(
+        f"  COALESCE({p.lower()}_monthly.paid_amount, 0) AS paid_{p.lower()},\n"
+        f"  COALESCE({p.lower()}_monthly.denied_claims, 0) AS denied_{p.lower()}" for p in payers)
+    joins = "\n".join(f"LEFT JOIN {p.lower()}_monthly USING (service_month)" for p in payers)
+    return ("WITH months AS (\n  SELECT DISTINCT date_trunc('month', service_date)::DATE AS service_month\n"
+            "  FROM sem.claims\n),\n" + ",\n".join(ctes) +
+            "\nSELECT\n  months.service_month,\n" + cols + "\nFROM months\n" + joins + "\nORDER BY 1")
+
+
+LONG_SQL = _long_sql()
+#: many_repairs: four failing attempts, each with a different error, then a working query.
+MANY_REPAIRS_BAD = [
+    "SELECT denial_reason, COUNT(*) AS claims\nFROM sem.claims\nGROUP BY 1",
+    "SELECT carc, COUNT(*) AS claims\nFROM sem.claims\nGROUP BY 1",
+    "SELECT carc_code, COUNT(*) AS claims\nFROM sem.claim\nGROUP BY 1",
+    "SELECT carc_code, COUNT(*) AS claims\nFROM sem.claims\nGROUP BY carc_code, status ORDER BY claimz",
+]
+NESTED_CLARIFY = [
+    (CLARIFY_QUESTION,
+     [{"id": "count", "label": "By claim count"}, {"id": "dollars", "label": "By billed dollars"}]),
+    ("Over which **time window**?",
+     [{"id": "90d", "label": "Last 90 days", "description": "Service dates in the last 90 days of data"},
+      {"id": "all", "label": "All time", "description": "Every service date in the data"}]),
+]
+
 _SQL_CARC = ("SELECT carc_code, COUNT(*) AS claims, SUM(charge_amount) AS charge_amount\nFROM sem.claims\n"
          "WHERE status IN ('denied', 'partial')\nGROUP BY 1\nORDER BY claims DESC")
 
@@ -326,8 +407,91 @@ def scenario_turn(scenario: str):
                         "tool_calls": [{"name": "run_sql", "arguments": {"sql": _SQL_CARC}}]}
             return _final(_SQL_CARC, "Denied and partially paid claims by CARC code.",
                           ["Includes partial payments, which carry an adjustment reason."])
+        if scenario in EDGE_TURNS:
+            return EDGE_TURNS[scenario](model, question, step, candidate_index)
         return demo_turn(model, messages, candidate_index)
     return turn
+
+
+def _run_sql(sql: str, text: str | None = None) -> dict:
+    out = {"tool_calls": [{"name": "run_sql", "arguments": {"sql": sql}}]}
+    if text:
+        out["text"] = text
+    return out
+
+
+def _turn_empty(model, question, step, cand):
+    if step == 0:
+        return _explore()
+    if step == 1:
+        return _run_sql(EMPTY_SQL)
+    return _final(EMPTY_SQL, "No denied claims from Tricare in this data, so there is nothing to break down.",
+                  ["Tricare is matched by exact payer name."])
+
+
+def _turn_multi_table(model, question, step, cand):
+    if step == 0:
+        return _explore()
+    if step in (1, 2):
+        return _run_sql(MULTI_TABLE_SQL[step - 1])
+    return _final(MULTI_TABLE_SQL[0], "Claims and paid amount by payer, and claims and charges by status.",
+                  ["Each table counts every claim once."])
+
+
+def _turn_long_sql(model, question, step, cand):
+    if step == 0:
+        return _explore()
+    if step == 1:
+        return _run_sql(LONG_SQL, "One monthly series per payer, joined on service month.")
+    return _final(LONG_SQL, "Paid amount and denied claims by month, one column pair per payer.",
+                  ["Months with no claims for a payer show 0."])
+
+
+def _turn_many_repairs(model, question, step, cand):
+    if step == 0:
+        return _explore()
+    if 1 <= step <= len(MANY_REPAIRS_BAD):
+        return _run_sql(MANY_REPAIRS_BAD[step - 1], "Retrying with a corrected query." if step > 1 else None)
+    if step == len(MANY_REPAIRS_BAD) + 1:
+        return _run_sql(_SQL_CARC, "The denial reason column is carc_code on sem.claims.")
+    return _final(_SQL_CARC, "Denied and partially paid claims by CARC code (after four corrections).",
+                  ["Includes partial payments, which carry an adjustment reason."])
+
+
+def _turn_clarify_nested(model, question, step, cand):
+    answered = len(re.findall(r"^Clarification:", question, re.M))
+    if answered < len(NESTED_CLARIFY):
+        if answered == 0 and step == 0:
+            return _explore()
+        q, choices = NESTED_CLARIFY[answered]
+        return {"tool_calls": [{"name": "ask", "arguments": {"question": q, "choices": choices}}]}
+    dollars = re.search(r"Clarification:.*dollar", question, re.I)
+    recent = re.search(r"Clarification:.*90 days", question, re.I)
+    where = "\nWHERE service_date >= (SELECT MAX(service_date) - INTERVAL 90 DAY FROM sem.claims)" if recent else ""
+    sql = (("SELECT payer_name, SUM(CASE WHEN status = 'denied' THEN charge_amount ELSE 0 END) / SUM(charge_amount)"
+            " AS denied_dollar_rate, SUM(charge_amount) AS charge_amount\nFROM sem.claims") if dollars else
+           ("SELECT payer_name, AVG(CASE WHEN status = 'denied' THEN 1.0 ELSE 0.0 END) AS denial_rate, COUNT(*) AS claims"
+            "\nFROM sem.claims")) + where + "\nGROUP BY 1\nORDER BY 2 DESC"
+    if step == 0:
+        return _run_sql(sql)
+    return _final(sql, "Denial rate by payer, " + ("weighted by billed dollars" if dollars else "by claim count")
+                  + (", last 90 days." if recent else ", all time."), ["Denied means the whole claim was denied."])
+
+
+def _turn_escalation_abstain(model, question, step, cand):
+    if "haiku" in model.lower():
+        if step == 0:
+            return _explore()
+        return {"text": "I can't answer this reliably: I could not find appeal outcomes in this data."}
+    if step == 0:
+        return {"text": "Checking whether any view records appeal outcomes.", "tool_calls": [
+            {"name": "describe_relation", "arguments": {"relation": "sem.claims"}}]}
+    return {"tool_calls": [{"name": "refuse", "arguments": {"category": "data_unavailable", "reason": ABSTAIN_REASON}}]}
+
+
+EDGE_TURNS = {"empty": _turn_empty, "multi_table": _turn_multi_table, "long_sql": _turn_long_sql,
+              "many_repairs": _turn_many_repairs, "clarify_nested": _turn_clarify_nested,
+              "escalation_abstain": _turn_escalation_abstain}
 
 
 def demo_turn(model, messages, candidate_index):
@@ -354,8 +518,9 @@ def demo_turn(model, messages, candidate_index):
 def make_llm(kind: str = "scripted", scenario: str | None = None):
     """``scripted`` (default) is offline replay. Real models are wired behind config and stay disabled."""
     if kind == "scripted":
-        # "report" (1.9.0) runs the chart script; api.mapping.report_artifacts reshapes the answer into artifacts
-        scripted = "chart" if scenario == "report" else scenario
+        # "report" (1.9.0) runs the chart script; api.mapping.report_artifacts reshapes the answer into artifacts.
+        # cancel_* (1.16.0) run another script and press Stop at a stage (api.app; CANCEL_AT).
+        scripted = scripted_scenario(scenario)
         return ScriptedLLM([scenario_turn(scripted) if scripted else demo_turn] * 8)
     if kind == "anthropic":
         return AnthropicLLM()

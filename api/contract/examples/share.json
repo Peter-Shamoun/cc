@@ -38,7 +38,7 @@
               "type": "reasoning",
               "id": "p_1",
               "summary": "Checking the claims view.",
-              "durationMs": 23
+              "durationMs": 14
             },
             {
               "type": "text",
@@ -76,7 +76,7 @@
                 "views": [
                   "sem.claims"
                 ],
-                "elapsedMs": 23
+                "elapsedMs": 15
               },
               "dataWithheld": true
             },
@@ -111,21 +111,21 @@
           "finishReason": "stop",
           "usage": {
             "queries": 2,
-            "elapsedMs": 85,
+            "elapsedMs": 77,
             "latency": {
-              "totalMs": 85,
+              "totalMs": 77,
               "modelMs": 0,
               "sqlMs": 4,
               "stages": {
-                "plan": 18,
-                "sql": 6,
+                "plan": 11,
+                "sql": 4,
                 "repair": 0,
-                "checks": 0,
+                "checks": 1,
                 "render": 61
               },
               "firstEventMs": 0,
-              "firstStepMs": 17,
-              "firstTokenMs": 24
+              "firstStepMs": 10,
+              "firstTokenMs": 16
             },
             "costIsEstimate": true,
             "costUsd": 0.003891,
@@ -150,7 +150,7 @@
               "stepId": "s_1",
               "probe": "describe_view",
               "summary": "8 columns",
-              "elapsedMs": 15,
+              "elapsedMs": 8,
               "target": "sem.claims",
               "seq": 4
             },

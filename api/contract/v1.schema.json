@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://cc.local/api/contract/v1.schema.json",
   "title": "CC chat stream contract",
-  "version": "1.15.0",
+  "version": "1.16.0",
   "description": "One JSON object per SSE data: line. See api/CONTRACT.md. Validate an event against #/$defs/StreamEvent.",
   "$ref": "#/$defs/StreamEvent",
   "$defs": {
@@ -2166,7 +2166,7 @@
           "additionalProperties": true
         },
         "scenario": {
-          "description": "Demo mode only: force a scripted scenario.",
+          "description": "Demo mode only: force a scripted scenario (CONTRACT.md §9). 1.16.0 adds the edge cases (§9.1): `empty`, `multi_table`, `long_sql`, `many_repairs`, `clarify_nested`, `escalation_abstain` and `cancel_plan|sql|repair|candidates|escalation|render` (the server presses Stop at that stage); `report` (1.9.0) is listed too. Ignored outside demo mode.",
           "enum": [
             "table",
             "chart",
@@ -2174,9 +2174,22 @@
             "abstain",
             "clarify",
             "escalation",
-            "error",
             "candidates",
-            "slow"
+            "error",
+            "slow",
+            "report",
+            "empty",
+            "multi_table",
+            "long_sql",
+            "many_repairs",
+            "clarify_nested",
+            "escalation_abstain",
+            "cancel_plan",
+            "cancel_sql",
+            "cancel_repair",
+            "cancel_candidates",
+            "cancel_escalation",
+            "cancel_render"
           ]
         }
       },
