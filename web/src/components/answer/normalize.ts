@@ -180,9 +180,9 @@ export function unresolvedFailures(steps: Step[]): number {
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 export function fmtMs(ms: number): string {
-  if (ms < 1000) return `${Math.round(ms)} ms`;
+  if (ms < 1000) return `${Math.round(ms)}ms`; // QA-A14: one format everywhere (7ms, 1.2s, 2m 5s)
   const s = ms / 1000;
-  if (s < 60) return `${s < 10 ? s.toFixed(1) : Math.round(s)}s`;
+  if (s < 60) return `${s < 10 ? s.toFixed(1).replace(/\.0$/, '') : Math.round(s)}s`;
   return `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
 }
 
