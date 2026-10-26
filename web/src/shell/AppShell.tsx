@@ -39,6 +39,7 @@ import { signedOutUrl } from './routes';
 import { trackInputModality } from '../lib/inputModality';
 import type { AssistantView } from '../lib/contract';
 import type { AssistantViewV1, ChatRequest } from '../api/contract';
+import { composerResume, useOpenClarification } from '../lib/openClarification';
 
 /** One auth session for both adapters (src/auth/session.ts): demo token, real-backend cookie, or none. */
 const session = sessionFromEnv();
@@ -435,9 +436,13 @@ function ShellInner() {
   }, [messages]);
   // Late-growing content (charts, images, tables measured after paint) keeps the view anchored at the bottom.
   useEffect(() => {
-    const el = scroller.current, inner = content.current;
-    if (!el || !inner || typeof ResizeObserver === 'undefined') return;
+    const inner = content.current;
+    if (!scroller.current || !inner || typeof ResizeObserver === 'undefined') return;
+    // Memory: read the scroller inside the callback; don't capture it. React's alternate fiber can keep this
+    // effect's closures after you leave a chat, and a captured element kept that chat's whole thread alive.
     const ro = new ResizeObserver(() => {
+      const el = scroller.current;
+      if (!el) return;
       if (atBottomRef.current && !pinned.current) el.scrollTop = el.scrollHeight;
       // QA-A2: a pinned question lets the answer grow below the fold (chart under the composer)
       // without any scroll event. Re-measure so "Jump to latest" shows, like ChatGPT's down arrow.
@@ -560,10 +565,13 @@ function ShellInner() {
   const online = useOnline(); // gates Send at once
   const bannerOnline = useSettledOnline(); // the banner waits out sub-second flaps
   const printing = usePrinting();
+  // QA-A30: while a clarifying question is open, the composer is the reply (Claude/ChatGPT); the card stays in the thread.
+  const clarify = useOpenClarification(messages, chat.busy);
+  const sendOrReply = (t: string) => send(t, clarify ? composerResume(clarify, t) : undefined);
   const composer = (autoFocus: boolean, placeholder?: string) => (
     <>
       {!bannerOnline && <OfflineBanner />}
-      <Composer onEditLast={editLast} onSend={send} onStop={chat.stop} busy={chat.busy} autoFocus={autoFocus} initial={draft} placeholder={placeholder} draftKey={draftKey} enterToSend={enterToSend} onCommand={onCommand} offline={!online} />
+      <Composer onEditLast={editLast} onSend={sendOrReply} onStop={chat.stop} busy={chat.busy} autoFocus={autoFocus} initial={draft} placeholder={clarify ? 'Reply…' : placeholder} draftKey={draftKey} enterToSend={enterToSend} onCommand={onCommand} offline={!online} />
     </>
   );
   const threadActions: ThreadActions = {
@@ -576,6 +584,10 @@ function ShellInner() {
     send,
     // Clarification chips / free text resume the paused run (ChatRequest.resume); abstain rephrasings send plainly.
     reply: (t, resume) => send(t, resume),
+    // Not from a temporary chat: the copy would have to be temporary too, and a branch is meant to be kept.
+    branch: chat.canBranch && !isTempChat ? (i) => {
+      void chat.branchAt(i).then((id) => { if (id) { toast({ text: 'Branched into a new chat' }); if (!coarse()) requestAnimationFrame(focusComposer); } }, () => toast({ text: 'Couldn’t branch this chat. Try again.' }));
+    } : undefined,
   };
   useLayoutEffect(() => {
     if (!auditOn) return;

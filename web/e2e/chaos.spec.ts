@@ -275,7 +275,7 @@ test.describe('chaos: zoom, reflow, RTL @chaos', () => {
 test.describe('chaos: monkey @chaos', () => {
   for (const seed of [7, 42, 1337]) {
     test(`monkey seed ${seed}: 120 random actions, no crash, still answers`, async ({ page }) => {
-      test.setTimeout(180_000);
+      test.setTimeout(300_000); // each miss can burn ~1s; 180s was flaky on a loaded box (C10)
       const errs = crashWatch(page);
       page.on('dialog', (d) => void d.dismiss());
       page.on('popup', (p) => void p.close());

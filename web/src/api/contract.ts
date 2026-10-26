@@ -23,7 +23,7 @@ export type {
   Sensitivity, StatusPart, TablePart, TextPart, ToolCallPart, ArtifactPart, PartBase,
 };
 
-export const CONTRACT_VERSION = '1.19.0';
+export const CONTRACT_VERSION = '1.20.1';
 export const CONTRACT_MAJOR = 1;
 
 // ---------------------------------------------------------------- new parts (v1)
@@ -97,6 +97,8 @@ export interface MessageStartEvent extends Seq {
   regenerateStyle?: RegenerateStyle;
   /** Set when this answer is for an edited question (ChatMessage.editOf). */
   editOf?: ID;
+  /** 1.20.0: present when the turn belongs to a temporary chat (CONTRACT.md §11.1). */
+  temporary?: true;
 }
 export interface StatusEvent extends Seq { type: 'status'; label: string | null }
 
@@ -221,6 +223,11 @@ export interface ChatRequest {
    * (§9.1, `EDGE_SCENARIOS` in ../contract/edgeCases.ts); `report` (1.9.0) was missing here before.
    */
   scenario?: DemoScenario;
+  /**
+   * 1.20.0: a temporary chat (CONTRACT.md §11.1): never saved, listed, titled, exported, rated or shared. Send it on
+   * every turn of that chat, and only when `Capabilities.temporaryChat` is present.
+   */
+  temporary?: boolean;
 }
 
 /**

@@ -1,4 +1,4 @@
-# CC chat contract: changelog and migration guide (v1.0 → 1.19.0)
+# CC chat contract: changelog and migration guide (v1.0 → 1.20.1)
 
 **For review by Claude.** This is a reading guide to `api/CONTRACT.md`, which stays the normative text, and
 `api/contract/v1.schema.json`. It covers three things:
@@ -10,7 +10,7 @@
 The adapter that produces these events from analyzer and analyst outputs is specified in
 [`frontend-analyzer-adapter.md`](frontend-analyzer-adapter.md).
 
-Every version from 1.0 to 1.19 is **additive**. A 1.0 client keeps working against a 1.19 server, because it ignores
+Every version from 1.0 to 1.20 is **additive**. A 1.0 client keeps working against a 1.20 server, because it ignores
 unknown events, fields and part types (§3). No field was removed or renamed. The one wire-visible tightening is
 1.12's error envelope on 404 and 405, and 1.13's `not_found` for regenerate/edit 404s (below).
 
@@ -38,9 +38,12 @@ unknown events, fields and part types (§3). No field was removed or renamed. Th
 | 1.17 | pin/archive persisted: PATCH `{pinned?, archived?}`, flags on summaries, `?archived=` filter, pinned first, `Capabilities.pinArchive` | store flags per user; archive drops pin; pin or a new question unarchives | when `pinArchive`: call `setPinned`/`setArchived`, list the sidebar with `archived=exclude` and Archived chats with `only` |
 | 1.18 | strict `ChartPart.plot` (`PlotSpec`, closed, capped, shared `plot_cases.json`), `chart.start` / `chart.points` progressive charts, server gate (invalid chart → dropped, table fallback) | emit `plot` with every chart; validate before emitting; stream header then points | validate with `checkPlot`, render from `plot` (`plotToVegaLite`), draw from `chart.start`, drop on `rejectedCharts` |
 | 1.19 | patterns reject a trailing newline (`(?![\s\S])`, `[0-9]`), shared `pattern_cases.json`; demo follow-up report is v2 (`report_v2.jsonl`) | use `fullmatch` for ids; reuse the branch's `artifactId` with `version + 1` | nothing; the v1/v2 switcher now gets live data |
+| 1.20 | temporary chat: `ChatRequest.temporary`, `MessageStart.temporary`, `Capabilities.temporaryChat` (§11.1) | hold it in memory only (TTL, per-user cap); 404 for list/GET/share/export/feedback; 422 on crossing | offer the toggle only when `temporaryChat` is present; send `temporary: true` every turn; `DELETE` on leaving |
+| 1.20.1 | no shape change: `/stop` interrupts a running query (§8), `aborted` within 1 s during SQL too | wrap the session opener and interrupt this run's cursors on cancel (`api/cancel.py`) | nothing; "Stopping…" is now brief |
 
 **Migration notes**
 * **1.19 patterns.** Only ids that were already invalid in JS (a trailing `\n`) are now rejected by the server too.
+* **1.20 temporary chat.** Clients that never send `temporary` see no change. The flag must be repeated on every turn; dropping it mid-chat is a 422, not a silent save.
 * **1.18 plots.** Nothing breaks: `spec` and `data.values` are still sent (now derived from `plot`). A chart
   stored before 1.18 has no `plot` and still renders from its sanitized `spec`. A server-side chart that fails the
   gate is simply absent (a table takes its place if there was none), so never assume a chart follows a table.
@@ -106,7 +109,7 @@ acceptance test for any backend: `api.contract.conformance.check` in Python, `ch
 | `step.check.check` | only `verifier` is emitted | `row_count`, `null_share`, `join_fanout`, … when the analyzer gains those checks |
 | `escalation.trigger` | only `repair_exhausted` / `verifier_fail` | `low_confidence`, `complexity`, `disagreement`, `user` are reserved |
 | `step.candidates.score` / `label` | not emitted | optional |
-| cancel during SQL | stops between model turns only (§8) | an analyzer cancel hook (§8 "intended semantics") |
+| cancel during SQL | done in 1.20.1 for backends whose cursor has `interrupt()`/`cancel()` (§8) | the live backend's cursor must expose one |
 | auth `demo:<customer>:<user>` | demo bearer tokens | `cc_session` cookie / Cognito (sim) |
 | data | synthetic `sem.claims` in DuckDB (`api/backends.py: demo_connection`) | `ccsim.query.open_session` via `QueryPathOpener` |
 | paid model APIs | **never called** | the off-by-default switch in `api/analyzer_adapter.py` (not wired) |

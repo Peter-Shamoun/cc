@@ -38,7 +38,7 @@
               "type": "reasoning",
               "id": "p_1",
               "summary": "Checking the claims view.",
-              "durationMs": 44
+              "durationMs": 15
             },
             {
               "type": "text",
@@ -76,7 +76,7 @@
                 "views": [
                   "sem.claims"
                 ],
-                "elapsedMs": 45
+                "elapsedMs": 17
               },
               "dataWithheld": true
             },
@@ -111,21 +111,21 @@
           "finishReason": "stop",
           "usage": {
             "queries": 2,
-            "elapsedMs": 106,
+            "elapsedMs": 111,
             "latency": {
-              "totalMs": 106,
+              "totalMs": 111,
               "modelMs": 0,
-              "sqlMs": 19,
+              "sqlMs": 4,
               "stages": {
-                "plan": 24,
-                "sql": 21,
+                "plan": 12,
+                "sql": 5,
                 "repair": 0,
-                "checks": 0,
-                "render": 61
+                "checks": 34,
+                "render": 60
               },
               "firstEventMs": 0,
-              "firstStepMs": 21,
-              "firstTokenMs": 45
+              "firstStepMs": 10,
+              "firstTokenMs": 51
             },
             "costIsEstimate": true,
             "costUsd": 0.003891,
@@ -150,7 +150,7 @@
               "stepId": "s_1",
               "probe": "describe_view",
               "summary": "8 columns",
-              "elapsedMs": 20,
+              "elapsedMs": 9,
               "target": "sem.claims",
               "seq": 4
             },
@@ -167,7 +167,7 @@
               "type": "step.sql_result",
               "stepId": "s_2",
               "ok": true,
-              "elapsedMs": 7,
+              "elapsedMs": 2,
               "rowCount": 1,
               "columns": [
                 {
@@ -195,7 +195,7 @@
               "type": "step.sql_result",
               "stepId": "s_3",
               "ok": true,
-              "elapsedMs": 12,
+              "elapsedMs": 2,
               "rowCount": 1,
               "columns": [
                 {

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://cc.local/api/contract/v1.schema.json",
   "title": "CC chat stream contract",
-  "version": "1.19.0",
+  "version": "1.20.1",
   "description": "One JSON object per SSE data: line. See api/CONTRACT.md. Validate an event against #/$defs/StreamEvent.",
   "$ref": "#/$defs/StreamEvent",
   "$defs": {
@@ -1513,6 +1513,11 @@
         "regenerateStyle": {
           "$ref": "#/$defs/RegenerateStyle",
           "description": "1.10.0: echoes `regenerate.style` when it is not `default`."
+        },
+        "temporary": {
+          "type": "boolean",
+          "const": true,
+          "description": "1.20.0: present (true) when this turn belongs to a temporary chat; absent otherwise."
         }
       },
       "additionalProperties": true
@@ -2432,6 +2437,10 @@
             "cancel_escalation",
             "cancel_render"
           ]
+        },
+        "temporary": {
+          "type": "boolean",
+          "description": "1.20.0: a temporary chat (CONTRACT.md §11.1), like ChatGPT's Temporary chat: never saved, listed, searched, titled, exported, rated or shared. Send it on every turn of that chat; a turn that would move a chat between temporary and saved is 422 `validation`. Only when `Capabilities.temporaryChat` is present."
         }
       },
       "additionalProperties": true
@@ -2950,6 +2959,21 @@
         "pinArchive": {
           "type": "boolean",
           "description": "1.17.0: true when PATCH /api/conversations/{id} persists `pinned` / `archived` server-side. Absent on older servers: hide Pin/Archive or keep them client-only."
+        },
+        "temporaryChat": {
+          "type": "object",
+          "required": [
+            "ttlSeconds"
+          ],
+          "properties": {
+            "ttlSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Idle lifetime of the server-side history that lets edit and regenerate work inside the open temporary chat."
+            }
+          },
+          "additionalProperties": true,
+          "description": "1.20.0: present when the server honours `ChatRequest.temporary` (§11.1). Absent on older servers: offer temporary chat only as a client-side mode, or not at all."
         }
       },
       "additionalProperties": true

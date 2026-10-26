@@ -1,4 +1,4 @@
-# Real analyzer adapter: spec (contract 1.19.0)
+# Real analyzer adapter: spec (contract 1.20.1)
 
 **Status:** a stub, for review by Claude. `api/analyzer_adapter.py`, `api/reasoning_policy.py` (R2), `api/strategy_config.py` (R4) and `api/analyst_shim.py` (R7), plus fixture-only tests in
 `api/tests/test_analyzer_adapter.py`. The server is **not** wired to it. No paid API is called, and nothing under
@@ -139,8 +139,9 @@ protocol need a small shim to `Completion`: see §6 (R7) and `api/analyst_shim.p
   `"strategy"`. (Before this, the stub sent `"analyst"`, which is not a capability id.)
 * **R5 Usage.** Use `Completion.usage` tokens. `LiveTap` falls back to an approximation when they are missing.
   `costIsEstimate` stays true.
-* **R6 Cancel during SQL.** This needs an analyzer cancel hook (CONTRACT §8). Until then, Stop takes effect between
-  model turns.
+* **R6 Cancel during SQL.** Done API-side in 1.20.1 (`api/cancel.py`, CONTRACT §8): the adapter must pass the
+  request's opener through `CancellableOpener`, as the demo path does, and the live backend's `SessionHandle.con` must
+  expose `interrupt()` (DuckDB) or `cancel()`; otherwise Stop falls back to the next model turn.
 * **R7 Analyst model shims (stub).** See §6.
 
 ## 4. Recordings (fixtures)

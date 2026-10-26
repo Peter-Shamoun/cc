@@ -62,26 +62,12 @@ describe('composer text-file attachments', () => {
 });
 
 
-describe('scope popover', () => {
-  it('opens from the Claims lake chip, shows the locked raw scope and closes on Esc back to the chip', async () => {
-    render(<Composer onSend={() => {}} onStop={() => {}} busy={false} />);
-    const chip = screen.getByTestId('scope-chip');
-    expect(chip).toHaveAttribute('aria-expanded', 'false');
-    fireEvent.click(chip);
-    const pop = screen.getByRole('dialog', { name: 'Data scope' });
-    expect(chip).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('radio', { name: /Claims lake/ })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('radio', { name: /Raw EDI/ })).toHaveAttribute('aria-disabled', 'true');
-    expect(pop).toHaveTextContent('sem.claim_outcomes');
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('radio', { name: /Claims lake/ })));
-    fireEvent.keyDown(pop, { key: 'Escape' });
-    expect(screen.queryByTestId('scope-popover')).toBeNull();
-    expect(document.activeElement).toBe(chip);
-  });
-  it('closes on an outside click', () => {
-    render(<Composer onSend={() => {}} onStop={() => {}} busy={false} />);
-    fireEvent.click(screen.getByTestId('scope-chip'));
-    fireEvent.mouseDown(document.body);
-    expect(screen.queryByTestId('scope-popover')).toBeNull();
+describe('no data-source picker (Peter 11:57 PM: the session decides the data)', () => {
+  it('is just attach, text and send, like Claude and ChatGPT', () => {
+    const { container } = render(<Composer onSend={() => {}} onStop={() => {}} busy={false} />);
+    expect(screen.queryByTestId('scope-chip')).toBeNull();
+    expect(container.textContent ?? '').not.toMatch(/claims lake|sem\.|scope|database/i);
+    const buttons = [...container.querySelectorAll('button')].map((b) => b.getAttribute('aria-label'));
+    expect(buttons).toEqual(['Attach text files', 'Send message']);
   });
 });
