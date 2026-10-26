@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ArrowDown, ArrowUp, Download, Maximize2, ShieldAlert } from 'lucide-react';
+import { ArrowDown, ArrowUp, Download, Lock, Maximize2, ShieldAlert } from 'lucide-react';
 import clsx from 'clsx';
 import type { TablePart } from '../../lib/contract';
 import { csvFilename, downloadBlob, downloadText, formatCell, isNumeric, tableToCsv, tableToTsv } from '../../lib/csv';
@@ -128,6 +128,9 @@ export const DataTable = memo(function DataTable({ part, onOpen, full }: { part:
   const padBottom = virtual && items.length ? rv.getTotalSize() - items[items.length - 1].end : 0;
   const shown = virtual ? items.map((v) => ({ key: v.index, row: rows[v.index] })) : rows.map((row, index) => ({ key: index, row }));
   const hasPhi = part.columns.some((c) => c.phi);
+  // Contract 1.11.0: a link shared without data keeps the columns and the real row count, but no rows.
+  const withheld = !!part.dataWithheld;
+  const rowsLabel = `${part.rowCount.toLocaleString()} ${part.rowCount === 1 ? 'row' : 'rows'}`;
   const download = async () => {
     const name = csvFilename(part.title);
     if (part.csvFileId && adapter) {
@@ -148,11 +151,13 @@ export const DataTable = memo(function DataTable({ part, onOpen, full }: { part:
           {full && (
             <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter rows" aria-label="Filter rows" className="mr-1 h-7 rounded-md border border-line bg-bg px-2 text-xs outline-none" />
           )}
-          <CopyButton text={() => tableToTsv(part)} label="Copy table" className="h-7 w-7" />
-          <IconButton label="Download CSV" className="h-7 w-7" onClick={download}>
-            <Download size={15} />
-          </IconButton>
-          {onOpen && (
+          {!withheld && <CopyButton text={() => tableToTsv(part)} label="Copy table" className="h-7 w-7" />}
+          {!withheld && (
+            <IconButton label="Download CSV" className="h-7 w-7" onClick={download}>
+              <Download size={15} />
+            </IconButton>
+          )}
+          {onOpen && !withheld && (
             <IconButton label="Expand table" className="h-7 w-7" onClick={onOpen}>
               <Maximize2 size={14} />
             </IconButton>
@@ -178,7 +183,7 @@ export const DataTable = memo(function DataTable({ part, onOpen, full }: { part:
                 return (
                   <th key={`${i}:${col.key}`} scope="col" aria-sort={dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : 'none'} title={col.description} style={fixed(widths[i])}
                     className={clsx('group/th relative border-b border-line px-3 py-2 font-semibold whitespace-nowrap', numeric ? 'text-right' : 'text-left', widths[i] !== undefined && 'overflow-hidden text-ellipsis')}>
-                    <button type="button" disabled={!!col.phi} onClick={() => cycle(i)} className={clsx('inline-flex items-center gap-1', numeric && 'flex-row-reverse')}>
+                    <button type="button" disabled={!!col.phi || withheld} onClick={() => cycle(i)} className={clsx('inline-flex items-center gap-1', numeric && 'flex-row-reverse')}>
                       {col.label}
                       {col.phi && <ShieldAlert size={12} className="text-fg-subtle" aria-label="PHI, masked" />}
                       {dir === 'asc' ? <ArrowUp size={13} /> : dir === 'desc' ? <ArrowDown size={13} /> : null}
@@ -207,9 +212,14 @@ export const DataTable = memo(function DataTable({ part, onOpen, full }: { part:
               </tr>
             ))}
             {padBottom > 0 && <tr aria-hidden style={{ height: padBottom }} />}
-            {rows.length === 0 && (
+            {rows.length === 0 && (withheld ? (
+              <tr><td colSpan={part.columns.length} className="px-3 py-6 text-center text-fg-subtle" data-testid="table-withheld">
+                <span className="inline-flex items-center gap-1.5"><Lock size={13} aria-hidden />Data not shared ({rowsLabel})</span>
+                <span className="mt-0.5 block text-xs">The owner shared this chat without result data.</span>
+              </td></tr>
+            ) : (
               <tr><td colSpan={part.columns.length} className="px-3 py-6 text-center text-fg-subtle">Query returned 0 rows</td></tr>
-            )}
+            ))}
           </tbody>
         </table>
       </div>
@@ -221,11 +231,11 @@ export const DataTable = memo(function DataTable({ part, onOpen, full }: { part:
       <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-xs text-fg-subtle">
         <span>
           {part.source ? <>from <code className="font-mono">{part.source.views.join(', ')}</code> · </> : null}
-          Showing {part.rows.length.toLocaleString()} of {part.rowCount.toLocaleString()} rows
+          {withheld ? `${rowsLabel} · data not shared` : <>Showing {part.rows.length.toLocaleString()} of {part.rowCount.toLocaleString()} rows</>}
           {part.source?.elapsedMs !== undefined && ` · ${(part.source.elapsedMs / 1000).toFixed(2)} s`}
           {hasPhi && ' · PHI masked'}
         </span>
-        {!full && onOpen && part.rowCount > 8 && (
+        {!full && onOpen && !withheld && part.rowCount > 8 && (
           <button type="button" onClick={onOpen} className="underline underline-offset-2 hover:text-fg">Open full table</button>
         )}
       </div>
