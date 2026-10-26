@@ -2,7 +2,7 @@
 // Needs the dev server: npx vite --port 5211 --strictPort. Usage: node scripts/e2e_answer_torture.mjs [outDir]
 import { chromium } from 'playwright';
 import fs from 'node:fs';
-const OUT = process.argv[2] ?? '/workspace/cc_fe/shots/answer/e5/torture';
+const OUT = process.argv[2] ?? '/workspace/cc_fe/shots/answer/e6/torture';
 fs.mkdirSync(OUT, { recursive: true });
 const KEY = ['unclosed-fence', 'half-table', 'nested-lists', 'rtl-hebrew', 'rtl-arabic', 'emoji', 'long-url', 'display-math', 'unclosed-math', 'mixed-partial',
   'answer-with-table-and-code', 'deep-nested-lists', 'wide-display-math', 'long-urls-in-table', 'rtl-mixed', 'emoji-sequences', 'huge-table', 'fence-with-backticks', 'blockquote-list-code', 'table-wide-50'];
