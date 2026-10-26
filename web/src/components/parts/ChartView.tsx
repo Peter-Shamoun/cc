@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Download, Maximize2, FileJson } from 'lucide-react';
+import { Check, Copy, CornerDownRight, Download, Maximize2, FileJson, X } from 'lucide-react';
 import type { ChartPart } from '../../lib/contract';
 import { IconButton } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
@@ -20,7 +20,36 @@ const yieldToMain = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
 
 export const preloadCharts = (): Promise<void> => loadVega().then(() => undefined);
 
-type View = { finalize: () => void; toImageURL: (t: 'png' | 'svg', scale?: number) => Promise<string> };
+type View = { finalize: () => void; toImageURL: (t: 'png' | 'svg', scale?: number) => Promise<string>; addEventListener?: (type: string, h: (e: unknown, item?: { datum?: unknown } | null) => void) => void };
+
+type Enc = { field?: unknown; type?: unknown; timeUnit?: unknown };
+/**
+ * The category a clicked mark stands for (the bar's x/y label, else its series), for "Ask about …". Only nominal or
+ * ordinal fields (then temporal), so a click never turns a measure like 0.0898 into a question. Capped at 60 chars.
+ */
+export function datumLabel(spec: Record<string, unknown>, datum: unknown): string | null {
+  if (!datum || typeof datum !== 'object') return null;
+  // Layered specs (rule/text overlays from `plot`) keep the bar encoding on a layer.
+  const layer = Array.isArray(spec.layer) ? (spec.layer as { encoding?: unknown }[]).find((l) => l?.encoding)?.encoding : undefined;
+  const enc = { ...(layer as object | undefined), ...(spec.encoding as object | undefined) } as Record<string, Enc | undefined>;
+  const d = datum as Record<string, unknown>;
+  const pick = (types: string[]) => {
+    for (const ch of ['x', 'y', 'color', 'theta']) {
+      const e = enc[ch];
+      if (e && typeof e.field === 'string' && types.includes(String(e.type)) && d[e.field] != null && String(d[e.field]).trim()) {
+        const v = d[e.field];
+        return (v instanceof Date ? v.toISOString().slice(0, 10) : String(v)).trim();
+      }
+    }
+    return null;
+  };
+  const v = pick(['nominal', 'ordinal']) ?? pick(['temporal']);
+  return v ? (v.length > 60 ? v.slice(0, 59) + '…' : v) : null;
+}
+
+/** PNG blob from a data URL (Vega's toImageURL), for the clipboard. */
+const dataUrlBlob = async (url: string): Promise<Blob> => (await fetch(url)).blob();
+export const canCopyImage = (): boolean => typeof ClipboardItem !== 'undefined' && !!navigator.clipboard?.write;
 
 /**
  * Refuse http(s) and file loads. Inline `values` never need the loader (spec §4.5, §6.11).
@@ -34,7 +63,7 @@ function remoteBlockedLoader(createVegaLoader: typeof import('vega').loader) {
   return loader;
 }
 
-type ChartViewProps = { part: ChartPart; onOpen?: () => void; full?: boolean; onShowSpec?: () => void };
+type ChartViewProps = { part: ChartPart; onOpen?: () => void; full?: boolean; onShowSpec?: () => void; /** Click a bar → "Ask about …" sends a follow-up (answer surface only). */ onAsk?: (text: string) => void };
 
 /** A chart that fails to render (bad spec, renderer bug) becomes an inline "Try again" card; the rest of the answer stays. */
 export function ChartView(props: ChartViewProps) {
@@ -48,7 +77,11 @@ export function ChartView(props: ChartViewProps) {
   );
 }
 
-function ChartViewInner({ part, onOpen, full, onShowSpec }: ChartViewProps) {
+function ChartViewInner({ part, onOpen, full, onShowSpec, onAsk }: ChartViewProps) {
+  const [picked, setPicked] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const askRef = useRef(onAsk);
+  useEffect(() => { askRef.current = onAsk; }, [onAsk]);
   const ref = useRef<HTMLDivElement>(null);
   const viewRef = useRef<View | null>(null);
   // Memory: Vega keeps module-level references to the last SVG it drew, and that SVG reaches the View, whose `_el` is
@@ -82,6 +115,10 @@ function ChartViewInner({ part, onOpen, full, onShowSpec }: ChartViewProps) {
         return;
       }
       viewRef.current = r.view as unknown as View;
+      viewRef.current.addEventListener?.('click', (_e, item) => {
+        if (!askRef.current) return;
+        setPicked(datumLabel(JSON.parse(specKey) as Record<string, unknown>, item?.datum));
+      });
       setReady(true);
     };
     loadVega()
@@ -158,6 +195,15 @@ function ChartViewInner({ part, onOpen, full, onShowSpec }: ChartViewProps) {
     a.download = csvFilename(part.title).replace(/\.csv$/, `.${t}`);
     a.click();
   };
+  const copyImage = async () => {
+    try {
+      const url = await viewRef.current?.toImageURL('png', 2);
+      if (!url) return;
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': await dataUrlBlob(url) })]);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* clipboard refused (permissions, insecure context): the PNG download is right next to it */ }
+  };
   const dlData = () => {
     downloadText(csvFilename(part.title), recordsToCsv(part.data?.values ?? []));
   };
@@ -167,6 +213,7 @@ function ChartViewInner({ part, onOpen, full, onShowSpec }: ChartViewProps) {
       <div className="flex items-start justify-between gap-2 px-3 pt-2 pb-1">
         <figcaption className="min-w-0 break-words text-[13px] font-medium leading-snug text-fg-muted">{part.title}</figcaption>
         <div className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover/chart:opacity-100 group-focus-within/chart:opacity-100 [@media(hover:none)]:opacity-100">
+          {canCopyImage() && <IconButton label={copied ? 'Copied' : 'Copy as image'} className="h-7 w-7" onClick={copyImage} disabled={!ready}>{copied ? <Check size={14} /> : <Copy size={14} />}</IconButton>}
           <IconButton label="Download PNG" className="h-7 w-7" onClick={() => dl('png')}><Download size={15} /></IconButton>
           <button type="button" onClick={() => dl('svg')} className="rounded-md px-1.5 py-1 text-xs text-fg-muted hover:bg-hover">SVG</button>
           <button type="button" onClick={dlData} className="rounded-md px-1.5 py-1 text-xs text-fg-muted hover:bg-hover">CSV</button>
@@ -184,6 +231,16 @@ function ChartViewInner({ part, onOpen, full, onShowSpec }: ChartViewProps) {
           </div>
         )}
       </div>
+      {picked && onAsk && (
+        <div className="flex items-center gap-1 border-t border-line px-2 py-1 font-sans text-sm" data-testid="chart-ask">
+          <button type="button" className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 py-1 text-left text-fg-muted hover:text-fg"
+            onClick={() => { onAsk(`Tell me more about ${picked}${part.title ? ` in "${part.title}"` : ''}`); setPicked(null); }}>
+            <CornerDownRight size={14} className="shrink-0 text-fg-subtle" aria-hidden />
+            <span className="min-w-0 truncate">Ask about {picked}</span>
+          </button>
+          <IconButton label="Dismiss" className="h-7 w-7" onClick={() => setPicked(null)}><X size={14} /></IconButton>
+        </div>
+      )}
     </figure>
   );
 }
