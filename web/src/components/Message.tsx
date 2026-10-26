@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, Pencil, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react';
 import clsx from 'clsx';
 import type { AssistantView, ChartPart, CodePart, ImagePart, Part, TablePart, UserMessage } from '../lib/contract';
@@ -163,8 +163,18 @@ function FeedbackPanel({ onClose, onSubmit }: { onClose: () => void; onSubmit: (
   const [reasons, setReasons] = useState<string[]>([]);
   const [detail, setDetail] = useState('');
   const toggle = (r: string) => setReasons((rs) => (rs.includes(r) ? rs.filter((x) => x !== r) : [...rs, r]));
+  const ref = useRef<HTMLDivElement>(null);
+  // QA-A5: the panel opens under the last answer, often below the fold. Bring it into view and put focus on the first reason.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const reduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView?.({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+    el.querySelector<HTMLButtonElement>('button[aria-pressed]')?.focus({ preventScroll: true });
+  }, []);
   return (
-    <div className="mt-2 rounded-xl border border-line bg-bg p-3 font-sans text-sm" data-testid="feedback-panel" role="group" aria-label="Tell us more">
+    <div ref={ref} className="mt-2 scroll-mb-28 rounded-xl border border-line bg-bg p-3 font-sans text-sm" data-testid="feedback-panel" role="group" aria-label="Tell us more"
+      onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }}>
       <div className="mb-2 flex items-center justify-between">
         <span className="font-medium">Tell us more</span>
         <IconButton label="Close feedback" className="h-7 w-7" onClick={onClose}>×</IconButton>
