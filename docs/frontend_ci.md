@@ -15,7 +15,7 @@ secrets and makes no paid API calls.
 | Typecheck | `npx tsc -b` | any type error |
 | Unit tests | `npx vitest run --maxWorkers=2` | any test fails, including the guard tests below |
 | Build | `npx vite build` | the build fails |
-| Bundle budget | `node scripts/bundle_budget.mjs` | the gzipped initial JS, initial CSS, largest lazy chunk, total JS or asset count goes over `web/bundle-budget.json` |
+| Bundle budget | `node scripts/bundle_budget.mjs` | the gzipped initial JS, initial CSS, largest lazy chunk, total JS or asset count goes over `web/bundle-budget.json`, or any .wasm / WebAssembly-compiling chunk ships (the CSP forbids it) |
 | CSP check | `CSP_MODE=mock node scripts/csp_check.mjs` against `vite preview` of a mock build | a CSP violation, a console error, a missing security header, or row data in storage, the URL or the console |
 | API tests (separate job) | `pytest api/tests -q` | any API test fails |
 
@@ -24,8 +24,8 @@ Guard tests that run inside `npm test`:
 - `src/security/phi.test.tsx`: every fixture that has a table is streamed through the real App. The test then searches these sinks for row values: every console method, localStorage, sessionStorage, cookies, `location.href`, `history.pushState`/`replaceState` (state and URL), `document.title`, `window.name` and fetch URLs. It also checks that PHI columns are masked in the DOM and that only `cc.pref.*` keys are persisted.
 - `src/security/licenses.test.ts`: the licence audit and the coverage of THIRD_PARTY_NOTICES.
 
-Current bundle, as of 2026-10-25: initial JS is 528 KB gz and the largest lazy chunk is Shiki's oniguruma wasm at 225 KB gz. The budgets
-sit slightly above these numbers. Lower a budget whenever the bundle shrinks. A PR that raises one has to say why.
+Current bundle, after #139 (2026-10-25): initial JS is 263 KB gz, initial CSS 13.6, the largest lazy chunk is vega at 178,
+total JS 720, 79 assets. Budgets: 300 / 16 / 200 / 800 / 100. Lower a budget whenever the bundle shrinks. A PR that raises one has to say why.
 
 ## Demo pacing (QA-P1/P4)
 
