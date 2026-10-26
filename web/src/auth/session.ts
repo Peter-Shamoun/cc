@@ -37,13 +37,78 @@ export function demoTokenSession(token: string, onExpired: () => void = () => {}
   return { kind: 'demo-token', headers: () => ({ authorization: `Bearer ${token}` }), onExpired: once(onExpired) };
 }
 
+/**
+ * Cross-tab sign-out. Signing out in one tab must not leave a conversation on screen in another tab until that tab
+ * happens to make a request. `signOut` posts a constant on a BroadcastChannel (no ids or data). Every cookie
+ * session listens and leaves the page, which drops its in-memory answers and drafts. One listener per page.
+ */
+export const AUTH_CHANNEL = 'cc-auth';
+export const SIGNED_OUT = 'signed-out';
+let signOutListener: { channel: BroadcastChannel; fns: Set<() => void> } | null = null;
+/** This tab is the one signing out: its own navigation wins, the echo on its listener is ignored. */
+let signingOut = false;
+
+/**
+ * Back/forward cache. A page left because of a sign-out (here, in another tab, or an expired session) can come back
+ * from the bfcache with the conversation still in its DOM and memory when the user presses Back. The HTML is
+ * `no-store`, which most browsers treat as "don't bfcache", but that's a heuristic. So: blank the DOM before leaving
+ * (the snapshot holds nothing), and if the page is restored anyway (`pageshow` with `persisted`), reload it. The reload
+ * fetches a fresh page, which the server answers as signed out.
+ */
+export const pageHooks = { reload: () => window.location.reload() };
+let leftSignedOut = false;
+let bfcacheGuard = false;
+
+function onPageShow(e: PageTransitionEvent | Event) {
+  if ((e as PageTransitionEvent).persisted && leftSignedOut) pageHooks.reload();
+}
+
+export function leaveSignedOut(nav: (url: string) => void, url: string): void {
+  leftSignedOut = true;
+  if (!bfcacheGuard && typeof window !== 'undefined') { bfcacheGuard = true; window.addEventListener('pageshow', onPageShow); }
+  try { document.getElementById('root')?.replaceChildren(); } catch { /* leaving anyway */ }
+  nav(url);
+}
+
+/** Tests only. */
+export function resetSignOutState(): void {
+  signingOut = false; signOutListener?.channel.close(); signOutListener = null;
+  leftSignedOut = false; if (bfcacheGuard) { window.removeEventListener('pageshow', onPageShow); bfcacheGuard = false; }
+}
+
+export function onSignedOutElsewhere(fn: () => void): () => void {
+  if (typeof BroadcastChannel === 'undefined') return () => {};
+  if (!signOutListener) {
+    const channel = new BroadcastChannel(AUTH_CHANNEL);
+    const fns = new Set<() => void>();
+    channel.onmessage = (e: MessageEvent) => { if (e.data === SIGNED_OUT && !signingOut) fns.forEach((f) => f()); };
+    signOutListener = { channel, fns };
+  }
+  const l = signOutListener;
+  l.fns.add(fn);
+  return () => {
+    l.fns.delete(fn);
+    if (!l.fns.size && signOutListener === l) { l.channel.close(); signOutListener = null; }
+  };
+}
+
+function announceSignOut(): void {
+  signingOut = true;
+  if (typeof BroadcastChannel === 'undefined') return;
+  try { const c = new BroadcastChannel(AUTH_CHANNEL); c.postMessage(SIGNED_OUT); c.close(); } catch { /* best effort */ }
+}
+
 /** `signInUrl` gets `?next=<path>`. Only the pathname: no query or hash, which could hold app state. */
 export function cookieSession(signInUrl?: string, nav: (url: string) => void = (u) => window.location.assign(u)): AuthSession {
+  const toSignIn = () => (signInUrl ? `${signInUrl}${signInUrl.includes('?') ? '&' : '?'}next=${encodeURIComponent(window.location.pathname)}` : null);
+  // Another tab signed out: leave even without a sign-in URL (a reload drops what's on screen; the next load is 401).
+  onSignedOutElsewhere(once(() => leaveSignedOut(nav, toSignIn() ?? window.location.pathname)));
   return {
     kind: 'cookie',
     headers: () => ({ [CSRF_HEADER]: '1' }),
     onExpired: once(() => {
-      if (signInUrl) nav(`${signInUrl}${signInUrl.includes('?') ? '&' : '?'}next=${encodeURIComponent(window.location.pathname)}`);
+      const url = toSignIn();
+      if (url) leaveSignedOut(nav, url);
     }),
   };
 }
@@ -88,6 +153,7 @@ export async function signOut(
   } catch {
     /* offline: still leave */
   }
-  nav(opts.signInUrl || window.location.pathname);
+  announceSignOut();
+  leaveSignedOut(nav, opts.signInUrl || window.location.pathname);
   return ok;
 }

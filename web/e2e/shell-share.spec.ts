@@ -42,8 +42,13 @@ test.describe('share links (live, contract 1.11.0) @desktop', () => {
     await expect(view.getByRole('heading', { level: 1 })).toBeVisible();
     await expect(view).toContainText('Shared within your organization · Read-only');
     await expect(view.getByTestId('shared-no-data')).toBeVisible();
+    await expect(view.getByTestId('shared-no-sql')).toHaveText('SQL not shared');
     await expect(view.getByText('Total paid by payer').first()).toBeVisible();
     await expect(view.getByTestId('msg-assistant').first()).toBeVisible();
+    // QA-S18: a data-off share keeps the SQL with the owner (queries can hold literal values).
+    await expect(view.getByTestId('table-sql')).toHaveCount(0);
+    await expect(view.getByTestId('open-sql')).toHaveCount(0);
+    expect(await view.evaluate((el) => /\bSELECT\b|\bFROM\s+sem\./.test(el.textContent ?? ''))).toBe(false);
     await expect(viewer.getByRole('textbox', { name: 'Message' })).toHaveCount(0);
     await expect(viewer.getByRole('button', { name: /Regenerate/ })).toHaveCount(0);
     await expect(viewer.getByRole('button', { name: /Edit/ })).toHaveCount(0);
@@ -56,6 +61,52 @@ test.describe('share links (live, contract 1.11.0) @desktop', () => {
     await expect(dlg.getByTestId('create-link')).toBeVisible();
     await viewer.reload();
     await expect(viewer.getByTestId('shared-unavailable')).toContainText("This link isn't available");
+    await viewer.close();
+  });
+
+  test('QA-S18: a share with result data keeps "View SQL"', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await open(page, LIVE);
+    await ask(page, 'Total paid by payer');
+    await page.getByTestId('share-button').click();
+    const dlg = page.getByRole('dialog', { name: 'Share chat' });
+    await dlg.getByRole('switch', { name: 'Include result data' }).check();
+    await dlg.getByTestId('create-link').click();
+    const url = await dlg.getByTestId('share-url').inputValue();
+    const viewer = await context.newPage();
+    await viewer.goto(url);
+    const view = viewer.getByTestId('shared-view');
+    await expect(view.getByTestId('msg-assistant').first()).toBeVisible();
+    await expect(view.getByTestId('shared-no-data')).toHaveCount(0);
+    await expect(view.getByTestId('table-sql').first()).toBeVisible();
+    await dlg.getByRole('button', { name: 'Stop sharing' }).click();
+    await viewer.close();
+  });
+
+  test('1.15.0: pick a 7-day expiry, then turning data on replaces the link and the old one stops working', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await open(page, LIVE);
+    await ask(page, 'Total paid by payer');
+    await page.getByTestId('share-button').click();
+    const dlg = page.getByRole('dialog', { name: 'Share chat' });
+    const pick = dlg.getByRole('combobox', { name: 'Link expires after' });
+    await expect(pick).toHaveValue('30');
+    await pick.selectOption('7');
+    await dlg.getByTestId('create-link').click();
+    const oldUrl = await dlg.getByTestId('share-url').inputValue();
+    await expect(dlg.getByTestId('share-dates')).toContainText(/in [67] days/);
+    await dlg.getByRole('switch', { name: 'Include result data' }).check();
+    await expect(dlg.getByTestId('share-rotated')).toContainText('The old link no longer works');
+    const newUrl = await dlg.getByTestId('share-url').inputValue();
+    expect(newUrl).not.toBe(oldUrl);
+    await expect(dlg.getByTestId('share-dates')).toContainText(/in [67] days/);
+    const viewer = await context.newPage();
+    await viewer.goto(oldUrl);
+    await expect(viewer.getByTestId('shared-unavailable')).toContainText("This link isn't available");
+    await viewer.goto(newUrl);
+    await expect(viewer.getByTestId('msg-assistant').first()).toBeVisible();
+    await expect(viewer.getByTestId('shared-no-sql')).toHaveCount(0);
+    await dlg.getByRole('button', { name: 'Stop sharing' }).click();
     await viewer.close();
   });
 

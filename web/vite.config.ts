@@ -6,12 +6,33 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { NONCE_PLACEHOLDER, newNonce, securityHeaders } from './src/security/headers.ts';
 import { bootShellHtml } from './scripts/boot_shell.mjs';
+import { applySri } from './scripts/sri.mjs';
 
 /** Boot shell (QA-P8): see scripts/boot_shell.mjs. Applied to built and dev HTML alike. */
 function bootShellPlugin(root: string): Plugin {
   return {
     name: 'cc-boot-shell',
     transformIndexHtml: { order: 'post', handler: (html) => bootShellHtml(html, fs.readFileSync(path.join(root, 'public/theme-init.js'), 'utf8')) },
+  };
+}
+
+/**
+ * Subresource Integrity (build only): see scripts/sri.mjs. Runs after the files are written, so the hashes cover the
+ * exact bytes served; preview and production servers must not rewrite /assets/ files (compression is fine).
+ */
+function sriPlugin(): Plugin {
+  return {
+    name: 'cc-sri',
+    apply: 'build',
+    enforce: 'post',
+    writeBundle(opts, bundle) {
+      const dir = opts.dir ?? 'dist';
+      const index = path.join(dir, 'index.html');
+      if (!fs.existsSync(index)) return;
+      const read = (p: string) => { const f = path.join(dir, p); return fs.existsSync(f) ? fs.readFileSync(f) : undefined; };
+      const js = Object.keys(bundle).filter((f) => f.startsWith('assets/') && f.endsWith('.js')).map((f) => `/${f}`);
+      fs.writeFileSync(index, applySri(fs.readFileSync(index, 'utf8'), read, js));
+    },
   };
 }
 
@@ -74,7 +95,7 @@ export default defineConfig(({ command }) => {
   const devNonce = newNonce();
   const api = env.CC_API_URL ?? 'http://127.0.0.1:8787';
   return {
-    plugins: [react(), tailwindcss(), securityHeadersPlugin(devNonce), bootShellPlugin(path.dirname(new URL(import.meta.url).pathname))],
+    plugins: [react(), tailwindcss(), securityHeadersPlugin(devNonce), bootShellPlugin(path.dirname(new URL(import.meta.url).pathname)), sriPlugin()],
     html: { cspNonce: command === 'serve' && !env.CC_PREVIEW ? devNonce : NONCE_PLACEHOLDER },
     server: { port: 5173, host: '127.0.0.1', proxy: { '/api': { target: api, changeOrigin: true } } },
     preview: { host: '127.0.0.1', proxy: { '/api': { target: api, changeOrigin: true } } },

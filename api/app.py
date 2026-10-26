@@ -25,21 +25,24 @@ from pydantic import BaseModel, Field
 from analyzer.config import AnalyzerConfig
 from analyzer.llm import PaidAPIDisabled
 from analyzer.loop import Analyzer
+from analyzer.tools import ToolLayer
 
-from api.backends import SCENARIO_CONFIG, AuthError, DemoAuth, detect_scenario, make_llm
+from api.backends import (CANCEL_AT, MULTI_TABLE_SQL, MULTI_TABLE_TITLES, SCENARIO_CONFIG, AuthError, DemoAuth,
+                          detect_scenario, make_llm)
 from api.contract import CONTRACT_VERSION, schema as contract_schema
 from api.ids import new_id
 from api.live import Cancelled, LiveTap
-from api.mapping import outcome_parts, report_artifacts
-from api.redact import install_access_log_redaction, install_log_redaction
+from api.mapping import multi_table_parts, outcome_parts, report_artifacts
+from api.redact import install_access_log_redaction, install_log_redaction, install_outbound_url_redaction
 from api.security import (MAX_BODY_BYTES, SESSION_COOKIE, BodyLimitMiddleware, CsrfMiddleware, ErrorShieldMiddleware,
-                          SecurityHeadersMiddleware)
+                          HeadMiddleware, SecurityHeadersMiddleware)
 from api.store import DownloadRegistry, Principal
 from api.feedback import MAX_COMMENT, check as check_feedback, record as feedback_record
 from api.capabilities import DEFAULT_STRATEGY, capabilities as capabilities_body, check_options
 from api.export import FORMATS as EXPORT_FORMATS, as_json as export_json, as_markdown as export_markdown, filename as export_filename
 from api.share import ShareRegistry, link as share_link, shared_view
 from api.sources import sources_for
+from api.sql_mask import POLICIES as SQL_MASK_POLICIES, mask_event, mask_part, policy_from_env as sql_mask_policy_from_env
 from api.stream_parts import emit_parts
 from api.styles import apply_style
 from api.titles import title_from_parts
@@ -67,6 +70,7 @@ class FeedbackIn(BaseModel):
 
 class ShareIn(BaseModel):
     includeData: bool = False
+    expiresInDays: Literal[7, 30, 90] | None = None  # 1.15.0 (S4): None keeps the current expiry; new shares get 30
 
 
 class SearchIn(BaseModel):
@@ -154,6 +158,8 @@ class Settings:
                                                                                          "3600")))
     #: "demo" (default) lets create_app fall back to DemoAuth; anything else requires an explicit auth backend
     auth_mode: str = field(default_factory=lambda: os.environ.get("CC_API_AUTH", "demo"))
+    #: 1.14.0: literal masking in *shown* SQL ("phi" default, "all", "off"); an unknown value means "phi" (sql_mask)
+    sql_literal_masking: str = field(default_factory=sql_mask_policy_from_env)
     analyzer_overrides: dict = field(default_factory=lambda: {
         "glossary": "basic", "data_dictionary": False, "data_profile": False, "row_limit": 5000,
         "candidates": 1, "cascade": "off"})
@@ -163,7 +169,8 @@ class AuditLog:
     """Structured audit events. Field allowlist: no SQL text, no row values, no question text."""
 
     ALLOWED = {"customer", "user", "file_id", "row_count", "conversation_id", "message_id", "parts",
-               "queries", "elapsed_ms", "finish", "kind", "reason", "status", "scenario", "steps"}
+               "queries", "elapsed_ms", "finish", "kind", "reason", "status", "scenario", "steps",
+               "expires_in_days", "rotated"}
 
     def __init__(self):
         self.events: list[dict] = []
@@ -247,12 +254,15 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
     app = FastAPI(title="CC chat API", version="0.1.0", docs_url=None, redoc_url=None, openapi_url=None,
                   lifespan=lifespan)
     install_log_redaction()
+    install_outbound_url_redaction()
+    app.add_middleware(HeadMiddleware)  # innermost: HEAD = GET without a body (not SSE)
     app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_body_bytes)
     app.add_middleware(CsrfMiddleware)
     app.add_middleware(ErrorShieldMiddleware)  # inside SecurityHeaders: 500s get the headers too
     app.add_middleware(SecurityHeadersMiddleware)  # outermost, so the 413 carries the security headers too
     app.state.audit, app.state.store, app.state.downloads, app.state.runs = audit, store, downloads, runs
     app.state.settings, app.state.auth = settings, auth
+    app.state.shares = shares
 
     def authed(request: Request, request_id: str):
         return auth.authenticate(_token(request), request_id)
@@ -310,8 +320,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             customer = authed(request, new_id("r")).principal.customer if _token(request) else None
         except AuthError:
             customer = None
-        return JSONResponse(capabilities_body(CONTRACT_VERSION, demo=settings.llm == "scripted", customer=customer),
-                            headers=NO_STORE)
+        return JSONResponse(capabilities_body(CONTRACT_VERSION, demo=settings.llm == "scripted", customer=customer,
+                                              sql_literal_masking=settings.sql_literal_masking), headers=NO_STORE)
 
     @app.post("/api/auth/sign-out")
     def sign_out(request: Request):
@@ -463,11 +473,15 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         run = _Run(message_id, ctx.principal, conversation_id=conversation_id)
         runs[message_id] = run
         started = time.perf_counter()
+        sql_policy = settings.sql_literal_masking if settings.sql_literal_masking in SQL_MASK_POLICIES else "phi"
         marks: dict = {}
         persisted_steps: list = []
         reasoning: dict = {}
 
+        press_stop_on = CANCEL_AT[scenario][1] if scenario in CANCEL_AT else None
+
         def emit(payload: dict):
+            payload = mask_event(payload, sql_policy)  # 1.14.0: shown SQL never carries PHI-bearing literals
             seq = len(run.events)
             event = {**payload, "seq": seq}
             if "first_event" not in marks:
@@ -483,6 +497,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             elif t == "text.delta" and "first_token" not in marks:
                 marks["first_token"] = int((time.perf_counter() - started) * 1000)
             run.events.append((seq, event))
+            if press_stop_on is not None and not run.cancelled.is_set() and press_stop_on(event):
+                run.cancelled.set()  # 1.16.0 demo cancel_* scenarios: Stop pressed at a known stage
             run.notify()
 
         def work():
@@ -512,6 +528,13 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                                               legacy_tools=legacy_tools)
                 if scenario == "report" and finish == "stop":
                     parts = report_artifacts(parts)
+                if scenario == "multi_table" and finish == "stop":
+                    # 1.16.0 demo: the second query already ran live (its steps streamed); show its rows too
+                    tools = ToolLayer(ctx.opener, config)
+                    digest = tools.run_sql(MULTI_TABLE_SQL[1], charge=False, include_all_rows=True)
+                    parts = [{**p, "title": MULTI_TABLE_TITLES[0]} if p.get("type") == "table" else p for p in parts]
+                    parts = multi_table_parts(parts, answer, [(MULTI_TABLE_TITLES[1], MULTI_TABLE_SQL[1], digest)],
+                                              ctx.principal, downloads.scoped(conversation_id), elapsed_ms=elapsed)
                 if finish == "stop" and start_extra.get("regenerateStyle"):
                     parts = apply_style(parts, start_extra["regenerateStyle"])
             except Cancelled:
@@ -539,6 +562,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                         "message_id": message_id, "choices": part.get("choices", []), "scenario": scenario,
                         "expires": time.time() + settings.clarification_ttl_seconds}
 
+            parts = [mask_part(p, sql_policy) for p in parts]   # persisted, shared and exported copies too
             if not emit_parts(parts, emit, cancelled=run.cancelled, delay=settings.stream_delay_seconds,
                               on_part=remember_clarification):
                 finish = "aborted"
@@ -886,13 +910,16 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
 
     @app.put("/api/conversations/{conversation_id}/share")
     def put_share(conversation_id: str, body: ShareIn, request: Request):
-        """Create (or update) the org-scoped read-only link. ``includeData`` defaults to false."""
+        """Create (or update) the org-scoped read-only link. ``includeData`` defaults to false. 1.15.0: widening
+        ``includeData`` issues a new id and revokes the old one (S1); ``expiresInDays`` is 7, 30 (default) or 90 (S4)."""
         ctx, err = _own_conversation(request, conversation_id)
         if err is not None:
             return err
-        share = shares.put(ctx.principal.customer, ctx.principal.user, conversation_id, body.includeData, _iso(time.time()))
+        share = shares.put(ctx.principal.customer, ctx.principal.user, conversation_id, body.includeData,
+                           body.expiresInDays)
         audit("conversation_shared", customer=ctx.principal.customer, user=ctx.principal.user,
-              conversation_id=conversation_id, kind="with_data" if body.includeData else "no_data")
+              conversation_id=conversation_id, kind="with_data" if body.includeData else "no_data",
+              expires_in_days=share.expires_in_days, rotated=share.rotated)
         return JSONResponse(share_link(share), headers=NO_STORE)
 
     @app.delete("/api/conversations/{conversation_id}/share")

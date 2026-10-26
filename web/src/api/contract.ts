@@ -22,7 +22,7 @@ export type {
   Sensitivity, StatusPart, TablePart, TextPart, ToolCallPart, ArtifactPart, PartBase,
 };
 
-export const CONTRACT_VERSION = '1.13.0';
+export const CONTRACT_VERSION = '1.16.0';
 export const CONTRACT_MAJOR = 1;
 
 // ---------------------------------------------------------------- new parts (v1)
@@ -190,6 +190,10 @@ export type { ShareLink, ShareRequest, SharedConversation } from '../contract/v1
 
 // ---------------------------------------------------------------- requests
 
+/** Demo scenarios (CONTRACT.md §9, §9.1). */
+export type DemoScenario =
+  'table' | 'chart' | 'repair' | 'abstain' | 'clarify' | 'escalation' | 'candidates' | 'error' | 'slow' | 'report' | 'empty' | 'multi_table' | 'long_sql' | 'many_repairs' | 'clarify_nested' | 'escalation_abstain' | 'cancel_plan' | 'cancel_sql' | 'cancel_repair' | 'cancel_candidates' | 'cancel_escalation' | 'cancel_render';
+
 export interface ChatRequest {
   conversationId?: ID;
   /** `editOf`: id of an earlier user message this one replaces (its sibling; editing the first question makes a new root). */
@@ -203,8 +207,11 @@ export interface ChatRequest {
    * version of the answer. 1.10.0: `style` restyles it ('More concise' / 'More detailed'; CONTRACT.md §8.1).
    */
   regenerate?: { messageId: ID; style?: RegenerateStyle };
-  /** Demo backend only: force a scripted scenario (see CONTRACT.md §9). Ignored in sim/prod. */
-  scenario?: 'table' | 'chart' | 'repair' | 'abstain' | 'clarify' | 'escalation' | 'error' | 'candidates' | 'slow';
+  /**
+   * Demo backend only: force a scripted scenario (see CONTRACT.md §9). Ignored in sim/prod. 1.16.0: the edge cases
+   * (§9.1, `EDGE_SCENARIOS` in ../contract/edgeCases.ts); `report` (1.9.0) was missing here before.
+   */
+  scenario?: DemoScenario;
 }
 
 /**

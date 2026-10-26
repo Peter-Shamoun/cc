@@ -89,7 +89,12 @@ const DataTableView = memo(function DataTableView({ part, onOpen, full }: DataTa
   const rows = useMemo(() => {
     const q = filter.trim().toLowerCase();
     let next = part.rows;
-    if (q) next = part.rows.filter((row) => row.some((cell, i) => !part.columns[i]?.phi && String(cell ?? '').toLowerCase().includes(q)));
+    // Match what the user sees ("$1,234.50", "12.3%") as well as the raw value ("1234.5"); never PHI columns.
+    if (q) next = part.rows.filter((row) => row.some((cell, i) => {
+      const c = part.columns[i];
+      if (!c || c.phi) return false;
+      return (typeof cell === 'object' && cell !== null ? '' : String(cell ?? '')).toLowerCase().includes(q) || formatCell(cell, c).toLowerCase().includes(q);
+    }));
     if (!sort) return next;
     const numeric = isNumeric(part.columns[sort.index]);
     const { index, dir } = sort;
@@ -230,7 +235,11 @@ const DataTableView = memo(function DataTableView({ part, onOpen, full }: DataTa
                 <span className="mt-0.5 block text-xs">The owner shared this chat without result data.</span>
               </td></tr>
             ) : (
-              <tr><td colSpan={part.columns.length} className="px-3 py-6 text-center text-fg-subtle">Query returned 0 rows</td></tr>
+              <tr><td colSpan={part.columns.length} className="px-3 py-6 text-center text-fg-subtle" data-testid="table-empty">
+                {filter.trim() && part.rows.length > 0
+                  ? <>No rows match “{filter.trim()}”. <button type="button" className="underline underline-offset-2 hover:text-fg" onClick={() => setFilter('')}>Clear filter</button></>
+                  : 'Query returned 0 rows'}
+              </td></tr>
             ))}
           </tbody>
         </table>

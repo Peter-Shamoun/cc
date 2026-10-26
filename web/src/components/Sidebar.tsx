@@ -1,19 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
-import { Ellipsis, Filter, Keyboard, MessageSquarePlus, PanelLeft, Pencil, Pin, PinOff, Search, Settings, ShieldCheck, Share, SquarePen, Trash2, X } from 'lucide-react';
+import { Archive, Ellipsis, Filter, Keyboard, MessageSquarePlus, PanelLeft, Pencil, Pin, PinOff, Search, Settings, ShieldCheck, Share, SquarePen, Trash2, X } from 'lucide-react';
 import clsx from 'clsx';
 import { IconButton } from './ui';
 import { Menu, modKey, useMenu, type MenuItem } from '../shell/primitives';
 import type { ThreadSummary } from '../adapters/types';
 
-const DAY = 86400000;
-/** ChatGPT-style date buckets, computed against local midnight (not a rolling 24h). */
+/**
+ * ChatGPT-style date buckets, by local calendar day (not a rolling 24 h). Day boundaries are built with `new Date(y,
+ * m, d - n)`, never `midnight - n * 24 h`: across a DST change a day is 23 or 25 hours long, and the fixed-length
+ * version put a chat from 23:30 two days ago under "Yesterday". An unparseable timestamp goes to "Older", not "NaN".
+ */
 export function bucket(iso: string, now = new Date()): string {
-  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const t = Date.parse(iso);
-  if (t >= midnight) return 'Today';
-  if (t >= midnight - DAY) return 'Yesterday';
-  if (t >= midnight - 7 * DAY) return 'Previous 7 days';
-  if (t >= midnight - 30 * DAY) return 'Previous 30 days';
+  if (Number.isNaN(t)) return 'Older';
+  const dayStart = (back: number) => new Date(now.getFullYear(), now.getMonth(), now.getDate() - back).getTime();
+  if (t >= dayStart(0)) return 'Today';
+  if (t >= dayStart(1)) return 'Yesterday';
+  if (t >= dayStart(7)) return 'Previous 7 days';
+  if (t >= dayStart(30)) return 'Previous 30 days';
   const d = new Date(t);
   return d.getFullYear() === now.getFullYear() ? d.toLocaleString('en-US', { month: 'long' }) : String(d.getFullYear());
 }
@@ -50,6 +54,8 @@ export interface SidebarProps {
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
   onPin?: (id: string, pinned: boolean) => void;
+  /** Archive a chat (it leaves the list; Settings → Data controls → Archived chats brings it back). */
+  onArchive?: (id: string) => void;
   onExport?: (id: string) => void;
   onCollapse: () => void;
   onSearch: () => void;
@@ -87,7 +93,7 @@ export function Sidebar(p: SidebarProps) {
   ];
   const Root = p.drawer ? 'div' : 'aside';
   return (
-    <Root className={clsx('flex h-full w-[260px] shrink-0 flex-col bg-sidebar font-sans', p.drawer && 'fixed inset-y-0 left-0 z-40 w-[min(300px,85vw)] cc-pan-y shadow-2xl motion-safe:animate-[cc-drawer_200ms_var(--ease-out)]')}
+    <Root className={clsx('flex h-full w-[260px] shrink-0 flex-col bg-sidebar font-sans', p.drawer && 'fixed inset-y-0 left-0 z-40 w-[min(300px,85vw)] cc-pan-y shadow-lg motion-safe:animate-[cc-drawer_200ms_var(--ease-out)]')}
       data-testid="sidebar" aria-modal={p.drawer || undefined} role={p.drawer ? 'dialog' : undefined} aria-label="Chat history" tabIndex={p.drawer ? -1 : undefined}>
       <div className="flex h-[52px] shrink-0 items-center justify-between px-2">
         <div className="flex items-center gap-2 px-2 font-semibold">
@@ -147,7 +153,7 @@ export function Sidebar(p: SidebarProps) {
           <span>{p.storeMode === 'ephemeral' ? <><b className="font-medium text-fg-muted">History off</b> · chats live in memory only.</> : 'History on'} Synthetic demo data.</span>
         </div>
         <button type="button" onClick={account.toggle} aria-haspopup="menu" aria-expanded={!!account.anchor} className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm hover:bg-hover" data-testid="account-button">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#4352d6] text-[11px] font-semibold text-white" aria-hidden>DU</span>
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-fg/80 text-[11px] font-semibold text-bg" aria-hidden>DU</span>
           <span className="min-w-0 flex-1">
             <span className="block truncate font-medium">Demo user</span>
             <span className="block truncate text-xs text-fg-subtle">acme_labs · analyst</span>
@@ -159,7 +165,7 @@ export function Sidebar(p: SidebarProps) {
   );
 }
 
-function ThreadRow({ t, active, tabStop, renaming, setRenaming, onSelect, onRename, onDelete, onPin, onExport, canPin }: SidebarProps & { t: ThreadSummary; active: boolean; tabStop: boolean; renaming: boolean; setRenaming: (id: string | null) => void }) {
+function ThreadRow({ t, active, tabStop, renaming, setRenaming, onSelect, onRename, onDelete, onPin, onArchive, onExport, canPin }: SidebarProps & { t: ThreadSummary; active: boolean; tabStop: boolean; renaming: boolean; setRenaming: (id: string | null) => void }) {
   const menu = useMenu();
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => { if (renaming) input.current?.select(); }, [renaming]);
@@ -167,6 +173,7 @@ function ThreadRow({ t, active, tabStop, renaming, setRenaming, onSelect, onRena
     ...(onExport ? [{ label: 'Export as Markdown', icon: <Share size={16} />, onSelect: () => onExport(t.id) }] : []),
     { label: 'Rename', icon: <Pencil size={16} />, onSelect: () => setRenaming(t.id) },
     ...(canPin && onPin ? [{ label: t.pinned ? 'Unpin' : 'Pin', icon: t.pinned ? <PinOff size={16} /> : <Pin size={16} />, onSelect: () => onPin(t.id, !t.pinned) }] : []),
+    ...(onArchive ? [{ label: 'Archive', icon: <Archive size={16} />, onSelect: () => onArchive(t.id) }] : []),
     'sep',
     { label: 'Delete', icon: <Trash2 size={16} />, danger: true, onSelect: () => onDelete(t.id) },
   ];

@@ -226,20 +226,32 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore, getOpti
   }, [adapter, refresh, store]);
 
   /** Send a user turn. `resume` answers a clarification (CONTRACT.md §6) so the server continues that run. */
+  // `busy` is React state: two calls in the same tick (double Enter, double-clicked Regenerate, Send while an
+  // edit is starting) both see busy=false, and the store write awaits before run() sets it. This ref claims
+  // the turn synchronously, so only the first starts.
+  const startingRef = useRef(false);
+  const claim = async (work: () => Promise<void>) => {
+    if (startingRef.current) return;
+    startingRef.current = true;
+    try { await work(); } finally { startingRef.current = false; }
+  };
+
   const send = useCallback(async (text: string, opts?: { resume?: ChatRequest['resume'] }) => {
     const t = text.trim();
-    if (!t || busy) return;
-    const cid = convId ?? uid('c');
-    if (!convId) setConvId(cid);
-    const user: UserMessage = { id: uid('u'), role: 'user', text: t, createdAt: new Date().toISOString() };
-    await store.appendMessage(cid, user, draftTitle(t));
-    refresh(); // show the new chat in the sidebar now, not when the first answer ends (QA-S2)
-    await run(cid, [...messages, user], { resume: opts?.resume });
+    if (!t || busy || startingRef.current) return;
+    await claim(async () => {
+      const cid = convId ?? uid('c');
+      if (!convId) setConvId(cid);
+      const user: UserMessage = { id: uid('u'), role: 'user', text: t, createdAt: new Date().toISOString() };
+      await store.appendMessage(cid, user, draftTitle(t));
+      refresh(); // show the new chat in the sidebar now, not when the first answer ends (QA-S2)
+      await run(cid, [...messages, user], { resume: opts?.resume });
+    });
   }, [busy, convId, messages, refresh, run, store]);
 
   const stop = useCallback(() => abortRef.current?.abort(), []);
 
-  const regenerate = useCallback(async (style: RegenerateStyle = 'default') => {
+  const regenerate = useCallback((style: RegenerateStyle = 'default') => claim(async () => {
     if (!convId || busy) return;
     const lastUserIdx = messages.map((m) => m.role).lastIndexOf('user');
     if (lastUserIdx < 0) return;
@@ -259,7 +271,7 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore, getOpti
     }
     await store.truncateAfter(convId, messages[lastUserIdx].id);
     await run(convId, messages.slice(0, lastUserIdx + 1), { regenerate: regen });
-  }, [branches, busy, convId, messages, run, store]);
+  }), [branches, busy, convId, messages, run, store]);
 
   const remove = useCallback(async (id: ID) => {
     await store.deleteConversation(id);
@@ -268,7 +280,7 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore, getOpti
   }, [convId, newChat, refresh, store]);
 
   /** Edit user message `i`: keep the old tail as a version, run the edited question as a new one. */
-  const editAt = useCallback(async (i: number, text: string) => {
+  const editAt = useCallback((i: number, text: string) => claim(async () => {
     const t = text.trim();
     const old = messages[i];
     if (!convId || busy || !t || old?.role !== 'user' || t === old.text) return;
@@ -284,7 +296,7 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore, getOpti
     const prefix = messages.slice(0, i);
     await store.replaceMessages(convId, [...prefix, user].map(persist));
     await run(convId, [...prefix, user]);
-  }, [branches, busy, convId, messages, run, store]);
+  }), [branches, busy, convId, messages, run, store]);
 
   /** Show version `k` of the branch at user message `i`. */
   const switchVersion = useCallback(async (i: number, k: number) => {
@@ -305,6 +317,11 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore, getOpti
 
   const pin = useCallback(async (id: ID, pinned: boolean) => {
     await store.setPinned?.(id, pinned);
+    refresh();
+  }, [refresh, store]);
+
+  const archive = useCallback(async (id: ID, archived: boolean) => {
+    await store.setArchived?.(id, archived);
     refresh();
   }, [refresh, store]);
 
@@ -381,5 +398,5 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore, getOpti
     return () => { delete window.__ccAudit; };
   }, []);
 
-  return { threads, convId, messages, busy, send, stop, open, newChat, regenerate, remove, editAt, switchVersion, versionOf, rename, pin, canPin: !!store.setPinned };
+  return { threads, convId, messages, busy, send, stop, open, newChat, regenerate, remove, editAt, switchVersion, versionOf, rename, pin, canPin: !!store.setPinned, archive, canArchive: !!store.setArchived };
 }

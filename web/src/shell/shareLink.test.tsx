@@ -27,7 +27,7 @@ describe('share link (contract 1.11.0)', () => {
     expect(sw).not.toBeChecked();
     fireEvent.click(create);
     await screen.findByTestId('share-url');
-    expect(api.set).toHaveBeenCalledWith(false);
+    expect(api.set).toHaveBeenCalledWith(false, undefined);
     expect(api.copy).toHaveBeenCalledWith(`${window.location.origin}/shared/sh_test`);
     expect((screen.getByTestId('share-url') as HTMLInputElement).value).toBe(`${window.location.origin}/shared/sh_test`);
     expect(screen.getByRole('button', { name: /Copied/ })).toBeInTheDocument();
@@ -42,7 +42,7 @@ describe('share link (contract 1.11.0)', () => {
     await screen.findByTestId('share-url');
     const sw = screen.getByRole('switch', { name: 'Include result data' });
     fireEvent.click(sw);
-    await waitFor(() => expect(api.set).toHaveBeenCalledWith(true));
+    await waitFor(() => expect(api.set).toHaveBeenCalledWith(true, undefined));
     await waitFor(() => expect(sw).toBeChecked());
     expect(sw).toHaveAccessibleDescription(/Table previews/);
   });

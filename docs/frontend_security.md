@@ -113,7 +113,10 @@ test vectors in `web/src/lib/csvFilename.vectors.json`. The Content-Disposition 
 - `install_log_redaction()` runs in `create_app`. It attaches `PhiLogFilter` to root, cc.api, uvicorn*, fastapi and starlette loggers, and their handlers. The filter redacts every message and replaces tracebacks with `Type (message redacted)` plus `file:line in func` frames, with no source text.
 - **Access logs** (`AccessLogFilter`, installed by `create_app` on `uvicorn.access`) log the route *shape*, never the path. A segment is kept only if it's a static segment of a registered route; anything else (share ids, conversation, message and file ids, probe junk) becomes `:id`. A query string becomes `?…`, and client IPs (a HIPAA identifier) are truncated to /24 or /48. Example: `203.0.113.0 - "GET /api/shared/:id HTTP/1.1" 200`. This holds for the plain `uvicorn api.app:app` command (access log on), as used by Playwright and the docs. `python -m api` still turns the access log off. `api/tests/test_access_log.py` starts a real uvicorn and checks its output.
 - `ErrorShieldMiddleware` (inside SecurityHeaders) turns any unhandled exception into the contract's 500 envelope, `{"error":{"code":"internal",...}}`. It logs only `Type at file:line` and the route template, and doesn't re-raise, so uvicorn never prints the message.
+- `HeadMiddleware` (innermost) answers `HEAD` on every `GET` route: it runs the GET, keeps its status and headers (including `content-length` and the security headers), and drops the body. Starlette routes declared with `@app.get` answered `HEAD` with 405, which broke uptime checks, `curl -I` and link previews. `HEAD .../stream` stays 405: a HEAD there would attach to a live run and look like a viewer that dropped. Tests: `api/tests/test_head_and_outbound_log.py`.
 - 422s use the contract envelope with field paths only (`Invalid request: messages.0.id.`). User-controlled keys are masked as `*`. FastAPI's default 422 echoed the offending `input` back.
+
+- **Outbound HTTP logs** (`OutboundUrlFilter`, installed by `create_app` via `install_outbound_url_redaction()` on the `httpx` and `httpcore` loggers). httpx logs every request at INFO as `HTTP Request: GET http://testserver/api/shared/sh_… "HTTP/1.1 200 OK"`, i.e. full URLs with share and conversation ids. The test client and any future backend client go through it. The filter keeps scheme and host, reduces the path to its route shape, and drops query and fragment.
 
 **Heuristics, not de-identification.** Quoted strings, emails, SSNs, phones, dates, 6+ digit numbers and 8+ char alphanumeric ids are masked. A bare unquoted name is not. The primary rule still stands: never pass user text, SQL or row values to a logger or `reportError`.
 
@@ -148,6 +151,8 @@ test vectors in `web/src/lib/csvFilename.vectors.json`. The Content-Disposition 
 - **CSRF:** a cookie-borne sign-out needs `x-cc-csrf: 1` like every write, so a third-party page can't force a sign-out (403, no wipe).
 - **Audit:** `signed_out` is recorded with customer and user only, and only when the token was still valid.
 - **Client:** `signOut(base, session, {signInUrl})` in `web/src/auth/session.ts` POSTs and then navigates to sign-in, or reloads. The navigation also drops in-memory drafts and answers. It navigates away even when the request fails (offline), because the user asked to leave. No UI calls it yet: shell should wire a "Sign out" item once the real backend exists, since demo mode has no sign-in to return to.
+- **Other tabs:** `Clear-Site-Data` empties storage, but another open tab keeps its conversation on screen (in memory) until its next request. `signOut` therefore posts the constant `signed-out` on the `cc-auth` BroadcastChannel (no ids or data). Every cookie session listens (one listener per page) and leaves for sign-in with `next=<path>`, or reloads, which drops what's on screen. The signing-out tab ignores its own echo. Tests: `web/src/auth/crossTabSignOut.test.ts`.
+- **Back button (bfcache):** a page left because of a sign-out (in this tab, in another tab, or an expired session) could come back from the back/forward cache with the conversation in its DOM. The HTML is `no-store`, which browsers mostly, but not always, treat as "don't cache". `leaveSignedOut` therefore empties `#root` before navigating, so the snapshot holds nothing. A `pageshow` with `persisted` after such a leave reloads the page, and the server answers the reload as signed out. Tests: `web/src/auth/bfcache.test.ts`.
 
 ## Caching and offline
 
@@ -207,4 +212,30 @@ The web CSP enforces Trusted Types: `require-trusted-types-for 'script'; trusted
 - `scripts/header_rules.mjs` fails the header check if `require-trusted-types-for 'script'` is missing, or if `trusted-types` is `*` or allows duplicates.
 
 **Adding a sink:** don't. Render with React elements. If a library needs HTML, add a narrowly-validated producer to `trustedTypes.ts` with a test, and say why here. Never widen `default` and never add `'allow-duplicates'` or `*` in production. Browsers without Trusted Types (Firefox, older Safari) ignore the directive; React's escaping still applies there.
+
+## Subresource Integrity
+
+Production builds (`vite build`, including the mock build) pin every built script and stylesheet by hash. This is done by `sriPlugin` in `web/vite.config.ts`, which calls `web/scripts/sri.mjs`.
+
+**What's covered:**
+- **Static tags.** The entry `<script type="module">`, every `<link rel="modulepreload">` and the stylesheet get `integrity="sha384-…"` (plus `crossorigin`, which Vite already adds). The browser refuses a file whose bytes don't match.
+- **Lazy chunks.** These include vega, Shiki grammars and the markdown renderer, loaded with `import()`, which has no integrity attribute. They're covered by an **import map with an `integrity` section** placed before the first module script. It carries the CSP nonce like every other inline script, and it lists every `.js` file in `assets/`.
+  - Chrome 127+ and Safari 18+ enforce it. Other browsers ignore the key and still load the files.
+
+**How it's applied:** the hashes are computed in `writeBundle`, after the files are on disk, so they cover the exact served bytes.
+
+**Requirements for serving:**
+- A server or CDN may compress `/assets/` files: integrity is checked on the decoded body.
+- It must **not** rewrite them (minify, inject, or "optimise"), or the app won't boot.
+- Dev (`vite`) has no SRI because files change on every edit.
+
+**Verification:**
+- `web/src/security/sri.test.ts` (7 tests): hashing; placement before module scripts and modulepreloads; idempotence; that the check catches a tampered file, a missing attribute, a missing crossorigin, a late map or an unlisted chunk; that the build fails if a referenced asset is missing; and `<` escaping in the map.
+- **Local gate:** `node scripts/sri_check.mjs dist dist-mock` re-hashes both builds.
+- Then `csp_check.mjs` loads the SRI'd mock build and fails on any console error, which would include an integrity failure.
+- **Manual check in Chrome 156 (2026-10-25, 21:58 PDT):** a clean build loads a lazy chunk with no console errors. After one byte was appended to that chunk on disk, `import()` was rejected with "Failed to find a valid digest in the 'integrity' attribute".
+
+**Limits:**
+- KaTeX fonts are loaded from CSS, and fetched fonts have no SRI.
+- Integrity doesn't protect against a compromised build, only against tampering after the build: on a CDN, in a cache, or by a proxy.
 

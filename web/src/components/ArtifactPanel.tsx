@@ -177,7 +177,8 @@ function ArtifactPanelView({ artifact, onClose, versions, onVersion }: { artifac
         </div>
       </header>
       <div className={clsx('min-h-0 flex-1 overflow-auto pb-3', phone ? 'px-2' : 'px-3')}>
-        <div className={clsx('min-h-full rounded-2xl border border-line bg-bg', phone ? 'p-2' : 'p-4')}>
+        {/* Content sits on the panel itself (no card-in-card); the table/chart keep their own hairline frame. */}
+        <div className={clsx('min-h-full', phone ? 'p-1' : 'p-2')} data-testid="artifact-body">
           {tab === 'preview' && p.type === 'table' && <DataTable part={p} full />}
           {tab === 'preview' && p.type === 'chart' && <ChartView part={p} full />}
           {tab === 'preview' && p.type === 'image' && <PanelImage blobId={p.blobId} alt={p.alt} caption={p.caption} />}

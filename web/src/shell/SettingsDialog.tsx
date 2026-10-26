@@ -1,14 +1,16 @@
-import { useState, type ReactNode } from 'react';
-import { Database, Keyboard, Monitor, Moon, Settings2, Sun } from 'lucide-react';
+import { useState, type KeyboardEvent, type ReactNode } from 'react';
+import { ArchiveRestore, Database, Keyboard, Monitor, Moon, Settings2, Sun } from 'lucide-react';
 import clsx from 'clsx';
 import { Dialog, Kbd } from './primitives';
 import { useTheme, type ModePref } from '../lib/theme';
 import { SHORTCUTS } from './shortcuts';
+import type { ThreadSummary } from '../adapters/types';
 
 type Tab = 'general' | 'data' | 'shortcuts';
 
 /** ChatGPT-style settings: tabs on the left, rows of label + control on the right. */
-export function SettingsDialog({ onClose, initialTab = 'general', storeMode, enterToSend, setEnterToSend, onExportAll, threadCount }: { onClose: () => void; initialTab?: Tab; storeMode: string; enterToSend: boolean; setEnterToSend: (v: boolean) => void; onExportAll: () => void; threadCount: number }) {
+export function SettingsDialog({ onClose, initialTab = 'general', storeMode, enterToSend, setEnterToSend, onExportAll, threadCount, archived, onUnarchive, onOpenChat }: { onClose: () => void; initialTab?: Tab; storeMode: string; enterToSend: boolean; setEnterToSend: (v: boolean) => void; onExportAll: () => void; threadCount: number; archived?: ThreadSummary[]; onUnarchive?: (id: string) => void; onOpenChat?: (id: string) => void }) {
+  const [showArchived, setShowArchived] = useState(false);
   const [tab, setTab] = useState<Tab>(initialTab);
   const { preference, setPreference, palette, setPalette } = useTheme();
   const tabs: [Tab, string, ReactNode][] = [['general', 'General', <Settings2 size={16} />], ['data', 'Data controls', <Database size={16} />], ['shortcuts', 'Shortcuts', <Keyboard size={16} />]];
@@ -59,6 +61,26 @@ export function SettingsDialog({ onClose, initialTab = 'general', storeMode, ent
               <Row label="Unsent drafts" hint="Kept per chat in memory only, never in localStorage, because a draft can contain PHI.">
                 <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-fg-muted">Memory only</span>
               </Row>
+              {archived && (
+                <>
+                  <Group label="Chats" />
+                  <Row label="Archived chats" hint={archived.length ? `${archived.length} archived. They stay searchable and keep their history.` : 'Archive a chat from its … menu in the sidebar.'}>
+                    <button type="button" disabled={!archived.length} aria-expanded={showArchived} aria-controls="archived-list" onClick={() => setShowArchived((v) => !v)}
+                      className="rounded-full border border-line px-3 py-1 text-[13px] hover:bg-hover disabled:opacity-40" data-testid="archived-manage">{showArchived && archived.length ? 'Hide' : 'Manage'}</button>
+                  </Row>
+                  {showArchived && archived.length > 0 && (
+                    <ul id="archived-list" aria-label="Archived chats" className="mb-2 divide-y divide-line/60 rounded-lg border border-line/70" data-testid="archived-list">
+                      {archived.map((t) => (
+                        <li key={t.id} className="flex items-center gap-2 py-1 pl-3 pr-1">
+                          <button type="button" onClick={() => onOpenChat?.(t.id)} className="min-w-0 flex-1 truncate py-1 text-left hover:underline" title={t.title}>{t.title}</button>
+                          <button type="button" onClick={() => onUnarchive?.(t.id)} aria-label={`Unarchive ${t.title}`} title="Unarchive"
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-fg-muted hover:bg-hover hover:text-fg"><ArchiveRestore size={15} aria-hidden /></button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              )}
               <Group label="Export" />
               <Row label="Export chats" hint="Download every chat in this session as one Markdown file. PHI-flagged table columns are dropped.">
                 <button type="button" disabled={!threadCount} onClick={onExportAll} className="rounded-full border border-line px-3 py-1 text-[13px] hover:bg-hover disabled:opacity-40">Export</button>
@@ -119,11 +141,25 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
   );
 }
 
+// One radio group, one Tab stop (QA-S17): only the checked radio is tabbable; arrows (and Home/End) move
+// the selection and focus together, wrapping, mirrored in RTL — the native radio-group pattern.
 function Segmented({ value, onChange, options, label }: { value: string; onChange: (v: string) => void; options: [string, string, ReactNode?][]; label: string }) {
+  const values = options.map(([v]) => v);
+  const tabStop = values.includes(value) ? value : values[0];
+  const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
+    const i = Math.max(0, values.indexOf(value));
+    const rtl = getComputedStyle(e.currentTarget).direction === 'rtl';
+    const step = { ArrowDown: 1, ArrowUp: -1, ArrowRight: rtl ? -1 : 1, ArrowLeft: rtl ? 1 : -1 }[e.key];
+    const next = e.key === 'Home' ? 0 : e.key === 'End' ? values.length - 1 : step === undefined ? -1 : (i + step + values.length) % values.length;
+    if (next < 0) return;
+    e.preventDefault();
+    onChange(values[next]);
+    e.currentTarget.parentElement?.querySelectorAll<HTMLElement>('[role="radio"]')[next]?.focus();
+  };
   return (
     <div role="radiogroup" aria-label={label} className="flex rounded-lg bg-muted p-0.5 text-xs">
       {options.map(([v, l, icon]) => (
-        <button key={v} type="button" role="radio" aria-checked={value === v} onClick={() => onChange(v)}
+        <button key={v} type="button" role="radio" aria-checked={value === v} tabIndex={v === tabStop ? 0 : -1} onKeyDown={onKeyDown} onClick={() => onChange(v)}
           className={clsx('flex items-center gap-1.5 rounded-md px-2.5 py-1.5 transition-colors', value === v ? 'bg-elev font-medium shadow-sm' : 'text-fg-muted hover:text-fg')}>
           {icon}{l}
         </button>
@@ -135,8 +171,8 @@ function Segmented({ value, onChange, options, label }: { value: string; onChang
 function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
     <button type="button" role="switch" aria-checked={checked} aria-label={label} onClick={() => onChange(!checked)}
-      className={clsx('relative h-6 w-10 rounded-full transition-colors', checked ? 'bg-[var(--focus)]' : 'bg-line-strong')}>
-      <span className={clsx('absolute left-0 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-150', checked ? 'translate-x-[18px]' : 'translate-x-0.5')} />
+      className={clsx('relative h-6 w-10 rounded-full transition-colors', checked ? 'bg-accent' : 'bg-line-strong')}>
+      <span className={clsx('absolute left-0 top-0.5 h-5 w-5 rounded-full shadow-sm transition-transform duration-150', checked ? 'translate-x-[18px] bg-accent-fg' : 'translate-x-0.5 bg-white')} />
     </button>
   );
 }
