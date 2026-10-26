@@ -17,7 +17,7 @@ const escape = (page: Page) => page.keyboard.press('Escape');
 
 test.describe('sharing removed @both', () => {
   test('no share affordance in the header, menus, shortcuts or settings (QA-SH0)', async ({ page, isMobile }) => {
-    gap('QA-SH0');
+    // QA-SH0 UI half verified fixed by #302 (C10-final): ratchet removed, now a regression guard.
     await open(page, LIVE);
     await ask(page, 'What was our denial rate by payer last quarter?');
     await noShareVisible(page, 'the chat view');
@@ -30,7 +30,7 @@ test.describe('sharing removed @both', () => {
     await noShareVisible(page, "the answer's More menu"); await escape(page);
     // sidebar row ⋯ menu (mobile: open the drawer first)
     if (isMobile) await page.getByRole('button', { name: 'Open sidebar' }).click();
-    await page.getByRole('button', { name: /^Chat options/ }).first().click();
+    await page.getByRole('button', { name: /^(Chat options|Options for)/ }).first().click();
     await noShareVisible(page, 'the chat row menu'); await escape(page);
     // keyboard: the shortcuts sheet lists no share binding
     if (!isMobile) {
