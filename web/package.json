@@ -11,7 +11,8 @@
     "shots": "node scripts/screenshots.mjs",
     "e2e": "playwright test -c e2e/playwright.config.ts --project=desktop --project=mobile",
     "e2e:perf": "playwright test -c e2e/playwright.config.ts --project=perf",
-    "e2e:update": "playwright test -c e2e/playwright.config.ts --project=desktop --project=mobile --update-snapshots -g visual"
+    "e2e:update": "playwright test -c e2e/playwright.config.ts --project=desktop --project=mobile --update-snapshots -g visual",
+    "check:csp": "node scripts/csp_check.mjs"
   },
   "dependencies": {
     "@streamdown/math": "^1.0.3",
@@ -37,6 +38,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.3",
+    "@types/node": "^22.20.5",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^6.1.2",
