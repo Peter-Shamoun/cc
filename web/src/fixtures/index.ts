@@ -5,10 +5,12 @@
  */
 import type { Column, Part } from '../lib/contract';
 import { ANSWER_FIXTURES } from './answer';
-import type { Usage } from '../api/contract';
+import { V1_FIXTURES, type V1Step } from './v1';
+import type { FinishReason, Usage } from '../api/contract';
 
-export type FixtureStep = Part | { status: string };
-export interface Fixture { id: string; title: string; prompt: string; match: RegExp; queries: number; steps: FixtureStep[]; usage?: Partial<Usage>; hidden?: boolean }
+/** Legacy parts, status labels, or raw contract-v1 step/escalation events (`{ event }`, see fixtures/v1.ts). */
+export type FixtureStep = Part | V1Step;
+export interface Fixture { id: string; title: string; prompt: string; match: RegExp; queries: number; steps: FixtureStep[]; usage?: Partial<Usage>; finishReason?: FinishReason; hidden?: boolean }
 
 const payers: [string, number, number][] = [
   ['Northwind Health Plan', 18432, 0.142],
@@ -169,10 +171,10 @@ export const FIXTURES: Fixture[] = [
   },
 ];
 
-const ALL: Fixture[] = [...FIXTURES, ...ANSWER_FIXTURES];
+const ALL: Fixture[] = [...FIXTURES, ...ANSWER_FIXTURES, ...V1_FIXTURES];
 
 export function pickFixture(prompt: string): Fixture {
-  return ALL.find((f) => f.prompt === prompt) ?? ANSWER_FIXTURES.find((f) => f.match.test(prompt)) ?? FIXTURES.find((f) => f.match.test(prompt)) ?? FIXTURES[0];
+  return ALL.find((f) => f.prompt === prompt) ?? ANSWER_FIXTURES.find((f) => f.match.test(prompt)) ?? V1_FIXTURES.find((f) => f.match.test(prompt)) ?? FIXTURES.find((f) => f.match.test(prompt)) ?? FIXTURES[0];
 }
 
 /** Main demos plus the answer-surface demos (Team B: repair/candidates/checks, abstain, clarify). */

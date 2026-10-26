@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { newAssistantView, reduce, type AssistantMessage, type AssistantView, type ID, type UserMessage } from './contract';
+import type { AssistantMessage, ID, UserMessage } from './contract';
+import { newAssistantViewV1, reduceV1, type AssistantViewV1, type ChatRequest } from '../api/contract';
 import type { AnalystAdapter, ThreadSummary, TranscriptStore } from '../adapters/types';
 
 const uid = (p: string) => `${p}_${Math.random().toString(36).slice(2, 10)}`;
-export type ViewMessage = UserMessage | AssistantView;
+export type ViewMessage = UserMessage | AssistantViewV1;
 
 function toView(m: UserMessage | AssistantMessage): ViewMessage {
-  return m.role === 'user' ? m : { ...m, streaming: false, status: null, openText: [] };
+  if (m.role === 'user') return m;
+  const v = m as AssistantMessage & Partial<AssistantViewV1>;
+  return { ...v, parts: v.parts as AssistantViewV1['parts'], streaming: false, status: null, openText: [], steps: v.steps ?? [], escalations: v.escalations ?? [], lastSeq: -1 };
 }
 
 /** Placeholder title until the server returns a PHI-scrubbed one (spec §6.5). */
@@ -27,9 +30,11 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
   const [branches, setBranches] = useState<Record<number, { versions: ViewMessage[][]; idx: number }>>({});
   const persist = (m: ViewMessage): UserMessage | AssistantMessage => {
     if (m.role === 'user') return m;
-    const { streaming: _s, status: _st, openText: _o, finishReason: _f, usage: _u, ...rest } = m;
-    void _s; void _st; void _o; void _f; void _u;
-    return rest as AssistantMessage;
+    // Steps, escalations, usage and finishReason stay with the message so a reopened chat
+    // still shows its work timeline (memory store only; no PHI: steps carry no row values).
+    const { streaming: _s, status: _st, openText: _o, lastSeq: _l, ...rest } = m;
+    void _s; void _st; void _o; void _l;
+    return rest as unknown as AssistantMessage;
   };
   const abortRef = useRef<AbortController | null>(null);
 
@@ -53,43 +58,42 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     setMessages([]);
   }, []);
 
-  const run = useCallback(async (cid: ID, history: ViewMessage[]) => {
+  const run = useCallback(async (cid: ID, history: ViewMessage[], resume?: ChatRequest['resume']) => {
     const ctrl = new AbortController();
     abortRef.current = ctrl;
-    let view = newAssistantView(uid('a'));
+    let view = newAssistantViewV1(uid('a'));
     const set = () => setMessages([...history, view]);
     set();
     setBusy(true);
     const wire = history.map((m) => ({ id: m.id, role: m.role, text: m.role === 'user' ? m.text : m.parts.map((p) => (p.type === 'text' ? p.text : '')).join('\n') }));
     try {
-      for await (const ev of adapter.streamTurn({ conversationId: cid, messages: wire, signal: ctrl.signal })) {
-        view = reduce(view, ev);
+      for await (const ev of adapter.streamTurn({ conversationId: cid, messages: wire, signal: ctrl.signal, ...(resume ? { resume } : {}) })) {
+        view = reduceV1(view, ev);
         set();
         if (ev.type === 'message.end') break;
       }
     } catch (e) {
       if ((e as Error).name !== 'AbortError') {
-        view = reduce(view, { type: 'part', part: { type: 'error', id: uid('err'), code: 'internal', title: 'Connection lost', message: 'Response interrupted.', retryable: true } });
+        view = reduceV1(view, { type: 'part', part: { type: 'error', id: uid('err'), code: 'internal', title: 'Connection lost', message: 'Response interrupted.', retryable: true } });
       }
     }
-    if (ctrl.signal.aborted && view.streaming) view = reduce(view, { type: 'message.end', messageId: view.id, finishReason: 'aborted' });
+    if (ctrl.signal.aborted && view.streaming) view = reduceV1(view, { type: 'message.end', messageId: view.id, finishReason: 'aborted', usage: view.usage ?? { queries: 0, elapsedMs: 0 } } as never);
     view = { ...view, streaming: false, status: null, openText: [] };
     set();
     setBusy(false);
-    const { streaming: _s, status: _st, openText: _o, finishReason: _f, usage: _u, ...persist } = view;
-    void _s; void _st; void _o; void _f; void _u;
-    await store.appendMessage(cid, persist);
+    await store.appendMessage(cid, persist(view));
     refresh();
   }, [adapter, refresh, store]);
 
-  const send = useCallback(async (text: string) => {
+  /** Send a user turn. `resume` answers a clarification (CONTRACT.md §6) so the server continues that run. */
+  const send = useCallback(async (text: string, opts?: { resume?: ChatRequest['resume'] }) => {
     const t = text.trim();
     if (!t || busy) return;
     const cid = convId ?? uid('c');
     if (!convId) setConvId(cid);
     const user: UserMessage = { id: uid('u'), role: 'user', text: t, createdAt: new Date().toISOString() };
     await store.appendMessage(cid, user, draftTitle(t));
-    await run(cid, [...messages, user]);
+    await run(cid, [...messages, user], opts?.resume);
   }, [busy, convId, messages, run, store]);
 
   const stop = useCallback(() => abortRef.current?.abort(), []);

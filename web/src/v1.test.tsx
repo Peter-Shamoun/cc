@@ -5,7 +5,8 @@ import { HttpAnalystAdapter } from './adapters/http';
 import { MemoryTranscriptStore } from './adapters/memoryStore';
 import { Markdown } from './components/parts/Markdown';
 import { DataTable } from './components/parts/DataTable';
-import type { StreamEvent, TablePart } from './lib/contract';
+import type { TablePart } from './lib/contract';
+import type { AnyStreamEvent } from './adapters/types';
 
 vi.mock('./adapters/mock', async (orig) => {
   const m = await orig<typeof import('./adapters/mock')>();
@@ -26,7 +27,7 @@ describe('HttpAnalystAdapter (api/ contract)', () => {
       return sse([{ type: 'message.start', messageId: 'm1', conversationId: 'c1' }, { type: 'heartbeat' }, { type: 'message.end', messageId: 'm1', finishReason: 'stop' }]);
     }));
     const a = new HttpAnalystAdapter('', 'demo:acme_labs:peter');
-    const out: StreamEvent[] = [];
+    const out: AnyStreamEvent[] = [];
     for await (const e of a.streamTurn({ conversationId: 'c1', messages: [{ id: 'u1', role: 'user', text: 'q' }, { id: 'a1', role: 'assistant', text: 'x' }], signal: new AbortController().signal })) out.push(e);
     expect(out.map((e) => e.type)).toEqual(['message.start', 'message.end']);
     expect(JSON.parse(calls[0][1].body as string).messages).toEqual([{ id: 'u1', role: 'user', text: 'q' }]);
