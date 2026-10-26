@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, Copy, Database, Download, Ellipsis, Keyboard, Moon, PanelLeft, Pencil, Settings, Share, ShieldCheck, SquarePen, Sun, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, Copy, Database, Download, Ellipsis, Keyboard, MessageCircleDashed, Moon, PanelLeft, Pencil, Settings, Share, ShieldCheck, SquarePen, Sun, Trash2 } from 'lucide-react';
 import { useTheme } from '../lib/theme';
 import { IconButton } from '../components/ui';
 import { Menu, modKey, useMenu, type MenuItem } from './primitives';
@@ -23,6 +23,9 @@ export interface HeaderProps {
   onShare?: () => void;
   /** Strategy/model picker (contract 1.4.0) in the product menu, like ChatGPT's model menu. */
   strategy?: StrategyState;
+  /** Temporary chat toggle (QA-S22, ChatGPT-style): shown only when set. */
+  temporary?: boolean;
+  onTemporary?: (on: boolean) => void;
 }
 
 /** Top bar: sidebar/new-chat when the sidebar is hidden, product menu (scope + data mode), PHI badge, Share and "…" (ChatGPT layout). */
@@ -113,6 +116,12 @@ export function Header(p: HeaderProps) {
           <button type="button" onClick={p.onShare ?? share.toggle} aria-haspopup={p.onShare ? 'dialog' : 'menu'} aria-expanded={p.onShare ? undefined : !!share.anchor} data-testid="share-button" className="flex h-9 items-center gap-1.5 rounded-full border border-line px-3 text-sm hover:bg-hover @max-[600px]:w-9 @max-[600px]:justify-center @max-[600px]:px-0" aria-label="Share chat">
             <Share size={15} /> <span className="@max-[600px]:hidden">Share</span>
           </button>
+        )}
+        {p.onTemporary && (
+          <IconButton label={p.temporary ? 'Turn off temporary chat' : 'Turn on temporary chat'} tip tipAt="end" aria-pressed={!!p.temporary} data-testid="temporary-toggle"
+            onClick={() => p.onTemporary?.(!p.temporary)} className={p.temporary ? 'bg-hover text-fg' : undefined}>
+            <MessageCircleDashed size={18} />
+          </IconButton>
         )}
         {p.showNav && (
           <IconButton label="New chat" onClick={p.onNewChat} className="sm:hidden"><SquarePen size={18} /></IconButton>
