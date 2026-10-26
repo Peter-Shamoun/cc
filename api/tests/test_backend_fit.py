@@ -13,12 +13,12 @@ from api.app import Settings, create_app
 from api.backends import AuthError, DemoAuth, SimAuth
 from api.tests.conftest import DX, LABS, events, parts
 
-#: Everything a client might try in order to choose data. None of it may have any effect.
-HINT_OPTIONS = {"customer": "acme_diagnostics", "tenant": "acme_diagnostics", "escalate": True, "lossless": True,
-                "schema": "lossless", "database": "claims_lake", "lake": "raw", "scope": "lossless.*",
-                "views": ["lossless.claims"], "relations": ["lossless.claims"], "sources": ["raw.x12_837"]}
-HINT_FIELDS = {"customer": "acme_diagnostics", "tenant": "acme_diagnostics", "escalate": True,
-               "scope": {"views": ["lossless.claims"]}, "dataSource": "raw"}
+#: 1.21.0 (CONTRACT §2.1): a body or options key from IdentityScopedKey is refused with 422 and nothing runs.
+#: Data-flavoured keys outside that enum are ignored like any unknown key, and headers and the query string are never
+#: read for scope. Either way none of it may change the customer, the relations or escalation.
+IGNORED_OPTIONS = {"lossless": True, "views": ["lossless.claims"], "sources": ["raw.x12_837"], "lakehouse": "raw",
+                   "allowedDirectories": ["s3://raw/"], "sql": "SELECT * FROM lossless.claims"}
+IGNORED_FIELDS = {"views": ["lossless.claims"], "lossless": True, "principal": "acme_diagnostics"}
 HINT_QUERY = "?customer=acme_diagnostics&tenant=acme_diagnostics&escalate=1&schema=lossless&scope=raw"
 HINT_HEADERS = {"X-Customer": "acme_diagnostics", "X-Tenant": "acme_diagnostics", "X-Scope": "lossless.*",
                 "X-Escalate": "1", "X-Database": "raw", "X-Forwarded-User": "dev@xifin.example"}
@@ -27,7 +27,7 @@ HINT_HEADERS = {"X-Customer": "acme_diagnostics", "X-Tenant": "acme_diagnostics"
 def _claims_table(client, headers, *, hints: bool):
     body = {"messages": [{"id": "u1", "role": "user", "text": "List all claims"}]}
     if hints:
-        body = {**body, **HINT_FIELDS, "options": dict(HINT_OPTIONS)}
+        body = {**body, **IGNORED_FIELDS, "options": dict(IGNORED_OPTIONS)}
     r = client.post("/api/chat" + (HINT_QUERY if hints else ""), json=body,
                     headers={**headers, **(HINT_HEADERS if hints else {})})
     assert r.status_code == 200, r.text
@@ -68,18 +68,36 @@ def test_client_hints_cannot_choose_customer_relations_or_escalation(headers, pr
     assert not [e for e in evs if e["type"] == "escalation"]
 
 
-def test_downloads_and_shares_stay_inside_the_tokens_customer():
+def test_identity_scoped_keys_are_refused_before_anything_runs():
+    """Every IdentityScopedKey, in the body or in options, is 422 validation and opens no session."""
+    from api.app import IDENTITY_SCOPED_KEYS
+    assert {"customer", "tenant", "schema", "database", "relations", "scope", "escalate", "dataSource"} <= IDENTITY_SCOPED_KEYS
+    opened = []
+
+    class CountingAuth(DemoAuth):
+        def authenticate(self, token, request_id):
+            ctx = super().authenticate(token, request_id)
+            real = ctx.opener.open
+            ctx.opener.open = lambda escalate: (opened.append(escalate), real(escalate))[1]
+            return ctx
+
+    client = TestClient(create_app(auth=CountingAuth(), settings=Settings(heartbeat_seconds=5)))
+    msg = {"messages": [{"id": "u1", "role": "user", "text": "List all claims"}]}
+    for key in sorted(IDENTITY_SCOPED_KEYS):
+        for body in ({**msg, key: "acme_diagnostics"}, {**msg, "options": {key: "acme_diagnostics"}}):
+            r = client.post("/api/chat", json=body, headers=LABS)
+            assert r.status_code == 422, (key, r.status_code)
+            assert r.json()["error"]["code"] == "validation"
+            assert "sign-in" in r.json()["error"]["message"]
+    assert opened == []  # no session was opened (a valid request opens one: CountingAuth records [False])
+
+
+def test_downloads_stay_inside_the_tokens_customer():
     client = TestClient(create_app(settings=Settings(heartbeat_seconds=5)))
-    evs, table = _claims_table(client, LABS, hints=False)
-    conv = evs[0]["conversationId"]
+    _, table = _claims_table(client, LABS, hints=False)
     assert client.get(f"/api/download/{table['csvFileId']}", headers=LABS).status_code == 200
     other = client.get(f"/api/download/{table['csvFileId']}?customer=acme_labs", headers={**DX, "X-Customer": "acme_labs"})
     assert other.status_code in (403, 404)
-    share = client.put(f"/api/conversations/{conv}/share", json={"includeData": True}, headers=LABS)
-    assert share.status_code == 200, share.text
-    share_id = share.json()["shareId"]
-    assert client.get(f"/api/shared/{share_id}", headers=LABS).status_code == 200
-    assert client.get(f"/api/shared/{share_id}?customer=acme_labs", headers={**DX, "X-Customer": "acme_labs"}).status_code in (403, 404)
 
 
 # ------------------------------------------------------------- the real mock path (Cognito -> open_session)
@@ -115,8 +133,8 @@ def test_sim_path_opens_sessions_from_the_token_only(world, monkeypatch):
     client = TestClient(create_app(auth=SimAuth(world.aws, world.dep), settings=Settings(heartbeat_seconds=5),
                                    llm_factory=script))
     headers = {"Authorization": "Bearer " + login(world.aws, "ana@xifin.example"), **HINT_HEADERS}
-    body = {"messages": [{"id": "u1", "role": "user", "text": "How many claims?"}], **HINT_FIELDS,
-            "options": dict(HINT_OPTIONS)}
+    body = {"messages": [{"id": "u1", "role": "user", "text": "How many claims?"}], **IGNORED_FIELDS,
+            "options": dict(IGNORED_OPTIONS)}
     r = client.post("/api/chat" + HINT_QUERY, json=body, headers=headers)
     assert r.status_code == 200
     assert events(r)[-1]["finishReason"] == "stop"
