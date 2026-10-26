@@ -26,7 +26,7 @@ export function useFocusTrap(ref: RefObject<HTMLElement | null>, active = true) 
   }, [active, ref]);
 }
 
-/** Centered modal (settings, search, shortcuts). Esc and scrim click close it. */
+/** Centered modal (settings, search, shortcuts); a full-screen sheet on phones. Esc and scrim click close it. */
 export function Dialog({ title, onClose, children, className, hideTitle, testId }: { title: string; onClose: () => void; children: ReactNode; className?: string; hideTitle?: boolean; testId?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
@@ -37,9 +37,9 @@ export function Dialog({ title, onClose, children, className, hideTitle, testId 
     return () => window.removeEventListener('keydown', onKey, true);
   }, [onClose]);
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-3 pt-[10vh] font-sans motion-safe:animate-[cc-fade_120ms_ease-out] dark:bg-black/60" onMouseDown={(e) => e.target === e.currentTarget && onClose()} data-testid={testId ? `${testId}-scrim` : undefined}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-3 pt-[10vh] font-sans max-sm:p-0 max-sm:pt-0 motion-safe:animate-[cc-fade_120ms_ease-out] dark:bg-black/60" onMouseDown={(e) => e.target === e.currentTarget && onClose()} data-testid={testId ? `${testId}-scrim` : undefined}>
       <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={id} tabIndex={-1} data-testid={testId}
-        className={clsx('relative w-full max-w-[680px] rounded-2xl border border-line bg-elev text-fg shadow-[0_16px_70px_rgba(0,0,0,0.25)] outline-none motion-safe:animate-[cc-pop_160ms_cubic-bezier(.2,.9,.3,1.2)]', className)}>
+        className={clsx('relative w-full max-w-[680px] rounded-2xl border border-line bg-elev text-fg shadow-[0_16px_70px_rgba(0,0,0,0.25)] outline-none motion-safe:animate-[cc-pop_160ms_cubic-bezier(.2,.9,.3,1.2)] max-sm:flex max-sm:min-h-full max-sm:flex-col max-sm:rounded-none max-sm:border-0 max-sm:shadow-none max-sm:motion-safe:animate-[cc-rise_200ms_ease-out]', className, 'max-sm:max-w-none')}>
         <div className={clsx('flex items-center justify-between px-5 pt-4', hideTitle && 'sr-only')}>
           <h2 id={id} className="text-lg font-semibold">{title}</h2>
           <IconButton label="Close" onClick={onClose}><X size={18} /></IconButton>
