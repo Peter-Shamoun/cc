@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, ChevronDown, ChevronRight, Download, FileSpreadsheet, Info, Lightbulb, Loader2, Maximize2, ShieldCheck, Wrench, Check, X, Database, List, BarChart3, ListChecks, Search, RotateCcw, Code2, Table2, Image as ImageIcon, FileText, Copy } from 'lucide-react';
 import clsx from 'clsx';
 import ReactMarkdown from 'react-markdown';
@@ -49,11 +49,19 @@ export function FileCard({ part, onPreview }: { part: FilePart; onPreview?: () =
 export function ImageView({ part, onOpen }: { part: ImagePart; onOpen?: () => void }) {
   const { url, err } = useBlobUrl(part.blobId);
   const [lightbox, setLightbox] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const adapter = useAdapter();
   const box = imageDisplayBox(part.width, part.height);
   // Fixed box reserves space (no layout jump); on narrow screens it shrinks to the column width and the
   // aspect ratio keeps the height proportional instead of overflowing sideways.
   const frame = { width: box.width, height: box.height, aspectRatio: `${box.width} / ${box.height}` };
+  useEffect(() => {
+    if (!lightbox) return;
+    dialogRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); setLightbox(false); } };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [lightbox]);
   return (
     <figure className="group/img relative my-4 max-w-full" data-testid="image" style={{ width: box.width }}>
       <div data-testid="image-frame" className="max-w-full h-auto!" style={frame}>
@@ -65,13 +73,13 @@ export function ImageView({ part, onOpen }: { part: ImagePart; onOpen?: () => vo
           <div className="h-full w-full animate-pulse rounded-xl bg-muted" data-testid="image-skeleton" />
         )}
       </div>
-      <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover/img:opacity-100 group-focus-within/img:opacity-100 [@media(hover:none)]:opacity-100">
+      <div className="absolute right-2 top-2 flex gap-1 opacity-0 group-hover/img:opacity-100 group-focus-within/img:opacity-100 [@media(hover:none)]:opacity-100">
         <IconButton label="Download image" className="bg-elev/90 shadow" onClick={async () => adapter && downloadBlob(`cc_figure.${part.mime === 'image/svg+xml' ? 'svg' : 'png'}`, await adapter.fetchBlob(part.blobId))}><Download size={15} /></IconButton>
         <IconButton label="Expand image" className="bg-elev/90 shadow" onClick={onOpen ?? (() => setLightbox(true))}><Maximize2 size={14} /></IconButton>
       </div>
       {part.caption && <figcaption className="mt-1.5 text-xs text-fg-subtle">{part.caption}</figcaption>}
       {lightbox && url && (
-        <div role="dialog" aria-label={part.alt} onClick={() => setLightbox(false)} onKeyDown={(e) => e.key === 'Escape' && setLightbox(false)} tabIndex={-1} className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-8">
+        <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={part.alt} onClick={() => setLightbox(false)} tabIndex={-1} className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-8">
           <img src={url} alt={part.alt} className="max-h-full max-w-full rounded-lg bg-white" />
           <IconButton label="Close" className="absolute right-4 top-4 bg-white/90 text-black" onClick={() => setLightbox(false)}><X size={18} /></IconButton>
         </div>

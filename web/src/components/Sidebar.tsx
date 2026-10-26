@@ -67,9 +67,10 @@ export function Sidebar(p: SidebarProps) {
     { label: 'Settings', icon: <Settings size={16} />, onSelect: p.onSettings, shortcut: `${modKey()} ,` },
     { label: 'Keyboard shortcuts', icon: <Keyboard size={16} />, onSelect: p.onShortcuts, shortcut: `${modKey()} /` },
   ];
+  const Root = p.drawer ? 'div' : 'aside';
   return (
-    <aside className={clsx('flex h-full w-[260px] shrink-0 flex-col bg-sidebar font-sans', p.drawer && 'fixed inset-y-0 left-0 z-40 w-[min(300px,85vw)] shadow-2xl motion-safe:animate-[cc-drawer_200ms_var(--ease-out)]')}
-      data-testid="sidebar" aria-modal={p.drawer || undefined} role={p.drawer ? 'dialog' : undefined} aria-label="Chat history">
+    <Root className={clsx('flex h-full w-[260px] shrink-0 flex-col bg-sidebar font-sans', p.drawer && 'fixed inset-y-0 left-0 z-40 w-[min(300px,85vw)] shadow-2xl motion-safe:animate-[cc-drawer_200ms_var(--ease-out)]')}
+      data-testid="sidebar" aria-modal={p.drawer || undefined} role={p.drawer ? 'dialog' : undefined} aria-label="Chat history" tabIndex={p.drawer ? -1 : undefined}>
       <div className="flex h-[52px] shrink-0 items-center justify-between px-2">
         <div className="flex items-center gap-2 px-2 font-semibold">
           <span className="flex h-6 w-6 items-center justify-center rounded-md bg-accent text-[11px] font-bold text-accent-fg" aria-hidden>CC</span>
@@ -115,7 +116,7 @@ export function Sidebar(p: SidebarProps) {
         </button>
         {account.anchor && <Menu label="Account" anchor={account.anchor} items={accountItems} onClose={account.close} side="top" />}
       </div>
-    </aside>
+    </Root>
   );
 }
 

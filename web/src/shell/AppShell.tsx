@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown } from 'lucide-react';
 import clsx from 'clsx';
 import { useChat } from '../lib/useChat';
@@ -22,6 +22,7 @@ import { NEW_CHAT_KEY, moveDraft } from './drafts';
 import { transcriptMarkdown, exportFilename } from './exportMarkdown';
 import type { SlashCommand } from './slash';
 import { useTheme } from '../lib/theme';
+import { scrollBehavior } from '../lib/motion';
 import { copyText, downloadText } from '../lib/csv';
 import { getPref, setPref } from '../lib/prefs';
 import type { AssistantView } from '../lib/contract';
@@ -58,6 +59,9 @@ export function AppShell() {
 }
 
 function ShellInner() {
+  const auditOn = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('audit');
+  const renderStart = useRef(0);
+  if (auditOn) renderStart.current = performance.now();
   const adapter = useMemo(makeAdapter, []);
   const store = useMemo(() => makeStore(adapter), [adapter]);
   const chat = useChat(adapter, store);
@@ -223,11 +227,17 @@ function ShellInner() {
   const [draft, setDraftPush] = useState<{ text: string; n: number } | undefined>();
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
+  const scrollToIndexRef = useRef<((index: number) => void) | null>(null);
   const [atBottom, setAtBottom] = useState(true);
   const atBottomRef = useRef(true);
   const pinned = useRef(false);
   const lastLen = useRef(0);
   const { messages } = chat;
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+  const busyRef = useRef(chat.busy);
+  busyRef.current = chat.busy;
+  const virtualList = messages.length > 30;
   useEffect(() => {
     const el = scroller.current;
     if (!el) return;
@@ -236,12 +246,17 @@ function ShellInner() {
     const last = messages[messages.length - 1];
     const prev = messages[messages.length - 2];
     if (grew && last?.role === 'assistant' && prev?.role === 'user') {
+      pinned.current = true;
+      // A virtual window unmounts the streaming row if we animate the scroll. Jump by index instead.
+      if (scrollToIndexRef.current) {
+        scrollToIndexRef.current(messages.length - 2);
+        return;
+      }
       const users = el.querySelectorAll<HTMLElement>('[data-testid="msg-user"]');
       const u = users[users.length - 1];
       if (u) {
-        pinned.current = true;
         const top = el.scrollTop + u.getBoundingClientRect().top - el.getBoundingClientRect().top - 16;
-        if (typeof el.scrollTo === 'function') el.scrollTo({ top, behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+        if (typeof el.scrollTo === 'function') el.scrollTo({ top, behavior: scrollBehavior() });
         else el.scrollTop = top;
         return;
       }
@@ -266,7 +281,7 @@ function ShellInner() {
   const jumpToLatest = () => {
     pinned.current = false;
     atBottomRef.current = true;
-    scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' });
+    scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: scrollBehavior() });
   };
 
   // ---- screen readers: the log is aria-busy while streaming (one announcement, not per token), then "Answer complete" (QA-S1) ----
@@ -281,6 +296,32 @@ function ShellInner() {
     wasBusy.current = chat.busy;
   }, [chat.busy]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => setAnnounce(''), [chat.convId]);
+  // Streaming text is announced as a suffix on a timer, not on every token. Clearing the timer
+  // from the message effect would reset it at 60fps and the region would stay silent.
+  const announcedLen = useRef(0);
+  useEffect(() => {
+    if (!chat.busy) return;
+    announcedLen.current = 0;
+    let timer = 0;
+    let cancelled = false;
+    const tick = () => {
+      timer = window.setTimeout(() => {
+        if (cancelled || !busyRef.current) return;
+        const last = messagesRef.current[messagesRef.current.length - 1];
+        if (last?.role === 'assistant') {
+          const text = last.parts.flatMap((p) => (p.type === 'text' ? [p.text] : [])).join('\n');
+          if (text.length > announcedLen.current) {
+            const start = Math.max(announcedLen.current, text.length - 240);
+            announcedLen.current = text.length;
+            setAnnounce(`CC is answering. ${text.slice(start)}`);
+          }
+        }
+        tick();
+      }, 180);
+    };
+    tick();
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [chat.busy]);
 
   const edit = (t: string) => setDraftPush((d) => ({ text: t, n: (d?.n ?? 0) + 1 }));
   const empty = messages.length === 0;
@@ -312,6 +353,14 @@ function ShellInner() {
     // Clarification chips / free text resume the paused run (ChatRequest.resume); abstain rephrasings send plainly.
     reply: (t, resume) => send(t, resume),
   };
+  useLayoutEffect(() => {
+    if (!auditOn) return;
+    const ms = performance.now() - renderStart.current;
+    const stats = (window.__ccRenderStats ??= { commits: 0, actual: 0, worst: 0, children: 0 });
+    stats.commits += 1;
+    stats.actual += ms;
+    stats.worst = Math.max(stats.worst, ms);
+  });
   const searchStore = useCallback((q: string) => store.search?.(q) ?? Promise.resolve([]), [store]);
   const openFromSearch = async (id: string, messageId?: string) => {
     await chat.open(id);
@@ -360,10 +409,10 @@ function ShellInner() {
             </div>
           ) : (
             <>
-              <div ref={scroller} onScroll={(e) => onScroll(e.currentTarget)} className="flex-1 overflow-y-auto [overflow-anchor:none]" data-testid="thread-scroller">
-                <div ref={content} className="mx-auto flex max-w-[48rem] flex-col gap-6 px-4 pb-10 pt-4 md:px-6" role="log" aria-live="polite" aria-relevant="additions" aria-busy={chat.busy} aria-label="Messages">
+              <div ref={scroller} tabIndex={0} role="region" aria-label="Conversation" onScroll={(e) => onScroll(e.currentTarget)} className="flex-1 overflow-y-auto [overflow-anchor:none] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--focus)]" data-testid="thread-scroller">
+                <div ref={content} className="mx-auto flex max-w-[48rem] flex-col gap-6 px-4 pb-10 pt-4 md:px-6" role={virtualList ? undefined : 'log'} aria-live={virtualList ? undefined : 'polite'} aria-relevant={virtualList ? undefined : 'additions'} aria-busy={virtualList ? undefined : chat.busy} aria-label={virtualList ? undefined : 'Messages'}>
                   <h1 className="sr-only" data-testid="thread-title">{currentTitle}</h1>
-                  <ThreadView messages={messages} busy={chat.busy} actions={threadActions} />
+                  <ThreadView messages={messages} busy={chat.busy} actions={threadActions} scrollRef={scroller} scrollToIndexRef={scrollToIndexRef} />
                 </div>
               </div>
               <div className="relative mx-auto w-full max-w-[48rem] px-4 md:px-6" id="composer">
