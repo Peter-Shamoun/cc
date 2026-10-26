@@ -69,6 +69,8 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -
 }
 .prose-chat :where(a, code) { overflow-wrap: anywhere; }
 .prose-chat .overflow-x-auto { max-width: 100%; }
+.prose-chat .katex-display { display: block; margin: 0.75em 0; padding: 0.125em 0; text-align: center; overflow-x: auto; overflow-y: hidden; max-width: 100%; overflow-wrap: normal; word-break: normal; }
+.prose-chat .katex-display > .katex { display: inline-block; white-space: nowrap; text-align: initial; }
 .prose-chat :where(p) { margin: 0 0 var(--p-gap); }
 .prose-chat :where(ul, ol) { margin: 0.5em 0 1em; padding-left: 1.5em; }
 .prose-chat :where(ul) { list-style: disc; }
