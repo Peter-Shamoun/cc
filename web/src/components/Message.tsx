@@ -280,7 +280,7 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
           {isLast && <IconButton tip label="Regenerate" onClick={onRegenerate}><RefreshCw size={16} /></IconButton>}
           {isLast && onRefine && <IconButton tip label="Answer style" className="-ml-1 w-6!" aria-haspopup="menu" aria-expanded={!!regen.anchor} onClick={regen.toggle} data-testid="regenerate-menu-button"><ChevronDown size={14} /></IconButton>}
           <IconButton tip label="More actions" aria-haspopup="menu" aria-expanded={!!more.anchor} onClick={more.toggle} data-testid="more-actions"><MoreHorizontal size={16} /></IconButton>
-          {styleLabel && <span className="mx-1 rounded-full border border-line px-2 py-0.5 font-sans text-[11px] text-fg-subtle" data-testid="regen-style" title="Regenerated with this style">{styleLabel}</span>}
+          {styleLabel && <span className="mx-1 font-sans text-xs text-fg-subtle" data-testid="regen-style" title="Regenerated with this style">{styleLabel}</span>}
           <AnswerMeta usage={usage && (usage.queries > 0 || usage.costUsd !== undefined) ? usage : undefined} queries={queries.length ? nQueries : 0} repairs={steps.filter((s) => s.kind === 'repair' && s.state === 'ok').length} onSql={queries.length ? () => setSqlOpen((o) => !o) : undefined} sqlOpen={sqlOpen} />
           </>)}
           {feedbackSent && <span className="ml-2 font-sans text-xs text-fg-subtle">Thanks for the feedback</span>}

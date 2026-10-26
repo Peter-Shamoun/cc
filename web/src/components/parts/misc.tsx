@@ -144,10 +144,10 @@ export function ToolRow({ part }: { part: ToolCallPart }) {
         <Icon size={14} className="shrink-0" />
         <span className={clsx('truncate', part.state === 'running' && 'shimmer')}>{part.label}</span>
         {part.state === 'running' && <Loader2 size={13} className="shrink-0 animate-spin" />}
-        {part.state === 'ok' && <Check size={13} className="shrink-0 text-[#10a37f]" />}
+        {part.state === 'ok' && <Check size={13} className="shrink-0 text-fg-subtle" />}
         {part.state === 'error' && <X size={13} className="shrink-0 text-danger" />}
         {meta && <span className="shrink-0 text-xs text-fg-subtle">{meta}</span>}
-        {part.agent && <span className="shrink-0 rounded-full border border-line px-1.5 text-[11px] text-fg-subtle">{part.agent}</span>}
+        {part.agent && <span className="shrink-0 text-xs text-fg-subtle"><span aria-hidden>· </span><span>{part.agent}</span></span>}
         {open ? <ChevronDown size={13} className="shrink-0" /> : <ChevronRight size={13} className="shrink-0" />}
       </button>
       {open && (
@@ -181,8 +181,8 @@ export function ToolGroup({ parts }: { parts: ToolCallPart[] }) {
 export function ErrorView({ part, onRetry }: { part: ErrorPart; onRetry?: () => void }) {
   const [details, setDetails] = useState(false);
   return (
-    // Comparison pass: ChatGPT/Claude errors are a quiet tinted note with one clear Retry, not a red-barred alarm.
-    <div className="my-3 rounded-xl border px-3.5 py-2.5 font-sans text-sm" style={{ borderColor: 'color-mix(in srgb, var(--danger) 22%, transparent)', background: 'color-mix(in srgb, var(--danger) 5%, transparent)' }} role="alert" data-testid="error">
+    // Like ChatGPT/Claude: a plain line in the answer column (small red icon, no tinted box) with one quiet Retry.
+    <div className="my-3 font-sans text-sm" role="alert" data-testid="error">
       <div className="flex items-start gap-2">
         <AlertTriangle size={15} className="mt-0.5 shrink-0 text-danger" aria-hidden />
         <div className="min-w-0 flex-1">
@@ -192,7 +192,7 @@ export function ErrorView({ part, onRetry }: { part: ErrorPart; onRetry?: () => 
       </div>
       <div className={clsx('flex items-center gap-3 pl-[23px] text-xs', ((part.retryable && onRetry) || part.details) && 'mt-2')}>
         {part.retryable && onRetry && (
-          <button type="button" onClick={onRetry} className="inline-flex items-center gap-1 rounded-full bg-fg px-3 py-1 font-medium text-bg hover:opacity-90"><RotateCcw size={12} aria-hidden /> Retry</button>
+          <button type="button" onClick={onRetry} className="inline-flex items-center gap-1 rounded-md border border-line px-2.5 py-1 font-medium text-fg hover:bg-hover"><RotateCcw size={12} aria-hidden /> Retry</button>
         )}
         {part.details && <button type="button" onClick={() => setDetails((d) => !d)} className="text-fg-muted underline underline-offset-2">{details ? 'Hide details' : 'Details'}</button>}
       </div>
