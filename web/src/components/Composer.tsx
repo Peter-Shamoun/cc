@@ -62,9 +62,11 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
   };
   const pasteSeq = useRef(0);
   const setValue = (t: string) => { setValueState(t); if (draftKey) setDraft(draftKey, t); };
+// oxlint-disable-next-line react/set-state-in-effect -- each chat restores its own saved draft
   useEffect(() => { setValueState(draftKey ? getDraft(draftKey) : ''); setPastes([]); setNotice(''); }, [draftKey]);
   useEffect(() => {
     if (initial !== undefined) {
+      // oxlint-disable-next-line react/set-state-in-effect -- an edit/prefill request from outside replaces the draft
       setValue(initial.text);
       const el = ref.current;
       el?.focus();
@@ -78,6 +80,7 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
     el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
   }, [value]);
   const slash = slashDismissed ? null : matchSlash(value);
+// oxlint-disable-next-line react/set-state-in-effect -- typing resets the slash-menu highlight
   useEffect(() => { setSlashIdx(0); if (!value.startsWith('/')) setSlashDismissed(false); }, [value]);
   const runCommand = (c: SlashCommand) => {
     if (c.insert) { setValue(c.insert); ref.current?.focus(); }

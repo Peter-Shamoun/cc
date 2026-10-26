@@ -34,7 +34,7 @@ export function StepTimeline({ steps, live, elapsedMs, reasoning = [] }: { steps
   const [open, setOpen] = useState(live);
   const touched = useRef(false);
   const wasLive = useRef(live);
-  const mountedLive = useRef(live);
+  const [mountedLive] = useState(live);
   useEffect(() => {
     if (wasLive.current && !live && !touched.current) setOpen(false);
     if (!wasLive.current && live && !touched.current) setOpen(true);
@@ -52,7 +52,7 @@ export function StepTimeline({ steps, live, elapsedMs, reasoning = [] }: { steps
   const worked = steps.reduce((a, b) => a + (b.durationMs ?? 0), 0) + reasoning.reduce((a, r) => a + (r.durationMs ?? 0), 0);
   // QA-A16: never shorter than the longest step it contains (a 2.4s query under "Thought for 1.8s" reads wrong).
   const longest = Math.max(0, ...steps.map((s) => s.durationMs ?? 0), ...reasoning.map((r) => r.durationMs ?? 0));
-  const thoughtMs = Math.max(mountedLive.current ? Math.max(ticking, 0) : elapsedMs ?? worked, longest);
+  const thoughtMs = Math.max(mountedLive ? Math.max(ticking, 0) : elapsedMs ?? worked, longest);
   const stopped = steps.filter((x) => x.state === 'cancelled').length;
   // Collapsed: "Thought for 1.2s" (plus "1 stopped" if any). Expanded: the counts join the header.
   const header = live ? 'Thinking…' : [`Thought for ${fmtMs(Math.max(thoughtMs, 1000))}`, open && steps.length ? counts : stopped ? `${stopped} stopped` : ''].filter(Boolean).join(' · ');
