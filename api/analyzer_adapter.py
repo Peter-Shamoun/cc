@@ -1,4 +1,4 @@
-"""Real-analyzer adapter (contract 1.12.0): analyzer/analyst outputs → contract stream events.
+"""Real-analyzer adapter (contract 1.12.0+): analyzer/analyst outputs → contract stream events.
 
 Spec: ``docs/frontend-analyzer-adapter.md``. This module is the **stub**. It does not change how the server runs.
 
@@ -11,6 +11,11 @@ Spec: ``docs/frontend-analyzer-adapter.md``. This module is the **stub**. It doe
   ``CC_API_ALLOW_PAID_API`` equals ``PAID_SWITCH_VALUE`` *and* the caller passes ``enable=True``, it raises the
   analyzer's ``PaidAPIDisabled`` before any client is built. Nothing in ``api.app`` calls it. Wiring it in is a
   separate, reviewed change (see the spec, "Rollout").
+* Reasoning text never streams as-is (spec R2). Every replay/run goes through ``api.reasoning_policy.ReasoningPolicy``:
+  ``"drop"`` (default) or ``"summary"`` (labels and counts only).
+* ``strategy_config`` (``api.strategy_config``) maps a contract strategy, model choice and 384-grid cell to
+  ``AnalyzerConfig`` overrides (spec R4). ``api.analyst_shim`` adapts the analyst agents' model interfaces to the
+  analyzer's ``complete(**kw) -> Completion`` so ``LiveTap`` can observe them (spec R7).
 """
 from __future__ import annotations
 
@@ -25,6 +30,7 @@ from analyzer.llm import Completion, PaidAPIDisabled, ToolCall
 from api.contract import CONTRACT_VERSION
 from api.live import Cancelled, LiveTap
 from api.mapping import outcome_parts
+from api.reasoning_policy import DEFAULT_POLICY, ReasoningPolicy
 from api.store import DownloadRegistry, Principal
 from api.stream_parts import emit_parts
 
@@ -122,26 +128,14 @@ class _ReplayLLM:
 def events_for_recording(recording: Recording, *, principal: Principal | None = None,
                          downloads: DownloadRegistry | None = None, message_id: str = "m_rec",
                          conversation_id: str = "c_rec", parent_id: str = "u_rec",
-                         cancel_after_call: int | None = None) -> list[dict]:
+                         cancel_after_call: int | None = None, reasoning: str = DEFAULT_POLICY) -> list[dict]:
     """Replay a recorded analyzer run into the contract stream that ``POST /api/chat`` would send.
 
-    ``cancel_after_call`` simulates Stop after N model calls (the stream must finish "aborted")."""
-    events: list[dict] = []
-
-    def emit(payload: dict):
-        events.append({**payload, "seq": len(events)})
-
-    principal = principal or Principal("acme_labs", "ana@xifin.example")
-    downloads = downloads or DownloadRegistry()
+    ``cancel_after_call`` simulates Stop after N model calls (the stream must finish "aborted").
+    ``reasoning`` is the R2 policy for model text: ``"drop"`` (default) or ``"summary"``."""
     cancelled = threading.Event()
-    emit({"type": "message.start", "messageId": message_id, "conversationId": conversation_id,
-          "contractVersion": CONTRACT_VERSION, "model": recording.calls[0].model if recording.calls else "none",
-          "parentId": parent_id, "strategy": "analyst"})
-    emit({"type": "status", "label": "Thinking"})
-    tap = LiveTap(_ReplayLLM(recording.calls), emit, cancelled=cancelled, multi_candidate=recording.multi_candidate)
-    finish = "stop"
-    parts: list[dict] = []
-    try:
+
+    def run(tap: LiveTap) -> AnalyzerAnswer:
         for n, rec in enumerate(recording.calls):
             if cancel_after_call is not None and n >= cancel_after_call:
                 cancelled.set()
@@ -150,19 +144,51 @@ def events_for_recording(recording: Recording, *, principal: Principal | None = 
             messages = [{"role": "user", "content": blocks if blocks else recording.question}]
             tap.complete(model=rec.model, candidate_index=rec.candidate, messages=messages, system="", tools=[],
                          max_tokens=1)
-        answer = AnalyzerAnswer(**recording.answer)
+        return AnalyzerAnswer(**recording.answer)
+
+    return run_to_events(recording.question, run, _ReplayLLM(recording.calls),
+                         model=recording.calls[0].model if recording.calls else "none",
+                         multi_candidate=recording.multi_candidate, cancelled=cancelled, principal=principal,
+                         downloads=downloads, message_id=message_id, conversation_id=conversation_id,
+                         parent_id=parent_id, reasoning=reasoning)
+
+
+def run_to_events(question: str, run: Callable[[LiveTap], AnalyzerAnswer], inner_llm: Any, *, model: str,
+                  multi_candidate: bool = False, cancelled: threading.Event | None = None,
+                  principal: Principal | None = None, downloads: DownloadRegistry | None = None,
+                  message_id: str = "m_rec", conversation_id: str = "c_rec", parent_id: str = "u_rec",
+                  strategy: str = "analyst", reasoning: str = DEFAULT_POLICY) -> list[dict]:
+    """The shared adapter pipeline: ``run(tap)`` drives an analyzer/analyst run whose model calls go through ``tap``
+    (a ``LiveTap`` around ``inner_llm``) and returns the ``AnalyzerAnswer``; this function frames it as the full
+    contract stream (``message.start`` … ``message.end``, with ``seq``). Model text is filtered by ``reasoning``."""
+    events: list[dict] = []
+
+    def raw_emit(payload: dict):
+        events.append({**payload, "seq": len(events)})
+
+    emit = ReasoningPolicy(raw_emit, reasoning)
+    principal = principal or Principal("acme_labs", "ana@xifin.example")
+    downloads = downloads or DownloadRegistry()
+    cancelled = cancelled or threading.Event()
+    emit({"type": "message.start", "messageId": message_id, "conversationId": conversation_id,
+          "contractVersion": CONTRACT_VERSION, "model": model, "parentId": parent_id, "strategy": strategy})
+    emit({"type": "status", "label": "Thinking"})
+    tap = LiveTap(inner_llm, emit, cancelled=cancelled, multi_candidate=multi_candidate)
+    finish = "stop"
+    parts: list[dict] = []
+    try:
+        answer = run(tap)
         tap.finish(answer)
         parts, finish = outcome_parts(answer, principal, downloads.scoped(conversation_id), elapsed_ms=0,
-                                      question=recording.question, ask_args=tap.ask_args, refuse_args=tap.refuse_args)
+                                      question=question, ask_args=tap.ask_args, refuse_args=tap.refuse_args)
     except Cancelled:
         tap.abort()
         finish = "aborted"
     except Exception:  # noqa: BLE001 - mirrors api.app: never echo internals; the stream still ends cleanly
         tap.finish(None)
-        if True:
-            parts = [{"type": "error", "id": "p_adapter_error", "code": "internal", "title": "Something went wrong",
-                      "message": "The analysis failed. Try again.", "retryable": True}]
-            finish = "error"
+        parts = [{"type": "error", "id": "p_adapter_error", "code": "internal", "title": "Something went wrong",
+                  "message": "The analysis failed. Try again.", "retryable": True}]
+        finish = "error"
     emit({"type": "status", "label": "Writing answer" if finish == "stop" else None})
     if finish != "aborted" and not emit_parts(parts, emit, cancelled=cancelled):
         finish = "aborted"

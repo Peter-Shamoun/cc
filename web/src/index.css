@@ -191,6 +191,12 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -
   /* "Print this answer": only the marked question + answer. */
   body[data-print-one] [data-message-id]:not([data-print-keep]) { display: none !important; }
   body[data-print-one] [data-message-id] { min-height: 0 !important; }
+  /* "Print report" in the artifact panel: just the report document. */
+  body[data-print-report] main, body[data-print-report] [data-testid="artifact-panel"] > header,
+  body[data-print-report] [data-testid="artifact-panel"] > [role="separator"] { display: none !important; }
+  body[data-print-report] [data-testid="artifact-panel"] { position: static !important; width: auto !important; height: auto !important; border: 0 !important; background: #fff !important; display: block !important; }
+  body[data-print-report] [data-testid="artifact-panel"] * { overflow: visible !important; }
+  body[data-print-report] [data-testid="artifact-panel"] > div, body[data-print-report] [data-testid="artifact-panel"] > div > div { border: 0 !important; padding: 0 !important; height: auto !important; }
 }
 
 /*
@@ -206,3 +212,7 @@ html[data-kbd] .cc-composer:focus-within { box-shadow: 0 0 0 2px var(--focus), 0
 /* Shared (read-only) chat page: no per-message actions (feedback, regenerate, edit). */
 .cc-readonly [data-testid="msg-actions"],
 .cc-readonly [data-testid="callout"] li > button { display: none; }
+
+/* Phone drawer + scrim: the browser keeps vertical scrolling; horizontal drags reach the swipe-to-close handler.
+   Set on every descendant because a nested scroller (the chat list) would otherwise reset it to auto. */
+.cc-pan-y, .cc-pan-y * { touch-action: pan-y; }

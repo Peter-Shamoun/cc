@@ -31,7 +31,7 @@ from api.contract import CONTRACT_VERSION, schema as contract_schema
 from api.ids import new_id
 from api.live import Cancelled, LiveTap
 from api.mapping import outcome_parts, report_artifacts
-from api.redact import install_log_redaction
+from api.redact import install_access_log_redaction, install_log_redaction
 from api.security import (MAX_BODY_BYTES, SESSION_COOKIE, BodyLimitMiddleware, CsrfMiddleware, ErrorShieldMiddleware,
                           SecurityHeadersMiddleware)
 from api.store import DownloadRegistry, Principal
@@ -312,6 +312,33 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             customer = None
         return JSONResponse(capabilities_body(CONTRACT_VERSION, demo=settings.llm == "scripted", customer=customer),
                             headers=NO_STORE)
+
+    @app.post("/api/auth/sign-out")
+    def sign_out(request: Request):
+        """Ends the session everywhere it can. Server side: ``auth.sign_out(token)`` (best effort, any token, even
+        expired). Browser side, always: ``Clear-Site-Data: "cache", "storage"`` wipes the HTTP cache, localStorage,
+        sessionStorage, IndexedDB, Cache Storage and service workers for this origin, and ``cc_session`` is expired
+        explicitly (not ``"cookies"``, which would clear every cookie on the registrable domain). CSRF-protected like
+        every cookie-borne write, so a third-party page can't sign the user out. 204, no body."""
+        token = _token(request)
+        principal = None
+        if token:
+            try:
+                principal = authed(request, new_id("r")).principal
+            except AuthError:
+                pass
+            try:
+                revoke = getattr(auth, "sign_out", None)  # backends written before 1.x may lack it
+                if revoke:
+                    revoke(token)
+            except Exception as exc:  # noqa: BLE001 - sign-out must always clear the browser
+                log.warning("sign_out revoke failed: %s", type(exc).__name__)
+        if principal is not None:
+            audit("signed_out", customer=principal.customer, user=principal.user)
+        resp = Response(status_code=204, headers={**NO_STORE, "Clear-Site-Data": '"cache", "storage"'})
+        for path in ("/api", "/"):  # a cookie is only removed by a matching Path; the spec'd one is /api
+            resp.delete_cookie(SESSION_COOKIE, path=path, secure=True, httponly=True, samesite="strict")
+        return resp
 
     @app.get("/api/contract")
     def contract():
@@ -894,6 +921,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
               conversation_id=share.conversation_id, kind="with_data" if share.include_data else "no_data")
         return JSONResponse(shared_view(share, conv), headers={**NO_STORE, "Referrer-Policy": "no-referrer"})
 
+    install_access_log_redaction(app.routes)  # after every route is registered
     return app
 
 

@@ -77,3 +77,66 @@ def install_log_redaction() -> None:
         for h in lg.handlers:
             if _FILTER not in h.filters:
                 h.addFilter(_FILTER)
+
+
+# ---- access log ----------------------------------------------------------------------------------------------------
+# uvicorn logs every request as ``(client_addr, method, full_path, http_version, status)``. Paths carry bearer
+# capabilities (``/api/shared/<share id>``) and record ids (``/api/conversations/<id>``, ``/api/download/<id>``), and a
+# query string can carry anything. The general filter can't catch ids reliably (``sh_`` + token_urlsafe), so the
+# access log gets the route *shape* instead: a segment is kept only when it's a static segment of a registered route,
+# everything else becomes ``:id``, and the query string becomes ``?…``. Client IPs (a HIPAA identifier) are
+# truncated to /24 (IPv4) or /48 (IPv6).
+
+def path_shape(path: object, static: frozenset[str] | set[str]) -> str:
+    p = str(path)
+    p, q = (p.split("?", 1) + [""])[:2] if "?" in p else (p, "")
+    segs = [s if (s == "" or s in static) else ":id" for s in p.split("/")]
+    out = "/".join(segs)[:200]
+    return out + ("?\u2026" if q else "")
+
+
+def mask_client(client: object) -> str:
+    c = str(client)
+    if c.count(":") == 1 and c.count(".") == 3:  # ipv4:port
+        c = c.rsplit(":", 1)[0]
+    if re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}", c):
+        return ".".join(c.split(".")[:3]) + ".0"
+    m = re.fullmatch(r"\[?([0-9A-Fa-f:]+)\]?(?::\d+)?", c)
+    if m and ":" in m.group(1):
+        return ":".join(m.group(1).split(":")[:3]) + "::"
+    return "-"
+
+
+class AccessLogFilter(logging.Filter):
+    """Rewrites uvicorn access records to the route shape (see path_shape). ``static`` grows as apps register."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.static: set[str] = {"api"}
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        a = record.args
+        if isinstance(a, tuple) and len(a) == 5:
+            client, method, path, version, status = a
+            method = method if str(method).isalpha() and len(str(method)) <= 10 else "-"
+            record.args = (mask_client(client), method, path_shape(path, self.static), version, status)
+        elif record.name == "uvicorn.access":  # unknown shape: keep nothing request-derived
+            record.msg, record.args = "access (unparsed record dropped)", ()
+        return True
+
+
+ACCESS_FILTER = AccessLogFilter()
+
+
+def install_access_log_redaction(routes) -> None:
+    """Idempotent. ``routes`` is ``app.routes``; their static segments become the allowlist."""
+    for r in routes:
+        for seg in str(getattr(r, "path", "")).split("/"):
+            if seg and "{" not in seg:
+                ACCESS_FILTER.static.add(seg)
+    lg = logging.getLogger("uvicorn.access")
+    if ACCESS_FILTER not in lg.filters:
+        lg.addFilter(ACCESS_FILTER)
+    for h in lg.handlers:
+        if ACCESS_FILTER not in h.filters:
+            h.addFilter(ACCESS_FILTER)
