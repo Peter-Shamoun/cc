@@ -291,8 +291,14 @@ function ShellInner() {
     return () => ro.disconnect();
   }, [messages.length === 0]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { pinned.current = false; lastLen.current = 0; atBottomRef.current = true; setAtBottom(true); }, [chat.convId]);
+  // Only a scroll the reader made can release the pin (QA-S12). While pinned, the reserved space under the
+  // question leaves the view "at the bottom", so a programmatic scroll or a layout clamp must not count.
+  const userScrollAt = useRef(0);
+  const markUserScroll = () => { userScrollAt.current = Date.now(); };
   const onScroll = (el: HTMLDivElement) => {
     const b = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    const byUser = Date.now() - userScrollAt.current < 800;
+    if (pinned.current && !byUser) { setAtBottom(b); return; }
     atBottomRef.current = b;
     if (b) pinned.current = false;
     setAtBottom(b);
@@ -428,7 +434,7 @@ function ShellInner() {
             </div>
           ) : (
             <>
-              <div ref={scroller} tabIndex={0} role="region" aria-label="Conversation" onScroll={(e) => onScroll(e.currentTarget)} className="flex-1 overflow-y-auto [overflow-anchor:none] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--focus)]" data-testid="thread-scroller">
+              <div ref={scroller} tabIndex={0} role="region" aria-label="Conversation" onScroll={(e) => onScroll(e.currentTarget)} onWheel={markUserScroll} onTouchMove={markUserScroll} onPointerDown={markUserScroll} onKeyDown={markUserScroll} className="flex-1 overflow-y-auto [overflow-anchor:none] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--focus)]" data-testid="thread-scroller">
                 <div ref={content} className="mx-auto flex max-w-[48rem] flex-col gap-6 px-4 pb-10 pt-4 md:px-6" role={virtualList ? undefined : 'log'} aria-live={virtualList ? undefined : 'polite'} aria-relevant={virtualList ? undefined : 'additions'} aria-busy={virtualList ? undefined : chat.busy} aria-label={virtualList ? undefined : 'Messages'}>
                   <h1 className="sr-only" data-testid="thread-title">{currentTitle}</h1>
                   {opening ? <ThreadSkeleton /> : <ThreadView messages={messages} busy={chat.busy} actions={threadActions} scrollRef={scroller} scrollToIndexRef={scrollToIndexRef} />}
