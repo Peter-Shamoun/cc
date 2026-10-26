@@ -14,9 +14,9 @@ export function SettingsDialog({ onClose, initialTab = 'general', storeMode, ent
   const tabs: [Tab, string, ReactNode][] = [['general', 'General', <Settings2 size={16} />], ['data', 'Data controls', <Database size={16} />], ['shortcuts', 'Shortcuts', <Keyboard size={16} />]];
   return (
     <Dialog title="Settings" onClose={onClose} testId="settings-dialog">
-      <div className="flex min-h-[380px] flex-col gap-2 px-3 pb-4 pt-2 sm:flex-row">
+      <div className="mt-3 flex flex-col border-t border-line/70 max-sm:flex-1 sm:h-[min(440px,70vh)] sm:flex-row">
         {/* oxlint-disable-next-line jsx-a11y/interactive-supports-focus -- arrow keys delegated from the focused tab (roving tabindex) */}
-        <div role="tablist" aria-orientation="vertical" aria-label="Settings sections" className="flex shrink-0 gap-1 overflow-x-auto scrollbar-none max-sm:p-1 sm:w-44 sm:flex-col"
+        <div role="tablist" aria-orientation="vertical" aria-label="Settings sections" className="flex shrink-0 gap-0.5 overflow-x-auto scrollbar-none p-2 max-sm:border-b max-sm:border-line/70 sm:w-44 sm:flex-col sm:border-r sm:border-line/70"
           onKeyDown={(e) => {
             const order = tabs.map((t) => t[0]);
             const i = order.indexOf(tab);
@@ -29,12 +29,13 @@ export function SettingsDialog({ onClose, initialTab = 'general', storeMode, ent
           }}>
           {tabs.map(([id, label, icon]) => (
             <button key={id} id={`settings-tab-${id}`} role="tab" type="button" aria-selected={tab === id} aria-controls={`settings-panel-${id}`} tabIndex={tab === id ? 0 : -1} data-autofocus={tab === id ? '' : undefined} onClick={() => setTab(id)}
-              className={clsx('flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm', id === 'shortcuts' && 'max-sm:hidden', tab === id ? 'bg-hover font-medium' : 'text-fg-muted hover:bg-hover hover:text-fg')}>
+              className={clsx('flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-left text-sm', id === 'shortcuts' && 'max-sm:hidden', tab === id ? 'bg-hover font-medium text-fg' : 'text-fg-muted hover:bg-hover hover:text-fg')}>
               {icon}{label}
             </button>
           ))}
         </div>
-        <div id={`settings-panel-${tab}`} role="tabpanel" aria-labelledby={`settings-tab-${tab}`} className="min-w-0 flex-1 px-2 text-sm">
+        <div id={`settings-panel-${tab}`} role="tabpanel" aria-labelledby={`settings-tab-${tab}`} tabIndex={0} className="scrollbar-thin outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--focus)] min-w-0 flex-1 overflow-y-auto px-5 pb-4 pt-3 text-sm" data-testid="settings-panel">
+          <h3 className="pb-1 text-[15px] font-semibold max-sm:sr-only">{tabs.find((t) => t[0] === tab)?.[1]}</h3>
           {tab === 'general' && (
             <>
               <Row label="Theme" hint="System follows your OS setting.">
@@ -51,14 +52,16 @@ export function SettingsDialog({ onClose, initialTab = 'general', storeMode, ent
           )}
           {tab === 'data' && (
             <>
+              <Group label="Storage" />
               <Row label="Chat history" hint={storeMode === 'ephemeral' ? 'Off. Chats live in this tab’s memory and are gone on reload. Nothing is written to browser storage.' : 'On. Chats are stored encrypted server-side.'}>
-                <span className="rounded-full border border-line px-2.5 py-1 text-xs text-fg-muted">{storeMode === 'ephemeral' ? 'Memory only' : 'Server'}</span>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-fg-muted">{storeMode === 'ephemeral' ? 'Memory only' : 'Server'}</span>
               </Row>
               <Row label="Unsent drafts" hint="Kept per chat in memory only, never in localStorage, because a draft can contain PHI.">
-                <span className="rounded-full border border-line px-2.5 py-1 text-xs text-fg-muted">Memory only</span>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-fg-muted">Memory only</span>
               </Row>
+              <Group label="Export" />
               <Row label="Export chats" hint="Download every chat in this session as one Markdown file. PHI-flagged table columns are dropped.">
-                <button type="button" disabled={!threadCount} onClick={onExportAll} className="rounded-full border border-line px-3.5 py-1.5 hover:bg-hover disabled:opacity-40">Export</button>
+                <button type="button" disabled={!threadCount} onClick={onExportAll} className="rounded-full border border-line px-3 py-1 text-[13px] hover:bg-hover disabled:opacity-40">Export</button>
               </Row>
             </>
           )}
@@ -98,12 +101,18 @@ export function ShortcutsDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
+/** Quiet sub-heading inside a settings panel (ChatGPT-style grouping without boxes). */
+function Group({ label }: { label: string }) {
+  return <h4 className="pb-0.5 pt-4 text-xs font-medium text-fg-subtle first:pt-1">{label}</h4>;
+}
+
+/** One setting: label (+ one-line hint) left, control right, hairline between rows. Dense: ~52px per row. */
 function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-line py-3.5 last:border-0">
+    <div className="flex min-h-[52px] items-center justify-between gap-6 border-b border-line/60 py-2.5 last:border-0 [&:has(+h4)]:border-0" data-testid="settings-row">
       <div className="min-w-0">
-        <div>{label}</div>
-        {hint && <div className="mt-0.5 text-xs text-fg-subtle">{hint}</div>}
+        <div className="leading-5">{label}</div>
+        {hint && <div className="mt-0.5 max-w-[42ch] text-xs leading-4 text-fg-subtle">{hint}</div>}
       </div>
       <div className="shrink-0">{children}</div>
     </div>
