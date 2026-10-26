@@ -1,6 +1,6 @@
 # CC chat API — stream contract
 
-**Version: 1.16.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.17.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -401,14 +401,27 @@ checks `web/src/adapters/conversationsApi.ts` against them).
 |---|---|---|
 | `GET /api/transcripts` | | `TranscriptsInfo {mode: "ephemeral"\|"persisted", persisted, retentionDays}` |
 | `PUT /api/transcripts/retention` | `{days}` | `{mode, retentionDays}` |
-| `GET /api/conversations?cursor=` | | `ConversationPage {items: ConversationSummary[], next?}` |
-| `POST /api/conversations/search` | `SearchRequest {q, cursor?}` (POST: the text may be PHI) | `ConversationPage`, items carry `snippet` |
+| `GET /api/conversations?cursor=&archived=` | | `ConversationPage {items: ConversationSummary[], next?}`; `archived` = `include` (default) \| `exclude` \| `only` (1.17.0) |
+| `POST /api/conversations/search` | `SearchRequest {q, cursor?, archived?}` (POST: the text may be PHI) | `ConversationPage`, items carry `snippet` |
 | `GET /api/conversations/{id}` | | `Conversation {id, title, updatedAt, messages: StoredMessage[]}` |
-| `PATCH /api/conversations/{id}` | `RenameRequest {title}` | `RenameResponse {id, title, updatedAt}`; 422 `invalid_title` |
+| `PATCH /api/conversations/{id}` | `RenameRequest {title?, pinned?, archived?}` (at least one; 1.17.0) | `RenameResponse {id, title, updatedAt, pinned, archived}`; 422 `invalid_title` / `validation` |
 | `DELETE /api/conversations/{id}` | | `{deleted: true}`, or 404 `{deleted: false, error: {code: "not_found"}}` (envelope since 1.13.0) |
 | `DELETE /api/conversations` | | `{deleted: <count>}` |
 
-Errors (`HttpError`): `not_found` (404), `invalid_title` (422), `transcripts_unavailable` (410: the customer key was destroyed, so the history is gone).
+Errors (`HttpError`): `not_found` (404), `invalid_title` (422), `validation` (422: bad PATCH flags or `archived` filter, 1.17.0), `transcripts_unavailable` (410: the customer key was destroyed, so the history is gone).
+
+**Pin and archive (1.17.0).** Persisted per user, like the title (sealed with the transcript in persisted mode), and
+announced by `Capabilities.pinArchive: true`; older servers lack it, so keep pin/archive client-only there.
+* Every `ConversationSummary` and `Conversation` carries `pinned` and `archived` (booleans, false by default).
+* `PATCH {pinned}` / `PATCH {archived}` never change `updatedAt`. **Archiving drops the pin**; **pinning an archived chat
+  unarchives it**; `{pinned: true, archived: true}` together, an empty body, unknown fields or non-boolean values are
+  422 `validation`. Re-pinning a pinned chat is a no-op (it keeps its place). Another user's chat is 404.
+* **A new user message in an archived chat unarchives it** (a run that finishes after the user archived does not).
+* The plain list returns **pinned chats first** (most recently pinned on top), then the rest newest first, so pins are
+  on page 1 whatever their age. Search results stay newest first. `?archived=exclude` is the sidebar,
+  `?archived=only` is Settings → Archived chats; the default `include` keeps pre-1.17 clients unchanged. Archived
+  chats stay searchable and openable. Shared views (§17) never show the flags.
+* Audit: `conversation_flags` with `pinned` / `archived` only (no title, no text).
 
 **`StoredMessage`.** User messages carry `text`, `parentId?` and `editOf?`. Assistant messages carry `parts`,
 `finishReason`, `usage`, `regenerateOf?` and `steps`. **`steps` are the flat `step.*` / `escalation` events in stream
@@ -588,6 +601,11 @@ must be signed in to the same organization (customer). A conversation has at mos
 
 ## Changelog
 
+* **1.17.0** (2026-10-25) — Pin and archive persisted server-side (shell ask), additive. `PATCH /api/conversations/{id}`
+  accepts `pinned` / `archived` (and `title`, at least one); `ConversationSummary`, `Conversation` and `RenameResponse`
+  carry both flags; `GET /api/conversations?archived=` and `SearchRequest.archived` filter (`include` default,
+  `exclude`, `only`); pinned chats list first; `Capabilities.pinArchive`. Rules in §11. `conversationsApi.ts` gains
+  `setPinned`, `setArchived`, `update` and the `archived` filter on `list` / `search`.
 * **1.16.0** (2026-10-25) — Edge-case demo scenarios (§9.1), additive. `ChatRequest.scenario` gains `empty`,
   `multi_table`, `long_sql`, `many_repairs`, `clarify_nested`, `escalation_abstain` and `cancel_plan|sql|repair|
   candidates|escalation|render`; the enum now also lists `report` (1.9.0, previously missing from the schema and

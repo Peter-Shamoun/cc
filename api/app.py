@@ -20,7 +20,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictBool
 
 from analyzer.config import AnalyzerConfig
 from analyzer.llm import PaidAPIDisabled
@@ -59,7 +59,11 @@ _SAFE_ID = re.compile(_ID)
 
 
 class RenameIn(BaseModel):
-    title: str = Field(max_length=500)
+    """PATCH /api/conversations/{id} (ConversationPatch). 1.17.0: any of title / pinned / archived, at least one."""
+    model_config = {"extra": "forbid"}
+    title: str | None = Field(default=None, max_length=500)
+    pinned: StrictBool | None = None  # strict: "yes" / 1 are 422, not True
+    archived: StrictBool | None = None
 
 
 class FeedbackIn(BaseModel):
@@ -76,6 +80,7 @@ class ShareIn(BaseModel):
 class SearchIn(BaseModel):
     q: str = Field(default="", max_length=200)
     cursor: str | None = Field(default=None, max_length=16)
+    archived: Literal["include", "exclude", "only"] = "include"  # 1.17.0
 
 
 class RetentionIn(BaseModel):
@@ -170,7 +175,7 @@ class AuditLog:
 
     ALLOWED = {"customer", "user", "file_id", "row_count", "conversation_id", "message_id", "parts",
                "queries", "elapsed_ms", "finish", "kind", "reason", "status", "scenario", "steps",
-               "expires_in_days", "rotated"}
+               "expires_in_days", "rotated", "pinned", "archived"}
 
     def __init__(self):
         self.events: list[dict] = []
@@ -737,13 +742,14 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                             headers=NO_STORE)
 
     @app.get("/api/conversations")
-    def conversations(request: Request, cursor: str | None = None):
+    def conversations(request: Request, cursor: str | None = None,
+                      archived: Literal["include", "exclude", "only"] = "include"):
         try:
             ctx = authed(request, new_id("r"))
         except AuthError:
             return unauthorized()
         try:
-            return JSONResponse(store.list_conversations(ctx.principal, cursor), headers=NO_STORE)
+            return JSONResponse(store.list_conversations(ctx.principal, cursor, archived=archived), headers=NO_STORE)
         except CustomerKeyDisabled:
             return shredded()
 
@@ -758,7 +764,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         if not query:
             return JSONResponse({"items": []}, headers=NO_STORE)
         try:
-            return JSONResponse(store.list_conversations(ctx.principal, body.cursor, query), headers=NO_STORE)
+            return JSONResponse(store.list_conversations(ctx.principal, body.cursor, query, archived=body.archived),
+                                headers=NO_STORE)
         except CustomerKeyDisabled:
             return shredded()
 
@@ -793,8 +800,13 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             ctx = authed(request, new_id("r"))
         except AuthError:
             return unauthorized()
+        if body.title is None and body.pinned is None and body.archived is None:
+            return error_json("validation", "Send title, pinned or archived.", 422)
+        if body.pinned and body.archived:
+            return error_json("validation", "A chat can't be pinned and archived at once.", 422)
         try:
-            out = store.rename_conversation(ctx.principal, conversation_id, body.title)
+            out = store.update_conversation(ctx.principal, conversation_id, title=body.title, pinned=body.pinned,
+                                            archived=body.archived)
         except ValueError:
             return JSONResponse({"error": {"code": "invalid_title", "message": "Use a single line of text."}}, 422,
                                 headers=NO_STORE)
@@ -802,8 +814,12 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             return shredded()
         if out is None:
             return not_found()
-        audit("conversation_renamed", customer=ctx.principal.customer, user=ctx.principal.user,
-              conversation_id=conversation_id)
+        if body.title is not None:
+            audit("conversation_renamed", customer=ctx.principal.customer, user=ctx.principal.user,
+                  conversation_id=conversation_id)
+        if body.pinned is not None or body.archived is not None:
+            audit("conversation_flags", customer=ctx.principal.customer, user=ctx.principal.user,
+                  conversation_id=conversation_id, pinned=out["pinned"], archived=out["archived"])
         return JSONResponse(out, headers=NO_STORE)
 
     @app.get("/api/conversations/{conversation_id}/export")
