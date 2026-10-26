@@ -22,6 +22,7 @@ import { OfflineBanner } from './OfflineBanner';
 import { useOnline } from '../lib/useOnline';
 import { usePrinting } from '../lib/usePrinting';
 import { SearchDialog } from './SearchDialog';
+import { useEdgeSwipeToOpen, useSwipeToClose } from './swipe';
 import { ShareDialog, type ShareLinkApi } from './ShareDialog';
 import { SettingsDialog, ShortcutsDialog } from './SettingsDialog';
 import { ToastProvider, useFocusTrap, useToast } from './primitives';
@@ -308,6 +309,11 @@ function ShellInner() {
 
   const drawerRef = useRef<HTMLDivElement>(null);
   useFocusTrap(drawerRef, mobile && drawerOpen);
+  const swipeRef = useRef<HTMLDivElement>(null);
+  const dismissDrawer = useCallback(() => setDrawerOpen(false), []);
+  const openDrawer = useCallback(() => setDrawerOpen(true), []);
+  useSwipeToClose(swipeRef, mobile && drawerOpen, dismissDrawer);
+  useEdgeSwipeToOpen(mobile && !drawerOpen && !dialog, openDrawer, 16);
 
   // ---- artifact panel ----
   // `follow`: the panel tracks the highest version of a versioned artifact (contract 1.9 §16), so a v2 that
@@ -551,8 +557,15 @@ function ShellInner() {
     <AdapterCtx.Provider value={adapter}>
       <div className="flex h-full overflow-hidden bg-bg text-fg">
         <a href="#composer" onClick={(e) => { e.preventDefault(); focusComposer(); }} className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-[80] focus:rounded-lg focus:bg-elev focus:px-3 focus:py-2 focus:shadow">Skip to message box</a>
-        {mobile && drawerOpen && <div className="fixed inset-0 z-30 bg-black/40 motion-safe:animate-[cc-fade_150ms_ease-out]" aria-hidden onClick={() => setDrawerOpen(false)} data-testid="drawer-scrim" />}
-        {sidebarVisible && (mobile ? <div ref={drawerRef}><Sidebar {...sidebarProps} drawer /></div> : <Sidebar {...sidebarProps} />)}
+        {mobile && drawerOpen && (
+          <div ref={swipeRef} className="contents" data-testid="drawer-layer">
+            <div className="fixed inset-0 z-30 cc-pan-y bg-black/40 motion-safe:animate-[cc-fade_150ms_ease-out]" aria-hidden onClick={dismissDrawer} data-testid="drawer-scrim" />
+            <div ref={drawerRef}><Sidebar {...sidebarProps} drawer /></div>
+          </div>
+        )}
+        {sidebarVisible && !mobile && <Sidebar {...sidebarProps} />}
+        {/* Phone: a thin left-edge strip where a rightward swipe opens the drawer (the page itself keeps native panning). */}
+        {mobile && !drawerOpen && !dialog && <div className="cc-pan-y fixed bottom-0 left-0 top-[52px] z-20 w-3" aria-hidden data-testid="drawer-edge" />}
         {!sidebarVisible && !mobile && <SidebarRail onExpand={() => setSidebar(true)} onNew={sidebarProps.onNew} onSearch={() => setDialog('search')} onSettings={() => setDialog('settings')} />}
         <main className="relative flex min-w-0 flex-1 flex-col font-sans md:min-w-[400px]" aria-label="Chat">
           {!empty && <p className="hidden pb-4 text-lg font-semibold print:block" data-testid="print-title">{currentTitle}</p>}
