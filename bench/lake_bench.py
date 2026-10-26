@@ -208,8 +208,10 @@ def claim_lookup_probe(aws, c: str) -> dict:
     creds = parser_session(aws, c)
     st = Store(aws.boto3_client("s3", creds), BUCKET, c, aws.kms.resolve(f"alias/cc/{c}").arn)
     silver = silver_state(st)
-    newest = max(silver.committed_runs)
     cols = {"c837.claim": "clm01_patient_control_number", "r835.claim_payment": "clp01_patient_control_number"}
+    # open-month compaction can fold the newest run's parts away: probe the newest run that still has live parts
+    newest = next(run for run in sorted(silver.committed_runs, reverse=True)
+                  if any(silver.parts_of(t, [run]) for t in cols))
     con = duckdb.connect(config={"autoinstall_known_extensions": False, "autoload_known_extensions": False})
     con.execute("LOAD httpfs")
     con.execute(aws.duckdb_secret_sql(creds, f"s3://{BUCKET}/{c}/"))
