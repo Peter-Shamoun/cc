@@ -1,6 +1,16 @@
-import { useState, type ReactNode } from 'react';
-import { Braces, Copy, FileText, Link2, Lock, Printer } from 'lucide-react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
+import { Braces, Check, Copy, FileText, Link2, Lock, Printer } from 'lucide-react';
 import { Dialog } from './primitives';
+import type { ShareLink } from '../contract/v1.gen';
+
+/** Contract 1.11.0 §17 share calls for the open chat (absent when the chat isn't on a server, e.g. the offline mock). */
+export interface ShareLinkApi {
+  get: () => Promise<ShareLink | null>;
+  set: (includeData: boolean) => Promise<ShareLink>;
+  revoke: () => Promise<boolean>;
+  /** Copies the absolute link; resolves false when the clipboard is unavailable. */
+  copy: (url: string) => Promise<boolean>;
+}
 
 export interface ShareDialogProps {
   title: string;
@@ -13,11 +23,13 @@ export interface ShareDialogProps {
   /** Server JSON export (contract 1.8.0); hidden when the chat only lives in this tab. */
   onDownloadJson?: () => void;
   onPrint: () => void;
+  link?: ShareLinkApi;
 }
 
 /**
  * Share & export, in the ChatGPT/Claude shape: a preview of what is being shared, a link section, and export actions.
- * Link sharing is a stub: the demo backend has no share endpoint, so "Create link" stays disabled and says why.
+ * The link is read-only and org-only (contract 1.11.0). Result data is withheld unless the owner opts in. Without a
+ * server (offline mock), "Create link" stays disabled and says why.
  */
 export function ShareDialog(p: ShareDialogProps) {
   const [busy, setBusy] = useState(false);
@@ -31,20 +43,22 @@ export function ShareDialog(p: ShareDialogProps) {
           <div className="mt-2 text-xs text-fg-subtle">{p.messageCount} {p.messageCount === 1 ? 'message' : 'messages'} · de-identified demo data</div>
         </div>
 
-        <section aria-labelledby="share-link-h">
-          <h3 id="share-link-h" className="mb-2 text-xs font-medium uppercase tracking-wide text-fg-subtle">Link</h3>
-          <div className="flex items-center gap-3 rounded-xl border border-line px-3 py-2.5">
-            <Lock size={16} aria-hidden className="shrink-0 text-fg-subtle" />
-            <div className="min-w-0 flex-1">
-              <div>Only people in your organization</div>
-              <div id="share-link-note" className="text-xs text-fg-subtle">Link sharing isn't available in this demo. Messages sent after you create a link won't be shared.</div>
+        {p.link ? <LinkSection api={p.link} /> : (
+          <section aria-labelledby="share-link-h">
+            <h3 id="share-link-h" className="mb-2 text-xs font-medium uppercase tracking-wide text-fg-subtle">Link</h3>
+            <div className="flex items-center gap-3 rounded-xl border border-line px-3 py-2.5">
+              <Lock size={16} aria-hidden className="shrink-0 text-fg-subtle" />
+              <div className="min-w-0 flex-1">
+                <div>Only people in your organization</div>
+                <div id="share-link-note" className="text-xs text-fg-subtle">Links need the analyst server. This chat only lives in this tab.</div>
+              </div>
+              <button type="button" aria-disabled="true" aria-describedby="share-link-note" data-testid="create-link" onClick={(e) => e.preventDefault()}
+                className="flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded-full bg-fg/10 px-3 py-1.5 text-fg-subtle">
+                <Link2 size={14} aria-hidden /> Create link
+              </button>
             </div>
-            <button type="button" aria-disabled="true" aria-describedby="share-link-note" data-testid="create-link" onClick={(e) => e.preventDefault()}
-              className="flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded-full bg-fg/10 px-3 py-1.5 text-fg-subtle">
-              <Link2 size={14} aria-hidden /> Create link
-            </button>
-          </div>
-        </section>
+          </section>
+        )}
 
         <section aria-labelledby="share-export-h">
           <h3 id="share-export-h" className="mb-2 text-xs font-medium uppercase tracking-wide text-fg-subtle">Export</h3>
@@ -68,5 +82,91 @@ function Action({ icon, label, hint, onClick, disabled }: { icon: ReactNode; lab
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {hint && <span aria-hidden className="shrink-0 text-xs text-fg-subtle">{hint}</span>}
     </button>
+  );
+}
+
+type LinkState = { kind: 'loading' } | { kind: 'none' } | { kind: 'shared'; link: ShareLink } | { kind: 'error'; message: string };
+
+/** Create, copy, scope (with/without data) and revoke the org-only link. Never logs or displays more of the id than the URL. */
+function LinkSection({ api }: { api: ShareLinkApi }) {
+  const [state, setState] = useState<LinkState>({ kind: 'loading' });
+  const [includeData, setIncludeData] = useState(false);
+  const [working, setWorking] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const id = useId();
+  useEffect(() => {
+    let live = true;
+    api.get().then(
+      (l) => { if (!live) return; setState(l ? { kind: 'shared', link: l } : { kind: 'none' }); if (l) setIncludeData(l.includeData); },
+      () => { if (live) setState({ kind: 'error', message: "Couldn't check this chat's link." }); },
+    );
+    return () => { live = false; };
+  }, [api]);
+  const act = async (f: () => Promise<void>, failure: string) => {
+    setWorking(true);
+    try { await f(); } catch { setState({ kind: 'error', message: failure }); } finally { setWorking(false); }
+  };
+  const absolute = (l: ShareLink) => new URL(l.url, window.location.origin).href;
+  const copy = async (l: ShareLink) => { const ok = await api.copy(absolute(l)); setCopied(ok); if (ok) window.setTimeout(() => setCopied(false), 2000); };
+  const create = () => act(async () => { const l = await api.set(includeData); setState({ kind: 'shared', link: l }); await copy(l); }, "Couldn't create the link. Try again.");
+  const toggle = (next: boolean) => {
+    setIncludeData(next);
+    if (state.kind === 'shared') void act(async () => { const l = await api.set(next); setState({ kind: 'shared', link: l }); }, "Couldn't update the link. Try again.");
+  };
+  const revoke = () => act(async () => { await api.revoke(); setState({ kind: 'none' }); setCopied(false); }, "Couldn't stop sharing. Try again.");
+  const shared = state.kind === 'shared' ? state.link : null;
+  return (
+    <section aria-labelledby="share-link-h" data-testid="share-link" aria-busy={state.kind === 'loading' || working}>
+      <h3 id="share-link-h" className="mb-2 text-xs font-medium uppercase tracking-wide text-fg-subtle">Link</h3>
+      <div className="rounded-xl border border-line">
+        <div className="flex items-center gap-3 px-3 py-2.5">
+          <Lock size={16} aria-hidden className="shrink-0 text-fg-subtle" />
+          <div className="min-w-0 flex-1">
+            <div>Only people in your organization</div>
+            <div id={`${id}-note`} className="text-xs text-fg-subtle">
+              {shared ? 'Anyone signed in to your organization with the link can read this chat, including later messages. Read-only.' : 'Read-only. Viewers must be signed in to your organization.'}
+            </div>
+          </div>
+          {!shared && (
+            <button type="button" onClick={create} disabled={working || state.kind === 'loading'} aria-describedby={`${id}-note`} data-testid="create-link"
+              className="flex shrink-0 items-center gap-1.5 rounded-full bg-fg px-3 py-1.5 text-bg hover:opacity-90 disabled:opacity-50">
+              <Link2 size={14} aria-hidden /> {state.kind === 'loading' ? 'Checking…' : 'Create link'}
+            </button>
+          )}
+        </div>
+        {shared && (
+          <div className="flex items-center gap-2 border-t border-line px-3 py-2.5">
+            <input readOnly value={absolute(shared)} aria-label="Share link" data-testid="share-url" onFocus={(e) => e.currentTarget.select()}
+              className="min-w-0 flex-1 truncate rounded-lg bg-muted px-2.5 py-1.5 font-mono text-[12px] text-fg-muted outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)]" />
+            <button type="button" onClick={() => void copy(shared)} data-testid="copy-link"
+              className="flex shrink-0 items-center gap-1.5 rounded-full border border-line px-3 py-1.5 hover:bg-hover">
+              {copied ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />} {copied ? 'Copied' : 'Copy link'}
+            </button>
+          </div>
+        )}
+        <div className="relative flex items-start gap-3 border-t border-line px-3 py-2.5">
+          <span className="min-w-0 flex-1">
+            <label htmlFor={`${id}-sw`} className="block cursor-pointer after:absolute after:inset-0">Include result data</label>
+            <span id={`${id}-data`} className="block text-xs text-fg-subtle">
+              {includeData ? 'Table previews (up to 50 rows) and charts are shared. CSV downloads never are.' : 'Off: questions, answers, SQL and steps only. Tables show their size, not their rows.'}
+            </span>
+          </span>
+          <span className="relative mt-0.5 flex shrink-0">
+          <input id={`${id}-sw`} type="checkbox" role="switch" aria-checked={includeData} checked={includeData} disabled={working} onChange={(e) => toggle(e.target.checked)} aria-describedby={`${id}-data`} data-testid="share-include-data"
+            className="peer absolute inset-0 z-10 m-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-default" />
+          <span aria-hidden className="relative h-5 w-9 shrink-0 rounded-full bg-fg/20 transition-colors peer-checked:bg-accent peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--focus)] peer-disabled:opacity-50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:translate-x-4" />
+          </span>
+        </div>
+        {shared && (
+          <div className="flex items-center justify-between gap-3 border-t border-line px-3 py-2 text-xs text-fg-subtle">
+            <span>Link created {new Date(shared.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+            <button type="button" onClick={revoke} disabled={working} data-testid="revoke-link" className="rounded-md px-2 py-1 font-medium text-[var(--danger)] hover:bg-hover disabled:opacity-50">Stop sharing</button>
+          </div>
+        )}
+      </div>
+      <p role="status" className={state.kind === 'error' ? 'mt-2 text-xs text-[var(--danger)]' : 'sr-only'}>
+        {state.kind === 'error' ? state.message : copied ? 'Link copied' : shared ? 'Link active' : ''}
+      </p>
+    </section>
   );
 }

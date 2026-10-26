@@ -1,3 +1,5 @@
+import { getShare, loadShared, revokeShare, setShare } from '../contract/share';
+import type { ShareLink, SharedConversation } from '../contract/v1.gen';
 import type { ErrorPart, StreamEvent } from '../lib/contract';
 import { asSession, type AuthSession } from '../auth/session';
 import type { HttpError } from '../api/contract';
@@ -6,6 +8,7 @@ import { loadCapabilities } from '../contract/capabilities';
 import { exportUrl, exportFilename as serverExportFilename, type ExportFormat } from '../contract/sources';
 import type { Capabilities, Feedback, FeedbackRequest } from '../contract/v1.gen';
 import { sendFeedback } from '../contract/feedback';
+import { SseDecoder, readSse } from '../contract/sse';
 
 /**
  * Adapter for the real analyst endpoint (spec §5). POST {base}/api/chat with
@@ -278,6 +281,13 @@ export class HttpAnalystAdapter implements AnalystAdapter {
     return { blob: await res.blob(), filename: serverExportFilename(res.headers.get('content-disposition'), format) };
   }
 
+  /** Contract 1.11.0 §17: org-scoped, read-only share links. Auth (and the CSRF header on cookie sessions) come from the session. */
+  private shareOpts() { return { base: this.base, init: { credentials: 'same-origin' as const, cache: 'no-store' as const, headers: this.headers() } }; }
+  getShare(conversationId: string): Promise<ShareLink | null> { return getShare(conversationId, this.shareOpts()); }
+  setShare(conversationId: string, includeData: boolean): Promise<ShareLink> { return setShare(conversationId, includeData, this.shareOpts()); }
+  revokeShare(conversationId: string): Promise<boolean> { return revokeShare(conversationId, this.shareOpts()); }
+  loadShared(shareId: string): Promise<SharedConversation | null> { return loadShared(shareId, this.shareOpts()); }
+
   async fetchBlob(id: string): Promise<Blob> {
     const res = await fetch(`${this.base}/api/download/${encodeURIComponent(id)}`, { credentials: 'same-origin', cache: 'no-store', headers: this.headers() });
     if (!res.ok) throw new Error(`blob ${res.status}`);
@@ -285,29 +295,11 @@ export class HttpAnalystAdapter implements AnalystAdapter {
   }
 }
 
-/** Minimal SSE parser: yields the JSON of each `data:` event. */
-export async function* parseSse(body: ReadableStream<Uint8Array>): AsyncIterable<StreamEvent> {
-  const reader = body.getReader();
-  const dec = new TextDecoder();
-  let buf = '';
-  const flush = function* (chunk: string) {
-    const data = chunk
-      .split('\n')
-      .filter((l) => l.startsWith('data:'))
-      .map((l) => l.slice(5).trimStart())
-      .join('\n');
-    if (data) yield JSON.parse(data) as StreamEvent;
-  };
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buf += dec.decode(value, { stream: true }).replace(/\r\n/g, '\n');
-    let sep: number;
-    while ((sep = buf.indexOf('\n\n')) >= 0) {
-      const chunk = buf.slice(0, sep);
-      buf = buf.slice(sep + 2);
-      yield* flush(chunk);
-    }
-  }
-  if (buf.trim()) yield* flush(buf);
+/**
+ * Fail-safe SSE events over a fetch body (contract 1.12.0 `readSse`). A malformed frame (non-JSON, or no string
+ * `type`) is skipped and counted instead of throwing, so one bad frame can't kill a live answer. CRLF and lone CR
+ * line endings are accepted, and frames split across chunks are reassembled. Frame content is never logged (PHI).
+ */
+export async function* parseSse(body: ReadableStream<Uint8Array>, decoder = new SseDecoder()): AsyncIterable<StreamEvent> {
+  for await (const frame of readSse(body, decoder)) yield frame.event as unknown as StreamEvent;
 }

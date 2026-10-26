@@ -18,8 +18,11 @@ Owner: platform team (frontend SOTA sprint). Source of truth:
 
 Why each relaxation exists:
 
-* **No `'unsafe-inline'` / `'unsafe-eval'` for scripts.** The pre-paint theme script moved to
-  `web/public/theme-init.js`. Vega used `new Function` for expressions; `ChartView` now passes `ast: true`
+* **No `'unsafe-inline'` / `'unsafe-eval'` for scripts.** The pre-paint theme script lives in
+  `web/public/theme-init.js` (single source); the build inlines it into `index.html` as a nonce'd script
+  (`web/scripts/boot_shell.mjs`, QA-P8: one fewer render-blocking round trip). It reads only allowlisted UI prefs
+  and records whether a chat is open, never the id. The static boot shell's `<style>` is nonce'd the same way;
+  `checkHtmlNonce` fails the header/CSP gates if any inline element lacks the response nonce. Vega used `new Function` for expressions; `ChartView` now passes `ast: true`
   so vega-embed uses `vega-interpreter`.
 * **No `'wasm-unsafe-eval'`.** Shiki runs its JavaScript regex engine (fine-grained imports in CodeBlock.tsx), so no WebAssembly is compiled.
 * **`style-src-attr 'unsafe-inline'`** only. Shiki token colours, KaTeX layout and Vega SVG set inline
@@ -44,7 +47,8 @@ so there is exactly one `Cache-Control`.
 
 ## Checks
 * `pytest api/tests/test_headers.py` — headers on every response type.
-* `web/src/security/headers.test.ts` — policy shape, no inline script/style in `index.html`, no
+* `web/src/security/headers.test.ts` — policy shape, `index.html` source has no inline script and only the
+  boot-shell `<style>`, the boot-shell transform passes `checkHtmlNonce`, no
   `eval`/`new Function`/`createElement('style')` in `src/`, Vega interpreter options present.
 * `npm run check:csp -- <url> [shotDir]` (Playwright, `web/scripts/csp_check.mjs`) — loads a running build,
   asks the live demo questions (or every fixture with `CSP_MODE=mock`), and fails on any CSP violation,
@@ -89,7 +93,15 @@ test vectors in `web/src/lib/csvFilename.vectors.json`. The Content-Disposition 
   - Records live in a 20-entry in-memory ring. There's no storage, URL, console or network use.
   - The later backend plugs in with `setReporter(fn)`, which only ever sees redacted records.
 - `installGlobalErrorHandlers()` (in main.tsx) captures `error` and `unhandledrejection`. In production builds it calls `preventDefault()`, so the browser doesn't print the raw error to the console.
-- `ErrorBoundary` wraps `<App/>`. The fallback shows a generic message and a reference id, never the error text.
+- `ErrorBoundary` wraps `<App/>`. Its **crash screen** shows a generic message, never the error text, plus:
+  - **Reload** (autofocused).
+  - **Start a new chat**, which drops the `#/c/<id>` route so a conversation that crashes on load can't trap the user in a reload loop.
+  - A collapsed **"diagnostics for support"** block. The block shows exactly what **Copy diagnostics** puts on the clipboard (`web/src/lib/diagnostics.ts`):
+    - Allowed: reference id, ISO time, contract version and build mode, error class and kind, bundle frames, allowlisted context, route *kind*, browser family/major/OS, viewport, theme, online flag, and other recent error ids.
+    - Never included: the message (even redacted), conversation ids, the raw user agent, titles, or text.
+  - When a lazy chunk fails to load (dropped connection or a new deploy), the copy says so and the record carries `code: chunk_load`.
+  - `<ErrorBoundary scope="section" name="…">` is an inline "This part couldn't be displayed · Try again" card. Teams can wrap risky subtrees with it (artifact panel, charts) so one bad part doesn't take down the page.
+  - `web/src/components/ErrorBoundary.test.tsx` throws synthetic PHI (name, MRN, SSN, DOB, email) and asserts none of it reaches the screen or the clipboard.
 - **Residual:** React 18 still `console.error`s errors that a boundary catches, even in production. React 19's `createRoot({ onCaughtError })` closes this gap; do it on upgrade.
 
 **API.**
@@ -119,3 +131,42 @@ test vectors in `web/src/lib/csvFilename.vectors.json`. The Content-Disposition 
 - With `CC_API_AUTH` set to anything but `demo`, `create_app()` refuses to start without an explicit `auth=` backend. There's no silent fallback to demo tokens.
 - A token baked into the bundle is public. `vite build` and `sessionFromEnv()` refuse a `VITE_ANALYST_DEMO_TOKEN` that isn't the synthetic `demo:<customer>:<user>` shape.
 - `onExpired` for cookie sessions sends the user to `VITE_SIGN_IN_URL?next=<pathname>`, once, with no query or hash.
+
+## Caching and offline
+
+**Decision: no service worker and no offline shell.** The app ships no worker script, manifest, Cache Storage or IndexedDB. `web/src/security/noServiceWorker.test.ts` enforces this.
+
+Why:
+- **PHI stays off disk.** A service worker caches responses in Cache Storage. That puts answers, tables, CSVs, titles and shared views on disk, where they outlive sign-out, retention (`PUT /api/transcripts/retention`), share revocation and customer-key shredding. There is no reliable way to purge copies on a machine that never comes back online. Spec §6.2 allows only allowlisted UI prefs in browser storage.
+- **Shared workstations.** Billing offices share PCs. With `no-store`, the next user of the browser profile finds nothing in its caches.
+- **Blast radius.** A worker is a long-lived script that intercepts every request on the origin, so an XSS that registers one persists after the tab closes. With no worker, an XSS ends with the page. `worker-src` stays limited to `'self' blob:`, which Vega and Shiki need for dedicated workers.
+- **Little to gain.** Every answer needs the server. Offline, the composer keeps its in-memory draft and shows the offline notice; sending waits for reconnect.
+
+What covers fast loads instead:
+- the static boot shell in `index.html`, which paints from the HTML alone (QA-P8, `docs/frontend_a11y_perf.md`)
+- the lazy chunks
+- the browser HTTP cache for content-hashed assets (code, no PHI; `immutable` is allowed by `header_rules.mjs`)
+
+When to revisit: only if a real offline requirement appears. Even then, cache hashed static assets only, never `/api/` or HTML, and send `Clear-Site-Data: "cache", "storage"` on sign-out. The real backend's sign-out route should send that header regardless (see "Session / auth boundary").
+
+### Cache-control audit of every API route
+
+`api/tests/test_cache_audit.py` enumerates `app.routes`, so a new route fails the test until it's added to the table. Every route is exercised on its success path and at least one error path: 401, 404 or 422. Signed-out `health`, `contract` and `capabilities` return generic data with no user data. Framework-level 404/405, OPTIONS and HEAD are covered too. Every response must carry:
+- `Cache-Control: no-store` exactly (no `public`, `max-age` or `immutable`)
+- `Pragma: no-cache`
+- the full `SECURITY_HEADERS` set
+
+No response may carry `ETag`, `Last-Modified`, `Expires` or `Age`, and forged `If-None-Match`/`If-Modified-Since` never produce a 304.
+
+| Route | Data | Result |
+|---|---|---|
+| `GET /api/health`, `/api/contract`, `/api/capabilities` | none / schema / picker options | no-store ✓ |
+| `POST /api/chat`, `GET /api/chat/{id}/stream`, `POST /api/chat/{id}/stop` | answers (SSE) | no-store ✓, `X-Accel-Buffering: no` |
+| `GET /api/download/{id}` | CSV (PHI) | no-store ✓, attachment |
+| `GET /api/transcripts`, `PUT /api/transcripts/retention` | account state | no-store ✓ |
+| `GET`/`DELETE /api/conversations`, `POST /api/conversations/search` | titles, search (POST so text never sits in a URL) | no-store ✓ |
+| `GET`/`PATCH`/`DELETE /api/conversations/{id}`, `GET …/export` | transcripts (PHI) | no-store ✓ |
+| `PUT`/`DELETE …/messages/{mid}/feedback` | feedback | no-store ✓ |
+| `GET`/`PUT`/`DELETE …/share`, `GET /api/shared/{id}` | share link, shared view | no-store ✓, shared view `no-referrer` |
+
+The audit found no gaps: `SecurityHeadersMiddleware` overrides any per-route value on every status. The web side is checked separately by `header_rules.mjs`: HTML is no-store, and hashed assets are no-store or immutable.

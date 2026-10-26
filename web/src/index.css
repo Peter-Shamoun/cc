@@ -205,3 +205,7 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -
 .cc-composer:focus-within { box-shadow: 0 0 0 1px var(--border-strong), 0 6px 20px rgba(0, 0, 0, 0.08); }
 html[data-kbd] .cc-composer:focus-within { box-shadow: 0 0 0 2px var(--focus), 0 6px 20px rgba(0, 0, 0, 0.08); }
 @media (forced-colors: active) { .cc-composer:focus-within { outline: 2px solid Highlight; outline-offset: 1px; } }
+
+/* Shared (read-only) chat page: no per-message actions (feedback, regenerate, edit). */
+.cc-readonly [data-testid="msg-actions"],
+.cc-readonly [data-testid="callout"] li > button { display: none; }
