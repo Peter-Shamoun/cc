@@ -1,4 +1,5 @@
-import { Check, ChevronDown, Copy, Database, Download, Ellipsis, Keyboard, Moon, PanelLeft, Settings, Share, SquarePen, Sun } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Check, ChevronDown, Copy, Database, Download, Ellipsis, Keyboard, Moon, PanelLeft, Pencil, Settings, Share, SquarePen, Sun, Trash2 } from 'lucide-react';
 import { useTheme } from '../lib/theme';
 import { IconButton } from '../components/ui';
 import { Menu, useMenu, type MenuItem } from './primitives';
@@ -13,6 +14,10 @@ export interface HeaderProps {
   onDownloadMarkdown: () => void;
   onSettings: () => void;
   onShortcuts: () => void;
+  /** Open chat's title (Claude-style title menu: rename, export, delete). */
+  title?: string;
+  onRename?: (title: string) => void;
+  onDelete?: () => void;
 }
 
 /** Top bar: sidebar/new-chat when the sidebar is hidden, product menu (scope + data mode), PHI badge, Share and "…" (ChatGPT layout). */
@@ -21,6 +26,22 @@ export function Header(p: HeaderProps) {
   const share = useMenu();
   const more = useMenu();
   const product = useMenu();
+  const titleMenu = useMenu();
+  const [renaming, setRenaming] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  const titleBtn = useRef<HTMLButtonElement>(null);
+  useEffect(() => { if (renaming) input.current?.select(); }, [renaming]);
+  const endRename = (save: boolean) => {
+    const v = input.current?.value.trim();
+    if (save && v && v !== p.title) p.onRename?.(v);
+    setRenaming(false);
+    requestAnimationFrame(() => titleBtn.current?.focus());
+  };
+  const titleItems: MenuItem[] = [
+    { label: 'Rename', icon: <Pencil size={16} />, onSelect: () => setRenaming(true) },
+    { label: 'Export as Markdown', icon: <Download size={16} />, onSelect: p.onDownloadMarkdown },
+    ...(p.onDelete ? ['sep' as const, { label: 'Delete', icon: <Trash2 size={16} />, danger: true, onSelect: p.onDelete }] : []),
+  ];
   const dataLabel = p.adapterName === 'http' ? 'Live API' : 'Demo data';
   // Scope + data mode live in the product menu (QA-S6): ChatGPT/Claude headers stay near-empty.
   const productItems: MenuItem[] = [
@@ -48,10 +69,29 @@ export function Header(p: HeaderProps) {
           </>
         )}
         <button type="button" onClick={product.toggle} aria-haspopup="menu" aria-expanded={!!product.anchor} data-testid="product-menu" data-mode={p.adapterName}
-          className="flex min-w-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-lg hover:bg-hover" aria-label={`CC Analyst, ${dataLabel}`}>
-          <span className="truncate">CC <span className="text-fg-subtle @max-[560px]:hidden">Analyst</span></span>
+          className="flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-lg hover:bg-hover" aria-label={`CC Analyst, ${dataLabel}`}>
+          <span className="whitespace-nowrap">CC <span className={p.hasChat && p.title ? 'text-fg-subtle @max-[820px]:hidden' : 'text-fg-subtle @max-[560px]:hidden'}>Analyst</span></span>
           <ChevronDown size={16} className="shrink-0 text-fg-subtle" />
         </button>
+        {p.hasChat && p.title && (
+          <div className="flex min-w-0 items-center @max-[520px]:hidden" data-testid="header-title">
+            <span className="mx-0.5 text-fg-subtle/60" aria-hidden>/</span>
+            {renaming ? (
+              <input ref={input} defaultValue={p.title} aria-label="Rename chat" maxLength={120}
+                className="w-[min(28rem,40cqw)] min-w-0 rounded-md border border-[var(--focus)] bg-bg px-2 py-1 text-sm outline-none"
+                onBlur={() => endRename(true)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); endRename(true); } if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); endRename(false); } }} />
+            ) : (
+              <button ref={titleBtn} type="button" onClick={titleMenu.toggle} onDoubleClick={() => setRenaming(true)} aria-haspopup="menu" aria-expanded={!!titleMenu.anchor}
+                aria-label={`Chat options: ${p.title}`} title={p.title}
+                className="flex min-w-0 max-w-[min(28rem,40cqw)] items-center gap-1 rounded-lg px-2 py-1.5 text-sm text-fg-muted hover:bg-hover hover:text-fg">
+                <span className="truncate">{p.title}</span>
+                <ChevronDown size={14} className="shrink-0 text-fg-subtle" />
+              </button>
+            )}
+            {titleMenu.anchor && <Menu label="Chat options" anchor={titleMenu.anchor} items={titleItems} onClose={titleMenu.close} />}
+          </div>
+        )}
       </div>
       <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
         <span className="hidden rounded-full bg-[#10a37f]/12 px-2.5 py-1 text-xs font-medium text-[#0b7a5f] @[440px]:inline dark:text-[#4fd1a5]" title="PHI mode, set by the server" data-testid="phi-badge">De-identified</span>
