@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { Markdown } from './Markdown';
 import { AssistantTurn } from '../Message';
 import { newAssistantView, reduce, type StreamEvent } from '../../lib/contract';
@@ -7,12 +7,13 @@ import { newAssistantView, reduce, type StreamEvent } from '../../lib/contract';
 afterEach(cleanup);
 
 describe('streaming polish', () => {
-  it('fades new words in while streaming and renders plain text once done', () => {
-    const { container, rerender } = render(<Markdown text="Denials rose in **Q3** for Cascade" streaming />);
-    expect(container.querySelector('[data-sd-animate]')).not.toBeNull();
+  it('fades new words in while streaming and renders plain text once done (after the paced tail lands)', async () => {
+    const { container, rerender } = render(<Markdown text="Denials rose in **Q3** for Cascade" streaming paced />);
+    await waitFor(() => expect(container.querySelector('[data-sd-animate]')).not.toBeNull());
     expect(container.querySelector('.streaming-caret')).not.toBeNull();
-    rerender(<Markdown text="Denials rose in **Q3** for Cascade." />);
-    expect(container.querySelector('[data-sd-animate]')).toBeNull();
+    rerender(<Markdown text="Denials rose in **Q3** for Cascade." paced />);
+    await waitFor(() => expect(container.querySelector('[data-sd-animate]')).toBeNull());
+    expect(container.querySelector('.streaming-caret')).toBeNull();
     expect(container.textContent).toContain('Denials rose in Q3 for Cascade.');
   });
   it('message actions use quick styled tooltips, not native titles', () => {
