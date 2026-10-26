@@ -89,7 +89,7 @@ export function Sidebar(p: SidebarProps) {
   ];
   const Root = p.drawer ? 'div' : 'aside';
   return (
-    <Root className={clsx('flex h-full w-[260px] shrink-0 flex-col bg-sidebar font-sans', p.drawer && 'fixed inset-y-0 left-0 z-40 w-[min(300px,85vw)] cc-pan-y shadow-2xl motion-safe:animate-[cc-drawer_200ms_var(--ease-out)]')}
+    <Root className={clsx('flex h-full w-[260px] shrink-0 flex-col bg-sidebar font-sans', p.drawer && 'fixed inset-y-0 left-0 z-40 w-[min(300px,85vw)] cc-pan-y shadow-lg motion-safe:animate-[cc-drawer_200ms_var(--ease-out)]')}
       data-testid="sidebar" aria-modal={p.drawer || undefined} role={p.drawer ? 'dialog' : undefined} aria-label="Chat history" tabIndex={p.drawer ? -1 : undefined}>
       <div className="flex h-[52px] shrink-0 items-center justify-between px-2">
         <div className="flex items-center gap-2 px-2 font-semibold">
@@ -149,7 +149,7 @@ export function Sidebar(p: SidebarProps) {
           <span>{p.storeMode === 'ephemeral' ? <><b className="font-medium text-fg-muted">History off</b> · chats live in memory only.</> : 'History on'} Synthetic demo data.</span>
         </div>
         <button type="button" onClick={account.toggle} aria-haspopup="menu" aria-expanded={!!account.anchor} className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm hover:bg-hover" data-testid="account-button">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#4352d6] text-[11px] font-semibold text-white" aria-hidden>DU</span>
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-fg/80 text-[11px] font-semibold text-bg" aria-hidden>DU</span>
           <span className="min-w-0 flex-1">
             <span className="block truncate font-medium">Demo user</span>
             <span className="block truncate text-xs text-fg-subtle">acme_labs · analyst</span>
