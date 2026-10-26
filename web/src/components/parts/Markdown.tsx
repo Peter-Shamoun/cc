@@ -5,6 +5,8 @@ import clsx from 'clsx';
 import { CodeBlock } from './CodeBlock';
 import { safeHref } from '../../render/safeHref';
 import 'katex/dist/katex.min.css';
+// Streamdown (Apache-2.0) word fade-in keyframes for [data-sd-animate]; plain stylesheet, CSP-safe.
+import 'streamdown/styles.css';
 
 /**
  * `$…$` and `$$…$$` (spec §4.1). Currency such as `$412` is escaped before parse
@@ -19,6 +21,12 @@ const mathPlugin = createMathPlugin({ singleDollarTextMath: true, errorColor: 'v
  * markdown links and images. The math plugin is appended by Streamdown.
  */
 const rehypePlugins = [defaultRehypePlugins.sanitize, defaultRehypePlugins.harden];
+
+/**
+ * New words fade in as they arrive (ChatGPT/Claude both soften the token edge rather than
+ * popping whole chunks). Only while streaming; prefers-reduced-motion zeroes it in index.css.
+ */
+const STREAM_ANIMATION = { animation: 'fadeIn', duration: 160, easing: 'ease-out', sep: 'word', stagger: 8, maxBacklogMs: 160 } as const;
 
 const CODE_SPAN = /```[\s\S]*?```|`[^`\n]+`|```[\s\S]*$/g;
 
@@ -64,6 +72,7 @@ export const Markdown = memo(function Markdown({ text, streaming }: { text: stri
         mode={streaming ? 'streaming' : 'static'}
         dir="auto"
         isAnimating={!!streaming}
+        animated={streaming ? STREAM_ANIMATION : false}
         parseIncompleteMarkdown
         controls={false}
         plugins={{ math: mathPlugin }}
