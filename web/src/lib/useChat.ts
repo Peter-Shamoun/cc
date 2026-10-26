@@ -5,11 +5,29 @@ import type { AnalystAdapter, ConnectionInfo, ConnectionState, ThreadSummary, Tr
 
 const CONNECTION_LABEL = { offline: 'Offline, waiting for the network…', reconnecting: 'Reconnecting…' } as const;
 const RATE_LIMIT_PREFIX = 'Busy right now';
-/** Status line while a 429 is waited out: "Busy right now, retrying in 3s…" (never below 1s, then "retrying…"). */
 /** Client transport statuses (offline, reconnecting, 429 countdown); these show even while the step timeline is live. */
 export function isTransportStatus(s: string | null | undefined): boolean {
   return !!s && (s === CONNECTION_LABEL.offline || s === CONNECTION_LABEL.reconnecting || s.startsWith(RATE_LIMIT_PREFIX));
 }
+/**
+ * What a screen reader should hear for a status change, or null to stay quiet. The visible 429 countdown
+ * ticks every second; announcing each tick would talk over everything, so we speak when the wait starts,
+ * every 5 s while it is long, and once when it retries. Other statuses are spoken when they change.
+ */
+export function transportAnnouncement(status: string | null | undefined, prev: string | null | undefined): string | null {
+  if (!status || status === prev) return null;
+  if (!status.startsWith(RATE_LIMIT_PREFIX)) return isTransportStatus(status) ? status.replace(/…$/, '') : null;
+  const m = /retrying in (\d+)s/.exec(status);
+  const wasCounting = !!prev && prev.startsWith(RATE_LIMIT_PREFIX) && /retrying in \d+s/.test(prev);
+  if (!m) return wasCounting || !prev?.startsWith(RATE_LIMIT_PREFIX) ? 'Retrying now' : null;
+  const n = Number(m[1]);
+  const secs = `${n} second${n === 1 ? '' : 's'}`;
+  if (!wasCounting) return prev?.startsWith(RATE_LIMIT_PREFIX) ? `Still busy. Retrying in ${secs}.` : `Busy right now. Retrying automatically in ${secs}.`;
+  // Another 429 after the retry: the count jumps back up.
+  if (n > Number(/retrying in (\d+)s/.exec(prev!)![1])) return `Still busy. Retrying in ${secs}.`;
+  return n % 5 === 0 ? `Retrying in ${secs}.` : null;
+}
+/** Status line while a 429 is waited out: "Busy right now, retrying in 3s…" (never below 1s, then "retrying…"). */
 export function rateLimitLabel(msLeft: number): string {
   const s = Math.ceil(msLeft / 1000);
   return s >= 1 ? `${RATE_LIMIT_PREFIX}, retrying in ${s}s…` : `${RATE_LIMIT_PREFIX}, retrying…`;

@@ -16,7 +16,7 @@ import { AnswerMeta } from './answer/AnswerMeta';
 import { escalationsOf, partsOf, stepsOf, usageOf, type AnyView } from './answer/normalize';
 import type { OnReply } from './answer/States';
 import { tableToTsv, visible } from '../lib/csv';
-import { isTransportStatus } from '../lib/useChat';
+import { isTransportStatus, transportAnnouncement } from '../lib/useChat';
 
 export type Artifact = { part: TablePart | ChartPart | CodePart | ImagePart; title: string; version?: number; related: Part[] };
 
@@ -137,9 +137,10 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
       {/* QA-A7: while the timeline is live it already says what is happening; only transport states (offline, reconnecting, 429) add a line. */}
       {msg.streaming && (msg.status || empty) && !(timeline && timelineLive && !isTransportStatus(msg.status)) && (
         <div className="my-2 flex items-center gap-2 font-sans text-sm text-fg-muted" data-testid="status">
-          {empty && !msg.status ? <span className="streaming-caret prose-chat" /> : <span className="shimmer">{msg.status}</span>}
+          {empty && !msg.status ? <span className="streaming-caret prose-chat" /> : <span className="shimmer" aria-hidden={isTransportStatus(msg.status) || undefined}>{msg.status}</span>}
         </div>
       )}
+      {isLast && <TransportAnnouncer status={msg.streaming ? msg.status : null} />}
       {!msg.streaming && msg.finishReason === 'aborted' && <StoppedNote onRetry={isLast ? onRegenerate : undefined} />}
       {!msg.streaming && !empty && (
         <div className={clsx('-ml-2 mt-2 flex flex-wrap items-center gap-0.5 transition-opacity', isLast ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100')} data-testid="msg-actions">
@@ -156,6 +157,19 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
     </div>
   );
 });
+
+/** Polite live region for transport states (429 countdown, offline, reconnecting), throttled by transportAnnouncement. */
+function TransportAnnouncer({ status }: { status: string | null | undefined }) {
+  const prev = useRef<string | null | undefined>(null);
+  const [said, setSaid] = useState('');
+  useEffect(() => {
+    const next = transportAnnouncement(status, prev.current);
+    prev.current = status;
+    if (next) setSaid(next);
+    else if (!isTransportStatus(status)) setSaid('');
+  }, [status]);
+  return <span role="status" aria-live="polite" aria-atomic="true" className="sr-only" data-testid="transport-announcer">{said}</span>;
+}
 
 const FEEDBACK_REASONS = ['Wrong numbers', 'Wrong or missing filter', 'Misread the question', 'SQL looks wrong', 'Chart not helpful', 'Too slow', 'Other'];
 
