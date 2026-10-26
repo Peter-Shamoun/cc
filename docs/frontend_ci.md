@@ -79,3 +79,32 @@ remove it.
 - `jsx-a11y/prefer-tag-over-role`, `jsx-a11y/no-noninteractive-tabindex` and `react/incompatible-library` are **off**. ARIA roles on divs are valid. Scrollable regions *need* `tabIndex=0` (axe `scrollable-region-focusable`). TanStack hooks are fine without React Compiler. Runtime a11y is gated by the axe e2e suite.
 - Any other jsx-a11y exception is a per-site `oxlint-disable-next-line <rule> -- <reason>` comment. The reason must name the keyboard path (delegated Escape, aria-activedescendant combobox, roving tabindex, or a separate button). Don't add file-wide disables.
 - Remaining warnings are React-Compiler-style rules (refs, purity, set-state-in-effect, immutability, use-memo). Owners are listed in `NOTES.md`. Once these reach zero, `.oxlintrc.json` flips `warn` to `error`.
+
+## Perf budget (Lighthouse)
+
+`scripts/lighthouse_budget.mjs` runs Lighthouse against the mock production build on `vite preview`. It uses the same server as the CSP and header checks, and synthetic data only. It fails CI when a budget in `scripts/perf_budget.json` is missed:
+
+| | desktop | mobile (simulated slow 4G, 4x CPU) |
+|---|---|---|
+| performance / accessibility / best-practices | ≥ 0.95 / 1.00 / 0.95 | ≥ 0.85 / 1.00 / 0.95 |
+| FCP / LCP | ≤ 1000 / 1200 ms | ≤ 3200 / 3500 ms |
+| TBT / time to interactive | ≤ 150 / 1500 ms | ≤ 300 / 4000 ms |
+| CLS | ≤ 0.02 | ≤ 0.02 |
+| bytes transferred | ≤ 350 KB | ≤ 350 KB |
+
+**Baseline at introduction (2026-10-25, Lighthouse 12.8.2, median of 3):**
+- Desktop: 1.00 / 1.00 / 1.00, LCP 0.56 s, TBT 0 ms, CLS 0.
+- Mobile: 0.93 / 1.00 / 1.00, LCP 2.55 s, TBT 100 ms, CLS 0.
+- Size: 296 KB.
+
+**How it runs:**
+- CI takes the median of 3 runs per form factor (`LH_RUNS`). One slow run doesn't fail the build.
+- Reports are uploaded as the `csp-check-shot-and-lighthouse` artifact.
+- `ci/run_local.sh` does 1 run (`SKIP_LIGHTHOUSE=1` skips it).
+- QA can run it directly against any preview build with `npm run check:perf -- http://127.0.0.1:<port>/`. To re-check saved reports without Chrome, use `node scripts/lighthouse_budget.mjs --reports <json...>`.
+
+**Rules:**
+- Lighthouse is pinned in `perf_budget.json` and fetched with `npx -y lighthouse@<pin>`. It is **not** a repo dependency (about 114 packages), so the lockfile and `npm audit` stay unaffected. Set `LIGHTHOUSE_BIN` to use a local install.
+- 12.x is pinned because 13.x needs Node ≥ 22.19 and CI runs Node 20.
+- Tighten budgets when the app gets faster; don't loosen them to make a PR pass. A loosening needs a note here saying why.
+- Interaction performance (500-message thread, 10k-row table) is covered separately by `npm run e2e:perf`. The bundle-size budget is `scripts/bundle_budget.mjs`.
