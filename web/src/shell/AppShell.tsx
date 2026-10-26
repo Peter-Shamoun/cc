@@ -4,9 +4,9 @@ import { ArrowDown } from 'lucide-react';
 import clsx from 'clsx';
 import { useChat } from '../lib/useChat';
 import { MockAnalystAdapter } from '../adapters/mock';
-import { MemoryTranscriptStore } from '../adapters/memoryStore';
 import { HttpAnalystAdapter } from '../adapters/http';
 import { HttpTranscriptStore } from '../adapters/httpStore';
+import { TemporaryAwareStore } from './temporaryStore';
 import { AdapterCtx } from '../adapters/context';
 import type { AnalystAdapter, TranscriptStore } from '../adapters/types';
 import { Sidebar, SidebarRail } from '../components/Sidebar';
@@ -65,7 +65,7 @@ function demoFaultOption(): { demoFault?: 'rate_limited' } {
  */
 function makeStore(adapter: AnalystAdapter): TranscriptStore {
   const base = import.meta.env.VITE_ANALYST_BASE as string | undefined;
-  if (adapter.name !== 'http' || import.meta.env.VITE_TRANSCRIPTS === 'memory' || base === undefined) return new MemoryTranscriptStore();
+  if (adapter.name !== 'http' || import.meta.env.VITE_TRANSCRIPTS === 'memory' || base === undefined) return new TemporaryAwareStore();
   return new HttpTranscriptStore(base === '/' ? '' : base.replace(/\/$/, ''), session);
 }
 
@@ -113,7 +113,20 @@ function ShellInner() {
   // Opening a stored chat can take a round trip (server history): after a short grace period show a
   // thread skeleton instead of the empty state or the previous chat (ChatGPT/Claude behaviour).
   const [opening, setOpening] = useState<string | null>(() => (store instanceof HttpTranscriptStore ? routeId() : null));
+  // ---- temporary chat (QA-S22): memory store only; not in the sidebar, search or the URL; dropped on leave ----
+  const tempStore = store instanceof TemporaryAwareStore ? store : null;
+  const [temporary, setTemporaryState] = useState(false);
+  const isTempChat = !!tempStore?.isTemporary(chat.convId);
+  const setTemporary = (on: boolean) => {
+    if (!tempStore) return;
+    const leaving = !on && (isTempChat || chat.messages.length > 0);
+    tempStore.temporary = on;
+    setTemporaryState(on);
+    if (leaving) chat.newChat();
+    if (!on) void tempStore.discardTemporary();
+  };
   const openChat = async (id: string) => {
+    if (temporary) setTemporary(false);
     const t = setTimeout(() => setOpening(id), 120);
     try { await chat.open(id); } finally { clearTimeout(t); setOpening(null); }
   };
@@ -198,13 +211,13 @@ function ShellInner() {
   const routing = useRef(false);
   useEffect(() => {
     if (routing.current) return;
-    const want = chat.convId ? `#/c/${chat.convId}` : '';
+    const want = chat.convId && !tempStore?.isTemporary(chat.convId) ? `#/c/${chat.convId}` : '';
     if ((window.location.hash || '') !== want) {
       const url = want || window.location.pathname + window.location.search;
       if (chat.convId && routeId() === null && window.location.hash === '') window.history.replaceState(null, '', url);
       else window.history.pushState(null, '', url);
     }
-  }, [chat.convId]);
+  }, [chat.convId, tempStore]);
   useEffect(() => {
     const on = async () => {
       const id = routeId();
@@ -560,7 +573,7 @@ function ShellInner() {
   const sidebarProps = {
     threads, activeId: chat.convId, storeMode: store.mode, canPin: chat.canPin,
     onSelect: (id: string) => { closeDrawer(); void openChat(id).then(focusAfterOpen); },
-    onNew: () => { chat.newChat(); closeDrawer(); if (!coarse()) requestAnimationFrame(focusComposer); },
+    onNew: () => { if (isTempChat) void tempStore?.discardTemporary(); chat.newChat(); closeDrawer(); if (!coarse()) requestAnimationFrame(focusComposer); },
     onDelete: requestDelete, onRename: chat.rename, onPin: chat.pin, onExport: exportThread,
     onArchive: chat.canArchive ? requestArchive : undefined,
     onCollapse: () => setSidebar(false), onSearch: () => setDialog('search'),
@@ -584,13 +597,15 @@ function ShellInner() {
         <main className="relative flex min-w-0 flex-1 flex-col font-sans md:min-w-[400px]" aria-label="Chat">
           {!empty && <p className="hidden pb-4 text-lg font-semibold print:block" data-testid="print-title">{currentTitle}</p>}
           <Header strategy={strategy} showNav={mobile} onOpenSidebar={() => setSidebar(true)} onNewChat={sidebarProps.onNew} adapterName={adapter.name}
-            hasChat={!empty} onShare={() => setDialog('share')} onCopyMarkdown={copyCurrent} onDownloadMarkdown={exportCurrent} onSettings={() => setDialog('settings')} onShortcuts={() => setDialog('shortcuts')}
+            hasChat={!empty} onShare={isTempChat ? undefined : () => setDialog('share')}
+            temporary={temporary} onTemporary={tempStore && (empty || temporary) ? setTemporary : undefined} onCopyMarkdown={copyCurrent} onDownloadMarkdown={exportCurrent} onSettings={() => setDialog('settings')} onShortcuts={() => setDialog('shortcuts')}
             title={chat.convId ? threads.find((t) => t.id === chat.convId)?.title : undefined}
             onRename={(t) => { if (chat.convId) chat.rename(chat.convId, t); }} onDelete={() => { if (chat.convId) requestDelete(chat.convId); }} />
 
           {empty ? (
             <div className="flex flex-1 flex-col items-center justify-center px-4 pb-[12vh] max-sm:justify-end max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]" data-testid="empty-state">
-              <h1 className="mb-7 text-center tracking-tight max-sm:mb-auto max-sm:mt-auto" style={{ fontFamily: 'var(--heading-font)', fontSize: 'var(--empty-size)', fontWeight: 'var(--empty-weight)' as never }}>What should we look into?</h1>
+              <h1 className="mb-7 text-center tracking-tight max-sm:mb-auto max-sm:mt-auto" style={{ fontFamily: 'var(--heading-font)', fontSize: 'var(--empty-size)', fontWeight: 'var(--empty-weight)' as never }}>{temporary ? 'Temporary chat' : 'What should we look into?'}</h1>
+              {temporary && <p className="-mt-4 mb-7 max-w-[28rem] text-center text-sm text-fg-muted max-sm:-mt-2" data-testid="temporary-note">This chat won’t appear in your history or search, and it’s cleared when you leave it.</p>}
               <div className="flex w-full max-w-[48rem] flex-col" id="composer">
                 {composer(!coarse())}
                 <StarterCards onPick={(p) => send(p)} />
