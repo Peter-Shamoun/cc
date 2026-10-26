@@ -33,6 +33,8 @@ FAKE_WORKER = r'''
 import json, os, subprocess, sys
 session_dir, plan = sys.argv[1], json.loads(os.environ["FAKE_WORKER_PLAN"])
 report = {"environment_keys": sorted(os.environ), "outputs": []}
+for name, body in plan.get("files_first", {}).items():     # e.g. a forged escalation.json
+    open(os.path.join(session_dir, name), "w").write(json.dumps(body))
 for tail in plan["commands"]:
     argv = [sys.executable, "-m", "analyzer.cli", "--session", tail.pop(0) if tail and tail[0].startswith("/") else session_dir] + tail
     done = subprocess.run(argv, capture_output=True, text=True, cwd=os.environ["FAKE_WORKER_ROOT"])
@@ -182,6 +184,65 @@ def test_customer_a_cannot_reach_customer_b_through_the_channel(world, sim_drive
     late = subprocess.run([sys.executable, "-m", "analyzer.cli", "--session", str(kept[0]), "list"], cwd=ROOT,
                           capture_output=True, text=True)
     assert late.returncode == 1 and "run has ended" in late.stdout
+
+
+REJECTED_SQL = "SELECT count(*) AS rejected FROM lossless.edi_source_file WHERE parse_status = 'REJECTED'"
+
+
+def own_rejected_count(world, upn):
+    return open_session(world.aws, world.dep, login(world.aws, upn), escalate=True).con.execute(
+        REJECTED_SQL).fetchone()[0]
+
+
+def test_escalation_through_the_run_channel_is_reasoned_audited_and_customer_scoped(world, sim_driver, monkeypatch):
+    import ccsim.query as query
+    opened = []
+    real_open_session = query.open_session
+
+    def spy(aws, dep, token, escalate=False, **kw):
+        session = real_open_session(aws, dep, token, escalate=escalate, **kw)
+        opened.append((session.customer, escalate))
+        return session
+
+    monkeypatch.setattr(query, "open_session", spy)
+    other_lossless = f"s3://{BUCKET}/acme_diagnostics/semantic_layer/lossless.edi_source_file/*/*.parquet"
+    plan = {"files_first": {"escalation.json": {"escalated": True}},   # forged by the worker: ignored
+            "commands": [["list"], ["sql", REJECTED_SQL], ["escalate", "  "],
+                         ["escalate", "sem.* has no parse status; need rejected files for jane@x.com"],
+                         ["list"], ["sql", REJECTED_SQL], ["sql", "SELECT DISTINCT tenant_code FROM lossless.edi_source_file"],
+                         ["sql", f"SELECT count(*) FROM read_parquet('{other_lossless}')"],
+                         ["answer", "--sql", REJECTED_SQL, "--text", "Rejected files."]]}
+    app = create_app(auth=SimAuth(world.aws, world.dep), settings=Settings(heartbeat_seconds=5),
+                     claude_code_cli_driver=sim_driver(plan))
+    expected = own_rejected_count(world, "ana@xifin.example")
+    opened.clear()
+    client, token = TestClient(app), login(world.aws, "ana@xifin.example")
+    stream = chat(client, token, "How many files were rejected?")
+    assert stream[-1]["finishReason"] == "stop", stream
+    from api.contract.conformance import check
+    assert check(stream) == []
+    table = next(part for part in parts(stream) if part["type"] == "table")
+    assert table["rows"] == [[expected]]
+    outputs = last_report(sim_driver)["outputs"]
+    assert [output["code"] for output in outputs] == [0, 1, 1, 0, 0, 0, 0, 1, 0], outputs
+    assert all(rel.startswith("sem.") for rel in json.loads(outputs[0]["stdout"])["relations"])
+    assert "requires a reason" in outputs[2]["stdout"]
+    assert any(rel.startswith("lossless.") for rel in json.loads(outputs[4]["stdout"])["relations"])
+    assert json.loads(outputs[5]["stdout"])["rows"] == [[expected]]
+    assert json.loads(outputs[6]["stdout"])["rows"] == [["acme_labs"]]           # only this customer's files
+    assert "ERROR" in outputs[7]["stdout"]                                       # another customer's lossless files
+    # this customer's sessions only: sem.* first, lossless.* once after the stated reason
+    assert opened == [("acme_labs", False), ("acme_labs", True)]
+    refused, step = [event for event in stream if event.get("probe") == "request_escalation"]
+    assert refused["summary"].startswith("Failed") and "reason" in refused["summary"]
+    assert step["summary"].startswith("Reason: sem.* has no parse status") and "jane@x.com" not in step["summary"]
+    (record,) = [e for e in app.state.audit.events if e["event"] == "data_escalation"]
+    claims = world.aws.cognito.verify_id_token(login(world.aws, "ana@xifin.example"))
+    assert record["customer"] == "acme_labs" and record["user"] == claims["sub"]
+    assert record["reason"] == step["summary"].removeprefix("Reason: ") and "jane@x.com" not in record["reason"]
+    saved = client.get(f"/api/conversations/{stream[0]['conversationId']}",
+                       headers={"Authorization": "Bearer " + token}).json()["messages"][-1]["steps"]
+    assert [e["summary"] for e in saved if e.get("probe") == "request_escalation"][-1] == step["summary"]
 
 
 def test_gates_5_and_6_hold_for_a_reader_session(world):

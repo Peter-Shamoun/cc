@@ -17,9 +17,11 @@ PYTHONPATH=. pytest api/tests -q           # 22 tests, no network, no paid APIs
 | `demo` (default `app`) | `Authorization: Bearer demo:<customer>:<user>` (customers `acme_labs`, `acme_diagnostics`) | Synthetic, PHI-free `sem.claims` in DuckDB, one per customer | UI development |
 | `sim` | `Authorization: Bearer <Cognito id token>` (or `cc_session` httpOnly cookie) from the `ccsim` mock | `ccsim.query.open_session` via `analyzer.opener.QueryPathOpener`: Cognito verify → STS AssumeRoleWithWebIdentity (900 s) → CURRENT → manifest → scoped DuckDB | Integration, `create_app(auth=SimAuth(world.aws, world.dep))` |
 
-Escalation is never granted from chat: every opener is wrapped in `NoEscalateOpener`, which
-refuses `open(escalate=True)`, so `lossless.*` is unreachable. The model sees that as a tool
-error and the UI shows a failed `request_escalation` step.
+The analyzer sees `sem.*` by default. When `sem.*` cannot answer it may call `request_escalation(reason)` (CLI:
+`escalate "<reason>"`): `/api/chat` wraps every opener in `ReasonedEscalationOpener`, which refuses a reasonless
+escalation, re-opens the session for the token's customer with the PHI-stripped `lossless.*` mounted, and audits
+`data_escalation` (customer, user, masked reason). The step timeline shows it as a `step.explore` with probe
+`request_escalation` and summary `Reason: <masked reason>` (the web labels it "Used the full EDI data").
 
 ## Model backend
 

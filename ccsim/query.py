@@ -78,6 +78,7 @@ def open_session(aws, dep: Deployment, id_token: str, escalate: bool = False, re
         con.execute("CREATE SCHEMA lossless")
         for rel in APPEND_RELATIONS:
             con.execute(f"CREATE VIEW {rel} AS SELECT * FROM read_parquet({files(rel)!r}, hive_partitioning=false)")
+        refuse_identifier_columns(con)
     # DuckDB unions temp_directory into allowed_directories, so COPY into it would succeed even with external access
     # off. No temp directory means no spill path to write to, for any process user (root ignores a 0555 directory).
     con.execute("SET temp_directory = ''")
@@ -94,6 +95,23 @@ def open_session(aws, dep: Deployment, id_token: str, escalate: bool = False, re
                             "escalate": escalate, "version": version, "request_id": rid,
                             "token_sha256": hashlib.sha256(id_token.encode()).hexdigest()[:16]})
     return session
+
+
+class IdentifierColumnExposed(PermissionError):
+    """An escalated view carries a column named like a patient identifier: the session is not opened."""
+
+
+def refuse_identifier_columns(con: duckdb.DuckDBPyConnection) -> None:
+    """Enforce, at session open, what the escalation projections (pipeline.ESCALATION) promise: no lossless.* column
+    is named like a patient identifier (the analyzer's ``is_phi_column``). A gold build that ever grew one fails
+    closed here instead of relying on output redaction."""
+    from analyzer.tools import is_phi_column
+    exposed = [f"{schema}.{table}.{column}" for schema, table, column in con.execute(
+        "SELECT schema_name, table_name, column_name FROM duckdb_columns() WHERE schema_name = 'lossless'").fetchall()
+        if is_phi_column(column)]
+    if exposed:
+        con.close()
+        raise IdentifierColumnExposed(f"escalated session refused: identifier columns {exposed[:5]}")
 
 
 def run_agent_sql(session: QuerySession, sql: str, row_limit: int = 1000):

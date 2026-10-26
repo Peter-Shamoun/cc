@@ -2,7 +2,7 @@
 
 Production opens every session from the Cognito token alone (ccsim.query.open_session): the customer is the
 ``custom:customer`` claim, the user is ``email`` (or ``sub``), and the relations are fixed server-side (``sem.*``;
-``lossless.*`` only when escalating, which chat never does). These tests pin that nothing a client sends (body
+``lossless.*`` only when the analyzer itself escalates with a stated reason). These tests pin that nothing a client sends (body
 options, extra body fields, query parameters, headers) can choose the customer, the relations or escalation, in the
 demo stub and on the real mock path, and that the demo stub derives identity the same way production does.
 """
@@ -47,13 +47,20 @@ def test_demo_identity_comes_from_the_token_like_production():
             DemoAuth().authenticate(bad, "r2")
 
 
-def test_demo_session_exposes_only_sem_relations_and_never_escalates():
+def test_demo_session_exposes_only_sem_until_escalated_for_the_same_customer():
     ctx = DemoAuth().authenticate("demo:acme_labs:ana@xifin.example", "r1")
-    with pytest.raises(Exception, match="escalation is not available"):
-        ctx.opener.open(True)
     handle = ctx.opener.open(False)
     rows = handle.con.execute("SELECT DISTINCT table_schema FROM information_schema.tables").fetchall()
     assert {r[0] for r in rows} == {"sem"}
+    escalated = ctx.opener.open(True)
+    rows = escalated.con.execute("SELECT DISTINCT table_schema FROM information_schema.tables").fetchall()
+    assert {r[0] for r in rows} == {"sem", "lossless"}
+    assert (escalated.customer, escalated.user) == (handle.customer, handle.user) == ("acme_labs", "ana@xifin.example")
+    keys = {r[0][:2] for r in escalated.con.execute("SELECT claim_key FROM sem.claims").fetchall()}
+    assert keys == {"AL"}
+    # the non-escalated connection still has no lossless schema
+    assert {r[0] for r in ctx.opener.open(False).con.execute(
+        "SELECT DISTINCT table_schema FROM information_schema.tables").fetchall()} == {"sem"}
 
 
 @pytest.mark.parametrize("headers, prefix", [(LABS, "AL"), (DX, "AD")])
@@ -66,6 +73,7 @@ def test_client_hints_cannot_choose_customer_relations_or_escalation(headers, pr
     assert hinted["rows"] == plain["rows"] and hinted["rowCount"] == plain["rowCount"]
     assert all(v.startswith("sem.") for v in (hinted.get("source") or {}).get("views", []))
     assert not [e for e in evs if e["type"] == "escalation"]
+    assert not [e for e in evs if e.get("probe") == "request_escalation"]   # a hint never escalates
 
 
 def test_identity_scoped_keys_are_refused_before_anything_runs():

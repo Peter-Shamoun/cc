@@ -62,6 +62,13 @@ def masked_explore_target(text: str, limit: int = 120) -> str:
     return PHI_VALUE.sub("…", text)[:limit]
 
 
+def masked_escalation_reason(reason: str, limit: int = 300) -> str:
+    """The analyzer's stated reason for reading lossless.*, as shown in the step timeline and audited: on one line,
+    with quoted strings, dates, e-mail addresses, mixed or long ids (``scrub``) and SSN/phone-like values
+    (sql_mask.PHI_VALUE) masked."""
+    return scrub(PHI_VALUE.sub("…", " ".join(str(reason or "").split())), limit).strip()
+
+
 def _error_code(message: str) -> str:
     m = message.lower()
     for needle, code in (("binder", "binder_error"), ("not found", "binder_error"), ("does not have a column", "binder_error"),
@@ -334,6 +341,10 @@ class LiveTap:
             payload = {}
         if not ok:
             summary = "Failed: " + scrub(content[6:], 200)
+        elif pend.name == "request_escalation":
+            # data escalation (the web shows it as "Used the full EDI data"); not the model-handoff `escalation` event
+            target = None
+            summary = "Reason: " + (masked_escalation_reason(pend.arguments.get("reason")) or "not stated")
         elif "columns" in payload and isinstance(payload["columns"], list) and pend.name != "sample_rows":
             summary = f"{len(payload['columns'])} columns"
         elif "relations" in payload and isinstance(payload["relations"], list):

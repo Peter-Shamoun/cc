@@ -9,8 +9,9 @@ Two modes (``CC_API_MODE``):
 * ``demo`` (default for local UI work): a synthetic, PHI-free ``sem.*`` fixture in DuckDB, one per
   customer, with tokens of the form ``demo:<customer>:<user>``. No AWS, no network.
 
-In both modes escalation is never granted: ``NoEscalateOpener`` refuses ``open(escalate=True)``,
-so ``lossless.*`` is unreachable from chat.
+Escalation to ``lossless.*`` (the PHI-stripped EDI tables) is the analyzer's own choice, with a stated reason: the
+app wraps every request's opener in ``ReasonedEscalationOpener``, which opens the escalated session for the same
+signed-in customer only through ``open_escalated(reason)`` and audits the grant (customer, user, masked reason).
 
 The model is ``ScriptedLLM`` driven by ``demo_turn`` (offline replay). Paid APIs stay disabled:
 ``AnthropicLLM``/``BedrockLLM`` are only built when ``CC_API_LLM`` names them and still raise
@@ -21,6 +22,7 @@ from __future__ import annotations
 import datetime as dt
 import random
 import re
+import threading
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -37,16 +39,41 @@ class AuthError(Exception):
     pass
 
 
-class NoEscalateOpener:
-    """Wrap any opener; the chat surface never escalates to lossless.*."""
+#: what a stated escalation reason may be at most, after masking (it is shown in the step timeline and audited)
+ESCALATION_REASON_MAX_CHARACTERS = 300
 
-    def __init__(self, inner):
+
+class ReasonedEscalationOpener:
+    """Chat's only way to ``lossless.*``. ``open_escalated(reason)`` needs a non-empty reason; it re-opens the session
+    through the inner opener (the same signed-in customer: the inner opener holds the verified token) with
+    ``lossless.*`` mounted and calls ``on_escalation_granted(masked_reason)`` for the audit. A bare
+    ``open(escalate=True)`` is refused until that grant: restoring an escalated session (a later command of the same
+    run) is fine, starting one without a reason is not."""
+
+    def __init__(self, inner, on_escalation_granted=None):
         self.inner = inner
+        self.on_escalation_granted = on_escalation_granted
+        self.escalation_reason: str | None = None
+
+    @property
+    def escalated(self) -> bool:
+        return self.escalation_reason is not None
 
     def open(self, escalate: bool) -> SessionHandle:
-        if escalate:
-            raise ToolError("escalation is not available from chat; ask a data steward")
-        return self.inner.open(False)
+        if escalate and not self.escalated:
+            raise ToolError("lossless.* needs a stated reason: call request_escalation with one")
+        return self.inner.open(escalate)
+
+    def open_escalated(self, reason: str) -> SessionHandle:
+        from api.live import masked_escalation_reason
+        masked_reason = masked_escalation_reason(reason, ESCALATION_REASON_MAX_CHARACTERS)
+        if not masked_reason:
+            raise ToolError("request_escalation requires a reason")
+        handle = self.inner.open(True)
+        self.escalation_reason = masked_reason
+        if self.on_escalation_granted is not None:
+            self.on_escalation_granted(masked_reason)
+        return handle
 
 
 @dataclass
@@ -60,8 +87,9 @@ class AuthBackend(Protocol):
 
     ``token`` is the bearer token, or the ``cc_session`` cookie value (api.app._token). It is never read from a
     URL. Raise AuthError for anything invalid or expired; the API answers 401 ``auth_expired``. The token is never
-    logged, and neither is the principal's user beyond the audit allowlist. ``opener`` must refuse escalation
-    (wrap it in NoEscalateOpener)."""
+    logged, and neither is the principal's user beyond the audit allowlist. ``opener.open(escalate=True)`` must open
+    the same customer's session with ``lossless.*`` mounted (or raise); the app wraps the opener in
+    ``ReasonedEscalationOpener``, so escalation happens only with a stated, audited reason."""
 
     mode: str
 
@@ -96,8 +124,7 @@ class SimAuth:
         # keyed by the immutable subject: an email address can be reassigned to another person, who must not
         # inherit the previous holder's conversations
         principal = Principal(customer, claims["sub"])
-        opener = NoEscalateOpener(QueryPathOpener(self.aws, self.deployment, token, request_id=request_id))
-        return AuthContext(principal, opener)
+        return AuthContext(principal, QueryPathOpener(self.aws, self.deployment, token, request_id=request_id))
 
     def sign_out(self, token: str) -> None:
         """The ccsim mock has no revocation; id tokens expire on their own (the real backend calls GlobalSignOut)."""
@@ -111,7 +138,7 @@ _CARC = ["CO-45", "CO-97", "PR-1", "CO-16", "CO-50", "PR-2"]
 
 #: The demo's stand-in for the identity provider plus each customer's semantic-layer manifest. In production the
 #: Cognito id token's ``custom:customer`` claim names the tenant and ``ccsim.query.open_session`` builds the session
-#: from that customer's manifest (sem.* only; lossless.* only when escalating, which chat never does). Here the demo
+#: from that customer's manifest (sem.* only; lossless.* only when the analyzer escalates with a reason). Here the demo
 #: token ``demo:<customer>:<user>`` plays the id token and this table plays the manifest. Nothing in a request body,
 #: query string or header other than the session token can choose the customer or the relations (CONTRACT §2.1).
 DEMO_DIRECTORY: dict[str, tuple[str, ...]] = {
@@ -119,6 +146,9 @@ DEMO_DIRECTORY: dict[str, tuple[str, ...]] = {
     "acme_diagnostics": ("sem.claims",),
 }
 DEMO_RELATIONS = frozenset({"sem.claims"})  # the relations demo_connection knows how to synthesise
+#: what an escalated demo session adds: the received EDI files and their parse status (like ccsim's
+#: lossless.edi_source_file, minus the S3 and envelope columns)
+DEMO_LOSSLESS_RELATIONS = ("lossless.edi_source_file",)
 
 
 @dataclass(frozen=True)
@@ -130,9 +160,9 @@ class DemoIdentity:
 
 
 def demo_connection(customer: str, n_claims: int = 1200, seed: int = 11,
-                    relations: tuple[str, ...] = ("sem.claims",)) -> duckdb.DuckDBPyConnection:
-    """Synthetic sem.* views, exactly ``relations`` (from the identity), nothing else. Every value is generated;
-    ``name_first`` exists only to exercise redaction. Like the production session, the connection can't read files
+                    relations: tuple[str, ...] = ("sem.claims",), escalated: bool = False) -> duckdb.DuckDBPyConnection:
+    """Synthetic sem.* views, exactly ``relations`` (from the identity), plus DEMO_LOSSLESS_RELATIONS when
+    ``escalated``, nothing else. Every value is generated; ``name_first`` exists only to exercise redaction. Like the production session, the connection can't read files
     or the network and its configuration is locked once built."""
     unknown = set(relations) - DEMO_RELATIONS
     if unknown or not relations:
@@ -152,6 +182,15 @@ def demo_connection(customer: str, n_claims: int = 1200, seed: int = 11,
         rows.append((f"{prefix}{100000 + i}", rng.choice(_PAYERS), start + dt.timedelta(days=rng.randrange(360)), status,
                      charge, paid, rng.choice(_CARC) if status in ("denied", "partial") else None, f"Synthetic{i % 37}"))
     con.executemany("INSERT INTO sem.claims VALUES (?, ?, ?, ?, ?, ?, ?, ?)", rows)
+    if escalated:
+        con.execute("CREATE SCHEMA lossless")
+        con.execute("""CREATE TABLE lossless.edi_source_file (file_id VARCHAR, file_kind VARCHAR, received_at TIMESTAMP,
+                       parse_status VARCHAR, segment_count INTEGER, transaction_count INTEGER)""")
+        files = [(f"F{prefix}{i:04d}", rng.choice(["837", "835"]),
+                  dt.datetime(2025, 11, 1) + dt.timedelta(hours=rng.randrange(360 * 24)),
+                  "REJECTED" if rng.random() < 0.08 else "PARSED", rng.randrange(40, 4000), rng.randrange(1, 60))
+                 for i in range(90)]
+        con.executemany("INSERT INTO lossless.edi_source_file VALUES (?, ?, ?, ?, ?, ?)", files)
     con.execute("SET enable_external_access = false")
     con.execute("SET lock_configuration = true")
     return con
@@ -159,16 +198,21 @@ def demo_connection(customer: str, n_claims: int = 1200, seed: int = 11,
 
 class DemoOpener:
     """Opens a session for the identity's customer only (the open_session analogue): the handle's customer and
-    user come from the token, and the cursor sees only that customer's relations."""
+    user come from the token, and the cursor sees only that customer's relations. An escalated session is a cursor
+    on a second connection that also holds DEMO_LOSSLESS_RELATIONS, so a non-escalated cursor cannot reach them."""
 
-    def __init__(self, con, principal: Principal, relations: tuple[str, ...] = ("sem.claims",)):
+    def __init__(self, con, principal: Principal, relations: tuple[str, ...] = ("sem.claims",),
+                 escalated_connection=None):
         self.con = con
         self.principal = principal
         self.relations = relations
+        self.escalated_connection = escalated_connection
 
     def open(self, escalate: bool) -> SessionHandle:
-        assert not escalate
-        return SessionHandle(self.principal.customer, self.principal.user, "demo", self.con.cursor())
+        if escalate and self.escalated_connection is None:
+            raise ToolError("this demo session has no lossless.* data")
+        con = self.escalated_connection() if escalate else self.con
+        return SessionHandle(self.principal.customer, self.principal.user, "demo", con.cursor())
 
 
 class DemoAuth:
@@ -178,7 +222,8 @@ class DemoAuth:
     def __init__(self, customers=tuple(DEMO_DIRECTORY)):
         self.directory = {c: DEMO_DIRECTORY.get(c, ("sem.claims",)) for c in customers}
         self.customers = set(self.directory)
-        self._cons: dict[str, duckdb.DuckDBPyConnection] = {}
+        self._cons: dict[tuple[str, bool], duckdb.DuckDBPyConnection] = {}
+        self._cons_lock = threading.Lock()
 
     def verify(self, token: str) -> DemoIdentity:
         """The id-token check: the customer and its relations come from the token and the directory, never the request."""
@@ -190,10 +235,17 @@ class DemoAuth:
     def authenticate(self, token: str, request_id: str) -> AuthContext:
         ident = self.verify(token)
         principal = Principal(ident.customer, ident.user)
-        con = self._cons.get(ident.customer)
-        if con is None:
-            con = self._cons[ident.customer] = demo_connection(ident.customer, relations=ident.relations)
-        return AuthContext(principal, NoEscalateOpener(DemoOpener(con, principal, ident.relations)))
+        return AuthContext(principal, DemoOpener(self._connection(ident, False), principal, ident.relations,
+                                                 escalated_connection=lambda: self._connection(ident, True)))
+
+    def _connection(self, ident: DemoIdentity, escalated: bool) -> duckdb.DuckDBPyConnection:
+        """One synthetic connection per customer and escalation level, built on first use."""
+        with self._cons_lock:
+            con = self._cons.get((ident.customer, escalated))
+            if con is None:
+                con = self._cons[(ident.customer, escalated)] = demo_connection(
+                    ident.customer, relations=ident.relations, escalated=escalated)
+            return con
 
     def sign_out(self, token: str) -> None:
         """Demo tokens are stateless and synthetic; nothing to revoke. The route still clears the browser."""

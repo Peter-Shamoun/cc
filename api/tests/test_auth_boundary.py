@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.app import Settings, create_app
-from api.backends import AuthBackend, AuthContext, AuthError, DemoAuth, NoEscalateOpener
+from api.backends import AuthBackend, AuthContext, AuthError, DemoAuth
 from api.store import Principal
 from api.tests.conftest import LABS
 
@@ -66,7 +66,7 @@ class FakeRealAuth:
         if token != "opaque-session-123":
             raise AuthError("invalid or expired session")
         inner = DemoAuth().authenticate(TOKEN, request_id).opener
-        return AuthContext(Principal("acme_labs", "ana@xifin.example"), NoEscalateOpener(inner.inner))
+        return AuthContext(Principal("acme_labs", "ana@xifin.example"), inner)
 
 
 def test_a_real_backend_plugs_in_through_the_protocol():

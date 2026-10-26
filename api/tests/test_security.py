@@ -6,7 +6,7 @@ import pytest
 from analyzer.llm import PaidAPIDisabled
 from analyzer.tools import ToolError
 from api.app import Settings, create_app
-from api.backends import DemoAuth, NoEscalateOpener, make_llm
+from api.backends import DemoAuth, ReasonedEscalationOpener, make_llm
 from api.tests.conftest import DX, LABS, ask, parts
 from fastapi.testclient import TestClient
 
@@ -58,20 +58,27 @@ def test_tenants_see_only_their_data_and_conversations(client):
     assert r.status_code == 404
 
 
-def test_never_escalates():
+def test_escalation_needs_a_stated_reason_and_is_audited_masked():
     class Inner:
         opened = []
 
         def open(self, escalate):
             self.opened.append(escalate)
-            return "handle"
+            return f"handle-{escalate}"
 
-    inner = Inner()
-    opener = NoEscalateOpener(inner)
-    assert opener.open(False) == "handle"
-    with pytest.raises(ToolError):
-        opener.open(True)
-    assert inner.opened == [False]
+    inner, granted = Inner(), []
+    opener = ReasonedEscalationOpener(inner, on_escalation_granted=granted.append)
+    assert opener.open(False) == "handle-False"
+    with pytest.raises(ToolError, match="stated reason"):
+        opener.open(True)                       # no restoring an escalation that was never granted
+    for blank in ("", "   ", None):
+        with pytest.raises(ToolError, match="requires a reason"):
+            opener.open_escalated(blank)
+    assert inner.opened == [False] and not opener.escalated and not granted
+    assert opener.open_escalated("need rejected files for member 123-45-6789 jane@x.com") == "handle-True"
+    assert opener.escalated and opener.open(True) == "handle-True"
+    assert granted == [opener.escalation_reason]
+    assert "123-45-6789" not in granted[0] and "jane@x.com" not in granted[0] and "rejected files" in granted[0]
 
 
 def test_paid_apis_stay_disabled():

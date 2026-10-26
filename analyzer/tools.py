@@ -428,8 +428,10 @@ class ToolLayer:
         if self.escalated:
             self._audit("escalation_already_active", reason=reason)
             return {"escalated": True, "already": True, "relations": self.list_relations(charge=False)}
+        # an opener that audits the grant itself (the chat API's ReasonedEscalationOpener) takes the reason with it
+        open_escalated = getattr(self.opener, "open_escalated", None)
         try:
-            opened = self.opener.open(True)
+            opened = open_escalated(reason) if open_escalated is not None else self.opener.open(True)
         except Exception as exc:
             self._audit("escalation_failed", reason=reason, error=str(exc)[:300])
             raise ToolError(f"escalation failed: {str(exc)[:300]}") from None

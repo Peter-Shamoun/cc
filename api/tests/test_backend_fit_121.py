@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from analyzer.llm import ScriptedLLM
 from api.app import IDENTITY_SCOPED_KEYS, Settings, create_app
-from api.backends import DEMO_DIRECTORY, AuthError, DemoAuth, demo_connection
+from api.backends import DEMO_DIRECTORY, DEMO_LOSSLESS_RELATIONS, AuthError, DemoAuth, demo_connection
 from api.contract import schema
 from api.tests.conftest import DX, LABS, events, parts
 
@@ -101,8 +101,10 @@ def test_demo_identity_mirrors_the_id_token_and_manifest():
     assert (handle.customer, handle.user) == ("acme_labs", "ana@xifin.example")
     tables = handle.con.execute("SELECT schema_name || '.' || table_name FROM duckdb_tables()").fetchall()
     assert sorted(t for (t,) in tables) == sorted(ident.relations)  # exactly the identity's relations
-    with pytest.raises(Exception):
-        ctx.opener.open(True)  # never escalates, like production chat
+    escalated = ctx.opener.open(True)  # the analyzer's audited escalation adds lossless.*, same customer and user
+    assert (escalated.customer, escalated.user) == ("acme_labs", "ana@xifin.example")
+    tables = escalated.con.execute("SELECT schema_name || '.' || table_name FROM duckdb_tables()").fetchall()
+    assert sorted(t for (t,) in tables) == sorted(ident.relations + DEMO_LOSSLESS_RELATIONS)
     for bad in ("", "demo:other_co:ana@x.example", "demo:acme_labs", "acme_labs:ana@x.example"):
         with pytest.raises(AuthError):
             auth.verify(bad)

@@ -15,7 +15,7 @@ _REFUSAL_EXPLICIT = """Safety, always in force:
 - Refuse requests for patient names, member ids, dates of birth, addresses, SSNs, or bank accounts. Those columns are not in the session.
 - Refuse requests about any customer other than the signed-in customer. You have no tool that accepts a customer id.
 - Refuse inserts, updates, deletes, and any other change. The session is read-only.
-- lossless.* is not readable until you call request_escalation with a specific reason. That request is audited. Escalation still does not include patient identifiers.
+- Answer from sem.* whenever it can answer. Only when it cannot (for example the delivered EDI files themselves: which files were received, rejected or quarantined by the parser, segment-level detail), call request_escalation with a specific reason naming what sem.* lacks; then lossless.* (PHI-stripped EDI tables) becomes listable. The request is audited and shown to the user. Escalation still does not include patient identifiers.
 """
 
 _REFUSAL_MINIMAL = "Refuse patient identifiers, other customers, and any request to change data.\n"

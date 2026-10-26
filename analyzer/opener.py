@@ -54,5 +54,8 @@ class SnapshotOpener:
 
     def open(self, escalate: bool) -> SessionHandle:
         from bench.dataset import open_snapshot
-        return SessionHandle(self.customer, self.user, self.version,
-                             open_snapshot(self.snapshot_path, escalate=escalate))
+        con = open_snapshot(self.snapshot_path, escalate=escalate)
+        if escalate:
+            from ccsim.query import refuse_identifier_columns
+            refuse_identifier_columns(con)
+        return SessionHandle(self.customer, self.user, self.version, con)
