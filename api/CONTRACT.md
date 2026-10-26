@@ -1,6 +1,6 @@
 # CC chat API — stream contract
 
-**Version: 1.12.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.13.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -35,9 +35,11 @@ The frontend builds against this document only; the analyzer adapts to it.
 * Each SSE frame is `id: <messageId>:<seq>` + `data: <one JSON StreamEvent>`. Heartbeats have no `id:`.
 * Auth: httpOnly `cc_session` cookie (prod) or `Authorization: Bearer demo:<customer>:<user>` (demo mode).
   Credentials are never accepted in query parameters, because URLs end up in logs.
-* **Errors (1.12.0):** every 4xx/5xx JSON body is `{"error":{"code","message"}}`, including unmatched routes (404
-  `not_found`) and wrong methods (405 `method_not_allowed`), which used to be FastAPI's `{"detail":…}`. One documented
-  exception remains: `DELETE /api/conversations/{id}` answers 404 `{deleted:false}` (§11). A non-ASCII-digit
+* **Errors (1.12.0; no exceptions since 1.13.0):** every 4xx/5xx JSON body has `{"error":{"code","message"}}`,
+  including unmatched routes (404 `not_found`) and wrong methods (405 `method_not_allowed`), which used to be
+  FastAPI's `{"detail":…}`. Since 1.13.0 the two success-shaped 404s carry it too, next to their old key:
+  `{"stopped":false,"error":{…}}` (§8) and `{"deleted":false,"error":{…}}` (§11). `error.code` is the open
+  `ErrorCode` registry in the schema; any other status may arrive as `http_<status>`. A non-ASCII-digit
   `Last-Event-ID` seq (e.g. `²`) is treated as "replay from the start", never as a 500.
 * **CSRF (1.10 docs, #198):** a cookie-authenticated (`cc_session`, no `Authorization` header) `POST`/`PUT`/`PATCH`/
   `DELETE` to `/api/*` must send the header **`x-cc-csrf: 1`**. Without it the API answers 403
@@ -52,12 +54,15 @@ The frontend builds against this document only; the analyzer adapts to it.
   | 401 | `auth_expired` | session gone | sign in again |
   | 404 | `access_denied` / `not_found` | unknown or another user's conversation (never 403) | "not available" |
   | 404 | `stream_gone` | nothing to resume: the run finished > 60 s ago or never existed | reload the conversation |
-  | 404 | `validation` | `regenerate` / `editOf` points at nothing | |
+  | 404 | `not_found` (1.13; was `validation`, still sent as `legacyCode`) | `regenerate` / `editOf` points at nothing, or `stop` / `DELETE` finds nothing | reload the conversation |
+  | 405 | `method_not_allowed` | wrong method on a known route | client bug |
   | 409 | `clarification_expired` | the clarification can no longer be answered | ask again |
   | 410 | `transcripts_unavailable` | the customer key was destroyed (§11) | history gone |
   | 413 | `payload_too_large` (1.5; was `validation`, still sent as `legacyCode`) | request body over **1 MiB** (`CC_API_MAX_BODY_BYTES`; `maxBytes` in the body), rejected before parsing | "message too long"; not retryable |
   | 403 | `access_denied` | cookie-session write without `x-cc-csrf: 1` (see CSRF above) | client bug: add the header |
   | 422 | `validation` / `invalid_title` | bad body, bad `options` (§12), bad title | show `message` |
+  | 500 | `internal` | unhandled server fault (no detail, ever) | retry once |
+  | any | `http_<status>` | a status with no dedicated code | branch on the status |
   | 429 | `rate_limited` | more than **3 unfinished runs** per user (`CC_API_MAX_CONCURRENT_RUNS`) | wait `Retry-After` seconds (sent, currently 3), then retry |
 
   **Every 422 uses this envelope (#186):** request-validation failures are
@@ -107,7 +112,13 @@ streams with `check(events) == []`.** To add a rule, give it an existing `kind` 
 
 * Ignore unknown event types and unknown fields.
 * Render unknown part types as an "Unsupported content" chip; never crash.
-* Enum fields marked *open* may gain values in a minor release: fall back to a generic rendering.
+* Enum fields marked *open* may gain values in a minor release: fall back to a generic rendering. **Since 1.13.0 this
+  is machine-readable.** An open enum has `x-open: true` and `x-fallback` (the value to render an unknown one as);
+  an open string has `x-open: true` and `x-known` (the values this version sends). The generated TS exports both
+  maps (`OPEN_ENUM_FALLBACKS`, `OPEN_KNOWN_VALUES`). TS unions of open enums stay closed in 1.x so `switch`es stay
+  exhaustive; a lookup table keyed by one must still apply the fallback. Every other enum is closed: adding a value
+  is a major change. A test fails if a new enum is neither.
+* Timestamps are `$defs/Timestamp`: ISO-8601 UTC (`…Z`). Accept fractional seconds and numeric offsets.
 * **Fail safe (1.12.0).** A malformed SSE frame (data that isn't a JSON object with a string `type`) is skipped and
   counted, not thrown: see `web/src/contract/sse.ts` (`SseDecoder`, `readSse`). An event missing a required field, or
   with the wrong JSON kind (`EVENT_SHAPES`, generated from the schema), is dropped by `wellFormed()` in `reduceV1`.
@@ -222,8 +233,8 @@ appear later (e.g. `queue`); clients ignore them.
 
 ## 8. Cancel, resume-after-disconnect, regenerate
 
-* **Cancel:** `POST /api/chat/{messageId}/stop` → `{"stopped": true}` (idempotent; 404 `{"stopped": false}` for
-  another user's or an unknown run). The stream finishes with `message.end {finishReason: "aborted"}` within 1 s.
+* **Cancel:** `POST /api/chat/{messageId}/stop` → `{"stopped": true}` (idempotent; 404 `{"stopped": false, "error":
+  {"code": "not_found", …}}` for another user's or an unknown run; the envelope since 1.13.0). The stream finishes with `message.end {finishReason: "aborted"}` within 1 s.
   Before that `message.end`, the server **closes everything still in flight**: every `step.sql_running` without a result
   gets `step.sql_result {ok: false, error: {code: "cancelled"}}`, an open reasoning part gets `reasoning.end`, an open
   text part gets `text.end`. So a UI never has to guess which spinners to stop. Partial parts are not persisted.
@@ -346,7 +357,7 @@ checks `web/src/adapters/conversationsApi.ts` against them).
 | `POST /api/conversations/search` | `SearchRequest {q, cursor?}` (POST: the text may be PHI) | `ConversationPage`, items carry `snippet` |
 | `GET /api/conversations/{id}` | | `Conversation {id, title, updatedAt, messages: StoredMessage[]}` |
 | `PATCH /api/conversations/{id}` | `RenameRequest {title}` | `RenameResponse {id, title, updatedAt}`; 422 `invalid_title` |
-| `DELETE /api/conversations/{id}` | | `{deleted: true}`, or 404 `{deleted: false}` |
+| `DELETE /api/conversations/{id}` | | `{deleted: true}`, or 404 `{deleted: false, error: {code: "not_found"}}` (envelope since 1.13.0) |
 | `DELETE /api/conversations` | | `{deleted: <count>}` |
 
 Errors (`HttpError`): `not_found` (404), `invalid_title` (422), `transcripts_unavailable` (410: the customer key was destroyed, so the history is gone).
@@ -517,6 +528,17 @@ must be signed in to the same organization (customer). A conversation has at mos
   Example: `examples/share.json`.
 
 ## Changelog
+
+* **1.13.0** (2026-10-25) — Review audit; additive. **Errors:** the 404s of `stop` and `DELETE` conversation carry
+  the error envelope (old keys kept), so §1 has no exceptions; `regenerate`/`editOf` "nothing to point at" 404s are
+  `not_found` (`legacyCode: "validation"`); `$defs/ErrorCode` lists the HttpError codes (open, with `http_<status>`);
+  `ErrorPart.code` and `StepError.code` list theirs. **Forward compat:** open enums and open strings are
+  machine-readable (`x-open` + `x-fallback` / `x-known`, §3), exported to TS as `OPEN_ENUM_FALLBACKS` and
+  `OPEN_KNOWN_VALUES`; `ArtifactPart.kind` stays closed until the web renderer has a fallback. **Naming:**
+  `$defs/Timestamp` for every `*At` field and `Heartbeat.at`; `SharedConversation.updatedAt` nullability
+  documented. Every `$def` has a description, including `resultId` vs `csvFileId`, `ColumnSummary.name` (DB column)
+  vs `Column.key`, `ConversationPage.next` (send as `cursor`), and `message.start.strategy`/`model`. No event or
+  part shape change; TS types are unchanged apart from the new `Timestamp`/`ErrorCode` aliases (both `string`).
 
 * **1.12.0** (2026-10-25) — The §2 ordering rules as data (`stream_rules.json`, §2.1), with Python and TS runners
   and shared cases. Fail-safe client decoding (§3): `sse.ts`, `wellFormed`/`EVENT_SHAPES`, and a guarded
