@@ -146,6 +146,7 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
         rows={1}
         value={value}
         autoFocus={autoFocus}
+        data-focus-fallback
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
           if (slash?.length) {
