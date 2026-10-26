@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { asSession, cookieSession, CSRF_HEADER, demoTokenSession, noSession, sessionFromEnv } from './session';
+import { asSession, cookieSession, CSRF_HEADER, demoTokenSession, noSession, sessionFromEnv, signOut } from './session';
 import { ConversationsApi } from '../adapters/conversationsApi';
 import { HttpAnalystAdapter } from '../adapters/http';
 
@@ -66,5 +66,23 @@ describe('adapters use the session', () => {
     expect((init.headers as Record<string, string>)[CSRF_HEADER]).toBe('1');
     expect(init.credentials).toBe('same-origin');
     spy.mockRestore();
+  });
+});
+
+describe('signOut', () => {
+  it('POSTs with the session headers (CSRF for cookie), then navigates to sign-in', async () => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    const fetchImpl = vi.fn(async (url: string, init: RequestInit) => { calls.push({ url, init }); return new Response(null, { status: 204 }); }) as unknown as typeof fetch;
+    const nav = vi.fn();
+    expect(await signOut('', cookieSession('/signin'), { signInUrl: '/signin', fetchImpl, nav })).toBe(true);
+    expect(calls[0].url).toBe('/api/auth/sign-out');
+    expect(calls[0].init).toMatchObject({ method: 'POST', credentials: 'same-origin', cache: 'no-store', headers: { [CSRF_HEADER]: '1' } });
+    expect(nav).toHaveBeenCalledWith('/signin');
+  });
+  it('still leaves when the request fails, and never puts anything in the URL', async () => {
+    const nav = vi.fn();
+    const fetchImpl = vi.fn(async () => { throw new TypeError('offline'); }) as unknown as typeof fetch;
+    expect(await signOut('', demoTokenSession('demo:a_b:u'), { fetchImpl, nav })).toBe(false);
+    expect(nav).toHaveBeenCalledWith(window.location.pathname);
   });
 });

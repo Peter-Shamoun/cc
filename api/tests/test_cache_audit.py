@@ -39,6 +39,8 @@ ROUTES = {
     ("GET", "/api/health"): lambda c, s: [c.get("/api/health")],
     ("GET", "/api/capabilities"): lambda c, s: [c.get("/api/capabilities", headers=LABS), c.get("/api/capabilities")],
     ("GET", "/api/contract"): lambda c, s: [c.get("/api/contract")],
+    ("POST", "/api/auth/sign-out"): lambda c, s: [c.post("/api/auth/sign-out", headers=COLLEAGUE),
+                                                 c.post("/api/auth/sign-out", headers={"cookie": "cc_session=demo:acme_labs:x"})],  # 403 CSRF
     ("POST", "/api/chat"): _chat,
     ("GET", "/api/chat/{message_id}/stream"): lambda c, s: [c.get(f"/api/chat/{s['mid']}/stream", headers=LABS),
                                                            c.get("/api/chat/m_missing/stream", headers=LABS)],

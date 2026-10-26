@@ -67,3 +67,27 @@ export function sessionFromEnv(env: AuthEnv = import.meta.env as AuthEnv): AuthS
   if (!DEMO_TOKEN.test(token)) throw new Error('VITE_ANALYST_DEMO_TOKEN must be a demo token (demo:<customer>:<user>)');
   return demoTokenSession(token);
 }
+
+/**
+ * Sign out: `POST /api/auth/sign-out` (204). The server revokes the session (AuthBackend.sign_out) and answers
+ * `Clear-Site-Data: "cache", "storage"` plus an expired `cc_session` cookie, so the browser drops the HTTP cache and
+ * all storage for this origin. Then it navigates to `signInUrl` (or reloads), which also drops in-memory drafts and
+ * answers. A failed request (offline, 5xx) still navigates away: the user asked to leave, and the cookie expires on
+ * its own.
+ */
+export async function signOut(
+  base: string,
+  session: AuthSession,
+  opts: { signInUrl?: string; fetchImpl?: typeof fetch; nav?: (url: string) => void } = {},
+): Promise<boolean> {
+  const { fetchImpl = fetch, nav = (u: string) => window.location.assign(u) } = opts;
+  let ok = false;
+  try {
+    const res = await fetchImpl(`${base}/api/auth/sign-out`, { method: 'POST', credentials: 'same-origin', cache: 'no-store', headers: session.headers() });
+    ok = res.status === 204;
+  } catch {
+    /* offline: still leave */
+  }
+  nav(opts.signInUrl || window.location.pathname);
+  return ok;
+}

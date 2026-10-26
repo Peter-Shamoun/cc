@@ -67,6 +67,14 @@ class AuthBackend(Protocol):
 
     def authenticate(self, token: str, request_id: str) -> AuthContext: ...
 
+    def sign_out(self, token: str) -> None:
+        """Revoke the server-side session for ``token`` (e.g. Cognito GlobalSignOut / delete the session row), so a
+        copied cookie stops working. Best effort: called by ``POST /api/auth/sign-out`` with whatever token the
+        request carried (possibly expired or empty). Must not raise for an unknown token, and never log it. The route
+        itself always clears the browser side: ``Clear-Site-Data: "cache", "storage"`` and an expired
+        ``cc_session`` cookie (docs/frontend_security.md, "Sign-out")."""
+        ...
+
 
 class SimAuth:
     """Cognito id token -> principal; sessions through ccsim.query.open_session only."""
@@ -88,6 +96,10 @@ class SimAuth:
         principal = Principal(customer, claims.get("email") or claims["sub"])
         opener = NoEscalateOpener(QueryPathOpener(self.aws, self.deployment, token, request_id=request_id))
         return AuthContext(principal, opener)
+
+    def sign_out(self, token: str) -> None:
+        """The ccsim mock has no revocation; id tokens expire on their own (the real backend calls GlobalSignOut)."""
+        return None
 
 
 _PAYERS = ["Aetna", "BCBS", "Cigna", "Humana", "Medicare", "Medicaid", "UnitedHealthcare"]
@@ -142,6 +154,10 @@ class DemoAuth:
         if con is None:
             con = self._cons[principal.customer] = demo_connection(principal.customer)
         return AuthContext(principal, NoEscalateOpener(DemoOpener(con, principal)))
+
+    def sign_out(self, token: str) -> None:
+        """Demo tokens are stateless and synthetic; nothing to revoke. The route still clears the browser."""
+        return None
 
 
 # ---------------------------------------------------------------- offline model
