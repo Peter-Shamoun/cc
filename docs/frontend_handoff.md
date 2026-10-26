@@ -207,8 +207,22 @@ Full list with owners: **`docs/frontend_deploy.md`** (`api/tests/test_deploy_doc
 | Anything needing `analyzer/` changes, paid LLM calls, infra the backend lacks, or that breaks identity-scoped data / PHI rules | Excluded (12:11 AM) | Log ideas under BACKEND-FIT in the sprint NOTES instead of building them. |
 | File upload / attachments | Not built | PHI. The analyzer reads only the identity's `sem.*` relations. |
 
-<!-- SECTION: not-built. Teams list in-flight features dropped at the 12:20 AM finalize (multi-question clarify form,
-A30 composer reply, collapsed thinking, context-full state, quote-a-selection, suggested follow-ups) as built / not built. -->
+### 8.1 Finalize (12:20 AM): what was finished and what was dropped
+
+| Item | Status | Notes |
+|---|---|---|
+| Multi-question clarify form (Claude-style: 1–4 questions, options, Other, Skip) | Built (answer UI; contract 1.23.0, `web/src/contract/clarify.ts`) | **Demo-only** (`clarify_multi` scenario) until the analyzer's `ask` tool carries `questions`; the adapter passes them through unchanged. |
+| A30: reply to a clarification from the composer | Built (#295) | The card hints "Or type your answer below". |
+| Collapsed thinking disclosure | Built (answer) | Reasoning is dropped by default on the real path (§5, R2), so it shows only when steps or a summary exist. |
+| Suggested follow-ups | Built, provisional (`follow_ups` part) | Treat it as provisional until the contract pins the part. |
+| "Ask to change response…" | Built (answer) | Sends the instruction as the next turn (the contract has no regenerate instruction). |
+| Context-full / chat-length-limit state | **Not built** | No error code was defined. |
+| Quote-a-selection | **Not built** | The draft was discarded. |
+| Response preferences | **Not built** | |
+| ChatGPT pill-shaped composer | **Not built** | The patch was kept outside the repo. |
+| Accessibility *settings* (gap #13) | **Not built** (excluded) | Existing a11y compliance stays. |
+
+<!-- SECTION: not-built (teams: correct the table above if your item's status changes). -->
 
 Shell, at the 12:20 AM finalize:
 
@@ -312,6 +326,9 @@ on gradients, glass/blur, glow, heavy shadows and similar.
 - CSV filenames use the UTC day (`docs/frontend_deploy.md` §10).
 - CI runs locally until the workflow move (§7).
 - Transcript storage is `ephemeral` by default. The persistent mode needs the retention decision and KMS keys.
+
+- Multi-question clarify and suggested follow-ups work end to end only in the demo until the analyzer emits them
+  (BACKEND-FIT: the analyzer `ask` tool has only `question`).
 
 <!-- SECTION: limitations. Any team: append known limitations in your area. -->
 
