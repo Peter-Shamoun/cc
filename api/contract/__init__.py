@@ -5,7 +5,7 @@ import json
 from functools import lru_cache
 from pathlib import Path
 
-CONTRACT_VERSION = "1.20.0"
+CONTRACT_VERSION = "1.20.1"
 SCHEMA_PATH = Path(__file__).with_name("v1.schema.json")
 
 

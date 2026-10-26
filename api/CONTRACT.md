@@ -1,6 +1,6 @@
 # CC chat API — stream contract
 
-**Version: 1.20.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.20.1** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -270,23 +270,23 @@ appear later (e.g. `queue`); clients ignore them.
   Before that `message.end`, the server **closes everything still in flight**: every `step.sql_running` without a result
   gets `step.sql_result {ok: false, error: {code: "cancelled"}}`, an open reasoning part gets `reasoning.end`, an open
   text part gets `text.end`. So a UI never has to guess which spinners to stop. Partial parts are not persisted.
-* **Cancel while a query runs: needs analyzer support (documented 1.6.0; not built yet).** Today the server checks
-  for a stop between model turns and during model latency, but it cannot interrupt a SQL statement that is already
-  running: the analyzer runs it synchronously (`analyzer/tools.py: execute_with_time_limit`). Its watchdog can call
-  `connection.interrupt()`, but only on the time limit (`AnalyzerConfig.time_limit_seconds`, default 25 s); the API
-  has no hook into it. So during a SQL step, `message.end {aborted}` arrives when the query returns, at the latest
-  after the time limit, not within 1 s. Clients should show "Stopping…" after `/stop` until `message.end`, and must
-  not assume the 1 s bound. **Intended semantics, once the analyzer exposes a cancel hook** (e.g. a `cancelled`
-  event checked by the watchdog, which then calls `connection.interrupt()`), which needs no client change:
+* **Cancel while a query runs (built API-side in 1.20.1; documented 1.6.0).** The server wraps the request's session
+  opener (`api/cancel.py`, `CancellableOpener`): it keeps the cursors this run opened and, once the run is cancelled
+  (`/stop` or the disconnect grace below), calls `interrupt()` on them, then again every 50 ms until the run ends, so
+  a statement started right after the first interrupt is stopped too. Only this run's cursors are touched; other
+  users' statements on the shared connection keep running. `analyzer/` is unchanged. Semantics:
   1. `/stop` interrupts the running statement immediately. Its step closes with
      `step.sql_result {ok: false, elapsedMs, error: {code: "cancelled", message: "Stopped by the user."}}`, the
-     same shape as today's close-out.
+     same shape as the generic close-out.
   2. A `cancelled` error never triggers `step.repair_attempt`, `escalation` or a verifier `step.check`. It is not a
      query failure, and it does not count toward `maxAttempts`.
-  3. Other candidates' statements are interrupted the same way, and each gets its own `cancelled` result.
+  3. Every statement the run has open (all candidates) is interrupted the same way.
   4. `message.end {finishReason: "aborted"}` follows within 1 s of `/stop`. `usage.queries` counts the interrupted
      statement, and `latency.stages.sql` includes its time up to the interrupt.
   5. A timeout keeps its own code (`timeout`, repairable); only a user stop is `cancelled`.
+  A backend whose connection has neither `interrupt()` nor `cancel()` falls back to the old behaviour (the stop lands
+  at the next model call, at the latest after `AnalyzerConfig.time_limit_seconds`), so clients should still show
+  "Stopping…" after `/stop` until `message.end`. Audit: `chat_message.interrupts` (a count) when it fired.
 * **Disconnect ≠ cancel (1.1).** If the last attached client drops, the run keeps going for
   `CC_API_DISCONNECT_GRACE_SECONDS` (default 10 s). If any client re-attaches in that window the run continues;
   otherwise it is cancelled exactly as if `/stop` had been called. Several tabs may be attached to one run.
@@ -690,6 +690,10 @@ must be signed in to the same organization (customer). A conversation has at mos
 
 ## Changelog
 
+* **1.20.1** (2026-10-26) — No shape change. **Stop interrupts a running query** (§8): the API wraps the session
+  opener and calls `interrupt()` on this run's cursors when the run is cancelled, so `message.end {aborted}` now
+  arrives within 1 s during a SQL step too (was: when the query finished, up to the 25 s time limit). Other users'
+  statements are untouched. `analyzer/` unchanged.
 * **1.20.0** (2026-10-25) — Temporary chat (§11.1), additive. `ChatRequest.temporary`, `MessageStart.temporary`
   (`true` when set) and `Capabilities.temporaryChat {ttlSeconds}`. A temporary chat is held in memory for its idle
   TTL only: never stored, listed, searched, titled, exported, rated or shared; discard with `DELETE`; a chat can't move
