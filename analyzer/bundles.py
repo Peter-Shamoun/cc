@@ -33,7 +33,8 @@ PARAMETER_NAMES = {
 }
 
 # Which technique settings carry each parameter on this route. "orchestration" means the level is a role in the
-# bundle's orchestration spec. #16 and #21 are at their B0 level in every bundle (the doc's section 2 says why).
+# bundle's orchestration spec. #16 is at its B0 level in every bundle (the doc's section 2 says why); #21 is on in
+# B1 only, adopted after research/clarify_results.md.
 PARAMETER_SETTINGS = {
     1: ("glossary",), 2: ("playbook",), 3: ("data_dictionary", "dictionary_detail"),
     4: ("data_profile", "profile_detail"), 5: ("enable_lookup", "lookup_mandatory_before_literals"),
@@ -171,8 +172,8 @@ _register(Bundle(
     "B1", "Knowledge only",
     {**B0_TECHNIQUE_CONFIG, "glossary": "invariants", "playbook": True, "data_dictionary": True,
      "dictionary_detail": "derivations", "data_profile": True, "profile_detail": "enums", "enable_lookup": True,
-     "enable_examples": True, "examples_k": 3},
-    {1: "inv", 2: "on", 3: "deriv", 4: "enums", 5: "on", 6: "k3 BM25"},
+     "enable_examples": True, "examples_k": 3, "enable_ask": True},
+    {1: "inv", 2: "on", 3: "deriv", 4: "enums", 5: "on", 6: "k3 BM25", 21: "ask (multi-question)"},
     approximations={
         3: "#3 derivations come from the semantic model's metric expressions (03_semantic_model.yaml), not from "
            "02_semantic_layer_views.sql: the view SQL is written over raw EDI tables the session cannot read.",

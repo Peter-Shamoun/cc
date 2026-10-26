@@ -279,8 +279,10 @@ user answers together in one form:
 * The analyzer receives one line, `Clarification: Header: value[, value]; Header: no preference` (`api/clarify.py`
   `summary`, mirrored by `web/src/contract/clarify.ts` `clarifySummary`; both run `api/contract/clarify_cases.json`).
   Use the same line as the user turn's visible `text` so the transcript matches.
-* **Live mode:** the analyzer's `ask` tool spec carries one `question` only, so live runs still send single questions
-  until the analyzer side adds `questions` (BACKEND-FIT). The demo scenario `clarify_multi` shows the full shape.
+* **Live mode:** the analyzer's `ask` takes the same shape (`analyzer/tools.py` `clarification_request`: one plain
+  `question`, or 1–4 `questions` with `header` and 2–4 described `options`, ids `q1…`/`o1…`), so a live clarification
+  arrives as this form. The shipped B1 configuration has `ask` on (`research/clarify_results.md`). The demo
+  scenario `clarify_multi` shows the full shape.
 
 ## 7. Usage, cost and latency (`message.end.usage`)
 

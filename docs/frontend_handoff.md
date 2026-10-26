@@ -217,8 +217,8 @@ A non-`auto` model adds `model`. An org-disabled or unknown strategy/model raise
 - Audit: an allowlist of fields only (no SQL, rows or question text). Access logs record route shapes, and IPs are
   truncated.
 - Escalation (`lossless.*`) is never granted from chat (`NoEscalateOpener`).
-- Live multi-question clarify needs an analyzer `ask` spec change (`analyzer/tools.py` has only `question`).
-  Until then, live clarifications are single-question. This is logged under BACKEND-FIT in NOTES.
+- The analyzer `ask` spec carries `questions` (`analyzer/tools.py` `clarification_request`) and the shipped B1 has
+  `ask` on (`research/clarify_results.md`), so live clarifications arrive as the multi-question form.
 
 **5.8 How to verify (in order; the first three are free)**
 1. `pytest api/tests/test_analyzer_adapter.py api/tests/test_adapter_r2_r4_r7.py api/tests/test_adapter_strategy_and_timing.py`: 9 recorded shapes plus
@@ -241,8 +241,8 @@ playbook v1, invariants glossary, dictionary with derivations, enum profile, val
 SQL over `sem.*`, one candidate, no repair) run by local headless Claude Code exactly as the benchmark runs it, on the
 signed-in user's subscription. Steps stream from the session's calls.jsonl, Stop kills the worker, the final SQL is
 re-executed in the sandbox. It refuses any auth but `DemoAuth` (its data is the bench snapshot, not the customer's
-lake), any strategy/model option but the defaults, and the `escalate` command. No live clarification: B1 has `ask`
-off, and multi-question clarify still needs the analyzer `ask` spec change (5.7).
+lake), any strategy/model option but the defaults, and the `escalate` command. B1 has `ask` on, so a live run can end
+in a multi-question clarification (5.7).
 
 ```bash
 CC_API_ANALYZER_INTERACTION=claude_code_cli CC_API_ANALYZER_SNAPSHOT=.ccsim/bench/<snapshot id> \
@@ -313,7 +313,7 @@ Full list with owners: **`docs/frontend_deploy.md`** (`api/tests/test_deploy_doc
 
 | Item | Status | Notes |
 |---|---|---|
-| Multi-question clarify form (Claude-style: 1–4 questions, options, Other, Skip) | Built (answer UI; contract 1.23.0, `web/src/contract/clarify.ts`) | **Demo-only** (`clarify_multi` scenario) until the analyzer's `ask` tool carries `questions`; the adapter passes them through unchanged. |
+| Multi-question clarify form (Claude-style: 1–4 questions, options, Other, Skip) | Built (answer UI; contract 1.23.0, `web/src/contract/clarify.ts`) | Live: B1's `ask` carries `questions` and the adapter passes them through unchanged (demo: `clarify_multi`). |
 | A30: reply to a clarification from the composer | Built (#295) | The card hints "Or type your answer below". |
 | Collapsed thinking disclosure | Built (answer) | Reasoning is dropped by default on the real path (§5, R2), so it shows only when steps or a summary exist. |
 | Suggested follow-ups | Built, provisional (`follow_ups` part) | Treat it as provisional until the contract pins the part. |
@@ -341,8 +341,8 @@ Contract, at the 12:20 AM finalize:
 
 - Multi-question clarification (Claude-style: 1–4 questions, 12-character headers, 2–4 described options,
   multi-select, Other, Skip): **built in the contract** as 1.23.0 (`ClarificationPart.questions`,
-  `resume.answers`, demo scenario `clarify_multi`, helpers `web/src/contract/clarify.ts`). Demo only: live needs the
-  analyzer `ask` spec to carry `questions` (BACKEND-FIT). The answer team renders the form.
+  `resume.answers`, demo scenario `clarify_multi`, helpers `web/src/contract/clarify.ts`). Live too: the analyzer
+  `ask` carries `questions` and B1 has `ask` on. The answer team renders the form.
 - Context-full error code: **not built** (not started at the finalize).
 - Suggested follow-ups and response preferences: **not built** (dropped at the finalize).
 
@@ -453,7 +453,7 @@ Turn chrome: Sources chip ("Looked at sem.claims +N"; only when data was actuall
   - 1–4 questions one at a time, ≤12-char header tabs, 2–4 described options, multi-select, "Other…", Skip, number keys and arrow keys;
   - it docks into `#cc-composer-dock` when the shell provides one, else it sits sticky at the end of the last answer.
   - The reply is `resume: clarifyRequest(id, answers)` (`resume.answers`, one per question; empty = skipped). The visible turn is `clarifySummary` ("Metric: …; Period: no preference"). Both come from `web/src/contract/clarify.ts`.
-  - It is demo-only (`clarify_multi`) until the analyzer's `ask` tool emits `questions`; `outcome_parts` passes them through.
+  - Live B1 runs emit it (the analyzer's `ask` sends `questions`; `outcome_parts` passes them through); demo: `clarify_multi`.
 - **Follow-ups:** they need a `follow_ups` part from the server. The real analyzer must produce them without an extra paid call; otherwise leave them off and the UI shows nothing.
 
 #### Not built (answer side)
@@ -501,8 +501,8 @@ Turn chrome: Sources chip ("Looked at sem.claims +N"; only when data was actuall
 - CI runs locally until the workflow move (§7).
 - Transcript storage is `ephemeral` by default. The persistent mode needs the retention decision and KMS keys.
 
-- Multi-question clarify and suggested follow-ups work end to end only in the demo until the analyzer emits them
-  (BACKEND-FIT: the analyzer `ask` tool has only `question`).
+- Suggested follow-ups work end to end only in the demo until the analyzer emits them. Multi-question clarify is live
+  (B1 has `ask` on, `research/clarify_results.md`).
 
 <!-- SECTION: limitations. Any team: append known limitations in your area. -->
 
@@ -544,7 +544,7 @@ S37, BF1, sharing removal). So 8.71 is a lower bound for the handed-off build.
 - BACKEND-FIT questionable items for the PM (not bugs; see §8 and the sprint notes `/workspace/cc_fe/NOTES.md`, "BACKEND-FIT"):
   - BF3: "+" attaches text as context only; the analyzer can't query it.
   - BF4: the strategy/model picker is validated and echoed but not wired to the scripted run.
-  - BF5/BF6: report versions and multi-question clarify are demo-only until the analyzer emits them.
+  - BF5: report versions are demo-only until the analyzer emits them. BF6 (multi-question clarify) is live.
 
 **How to re-run:**
 - Run `cd web && npm run ci`.
