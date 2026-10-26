@@ -120,31 +120,57 @@ type Toast = { id: number; text: string; action?: { label: string; run: () => vo
 const ToastCtx = createContext<(t: Omit<Toast, 'id' | 'ms'> & { ms?: number }) => void>(() => {});
 export const useToast = () => useContext(ToastCtx);
 
-/** Bottom-centre toasts (Claude/ChatGPT "Chat deleted · Undo"). Announced through a polite live region. */
+/** Top-centre toasts (Claude/ChatGPT "Chat deleted · Undo"). Announced through a polite live region. */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const timers = useRef(new Map<number, number>());
+  // Each timer remembers its deadline so hovering or focusing the stack can pause it (WCAG 2.2.1: an Undo
+  // toast must not vanish while someone is reading it or reaching for the button).
+  const timers = useRef(new Map<number, { handle?: number; left: number; since: number }>());
+  const paused = useRef(false);
+  const resumeRef = useRef(() => {});
   const dismiss = useCallback((id: number, expired: boolean) => {
     setToasts((ts) => {
       const t = ts.find((x) => x.id === id);
       if (t && expired) t.onExpire?.();
       return ts.filter((x) => x.id !== id);
     });
-    window.clearTimeout(timers.current.get(id));
+    window.clearTimeout(timers.current.get(id)?.handle);
     timers.current.delete(id);
+    // The hovered toast can vanish (Undo/Dismiss clicked) without a mouseleave: don't leave the rest frozen.
+    if (paused.current) queueMicrotask(() => resumeRef.current());
   }, []);
+  const arm = useCallback((id: number) => {
+    const t = timers.current.get(id);
+    if (!t) return;
+    t.since = Date.now();
+    t.handle = window.setTimeout(() => dismiss(id, true), t.left);
+  }, [dismiss]);
   const push = useCallback((t: Omit<Toast, 'id' | 'ms'> & { ms?: number }) => {
     const id = Date.now() + Math.random();
     const toast = { ...t, id, ms: t.ms ?? 5000 };
     setToasts((ts) => [...ts.slice(-2), toast]);
-    timers.current.set(id, window.setTimeout(() => dismiss(id, true), toast.ms));
-  }, [dismiss]);
+    timers.current.set(id, { left: toast.ms, since: Date.now() });
+    if (!paused.current) arm(id);
+  }, [arm]);
+  const pause = () => {
+    if (paused.current) return;
+    paused.current = true;
+    for (const t of timers.current.values()) { window.clearTimeout(t.handle); t.handle = undefined; t.left = Math.max(0, t.left - (Date.now() - t.since)); }
+  };
+  const resume = () => {
+    if (!paused.current) return;
+    paused.current = false;
+    // Give at least a beat after the pointer leaves, so an expiring Undo doesn't disappear under the cursor.
+    for (const [id, t] of timers.current) { t.left = Math.max(t.left, 1500); arm(id); }
+  };
+  resumeRef.current = resume;
   return (
     <ToastCtx.Provider value={push}>
       {children}
       <div className="pointer-events-none fixed inset-x-0 top-3 z-[70] flex flex-col items-center gap-2 px-3 font-sans" role="status" aria-live="polite" data-testid="toasts">
         {toasts.map((t) => (
-          <div key={t.id} className="pointer-events-auto flex items-center gap-3 rounded-xl bg-fg px-4 py-2.5 text-sm text-bg shadow-lg motion-safe:animate-[cc-drop_180ms_ease-out]" data-testid="toast">
+          <div key={t.id} className="pointer-events-auto flex items-center gap-3 rounded-xl bg-fg px-4 py-2.5 text-sm text-bg shadow-lg motion-safe:animate-[cc-drop_180ms_ease-out]" data-testid="toast"
+            onMouseEnter={pause} onMouseLeave={resume} onFocus={pause} onBlur={(e) => { if (!e.currentTarget.parentElement?.contains(e.relatedTarget as Node)) resume(); }}>
             <span>{t.text}</span>
             {t.action && (
               <button type="button" className="rounded-md px-2 py-0.5 font-semibold underline-offset-2 hover:underline" onClick={() => { t.action!.run(); dismiss(t.id, false); }}>{t.action.label}</button>
