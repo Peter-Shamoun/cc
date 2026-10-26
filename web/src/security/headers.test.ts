@@ -45,11 +45,30 @@ describe('security headers', () => {
 });
 
 describe('CSP-compatible sources', () => {
-  it('index.html has no inline scripts or styles', () => {
+  it('index.html source: no inline scripts, one inline <style> (the boot shell), no handlers', () => {
+    // The build inlines theme-init.js with the nonce (scripts/boot_shell.mjs); the source keeps it external.
     const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
     expect(html).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/);
-    expect(html).not.toMatch(/<style\b/);
+    expect(html.match(/<style\b/g)).toHaveLength(1);
     expect(html).not.toMatch(/\son[a-z]+=/i);
+  });
+  it('boot-shell transform: every inline element carries the response nonce, stylesheet leaves <head>', async () => {
+    const { bootShellHtml } = await import('../../scripts/boot_shell.mjs');
+    const { checkHtmlNonce } = await import('../../scripts/header_rules.mjs');
+    const src = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+    // What Vite emits for the source with html.cspNonce: nonce on every script/style/link it touches.
+    const vite = src
+      .replace(/<style>/, `<style nonce="${NONCE_PLACEHOLDER}">`)
+      .replace('</head>', `<script type="module" crossorigin src="/assets/a.js" nonce="${NONCE_PLACEHOLDER}"></script><link rel="stylesheet" crossorigin href="/assets/a.css" nonce="${NONCE_PLACEHOLDER}"></head>`)
+      .replace(/\s*<script type="module" src="\/src\/main.tsx"><\/script>/, '');
+    const out = bootShellHtml(vite, fs.readFileSync(path.join(root, 'public/theme-init.js'), 'utf8'));
+    expect(out).not.toContain('src="/theme-init.js"');
+    const head = out.slice(0, out.indexOf('</head>'));
+    expect(head).not.toMatch(/rel="stylesheet"/);
+    expect(out.indexOf('rel="stylesheet"')).toBeGreaterThan(out.indexOf('id="cc-boot"'));
+    const n = 'n0nceN0nceN0nceN0nce1234';
+    expect(checkHtmlNonce(out.split(NONCE_PLACEHOLDER).join(n), contentSecurityPolicy(n))).toEqual([]);
+    expect(() => bootShellHtml(vite, 'x</script><script>alert(1)')).toThrow();
   });
   it('no eval/new Function and no raw <style> injection in app source', () => {
     const files: string[] = [];

@@ -1,6 +1,6 @@
 {
-  "_comment": "Gzipped KB. Checked by scripts/bundle_budget.mjs after `npm run build` (CI: .github/workflows/web.yml). Tightened after #139 (initial 263, CSS 13.6, vega 178, total 720, 79 assets). Lower these as the bundle shrinks; raising one needs a reason in the PR.",
-  "initialJsGzKb": 300,
+  "_comment": "Gzipped KB. Checked by scripts/bundle_budget.mjs after `npm run build` (CI: .github/workflows/web.yml). Tightened after #139 (initial 263, CSS 13.6, vega 178, total 720, 79 assets). QA-P8 (boot shell, lazy markdown): initial JS 272 -> 128, so the initial budget drops 300 -> 160 and re-adding the 142 KB markdown chunk to the entry fails. Lower these as the bundle shrinks; raising one needs a reason in the PR.",
+  "initialJsGzKb": 160,
   "initialCssGzKb": 16,
   "maxLazyChunkGzKb": 200,
   "totalJsGzKb": 800,
