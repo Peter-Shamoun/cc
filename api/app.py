@@ -32,6 +32,7 @@ from api.backends import (CANCEL_AT, MULTI_TABLE_SQL, MULTI_TABLE_TITLES, SCENAR
 from api.contract import CONTRACT_VERSION, schema as contract_schema
 from api.ids import new_id
 from api.live import Cancelled, LiveTap
+from api.cancel import CancellableOpener
 from api.temporary import DEFAULT_TTL_SECONDS as TEMPORARY_TTL, TemporaryChats
 from api.mapping import multi_table_parts, outcome_parts, prior_artifacts, report_artifacts
 from api.redact import install_access_log_redaction, install_log_redaction, install_outbound_url_redaction
@@ -181,7 +182,7 @@ class Settings:
 class AuditLog:
     """Structured audit events. Field allowlist: no SQL text, no row values, no question text."""
 
-    ALLOWED = {"customer", "user", "file_id", "row_count", "conversation_id", "message_id", "parts",
+    ALLOWED = {"customer", "interrupts", "user", "file_id", "row_count", "conversation_id", "message_id", "parts",
                "queries", "elapsed_ms", "finish", "kind", "reason", "status", "scenario", "steps",
                "expires_in_days", "rotated", "pinned", "archived", "rules", "temporary"}
 
@@ -556,12 +557,13 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             emit({"type": "status", "label": "Thinking"})
             tap = None
             answer = None
+            opener = CancellableOpener(ctx.opener, run.cancelled).start()  # Stop interrupts the running SQL
             try:
                 config = AnalyzerConfig(**overrides)
                 inner = llm_factory() if llm_factory else make_llm(settings.llm, scenario)
                 tap = LiveTap(inner, emit, cancelled=run.cancelled, model_delay=delay, started=started,
                               multi_candidate=config.candidates > 1)
-                analyzer = Analyzer(ctx.opener, tap, config)
+                analyzer = Analyzer(opener, tap, config)
                 answer = analyzer.answer(question)
                 tap.finish(answer)
                 elapsed = int((time.perf_counter() - started) * 1000)
@@ -572,7 +574,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                     parts = report_artifacts(parts, prior)
                 if scenario == "multi_table" and finish == "stop":
                     # 1.16.0 demo: the second query already ran live (its steps streamed); show its rows too
-                    tools = ToolLayer(ctx.opener, config)
+                    tools = ToolLayer(opener, config)
                     digest = tools.run_sql(MULTI_TABLE_SQL[1], charge=False, include_all_rows=True)
                     parts = [{**p, "title": MULTI_TABLE_TITLES[0]} if p.get("type") == "table" else p for p in parts]
                     parts = multi_table_parts(parts, answer, [(MULTI_TABLE_TITLES[1], MULTI_TABLE_SQL[1], digest)],
@@ -592,6 +594,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                     tap.finish(None)
                 parts = [_error("internal", "Something went wrong", "The analysis failed. Try again.", True)]
                 finish = "error"
+            opener.stop()
             if run.cancelled.is_set():
                 finish = "aborted"
             if tap is not None:
@@ -647,7 +650,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             audit("chat_message", customer=ctx.principal.customer, user=ctx.principal.user,
                   conversation_id=conversation_id, message_id=message_id, parts=len(parts), queries=usage["queries"],
                   elapsed_ms=elapsed, finish=finish, scenario=scenario, steps=len(persisted_steps),
-                  **({"temporary": True} if temporary else {}))
+                  **({"temporary": True} if temporary else {}),
+                  **({"interrupts": opener.interrupts} if opener.interrupts else {}))
             run.finished_at = time.time()
             run.done = True
             run.notify()

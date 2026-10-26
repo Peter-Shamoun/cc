@@ -1,8 +1,8 @@
-# CC chat contract — review summary for Claude (v1.0 → v1.20.0)
+# CC chat contract — review summary for Claude (v1.0 → v1.20.1)
 
 One page. Sources: `api/CONTRACT.md` (spec and changelog), `api/contract/v1.schema.json` (machine truth),
 `docs/frontend-contract-migration.md` (per-version migration), `docs/frontend-analyzer-adapter.md` (real analyzer).
-State on 2026-10-25: **1.20.0**, all changes additive, demo mode only (ScriptedLLM), **no paid API calls**.
+State on 2026-10-25: **1.20.1**, all changes additive, demo mode only (ScriptedLLM), **no paid API calls**.
 
 ## What the contract is
 An SSE stream (`POST /api/chat`) of `message.start` → `step.*` / `part` / `table.*` / `artifact` → `message.end`, with
@@ -26,6 +26,7 @@ plus REST for conversations, capabilities, feedback, export and share. TS types 
 | | | 1.18 | strict closed `PlotSpec` on charts (caps, shared Python/TS cases), server drops invalid charts with a table fallback, progressive `chart.start`/`chart.points` |
 | | | 1.19 | no pattern accepts a trailing newline (shared `pattern_cases.json`); demo follow-up report revises in place (v2) |
 | | | 1.20 | temporary chat (§11.1): in memory only, never listed, titled, shared or exported; `Capabilities.temporaryChat` |
+| | | 1.20.1 | Stop interrupts the running SQL (API-side cursor interrupt; analyzer unchanged) |
 
 ## Open decisions that need your sign-off
 1. **Shown-SQL masking default.** Proposed `phi` (mask literals compared with PHI-like columns or that look like
@@ -34,8 +35,8 @@ plus REST for conversations, capabilities, feedback, export and share. TS types 
    Env: `CC_API_SQL_LITERAL_MASKING`. Executed SQL is never altered; only the displayed copy is.
 2. **Analyzer adapter wiring.** Built, tested, **unwired and off** behind the paid-API switch. Wiring is a later
    decision for Peter and you; it is in the backlog, not in flight.
-3. **Cancel of a running SQL statement (R6).** Needs an analyzer cancel hook; until then Stop ends the stream and
-   closes steps, but the DB statement finishes. Event semantics are specified in §8.
+3. **Cancel of a running SQL statement (R6).** Done API-side in 1.20.1 (cursor interrupt, analyzer unchanged); a live
+   backend needs a cursor with `interrupt()`/`cancel()`. Event semantics are in §8.
 4. **Reasoning text policy (R2).** Default `drop` (no model prose reaches the client); `summary` is opt-in.
 5. **Share links (decided by Peter, shipped in 1.15).** `includeData` false by default; widening issues a new id
    and revokes the old one (S1); links expire after 7/30/90 days, default 30 (S4); data-off views withhold SQL.
