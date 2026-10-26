@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AssistantMessage, ID, UserMessage } from './contract';
 import { newAssistantViewV1, reduceV1, type AssistantViewV1, type ChatRequest, type Usage } from '../api/contract';
-import type { AnalystAdapter, ThreadSummary, TranscriptStore } from '../adapters/types';
+import type { AnalystAdapter, ConnectionState, ThreadSummary, TranscriptStore } from '../adapters/types';
+
+const CONNECTION_LABEL = { offline: 'Offline, waiting for the network…', reconnecting: 'Reconnecting…' } as const;
 import { shortTitle } from '../shell/title';
 import { frameBatch } from './frameBatch';
 import { foldThread } from './threadTree';
@@ -105,8 +107,20 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     set();
     setBusy(true);
     const wire = history.map((m) => ({ id: m.id, role: m.role, text: m.role === 'user' ? m.text : m.parts.map((p) => (p.type === 'text' ? p.text : '')).join('\n'), ...(m.role === 'user' && m.parentId ? { parentId: m.parentId } : {}) }));
+    // Transport hiccups show in the status line (client view state, not a contract event); the
+    // server's own status comes back once the replay resumes.
+    let serverStatus: string | null = null;
+    const onConnection = (state: ConnectionState) => {
+      if (!view.streaming) return;
+      if (state === 'live') view = { ...view, status: serverStatus };
+      else {
+        if (view.status !== CONNECTION_LABEL.offline && view.status !== CONNECTION_LABEL.reconnecting) serverStatus = view.status;
+        view = { ...view, status: CONNECTION_LABEL[state] };
+      }
+      set();
+    };
     try {
-      for await (const ev of adapter.streamTurn({ conversationId: cid, messages: wire, signal: ctrl.signal, ...(opts.resume ? { resume: opts.resume } : {}), ...(opts.regenerate ? { regenerate: opts.regenerate } : {}) })) {
+      for await (const ev of adapter.streamTurn({ conversationId: cid, messages: wire, signal: ctrl.signal, ...(opts.resume ? { resume: opts.resume } : {}), ...(opts.regenerate ? { regenerate: opts.regenerate } : {}), onConnection })) {
         view = reduceV1(view, ev);
         // Text and reasoning deltas are batched; structural events (start, parts, steps, end) paint at once.
         if (ev.type === 'text.delta' || ev.type === 'reasoning.delta') schedule();
