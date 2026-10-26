@@ -10,7 +10,7 @@ const active = (page: Page) => page.evaluate(() => {
 });
 
 test.describe('keyboard walkthrough @desktop', () => {
-  test('Tab from load reaches skip link, sidebar, header and composer with no trap', async ({ page }) => {
+  test('Tab from load reaches skip link, sidebar, header and composer with no trap', async ({ page, browserName }) => {
     await open(page, LIVE);
     const seen: string[] = [await active(page)]; // the composer has focus on load
     // The sidebar lists every chat the shared demo server holds (two stops per row), so allow plenty of presses.
@@ -19,7 +19,7 @@ test.describe('keyboard walkthrough @desktop', () => {
       const cur = await active(page);
       // Firefox hands focus to the browser chrome after the last stop instead of wrapping (the document loses focus
       // while activeElement stays put); bring focus back to the top of the document and keep walking.
-      if (cur === 'BODY' || cur === seen[seen.length - 1]) {
+      if (browserName === 'firefox' && (cur === 'BODY' || cur === seen[seen.length - 1])) {
         await page.evaluate(() => {
           const b = document.body; const had = b.getAttribute('tabindex');
           b.setAttribute('tabindex', '-1'); b.focus();
