@@ -14,9 +14,11 @@
     "e2e:update": "playwright test -c e2e/playwright.config.ts --project=desktop --project=mobile --update-snapshots -g visual"
   },
   "dependencies": {
+    "@streamdown/math": "^1.0.3",
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.14.22",
     "clsx": "^2.1.1",
+    "katex": "^0.19.1",
     "lucide-react": "^1.61.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

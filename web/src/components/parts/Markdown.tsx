@@ -2,6 +2,12 @@ import { memo } from 'react';
 import { Streamdown } from 'streamdown';
 import clsx from 'clsx';
 import { CodeBlock } from './CodeBlock';
+import { createMathPlugin } from '@streamdown/math';
+import 'katex/dist/katex.min.css';
+
+// KaTeX via Streamdown's math plugin (Apache-2.0; katex/remark-math/rehype-katex MIT). `$$…$$` only:
+// single-dollar math stays off so currency like "$412 and $380" never renders as maths.
+const math = createMathPlugin({ singleDollarTextMath: false, errorColor: 'var(--danger)' });
 
 /**
  * Assistant prose renderer. Streamdown (Vercel, Apache-2.0, see web/THIRD_PARTY_NOTICES.md)
@@ -17,6 +23,7 @@ export const Markdown = memo(function Markdown({ text, streaming }: { text: stri
         isAnimating={!!streaming}
         parseIncompleteMarkdown
         controls={false}
+        plugins={{ math }}
         components={{
           // No remote images in markdown (spec §4.1, §6.11): images arrive only as image parts.
           img: ({ alt }) => <span className="text-fg-subtle">[image: {alt}]</span>,
