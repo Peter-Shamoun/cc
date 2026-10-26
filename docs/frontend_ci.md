@@ -108,3 +108,10 @@ remove it.
 - 12.x is pinned because 13.x needs Node ≥ 22.19 and CI runs Node 20.
 - Tighten budgets when the app gets faster; don't loosen them to make a PR pass. A loosening needs a note here saying why.
 - Interaction performance (500-message thread, 10k-row table) is covered separately by `npm run e2e:perf`. The bundle-size budget is `scripts/bundle_budget.mjs`.
+
+### Warning ratchet
+
+`npm run lint` (and the CI lint step) runs `oxlint --max-warnings 28`. The count can't grow while the burn-down is in progress.
+- **If your PR adds a warning,** fix it or add an `oxlint-disable-next-line <rule> -- <reason>` comment. Don't raise the number.
+- **If your PR fixes warnings,** lower the number in `web/package.json` in the same PR.
+- **At 0,** platform switches the remaining rules to `error` and drops the flag.

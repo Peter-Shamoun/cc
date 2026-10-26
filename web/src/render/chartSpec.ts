@@ -61,15 +61,15 @@ export function readableBars(spec: Record<string, unknown>): Record<string, unkn
   const labels = new Set(values.map((r) => (isRecord(r) ? String(r[x.field as string] ?? '') : '')));
   const longest = Math.max(0, ...[...labels].map((l) => l.length));
   if (labels.size <= MANY_BARS && longest <= LONG_LABEL) {
-    const axis = x.axis === null ? null : { labelAngle: 0, labelLimit: 120, ...(x.axis ?? {}) };
+    const axis = x.axis === null ? null : { labelAngle: 0, labelLimit: 120, ...x.axis };
     return { ...spec, encoding: { ...enc, x: { ...x, axis } } };
   }
   const sort = x.sort === '-y' ? '-x' : x.sort === 'y' ? 'x' : x.sort;
   const flipped: Record<string, unknown> = {
     ...enc,
-    x: y.axis === null ? y : { ...y, axis: { tickCount: 6, ...(y.axis ?? {}) } },
+    x: y.axis === null ? y : { ...y, axis: { tickCount: 6, ...y.axis } },
     // The category axis title would sit rotated behind long labels; the chart title already names it.
-    y: { ...x, title: null, ...(sort !== undefined ? { sort } : {}), axis: x.axis === null ? null : { labelLimit: 200, ...(x.axis ?? {}), labelAngle: 0 } },
+    y: { ...x, title: null, ...(sort !== undefined ? { sort } : {}), axis: x.axis === null ? null : { labelLimit: 200, ...x.axis, labelAngle: 0 } },
   };
   const height = Math.min(Math.max(labels.size * 28, 140), 640);
   return { ...spec, encoding: flipped, height };

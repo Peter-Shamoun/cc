@@ -98,10 +98,11 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore, getOpti
   /** Bumped by every run, open and newChat: a run that is no longer current must not touch the view. */
   const runRef = useRef(0);
   const messagesRef = useRef(messages);
-  messagesRef.current = messages;
+  useLayoutEffect(() => { messagesRef.current = messages; }, [messages]);
 
   const refresh = useCallback(async () => setThreads((await store.listConversations()).items), [store]);
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- loads the external transcript store; setState runs after the await
     refresh();
   }, [refresh]);
 
