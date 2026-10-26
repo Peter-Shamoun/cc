@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, Pencil, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Code2, FileText, Minimize2, MoreHorizontal, Pencil, Plus, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react';
 import clsx from 'clsx';
 import type { AssistantView, ChartPart, CodePart, ImagePart, Part, TablePart, UserMessage } from '../lib/contract';
 import { KNOWN_PART_TYPES } from '../lib/contract';
@@ -15,7 +15,9 @@ import { AbstainCard, ClarifyCard, EscalationNote, StoppedNote, TableSkeleton } 
 import { AnswerMeta } from './answer/AnswerMeta';
 import { escalationsOf, partsOf, stepsOf, usageOf, type AnyView } from './answer/normalize';
 import type { OnReply } from './answer/States';
-import { tableToTsv, visible } from '../lib/csv';
+import { copyText, tableToTsv, visible } from '../lib/csv';
+import { feedbackFor, recordFeedback, sqlForClipboard, type Vote } from '../lib/feedback';
+import { Menu, useMenu, useToast, type MenuItem } from '../shell/primitives';
 import { isTransportStatus } from '../lib/useChat';
 
 export type Artifact = { part: TablePart | ChartPart | CodePart | ImagePart; title: string; version?: number; related: Part[] };
@@ -78,10 +80,19 @@ export const UserBubble = memo(function UserBubble({ msg, onEdit, version, onVer
   );
 });
 
-export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, onOpen, onRegenerate, onEdit, onSend, onReply }: { msg: AnyView; isLast: boolean; onOpen: (a: Artifact) => void; onRegenerate: () => void; onEdit: (t: string) => void; onSend?: (t: string) => void; onReply?: OnReply }) {
+/** Regenerate menu styles. Until the contract carries a style on `regenerate`, these ask as a visible follow-up. */
+export type Refine = 'concise' | 'detailed';
+export const REFINE_PROMPT: Record<Refine, string> = { concise: 'Make that answer more concise.', detailed: 'Explain that answer in more detail.' };
+
+export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, onOpen, onRegenerate, onEdit, onSend, onReply, onRefine }: { msg: AnyView; isLast: boolean; onOpen: (a: Artifact) => void; onRegenerate: () => void; onEdit: (t: string) => void; onSend?: (t: string) => void; onReply?: OnReply; onRefine?: (style: Refine) => void }) {
   const msg = view as AssistantView; // legacy part renderers; v1-only data is read through `view`
   const reply: OnReply | undefined = onReply ?? (onSend ? (t) => onSend(t) : undefined);
-  const [vote, setVote] = useState<'up' | 'down' | null>(msg.feedback ?? null);
+  // Feedback survives remounts (virtualized rows) in memory; see lib/feedback.ts.
+  const [vote, setVoteState] = useState<Vote | null>(() => feedbackFor(view.id)?.vote ?? msg.feedback ?? null);
+  const setVote = (v: Vote | null) => { setVoteState(v); recordFeedback({ messageId: view.id, vote: v }); };
+  const regen = useMenu();
+  const more = useMenu();
+  const toast = useToast();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [sqlOpen, setSqlOpen] = useState(false);
@@ -92,6 +103,7 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
   const steps = stepsOf(view);
   const usage = usageOf(view);
   const queries = queriesOf(view);
+  const okQueries = queries.filter((q) => q.state !== 'error' && q.sql.trim()).length;
   const escalations = escalationsOf(view);
   const tables = parts.filter((p): p is TablePart => p.type === 'table');
   const linkedSql = new Set(tables.map((t) => t.sqlPartId).filter(Boolean));
@@ -146,13 +158,30 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
           <CopyButton text={() => messageMarkdown(view)} tip />
           <IconButton tip label="Good response" aria-pressed={vote === 'up'} onClick={() => setVote(vote === 'up' ? null : 'up')}><ThumbsUp size={16} fill={vote === 'up' ? 'currentColor' : 'none'} /></IconButton>
           <IconButton tip label="Bad response" aria-pressed={vote === 'down'} onClick={() => { const next = vote === 'down' ? null : 'down'; setVote(next); setFeedbackOpen(next === 'down'); setFeedbackSent(false); }}><ThumbsDown size={16} fill={vote === 'down' ? 'currentColor' : 'none'} /></IconButton>
-          {isLast && <IconButton tip label="Regenerate" onClick={onRegenerate}><RefreshCw size={16} /></IconButton>}
+          {isLast && (onRefine
+            ? <IconButton tip label="Regenerate" aria-haspopup="menu" aria-expanded={!!regen.anchor} onClick={regen.toggle} data-testid="regenerate-menu-button"><RefreshCw size={16} /></IconButton>
+            : <IconButton tip label="Regenerate" onClick={onRegenerate}><RefreshCw size={16} /></IconButton>)}
+          <IconButton tip label="More actions" aria-haspopup="menu" aria-expanded={!!more.anchor} onClick={more.toggle} data-testid="more-actions"><MoreHorizontal size={16} /></IconButton>
           <AnswerMeta usage={usage && (usage.queries > 0 || usage.costUsd !== undefined) ? usage : undefined} queries={queries.length ? nQueries : 0} repairs={steps.filter((s) => s.kind === 'repair' && s.state === 'ok').length} onSql={queries.length ? () => setSqlOpen((o) => !o) : undefined} sqlOpen={sqlOpen} />
           {feedbackSent && <span className="ml-2 font-sans text-xs text-fg-subtle">Thanks for the feedback</span>}
         </div>
       )}
+      {regen.anchor && onRefine && (
+        <Menu anchor={regen.anchor} onClose={regen.close} label="Regenerate" items={[
+          { label: 'Try again', icon: <RefreshCw size={15} />, onSelect: onRegenerate },
+          'sep',
+          { label: 'More concise', icon: <Minimize2 size={15} />, onSelect: () => onRefine('concise') },
+          { label: 'More detailed', icon: <Plus size={15} />, onSelect: () => onRefine('detailed') },
+        ]} />
+      )}
+      {more.anchor && (
+        <Menu anchor={more.anchor} onClose={more.close} label="More actions" items={[
+          { label: 'Copy as Markdown', icon: <FileText size={15} />, onSelect: () => { void copyText(messageMarkdown(view)).then((ok) => ok && toast({ text: 'Copied as Markdown' })); } },
+          ...(okQueries ? [{ label: okQueries > 1 ? `Copy SQL (${okQueries} queries)` : 'Copy SQL', icon: <Code2 size={15} />, onSelect: () => { void copyText(sqlForClipboard(queries)).then((ok) => ok && toast({ text: 'SQL copied' })); } } as MenuItem] : []),
+        ]} />
+      )}
       {sqlOpen && <SqlInspector queries={queries} onClose={() => setSqlOpen(false)} />}
-      {feedbackOpen && <FeedbackPanel onClose={() => setFeedbackOpen(false)} onSubmit={() => { setFeedbackOpen(false); setFeedbackSent(true); }} />}
+      {feedbackOpen && <FeedbackPanel onClose={() => setFeedbackOpen(false)} onSubmit={(f) => { recordFeedback({ messageId: view.id, vote: 'down', reasons: f.reasons, detail: f.detail }); setFeedbackOpen(false); setFeedbackSent(true); }} />}
     </div>
   );
 });
