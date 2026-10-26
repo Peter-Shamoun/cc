@@ -1,8 +1,13 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { ArrowUp, Plus, Square, Database } from 'lucide-react';
+import { ArrowUp, Plus, Square, Database, X } from 'lucide-react';
 import clsx from 'clsx';
 import { getDraft, setDraft } from '../shell/drafts';
 import { matchSlash, type SlashCommand } from '../shell/slash';
+
+/** Pastes this long become an attachment chip instead of flooding the box (Claude-style). */
+export const PASTE_CHARS = 1200;
+export const PASTE_LINES = 15;
+export const isLongPaste = (t: string) => t.length >= PASTE_CHARS || t.split('\n').length > PASTE_LINES;
 
 export interface ComposerProps {
   onSend: (t: string) => void;
@@ -30,8 +35,11 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
   const [slashIdx, setSlashIdx] = useState(0);
   const [slashDismissed, setSlashDismissed] = useState(false);
   const lid = useId();
+  // Long pastes ride along as chips; they live in component memory only (never drafts or storage).
+  const [pastes, setPastes] = useState<{ id: number; text: string }[]>([]);
+  const pasteSeq = useRef(0);
   const setValue = (t: string) => { setValueState(t); if (draftKey) setDraft(draftKey, t); };
-  useEffect(() => { setValueState(draftKey ? getDraft(draftKey) : ''); }, [draftKey]);
+  useEffect(() => { setValueState(draftKey ? getDraft(draftKey) : ''); setPastes([]); }, [draftKey]);
   useEffect(() => {
     if (initial !== undefined) {
       setValue(initial.text);
@@ -54,11 +62,13 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
   };
   const submit = () => {
     if (slash?.length) { runCommand(slash[slashIdx]); return; }
-    if (!value.trim() || busy) return;
-    onSend(value);
+    if ((!value.trim() && !pastes.length) || busy) return;
+    onSend([value.trim(), ...pastes.map((x) => x.text)].filter(Boolean).join('\n\n'));
     setValue('');
+    setPastes([]);
   };
-  const canSend = !!value.trim();
+  const canSend = !!value.trim() || pastes.length > 0;
+  const removePaste = (id: number) => { setPastes((ps) => ps.filter((x) => x.id !== id)); ref.current?.focus(); };
   return (
     <form
       onSubmit={(e) => { e.preventDefault(); submit(); }}
@@ -77,7 +87,31 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
           ))}
         </ul>
       )}
+      {pastes.length > 0 && (
+        <ul className="flex gap-2 overflow-x-auto px-1 pb-2 pt-1 scrollbar-none" aria-label="Pasted text" data-testid="paste-chips">
+          {pastes.map((x) => {
+            const lines = x.text.split('\n').length;
+            return (
+              <li key={x.id} className="group/chip relative flex h-[88px] w-[132px] shrink-0 flex-col justify-between overflow-hidden rounded-xl border border-line bg-bg p-2.5 text-left motion-safe:animate-[cc-pop_150ms_ease-out]" data-testid="paste-chip">
+                <p className="line-clamp-3 break-all font-mono text-[10.5px] leading-[14px] text-fg-muted" aria-hidden>{x.text.slice(0, 160)}</p>
+                <span className="mt-1 inline-flex w-fit rounded border border-line px-1 text-[10px] font-semibold uppercase tracking-wide text-fg-subtle">Pasted</span>
+                <span className="sr-only">Pasted text, {lines} lines, {x.text.length} characters</span>
+                <button type="button" onClick={() => removePaste(x.id)} aria-label={`Remove pasted text (${lines} lines)`}
+                  className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full border border-line bg-elev text-fg-muted opacity-0 shadow-sm hover:text-fg focus-visible:opacity-100 group-hover/chip:opacity-100 max-md:opacity-100">
+                  <X size={12} strokeWidth={2.5} />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
       <textarea
+        onPaste={(e) => {
+          const t = e.clipboardData.getData('text/plain');
+          if (!isLongPaste(t)) return;
+          e.preventDefault();
+          setPastes((ps) => [...ps, { id: ++pasteSeq.current, text: t }]);
+        }}
         ref={ref}
         rows={1}
         value={value}
@@ -90,6 +124,7 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
             if (e.key === 'Tab') { e.preventDefault(); runCommand(slash[slashIdx]); return; }
             if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setSlashDismissed(true); return; }
           }
+          if (e.key === 'Backspace' && !value && pastes.length) { e.preventDefault(); setPastes((ps) => ps.slice(0, -1)); return; }
           if (e.key === 'ArrowUp' && !value && !busy && !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey && onEditLast?.()) { e.preventDefault(); return; }
           if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
           const mod = e.metaKey || e.ctrlKey;
