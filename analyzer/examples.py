@@ -5,6 +5,9 @@ never the snapshot's whole ``generated_questions.json``, which also holds valida
 ``ExampleIndex`` then applies its own pool rules (train only, not held-out, has SQL) and pair rules (not the
 target, not its family or template, not the same or a near-duplicate SQL or text), and ``assert_no_leakage``
 re-checks the selection. The target must have a frozen split; an unassigned question fails.
+
+A question asked in the chat app (``LIVE_QUESTION_ID``) is in no benchmark split, so nothing it is shown can leak
+into a score. It gets the same BM25 pick from the same TRAIN pool under the same pair rules.
 """
 
 from __future__ import annotations
@@ -16,6 +19,9 @@ from analyst.approaches.a10_dynamic_fewshot.leakage import SplitAssignment, asse
 from analyst.approaches.a10_dynamic_fewshot.retriever import ExampleIndex, RetrievedExample
 
 RETRIEVAL_METHOD = "bm25"
+#: question id of a session prepared for a question asked live (api/claude_code_cli_driver.py), never a bench id
+LIVE_QUESTION_ID = "live_question"
+LIVE_QUESTION_SPLIT = "live"
 
 
 def _assignment_row(case: dict, rows_by_id: dict) -> dict | None:
@@ -55,6 +61,8 @@ def _index(snapshot_path: str) -> tuple[ExampleIndex, dict, SplitAssignment]:
     from bench.splits import select_cases
     cases = with_link_groups(load_cases(snapshot_path=Path(snapshot_path)))
     assignment = split_assignment_for(cases)
+    assignment = SplitAssignment.from_mapping({**assignment.splits, LIVE_QUESTION_ID: LIVE_QUESTION_SPLIT},
+                                              assignment.held_out_ids, assignment.extra_held_out_question_sets)
     train_pool = select_cases(cases, "train")
     index = ExampleIndex.build(train_pool, assignment, method=RETRIEVAL_METHOD)
     return index, {case["id"]: case for case in cases}, assignment
@@ -68,3 +76,8 @@ def train_examples_for(snapshot_path: str | Path, question_id: str, k: int) -> l
     picked = index.retrieve(target, k=k)
     assert_no_leakage(target, [cases_by_id[example.question_id] for example in picked], assignment)
     return picked
+
+
+def train_examples_for_live_question(snapshot_path: str | Path, question_text: str, k: int) -> list[RetrievedExample]:
+    index, _cases_by_id, _assignment = _index(str(Path(snapshot_path).resolve()))
+    return index.retrieve({"id": LIVE_QUESTION_ID, "question": question_text}, k=k)

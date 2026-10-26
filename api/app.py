@@ -14,6 +14,7 @@ import re
 import threading
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Literal
 
 from fastapi import FastAPI, Request
@@ -140,8 +141,15 @@ DEMO_PACE_CHUNK_SECONDS = 0.02
 SLOW_FLOOR_SECONDS = 0.8
 
 
+#: How the analyzer reaches its model (CC_API_ANALYZER_INTERACTION). ``model_api``: the in-process loop
+#: (analyzer.loop.Analyzer) with the model client CC_API_LLM names. ``claude_code_cli``: the shipped bundle run by
+#: local headless Claude Code (api/claude_code_cli_driver.py; dev and mock runs). An MCP layer is not built.
+ANALYZER_INTERACTIONS = ("model_api", "claude_code_cli")
+
+
 def demo_pace_enabled() -> bool:
-    return os.environ.get("CC_API_DEMO_PACE", "1") != "0" and os.environ.get("CC_API_LLM", "scripted") == "scripted"
+    return (os.environ.get("CC_API_DEMO_PACE", "1") != "0" and os.environ.get("CC_API_LLM", "scripted") == "scripted"
+            and os.environ.get("CC_API_ANALYZER_INTERACTION", "model_api") == "model_api")
 
 
 def _paced(name: str, paced_default: float) -> float:
@@ -160,6 +168,10 @@ def _safe_filename(name: str) -> str:
 @dataclass
 class Settings:
     llm: str = os.environ.get("CC_API_LLM", "scripted")
+    analyzer_interaction: str = field(default_factory=lambda: os.environ.get("CC_API_ANALYZER_INTERACTION",
+                                                                             "model_api"))
+    #: bench snapshot directory the claude_code_cli layer queries (its data scope; see the driver's docstring)
+    analyzer_snapshot_path: str | None = field(default_factory=lambda: os.environ.get("CC_API_ANALYZER_SNAPSHOT"))
     heartbeat_seconds: float = float(os.environ.get("CC_API_HEARTBEAT_SECONDS", "15"))
     resume_seconds: float = 60.0
     #: a run whose last client disconnected is cancelled after this grace period unless a client re-attaches
@@ -237,14 +249,34 @@ def _token(request: Request) -> str:
     return request.cookies.get(SESSION_COOKIE, "")  # never a query parameter: URLs end up in logs
 
 
-def create_app(auth=None, settings: Settings | None = None, store=None, llm_factory=None) -> FastAPI:
-    """``llm_factory`` (no args -> LLM) overrides ``settings.llm``; tests use it to replay a script."""
+def build_claude_code_cli_driver(settings: Settings, auth):
+    """The claude_code_cli layer's driver, or None for model_api. Refuses what it can't honour."""
+    if settings.analyzer_interaction not in ANALYZER_INTERACTIONS:
+        raise RuntimeError(f"CC_API_ANALYZER_INTERACTION={settings.analyzer_interaction!r}; expected one of "
+                           f"{', '.join(ANALYZER_INTERACTIONS)}")
+    if settings.analyzer_interaction != "claude_code_cli":
+        return None
+    if not isinstance(auth, DemoAuth):
+        raise RuntimeError("claude_code_cli queries a bench snapshot, not the signed-in customer's data: "
+                           "it runs with demo auth only")
+    if not settings.analyzer_snapshot_path:
+        raise RuntimeError("claude_code_cli needs CC_API_ANALYZER_SNAPSHOT (a bench snapshot directory)")
+    from api.claude_code_cli_driver import ClaudeCodeCliDriver
+    return ClaudeCodeCliDriver(Path(settings.analyzer_snapshot_path))
+
+
+def create_app(auth=None, settings: Settings | None = None, store=None, llm_factory=None,
+               claude_code_cli_driver=None) -> FastAPI:
+    """``llm_factory`` (no args -> LLM) overrides ``settings.llm``; tests use it to replay a script.
+    ``claude_code_cli_driver`` overrides the one built from settings; tests pass one with a fake worker."""
     settings = settings or Settings()
     if auth is None:
         if settings.auth_mode != "demo":
             raise RuntimeError(f"CC_API_AUTH={settings.auth_mode!r} needs an explicit auth backend "
                                "(create_app(auth=...)); refusing to fall back to demo tokens")
         auth = DemoAuth()
+    cli_driver = claude_code_cli_driver or build_claude_code_cli_driver(settings, auth)
+    scripted_demo = settings.llm == "scripted" and cli_driver is None
     audit = AuditLog()
     store = store or make_store(audit=audit)
     temp_chats = TemporaryChats(settings.temporary_ttl_seconds)  # 1.20.0: never persisted (api/temporary.py)
@@ -334,6 +366,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
     @app.get("/api/health")
     def health():
         return JSONResponse({"status": "ok", "mode": getattr(auth, "mode", "custom"), "llm": settings.llm,
+                             "analyzerInteraction": "claude_code_cli" if cli_driver else "model_api",
                              "paidApis": False}, headers=NO_STORE)
 
     @app.get("/api/capabilities")
@@ -344,7 +377,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             customer = authed(request, new_id("r")).principal.customer if _token(request) else None
         except AuthError:
             customer = None
-        return JSONResponse(capabilities_body(CONTRACT_VERSION, demo=settings.llm == "scripted", customer=customer,
+        return JSONResponse(capabilities_body(CONTRACT_VERSION, demo=scripted_demo, customer=customer,
                                               sql_literal_masking=settings.sql_literal_masking,
                                               temporary_ttl_seconds=settings.temporary_ttl_seconds), headers=NO_STORE)
 
@@ -416,6 +449,9 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         bad_option = check_options(body.options, ctx.principal.customer)
         if bad_option:
             return error_json("validation", bad_option, 422)
+        if cli_driver is not None and (body.options.get("strategy", DEFAULT_STRATEGY) != DEFAULT_STRATEGY
+                                       or body.options.get("model", "auto") != "auto"):
+            return error_json("validation", "This server runs the shipped analyzer configuration only.", 422)
         conversation_id = body.conversationId or new_id("c_")
         if not _SAFE_ID.fullmatch(conversation_id) or store.owned_by_other(ctx.principal, conversation_id) \
                 or temp_chats.owned_by_other(ctx.principal, conversation_id):
@@ -523,7 +559,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 cstore.append_message(ctx.principal, conversation_id, user_msg)
             except CustomerKeyDisabled:
                 return shredded()
-        scenario = detect_scenario(question, scenario_hint) if demo else None
+        scenario = detect_scenario(question, scenario_hint) if demo and cli_driver is None else None
         if scenario and "scenario" not in user_msg and isinstance(user_msg, dict):
             user_msg["scenario"] = scenario
         prior: dict = {}
@@ -574,7 +610,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             if scenario == "slow" and settings.demo_pace:
                 delay = max(delay, SLOW_FLOOR_SECONDS)
             emit({"type": "message.start", "messageId": message_id, "conversationId": conversation_id,
-                  "contractVersion": CONTRACT_VERSION, "model": settings.llm, "parentId": user_msg["id"],
+                  "contractVersion": CONTRACT_VERSION, "model": cli_driver.model_label if cli_driver else settings.llm,
+                  "parentId": user_msg["id"],
                   "strategy": body.options.get("strategy", DEFAULT_STRATEGY), **start_extra,
                   **({"temporary": True} if temporary else {})})
             emit({"type": "status", "label": "Thinking"})
@@ -582,12 +619,15 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             answer = None
             opener = CancellableOpener(ctx.opener, run.cancelled).start()  # Stop interrupts the running SQL
             try:
-                config = AnalyzerConfig(**overrides)
-                inner = llm_factory() if llm_factory else make_llm(settings.llm, scenario)
-                tap = LiveTap(inner, emit, cancelled=run.cancelled, model_delay=delay, started=started,
-                              multi_candidate=config.candidates > 1)
-                analyzer = Analyzer(opener, tap, config)
-                answer = analyzer.answer(question)
+                if cli_driver is not None:
+                    tap = LiveTap(None, emit, cancelled=run.cancelled, started=started)
+                    answer = cli_driver.answer(question, tap, run.cancelled)
+                else:
+                    config = AnalyzerConfig(**overrides)
+                    inner = llm_factory() if llm_factory else make_llm(settings.llm, scenario)
+                    tap = LiveTap(inner, emit, cancelled=run.cancelled, model_delay=delay, started=started,
+                                  multi_candidate=config.candidates > 1)
+                    answer = Analyzer(opener, tap, config).answer(question)
                 tap.finish(answer)
                 elapsed = int((time.perf_counter() - started) * 1000)
                 parts, finish = outcome_parts(answer, ctx.principal, downloads.scoped(conversation_id), elapsed_ms=elapsed, question=question,

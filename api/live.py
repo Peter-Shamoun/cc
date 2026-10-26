@@ -16,6 +16,8 @@ import threading
 import time
 from dataclasses import dataclass, field
 
+from analyzer.llm import ToolCall
+
 from api.ids import new_id
 
 # USD per million tokens (input, output). Static estimate table; demo mode never bills anything.
@@ -211,6 +213,19 @@ class LiveTap:
 
     def __getattr__(self, name):  # pass through anything else the analyzer may read
         return getattr(self.inner, name)
+
+    def observe_finished_call(self, tool_name: str, arguments: dict, result_content: str | None) -> None:
+        """A tool call an out-of-process agent already ran (``api.claude_code_cli_driver`` reads them from the
+        session's calls.jsonl), turned into the same events as a live call. ``result_content`` is what the model saw
+        (``ERROR: ...`` on failure); None leaves the step open, as for a recorded final answer, which ``finish``
+        closes with the re-executed rows."""
+        self._check_cancel()
+        call = ToolCall(name=tool_name, arguments=dict(arguments), id=new_id("t_"))
+        with self._lock:
+            self._start_call(call, 0)
+            pending = self.pending.pop(call.id, None) if result_content is not None else None
+            if pending is not None:
+                self._finish_call(pending, result_content)
 
     # -- turning calls into events
     def _start_call(self, call, cand: int):

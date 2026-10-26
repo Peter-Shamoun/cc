@@ -134,8 +134,11 @@ def _method_blocks(config: AnalyzerConfig, meta: dict, cli: str) -> str:
 def _examples(config: AnalyzerConfig, meta: dict) -> str:
     if not config.enable_examples:
         return ""
-    from analyzer.examples import train_examples_for
-    examples = train_examples_for(meta["snapshot_path"], meta["question_id"], config.examples_k)
+    from analyzer.examples import LIVE_QUESTION_ID, train_examples_for, train_examples_for_live_question
+    if meta["question_id"] == LIVE_QUESTION_ID:
+        examples = train_examples_for_live_question(meta["snapshot_path"], meta["question"], config.examples_k)
+    else:
+        examples = train_examples_for(meta["snapshot_path"], meta["question_id"], config.examples_k)
     return protocols.examples_block(examples) + "\n"
 
 
