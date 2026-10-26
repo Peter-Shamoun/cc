@@ -19,7 +19,7 @@ To point at a real backend, set `VITE_ANALYST_BASE`. Empty or unset means the of
 
 ```bash
 pip install -e . && pip install -r api/requirements.txt
-uvicorn api.app:app --port 8787                       # demo mode: scripted model, synthetic DuckDB, no paid APIs
+python -m api --port 8787                             # demo mode (no Server header): scripted model, synthetic DuckDB, no paid APIs
 cd web
 VITE_ANALYST_BASE=/ VITE_ANALYST_DEMO_TOKEN=demo:acme_labs:peter npx vite --port 5174
 node scripts/shots_v1.mjs http://127.0.0.1:5174/ http://127.0.0.1:5175/ /workspace/cc_web/shots   # second URL = a mock-mode dev server
@@ -85,6 +85,41 @@ Part types and how they render:
 | `error` | Danger bar, message, collapsible details, Retry |
 | unknown | Muted "Unsupported content" chip |
 
+### HTTP errors before the stream starts
+
+`httpError` (`web/src/adapters/http.ts`) resolves an error in this order: `error.code` if it's a known code, then `error.legacyCode`, then the HTTP status. The fallback by status is: 400/422 → validation, 401 → auth_expired, 403 → access_denied, 404 → not_found, 405 → method_not_allowed, 409 → conflict, 410 → transcripts_unavailable, 413 → payload_too_large, 429 → rate_limited.
+
+| code | Card title | Retry |
+|---|---|---|
+| not_found | Not found | no |
+| access_denied | Not available | no |
+| payload_too_large | Message too long (gives the limit from `maxBytes`) | no |
+| clarification_expired / conflict | Ask again | no |
+| rate_limited | Too many requests (honours Retry-After) | yes |
+| internal / any 5xx | Analyst unavailable (generic copy, never the server's message) | yes |
+| method_not_allowed | Not supported | no |
+| unknown 4xx | Request not accepted (keeps the raw code) | no |
+
+Known 4xx cards show the server's fixed message, capped at 300 characters. The adapter handles the regenerate 404 and resume 409 fallbacks before `httpError` runs.
+
+### Stalled, huge and clock-skewed streams
+
+- **Stalled.** `guardBody` (src/adapters/http.ts) wraps every stream. With no bytes for `idleTimeoutMs` (45 s; the server heartbeats every 15 s), it cancels the connection. Mid-answer, that is a drop: it re-attaches with Last-Event-ID. Before `message.start`, the answer ends with a retryable "The analyst stopped responding" card instead of a spinner that never stops.
+- **Huge.** One SSE line that grows past `maxFrameBytes` (32 MiB) without a line break is refused before the decoder buffers it. The answer ends with what already arrived plus "Answer too large to show". It isn't re-attached, because the replay would send the same event. Large but complete events (a 200 KB text part) pass. Tests: `src/adapters/http.guard.test.ts`.
+- **Clock skew.** Server deadlines are judged by the server's clock. `src/lib/serverClock.ts` keeps the offset from each stream response's `Date` header (applied past 2 s). `useExpired` (download and clarification expiry) uses it. A Retry-After HTTP date is measured against the same response's `Date` (RFC 9110). With a local clock an hour off, "retry in 5 s" stays 5 s instead of retrying at once or giving up. `1.5` or `-3` is rejected rather than parsed as a date. Tests: `src/lib/serverClock.test.tsx`.
+
+### Non-stream calls: rate limits and oversized bodies
+
+`web/src/lib/fetchGuard.ts` covers the conversation list, search and detail, shares, feedback and capabilities:
+- **429:** `fetchRetrying` waits out Retry-After (seconds, or an HTTP date measured against the response's `Date`), up to 10 s and at most 2 times, then returns the 429 to the normal error path. A 429 means the server did nothing, so the identical request is safe to repeat. Before this, a 429 on `/api/capabilities` silently fell back to the demo model list.
+- **Oversized bodies:** `readJsonCapped` refuses a body over the cap (by Content-Length, or by counting while reading) before parsing it. The caps are 8 MiB for list and search pages, 32 MiB for a conversation or shared chat, and 1 MiB for capabilities. The list reports `response_too_large`, and the shared view shows its "couldn't load" state.
+
+Tests: `src/lib/fetchGuard.test.ts`.
+
+### Theme across tabs
+
+Changing theme or palette in one tab updates every open tab, as in ChatGPT and Claude. `onPrefChange` in `lib/prefs.ts` listens to the `storage` event, which fires only in other tabs and only when the value changes, so tabs can't ping-pong. Values outside the allowlist are ignored, and a stored junk palette falls back to `neutral`. Tests: `src/lib/themeSync.test.tsx`.
+
 ## Artifact panel
 
 Opens from any table, chart, code or image (and artifact cards). It's resizable by dragging or with the arrow keys (double-click resets to 50%, min 360 px, max 75%). It has segmented tabs (Table | SQL, Chart | Spec | Data, Code, Preview), Copy, Download, Full screen and Close (Esc). Opening it collapses the sidebar on screens narrower than 1400 px.
@@ -94,6 +129,7 @@ Opens from any table, chart, code or image (and artifact cards). It's resizable 
 - **No PHI in URLs.** The app has a single route. Prompts go in POST bodies. Downloads use short-lived `blob:` URLs revoked after 60 s.
 - **No browser persistence of data.** Only `cc.pref.theme` and `cc.pref.palette` are written, through `prefs.ts` (allowlist plus a length cap). Transcripts sit behind `TranscriptStore`. The default is `ephemeral` (memory only), and the sidebar shows "History off".
 - **No row data in console logs.** The app never logs. The screenshot script and the App test assert that no fixture row data shows up in console output and that storage holds only pref keys.
+- **No chat content in `document.title`.** The tab title is fixed (`CC`, `Shared chat · CC`), never the chat title: titles echo the question, and browsers keep page titles in history, sync them across devices and show them in screen shares. `src/security/titleSink.test.tsx` renders a shared chat whose title holds a synthetic name and also fails the build if any file assigns `document.title`, or names a `performance.mark`/`measure`, from anything but a string literal. History entries carry `state: null` and only `#/c/<id>`; resource-timing entries see the same id-only request URLs that `phi.test.tsx` checks.
 - **Masking.** Columns with `phi: true` render as `•••• 56`, can't be sorted, and are dropped from TSV copy, CSV export and message copy.
 - **Rendering safety.** No raw HTML in markdown. Remote markdown images are replaced by their alt text. Links get `noopener noreferrer nofollow`. Vega specs lose any `data.url`.
 
@@ -138,3 +174,48 @@ Recommendation: keep the Vite app (structure already mirrors the template, small
 - An ESLint rule banning direct `localStorage` use outside `prefs.ts`, and axe-core checks.
 - Shiki currently ships its full language bundle as lazy chunks. Switch to `shiki/core` with only sql, python, json and bash.
 - Playwright visual comparisons against logged-in reference screenshots.
+
+## Offline/online flapping
+
+- The browser fires `online` before the link actually carries traffic, so the first reconnect after an offline period often fails. `HttpAnalystAdapter` gives that one try for free (a 250 ms backoff that doesn't count against `maxRetries`). It gets one per real offline period, which keeps it bounded. Replayed events are still de-duplicated by `seq`.
+- The offline banner uses `useSettledOnline()` (`lib/useOnline.ts`): offline shows only after 1 s of continuous offline, and the banner hides as soon as the connection is back. The Send button still follows the raw `navigator.onLine`, so nothing is sent into a blip.
+- Tests: `adapters/http.flapping.test.ts`.
+
+## Slow CPUs (6x throttle)
+
+`web/scripts/cpu_throttle_audit.mjs URL [rate] [out.json]` (Playwright + CDP `Emulation.setCPUThrottlingRate`; `PROMPT=`, `THINK_MS=` env) measures FCP, CLS, long tasks, rAF frame gaps and Event Timing input latency while typing during a streamed answer. Against the mock preview at 6x, warm (median of runs):
+
+| | before | after |
+|---|---|---|
+| FCP / CLS | ~150 ms / 0 | ~160 ms / 0 (unchanged) |
+| CARC table answer: long-task total, frames > 50 ms | 557 ms, 21 | 295 ms, 6 |
+| Chart answer: worst task (= worst keystroke delay) | 370–460 ms | ~270 ms |
+
+What changed:
+- **Idle prefetch** (`lib/idlePrefetch.ts`). The Markdown renderer, KaTeX and Vega chunks are warmed one per idle slot after first paint, while the user is reading or typing, instead of being parsed and evaluated mid-stream. On Save-Data and 2G only the Markdown renderer is warmed.
+- **`onceOk` loaders** (`lib/onceOk.ts`). Before this, a lazy import that failed (offline at prefetch time, or a chunk 404 during a deploy) was cached forever, so charts, math or Markdown stayed broken until reload. A failure is now forgotten, and the next use retries.
+- **The chart's first render takes two tasks.** ChartView compiles Vega-Lite itself, yields a macrotask, then embeds the compiled Vega (`mode:'vega'`, `config:{}`, `hover:false`, the same as vega-embed's own VL path). Renders are pixel-identical (light, dark, 420 px). What's left (~270 ms at 6x, ~45 ms unthrottled) is Vega's own parse, dataflow and first draw.
+
+Test files: `lib/idlePrefetch.test.ts` and `components/parts/chartSplit.test.tsx`. JSONs and shots are in `shots/platform/cpu6/`.
+
+## Long sessions / memory
+
+`e2e/memory200.spec.ts` (`@perf`, Chromium) drives a 200-turn chat (`MEM_TURNS`) with contract streams (answer, chart, tool steps, report). Every 25 turns it samples the post-GC heap, DOM size, and CDP `Nodes`/`JSEventListeners`. Then it leaves the chat (Ctrl+Shift+O) and checks the old thread can be collected.
+
+- **In the chat:** the DOM stays windowed (#280, under 6k elements), listeners stay flat, and the heap grows about 20 KB a turn, which is message data only.
+- **After leaving:** listeners and DOM nodes, live plus detached, return to baseline. Before the fixes, three retainers kept the last window (3k+ nodes and about 140 listeners) as detached DOM:
+  1. **`ThreadView`:** the `scrollToIndexRef` closure held the virtualizer and its element cache. The ref is now cleared on unmount.
+  2. **`ChartView`:** Vega keeps a module-level reference to the last SVG it drew, and through it the View and `_el` (React's node). Vega now renders into a throwaway host div, which is removed on unmount.
+  3. **`AppShell`:** the scroller ResizeObserver effect captured `el`, and React's alternate fiber could keep that closure alive. The callback now reads `scroller.current`.
+- **Heap snapshots** (with retainer hunting) only run with `MEM_SNAP=<path prefix>`. Each one costs hundreds of MB, so leave it off on the shared box.
+
+## Box memory guard (`scripts/memguard.mjs`)
+
+All teams share one 15 GB box, so concurrent Playwright and Lighthouse runs OOM-killed each other. The guard prevents that:
+
+- **Automatic in Playwright:** `e2e/global-setup.ts` takes a box-wide slot before building. There are 2 slots in `/tmp/cc_heavy`, and a run also needs at least 3 GB of `MemAvailable`. If either is short, the run waits and logs who holds the slots. The slot is released at teardown.
+- **Anything else heavy:** wrap it with `npm run guarded -- <cmd>`, e.g. `npm run guarded -- npx playwright test …`. `shots` and `check:perf` are already wrapped.
+- **Settings:** `--min-gb` / `CC_GUARD_MIN_GB` (default 3), `--slots` / `CC_GUARD_SLOTS` (default 2), `--timeout` / `CC_GUARD_TIMEOUT` (default 1800 s; on timeout it exits with code 75), and `CC_GUARD_DIR`. `CC_GUARD_OFF=1` skips the guard.
+- **Crashed runs:** a run killed by the OOM killer doesn't block anyone. A slot whose pid is dead is reclaimed.
+- **Nested runs:** children of a guarded command get `CC_GUARD_HELD=1`, so they don't take a second slot.
+- **Tests:** `src/lib/memguard.test.ts`.

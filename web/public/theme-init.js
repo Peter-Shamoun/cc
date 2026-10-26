@@ -1,0 +1,4 @@
+/* Theme and boot-shell layout flags only (no PHI): runs before paint to avoid a flash. The build inlines this
+   file into index.html with the CSP nonce (QA-P8: one fewer render-blocking round trip); the copy in public/ is
+   the single source. Reads only allowlisted UI prefs; for the URL it records whether a chat is open, never the id. */
+try { var t = localStorage.getItem('cc.pref.theme'), p = localStorage.getItem('cc.pref.palette'), e = document.documentElement; var d = t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches); if (d) e.classList.add('dark'); e.style.colorScheme = d ? 'dark' : 'light'; /* QA C7: the canvas matches the theme before the CSS arrives (no white flash on slow links) */ e.dataset.palette = p === 'paper' ? 'paper' : 'neutral'; if (localStorage.getItem('cc.pref.sidebarCollapsed') === '1') e.dataset.bootSidebar = 'collapsed'; if (/^#\/c\/[\w-]+$/.test(location.hash)) e.dataset.bootRoute = 'chat'; } catch {}

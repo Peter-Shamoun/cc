@@ -1,0 +1,18 @@
+{"type":"message.start","messageId":"m_1","conversationId":"c_1","contractVersion":"1.23.0","model":"scripted","parentId":"u_1","strategy":"tool_loop","seq":0}
+{"type":"status","label":"Thinking","seq":1}
+{"type":"reasoning.delta","partId":"p_1","delta":"Checking the claims view.","seq":2}
+{"type":"status","label":"Exploring sem.claims","seq":3}
+{"type":"step.explore","stepId":"s_1","probe":"describe_view","summary":"8 columns","elapsedMs":5,"target":"sem.claims","seq":4}
+{"type":"step.sql_running","stepId":"s_2","sql":"SELECT payer_name, SUM(paid_amount) AS paid_amount, COUNT(*) AS claims\nFROM sem.claims\nGROUP BY 1\nORDER BY paid_amount DESC","attempt":1,"purpose":"answer","label":"Running query","seq":5}
+{"type":"status","label":"Running query","seq":6}
+{"type":"step.sql_result","stepId":"s_2","ok":true,"elapsedMs":4,"rowCount":7,"columns":[{"name":"payer_name"},{"name":"paid_amount"},{"name":"claims"}],"seq":7}
+{"type":"step.sql_running","stepId":"s_3","sql":"SELECT payer_name, SUM(paid_amount) AS paid_amount, COUNT(*) AS claims\nFROM sem.claims\nGROUP BY 1\nORDER BY paid_amount DESC","attempt":1,"purpose":"answer","label":"Final query","seq":8}
+{"type":"status","label":"Running query","seq":9}
+{"type":"step.sql_result","stepId":"s_3","ok":true,"elapsedMs":4,"rowCount":7,"columns":[{"name":"payer_name"},{"name":"paid_amount"},{"name":"claims"}],"seq":10}
+{"type":"reasoning.end","partId":"p_1","durationMs":715,"seq":11}
+{"type":"step.check","stepId":"s_4","check":"verifier","verdict":"warn","message":"sem.claims/claim_lines used without is_latest_submission: resubmitted claims count more than once","action":"caveat","targetStepId":"s_3","seq":12}
+{"type":"status","label":"Writing answer","seq":13}
+{"type":"text.start","partId":"p_2","seq":14}
+{"type":"text.end","partId":"p_2","seq":15}
+{"type":"status","label":null,"seq":16}
+{"type":"message.end","messageId":"m_1","finishReason":"aborted","usage":{"queries":2,"elapsedMs":1108,"latency":{"totalMs":1108,"modelMs":1050,"sqlMs":8,"stages":{"plan":1062,"sql":8,"repair":0,"checks":37,"render":1},"firstEventMs":2,"firstStepMs":360},"costIsEstimate":true,"costUsd":0.003951,"tokens":{"input":3326,"output":125},"models":[{"model":"claude-haiku-5-5","role":"analyst","inputTokens":3326,"outputTokens":125,"costUsd":0.003951,"calls":3}]},"seq":17}

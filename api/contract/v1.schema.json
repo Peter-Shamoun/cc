@@ -1,0 +1,3488 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cc.local/api/contract/v1.schema.json",
+  "title": "CC chat stream contract",
+  "version": "1.23.0",
+  "description": "One JSON object per SSE data: line. See api/CONTRACT.md. Validate an event against #/$defs/StreamEvent.",
+  "$ref": "#/$defs/StreamEvent",
+  "$defs": {
+    "ID": {
+      "description": "Opaque, non-PHI id: `^[A-Za-z0-9_:.-]+$`, 1–128 chars. Never derived from data values.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_:.-]+(?![\\s\\S])"
+    },
+    "Timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "1.13.0: ISO-8601 UTC timestamp, e.g. 2026-10-25T19:00:00Z. Clients must also accept fractional seconds and a numeric offset."
+    },
+    "Sensitivity": {
+      "description": "Closed. Data classification of a part; `phi` content is never persisted in an export.",
+      "enum": [
+        "none",
+        "deidentified",
+        "limited",
+        "phi"
+      ]
+    },
+    "ColumnType": {
+      "enum": [
+        "string",
+        "integer",
+        "number",
+        "currency",
+        "percent",
+        "date",
+        "datetime",
+        "boolean",
+        "code"
+      ],
+      "x-open": true,
+      "x-fallback": "string",
+      "description": "Open (1.13.0): a newer server may add values; render an unknown value as `string`."
+    },
+    "Column": {
+      "description": "A display column of a table part. `key` indexes the row arrays; `label` is display copy.",
+      "type": "object",
+      "required": [
+        "key",
+        "label",
+        "type"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/ColumnType"
+        },
+        "format": {
+          "type": "string"
+        },
+        "phi": {
+          "type": "boolean"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "ColumnSummary": {
+      "description": "A database column name (and optional type) reported by a SQL step. Steps report raw `name`s; table parts carry display `Column`s (`key`/`label`).",
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/ColumnType"
+        }
+      },
+      "additionalProperties": true
+    },
+    "StepError": {
+      "description": "Why a SQL step failed. `message` is scrubbed: no literals, dates or ids from the data.",
+      "type": "object",
+      "required": [
+        "code",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "x-open": true,
+          "x-known": [
+            "binder_error",
+            "syntax_error",
+            "timeout",
+            "guard_blocked",
+            "query_failed",
+            "cancelled"
+          ],
+          "description": "Open. Database-side failure class; `cancelled` closes a step the user stopped. Unknown codes render as a generic query failure."
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 500
+        }
+      },
+      "additionalProperties": true
+    },
+    "ModelRef": {
+      "description": "A model named in an escalation.",
+      "type": "object",
+      "required": [
+        "model"
+      ],
+      "properties": {
+        "model": {
+          "type": "string"
+        },
+        "tier": {
+          "enum": [
+            "small",
+            "medium",
+            "large"
+          ],
+          "x-open": true,
+          "x-fallback": "medium",
+          "description": "Open (1.13.0): a newer server may add values; render an unknown value as `medium`."
+        },
+        "provider": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "Usage": {
+      "description": "Run totals on `message.end` (CONTRACT.md §7). `costUsd` is an estimate when `costIsEstimate` is true.",
+      "type": "object",
+      "required": [
+        "queries",
+        "elapsedMs"
+      ],
+      "properties": {
+        "queries": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "elapsedMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tokens": {
+          "type": "object",
+          "required": [
+            "input",
+            "output"
+          ],
+          "properties": {
+            "input": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "output": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cacheRead": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cacheWrite": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": true
+        },
+        "costUsd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "costIsEstimate": {
+          "type": "boolean"
+        },
+        "latency": {
+          "type": "object",
+          "required": [
+            "totalMs"
+          ],
+          "properties": {
+            "firstEventMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "firstStepMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "firstTokenMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "modelMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "sqlMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "queueMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "totalMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "stages": {
+              "$ref": "#/$defs/LatencyStages"
+            }
+          },
+          "additionalProperties": true
+        },
+        "models": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "model",
+              "inputTokens",
+              "outputTokens"
+            ],
+            "properties": {
+              "model": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string",
+                "x-open": true,
+                "x-known": [
+                  "analyst",
+                  "escalation",
+                  "judge",
+                  "verifier"
+                ],
+                "description": "Open. What this model did in the run."
+              },
+              "inputTokens": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "outputTokens": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "costUsd": {
+                "type": "number",
+                "minimum": 0
+              },
+              "calls": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "Suggestion": {
+      "description": "A rephrasing offered by an abstain part; clicking it sends `text` as a new question.",
+      "type": "object",
+      "required": [
+        "id",
+        "text"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 300
+        }
+      },
+      "additionalProperties": true
+    },
+    "Choice": {
+      "description": "One option of a clarification part.",
+      "type": "object",
+      "required": [
+        "id",
+        "label"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "TextPart": {
+      "description": "Markdown answer text.",
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "text"
+      ],
+      "properties": {
+        "type": {
+          "const": "text"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "ReasoningPart": {
+      "description": "Optional thinking summary. Real backends send counts and labels only (never raw model text).",
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "summary"
+      ],
+      "properties": {
+        "type": {
+          "const": "reasoning"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "StatusPart": {
+      "description": "Legacy (pre-v1) status line. v1 streams `status` events instead.",
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "label"
+      ],
+      "properties": {
+        "type": {
+          "const": "status"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "ToolCallPart": {
+      "description": "Legacy (pre-v1) tool call. Still valid; v1 backends prefer `step.*` events.",
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "tool",
+        "label",
+        "state"
+      ],
+      "properties": {
+        "type": {
+          "const": "tool_call"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "tool": {
+          "type": "string",
+          "description": "Legacy (pre-v1) tool name. v1 backends emit `step.*` events instead."
+        },
+        "label": {
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "running",
+            "ok",
+            "error"
+          ]
+        },
+        "input": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "sql": {
+              "type": "string"
+            },
+            "args": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": true
+        },
+        "output": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "rowCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "columns": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Column"
+              }
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "agent": {
+          "type": "string"
+        },
+        "stepId": {
+          "$ref": "#/$defs/ID"
+        }
+      },
+      "additionalProperties": true
+    },
+    "TablePart": {
+      "description": "A result table: preview rows (≤50) plus `rowCount`; the full result is the CSV.",
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "columns",
+        "rows",
+        "rowCount"
+      ],
+      "properties": {
+        "type": {
+          "const": "table"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "title": {
+          "type": "string"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Column"
+          }
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "array"
+          }
+        },
+        "rowCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "resultId": {
+          "$ref": "#/$defs/ID",
+          "description": "Id of the full result set this preview came from (`ChartPart.dataResultId` points here). Equal to `csvFileId` today; prefer `csvFileId` for downloads."
+        },
+        "csvFileId": {
+          "$ref": "#/$defs/ID",
+          "description": "Download id: `GET /api/download/{csvFileId}` (auth, short-lived). Absent when the result is not downloadable."
+        },
+        "sqlPartId": {
+          "$ref": "#/$defs/ID"
+        },
+        "stepId": {
+          "$ref": "#/$defs/ID"
+        },
+        "source": {
+          "type": "object",
+          "required": [
+            "views"
+          ],
+          "properties": {
+            "views": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "elapsedMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "asOf": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "FilePart": {
+      "description": "A downloadable file chip.",
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "fileId",
+        "name",
+        "mime",
+        "sizeBytes"
+      ],
+      "properties": {
+        "type": {
+          "const": "file"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "fileId": {
+          "$ref": "#/$defs/ID"
+        },
+        "name": {
+          "type": "string"
+        },
+        "mime": {
+          "type": "string"
+        },
+        "sizeBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rowCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "previewable": {
+          "type": "boolean"
+        },
+        "expiresAt": {
+          "$ref": "#/$defs/Timestamp"
+        }
+      },
+      "additionalProperties": true
+    },
+    "ImagePart": {
+      "description": "A static image (e.g. a rendered chart). Blobs are fetched with auth.",
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "blobId",
+        "mime",
+        "width",
+        "height",
+        "alt"
+      ],
+      "properties": {
+        "type": {
+          "const": "image"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "blobId": {
+          "$ref": "#/$defs/ID"
+        },
+        "mime": {
+          "enum": [
+            "image/png",
+            "image/svg+xml",
+            "image/webp"
+          ]
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "alt": {
+          "type": "string"
+        },
+        "caption": {
+          "type": "string"
+        },
+        "svgBlobId": {
+          "$ref": "#/$defs/ID"
+        }
+      },
+      "additionalProperties": true
+    },
+    "PlotKind": {
+      "description": "1.18.0: closed. The chart kinds a client must draw. A server never sends another; a client drops a plot with an unknown kind (the table stays).",
+      "enum": [
+        "bar",
+        "line",
+        "area",
+        "point"
+      ]
+    },
+    "PlotFieldType": {
+      "description": "1.18.0: closed. The x encoding type.",
+      "enum": [
+        "temporal",
+        "nominal",
+        "ordinal",
+        "quantitative"
+      ]
+    },
+    "PlotFormat": {
+      "description": "1.18.0: closed. Number/date formats by name; the renderer maps them (currency `$,.2f`, percent `.1%`, integer `,d`, number `,.2~f`, date `%b %-d, %Y`, month `%b %Y`).",
+      "enum": [
+        "currency",
+        "percent",
+        "integer",
+        "number",
+        "date",
+        "month"
+      ]
+    },
+    "PlotSort": {
+      "description": "1.18.0: closed. `-y` = bars by value, descending; `x` = by x ascending; `none` = data order.",
+      "enum": [
+        "-y",
+        "x",
+        "none"
+      ]
+    },
+    "PlotAxisX": {
+      "type": "object",
+      "description": "1.18.0: the x encoding.",
+      "required": [
+        "field",
+        "type",
+        "title"
+      ],
+      "properties": {
+        "field": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}(?![\\s\\S])",
+          "description": "A row key: an identifier of at most 64 characters. `(?![\\s\\S])` instead of `$`, because Python's `$` also matches before a trailing newline."
+        },
+        "type": {
+          "$ref": "#/$defs/PlotFieldType"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 80
+        },
+        "format": {
+          "$ref": "#/$defs/PlotFormat"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PlotAxisY": {
+      "type": "object",
+      "description": "1.18.0: the y encoding, always a finite number (or null for a gap).",
+      "required": [
+        "field",
+        "type",
+        "title"
+      ],
+      "properties": {
+        "field": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}(?![\\s\\S])",
+          "description": "A row key: an identifier of at most 64 characters. `(?![\\s\\S])` instead of `$`, because Python's `$` also matches before a trailing newline."
+        },
+        "type": {
+          "const": "quantitative"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 80
+        },
+        "format": {
+          "$ref": "#/$defs/PlotFormat"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PlotSeries": {
+      "type": "object",
+      "description": "1.18.0: optional colour series; at most `maxSeries` (10) distinct values.",
+      "required": [
+        "field",
+        "title"
+      ],
+      "properties": {
+        "field": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}(?![\\s\\S])",
+          "description": "A row key: an identifier of at most 64 characters. `(?![\\s\\S])` instead of `$`, because Python's `$` also matches before a trailing newline."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 80
+        }
+      },
+      "additionalProperties": false
+    },
+    "PlotValue": {
+      "description": "1.18.0: a row value: a finite number, a string of at most 200 characters, or null.",
+      "type": [
+        "number",
+        "string",
+        "null"
+      ],
+      "maxLength": 200
+    },
+    "PlotRow": {
+      "type": "object",
+      "description": "1.18.0: one point, keyed by the declared x/y/series fields only.",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}(?![\\s\\S])",
+        "description": "A row key: an identifier of at most 64 characters. `(?![\\s\\S])` instead of `$`, because Python's `$` also matches before a trailing newline."
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/PlotValue"
+      }
+    },
+    "PlotHeader": {
+      "type": "object",
+      "description": "1.18.0 (§16.2): a PlotSpec without `data`: everything a client needs before the first draw. Sent in `chart.start`.",
+      "required": [
+        "v",
+        "kind",
+        "title",
+        "x",
+        "y"
+      ],
+      "properties": {
+        "v": {
+          "const": 1,
+          "description": "PlotSpec version. A client that does not know this version drops the plot (the table stays)."
+        },
+        "kind": {
+          "$ref": "#/$defs/PlotKind"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "x": {
+          "$ref": "#/$defs/PlotAxisX"
+        },
+        "y": {
+          "$ref": "#/$defs/PlotAxisY"
+        },
+        "series": {
+          "$ref": "#/$defs/PlotSeries"
+        },
+        "sort": {
+          "$ref": "#/$defs/PlotSort"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PlotSpec": {
+      "type": "object",
+      "description": "1.18.0 (§16.1): the strict, closed, versioned chart spec (an idea from json-render.dev; concept only). The server validates it before emitting and drops the chart on failure (the table stays); the client validates it before rendering. Caps are in `x-caps`.",
+      "required": [
+        "v",
+        "kind",
+        "title",
+        "x",
+        "y",
+        "data"
+      ],
+      "properties": {
+        "v": {
+          "const": 1,
+          "description": "PlotSpec version. A client that does not know this version drops the plot (the table stays)."
+        },
+        "kind": {
+          "$ref": "#/$defs/PlotKind"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "x": {
+          "$ref": "#/$defs/PlotAxisX"
+        },
+        "y": {
+          "$ref": "#/$defs/PlotAxisY"
+        },
+        "series": {
+          "$ref": "#/$defs/PlotSeries"
+        },
+        "sort": {
+          "$ref": "#/$defs/PlotSort"
+        },
+        "data": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2000,
+          "items": {
+            "$ref": "#/$defs/PlotRow"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "x-caps": {
+        "maxPoints": 2000,
+        "minPoints": 1,
+        "maxSeries": 10,
+        "maxTitle": 120,
+        "maxAxisTitle": 80,
+        "maxString": 200,
+        "maxFieldName": 64,
+        "chunkPoints": 50
+      },
+      "x-temporal": "^[0-9]{4}-[0-9]{2}(-[0-9]{2}([T ][0-9]{2}:[0-9]{2}(:[0-9]{2}(\\.[0-9]{1,9})?)?(Z|[+-][0-9]{2}:?[0-9]{2})?)?)?(?![\\s\\S])"
+    },
+    "ChartPart": {
+      "description": "A chart. 1.18.0: `plot` (PlotSpec, strict) is the source; the Vega-Lite `spec` with inline `data.values` (never `data.url`) is derived from it.",
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "library",
+        "spec",
+        "alt"
+      ],
+      "properties": {
+        "type": {
+          "const": "chart"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "library": {
+          "const": "vega-lite"
+        },
+        "spec": {
+          "type": "object",
+          "not": {
+            "properties": {
+              "data": {
+                "required": [
+                  "url"
+                ]
+              }
+            },
+            "required": [
+              "data"
+            ]
+          }
+        },
+        "data": {
+          "type": "object",
+          "required": [
+            "name",
+            "values"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          },
+          "additionalProperties": true
+        },
+        "dataResultId": {
+          "$ref": "#/$defs/ID",
+          "description": "The `TablePart.resultId` whose rows the chart plots when `data` is absent."
+        },
+        "staticImageBlobId": {
+          "$ref": "#/$defs/ID"
+        },
+        "title": {
+          "type": "string"
+        },
+        "alt": {
+          "type": "string"
+        },
+        "tablePartId": {
+          "$ref": "#/$defs/ID",
+          "description": "1.9.0: the table part this plot was drawn from (same message)."
+        },
+        "plot": {
+          "$ref": "#/$defs/PlotSpec",
+          "description": "1.18.0: the strict plot spec. `spec`/`data` are derived from it for pre-1.18 clients. A 1.18 client renders from `plot` and drops the chart if it fails validation."
+        }
+      },
+      "additionalProperties": true
+    },
+    "CodePart": {
+      "description": "A code block; `role: query` is the SQL behind the answer.",
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "language",
+        "code"
+      ],
+      "properties": {
+        "type": {
+          "const": "code"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "language": {
+          "type": "string",
+          "description": "Highlighter language, e.g. `sql`, `json`, `python`. Unknown languages render as plain text."
+        },
+        "code": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "query",
+            "snippet",
+            "spec"
+          ],
+          "x-open": true,
+          "x-fallback": "snippet",
+          "description": "Open (1.13.0): a newer server may add values; render an unknown value as `snippet`."
+        },
+        "collapsed": {
+          "type": "boolean"
+        },
+        "rerunnable": {
+          "type": "boolean"
+        },
+        "stepId": {
+          "$ref": "#/$defs/ID"
+        },
+        "maskedLiterals": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1.14.0: how many literals of the shown SQL were replaced by `?` (CONTRACT.md §10, `Capabilities.sqlLiteralMasking`). Absent when none were. The executed SQL is unchanged; shown SQL with `?` is not runnable as-is."
+        }
+      },
+      "additionalProperties": true
+    },
+    "CalloutPart": {
+      "description": "Assumptions, caveats, data-quality and PHI-redaction notes.",
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "variant",
+        "items"
+      ],
+      "properties": {
+        "type": {
+          "const": "callout"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "variant": {
+          "enum": [
+            "assumption",
+            "caveat",
+            "data_quality",
+            "phi_redaction",
+            "info"
+          ],
+          "x-open": true,
+          "x-fallback": "info",
+          "description": "Open (1.13.0): a newer server may add values; render an unknown value as `info`."
+        },
+        "title": {
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "text"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/ID"
+              },
+              "text": {
+                "type": "string"
+              },
+              "editable": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "ArtifactPart": {
+      "description": "A versioned side-panel artifact (CONTRACT.md §16).",
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "artifactId",
+        "version",
+        "kind",
+        "title",
+        "content"
+      ],
+      "properties": {
+        "type": {
+          "const": "artifact"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "artifactId": {
+          "$ref": "#/$defs/ID"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "kind": {
+          "enum": [
+            "table",
+            "chart",
+            "report",
+            "code",
+            "image"
+          ],
+          "x-open": true,
+          "x-fallback": "report",
+          "description": "Open (1.14.0): a newer server may add kinds; render an unknown kind as a generic document (`report`), using `content`'s own part type."
+        },
+        "title": {
+          "type": "string"
+        },
+        "content": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TablePart"
+            },
+            {
+              "$ref": "#/$defs/ChartPart"
+            },
+            {
+              "$ref": "#/$defs/CodePart"
+            },
+            {
+              "$ref": "#/$defs/ImagePart"
+            },
+            {
+              "type": "object",
+              "required": [
+                "markdown"
+              ],
+              "properties": {
+                "markdown": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "autoOpen": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    },
+    "ErrorPart": {
+      "description": "The run failed (`finishReason: error`). Exactly one per failed message.",
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "code",
+        "title",
+        "message",
+        "retryable"
+      ],
+      "properties": {
+        "type": {
+          "const": "error"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "code": {
+          "type": "string",
+          "x-open": true,
+          "x-known": [
+            "internal",
+            "query_failed",
+            "access_denied",
+            "timeout",
+            "rate_limited",
+            "auth_expired",
+            "validation",
+            "offline"
+          ],
+          "description": "Open. `internal` is the server's catch-all (e.g. the analysis failed, paid model APIs disabled); `offline` is client-made. Unknown codes: render `title`/`message` and honour `retryable`."
+        },
+        "title": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "retryAfterMs": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "AbstainPart": {
+      "description": "A deliberate non-answer (`finishReason: abstain`): an outcome, not an error.",
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "category",
+        "reason",
+        "suggestions"
+      ],
+      "properties": {
+        "type": {
+          "const": "abstain"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "category": {
+          "enum": [
+            "out_of_scope",
+            "phi_request",
+            "data_unavailable",
+            "ambiguous",
+            "low_confidence",
+            "unsupported",
+            "policy"
+          ],
+          "x-open": true,
+          "x-fallback": "unsupported",
+          "description": "Open (1.13.0): a newer server may add values; render an unknown value as `unsupported`."
+        },
+        "reason": {
+          "type": "string"
+        },
+        "details": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "suggestions": {
+          "type": "array",
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/Suggestion"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "ClarificationPart": {
+      "description": "A question back to the user (`finishReason: needs_input`).",
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "clarificationId",
+        "question",
+        "allowFreeText"
+      ],
+      "properties": {
+        "type": {
+          "const": "clarification"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "clarificationId": {
+          "$ref": "#/$defs/ID"
+        },
+        "question": {
+          "type": "string"
+        },
+        "choices": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/Choice"
+          }
+        },
+        "allowFreeText": {
+          "type": "boolean"
+        },
+        "multiSelect": {
+          "type": "boolean"
+        },
+        "expiresAt": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "answered": {
+          "type": "boolean"
+        },
+        "questions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/ClarifyQuestion"
+          },
+          "description": "1.23.0: 1–4 questions answered together (CONTRACT.md §6.1). `question` is then the lead-in, and `choices`/`multiSelect` mirror the first question for pre-1.23 clients."
+        }
+      },
+      "additionalProperties": true
+    },
+    "Part": {
+      "description": "Any persisted message part. Unknown `type`s render as an \"Unsupported content\" chip.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/TextPart"
+        },
+        {
+          "$ref": "#/$defs/ReasoningPart"
+        },
+        {
+          "$ref": "#/$defs/StatusPart"
+        },
+        {
+          "$ref": "#/$defs/ToolCallPart"
+        },
+        {
+          "$ref": "#/$defs/TablePart"
+        },
+        {
+          "$ref": "#/$defs/FilePart"
+        },
+        {
+          "$ref": "#/$defs/ImagePart"
+        },
+        {
+          "$ref": "#/$defs/ChartPart"
+        },
+        {
+          "$ref": "#/$defs/CodePart"
+        },
+        {
+          "$ref": "#/$defs/CalloutPart"
+        },
+        {
+          "$ref": "#/$defs/ArtifactPart"
+        },
+        {
+          "$ref": "#/$defs/ErrorPart"
+        },
+        {
+          "$ref": "#/$defs/AbstainPart"
+        },
+        {
+          "$ref": "#/$defs/ClarificationPart"
+        }
+      ]
+    },
+    "MessageStart": {
+      "description": "First event of every stream (seq 0).",
+      "type": "object",
+      "required": [
+        "type",
+        "messageId",
+        "conversationId",
+        "contractVersion",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "message.start"
+        },
+        "messageId": {
+          "$ref": "#/$defs/ID"
+        },
+        "conversationId": {
+          "$ref": "#/$defs/ID"
+        },
+        "contractVersion": {
+          "type": "string",
+          "pattern": "^1\\.[0-9]+\\.[0-9]+(?![\\s\\S])"
+        },
+        "model": {
+          "type": "string",
+          "description": "The model that starts the run (a ModelOption id other than `auto`, or the server's own id when it was `auto`). Escalations announce later models."
+        },
+        "strategy": {
+          "type": "string",
+          "description": "The StrategyOption id the run uses (GET /api/capabilities); the default when the request named none. Adapters for research agents may send another id: treat unknown ids as a plain label."
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "resumeOf": {
+          "type": "object",
+          "required": [
+            "clarificationId",
+            "messageId"
+          ],
+          "properties": {
+            "clarificationId": {
+              "$ref": "#/$defs/ID"
+            },
+            "messageId": {
+              "$ref": "#/$defs/ID"
+            }
+          },
+          "additionalProperties": true
+        },
+        "regenerateOf": {
+          "$ref": "#/$defs/ID"
+        },
+        "editOf": {
+          "$ref": "#/$defs/ID"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "regenerateStyle": {
+          "$ref": "#/$defs/RegenerateStyle",
+          "description": "1.10.0: echoes `regenerate.style` when it is not `default`."
+        },
+        "temporary": {
+          "type": "boolean",
+          "const": true,
+          "description": "1.20.0: present (true) when this turn belongs to a temporary chat; absent otherwise."
+        }
+      },
+      "additionalProperties": true
+    },
+    "Status": {
+      "description": "Transient progress label; `null` clears it.",
+      "type": "object",
+      "required": [
+        "type",
+        "label",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "status"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "StepSqlRunning": {
+      "description": "A SQL query started. Followed by `step.sql_result` with the same `stepId`.",
+      "type": "object",
+      "required": [
+        "type",
+        "stepId",
+        "sql",
+        "purpose",
+        "attempt",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "step.sql_running"
+        },
+        "stepId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sql": {
+          "type": "string"
+        },
+        "purpose": {
+          "enum": [
+            "explore",
+            "answer",
+            "candidate",
+            "repair",
+            "check"
+          ],
+          "x-open": true,
+          "x-fallback": "answer",
+          "description": "Open (1.13.0): a newer server may add values; render an unknown value as `answer`."
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "candidateId": {
+          "$ref": "#/$defs/ID"
+        },
+        "repairOf": {
+          "$ref": "#/$defs/ID"
+        },
+        "label": {
+          "type": "string"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maskedLiterals": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1.14.0: how many literals of the shown SQL were replaced by `?` (CONTRACT.md §10, `Capabilities.sqlLiteralMasking`). Absent when none were. The executed SQL is unchanged; shown SQL with `?` is not runnable as-is."
+        }
+      },
+      "additionalProperties": true
+    },
+    "StepSqlResult": {
+      "description": "A SQL query finished (or failed, or was cancelled).",
+      "type": "object",
+      "required": [
+        "type",
+        "stepId",
+        "ok",
+        "elapsedMs",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "step.sql_result"
+        },
+        "stepId": {
+          "$ref": "#/$defs/ID"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "elapsedMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rowCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ColumnSummary"
+          }
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "error": {
+          "$ref": "#/$defs/StepError"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "StepRepairAttempt": {
+      "description": "A failed query is being revised; the revision runs as a new `step.sql_running` with `repairOf`.",
+      "type": "object",
+      "required": [
+        "type",
+        "stepId",
+        "failedStepId",
+        "attempt",
+        "error",
+        "revisedSql",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "step.repair_attempt"
+        },
+        "stepId": {
+          "$ref": "#/$defs/ID"
+        },
+        "failedStepId": {
+          "$ref": "#/$defs/ID"
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxAttempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "error": {
+          "$ref": "#/$defs/StepError"
+        },
+        "revisedSql": {
+          "type": "string"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maskedLiterals": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1.14.0: how many literals of the shown SQL were replaced by `?` (CONTRACT.md §10, `Capabilities.sqlLiteralMasking`). Absent when none were. The executed SQL is unchanged; shown SQL with `?` is not runnable as-is."
+        }
+      },
+      "additionalProperties": true
+    },
+    "StepCheck": {
+      "description": "A verifier or sanity check fired.",
+      "type": "object",
+      "required": [
+        "type",
+        "stepId",
+        "check",
+        "verdict",
+        "message",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "step.check"
+        },
+        "stepId": {
+          "$ref": "#/$defs/ID"
+        },
+        "check": {
+          "type": "string",
+          "x-open": true,
+          "x-known": [
+            "verifier",
+            "row_count",
+            "null_share",
+            "join_fanout",
+            "date_range",
+            "definition"
+          ],
+          "description": "Open. Unknown checks render by `verdict` with the `message`."
+        },
+        "verdict": {
+          "enum": [
+            "pass",
+            "warn",
+            "fail"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "targetStepId": {
+          "$ref": "#/$defs/ID"
+        },
+        "action": {
+          "enum": [
+            "none",
+            "repair",
+            "caveat",
+            "abstain",
+            "escalate",
+            "clarify"
+          ],
+          "x-open": true,
+          "x-fallback": "none",
+          "description": "Open (1.13.0): a newer server may add values; render an unknown value as `none`."
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "StepExplore": {
+      "description": "A schema or data probe finished.",
+      "type": "object",
+      "required": [
+        "type",
+        "stepId",
+        "probe",
+        "summary",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "step.explore"
+        },
+        "stepId": {
+          "$ref": "#/$defs/ID"
+        },
+        "probe": {
+          "type": "string",
+          "x-open": true,
+          "x-known": [
+            "list_views",
+            "describe_view",
+            "sample_values",
+            "lookup_glossary",
+            "lookup_dictionary",
+            "search_examples",
+            "profile",
+            "request_escalation"
+          ],
+          "description": "Open. Unknown probes render with a generic icon and the `summary`."
+        },
+        "target": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "elapsedMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "StepCandidates": {
+      "description": "Multi-candidate comparison finished.",
+      "type": "object",
+      "required": [
+        "type",
+        "stepId",
+        "candidates",
+        "chosenId",
+        "method",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "step.candidates"
+        },
+        "stepId": {
+          "$ref": "#/$defs/ID"
+        },
+        "candidates": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "candidateId",
+              "sql",
+              "ok"
+            ],
+            "properties": {
+              "candidateId": {
+                "$ref": "#/$defs/ID"
+              },
+              "label": {
+                "type": "string"
+              },
+              "sql": {
+                "type": "string"
+              },
+              "ok": {
+                "type": "boolean"
+              },
+              "rowCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "score": {
+                "type": "number"
+              },
+              "agreesWith": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/ID"
+                }
+              },
+              "stepId": {
+                "$ref": "#/$defs/ID"
+              },
+              "maskedLiterals": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "1.14.0: how many literals of the shown SQL were replaced by `?` (CONTRACT.md §10, `Capabilities.sqlLiteralMasking`). Absent when none were. The executed SQL is unchanged; shown SQL with `?` is not runnable as-is."
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "chosenId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ID"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "method": {
+          "type": "string",
+          "x-open": true,
+          "x-known": [
+            "vote",
+            "execution_agreement",
+            "verifier",
+            "judge"
+          ],
+          "description": "Open. How the candidate was chosen."
+        },
+        "rationale": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "Escalation": {
+      "description": "The run moved to a bigger model.",
+      "type": "object",
+      "required": [
+        "type",
+        "from",
+        "to",
+        "reason",
+        "trigger",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "escalation"
+        },
+        "from": {
+          "$ref": "#/$defs/ModelRef"
+        },
+        "to": {
+          "$ref": "#/$defs/ModelRef"
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "trigger": {
+          "enum": [
+            "verifier_fail",
+            "low_confidence",
+            "repair_exhausted",
+            "complexity",
+            "disagreement",
+            "user"
+          ],
+          "x-open": true,
+          "x-fallback": "complexity",
+          "description": "Why the run moved to a bigger model. Open (1.13.0): a newer server may add values; render an unknown value as `complexity`."
+        },
+        "stepId": {
+          "$ref": "#/$defs/ID"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "TextStart": {
+      "description": "A text part starts streaming.",
+      "type": "object",
+      "required": [
+        "type",
+        "partId",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "text.start"
+        },
+        "partId": {
+          "$ref": "#/$defs/ID"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "TextDelta": {
+      "description": "Markdown appended to a streaming text part.",
+      "type": "object",
+      "required": [
+        "type",
+        "partId",
+        "delta",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "text.delta"
+        },
+        "partId": {
+          "$ref": "#/$defs/ID"
+        },
+        "delta": {
+          "type": "string"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "TextEnd": {
+      "description": "A text part finished streaming.",
+      "type": "object",
+      "required": [
+        "type",
+        "partId",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "text.end"
+        },
+        "partId": {
+          "$ref": "#/$defs/ID"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "ReasoningDelta": {
+      "description": "Text appended to the reasoning part. Real backends send label/count summaries only.",
+      "type": "object",
+      "required": [
+        "type",
+        "partId",
+        "delta",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "reasoning.delta"
+        },
+        "partId": {
+          "$ref": "#/$defs/ID"
+        },
+        "delta": {
+          "type": "string"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "ReasoningEnd": {
+      "description": "The reasoning part is complete.",
+      "type": "object",
+      "required": [
+        "type",
+        "partId",
+        "durationMs",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "reasoning.end"
+        },
+        "partId": {
+          "$ref": "#/$defs/ID"
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "CodeDelta": {
+      "description": "Text appended to a streaming code part.",
+      "type": "object",
+      "required": [
+        "type",
+        "partId",
+        "delta",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "code.delta"
+        },
+        "partId": {
+          "$ref": "#/$defs/ID"
+        },
+        "delta": {
+          "type": "string"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "PartEvent": {
+      "description": "A complete part. Replaces any earlier part with the same `id`.",
+      "type": "object",
+      "required": [
+        "type",
+        "part",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "part"
+        },
+        "part": {
+          "$ref": "#/$defs/Part"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "PartPatch": {
+      "description": "Shallow-merges `patch` into an existing part (never `id` or `type`).",
+      "type": "object",
+      "required": [
+        "type",
+        "partId",
+        "patch",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "part.patch"
+        },
+        "partId": {
+          "$ref": "#/$defs/ID"
+        },
+        "patch": {
+          "type": "object",
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "id"
+                ]
+              },
+              {
+                "required": [
+                  "type"
+                ]
+              }
+            ]
+          }
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "MessageEnd": {
+      "description": "Last event of every stream.",
+      "type": "object",
+      "required": [
+        "type",
+        "messageId",
+        "finishReason",
+        "usage",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "message.end"
+        },
+        "messageId": {
+          "$ref": "#/$defs/ID"
+        },
+        "finishReason": {
+          "enum": [
+            "stop",
+            "abstain",
+            "needs_input",
+            "error",
+            "aborted"
+          ]
+        },
+        "usage": {
+          "$ref": "#/$defs/Usage"
+        },
+        "conversationTitle": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "Set once, on the first finished answer of a conversation that still has the generic title: a PHI-free title the server derived from the result's column identifiers (never from the question). The server has already stored it; the client should show it in the thread list. A user rename always wins and is never overwritten."
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Source"
+          },
+          "description": "1.8.0: citations, answer sources first. Omitted when there are none (aborted runs never have any). An abstain or clarify can list explored sources only."
+        }
+      },
+      "additionalProperties": true
+    },
+    "Heartbeat": {
+      "description": "Keep-alive after ≤15 s of silence. No `seq`, no SSE `id`.",
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "heartbeat"
+        },
+        "at": {
+          "$ref": "#/$defs/Timestamp"
+        }
+      },
+      "additionalProperties": true
+    },
+    "StreamEvent": {
+      "description": "Any stream event. Clients ignore unknown `type`s and unknown fields (CONTRACT.md §3).",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/MessageStart"
+        },
+        {
+          "$ref": "#/$defs/Status"
+        },
+        {
+          "$ref": "#/$defs/StepSqlRunning"
+        },
+        {
+          "$ref": "#/$defs/StepSqlResult"
+        },
+        {
+          "$ref": "#/$defs/StepRepairAttempt"
+        },
+        {
+          "$ref": "#/$defs/StepCheck"
+        },
+        {
+          "$ref": "#/$defs/StepExplore"
+        },
+        {
+          "$ref": "#/$defs/StepCandidates"
+        },
+        {
+          "$ref": "#/$defs/Escalation"
+        },
+        {
+          "$ref": "#/$defs/TextStart"
+        },
+        {
+          "$ref": "#/$defs/TextDelta"
+        },
+        {
+          "$ref": "#/$defs/TextEnd"
+        },
+        {
+          "$ref": "#/$defs/ReasoningDelta"
+        },
+        {
+          "$ref": "#/$defs/ReasoningEnd"
+        },
+        {
+          "$ref": "#/$defs/CodeDelta"
+        },
+        {
+          "$ref": "#/$defs/TableStart"
+        },
+        {
+          "$ref": "#/$defs/TableRows"
+        },
+        {
+          "$ref": "#/$defs/ChartStart"
+        },
+        {
+          "$ref": "#/$defs/ChartPoints"
+        },
+        {
+          "$ref": "#/$defs/PartEvent"
+        },
+        {
+          "$ref": "#/$defs/PartPatch"
+        },
+        {
+          "$ref": "#/$defs/MessageEnd"
+        },
+        {
+          "$ref": "#/$defs/Heartbeat"
+        }
+      ]
+    },
+    "ChatRequest": {
+      "description": "Body of `POST /api/chat`.",
+      "type": "object",
+      "required": [
+        "messages"
+      ],
+      "properties": {
+        "conversationId": {
+          "$ref": "#/$defs/ID"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "role",
+              "text"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/ID"
+              },
+              "role": {
+                "enum": [
+                  "user"
+                ]
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 8000
+              },
+              "parentId": {
+                "$ref": "#/$defs/ID"
+              },
+              "editOf": {
+                "$ref": "#/$defs/ID",
+                "description": "Id of an earlier user message this one replaces (edit). The new message becomes its sibling: same parent, or a new root when editing the first question."
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "options": {
+          "type": "object",
+          "description": "Run options. `strategy` and `model` must be ids from GET /api/capabilities (unknown or incompatible: 422 validation). Omitted means the defaults. 1.21.0: options tune how the answer is produced, never which data it reads; an `IdentityScopedKey` here is 422 (§2.1). Other unknown keys are ignored.",
+          "properties": {
+            "strategy": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "model": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          "additionalProperties": true,
+          "propertyNames": {
+            "not": {
+              "$ref": "#/$defs/IdentityScopedKey"
+            }
+          }
+        },
+        "resume": {
+          "type": "object",
+          "required": [
+            "clarificationId"
+          ],
+          "properties": {
+            "clarificationId": {
+              "$ref": "#/$defs/ID"
+            },
+            "choiceIds": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ID"
+              }
+            },
+            "text": {
+              "type": "string",
+              "maxLength": 2000
+            },
+            "answers": {
+              "type": "array",
+              "maxItems": 4,
+              "items": {
+                "$ref": "#/$defs/ClarifyAnswer"
+              },
+              "description": "1.23.0: answers to `ClarificationPart.questions`; an empty array skips them all. Only for a part with `questions` (otherwise 422)."
+            }
+          },
+          "additionalProperties": true
+        },
+        "regenerate": {
+          "type": "object",
+          "required": [
+            "messageId"
+          ],
+          "properties": {
+            "messageId": {
+              "$ref": "#/$defs/ID"
+            },
+            "style": {
+              "$ref": "#/$defs/RegenerateStyle"
+            }
+          },
+          "additionalProperties": true
+        },
+        "scenario": {
+          "description": "Demo mode only: force a scripted scenario (CONTRACT.md §9). 1.16.0 adds the edge cases (§9.1): `empty`, `multi_table`, `long_sql`, `many_repairs`, `clarify_nested`, `escalation_abstain` and `cancel_plan|sql|repair|candidates|escalation|render` (the server presses Stop at that stage); `report` (1.9.0) is listed too. Ignored outside demo mode.",
+          "enum": [
+            "table",
+            "chart",
+            "repair",
+            "abstain",
+            "clarify",
+            "escalation",
+            "candidates",
+            "error",
+            "slow",
+            "report",
+            "empty",
+            "multi_table",
+            "long_sql",
+            "many_repairs",
+            "clarify_nested",
+            "escalation_abstain",
+            "cancel_plan",
+            "cancel_sql",
+            "cancel_repair",
+            "cancel_candidates",
+            "cancel_escalation",
+            "cancel_render",
+            "clarify_multi"
+          ]
+        },
+        "temporary": {
+          "type": "boolean",
+          "description": "1.20.0: a temporary chat (CONTRACT.md §11.1), like ChatGPT's Temporary chat: never saved, listed, searched, titled, exported or rated. Send it on every turn of that chat; a turn that would move a chat between temporary and saved is 422 `validation`. Only when `Capabilities.temporaryChat` is present."
+        }
+      },
+      "additionalProperties": true,
+      "propertyNames": {
+        "not": {
+          "$ref": "#/$defs/IdentityScopedKey"
+        }
+      }
+    },
+    "HttpError": {
+      "type": "object",
+      "required": [
+        "error"
+      ],
+      "properties": {
+        "error": {
+          "type": "object",
+          "required": [
+            "code",
+            "message"
+          ],
+          "properties": {
+            "code": {
+              "$ref": "#/$defs/ErrorCode"
+            },
+            "message": {
+              "type": "string",
+              "description": "Short, fixed, PHI-free copy. Safe to show; never contains request values."
+            },
+            "legacyCode": {
+              "type": "string",
+              "description": "1.5.0: the code this error had before it got a dedicated one (payload_too_large was 'validation'). Clients that predate the new code may branch on it."
+            },
+            "maxBytes": {
+              "type": "integer",
+              "description": "payload_too_large: the body limit in bytes."
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true,
+      "description": "Every non-stream 4xx/5xx JSON body (CONTRACT.md §1). Two success-shaped bodies also carry it since 1.13.0: 404 `{stopped:false, error}` and `{deleted:false, error}`."
+    },
+    "ConversationSummary": {
+      "type": "object",
+      "description": "One row of GET /api/conversations and POST /api/conversations/search.",
+      "required": [
+        "id",
+        "title",
+        "updatedAt",
+        "messageCount"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "title": {
+          "type": "string",
+          "description": "'New analysis' until the user renames it or the server sets message.end.conversationTitle."
+        },
+        "updatedAt": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "messageCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "snippet": {
+          "type": "string",
+          "description": "Search only: the first match with some context."
+        },
+        "pinned": {
+          "type": "boolean",
+          "description": "1.17.0: pinned to the top of the sidebar. The plain list returns pinned chats first (most recently pinned on top), then the rest newest first; search stays newest first. Always sent by 1.17+ servers."
+        },
+        "archived": {
+          "type": "boolean",
+          "description": "1.17.0: archived chats leave the sidebar but stay searchable and openable. Archiving drops the pin; pinning or sending a new question in an archived chat unarchives it. Always sent by 1.17+ servers."
+        }
+      },
+      "additionalProperties": true
+    },
+    "ConversationPage": {
+      "description": "One page of conversation summaries, newest first.",
+      "type": "object",
+      "required": [
+        "items"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ConversationSummary"
+          }
+        },
+        "next": {
+          "type": "string",
+          "description": "Opaque cursor for the next page; absent on the last page. Send it back as `?cursor=` (GET) or `SearchRequest.cursor`."
+        }
+      },
+      "additionalProperties": true
+    },
+    "StoredMessage": {
+      "type": "object",
+      "description": "A message as GET /api/conversations/{id} returns it. Assistant `steps` are the flat step.* and escalation events in stream order (canonical; rebuild the timeline with the same reducer as the live stream).",
+      "required": [
+        "id",
+        "role",
+        "createdAt"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "role": {
+          "enum": [
+            "user",
+            "assistant"
+          ]
+        },
+        "createdAt": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "text": {
+          "type": "string",
+          "description": "User messages."
+        },
+        "editOf": {
+          "$ref": "#/$defs/ID",
+          "description": "User messages: the message this one edits (a sibling of it). Without parentId it is a root."
+        },
+        "regenerateOf": {
+          "$ref": "#/$defs/ID",
+          "description": "Assistant messages: the answer this one regenerates."
+        },
+        "parts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Part"
+          }
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "finishReason": {
+          "enum": [
+            "stop",
+            "abstain",
+            "needs_input",
+            "error",
+            "aborted"
+          ]
+        },
+        "usage": {
+          "$ref": "#/$defs/Usage"
+        },
+        "feedback": {
+          "$ref": "#/$defs/Feedback",
+          "description": "Assistant messages: the user's thumbs up/down (1.7.0)."
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Source"
+          },
+          "description": "Assistant messages: same as message.end.sources (1.8.0)."
+        },
+        "regenerateStyle": {
+          "$ref": "#/$defs/RegenerateStyle",
+          "description": "1.10.0: assistant messages, the style this regeneration used (absent for `default`)."
+        }
+      },
+      "additionalProperties": true
+    },
+    "Conversation": {
+      "type": "object",
+      "description": "GET /api/conversations/{id}.",
+      "required": [
+        "id",
+        "title",
+        "updatedAt",
+        "messages"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "title": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/StoredMessage"
+          }
+        },
+        "pinned": {
+          "type": "boolean",
+          "description": "1.17.0: pinned to the top of the sidebar. The plain list returns pinned chats first (most recently pinned on top), then the rest newest first; search stays newest first. Always sent by 1.17+ servers."
+        },
+        "archived": {
+          "type": "boolean",
+          "description": "1.17.0: archived chats leave the sidebar but stay searchable and openable. Archiving drops the pin; pinning or sending a new question in an archived chat unarchives it. Always sent by 1.17+ servers."
+        }
+      },
+      "additionalProperties": true
+    },
+    "TranscriptsInfo": {
+      "type": "object",
+      "description": "GET /api/transcripts.",
+      "required": [
+        "mode",
+        "persisted",
+        "retentionDays"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "ephemeral",
+            "persisted"
+          ]
+        },
+        "persisted": {
+          "type": "boolean"
+        },
+        "retentionDays": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "RenameRequest": {
+      "type": "object",
+      "description": "PATCH /api/conversations/{id}. `title`: one line of text; empty resets to the generic title; 422 invalid_title otherwise. 1.17.0: also `pinned` / `archived`; send at least one field; `pinned: true` with `archived: true` is a 422 validation. Pin/archive do not change `updatedAt`.",
+      "minProperties": 1,
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "pinned": {
+          "type": "boolean"
+        },
+        "archived": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RenameResponse": {
+      "description": "Body of a successful PATCH /api/conversations/{id} (rename, pin or archive). 1.17.0: carries `pinned` and `archived`.",
+      "type": "object",
+      "required": [
+        "id",
+        "title",
+        "updatedAt"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "title": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "pinned": {
+          "type": "boolean",
+          "description": "1.17.0: pinned to the top of the sidebar. The plain list returns pinned chats first (most recently pinned on top), then the rest newest first; search stays newest first. Always sent by 1.17+ servers."
+        },
+        "archived": {
+          "type": "boolean",
+          "description": "1.17.0: archived chats leave the sidebar but stay searchable and openable. Archiving drops the pin; pinning or sending a new question in an archived chat unarchives it. Always sent by 1.17+ servers."
+        }
+      },
+      "additionalProperties": true
+    },
+    "SearchRequest": {
+      "type": "object",
+      "description": "POST /api/conversations/search (POST so search text, possibly PHI, never sits in a URL).",
+      "properties": {
+        "q": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "cursor": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "archived": {
+          "$ref": "#/$defs/ConversationArchivedFilter",
+          "description": "1.17.0: default `include` (archived chats stay searchable)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "CostTier": {
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "description": "Relative cost per answer, for a picker badge. Not a price."
+    },
+    "StrategyOption": {
+      "type": "object",
+      "description": "One answer strategy a picker can offer.",
+      "required": [
+        "id",
+        "label",
+        "description",
+        "default",
+        "costTier",
+        "models",
+        "available"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Send as ChatRequest.options.strategy; echoed on message.start.strategy."
+        },
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "default": {
+          "type": "boolean"
+        },
+        "costTier": {
+          "$ref": "#/$defs/CostTier"
+        },
+        "latencyTier": {
+          "enum": [
+            "fast",
+            "medium",
+            "slow"
+          ]
+        },
+        "models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "ModelOption ids allowed with this strategy."
+        },
+        "available": {
+          "type": "boolean",
+          "description": "False: show it disabled (not enabled for this organization; see unavailableReason). Sending it anyway is a 422 validation."
+        },
+        "unavailableReason": {
+          "type": "string",
+          "description": "Why it is unavailable for this organization (show as a tooltip). Present iff available is false."
+        }
+      },
+      "additionalProperties": true
+    },
+    "ModelOption": {
+      "description": "One model a picker can offer.",
+      "type": "object",
+      "required": [
+        "id",
+        "label",
+        "default",
+        "costTier",
+        "available"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Send as ChatRequest.options.model. 'auto' lets the server choose."
+        },
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "default": {
+          "type": "boolean"
+        },
+        "tier": {
+          "enum": [
+            "small",
+            "medium",
+            "large"
+          ]
+        },
+        "provider": {
+          "type": "string"
+        },
+        "costTier": {
+          "$ref": "#/$defs/CostTier"
+        },
+        "available": {
+          "type": "boolean",
+          "description": "False: show it disabled for this organization."
+        },
+        "unavailableReason": {
+          "type": "string",
+          "description": "Why it is unavailable for this organization (show as a tooltip). Present iff available is false."
+        }
+      },
+      "additionalProperties": true
+    },
+    "Capabilities": {
+      "type": "object",
+      "description": "GET /api/capabilities: what this server can run. Fetch once per session; no user data.",
+      "required": [
+        "contractVersion",
+        "demo",
+        "defaults",
+        "strategies",
+        "models",
+        "scope"
+      ],
+      "properties": {
+        "contractVersion": {
+          "type": "string"
+        },
+        "demo": {
+          "type": "boolean",
+          "description": "True with the scripted demo LLM: the choice is validated and echoed but the demo scenario drives the run."
+        },
+        "defaults": {
+          "type": "object",
+          "required": [
+            "strategy",
+            "model"
+          ],
+          "properties": {
+            "strategy": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "strategies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/StrategyOption"
+          }
+        },
+        "models": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelOption"
+          }
+        },
+        "scope": {
+          "enum": [
+            "organization",
+            "public"
+          ],
+          "description": "'organization' when the request was signed in, so `available` reflects the caller's organization; 'public' otherwise (everything shows available; the chat request is still checked). This is about which strategies/models are shown as available. It is not a data scope: the data a user can query comes from their sign-in and is never chosen or shown as a choice (§2.1)."
+        },
+        "feedbackReasons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FeedbackReason"
+          },
+          "description": "1.7.0: reason chips for answer feedback, grouped by rating."
+        },
+        "sqlLiteralMasking": {
+          "enum": [
+            "phi",
+            "all",
+            "off"
+          ],
+          "x-open": true,
+          "x-fallback": "phi",
+          "description": "1.14.0: how the server masks literals in shown SQL (CONTRACT.md §10). `phi` (default): literals compared with PHI-bearing columns, and identifier-like values; `all`: every string literal and compared number; `off`: verbatim. Open (render an unknown value as `phi`). Absent from pre-1.14 servers: assume `off`."
+        },
+        "pinArchive": {
+          "type": "boolean",
+          "description": "1.17.0: true when PATCH /api/conversations/{id} persists `pinned` / `archived` server-side. Absent on older servers: hide Pin/Archive or keep them client-only."
+        },
+        "temporaryChat": {
+          "type": "object",
+          "required": [
+            "ttlSeconds"
+          ],
+          "properties": {
+            "ttlSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Idle lifetime of the server-side history that lets edit and regenerate work inside the open temporary chat."
+            }
+          },
+          "additionalProperties": true,
+          "description": "1.20.0: present when the server honours `ChatRequest.temporary` (§11.1). Absent on older servers: offer temporary chat only as a client-side mode, or not at all."
+        }
+      },
+      "additionalProperties": true
+    },
+    "LatencyStages": {
+      "type": "object",
+      "description": "Wall-clock milliseconds per pipeline stage (1.6.0). Every instant of the run is attributed to exactly one stage, so the stages sum to about latency.totalMs (minus queueMs and time before the analyzer starts). plan: model turns and schema exploration; sql: running queries; repair: from a failed query or failed verification until the repaired query returns (model + SQL); checks: result checks after the final query; render: writing the answer parts. With parallel candidates the attribution follows the latest stage change, so treat it as approximate. 1.14.0: the five stages sum to exactly `totalMs`.",
+      "required": [
+        "plan",
+        "sql",
+        "repair",
+        "checks",
+        "render"
+      ],
+      "properties": {
+        "plan": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sql": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "repair": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "checks": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "render": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "FeedbackRating": {
+      "description": "Closed. Thumbs up or down.",
+      "enum": [
+        "up",
+        "down"
+      ]
+    },
+    "FeedbackReason": {
+      "type": "object",
+      "description": "A reason chip for one rating (1.7.0). Listed in Capabilities.feedbackReasons; ids are stable.",
+      "required": [
+        "id",
+        "label",
+        "rating"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "rating": {
+          "$ref": "#/$defs/FeedbackRating"
+        }
+      },
+      "additionalProperties": true
+    },
+    "FeedbackRequest": {
+      "type": "object",
+      "description": "PUT /api/conversations/{conversationId}/messages/{messageId}/feedback (1.7.0). Assistant messages only. Replaces earlier feedback; DELETE on the same path clears it ({cleared: true}). 422 validation for an unknown reason, a reason of the other rating, or a user message; 404 for an unknown or someone else's message.",
+      "required": [
+        "rating"
+      ],
+      "properties": {
+        "rating": {
+          "$ref": "#/$defs/FeedbackRating"
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 9,
+          "description": "FeedbackReason ids matching the rating."
+        },
+        "comment": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Optional free text. Treated like message text: stored with the transcript, never logged."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Feedback": {
+      "type": "object",
+      "description": "Stored feedback on an answer: the PUT response (with messageId) and StoredMessage.feedback.",
+      "required": [
+        "rating",
+        "reasons",
+        "updatedAt"
+      ],
+      "properties": {
+        "messageId": {
+          "$ref": "#/$defs/ID"
+        },
+        "rating": {
+          "$ref": "#/$defs/FeedbackRating"
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "comment": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "$ref": "#/$defs/Timestamp"
+        }
+      },
+      "additionalProperties": true
+    },
+    "Source": {
+      "type": "object",
+      "description": "A data source the answer used or explored (1.8.0, CONTRACT.md §14). Schema identifiers only, never row values.",
+      "required": [
+        "id",
+        "kind",
+        "name",
+        "label",
+        "role"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable within the message: src_1, src_2, …"
+        },
+        "kind": {
+          "type": "string",
+          "description": "Open enum: 'view' today; 'definition' (metric definition) and 'document' are reserved. Unknown kinds render as a plain chip.",
+          "x-open": true,
+          "x-known": [
+            "view",
+            "definition",
+            "document"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "description": "Fully qualified, e.g. sem.claims."
+        },
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "answer",
+            "explored"
+          ],
+          "description": "'answer': the final SQL/table read it; 'explored': looked at while planning only."
+        },
+        "stepIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ID"
+          },
+          "description": "step.* events that touched it (sql_running, explore)."
+        },
+        "partIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ID"
+          },
+          "description": "Parts built from it (code, table, chart)."
+        }
+      },
+      "additionalProperties": true
+    },
+    "ConversationExport": {
+      "type": "object",
+      "description": "GET /api/conversations/{id}/export?format=json (1.8.0, §15). format=markdown returns text/markdown instead. Both are attachments (Content-Disposition), Cache-Control: no-store.",
+      "required": [
+        "format",
+        "contractVersion",
+        "exportedAt",
+        "conversation"
+      ],
+      "properties": {
+        "format": {
+          "const": "cc.conversation"
+        },
+        "contractVersion": {
+          "type": "string"
+        },
+        "exportedAt": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "conversation": {
+          "$ref": "#/$defs/Conversation"
+        }
+      },
+      "additionalProperties": true
+    },
+    "TableStart": {
+      "type": "object",
+      "description": "1.9.0 (§5.1): a table is about to stream. Render the header now, append table.rows, then replace it with the complete `part` that has the same id (that part is canonical). If message.end comes first (aborted), drop the partial table.",
+      "required": [
+        "type",
+        "partId",
+        "columns",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "table.start"
+        },
+        "partId": {
+          "$ref": "#/$defs/ID"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Column"
+          }
+        },
+        "title": {
+          "type": "string"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "stepId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sqlPartId": {
+          "$ref": "#/$defs/ID"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "TableRows": {
+      "type": "object",
+      "description": "1.9.0: preview rows for a streaming table, in order. `offset` is the index of the first row, so a replayed chunk (Last-Event-ID) overwrites rather than duplicates.",
+      "required": [
+        "type",
+        "partId",
+        "offset",
+        "rows",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "table.rows"
+        },
+        "partId": {
+          "$ref": "#/$defs/ID"
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "array"
+          }
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "ChartStart": {
+      "type": "object",
+      "description": "1.18.0 (§5.2): a chart is about to stream. The header has every field needed for the first draw; draw from the first `chart.points`. The complete `part` with the same id follows and is canonical. If message.end comes first (aborted/error), drop the partial chart.",
+      "required": [
+        "type",
+        "partId",
+        "plot",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "chart.start"
+        },
+        "partId": {
+          "$ref": "#/$defs/ID"
+        },
+        "plot": {
+          "$ref": "#/$defs/PlotHeader"
+        },
+        "alt": {
+          "type": "string"
+        },
+        "tablePartId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "ChartPoints": {
+      "type": "object",
+      "description": "1.18.0: points for a streaming chart, in order. `offset` is the index of the first point, so a replayed chunk overwrites rather than duplicates.",
+      "required": [
+        "type",
+        "partId",
+        "offset",
+        "rows",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "chart.points"
+        },
+        "partId": {
+          "$ref": "#/$defs/ID"
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PlotRow"
+          }
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "RegenerateStyle": {
+      "enum": [
+        "default",
+        "concise",
+        "detailed"
+      ],
+      "description": "1.10.0: how a regenerated answer is restyled (CONTRACT.md §8.1). `default` means a plain re-run. `concise` cuts the prose to its first sentence and drops a chart that duplicates a table. `detailed` adds a 'How this was computed' paragraph. Tables, SQL, artifacts and every assumption/caveat callout are always kept."
+    },
+    "ErrorCode": {
+      "type": "string",
+      "x-open": true,
+      "x-known": [
+        "auth_expired",
+        "access_denied",
+        "not_found",
+        "method_not_allowed",
+        "stream_gone",
+        "validation",
+        "invalid_title",
+        "clarification_expired",
+        "transcripts_unavailable",
+        "payload_too_large",
+        "rate_limited",
+        "internal"
+      ],
+      "description": "1.13.0: `HttpError.error.code`. Open: branch on the known values, and on the HTTP status for anything else. A server may send `http_<status>` for a status with no dedicated code. When a code gets more specific the old one stays in `legacyCode` for at least one minor version."
+    },
+    "ConversationArchivedFilter": {
+      "type": "string",
+      "enum": [
+        "include",
+        "exclude",
+        "only"
+      ],
+      "description": "1.17.0: `GET /api/conversations?archived=` and `SearchRequest.archived`. `include` (default) lists everything, `exclude` is the sidebar, `only` is Settings → Archived chats."
+    },
+    "IdentityScopedKey": {
+      "enum": [
+        "catalog",
+        "connection",
+        "customer",
+        "customerId",
+        "database",
+        "dataSource",
+        "db",
+        "escalate",
+        "lake",
+        "org",
+        "orgId",
+        "organization",
+        "relations",
+        "schema",
+        "scope",
+        "source",
+        "tables",
+        "tenant",
+        "tenantId",
+        "warehouse"
+      ],
+      "description": "1.21.0 (BACKEND-FIT): names a client can never send in `ChatRequest` or `ChatRequest.options`, because the customer, the data source and the queryable relations come only from the signed-in identity, server-side (production: the Cognito id token's `custom:customer` claim, then `ccsim.query.open_session` with that customer's manifest; demo: the demo token and `DEMO_DIRECTORY`). Sending one is 422 `validation`; nothing is run. CONTRACT.md §2.1."
+    },
+    "ClarifyOption": {
+      "description": "1.23.0: one option of a ClarifyQuestion (CONTRACT.md §6.1). Unlike `Choice`, the description is required.",
+      "type": "object",
+      "required": [
+        "id",
+        "label",
+        "description"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "additionalProperties": true
+    },
+    "ClarifyQuestion": {
+      "description": "1.23.0: one question of a multi-question clarification (CONTRACT.md §6.1), like Claude's ask-the-user form. Every question also accepts free text (\"Other\") and can be skipped; the client always offers both.",
+      "type": "object",
+      "required": [
+        "id",
+        "header",
+        "question",
+        "options"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "header": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 12,
+          "description": "Short tab/chip label, 12 characters or fewer (e.g. \"Metric\")."
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/ClarifyOption"
+          }
+        },
+        "multiSelect": {
+          "type": "boolean",
+          "description": "More than one option (and free text) may be picked."
+        }
+      },
+      "additionalProperties": true
+    },
+    "ClarifyAnswer": {
+      "description": "1.23.0: the reply to one ClarifyQuestion in `ChatRequest.resume.answers`. Exactly one of: `choiceIds` and/or `otherText` (both or several picks only when `multiSelect`), or `skipped: true`. A question with no answer counts as skipped.",
+      "type": "object",
+      "required": [
+        "questionId"
+      ],
+      "properties": {
+        "questionId": {
+          "$ref": "#/$defs/ID"
+        },
+        "choiceIds": {
+          "type": "array",
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ID"
+          }
+        },
+        "otherText": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "skipped": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

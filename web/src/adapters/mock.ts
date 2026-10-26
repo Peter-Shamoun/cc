@@ -1,6 +1,7 @@
-import type { Part, StreamEvent } from '../lib/contract';
+import type { Part } from '../lib/contract';
+import { CONTRACT_VERSION, type Part as V1Part } from '../api/contract';
 import { BLOBS, pickFixture, type FixtureStep } from '../fixtures';
-import type { AnalystAdapter } from './types';
+import type { AnalystAdapter, AnyStreamEvent } from './types';
 
 const sleep = (ms: number, signal: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
@@ -26,18 +27,29 @@ export class MockAnalystAdapter implements AnalystAdapter {
   readonly name = 'mock';
   constructor(private delayMs = 16) {}
 
-  async *streamTurn({ conversationId, messages, signal }: Parameters<AnalystAdapter['streamTurn']>[0]): AsyncIterable<StreamEvent> {
+  async *streamTurn({ conversationId, messages, signal }: Parameters<AnalystAdapter['streamTurn']>[0]): AsyncIterable<AnyStreamEvent> {
     const prompt = [...messages].reverse().find((m) => m.role === 'user')?.text ?? '';
     const fixture = pickFixture(prompt);
     const messageId = `m_${Math.random().toString(36).slice(2, 10)}`;
-    yield { type: 'message.start', messageId, conversationId, strategy: 'mock-replay' };
+    let seq = 0;
+    // Every event carries a monotonically increasing seq, as the v1 server does (CONTRACT.md §3).
+    const stamp = (e: object) => ({ ...e, seq: seq++ }) as unknown as AnyStreamEvent;
+    yield stamp({ type: 'message.start', messageId, conversationId, contractVersion: CONTRACT_VERSION, strategy: 'mock-replay' });
     const t0 = Date.now();
+    let ran = 0; // SQL that finished before a Stop, so a stopped answer keeps its query count
     try {
-      for (const step of fixture.steps) yield* this.emit(step, signal);
-      yield { type: 'message.end', messageId, finishReason: 'stop', usage: { queries: fixture.queries, elapsedMs: Date.now() - t0 } };
+      for (const step of fixture.steps) {
+        for await (const e of this.emit(step, signal)) {
+          if ((e as { type?: string }).type === 'step.sql_result') ran++;
+          yield stamp(e);
+        }
+      }
+      const u = fixture.usage;
+      const elapsedMs = u?.latency?.totalMs ?? Date.now() - t0;
+      yield stamp({ type: 'message.end', messageId, finishReason: fixture.finishReason ?? 'stop', usage: { ...u, queries: fixture.queries, elapsedMs } });
     } catch (e) {
       if ((e as Error).name !== 'AbortError') throw e;
-      yield { type: 'message.end', messageId, finishReason: 'aborted' };
+      yield stamp({ type: 'message.end', messageId, finishReason: 'aborted', usage: { queries: ran, elapsedMs: Date.now() - t0 } });
     }
   }
 
@@ -47,13 +59,19 @@ export class MockAnalystAdapter implements AnalystAdapter {
     return new Blob([b.content], { type: b.mime });
   }
 
-  private async *emit(step: FixtureStep, signal: AbortSignal): AsyncIterable<StreamEvent> {
+  private async *emit(step: FixtureStep, signal: AbortSignal): AsyncIterable<object> {
+    if ('event' in step) {
+      // Raw contract-v1 step/escalation event; waitMs simulates the step's own latency.
+      await sleep(step.waitMs !== undefined ? (this.delayMs ? step.waitMs : 0) : this.delayMs * 10, signal);
+      yield step.event;
+      return;
+    }
     if ('status' in step) {
       yield { type: 'status', label: step.status };
       await sleep(this.delayMs * 12, signal);
       return;
     }
-    const part: Part = step;
+    const part = step as Part | Exclude<V1Part, Part>;
     switch (part.type) {
       case 'text':
         yield { type: 'text.start', partId: part.id };

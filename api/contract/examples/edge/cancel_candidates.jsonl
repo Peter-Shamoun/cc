@@ -1,0 +1,14 @@
+{"type":"message.start","messageId":"m_1","conversationId":"c_1","contractVersion":"1.23.0","model":"scripted","parentId":"u_1","strategy":"tool_loop","seq":0}
+{"type":"status","label":"Thinking","seq":1}
+{"type":"step.sql_running","stepId":"s_1","sql":"SELECT payer_name, AVG(paid_amount) AS avg_paid_amount, COUNT(*) AS claims\nFROM sem.claims\nGROUP BY 1\nORDER BY 2 DESC","attempt":1,"purpose":"candidate","label":"Running query","candidateId":"k1","seq":2}
+{"type":"status","label":"Running query","seq":3}
+{"type":"step.sql_result","stepId":"s_1","ok":true,"elapsedMs":4,"rowCount":7,"columns":[{"name":"payer_name"},{"name":"avg_paid_amount"},{"name":"claims"}],"seq":4}
+{"type":"step.sql_running","stepId":"s_2","sql":"SELECT payer_name, AVG(paid_amount) AS avg_paid_amount, COUNT(*) AS claims\nFROM sem.claims\nGROUP BY 1\nORDER BY 2 DESC","attempt":1,"purpose":"candidate","label":"Final query","candidateId":"k1","seq":5}
+{"type":"status","label":"Running query","seq":6}
+{"type":"step.sql_running","stepId":"s_3","sql":"SELECT payer_name, AVG(paid_amount) AS avg_paid_amount, COUNT(*) AS claims\nFROM sem.claims\nGROUP BY 1\nORDER BY 2 DESC","attempt":1,"purpose":"candidate","label":"Running query","candidateId":"k2","seq":7}
+{"type":"status","label":"Running query","seq":8}
+{"type":"step.sql_result","stepId":"s_2","ok":false,"elapsedMs":359,"error":{"code":"cancelled","message":"Stopped by the user."},"seq":9}
+{"type":"step.sql_result","stepId":"s_3","ok":false,"elapsedMs":4,"error":{"code":"cancelled","message":"Stopped by the user."},"seq":10}
+{"type":"status","label":null,"seq":11}
+{"type":"status","label":null,"seq":12}
+{"type":"message.end","messageId":"m_1","finishReason":"aborted","usage":{"queries":3,"elapsedMs":1073,"latency":{"totalMs":1073,"modelMs":1050,"sqlMs":4,"stages":{"plan":708,"sql":365,"repair":0,"checks":0,"render":0},"firstEventMs":0,"firstStepMs":357},"costIsEstimate":true,"costUsd":0.003732,"tokens":{"input":2982,"output":150},"models":[{"model":"claude-haiku-5-5","role":"analyst","inputTokens":2982,"outputTokens":150,"costUsd":0.003732,"calls":3}]},"seq":13}

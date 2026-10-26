@@ -1,0 +1,65 @@
+{
+ "question": "Which payer is worst?",
+ "multiCandidate": true,
+ "calls": [
+  {
+   "model": "claude-haiku-5-5",
+   "candidate": 0,
+   "tool_results": [],
+   "completion": {
+    "text": "",
+    "tool_calls": [
+     {
+      "name": "final_answer",
+      "arguments": {
+       "sql": "SELECT payer_name, SUM(paid_amount) AS paid_amount, COUNT(*) AS claims\nFROM sem.claims\nGROUP BY 1\nORDER BY paid_amount DESC",
+       "answer": "A."
+      },
+      "id": "a1"
+     }
+    ]
+   }
+  },
+  {
+   "model": "claude-haiku-5-5",
+   "candidate": 1,
+   "tool_results": [],
+   "completion": {
+    "text": "",
+    "tool_calls": [
+     {
+      "name": "final_answer",
+      "arguments": {
+       "sql": "SELECT 1",
+       "answer": "B."
+      },
+      "id": "b1"
+     }
+    ]
+   }
+  }
+ ],
+ "answer": {
+  "kind": "abstain",
+  "model": "claude-haiku-5-5",
+  "text": "candidates returned different results",
+  "selection": {
+   "mode": "agree_or_abstain",
+   "candidates": 2
+  },
+  "candidate_results": [
+   {
+    "candidate_index": 0,
+    "kind": "answer",
+    "sql": "SELECT payer_name, SUM(paid_amount) AS paid_amount, COUNT(*) AS claims\nFROM sem.claims\nGROUP BY 1\nORDER BY paid_amount DESC",
+    "row_count": 3
+   },
+   {
+    "candidate_index": 1,
+    "kind": "answer",
+    "sql": "SELECT 1",
+    "row_count": 1
+   }
+  ]
+ }
+}

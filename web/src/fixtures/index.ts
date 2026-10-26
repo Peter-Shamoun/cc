@@ -4,9 +4,13 @@
  * public X12 code list.
  */
 import type { Column, Part } from '../lib/contract';
+import { ANSWER_FIXTURES } from './answer';
+import { V1_FIXTURES, type V1Step } from './v1';
+import type { FinishReason, Usage } from '../api/contract';
 
-export type FixtureStep = Part | { status: string };
-export interface Fixture { id: string; title: string; prompt: string; match: RegExp; queries: number; steps: FixtureStep[] }
+/** Legacy parts, status labels, or raw contract-v1 step/escalation events (`{ event }`, see fixtures/v1.ts). */
+export type FixtureStep = Part | V1Step;
+export interface Fixture { id: string; title: string; prompt: string; match: RegExp; queries: number; steps: FixtureStep[]; usage?: Partial<Usage>; finishReason?: FinishReason; hidden?: boolean }
 
 const payers: [string, number, number][] = [
   ['Northwind Health Plan', 18432, 0.142],
@@ -65,7 +69,7 @@ function plotSvg(): string {
   const bw = (w - left - 20) / bars.length;
   const rects = bars.map(([k, v], i) => {
     const bh = ((h - top - bottom) * v) / max, x = left + i * bw + 10, y = h - bottom - bh;
-    return `<rect x="${x}" y="${y}" width="${bw - 20}" height="${bh}" rx="3" fill="#4C78A8"/>` +
+    return `<rect x="${x}" y="${y}" width="${bw - 20}" height="${bh}" rx="3" fill="#5B7FA6"/>` +
       `<text x="${x + (bw - 20) / 2}" y="${h - bottom + 18}" font-size="12" text-anchor="middle" fill="#555">${k}</text>` +
       `<text x="${x + (bw - 20) / 2}" y="${y - 6}" font-size="11" text-anchor="middle" fill="#333">${v}%</text>`;
   }).join('');
@@ -81,7 +85,7 @@ export const BLOBS: Record<string, { mime: string; content: string }> = {
   'file_lines_q3': { mime: 'text/csv', content: csvOf(lineCols, lineRows.map((r) => r.map((v, j) => (lineCols[j].phi ? '[masked]' : v)))) },
 };
 
-const SQL_DENIAL = `-- scoped DuckDB session · sem.* views only
+const SQL_DENIAL = `-- semantic views (sem.*)
 SELECT
   payer_name                                         AS payer,
   COUNT(*)                                           AS claims,
@@ -167,8 +171,11 @@ export const FIXTURES: Fixture[] = [
   },
 ];
 
+const ALL: Fixture[] = [...FIXTURES, ...ANSWER_FIXTURES, ...V1_FIXTURES];
+
 export function pickFixture(prompt: string): Fixture {
-  return FIXTURES.find((f) => f.prompt === prompt) ?? FIXTURES.find((f) => f.match.test(prompt)) ?? FIXTURES[0];
+  return ALL.find((f) => f.prompt === prompt) ?? ANSWER_FIXTURES.find((f) => f.match.test(prompt)) ?? V1_FIXTURES.find((f) => f.match.test(prompt)) ?? FIXTURES.find((f) => f.match.test(prompt)) ?? FIXTURES[0];
 }
 
-export const SUGGESTIONS = FIXTURES.map((f) => ({ title: f.title, prompt: f.prompt }));
+/** Main demos plus the answer-surface demos (Team B: repair/candidates/checks, abstain, clarify). */
+export const SUGGESTIONS = ALL.filter((f) => !f.hidden).map((f) => ({ title: f.title, prompt: f.prompt }));

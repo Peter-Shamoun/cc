@@ -1,14 +1,14 @@
 import type { ID, Message } from '../lib/contract';
-import type { TranscriptStore } from './types';
+import type { SearchHit, TranscriptStore } from './types';
 
 /** `ephemeral` transcript store: memory only, gone on reload. Nothing touches browser storage. */
 export class MemoryTranscriptStore implements TranscriptStore {
   readonly mode = 'ephemeral' as const;
-  private convs = new Map<ID, { id: ID; title: string; updatedAt: string; messages: Message[] }>();
+  private convs = new Map<ID, { id: ID; title: string; updatedAt: string; pinned?: boolean; archived?: boolean; messages: Message[] }>();
   async listConversations() {
     const items = [...this.convs.values()]
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .map(({ id, title, updatedAt }) => ({ id, title, updatedAt }));
+      .map(({ id, title, updatedAt, pinned, archived }) => ({ id, title, updatedAt, pinned: !!pinned, archived: !!archived }));
     return { items };
   }
   async getConversation(id: ID) {
@@ -39,4 +39,50 @@ export class MemoryTranscriptStore implements TranscriptStore {
     if (c) c.messages = structuredClone(msgs);
   }
   async setRetention() {}
+  async setPinned(id: ID, pinned: boolean) {
+    const c = this.convs.get(id);
+    if (c) c.pinned = pinned;
+  }
+  async setArchived(id: ID, archived: boolean) {
+    const c = this.convs.get(id);
+    if (!c) return;
+    c.archived = archived;
+    if (archived) c.pinned = false; // ChatGPT: archiving drops the pin
+  }
+  async search(query: string, limit = 30): Promise<SearchHit[]> {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    const hits: SearchHit[] = [];
+    const convs = [...this.convs.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    for (const c of convs) {
+      const t = c.title.toLowerCase().indexOf(q);
+      if (t >= 0) { hits.push({ id: c.id, title: c.title, updatedAt: c.updatedAt, snippet: c.title, matchStart: t, matchLength: q.length }); continue; }
+      for (const m of c.messages) {
+        const text = messageText(m);
+        const i = text.toLowerCase().indexOf(q);
+        if (i < 0) continue;
+        const from = Math.max(0, i - 40);
+        const lead = from > 0 ? '…' : '';
+        const snippet = lead + text.slice(from, i + q.length + 80).replace(/\s+/g, ' ');
+        // offsets are against the collapsed snippet; recompute so highlighting stays exact
+        const start = snippet.toLowerCase().indexOf(q);
+        hits.push({ id: c.id, title: c.title, updatedAt: c.updatedAt, messageId: m.id, snippet, matchStart: start, matchLength: q.length });
+        break;
+      }
+      if (hits.length >= limit) break;
+    }
+    return hits;
+  }
+}
+
+/** Plain text of a message for search: user text, assistant text parts and table/chart titles. */
+export function messageText(m: Message): string {
+  if (m.role === 'user') return m.text;
+  return m.parts
+    .map((p) => (p.type === 'text' ? p.text : 'title' in p && typeof p.title === 'string' ? p.title : ''))
+    .filter(Boolean)
+    .join('\n')
+    // search over what the reader sees, not markdown syntax
+    .replace(/[*_`#>|]+/g, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
 }

@@ -1,46 +1,51 @@
-import { memo } from 'react';
-import { Streamdown } from 'streamdown';
+import { onceOk } from '../../lib/onceOk';
+import { memo, useEffect, useState } from 'react';
 import clsx from 'clsx';
-import { CodeBlock } from './CodeBlock';
+import { usePacedText } from '../../lib/pacedText';
+
+export { displayMath, loadMath, mayContainMath } from './markdownText';
 
 /**
- * Assistant prose renderer. Streamdown (Vercel, Apache-2.0, see web/THIRD_PARTY_NOTICES.md)
- * repairs unfinished markdown while tokens stream in (an open `**`, a half-written table or
- * code fence renders as if closed) and memoizes per block so only the tail re-renders.
- * Its default rehype-harden / sanitize pipeline stays on; we only swap a few components.
+ * Lazy front for the markdown renderer (QA-P8: slow-3G fresh load was blank ~10 s because
+ * Streamdown, marked, micromark, rehype-raw/parse5, tailwind-merge and react-markdown sat in the
+ * entry chunk). The empty state never renders markdown, so the stack loads as its own chunk:
+ * main.tsx preloads it at idle after first paint, and once it is in memory every render is
+ * synchronous (no Suspense, no flash). Until then an answer shows as plain wrapped text in the
+ * same container, which is what a reader sees for one frame at most on a normal connection.
  */
-export const Markdown = memo(function Markdown({ text, streaming }: { text: string; streaming?: boolean }) {
+type Impl = typeof import('./MarkdownImpl');
+let impl: Impl | null = null;
+// A failed load (offline at idle-prefetch time) is retried on next use (lib/onceOk), not cached.
+export const preloadMarkdown: () => Promise<Impl> = onceOk(() => import('./MarkdownImpl').then((m) => (impl = m)));
+
+function useImpl(): Impl | null {
+  const [m, setM] = useState<Impl | null>(impl);
+  useEffect(() => {
+    if (m) return;
+    let alive = true;
+    preloadMarkdown().then((x) => { if (alive) setM(x); }).catch(() => undefined);
+    return () => { alive = false; };
+  }, [m]);
+  return m ?? impl;
+}
+
+const BOX = { overflowWrap: 'anywhere', wordBreak: 'break-word', maxWidth: '100%', minWidth: 0, unicodeBidi: 'isolate' } as const;
+
+/** Assistant prose. See MarkdownImpl for the renderer and its safety rules. */
+export const Markdown = memo(function Markdown({ text: full, streaming: open, paced, liveTurn }: { text: string; streaming?: boolean; /** Answer prose: reveal streamed text evenly (lib/pacedText); the caret stays until it has caught up. */ paced?: boolean; /** The turn was streaming on screen (see usePacedText). */ liveTurn?: boolean }) {
+  const m = useImpl();
+  const { shown: text, pending } = usePacedText(full, !!open && !!paced, !!paced && !!liveTurn);
+  const streaming = !!open || pending;
+  if (m) return <m.MarkdownImpl text={text} streaming={streaming} />;
   return (
-    <div className={clsx('prose-chat', streaming && 'streaming-caret')} data-testid="markdown">
-      <Streamdown
-        mode={streaming ? 'streaming' : 'static'}
-        isAnimating={!!streaming}
-        parseIncompleteMarkdown
-        controls={false}
-        components={{
-          // No remote images in markdown (spec §4.1, §6.11): images arrive only as image parts.
-          img: ({ alt }) => <span className="text-fg-subtle">[image: {alt}]</span>,
-          a: ({ href, children }) => (
-            <a href={href} target="_blank" rel="noopener noreferrer nofollow">
-              {children}
-            </a>
-          ),
-          code({ className, children }) {
-            const m = /language-(\w+)/.exec(className ?? '');
-            const t = String(children ?? '');
-            if (m || t.includes('\n')) return <CodeBlock code={t.replace(/\n$/, '')} language={m?.[1] ?? 'text'} />;
-            return <code>{children}</code>;
-          },
-          pre: ({ children }) => <>{children}</>,
-          table: ({ children }) => (
-            <div className="overflow-x-auto">
-              <table>{children}</table>
-            </div>
-          ),
-        }}
-      >
-        {text}
-      </Streamdown>
+    <div className={clsx('prose-chat', streaming && 'streaming-caret')} data-testid="markdown" data-pending="" dir="auto" style={BOX}>
+      <p className="whitespace-pre-wrap">{text}</p>
     </div>
   );
 });
+
+/** Inline markdown only (bold, code, links) for callout and clarify text; plain text until loaded. */
+export function Inline({ text }: { text: string }) {
+  const m = useImpl();
+  return m ? <m.InlineImpl text={text} /> : <>{text}</>;
+}
