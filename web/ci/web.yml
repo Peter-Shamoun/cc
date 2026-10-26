@@ -43,7 +43,7 @@ jobs:
         run: npx vite build
       - name: Bundle-size budget
         run: node scripts/bundle_budget.mjs
-      - name: CSP check (mock build, every fixture, headless Chrome)
+      - name: CSP, header and Lighthouse budget checks (mock build, headless Chrome)
         env:
           CSP_MODE: mock
           CC_PREVIEW: '1'
@@ -53,11 +53,16 @@ jobs:
           for i in $(seq 60); do curl -sf -o /dev/null http://127.0.0.1:5231/ && break; sleep 1; done
           node scripts/csp_check.mjs http://127.0.0.1:5231/ "$RUNNER_TEMP/shots"
           node scripts/header_check.mjs http://127.0.0.1:5231/
+          # Lighthouse (pinned in scripts/perf_budget.json, fetched by npx, not a repo dependency):
+          # median of 3 runs per form factor against the same preview server.
+          LH_OUT="$RUNNER_TEMP/lighthouse" node scripts/lighthouse_budget.mjs http://127.0.0.1:5231/
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: csp-check-shot
-          path: ${{ runner.temp }}/shots
+          name: csp-check-shot-and-lighthouse
+          path: |
+            ${{ runner.temp }}/shots
+            ${{ runner.temp }}/lighthouse
           if-no-files-found: ignore
   api:
     runs-on: ubuntu-latest
