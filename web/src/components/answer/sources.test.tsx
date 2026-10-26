@@ -30,7 +30,7 @@ describe('data-source citations (contract 1.8.0 §14)', () => {
   it('chip opens a popover listing tables and columns, never row values; Escape closes', () => {
     render(<SourcesChip sources={sources} parts={[table]} />);
     const chip = screen.getByTestId('sources-chip');
-    expect(chip).toHaveTextContent('Sources');
+    expect(chip).toHaveTextContent('Looked at');
     expect(chip).toHaveTextContent('sem.claims');
     expect(chip).toHaveTextContent('+1');
     fireEvent.click(chip);

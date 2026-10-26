@@ -88,7 +88,8 @@ export function CodeBlock({ code, language, title, onOpen, tall, masked }: { cod
               <Maximize2 size={14} />
             </IconButton>
           )}
-          <CopyButton text={copyable} label="Copy code" withText className="h-7" />
+          {/* ChatGPT hands-on: icon-only copy that turns into a check; the name says "Copied" for screen readers. */}
+          <CopyButton text={copyable} label="Copy code" className="h-7 w-7" />
         </div>
       </div>
       <div tabIndex={0} aria-label={`${label || 'Plain'} code`} data-wrap={wrap || undefined} className={tall ? 'shiki-wrap overflow-auto' : 'shiki-wrap max-h-[480px] overflow-auto'}>

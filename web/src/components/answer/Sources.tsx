@@ -50,7 +50,8 @@ export function SourcesChip({ sources, parts }: { sources: Source[] | undefined;
         className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-md px-1.5 py-1 font-sans text-xs text-fg-muted hover:bg-hover hover:text-fg"
         data-testid="sources-chip">
         <Database size={12} aria-hidden className="shrink-0" />
-        <span className="font-medium">Sources</span>
+        {/* BACKEND-FIT: the analyst picked these itself (the user never chooses a DB); say so plainly. */}
+        <span className="font-medium">Looked at</span>
         <span className="truncate font-mono text-[11px]">{first.name}</span>
         {shown.length > 1 && <span className="shrink-0 tabular-nums text-fg-subtle">+{shown.length - 1}</span>}
       </button>
@@ -86,7 +87,7 @@ function SourcesPopover({ rows, anchor, onClose }: { rows: SourceRow[]; anchor: 
     <div ref={ref} role="dialog" aria-labelledby={`${id}-t`} tabIndex={-1} data-testid="sources-popover" style={pos ?? { top: -9999, left: -9999 }}
       onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } }}
       className="fixed z-[60] max-h-[min(24rem,calc(100vh-16px))] w-[min(22rem,calc(100vw-16px))] overflow-auto rounded-2xl border border-line bg-elev p-1.5 font-sans text-sm text-fg shadow-[var(--shadow-menu)] outline-none motion-safe:animate-[cc-pop_120ms_ease-out]">
-      <div id={`${id}-t`} className="px-2.5 pb-1 pt-1.5 text-xs font-medium text-fg-subtle">{answer.length ? 'Data this answer used' : 'Data looked at'}</div>
+      <div id={`${id}-t`} className="px-2.5 pb-1 pt-1.5 text-xs font-medium text-fg-subtle">{answer.length ? 'What the analyst used for this answer' : 'What the analyst looked at'}</div>
       <ul className="space-y-0.5">{(answer.length ? answer : explored).map((r) => <SourceItem key={r.id} r={r} />)}</ul>
       {answer.length > 0 && explored.length > 0 && (
         <details className="group/exp mt-1 border-t border-line pt-1">

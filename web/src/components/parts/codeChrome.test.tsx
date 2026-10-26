@@ -7,15 +7,20 @@ afterEach(cleanup);
 const LONG = `SELECT ${Array.from({ length: 60 }, (_, i) => `col_${i}`).join(', ')} FROM claims`;
 
 describe('code block chrome (ChatGPT/Claude observed)', () => {
-  it('header: language at left, a labelled "Copy code" that says Copied, secondary actions', async () => {
+  it('header: language at left, an icon-only "Copy code" that turns into a check (ChatGPT hands-on), secondary actions', async () => {
     const write = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText: write } });
     render(<CodeBlock code="SELECT 1" language="sql" />);
     expect(screen.getByTestId('code-lang')).toHaveTextContent(/^sql$/);
     const copy = screen.getByRole('button', { name: 'Copy code' });
-    expect(copy).toHaveTextContent('Copy code');
+    // No visible words in the header's copy control: just the icon.
+    expect(copy.textContent?.trim()).toBe('');
+    expect(copy.querySelector('svg.lucide-copy')).not.toBeNull();
     fireEvent.click(copy);
-    await waitFor(() => expect(copy).toHaveTextContent('Copied'));
+    await waitFor(() => expect(copy).toHaveAttribute('aria-label', 'Copied'));
+    expect(copy.querySelector('svg.lucide-check')).not.toBeNull();
+    expect(copy.querySelector('svg.lucide-copy')).toBeNull();
+    expect(screen.getByTestId('copy-status')).toHaveTextContent('Copied');
     expect(write).toHaveBeenCalledWith('SELECT 1');
     expect(screen.getByRole('button', { name: 'Wrap lines' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Download' })).toBeInTheDocument();

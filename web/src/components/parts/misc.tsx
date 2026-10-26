@@ -126,7 +126,7 @@ export function ReasoningView({ part, running }: { part: ReasoningPart; running:
   return (
     <div className="my-2 font-sans text-sm first:mt-0" data-testid="reasoning">
       <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="inline-flex items-center gap-1 text-fg-muted hover:text-fg">
-        <span className={clsx(running && 'shimmer')}>{running ? 'Thinking…' : `Thought for ${fmtMs(part.durationMs ?? 1000)}`}</span>
+        <span>{running ? 'Thinking' : `Thought for ${fmtMs(part.durationMs ?? 1000)}`}</span>
         {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
       </button>
       {open && <div className="mt-1.5 border-l-2 border-line pl-4 leading-relaxed text-fg-muted">{part.summary}</div>}
@@ -144,7 +144,7 @@ export function ToolRow({ part }: { part: ToolCallPart }) {
     <div className="font-sans text-sm" data-testid="tool-call" data-state={part.state}>
       <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="group inline-flex max-w-full items-center gap-2 rounded-md py-1 text-left text-fg-muted hover:text-fg">
         <Icon size={14} className="shrink-0" />
-        <span className={clsx('truncate', part.state === 'running' && 'shimmer')}>{part.label}</span>
+        <span className="truncate">{part.label}</span>
         {part.state === 'running' && <Loader2 size={13} className="shrink-0 animate-spin" />}
         {part.state === 'ok' && <Check size={13} className="shrink-0 text-fg-subtle" />}
         {part.state === 'error' && <X size={13} className="shrink-0 text-danger" />}
@@ -157,7 +157,7 @@ export function ToolRow({ part }: { part: ToolCallPart }) {
           {part.input?.sql && <CodeBlock code={part.input.sql} language="sql" title="input" />}
           {part.input?.args && <CodeBlock code={JSON.stringify(part.input.args, null, 2)} language="json" title="args" />}
           {part.output?.message && <div className="py-1">{part.output.message}</div>}
-          <div className="py-1 text-xs text-fg-subtle">Scoped session · result rows are not shown here</div>
+          <div className="py-1 text-xs text-fg-subtle">Result rows are not shown here</div>
         </div>
       )}
     </div>
@@ -172,7 +172,7 @@ export function ToolGroup({ parts }: { parts: ToolCallPart[] }) {
   return (
     <div className="my-2 font-sans text-sm">
       <button type="button" aria-expanded={open || running} onClick={() => setOpen((o) => !o)} className="inline-flex items-center gap-1.5 py-1 text-fg-muted hover:text-fg">
-        <Wrench size={14} /> <span className={clsx(running && 'shimmer')}>{running ? `Using ${parts.length} tools…` : `Used ${parts.length} tools`}</span>
+        <Wrench size={14} /> <span>{running ? `Using ${parts.length} tools…` : `Used ${parts.length} tools`}</span>
         {open || running ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
       </button>
       {(open || running) && <div className="ml-1.5 border-l-2 border-line pl-3">{parts.map((p) => <ToolRow key={p.id} part={p} />)}</div>}
