@@ -1,26 +1,44 @@
 import { useState } from 'react';
-import { ArrowUp, CircleSlash, HelpCircle, Info, Sparkles, RotateCcw, Square } from 'lucide-react';
+import { ArrowUp, Check, CircleSlash, HelpCircle, Info, Lock, Sparkles, RotateCcw, Square } from 'lucide-react';
 import clsx from 'clsx';
-import type { AbstainPart, ClarifyPart, EscalationPart } from './provisional';
+import type { ChatRequest } from '../../api/contract';
+import { Markdown } from '../parts/Markdown';
+import { modelName } from './normalize';
+import type { AbstainPart, ClarificationPart, EscalationEvent } from './provisional';
 
-/** "Can't answer" is an outcome, not an error: calm card, reason, what's missing, rephrasings. */
-export function AbstainCard({ part, onSend }: { part: AbstainPart; onSend?: (t: string) => void }) {
+export type Resume = NonNullable<ChatRequest['resume']>;
+/** Send a new user turn; `resume` answers a pending clarification (CONTRACT.md §6). */
+export type OnReply = (text: string, resume?: Resume) => void;
+
+const ABSTAIN_TITLE: Record<string, string> = {
+  out_of_scope: "That's outside what I can answer from this data",
+  phi_request: "I can't share patient-identifying details",
+  data_unavailable: "The data needed for this isn't available",
+  ambiguous: 'I need a clearer question to answer this',
+  low_confidence: "I'm not confident enough to give you a number",
+  unsupported: "I can't do that kind of analysis yet",
+  policy: "I can't help with that request",
+};
+
+/** "Can't answer" is an outcome, not an error: calm card, reason, details, rephrasings. */
+export function AbstainCard({ part, onReply }: { part: AbstainPart; onReply?: OnReply }) {
+  const Icon = part.category === 'phi_request' || part.category === 'policy' ? Lock : CircleSlash;
   return (
-    <div className="my-4 rounded-2xl border border-line bg-elev px-4 py-3.5 font-sans text-sm" role="note" aria-label="Cannot answer" data-testid="abstain">
-      <div className="flex items-center gap-2 font-medium text-fg"><CircleSlash size={16} className="text-fg-muted" aria-hidden /> {part.title ?? "I can't answer this from the data I have"}</div>
-      <p className="mt-1.5 leading-relaxed text-fg-muted">{part.reason}</p>
-      {part.needed && part.needed.length > 0 && (
-        <div className="mt-3">
-          <div className="text-xs font-medium uppercase tracking-wide text-fg-subtle">What would be needed</div>
-          <ul className="mt-1 list-disc space-y-0.5 pl-5 text-fg-muted">{part.needed.map((n) => <li key={n}>{n}</li>)}</ul>
-        </div>
+    <div className="my-4 rounded-2xl border border-line bg-elev px-4 py-3.5 font-sans text-sm" role="note" aria-label="Cannot answer" data-testid="abstain" data-category={part.category}>
+      <div className="flex items-center gap-2 font-medium text-fg"><Icon size={16} className="shrink-0 text-fg-muted" aria-hidden /> {ABSTAIN_TITLE[part.category] ?? "I can't answer this from the data I have"}</div>
+      <div className="abstain-reason mt-1 text-fg-muted [&_p]:my-1"><Markdown text={part.reason} /></div>
+      {part.details && (
+        <details className="mt-1 text-[13px]" data-testid="abstain-details">
+          <summary className="cursor-pointer text-fg-subtle hover:text-fg">What would be needed</summary>
+          <div className="mt-1 text-fg-muted [&_p]:my-1"><Markdown text={part.details} /></div>
+        </details>
       )}
-      {part.suggestions && part.suggestions.length > 0 && (
+      {part.suggestions.length > 0 && (
         <div className="mt-3">
           <div className="text-xs font-medium uppercase tracking-wide text-fg-subtle">Try asking</div>
           <div className="mt-1.5 flex flex-wrap gap-2">
             {part.suggestions.map((s) => (
-              <button key={s} type="button" onClick={() => onSend?.(s)} disabled={!onSend} className="rounded-full border border-line bg-bg px-3 py-1.5 text-left text-[13px] text-fg hover:bg-hover disabled:opacity-50" data-testid="rephrase-chip">{s}</button>
+              <button key={s.id} type="button" onClick={() => onReply?.(s.text)} disabled={!onReply} className="rounded-full border border-line bg-bg px-3 py-1.5 text-left text-[13px] text-fg hover:bg-hover disabled:opacity-50" data-testid="rephrase-chip">{s.text}</button>
             ))}
           </div>
         </div>
@@ -29,47 +47,72 @@ export function AbstainCard({ part, onSend }: { part: AbstainPart; onSend?: (t: 
   );
 }
 
-/** Clarifying question: choice chips plus a free reply. Answering resumes the run. */
-export function ClarifyCard({ part, onSend, active }: { part: ClarifyPart; onSend?: (t: string) => void; active: boolean }) {
-  const [answer, setAnswer] = useState<string | null>(part.answered ?? null);
+/** Clarifying question: choice chips (single or multi) plus a free reply. Answering resumes the run. */
+export function ClarifyCard({ part, onReply, active }: { part: ClarificationPart; onReply?: OnReply; active: boolean }) {
+  const [answer, setAnswer] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string[]>([]);
   const [text, setText] = useState('');
-  const done = answer !== null || !active;
-  const pick = (v: string) => { if (done || !v.trim()) return; setAnswer(v); onSend?.(v); };
+  const expired = !!part.expiresAt && Date.parse(part.expiresAt) < Date.now();
+  const done = answer !== null || !!part.answered || !active || expired;
+  const choices = part.choices ?? [];
+  const submit = (ids: string[], free?: string) => {
+    if (done) return;
+    const labels = ids.map((id) => choices.find((c) => c.id === id)?.label ?? id);
+    const reply = free?.trim() || labels.join(', ');
+    if (!reply) return;
+    setAnswer(reply);
+    onReply?.(reply, { clarificationId: part.clarificationId, ...(ids.length ? { choiceIds: ids } : {}), ...(free?.trim() ? { text: free.trim() } : {}) });
+  };
+  const chip = (id: string) => (part.multiSelect ? setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id])) : submit([id]));
   return (
     <div className={clsx('my-4 rounded-2xl border px-4 py-3.5 font-sans text-sm', done ? 'border-line bg-bg' : 'border-line-strong bg-elev shadow-sm')} role="group" aria-label="Clarifying question" data-testid="clarify">
       <div className="flex items-start gap-2 text-fg"><HelpCircle size={16} className="mt-0.5 shrink-0 text-fg-muted" aria-hidden /><span className="font-medium leading-snug">{part.question}</span></div>
-      <div className="mt-3 flex flex-wrap gap-2" role="list">
-        {part.options.map((o) => {
-          const v = o.value ?? o.label;
-          const chosen = answer === v;
-          return (
-            <button key={o.id} type="button" role="listitem" disabled={done} aria-pressed={chosen} onClick={() => pick(v)} title={o.description}
-              className={clsx('rounded-full border px-3 py-1.5 text-left text-[13px] transition-colors', chosen ? 'border-fg bg-fg text-bg' : 'border-line bg-bg text-fg enabled:hover:bg-hover disabled:opacity-50')} data-testid="clarify-chip">
-              {o.label}{o.description && <span className={clsx('ml-1', chosen ? 'text-bg/70' : 'text-fg-subtle')}>· {o.description}</span>}
-            </button>
-          );
-        })}
-      </div>
-      {!done && part.allowFreeText !== false && (
-        <form className="mt-3 flex items-center gap-2 rounded-full border border-line bg-bg py-1 pl-3.5 pr-1 focus-within:border-fg-subtle" onSubmit={(e) => { e.preventDefault(); pick(text); }}>
-          <input value={text} onChange={(e) => setText(e.target.value)} aria-label="Answer in your own words" placeholder="Or answer in your own words" className="min-w-0 flex-1 bg-transparent py-1 outline-none" />
+      {part.multiSelect && !done && <div className="mt-1 pl-6 text-xs text-fg-subtle">Choose one or more</div>}
+      {choices.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2" role="list">
+          {choices.map((o) => {
+            const on = part.multiSelect ? picked.includes(o.id) : answer === o.label;
+            return (
+              <button key={o.id} type="button" role="listitem" disabled={done} aria-pressed={on} onClick={() => chip(o.id)} title={o.description}
+                className={clsx('inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-left text-[13px] transition-colors', on ? 'border-fg bg-fg text-bg' : 'border-line bg-bg text-fg enabled:hover:bg-hover disabled:opacity-50')} data-testid="clarify-chip">
+                {part.multiSelect && on && <Check size={12} aria-hidden />}
+                {o.label}{o.description && <span className={clsx('ml-1', on ? 'text-bg/70' : 'text-fg-subtle')}>· {o.description}</span>}
+              </button>
+            );
+          })}
+          {part.multiSelect && !done && (
+            <button type="button" disabled={!picked.length} onClick={() => submit(picked)} className="rounded-full bg-fg px-3 py-1.5 text-[13px] text-bg disabled:opacity-30" data-testid="clarify-submit">Continue</button>
+          )}
+        </div>
+      )}
+      {!done && part.allowFreeText && (
+        <form className="mt-3 flex items-center gap-2 rounded-full border border-line bg-bg py-1 pl-3.5 pr-1 focus-within:border-fg-subtle" onSubmit={(e) => { e.preventDefault(); submit(part.multiSelect ? picked : [], text); }}>
+          <input value={text} onChange={(e) => setText(e.target.value)} aria-label="Answer in your own words" placeholder={choices.length ? 'Or answer in your own words' : 'Type your answer'} className="min-w-0 flex-1 bg-transparent py-1 outline-none" />
           <button type="submit" disabled={!text.trim()} aria-label="Send answer" className="flex h-7 w-7 items-center justify-center rounded-full bg-fg text-bg disabled:opacity-30"><ArrowUp size={15} /></button>
         </form>
       )}
       {answer !== null && <div className="mt-2 text-xs text-fg-subtle" data-testid="clarify-answered">You answered “{answer}”. Continuing…</div>}
+      {answer === null && part.answered && <div className="mt-2 text-xs text-fg-subtle" data-testid="clarify-answered">Answered</div>}
+      {answer === null && !part.answered && expired && <div className="mt-2 text-xs text-fg-subtle">This question expired. Ask again to continue.</div>}
     </div>
   );
 }
 
-/** Small inline pill: the run was handed to a larger model, with the reason on hover/focus. */
-export function EscalationNote({ part }: { part: EscalationPart }) {
+const TRIGGER: Record<string, string> = {
+  verifier_fail: 'a check failed', low_confidence: 'low confidence', repair_exhausted: 'repairs ran out', complexity: 'a complex question',
+  disagreement: 'candidates disagreed', user: 'you asked',
+};
+
+/** Small inline pill: the run was handed to a larger model; the reason opens on click. */
+export function EscalationNote({ ev }: { ev: EscalationEvent }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="my-2 font-sans text-xs" data-testid="escalation">
-      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-elev px-2.5 py-1 text-fg-muted hover:text-fg">
-        <Sparkles size={12} aria-hidden /> Escalated to a larger model <span className="text-fg-subtle">· {part.from} → {part.to}</span> <Info size={12} aria-hidden />
+      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-elev px-2.5 py-1 text-fg-muted hover:text-fg">
+        <Sparkles size={12} aria-hidden /> <span className="truncate">Escalated to {modelName(ev.to.model)}</span>
+        <span className="hidden text-fg-subtle sm:inline">· {TRIGGER[ev.trigger] ?? ev.trigger}</span> <Info size={12} aria-hidden />
       </button>
-      {open && <p className="mt-1.5 max-w-prose pl-1 leading-relaxed text-fg-muted">{part.reason}</p>}
+      {open && <p className="mt-1.5 max-w-prose pl-1 leading-relaxed text-fg-muted">{modelName(ev.from.model)} → {modelName(ev.to.model)}: {ev.reason}</p>}
     </div>
   );
 }
