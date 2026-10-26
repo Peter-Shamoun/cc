@@ -40,12 +40,12 @@ export function SourcesChip({ sources, parts }: { sources: Source[] | undefined;
   return (
     <>
       <button type="button" aria-haspopup="dialog" aria-expanded={!!anchor} onClick={(e) => setAnchor(anchor ? null : e.currentTarget)}
-        className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-elev px-2.5 py-1 font-sans text-xs text-fg-muted hover:bg-hover hover:text-fg"
+        className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-md px-1.5 py-1 font-sans text-xs text-fg-muted hover:bg-hover hover:text-fg"
         data-testid="sources-chip">
         <Database size={12} aria-hidden className="shrink-0" />
-        <span className="font-medium text-fg">Sources</span>
+        <span className="font-medium">Sources</span>
         <span className="truncate font-mono text-[11px]">{first.name}</span>
-        {shown.length > 1 && <span className="shrink-0 rounded-full bg-muted px-1.5 text-[10px] tabular-nums">+{shown.length - 1}</span>}
+        {shown.length > 1 && <span className="shrink-0 tabular-nums text-fg-subtle">+{shown.length - 1}</span>}
       </button>
       {anchor && <SourcesPopover rows={rows} anchor={anchor} onClose={() => setAnchor(null)} />}
     </>

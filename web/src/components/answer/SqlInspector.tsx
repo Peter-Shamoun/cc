@@ -77,7 +77,7 @@ export function SqlInspector({ queries, onClose }: { queries: QueryInfo[]; onClo
           {queries.map((x, k) => (
             <button key={x.id} role="tab" type="button" aria-selected={k === i} onClick={() => setI(k)}
               onKeyDown={(e) => { if (e.key === 'ArrowRight') setI((k + 1) % queries.length); if (e.key === 'ArrowLeft') setI((k - 1 + queries.length) % queries.length); }}
-              className={clsx('max-w-[16rem] shrink-0 truncate rounded-full px-3 py-1 text-xs', k === i ? 'bg-fg text-bg' : 'text-fg-muted hover:bg-hover', x.state === 'error' && k !== i && 'text-danger')}>
+              className={clsx('max-w-[16rem] shrink-0 truncate rounded-md px-2.5 py-1 text-xs', k === i ? 'bg-hover font-medium text-fg' : 'text-fg-muted hover:bg-hover', x.state === 'error' && k !== i && 'text-danger')}>
               {k + 1}. {x.state === 'error' ? 'Failed' : x.produces.length ? x.produces[0] : x.label}
             </button>
           ))}

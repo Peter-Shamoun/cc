@@ -48,6 +48,7 @@ export const useTheme = () => useContext(Ctx);
 
 /** Chart palettes from spec §2.3. */
 export const CHART_COLORS: Record<Palette, string[]> = {
-  neutral: ['#4C78A8', '#F58518', '#54A24B', '#E45756', '#72B7B2', '#EECA3B', '#B279A2', '#9D755D'],
+  // Restrained: one muted blue leads; the rest are desaturated, similar in weight, so no series shouts (Peter 10:06 PM: no neon/rainbow).
+  neutral: ['#5B7FA6', '#C08552', '#6F9A7A', '#B0625C', '#7EA6A6', '#B5A05F', '#8C7FA0', '#8A7A6B'],
   paper: ['#D97757', '#6A9BCC', '#788C5D', '#C46686', '#B8A16B', '#5E5D59', '#3898EC', '#B53333'],
 };

@@ -3,7 +3,8 @@ import { Code2 } from 'lucide-react';
 import { fmtMs, fmtTokens, fmtUsd, fmtUsdShort, modelName } from './normalize';
 import type { UsageView } from './provisional';
 
-const BAR = ['#7c9cbf', '#10a37f', '#e8b339', '#b58cd9', '#d97757'];
+// One restrained hue stepped in lightness (no rainbow of accents).
+const BAR = [70, 48, 32, 20, 12].map((p) => `color-mix(in srgb, var(--fg) ${p}%, transparent)`);
 
 /**
  * Per-answer metadata in the action row: subtle "3 queries · 12s · $0.004" (ChatGPT-style message
@@ -39,7 +40,7 @@ export function AnswerMeta({ usage, queries, repairs = 0, onSql, sqlOpen }: { us
         </button>
       )}
       {open && usage && (
-        <div id={id} role="dialog" aria-label="Answer details" className="absolute bottom-full left-0 z-20 mb-2 w-72 max-sm:fixed max-sm:inset-x-3 max-sm:bottom-24 max-sm:left-3 max-sm:w-auto rounded-xl border border-line bg-elev p-3 text-fg-muted shadow-lg step-enter" data-testid="meta-popover">
+        <div id={id} role="dialog" aria-label="Answer details" className="absolute bottom-full left-0 z-20 mb-2 w-72 max-sm:fixed max-sm:inset-x-3 max-sm:bottom-24 max-sm:left-3 max-sm:w-auto rounded-xl border border-line bg-elev p-3 text-fg-muted shadow-[0_4px_16px_rgba(0,0,0,0.08)] step-enter" data-testid="meta-popover">
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
             {usage.model && !(usage.models && usage.models.length > 1) && <><dt>Model</dt><dd className="text-right text-fg">{usage.model}</dd></>}
             {usage.inputTokens !== undefined && <><dt>Tokens</dt><dd className="text-right tabular-nums text-fg">{fmtTokens(usage.inputTokens)} in · {fmtTokens(usage.outputTokens ?? 0)} out{usage.cacheRead ? ` · ${fmtTokens(usage.cacheRead)} cached` : ''}</dd></>}

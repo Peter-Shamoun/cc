@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { AlertTriangle, BarChart3, Check, ChevronDown, ChevronRight, Database, GitCompare, List, ListChecks, Loader2, Search, Sparkles, Telescope, Wrench, X, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, BarChart3, Check, ChevronDown, ChevronRight, Database, GitCompare, List, ListChecks, Loader2, MoveUpRight, Search, Telescope, Wrench, X, type LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
 import { CodeBlock } from '../parts/CodeBlock';
 import { fmtMs, summarize, unresolvedFailures } from './normalize';
@@ -8,7 +8,7 @@ import type { CheckResult, Step, StepKind } from './provisional';
 /** Reasoning folded into the timeline (QA-A10): one "Thought for 1.2s" row, like ChatGPT/Claude. */
 export type TimelineReasoning = { summary?: string; durationMs?: number };
 
-const ICON: Record<StepKind, LucideIcon> = { sql: Database, repair: Wrench, check: ListChecks, explore: Telescope, candidates: GitCompare, escalation: Sparkles, chart: BarChart3, schema: List, search: Search, other: Wrench };
+const ICON: Record<StepKind, LucideIcon> = { sql: Database, repair: Wrench, check: ListChecks, explore: Telescope, candidates: GitCompare, escalation: MoveUpRight, chart: BarChart3, schema: List, search: Search, other: Wrench };
 const KIND_LABEL: Record<StepKind, string> = { sql: 'Query', repair: 'Repair', check: 'Check', explore: 'Probe', candidates: 'Candidates', escalation: 'Escalation', chart: 'Chart', schema: 'Schema', search: 'Search', other: 'Step' };
 
 /** Ticks while `live`, for the running timer in the header. */
@@ -67,7 +67,7 @@ export function StepTimeline({ steps, live, elapsedMs, reasoning = [] }: { steps
         <span className={clsx('truncate', live && 'shimmer')}>{header}</span>
         {live && <span className="shrink-0 tabular-nums text-xs text-fg-subtle" aria-hidden>{fmtMs(Math.max(ticking, 0))}</span>}
         {/* QA-A22: separators so the accessible name reads "Thought for 1s, 2 failed", not "1s2 failed". */}
-        {!live && errors > 0 && <span className="shrink-0 rounded-full bg-danger/10 px-1.5 text-[11px] text-danger"><span className="sr-only">, </span>{errors} failed</span>}
+        {!live && errors > 0 && <span className="shrink-0 text-xs text-danger"><span className="sr-only">, </span>{errors} failed</span>}
         {!live && !errors && repaired > 0 && <span className="sr-only">, all failures repaired</span>}
         {open ? <ChevronDown size={14} className="shrink-0" aria-hidden /> : <ChevronRight size={14} className="shrink-0" aria-hidden />}
       </button>
@@ -90,7 +90,7 @@ function StepRow({ step, last, showAgent }: { step: Step; last: boolean; showAge
   const [open, setOpen] = useState(false);
   const Icon = ICON[step.kind];
   const meta = [step.rowCount !== undefined && `${step.rowCount.toLocaleString()}${step.truncated ? '+' : ''} rows`, step.durationMs !== undefined && fmtMs(step.durationMs)].filter(Boolean).join(' · ');
-  const dot = step.state === 'running' || step.state === 'cancelled' ? 'border-fg-subtle bg-bg' : step.state === 'error' ? 'border-danger bg-danger' : step.state === 'warn' ? 'border-[#e8b339] bg-[#e8b339]' : step.kind === 'repair' ? 'border-[var(--callout-bar)] bg-[var(--callout-bar)]' : 'border-line-strong bg-bg';
+  const dot = step.state === 'running' || step.state === 'cancelled' ? 'border-fg-subtle bg-bg' : step.state === 'error' ? 'border-danger bg-bg' : step.kind === 'repair' ? 'border-fg-subtle bg-fg-subtle' : 'border-line-strong bg-bg';
   return (
     <li className={clsx('relative step-enter', !last && 'pb-1')} data-testid="step" data-kind={step.kind} data-state={step.state}>
       <span className={clsx('absolute -left-[26.5px] top-[9px] flex h-[11px] w-[11px] items-center justify-center rounded-full border-2', dot)} aria-hidden>
@@ -101,13 +101,13 @@ function StepRow({ step, last, showAgent }: { step: Step; last: boolean; showAge
         <Icon size={14} className="shrink-0" aria-hidden />
         <span className="sr-only">{KIND_LABEL[step.kind]}:</span>
         <span className={clsx('min-w-0 truncate', step.state === 'running' && 'shimmer')}>{step.label}</span>
-        {step.attempt !== undefined && step.attempt > 1 && <span className="shrink-0 rounded-full border border-line px-1.5 text-[11px] text-fg-subtle">attempt {step.attempt}</span>}
-        {step.state === 'ok' && <Check size={13} className="shrink-0 text-[#10a37f]" aria-label="done" />}
+        {step.attempt !== undefined && step.attempt > 1 && <span className="shrink-0 text-xs text-fg-subtle"><span aria-hidden>· </span><span>attempt {step.attempt}</span></span>}
+        {step.state === 'ok' && <Check size={13} className="shrink-0 text-fg-subtle" aria-label="done" />}
         {step.state === 'error' && <X size={13} className="shrink-0 text-danger" aria-label="failed" />}
         {step.state === 'warn' && <AlertTriangle size={13} className="shrink-0 text-[#b7791f] dark:text-[#e8b339]" aria-label="warning" />}
         {step.state === 'cancelled' && <span className="shrink-0 text-xs text-fg-subtle">stopped</span>}
         {meta && <span className="shrink-0 tabular-nums text-xs text-fg-subtle">{meta}</span>}
-        {showAgent && step.agent && <span className="shrink-0 rounded-full border border-line px-1.5 text-[11px] text-fg-subtle">{step.agent}</span>}
+        {showAgent && step.agent && <span className="shrink-0 text-xs text-fg-subtle"><span aria-hidden>· </span><span>{step.agent}</span></span>}
         {hasDetail && (open ? <ChevronDown size={13} className="shrink-0" /> : <ChevronRight size={13} className="shrink-0" />)}
       </button>
       {!open && step.kind === 'repair' && step.error && (
@@ -158,7 +158,7 @@ function CandidateTable({ candidates }: { candidates: { id: string; label: strin
               <tr key={c.id} className={clsx('border-t border-line', c.chosen && 'bg-hover')}>
                 <td className="px-3 py-1.5">
                   <button type="button" className="text-left text-fg underline-offset-2 hover:underline disabled:no-underline" disabled={!c.sql} onClick={() => setShow(show === c.id ? null : c.id)} aria-pressed={show === c.id}>{c.label}</button>
-                  {c.chosen && <span className="ml-2 rounded-full bg-[#10a37f]/12 px-1.5 py-0.5 text-[11px] font-medium text-[#0b7a5f] dark:text-[#4fd1a5]">chosen</span>}
+                  {c.chosen && <span className="ml-2 text-xs text-fg-subtle"><span aria-hidden>· </span><span>chosen</span></span>}
                 </td>
                 <td className="px-3 py-1.5 text-right tabular-nums">{c.rowCount?.toLocaleString() ?? '–'}</td>
                 <td className="px-3 py-1.5 text-right tabular-nums">{c.score !== undefined ? c.score.toFixed(2) : '–'}</td>
