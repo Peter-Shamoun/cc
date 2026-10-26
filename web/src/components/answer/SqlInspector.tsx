@@ -1,0 +1,89 @@
+import { useEffect, useId, useRef, useState } from 'react';
+import { ChevronDown, ChevronRight, Code2, Table2 } from 'lucide-react';
+import clsx from 'clsx';
+import type { AssistantView, CodePart, TablePart } from '../../lib/contract';
+import { CodeBlock } from '../parts/CodeBlock';
+import { fmtMs, stepsOf } from './normalize';
+
+export interface QueryInfo { id: string; label: string; sql: string; rowCount?: number; durationMs?: number; state?: 'running' | 'ok' | 'error' | 'cancelled'; produces: string[] }
+
+/**
+ * Every SQL statement behind an answer, and which table each produced. Sources: tool steps with
+ * SQL (in run order) and `code` parts with role=query; a table links to its query by `sqlPartId`
+ * (code part or tool step id) or by `resultId`.
+ */
+export function queriesOf(m: AssistantView): QueryInfo[] {
+  const tables = m.parts.filter((p): p is TablePart => p.type === 'table');
+  const producedBy = (ids: (string | undefined)[]) => tables.filter((t) => ids.some((id) => id && (t.sqlPartId === id || t.resultId === id))).map((t) => t.title ?? 'Result');
+  const out: QueryInfo[] = [];
+  const seen = new Set<string>();
+  for (const s of stepsOf(m)) {
+    if (!s.sql || s.state === 'running') continue;
+    out.push({ id: s.id, label: s.label, sql: s.sql, rowCount: s.rowCount, durationMs: s.durationMs, state: s.state, produces: producedBy([s.id, s.resultId]) });
+    seen.add(s.sql.trim());
+  }
+  for (const c of m.parts.filter((p): p is CodePart => p.type === 'code' && p.language === 'sql' && p.role === 'query')) {
+    const prod = producedBy([c.id]);
+    const dup = out.find((q) => q.sql.trim() === c.code.trim());
+    if (dup) { dup.produces = [...new Set([...dup.produces, ...prod])]; continue; }
+    out.push({ id: c.id, label: c.title ?? 'Query', sql: c.code, produces: prod, state: 'ok' });
+  }
+  return out;
+}
+
+/** The query that produced `t`, if known. */
+export function queryForTable(m: AssistantView, t: TablePart): QueryInfo | undefined {
+  const qs = queriesOf(m);
+  return qs.find((q) => q.produces.includes(t.title ?? 'Result') && (q.id === t.sqlPartId || q.id === t.resultId)) ?? qs.find((q) => q.id === t.sqlPartId) ?? qs.find((q) => q.produces.includes(t.title ?? 'Result'));
+}
+
+/** Inline "Query ▸" disclosure under a table, ChatGPT "View analysis" style. */
+export function TableSql({ query }: { query: QueryInfo }) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  return (
+    <div className="-mt-1 mb-3 font-sans text-xs" data-testid="table-sql">
+      <button type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen((o) => !o)} className="inline-flex items-center gap-1 rounded-md py-0.5 text-fg-subtle hover:text-fg">
+        <Code2 size={13} aria-hidden /> View SQL {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+        {query.durationMs !== undefined && <span className="tabular-nums">· {fmtMs(query.durationMs)}</span>}
+      </button>
+      <div id={id} hidden={!open}>{open && <CodeBlock code={query.sql} language="sql" title={query.label} />}</div>
+    </div>
+  );
+}
+
+/** Answer-level inspector: tabs per query, with what each produced. Opened from the footer. */
+export function SqlInspector({ queries, onClose }: { queries: QueryInfo[]; onClose: () => void }) {
+  const [i, setI] = useState(() => Math.max(0, queries.findIndex((q) => q.produces.length > 0)));
+  const q = queries[Math.min(i, queries.length - 1)];
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => { ref.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }); }, []);
+  if (!q) return null;
+  return (
+    <div ref={ref} className="mt-2 rounded-xl border border-line bg-elev p-3 font-sans text-sm step-enter" role="region" aria-label="SQL inspector" data-testid="sql-inspector"
+      onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}>
+      <div className="flex items-center justify-between gap-2">
+        <div role="tablist" aria-label="Queries" className="flex min-w-0 gap-1 overflow-x-auto">
+          {queries.map((x, k) => (
+            <button key={x.id} role="tab" type="button" aria-selected={k === i} onClick={() => setI(k)}
+              onKeyDown={(e) => { if (e.key === 'ArrowRight') setI((k + 1) % queries.length); if (e.key === 'ArrowLeft') setI((k - 1 + queries.length) % queries.length); }}
+              className={clsx('max-w-[16rem] shrink-0 truncate rounded-full px-3 py-1 text-xs', k === i ? 'bg-fg text-bg' : 'text-fg-muted hover:bg-hover', x.state === 'error' && k !== i && 'text-danger')}>
+              {k + 1}. {x.state === 'error' ? 'Failed' : x.produces.length ? x.produces[0] : x.label}
+            </button>
+          ))}
+        </div>
+        <button type="button" onClick={onClose} className="shrink-0 rounded-md px-2 py-1 text-xs text-fg-muted hover:bg-hover">Close</button>
+      </div>
+      <div role="tabpanel" className="mt-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-fg-subtle">
+          <span className="text-fg-muted">{q.label}</span>
+          {q.rowCount !== undefined && <span>{q.rowCount.toLocaleString()} rows</span>}
+          {q.durationMs !== undefined && <span>{fmtMs(q.durationMs)}</span>}
+          {q.state === 'error' && <span className="text-danger">failed, repaired below</span>}
+          {q.produces.map((t) => <span key={t} className="inline-flex items-center gap-1"><Table2 size={12} aria-hidden /> produced “{t}”</span>)}
+        </div>
+        <CodeBlock code={q.sql} language="sql" title={`query ${Math.min(i, queries.length - 1) + 1} of ${queries.length}`} />
+      </div>
+    </div>
+  );
+}
