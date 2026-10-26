@@ -27,10 +27,16 @@ test.describe('live demo backend @both', () => {
     await open(page, LIVE);
     await ask(page, 'What is the denial rate by payer?');
     const a = lastAssistant(page);
-    const sql = a.getByTestId('sql-disclosure').or(a.getByTestId('code-block')).first();
+    // v1 answer surface: "View SQL" opens the SQL inspector; legacy: inline SQL disclosure.
+    const sql = a.getByTestId('open-sql').or(a.getByTestId('sql-disclosure')).or(a.getByTestId('code-block')).first();
     await expect(sql).toBeVisible();
-    await sql.getByRole('button').first().click();
-    await expect(sql).toContainText(/SELECT[\s\S]+FROM/i);
+    if (await a.getByTestId('open-sql').count()) {
+      await a.getByTestId('open-sql').first().click();
+      await expect(page.getByTestId('sql-inspector').first()).toContainText(/SELECT[\s\S]+FROM/i);
+    } else {
+      await sql.getByRole('button').first().click();
+      await expect(sql).toContainText(/SELECT[\s\S]+FROM/i);
+    }
   });
 
   test('chart answer renders a plot', async ({ page }) => {
@@ -44,7 +50,8 @@ test.describe('live demo backend @both', () => {
   test('tool steps are shown for the run', async ({ page }) => {
     await open(page, LIVE);
     await ask(page, 'Total paid by payer');
-    await expect(lastAssistant(page).getByTestId('tool-call').first()).toBeAttached();
+    const a = lastAssistant(page);
+    await expect(a.getByTestId('step-timeline').or(a.getByTestId('tool-call')).first()).toBeAttached();
   });
 
   test('refusal for identifiers is a normal answer, not an error', async ({ page }) => {

@@ -38,7 +38,7 @@ test('keyboard: composer focused on load, Enter sends, Shift+Enter newline, Tab 
 test('keyboard: Ctrl+K opens chat search', async ({ page }) => {
   await open(page, MOCK);
   await page.keyboard.press('Control+k');
-  await expect(page.getByRole('textbox', { name: /search/i }).or(page.getByRole('searchbox')).or(page.getByRole('combobox', { name: /search/i })).first()).toBeFocused();
+  await expect(page.getByRole('combobox', { name: /search/i }).or(page.getByRole('searchbox')).or(page.getByRole('textbox', { name: /search/i })).first()).toBeFocused();
 });
 
 test('streaming answer is announced to screen readers (aria-live)', async ({ page }) => {
