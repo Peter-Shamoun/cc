@@ -1,8 +1,9 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { ArrowUp, Plus, Square, Database, X } from 'lucide-react';
+import { ArrowUp, ChevronDown, Plus, Square, Database, X } from 'lucide-react';
 import clsx from 'clsx';
 import { getDraft, setDraft } from '../shell/drafts';
 import { matchSlash, type SlashCommand } from '../shell/slash';
+import { ScopePopover } from '../shell/ScopePopover';
 
 /** Pastes this long become an attachment chip instead of flooding the box (Claude-style). */
 export const PASTE_CHARS = 1200;
@@ -46,6 +47,7 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
   const [pastes, setPastes] = useState<{ id: number; text: string; name?: string }[]>([]);
   const [notice, setNotice] = useState('');
   const [dragging, setDragging] = useState(false);
+  const [scopeAnchor, setScopeAnchor] = useState<HTMLElement | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const addFiles = async (files: FileList | File[]) => {
     const skipped: string[] = [];
@@ -173,9 +175,13 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
           </button>
           <input ref={fileInput} type="file" multiple accept={ATTACH_ACCEPT} className="hidden" tabIndex={-1} aria-hidden data-testid="attach-input"
             onChange={(e) => { if (e.currentTarget.files?.length) void addFiles(e.currentTarget.files); e.currentTarget.value = ''; }} />
-          <span className="inline-flex min-w-0 items-center gap-1.5 truncate rounded-full border border-line px-3 py-1.5 text-xs text-fg-muted" title="Queries run in a scoped, PHI-safe session">
-            <Database size={13} className="shrink-0" /> <span className="truncate">Claims lake · sem.*</span>
-          </span>
+          <button type="button" aria-haspopup="dialog" aria-expanded={!!scopeAnchor} data-testid="scope-chip"
+            onClick={(e) => { const t = e.currentTarget; setScopeAnchor((a) => (a ? null : t)); }}
+            className={clsx('inline-flex min-w-0 items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-xs text-fg-muted transition-colors hover:bg-hover hover:text-fg', scopeAnchor && 'bg-hover text-fg')}>
+            <Database size={13} className="shrink-0" aria-hidden /> <span className="truncate">Claims lake · sem.*</span>
+            <ChevronDown size={12} aria-hidden className={clsx('shrink-0 transition-transform', scopeAnchor && 'rotate-180')} />
+          </button>
+          {scopeAnchor && <ScopePopover anchor={scopeAnchor} onClose={() => setScopeAnchor(null)} />}
         </div>
         <div className="relative h-9 w-9 shrink-0">
           {busy ? (
