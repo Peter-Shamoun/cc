@@ -101,6 +101,12 @@ def _paced(name: str, paced_default: float) -> float:
     return paced_default if demo_pace_enabled() else 0.0
 
 
+def _safe_filename(name: str) -> str:
+    """Header-safe download name: [A-Za-z0-9._-] only (no quotes, CR/LF or path parts), always .csv."""
+    base = re.sub(r"[^A-Za-z0-9._-]+", "_", name or "").strip("._") or "download"
+    return base if base.endswith(".csv") else base + ".csv"
+
+
 @dataclass
 class Settings:
     llm: str = os.environ.get("CC_API_LLM", "scripted")
@@ -526,7 +532,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         audit("download", customer=ctx.principal.customer, user=ctx.principal.user, file_id=item.id,
               row_count=len(item.rows))
         return Response(data, media_type="text/csv; charset=utf-8", headers={
-            **NO_STORE, "Content-Disposition": f'attachment; filename="{item.name}"'})
+            **NO_STORE, "Content-Disposition": f'attachment; filename="{_safe_filename(item.name)}"'})
 
     def not_found():
         return JSONResponse({"error": {"code": "not_found", "message": "Not found."}}, 404, headers=NO_STORE)

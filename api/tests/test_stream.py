@@ -79,7 +79,7 @@ def test_large_result_is_capped_with_download_id(client):
     assert table["rowCount"] == 1200 and len(table["rows"]) == 50
     file = next(p for p in parts(evs) if p["type"] == "file")
     assert file["fileId"] == table["csvFileId"] and file["mime"] == "text/csv" and file["rowCount"] == 1200
-    assert file["name"] == "result.csv"
+    assert re.fullmatch(r"claimclarity_result_\d{4}-\d{2}-\d{2}\.csv", file["name"])
     assert not any(p["type"] == "chart" for p in parts(evs)), "row-level listings are not charted"
     for ev in evs:
         assert "\n" not in str(ev.get("part", {}).get("rows", "")), "no inline CSV"
