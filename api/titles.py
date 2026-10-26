@@ -12,10 +12,12 @@ import re
 
 from analyzer.tools import is_phi_column
 
+from api.mapping import ACRONYMS
+
 MAX_DIMS = 2
 _IDENT = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*$")
 _NUMERIC = {"integer", "number", "currency", "percent"}
-_ACRONYMS = {"ar", "carc", "cpt", "drg", "icd", "los", "npi", "pos", "rarc"}
+_ACRONYMS = ACRONYMS | {"ar", "los"}
 
 VOCAB = frozenset("""
     a amount allowed and avg average balance billed by cash category charge charges claim claims class code codes
