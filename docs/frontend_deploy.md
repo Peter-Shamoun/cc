@@ -81,14 +81,13 @@ Built HTML pins every script and stylesheet with **Subresource Integrity**, and 
 - [ ] `CC_API_LLM` stays `scripted` until the BAA and model decision are signed off.
 - [ ] `CC_API_ALLOW_PAID_API` is unset everywhere except the one production environment that's approved for it.
 
-## 7. Shares (pending a contract decision)
+## 7. Shares (decided in contract 1.15.0)
 
-These are tracked from [the share security review](frontend_share_security_review.md) and are now with the Contract
-team:
-- [ ] **S1**: widening a share to include data issues a **new link**, so the old link keeps its narrower scope.
-- [ ] **S4**: shares expire. The default is **30 days**, with 7, 30 and 90 day options shown in the share dialog.
-- [ ] The share registry is persistent, scoped to the same customer key as transcripts, and revoked when the
-      conversation is deleted.
+From [the share security review](frontend_share_security_review.md). The demo API implements both (`api/share.py`, tests in `api/tests/test_share_115.py`). The real backend must keep this behavior:
+- [x] **S1**: turning `includeData` on issues a **new share id** and revokes the old one, so a link sent while data was off never starts showing rows.
+- [x] **S4**: every share expires. `expiresInDays` is 7, 30 or 90 days (default 30 days), counted from the PUT that set it. An expired share reads like a revoked one.
+- [ ] The share registry is persistent, scoped to the same customer key as transcripts, and revoked when the conversation is deleted. The demo keeps shares in memory.
+- [ ] The web share dialog shows the 7/30/90 choice and the expiry date (Shell). Expiry is server time; the client compares it with the server clock (`web/src/lib/serverClock.ts`), not the local clock.
 
 ## 8. Environment variables the API reads
 
@@ -98,6 +97,7 @@ team:
 | `CC_API_MODE` | demo | not `sim` (the ccsim world) |
 | `CC_API_LLM` | `scripted` | `scripted` until sign-off (§6) |
 | `CC_API_ALLOW_PAID_API` | unset | unset unless approved (§6) |
+| `CC_API_SQL_LITERAL_MASKING` | `phi` | `phi` or `all`; never `off` (shown SQL would carry PHI literals; contract 1.14.0 §10) |
 | `CC_API_HOST` / `CC_API_PORT` | `127.0.0.1` / `8787` | behind the proxy |
 | `CC_API_MAX_BODY_BYTES` | 1 MiB | keep; set the proxy's body limit ≥ this so oversize requests get the API's 413 `payload_too_large` |
 | `CC_API_MAX_CONCURRENT_RUNS` | `3` unfinished runs per user | keep, or size to capacity |
@@ -111,3 +111,14 @@ team:
 
 Proxies must not buffer `text/event-stream`. For nginx, that means `proxy_buffering off` or the
 `X-Accel-Buffering: no` header the API sends; otherwise answers arrive all at once.
+
+## 9. One API process, or sticky routing (owner: Peter / infra)
+
+Live runs (`app.state.runs`) are kept in the API process's memory. Two things depend on that:
+- **Re-attaching** to an answer (`GET /api/chat/{id}/stream` with Last-Event-ID, after a dropped connection) must reach the process that is running it. Otherwise it gets 404 `stream_gone`, and the client reloads the saved answer instead of resuming.
+- **The concurrent-run cap** (3 per user, counted across all their tabs and sessions; `api/tests/test_concurrent_runs_tabs.py`) is counted per process. With N workers a user can have up to 3×N runs.
+
+So run one uvicorn worker per container and scale with containers behind sticky routing (cookie or user-keyed hash), or move runs to a shared store before adding workers.
+
+Proxy and load-balancer idle timeouts must be longer than the 15-s heartbeat (the ALB default of 60 s is fine). The web client treats 45 s of silence as a stalled stream and reconnects.
+

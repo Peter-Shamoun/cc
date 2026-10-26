@@ -37,13 +37,53 @@ export function demoTokenSession(token: string, onExpired: () => void = () => {}
   return { kind: 'demo-token', headers: () => ({ authorization: `Bearer ${token}` }), onExpired: once(onExpired) };
 }
 
+/**
+ * Cross-tab sign-out. Signing out in one tab must not leave a conversation on screen in another tab until that tab
+ * happens to make a request. `signOut` posts a constant on a BroadcastChannel (no ids or data). Every cookie
+ * session listens and leaves the page, which drops its in-memory answers and drafts. One listener per page.
+ */
+export const AUTH_CHANNEL = 'cc-auth';
+export const SIGNED_OUT = 'signed-out';
+let signOutListener: { channel: BroadcastChannel; fns: Set<() => void> } | null = null;
+/** This tab is the one signing out: its own navigation wins, the echo on its listener is ignored. */
+let signingOut = false;
+
+/** Tests only. */
+export function resetSignOutState(): void { signingOut = false; signOutListener?.channel.close(); signOutListener = null; }
+
+export function onSignedOutElsewhere(fn: () => void): () => void {
+  if (typeof BroadcastChannel === 'undefined') return () => {};
+  if (!signOutListener) {
+    const channel = new BroadcastChannel(AUTH_CHANNEL);
+    const fns = new Set<() => void>();
+    channel.onmessage = (e: MessageEvent) => { if (e.data === SIGNED_OUT && !signingOut) fns.forEach((f) => f()); };
+    signOutListener = { channel, fns };
+  }
+  const l = signOutListener;
+  l.fns.add(fn);
+  return () => {
+    l.fns.delete(fn);
+    if (!l.fns.size && signOutListener === l) { l.channel.close(); signOutListener = null; }
+  };
+}
+
+function announceSignOut(): void {
+  signingOut = true;
+  if (typeof BroadcastChannel === 'undefined') return;
+  try { const c = new BroadcastChannel(AUTH_CHANNEL); c.postMessage(SIGNED_OUT); c.close(); } catch { /* best effort */ }
+}
+
 /** `signInUrl` gets `?next=<path>`. Only the pathname: no query or hash, which could hold app state. */
 export function cookieSession(signInUrl?: string, nav: (url: string) => void = (u) => window.location.assign(u)): AuthSession {
+  const toSignIn = () => (signInUrl ? `${signInUrl}${signInUrl.includes('?') ? '&' : '?'}next=${encodeURIComponent(window.location.pathname)}` : null);
+  // Another tab signed out: leave even without a sign-in URL (a reload drops what's on screen; the next load is 401).
+  onSignedOutElsewhere(once(() => nav(toSignIn() ?? window.location.pathname)));
   return {
     kind: 'cookie',
     headers: () => ({ [CSRF_HEADER]: '1' }),
     onExpired: once(() => {
-      if (signInUrl) nav(`${signInUrl}${signInUrl.includes('?') ? '&' : '?'}next=${encodeURIComponent(window.location.pathname)}`);
+      const url = toSignIn();
+      if (url) nav(url);
     }),
   };
 }
@@ -88,6 +128,7 @@ export async function signOut(
   } catch {
     /* offline: still leave */
   }
+  announceSignOut();
   nav(opts.signInUrl || window.location.pathname);
   return ok;
 }

@@ -373,3 +373,25 @@ def _key_figures(table: dict) -> list[str]:
     out += [f"- **Highest:** {_md_cell(hi[0], kind)} ({_md_cell(hi[1])})",
             f"- **Lowest:** {_md_cell(lo[0], kind)} ({_md_cell(lo[1])})", ""]
     return out
+
+
+def multi_table_parts(parts: list[dict], answer: AnalyzerAnswer, extra: list[tuple[str, str, dict]],
+                      principal: Principal, downloads: DownloadRegistry, elapsed_ms: int | None = None) -> list[dict]:
+    """Demo ``multi_table`` scenario (contract 1.16.0, §9.1): one answer with several result tables.
+
+    ``parts`` is the normal single-table answer; ``extra`` is ``[(title, sql, digest)]`` for every further query the
+    run already executed (its ``step.sql_running``/``step.sql_result`` were streamed live). Each extra table gets its
+    own SQL ``code`` part and ``sqlPartId``, right after the first table, so a client learns to render N tables per
+    answer. The caller titles the first table."""
+    out = list(parts)
+    insert_at = max((i for i, p in enumerate(out) if p.get("type") in ("table", "chart", "file")), default=len(out) - 1) + 1
+    added: list[dict] = []
+    for title, sql, digest in extra:
+        one = AnalyzerAnswer(kind="answer", text="-", sql=sql, rows=digest.get("all_rows", digest.get("rows")),
+                             columns=digest.get("columns"), model=answer.model, candidate_index=0)
+        for p in answer_parts(one, principal, downloads, elapsed_ms, include_tools=False):
+            if p["type"] == "code":
+                added.append({**p, "title": f"SQL: {title}"})
+            elif p["type"] in ("table", "file", "chart"):
+                added.append({**p, "title": title} if p["type"] == "table" else p)
+    return out[:insert_at] + added + out[insert_at:]
