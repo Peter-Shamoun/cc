@@ -208,6 +208,13 @@ export function summarize(steps: Step[], elapsedMs?: number): string {
   return s;
 }
 
+/** Footer cost: cents, like a receipt ("<$0.01" under a cent). The popover keeps the exact figure (fmtUsd). */
+export function fmtUsdShort(x: number): string {
+  if (x === 0) return '$0';
+  if (x < 0.01) return '<$0.01';
+  return `$${x.toFixed(2)}`;
+}
+
 export function fmtUsd(x: number): string {
   if (x === 0) return '$0';
   if (x < 0.01) return `$${x.toFixed(4)}`;
