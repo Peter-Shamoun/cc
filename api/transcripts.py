@@ -53,6 +53,8 @@ CONDITIONAL_WRITE_ATTEMPTS = 8
 CONDITIONAL_WRITE_BACKOFF_SECONDS = 0.02
 #: always fullmatch (`$` would accept a trailing "\n"). Starts alphanumeric: "." / ".." would be path segments.
 _SAFE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_:.-]{0,127}")
+#: how long a process trusts its cached copy of a user's retention setting (another API task may change it)
+RETENTION_CACHE_SECONDS = 60.0
 _USER_PREFIX = re.compile(r"^[A-Za-z0-9_:.-]{1,128}/transcripts/users/[0-9a-f]{32}/")
 
 
@@ -318,7 +320,7 @@ class SealedTranscriptStore:
         self.default_retention_days = default_retention_days
         self._audit = audit or (lambda event, **kw: None)
         self._lock = threading.RLock()
-        self._retention: dict[Principal, int] = {}
+        self._retention: dict[Principal, tuple[int, float]] = {}  # (days, time.monotonic() when read)
 
     # ---- interface -------------------------------------------------------------------------------
     def list_conversations(self, principal, cursor=None, query=None, archived="include"):
@@ -404,15 +406,18 @@ class SealedTranscriptStore:
             raise ValueError("days must be >= 0")
         days = min(days, self.default_retention_days)
         with self._lock:
-            self._retention[principal] = days
+            self._retention[principal] = (days, time.monotonic())
             # Persisted beside the user's objects so it survives restarts and the sweep can read it. Days only.
             self.blobs.put(f"{self._prefix(principal)}retention.json", json.dumps({"days": days}).encode())
         self._expire(principal)
 
     def retention_days(self, principal):
-        if principal not in self._retention:
-            self._retention[principal] = self._stored_days(self._prefix(principal))
-        return self._retention[principal]
+        """The stored setting, re-read after RETENTION_CACHE_SECONDS so a change made on another task applies."""
+        cached = self._retention.get(principal)
+        if cached is None or time.monotonic() - cached[1] > RETENTION_CACHE_SECONDS:
+            cached = (self._stored_days(self._prefix(principal)), time.monotonic())
+            self._retention[principal] = cached
+        return cached[0]
 
     def purge_expired(self, now: float | None = None) -> int:
         """Sweep every user under every customer, not just the ones who come back. Deletes expired meta and
