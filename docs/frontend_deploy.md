@@ -112,3 +112,14 @@ team:
 
 Proxies must not buffer `text/event-stream`. For nginx, that means `proxy_buffering off` or the
 `X-Accel-Buffering: no` header the API sends; otherwise answers arrive all at once.
+
+## 9. One API process, or sticky routing (owner: Peter / infra)
+
+Live runs (`app.state.runs`) are kept in the API process's memory. Two things depend on that:
+- **Re-attaching** to an answer (`GET /api/chat/{id}/stream` with Last-Event-ID, after a dropped connection) must reach the process that is running it. Otherwise it gets 404 `stream_gone`, and the client reloads the saved answer instead of resuming.
+- **The concurrent-run cap** (3 per user, counted across all their tabs and sessions; `api/tests/test_concurrent_runs_tabs.py`) is counted per process. With N workers a user can have up to 3×N runs.
+
+So run one uvicorn worker per container and scale with containers behind sticky routing (cookie or user-keyed hash), or move runs to a shared store before adding workers.
+
+Proxy and load-balancer idle timeouts must be longer than the 15-s heartbeat (the ALB default of 60 s is fine). The web client treats 45 s of silence as a stalled stream and reconnects.
+
