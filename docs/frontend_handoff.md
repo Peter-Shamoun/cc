@@ -210,9 +210,71 @@ Full list with owners: **`docs/frontend_deploy.md`** (`api/tests/test_deploy_doc
 <!-- SECTION: not-built. Teams list in-flight features dropped at the 12:20 AM finalize (multi-question clarify form,
 A30 composer reply, collapsed thinking, context-full state, quote-a-selection, suggested follow-ups) as built / not built. -->
 
+Shell, at the 12:20 AM finalize:
+
+- A30 composer reply: **built** (#295). With a clarifying question open, the composer placeholder is "Reply…" and the
+  typed text answers it (`resume` on the wire).
+- Branch in new chat (answer More menu): **built** (#294).
+- Chat-length-limit (context-full) read-only state with "Start a new chat" / "Branch in new chat": **not built**.
+- Quote-a-selection chip in the composer: **not built**.
+- Response preferences settings section: **not built**.
+- ChatGPT-style single-row pill composer: **not built** (prototype dropped).
+
 ## 9. Team sections
 
 <!-- SECTION: shell. Shell team: layout, sidebar, routes, composer, themes, shortcuts, removed share/scope UI. -->
+
+### 9.x Shell (layout, sidebar, routes, composer, settings, themes, shortcuts)
+
+Owner during the sprint: shell. Design rule: ChatGPT/Claude parity from observation only, calm and neutral (one accent,
+hairline borders, ~48rem column, small muted icons, fast quiet motion). `src/shell/slopGuard.test.ts` fails the build
+on gradients, glass/blur, glow, heavy shadows and similar.
+
+**Components map** (`web/src/`)
+
+| File | What it owns |
+|---|---|
+| `App.tsx` | Path route switch: app, `/signed-out`, everything else is the 404 (`shell/StatusPage`). |
+| `shell/routes.ts` | `routeFromLocation` (path routes) and `signedOutUrl`. |
+| `shell/AppShell.tsx` | Layout and wiring: sidebar + header + `ThreadView` + docked composer; hash route `#/c/<id>`; dialogs (search, settings, shortcuts, delete/rename); global shortcuts; temporary chat; A30 composer-as-reply (`lib/openClarification.ts`); branch in new chat. |
+| `shell/Header.tsx` | Product menu (strategy / model from `/api/capabilities`), title menu (Rename, Copy as Markdown, Export as Markdown, Export as JSON when the server exports, Delete), temporary-chat toggle, new chat. No share, no scope. |
+| `components/Sidebar.tsx` | New chat, Search chats, date-grouped chats with a row menu (rename, pin, archive, export, delete), filter past 20 rows, collapsed rail with avatar, account menu (identity read-only, Settings, Sign out). Mobile: a drawer with swipe. |
+| `components/Composer.tsx` | `+` (attach text files) / textarea / send. Enter sends, Shift+Enter new line, long pastes become chips, Stop while streaming, offline-aware. Placeholder becomes "Reply…" when a clarifying question is open. |
+| `shell/ThreadView.tsx` | Windowed message list, scroll-to-bottom, stays pinned while streaming. |
+| `shell/SearchDialog.tsx` | Ctrl/⌘K chat search (server search when the API has it). |
+| `shell/SettingsDialog.tsx` | Settings modal (see below). |
+| `shell/StarterCards.tsx` | Empty-state heading and starter prompts. |
+| `shell/StatusPage.tsx` | 404 and signed-out / session-expired pages. |
+| `shell/OfflineBanner.tsx` | Offline notice. |
+| `shell/shortcuts.ts` | One table drives the key handler docs and the Shortcuts sheet. |
+| `shell/primitives.tsx` | Menu, Dialog, IconButton, `useMenu`, `modKey`. |
+
+**Routes**
+
+- `/` (the base): the app. Chats are hash routes `#/c/<id>`; an empty hash is a new chat.
+- `/signed-out` and `/signed-out?reason=expired`: signed-out and session-expired pages.
+- Anything else, including `/shared/*` and `/share/*`: the plain 404 ("Page not found", link home).
+- `document.title` never contains a chat title (PHI sink; `src/security/titleSink.test.tsx`).
+
+**Settings** (modal, tabs; ChatGPT and Claude use a full page, we kept the modal)
+
+- General: Theme (System / Light / Dark), Style (palette), Send with Enter.
+- Data controls: Chat history (on/off; off = memory only), Archived chats (unarchive), Export chats, Unsent drafts, Storage.
+- Shortcuts (desktop only): New chat ⌘/Ctrl⇧O, Search ⌘/Ctrl K, Toggle sidebar ⌘/Ctrl⇧S, Focus input ⇧Esc, Copy last
+  response ⌘/Ctrl⇧C, Export as Markdown ⌘/Ctrl⇧E, Settings ⌘/Ctrl ,, Shortcuts ⌘/Ctrl /, Stop Esc, Slash commands /,
+  New line ⇧Enter, Close Esc.
+
+**Known gaps (shell)**
+
+- Esc stops a running answer (Claude does this; ChatGPT does not). Kept on purpose.
+- Composer is a two-row box. ChatGPT's single-row pill that grows on Shift+Enter was prototyped and dropped at the
+  finalize (patch kept outside the repo).
+- The empty-state heading is larger than ChatGPT's.
+- Account identity is a demo constant (`ACCOUNT` in Sidebar); production should read it from the session (`/api/me`).
+- The `+` attach button adds text files to the question as context; files are not queryable data (see §8 "File upload").
+- Strategy / model in the product menu are validated and echoed by the API but don't change the scripted run (§10).
+- The header's "Data: Live API / Demo data" row is informational only.
+- Settings is a modal, not a full page.
 
 <!-- SECTION: answer. Answer team: answer rendering (timeline, text, table, chart, clarify, errors), print, copy. -->
 
