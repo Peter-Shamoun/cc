@@ -183,7 +183,7 @@ class AuditLog:
 
     ALLOWED = {"customer", "interrupts", "user", "file_id", "row_count", "conversation_id", "message_id", "parts",
                "queries", "elapsed_ms", "finish", "kind", "reason", "status", "scenario", "steps",
-               "expires_in_days", "rotated", "pinned", "archived", "rules", "temporary"}
+               "pinned", "archived", "rules", "temporary"}
 
     def __init__(self):
         self.events: list[dict] = []
