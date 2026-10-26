@@ -4,7 +4,7 @@ import { LIVE, open, ask, lastAssistant, composer, stopBtn, waitIdle, sse, gap }
 // Coverage for the newest composer, message and table features (QA C7 prep). Live = real demo API.
 const chatPosts = (page: import('@playwright/test').Page) => {
   const bodies: Record<string, unknown>[] = [];
-  page.on('request', (r) => { if (r.method() === 'POST' && /\/api\/chat$/.test(r.url())) bodies.push(r.postDataJSON()); });
+  page.on('request', (r) => { if (r.method() === 'POST' && r.url().endsWith('/api/chat')) bodies.push(r.postDataJSON()); });
   return bodies;
 };
 const lastUserText = (b: Record<string, unknown>) => {
