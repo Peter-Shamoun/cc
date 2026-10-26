@@ -61,7 +61,13 @@
 html, body, #root { height: 100%; }
 body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
 
-.prose-chat { font-family: var(--font-prose); font-size: var(--prose-size); line-height: var(--prose-lh); }
+.prose-chat {
+  font-family: var(--font-prose); font-size: var(--prose-size); line-height: var(--prose-lh);
+  overflow-wrap: anywhere; word-break: break-word; max-width: 100%; min-width: 0;
+  unicode-bidi: isolate;
+}
+.prose-chat :where(a, code) { overflow-wrap: anywhere; }
+.prose-chat .overflow-x-auto { max-width: 100%; }
 .prose-chat :where(p) { margin: 0 0 var(--p-gap); }
 .prose-chat :where(ul, ol) { margin: 0.5em 0 1em; padding-left: 1.5em; }
 .prose-chat :where(ul) { list-style: disc; }

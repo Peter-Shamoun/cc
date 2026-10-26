@@ -13,6 +13,12 @@ function esc(v: unknown): string {
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
+/** Tabs and newlines would shift columns when pasted into a spreadsheet. */
+function tsvField(v: unknown): string {
+  if (v === null || v === undefined) return '';
+  return String(v).replace(/[\t\r\n]+/g, ' ');
+}
+
 /** RFC 4180 CSV of loaded rows with raw values. PHI columns are dropped unless allowed (§6.6). */
 export function tableToCsv(t: Pick<TablePart, 'columns' | 'rows'>, allowPhi = false): string {
   const idx = t.columns.map((c, i) => [c, i] as const).filter(([c]) => visible(c, allowPhi));
@@ -24,9 +30,31 @@ export function tableToCsv(t: Pick<TablePart, 'columns' | 'rows'>, allowPhi = fa
 /** Tab-separated for pasting into Excel or Sheets. PHI columns are dropped unless allowed. */
 export function tableToTsv(t: Pick<TablePart, 'columns' | 'rows'>, allowPhi = false): string {
   const idx = t.columns.map((c, i) => [c, i] as const).filter(([c]) => visible(c, allowPhi));
-  const head = idx.map(([c]) => c.label).join('\t');
-  const body = t.rows.map((r) => idx.map(([, i]) => String(r[i] ?? '')).join('\t'));
+  const head = idx.map(([c]) => tsvField(c.label)).join('\t');
+  const body = t.rows.map((r) => idx.map(([, i]) => tsvField(r[i])).join('\t'));
   return [head, ...body].join('\n');
+}
+
+/**
+ * RFC 4180 CSV for a list of records (chart "Download data"). Columns are the
+ * union of keys in first-seen order, not just the first row. Nulls are empty.
+ */
+export function recordsToCsv(rows: readonly Record<string, unknown>[]): string {
+  const keys: string[] = [];
+  const seen = new Set<string>();
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue;
+    for (const key of Object.keys(row)) {
+      if (!seen.has(key)) {
+        seen.add(key);
+        keys.push(key);
+      }
+    }
+  }
+  if (keys.length === 0) return '';
+  const head = keys.map((key) => esc(key)).join(',');
+  const body = rows.map((row) => keys.map((key) => esc(row && typeof row === 'object' ? row[key] : '')).join(','));
+  return [head, ...body].join('\r\n');
 }
 
 export function isNumeric(c: Column) {
@@ -41,6 +69,7 @@ export function formatCell(v: unknown, c: Column, allowPhi = false): string {
   if (v === null || v === undefined || v === '') return '—';
   if (typeof v === 'boolean') return v ? 'Yes' : 'No';
   if (typeof v !== 'number') return String(v);
+  if (!Number.isFinite(v)) return '—';
   switch (c.type) {
     case 'percent':
       return `${(v * 100).toFixed(1)}%`;

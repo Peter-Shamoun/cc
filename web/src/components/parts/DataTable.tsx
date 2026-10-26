@@ -12,6 +12,22 @@ type Row = unknown[];
 const VIRTUALIZE_AT = 200;
 const ROW_H = 37;
 
+/** Null, blank, and non-finite values sort after every real number (Excel-style blanks). */
+function compareNumeric(a: unknown, b: unknown): number {
+  const to = (v: unknown) => {
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string' && v.trim() !== '') return Number(v);
+    return Number.NaN;
+  };
+  const na = to(a);
+  const nb = to(b);
+  const fa = Number.isFinite(na);
+  const fb = Number.isFinite(nb);
+  if (fa && fb) return na === nb ? 0 : na > nb ? 1 : -1;
+  if (!fa && !fb) return 0;
+  return fa ? -1 : 1;
+}
+
 export function DataTable({ part, onOpen, full }: { part: TablePart; onOpen?: () => void; full?: boolean }) {
   const adapter = useAdapter();
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -19,12 +35,15 @@ export function DataTable({ part, onOpen, full }: { part: TablePart; onOpen?: ()
   const columns = useMemo<ColumnDef<Row>[]>(
     () =>
       part.columns.map((c, i) => ({
-        id: c.key,
+        // Index keeps two columns that share a key from collapsing into one.
+        id: `${i}:${c.key}`,
         accessorFn: (r) => (c.phi ? null : r[i]),
         header: c.label,
         cell: (info) => formatCell(info.row.original[i], c),
         enableSorting: !c.phi,
-        sortingFn: isNumeric(c) ? 'basic' : 'alphanumeric',
+        // Spec §4.2: first click is ascending, then descending, then clear. TanStack otherwise starts numbers at descending.
+        sortDescFirst: false,
+        sortingFn: isNumeric(c) ? (a, b, id) => compareNumeric(a.getValue(id), b.getValue(id)) : 'alphanumeric',
         meta: { numeric: isNumeric(c), phi: c.phi, description: c.description },
       })),
     [part.columns],
@@ -43,7 +62,14 @@ export function DataTable({ part, onOpen, full }: { part: TablePart; onOpen?: ()
   // Virtualize once a table is big enough to cost layout time (spec §4.3: 10k-row previews).
   const scrollRef = useRef<HTMLDivElement>(null);
   const virtual = rows.length > VIRTUALIZE_AT;
-  const rv = useVirtualizer({ count: virtual ? rows.length : 0, getScrollElement: () => scrollRef.current, estimateSize: () => ROW_H, overscan: 12 });
+  const rv = useVirtualizer({
+    count: virtual ? rows.length : 0,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ROW_H,
+    overscan: 12,
+    // Paint a window before the scrollport is measured, so the first frame is not blank.
+    initialRect: { width: 800, height: full ? 600 : 400 },
+  });
   const items = virtual ? rv.getVirtualItems() : [];
   const padTop = virtual && items.length ? items[0].start : 0;
   const padBottom = virtual && items.length ? rv.getTotalSize() - items[items.length - 1].end : 0;
@@ -80,8 +106,13 @@ export function DataTable({ part, onOpen, full }: { part: TablePart; onOpen?: ()
           )}
         </div>
       </div>
-      <div ref={scrollRef} className={clsx('overflow-auto', full ? 'max-h-[calc(100vh-170px)]' : 'max-h-[400px]')} data-virtual={virtual || undefined}>
-        <table className="w-full border-collapse font-sans text-sm">
+      <div
+        ref={scrollRef}
+        className={clsx('overflow-auto', full ? 'max-h-[calc(100vh-170px)]' : 'max-h-[400px]')}
+        style={virtual ? { height: full ? 'calc(100vh - 170px)' : 400 } : undefined}
+        data-virtual={virtual || undefined}
+      >
+        <table className="w-max min-w-full border-collapse font-sans text-sm">
           <thead className="sticky top-0 z-[1] bg-elev">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
