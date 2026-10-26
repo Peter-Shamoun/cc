@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowUp, Check, ChevronRight, CircleSlash, HelpCircle, Lock, RotateCcw } from 'lucide-react';
+import { Check, ChevronRight, CircleSlash, HelpCircle, Lock, RotateCcw } from 'lucide-react';
 import clsx from 'clsx';
 import type { ChatRequest } from '../../api/contract';
 import { Markdown } from '../parts/Markdown';
@@ -56,7 +56,6 @@ export function AbstainCard({ part, onReply }: { part: AbstainPart; onReply?: On
 export function ClarifyCard({ part, onReply, active }: { part: ClarificationPart; onReply?: OnReply; active: boolean }) {
   const [answer, setAnswer] = useState<string | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
-  const [text, setText] = useState('');
   const expired = useExpired(part.expiresAt);
   const done = answer !== null || !!part.answered || !active || expired;
   const choices = part.choices ?? [];
@@ -90,12 +89,8 @@ export function ClarifyCard({ part, onReply, active }: { part: ClarificationPart
           )}
         </div>
       )}
-      {!done && part.allowFreeText && (
-        <form className="mt-3 flex items-center gap-2 rounded-xl border border-line bg-bg py-1 pl-3 pr-1 focus-within:border-fg-subtle" onSubmit={(e) => { e.preventDefault(); submit(part.multiSelect ? picked : [], text); }}>
-          <input value={text} onChange={(e) => setText(e.target.value)} aria-label="Answer in your own words" placeholder={choices.length ? 'Or answer in your own words' : 'Type your answer'} className="min-w-0 flex-1 bg-transparent py-1 outline-none" />
-          <button type="submit" disabled={!text.trim()} aria-label="Send answer" className="flex h-7 w-7 items-center justify-center rounded-lg bg-fg text-bg disabled:opacity-30"><ArrowUp size={15} /></button>
-        </form>
-      )}
+      {/* QA-A30: free text goes through the composer (shell routes it as resume.text), as in Claude/ChatGPT; no second input here. */}
+      {!done && part.allowFreeText && onReply && <div className="mt-2 text-xs text-fg-subtle" data-testid="clarify-type-hint">{choices.length ? 'Or type your answer below' : 'Type your answer below'}</div>}
       {answer !== null && <div className="mt-2 text-xs text-fg-subtle" data-testid="clarify-answered">You answered “{answer}”. Continuing…</div>}
       {answer === null && part.answered && <div className="mt-2 text-xs text-fg-subtle" data-testid="clarify-answered">Answered</div>}
       {answer === null && !part.answered && expired && <div className="mt-2 text-xs text-fg-subtle">This question expired. Ask again to continue.</div>}
