@@ -1,4 +1,4 @@
-# CC chat contract: changelog and migration guide (v1.0 → 1.15.0)
+# CC chat contract: changelog and migration guide (v1.0 → 1.16.0)
 
 **For review by Claude.** This is a reading guide to `api/CONTRACT.md`, which stays the normative text, and
 `api/contract/v1.schema.json`. It covers three things:
@@ -10,7 +10,7 @@
 The adapter that produces these events from analyzer and analyst outputs is specified in
 [`frontend-analyzer-adapter.md`](frontend-analyzer-adapter.md).
 
-Every version from 1.0 to 1.15 is **additive**. A 1.0 client keeps working against a 1.15 server, because it ignores
+Every version from 1.0 to 1.16 is **additive**. A 1.0 client keeps working against a 1.16 server, because it ignores
 unknown events, fields and part types (§3). No field was removed or renamed. The one wire-visible tightening is
 1.12's error envelope on 404 and 405, and 1.13's `not_found` for regenerate/edit 404s (below).
 
@@ -34,8 +34,11 @@ unknown events, fields and part types (§3). No field was removed or renamed. Th
 | 1.13 | review audit: error envelope on every 4xx (stop/delete 404s too), `ErrorCode` registry, `x-open`/`x-fallback`/`x-known`, `Timestamp`, descriptions on every def | regenerate/edit 404s are `not_found` + `legacyCode:"validation"`; send ISO-8601 UTC | read `error.code` (then `legacyCode`, then status); render unknown open-enum values with `OPEN_ENUM_FALLBACKS` |
 | 1.14 | shown-SQL literal masking (`maskedLiterals`, `Capabilities.sqlLiteralMasking`), `ArtifactPart.kind` open, exact latency stages | mask literals in every shown SQL (`api/sql_mask.py`); stages sum to `totalMs` | show "Patient values hidden" when `maskedLiterals` is set; never run shown SQL; unknown artifact kinds render as a generic document |
 | 1.15 | share expiry (`expiresInDays` 7/30/90, `expiresAt`), rotate id on widening (`rotated`), SQL withheld on data-off shares (`sqlWithheld`), sign-out documented | rotate on false→true; expire shares (same 404); strip SQL from data-off views | show expiry in the share dialog; on `rotated` show the new link; "SQL not shared" when `sqlWithheld` |
+| 1.16 | edge-case demo scenarios (`empty`, `multi_table`, `long_sql`, `many_repairs`, `clarify_nested`, `escalation_abstain`, `cancel_*` ×6) + `report` in the scenario enum; `examples/edge/` | demo backend only | use `EDGE_SCENARIOS` / `examples/edge/*.jsonl` in UI + e2e tests; nothing to migrate |
 
 **Migration notes**
+* **1.16 scenarios.** Nothing changes on the wire. If you typed `ChatRequest.scenario` yourself, use `DemoScenario`
+  from `web/src/api/contract.ts`; the old hand-written union lacked `report`.
 * **1.15 shares.** A link handed out data-free stops working when the owner turns data on (new id, `rotated: true`),
   and every link now expires (30 days unless chosen). A data-off shared view no longer contains SQL; clients that
   rendered `code`/`sql` from it get nothing to render (`sqlWithheld: true`).
