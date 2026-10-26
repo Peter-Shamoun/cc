@@ -48,8 +48,33 @@ let signOutListener: { channel: BroadcastChannel; fns: Set<() => void> } | null 
 /** This tab is the one signing out: its own navigation wins, the echo on its listener is ignored. */
 let signingOut = false;
 
+/**
+ * Back/forward cache. A page left because of a sign-out (here, in another tab, or an expired session) can come back
+ * from the bfcache with the conversation still in its DOM and memory when the user presses Back. The HTML is
+ * `no-store`, which most browsers treat as "don't bfcache", but that's a heuristic. So: blank the DOM before leaving
+ * (the snapshot holds nothing), and if the page is restored anyway (`pageshow` with `persisted`), reload it. The reload
+ * fetches a fresh page, which the server answers as signed out.
+ */
+export const pageHooks = { reload: () => window.location.reload() };
+let leftSignedOut = false;
+let bfcacheGuard = false;
+
+function onPageShow(e: PageTransitionEvent | Event) {
+  if ((e as PageTransitionEvent).persisted && leftSignedOut) pageHooks.reload();
+}
+
+export function leaveSignedOut(nav: (url: string) => void, url: string): void {
+  leftSignedOut = true;
+  if (!bfcacheGuard && typeof window !== 'undefined') { bfcacheGuard = true; window.addEventListener('pageshow', onPageShow); }
+  try { document.getElementById('root')?.replaceChildren(); } catch { /* leaving anyway */ }
+  nav(url);
+}
+
 /** Tests only. */
-export function resetSignOutState(): void { signingOut = false; signOutListener?.channel.close(); signOutListener = null; }
+export function resetSignOutState(): void {
+  signingOut = false; signOutListener?.channel.close(); signOutListener = null;
+  leftSignedOut = false; if (bfcacheGuard) { window.removeEventListener('pageshow', onPageShow); bfcacheGuard = false; }
+}
 
 export function onSignedOutElsewhere(fn: () => void): () => void {
   if (typeof BroadcastChannel === 'undefined') return () => {};
@@ -77,13 +102,13 @@ function announceSignOut(): void {
 export function cookieSession(signInUrl?: string, nav: (url: string) => void = (u) => window.location.assign(u)): AuthSession {
   const toSignIn = () => (signInUrl ? `${signInUrl}${signInUrl.includes('?') ? '&' : '?'}next=${encodeURIComponent(window.location.pathname)}` : null);
   // Another tab signed out: leave even without a sign-in URL (a reload drops what's on screen; the next load is 401).
-  onSignedOutElsewhere(once(() => nav(toSignIn() ?? window.location.pathname)));
+  onSignedOutElsewhere(once(() => leaveSignedOut(nav, toSignIn() ?? window.location.pathname)));
   return {
     kind: 'cookie',
     headers: () => ({ [CSRF_HEADER]: '1' }),
     onExpired: once(() => {
       const url = toSignIn();
-      if (url) nav(url);
+      if (url) leaveSignedOut(nav, url);
     }),
   };
 }
@@ -129,6 +154,6 @@ export async function signOut(
     /* offline: still leave */
   }
   announceSignOut();
-  nav(opts.signInUrl || window.location.pathname);
+  leaveSignedOut(nav, opts.signInUrl || window.location.pathname);
   return ok;
 }
