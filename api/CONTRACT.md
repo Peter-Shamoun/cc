@@ -1,6 +1,6 @@
 # ClaimClarity chat API — stream contract
 
-**Version: 1.21.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.22.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -421,7 +421,7 @@ In the `cancel_*` scenarios the **server presses Stop itself** when the stage's 
 * `error.details` and `step.*.error.message` are scrubbed (quoted literals and long digit runs masked) and ≤500 chars.
 * **Shown SQL masks PHI-bearing literals (1.14.0).** The SQL a run *executes* is unchanged; the SQL it *shows*
   (`step.sql_running.sql`, `step.repair_attempt.revisedSql`, `step.candidates[].sql`, the `code` part with `role: query`, legacy `tool_call` input, and
-  therefore transcripts, shares and exports) has literals replaced by `?`, and the event/part carries
+  therefore transcripts and exports) has literals replaced by `?`, and the event/part carries
   `maskedLiterals: <n>`. The server policy is `Capabilities.sqlLiteralMasking` (env `CC_API_SQL_LITERAL_MASKING`;
   an unknown value means `phi`, so a typo never turns it off):
 
@@ -466,7 +466,7 @@ announced by `Capabilities.pinArchive: true`; older servers lack it, so keep pin
 * The plain list returns **pinned chats first** (most recently pinned on top), then the rest newest first, so pins are
   on page 1 whatever their age. Search results stay newest first. `?archived=exclude` is the sidebar,
   `?archived=only` is Settings → Archived chats; the default `include` keeps pre-1.17 clients unchanged. Archived
-  chats stay searchable and openable. Shared views (§17) never show the flags.
+  chats stay searchable and openable.
 * Audit: `conversation_flags` with `pinned` / `archived` only (no title, no text).
 
 **`StoredMessage`.** User messages carry `text`, `parentId?` and `editOf?`. Assistant messages carry `parts`,
@@ -493,8 +493,8 @@ Like ChatGPT's Temporary chat: a chat the user doesn't want kept. Announced by `
   dropped after `ttlSeconds` idle, on `DELETE /api/conversations/{id}` (the client's "discard" on leaving the chat), on
   `DELETE /api/conversations` (not counted in `deleted`), and on sign-out. At most 20 per user (least recently used
   goes first).
-* **Never listed or reachable as history.** Not in the list or search; `GET`, `PATCH`, export, share and feedback on
-  its id are 404 `access_denied`, so it can't be shared, renamed, pinned or rated.
+* **Never listed or reachable as history.** Not in the list or search; `GET`, `PATCH`, export and feedback on
+  its id are 404 `access_denied`, so it can't be renamed, pinned or rated.
 * **No title.** `message.end` never carries `conversationTitle`.
 * **No crossing.** A temporary turn on a saved chat's id, or a saved turn on a temporary chat's id, is 422
   `validation` ("Start a new chat"). Another user's id is 404.
@@ -665,50 +665,26 @@ the declared fields, x/y/series present and well typed, finiteness, series count
   (`buildSpec`, `ChartView`) draws only from a valid `plot`; a chart without `plot` (stored before 1.18) still
   renders from its sanitized `spec`.
 
-## 17. Share inside the organization (1.11.0)
+## 17. Sharing (removed in 1.22.0)
 
-A share is a **read-only, org-scoped, revocable** link to one conversation. There are no public links: the viewer
-must be signed in to the same organization (customer). A conversation has at most one active share.
-
-| Request | Body | Response |
-|---|---|---|
-| `GET /api/conversations/{id}/share` | | `ShareLink`, or 404 `not_found` when not shared |
-| `PUT /api/conversations/{id}/share` | `ShareRequest {includeData?: false, expiresInDays?: 7\|30\|90}` | `ShareLink {shareId, conversationId, url, scope: "organization", includeData, createdAt, expiresAt, expiresInDays, rotated?}`. Same `shareId` unless data is widened (below); 422 for another `expiresInDays` |
-| `DELETE /api/conversations/{id}/share` | | `{revoked: true}`, or 404 when there was none |
-| `GET /api/shared/{shareId}` | | `SharedConversation {shareId, title, updatedAt, includeData, createdAt, expiresAt, sqlWithheld?, messages: StoredMessage[]}` |
-
-* Only the owner can manage a share. Anyone else gets a 404, like any other user's conversation (§1).
-* The viewer gets **404 `not_found`** for an unknown, revoked, **expired**, other-organization or
-  deleted-conversation share alike, so a link reveals nothing. 401 when signed out, 410 `transcripts_unavailable` after crypto-shredding.
-  Deleting the conversation revokes its share.
-* **Data is withheld by default.** With `includeData: false`, tables keep `columns` and `rowCount`, but `rows: []`
-  and `dataWithheld: true` (`TablePart.dataWithheld`, 1.11). `chart` parts and `table`/`chart`/`report`/`image`
-  artifacts are left out. **SQL is withheld too (1.15.0, QA-S18)**: SQL `code` parts are removed, `table.sqlPartId`
-  is dropped, SQL strings in stored steps (`sql`, `revisedSql`, `candidates[].sql`) and `tool_call.input.sql` are
-  `""`, and the view says `sqlWithheld: true` (show "SQL not shared"). Prose, steps, callouts and sources stay. With `includeData: true`, the stored preview
-  rows (≤ 50 per table) are shared. **Never shared:** the CSV (`csvFileId` is removed), `feedback`, and the owner's
-  identity.
-* **Widening rotates the link (1.15.0, S1).** A PUT that turns `includeData` from false to true issues a **new**
-  `shareId` and revokes the old one, so a link handed out for a data-free view never starts showing rows. The
-  response has `rotated: true`; the dialog must show the new link and say the old one stopped working. Narrowing
-  (true→false) or an unchanged `includeData` keeps the id.
-* **Expiry (1.15.0, S4).** Every share expires. `expiresInDays` is 7, **30 (default)** or 90, counted from the PUT
-  that set it; a PUT without it keeps the current expiry (a new or rotated share gets 30 days). `Capabilities.shareExpiry`
-  lists the options and default. The dialog shows the expiry (`expiresAt`, e.g. "Expires Nov 24 · in 30 days";
-  `shareDaysLeft()` in `web/src/contract/share.ts`). An expired share is gone: viewer 404 as above, and the owner's GET
-  is 404 "not shared". A share from a pre-1.15 server has no `expiresAt` (no expiry).
-* `url` is the app path `/shared/<shareId>`. The share id has 144 random bits and is a capability inside the org:
-  don't log it. The response is `no-store` with `Referrer-Policy: no-referrer`.
-* UI: the share dialog defaults to "Without result data", with an opt-in toggle. Show `rowCount` and "data not
-  shared" for withheld tables. The view is read-only, with no composer and no regenerate.
-* Audit: `conversation_shared` / `conversation_share_revoked` / `shared_conversation_viewed`, with `kind` =
-  `with_data`|`no_data` (and `expires_in_days`, `rotated` on `conversation_shared`, 1.15) and never the share id.
-* Demo: shares are kept in memory (they are lost on restart). A real backend persists them with the transcript.
-* Client: `getShare`, `setShare`, `revokeShare`, `loadShared` and `shareIdFromPath` in `web/src/contract/share.ts`.
-  Example: `examples/share.json`.
+Sharing was removed in 1.22.0 (product decision, 2026-10-26). There are no share links, no shared views and no share
+settings. `GET`/`PUT`/`DELETE /api/conversations/{id}/share`, `GET /api/shared/{shareId}` and any other
+`/api/share*` path are unmatched routes, so every method answers with the standard 404 envelope
+`{"error": {"code": "not_found", "message": "Not found."}}` (§1), signed in or not. The schemas `ShareRequest`,
+`ShareLink`, `SharedConversation` and `ShareExpiryDays`, `TablePart.dataWithheld` and `Capabilities.shareExpiry` are
+gone. A conversation is visible only to its owner (§1). Clients drop the share UI, and an old `/shared/<id>` app link
+lands on the client's not-found view. Test: `api/tests/test_share_removed_122.py`. The section number is kept so
+older references still resolve.
 
 ## Changelog
 
+* **1.22.0** (2026-10-26) — **Sharing removed** (§17). The routes `GET`/`PUT`/`DELETE /api/conversations/{id}/share`
+  and `GET /api/shared/{shareId}` are gone (they are now standard 404 envelopes, like every `/api/share*` path), along
+  with the in-memory share registry, expiry and rotation, and the share audit events. These schemas are removed:
+  `ShareRequest`, `ShareLink`, `SharedConversation`, `ShareExpiryDays`, `TablePart.dataWithheld` and
+  `Capabilities.shareExpiry`. `examples/share.json`, `web/src/contract/share.ts` and the share re-exports in
+  `web/src/api/contract.ts` are removed too. This is a removal, but the client already treated a missing
+  `shareExpiry` and a 404 share as "no sharing", and nothing on the stream changes.
 * **1.21.0** (2026-10-26) — BACKEND-FIT (§2.1). No field ever let the client choose a data source, scope,
   schema or customer; this release makes that a rule. New `IdentityScopedKey` enum, enforced with `propertyNames` on
   `ChatRequest` and `ChatRequest.options`: such a key is 422 `validation` and nothing runs. The demo session's
@@ -721,7 +697,7 @@ must be signed in to the same organization (customer). A conversation has at mos
   statements are untouched. `analyzer/` unchanged.
 * **1.20.0** (2026-10-25) — Temporary chat (§11.1), additive. `ChatRequest.temporary`, `MessageStart.temporary`
   (`true` when set) and `Capabilities.temporaryChat {ttlSeconds}`. A temporary chat is held in memory for its idle
-  TTL only: never stored, listed, searched, titled, exported, rated or shared; discard with `DELETE`; a chat can't move
+  TTL only: never stored, listed, searched, titled, exported, rated or shared (sharing itself was removed in 1.22); discard with `DELETE`; a chat can't move
   between temporary and saved (422).
 * **1.19.0** (2026-10-25) — Edge fixes, no new fields. (1) **No id or pattern accepts a trailing newline.**
   Python's `re` `$` also matches before a final `\n` (and `\d` matches any Unicode digit), so `ID`,

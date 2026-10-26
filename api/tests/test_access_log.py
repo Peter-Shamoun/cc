@@ -54,7 +54,7 @@ def test_filter_rewrites_uvicorn_shaped_record():
                             ("198.51.100.7:4000", "GET", "/api/shared/sh_secretToken-_42?x=Jane", "1.1", 200), None)
     for f in logging.getLogger("uvicorn.access").filters:
         f.filter(rec)
-    assert rec.getMessage() == '198.51.100.0 - "GET /api/shared/:id?\u2026 HTTP/1.1" 200'
+    assert rec.getMessage() == '198.51.100.0 - "GET /api/:id/:id?\u2026 HTTP/1.1" 200'  # 1.22: a stale share link
 
 
 def _free_port() -> int:
@@ -89,7 +89,7 @@ def test_real_uvicorn_access_log_is_redacted():
         out, _ = proc.communicate(timeout=budget(10))
     access = [line for line in out.splitlines() if '"GET ' in line]
     assert len(access) >= 4, out
-    assert any("/api/shared/:id" in line for line in access), access
+    assert any("/api/:id/:id" in line for line in access), access  # 1.22: stale share links are unmatched routes
     assert any("/api/conversations/:id?\u2026" in line for line in access), access
     for s in secrets_in_paths + ["127.0.0.1"]:
         assert s not in "\n".join(access), (s, access)

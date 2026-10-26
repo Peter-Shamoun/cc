@@ -80,9 +80,9 @@ def install_log_redaction() -> None:
 
 
 # ---- access log ----------------------------------------------------------------------------------------------------
-# uvicorn logs every request as ``(client_addr, method, full_path, http_version, status)``. Paths carry bearer
-# capabilities (``/api/shared/<share id>``) and record ids (``/api/conversations/<id>``, ``/api/download/<id>``), and a
-# query string can carry anything. The general filter can't catch ids reliably (``sh_`` + token_urlsafe), so the
+# uvicorn logs every request as ``(client_addr, method, full_path, http_version, status)``. Paths carry record
+# ids (``/api/conversations/<id>``, ``/api/download/<id>``), and a
+# query string can carry anything. The general filter can't catch ids reliably (random tokens), so the
 # access log gets the route *shape* instead: a segment is kept only when it's a static segment of a registered route,
 # everything else becomes ``:id``, and the query string becomes ``?…``. Client IPs (a HIPAA identifier) are
 # truncated to /24 (IPv4) or /48 (IPv6).
@@ -144,7 +144,7 @@ def install_access_log_redaction(routes) -> None:
 
 # ---- outbound / test-client request log -----------------------------------------------------------------------------
 # httpx logs every request it makes as ``HTTP Request: <method> <full url> ...``. That covers the API's own outbound
-# calls (model providers, IdP) and Starlette's TestClient, which logs ``http://testserver/api/shared/<share id>``.
+# calls (model providers, IdP) and Starlette's TestClient, which logs ``http://testserver/api/conversations/<id>``.
 # Keep the origin, shape the path the same way as the access log, and drop the query string.
 
 class OutboundUrlFilter(logging.Filter):

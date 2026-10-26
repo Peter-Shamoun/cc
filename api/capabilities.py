@@ -9,7 +9,6 @@ from __future__ import annotations
 import json
 import os
 
-from api.share import DEFAULT_EXPIRY_DAYS as SHARE_DEFAULT_EXPIRY_DAYS, EXPIRY_DAYS as SHARE_EXPIRY_DAYS
 from api.feedback import REASONS as FEEDBACK_REASONS
 
 DEFAULT_STRATEGY = "tool_loop"
@@ -75,9 +74,8 @@ def capabilities(contract_version: str, demo: bool, customer: str | None = None,
             "defaults": {"strategy": DEFAULT_STRATEGY, "model": DEFAULT_MODEL}, "strategies": strategies,
             "models": models, "feedbackReasons": [dict(r) for r in FEEDBACK_REASONS],
             "sqlLiteralMasking": sql_literal_masking if sql_literal_masking in ("phi", "all", "off") else "phi",
-            "shareExpiry": {"options": list(SHARE_EXPIRY_DAYS), "default": SHARE_DEFAULT_EXPIRY_DAYS},
             "pinArchive": True,  # 1.17.0: PATCH pinned/archived persists server-side
-            # 1.20.0: ChatRequest.temporary is honoured (never saved, listed or shared; §11.1)
+            # 1.20.0: ChatRequest.temporary is honoured (never saved or listed; §11.1)
             **({"temporaryChat": {"ttlSeconds": max(1, round(temporary_ttl_seconds))}}
                if temporary_ttl_seconds and temporary_ttl_seconds > 0 else {})}
 
