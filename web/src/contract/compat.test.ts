@@ -65,6 +65,9 @@ same<H.StreamEvent['type'], G.StreamEvent['type']>(true);
 same<H.ChatRequest, G.ChatRequest>(true);
 same<H.HttpError, G.HttpError>(true);
 
+// capabilities (1.4.0): re-exported from the generated file, so only check the request side and the export
+same<H.Capabilities, G.Capabilities>(true);
+
 // conversation REST (1.3.0): the history client's shapes match the schema
 same<CA.ConversationSummary, G.ConversationSummary>(true);
 same<CA.ConversationPage, G.ConversationPage>(true);
