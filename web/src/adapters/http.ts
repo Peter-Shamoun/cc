@@ -16,6 +16,21 @@ export interface HttpAdapterOptions {
   stopGraceMs: number;
   /** How long a dropped stream waits for the browser to come back online before giving up. */
   offlineWaitMs: number;
+  /** 429 before the answer starts: how many times to wait out Retry-After and try again on our own. */
+  maxRateRetries: number;
+  /** Longest Retry-After we'll wait on our own; longer (or missing past the cap) falls through to the error card. */
+  maxRateWaitMs: number;
+  /** Demo-only fault injection (dev query param ?fault=429): the first attempt asks the demo API for a 429. */
+  demoFault?: 'rate_limited';
+}
+
+/** Retry-After as delay-seconds or an HTTP date (RFC 9110 §10.2.3), in ms; null if absent/garbled. */
+export function retryAfterMs(value: string | null, now = Date.now()): number | null {
+  if (!value) return null;
+  const v = value.trim();
+  if (/^\d+$/.test(v)) return Number(v) * 1000;
+  const at = Date.parse(v);
+  return Number.isNaN(at) ? null : Math.max(0, at - now);
 }
 
 const abortError = () => new DOMException('aborted', 'AbortError');
@@ -40,10 +55,10 @@ export async function httpError(res: Response): Promise<ErrorPart> {
     code = j.error?.code ?? '';
     message = j.error?.message ?? '';
   } catch { /* not JSON */ }
-  const retryAfter = Number(res.headers.get('retry-after'));
+  const retryAfter = retryAfterMs(res.headers.get('retry-after')) ?? 0;
   const base = { type: 'error' as const, id: `err-http-${res.status}` };
   if (res.status === 401 || code === 'auth_expired') return { ...base, code: 'auth_expired', title: 'Session expired', message: message || 'Sign in again to continue.', retryable: false };
-  if (res.status === 429 || code === 'rate_limited') return { ...base, code: 'rate_limited', title: 'Too many requests', message: message || 'Wait a moment, then retry.', retryable: true, ...(retryAfter > 0 ? { retryAfterMs: retryAfter * 1000 } : {}) };
+  if (res.status === 429 || code === 'rate_limited') return { ...base, code: 'rate_limited', title: 'Too many requests', message: message || 'Wait a moment, then retry.', retryable: true, ...(retryAfter > 0 ? { retryAfterMs: retryAfter } : {}) };
   if (res.status === 403 || res.status === 404 || code === 'access_denied') return { ...base, code: 'access_denied', title: 'Not available', message: message || "You don't have access to this conversation.", retryable: false };
   if (res.status === 410) return { ...base, code: code || 'transcripts_unavailable', title: 'Chat unavailable', message: message || 'This chat is no longer available.', retryable: false };
   if (res.status === 422 || code === 'validation') return { ...base, code: 'validation', title: "Couldn't send that", message: message || 'Check the question and try again.', retryable: false };
@@ -58,7 +73,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
    * Real deployments leave it unset and authenticate with the httpOnly `cc_session` cookie.
    */
   constructor(private base = '', private token?: string, opts: Partial<HttpAdapterOptions> = {}) {
-    this.opts = { maxRetries: 3, retryBaseMs: 500, stopGraceMs: 1500, offlineWaitMs: 45_000, ...opts };
+    this.opts = { maxRetries: 3, retryBaseMs: 500, stopGraceMs: 1500, offlineWaitMs: 45_000, maxRateRetries: 2, maxRateWaitMs: 30_000, ...opts };
   }
   private readonly opts: HttpAdapterOptions;
 
@@ -94,10 +109,14 @@ export class HttpAnalystAdapter implements AnalystAdapter {
     let retries = 0;
     let dropped = false; // between a drop and the first replayed event
     let resumeFallback = !!resume;
+    let rateRetries = 0;
+    let first = true;
     try {
       for (;;) {
         // Reconnect (CONTRACT.md §8): same POST, plus Last-Event-ID so the server replays only what we missed.
         const replay: Record<string, string> = messageId !== null ? { 'last-event-id': `${messageId}:${lastSeq}` } : {};
+        if (first && this.opts.demoFault) replay['x-demo-fault'] = this.opts.demoFault; // first attempt only, so the retry gets through
+        first = false;
         let res: Response;
         try {
           res = await fetch(`${this.base}/api/chat`, {
@@ -129,6 +148,17 @@ export class HttpAnalystAdapter implements AnalystAdapter {
           regenerateFallback = false;
           body = JSON.stringify({ conversationId, messages: users });
           continue;
+        }
+        // 429 before the answer starts: wait out Retry-After (status line counts down), then send the same request again.
+        if (res.status === 429 && messageId === null && rateRetries < this.opts.maxRateRetries) {
+          const wait = retryAfterMs(res.headers.get('retry-after')) ?? this.opts.retryBaseMs * 2 ** rateRetries;
+          if (wait <= this.opts.maxRateWaitMs) {
+            rateRetries++;
+            onConnection?.('rate_limited', { retryInMs: wait });
+            dropped = true;
+            await this.sleep(wait, signal);
+            continue;
+          }
         }
         if (!res.ok || !res.body) {
           if (messageId !== null && res.status >= 500 && retries < this.opts.maxRetries) { onConnection?.('reconnecting'); dropped = true; await this.backoff(++retries, signal); continue; }
@@ -183,7 +213,10 @@ export class HttpAnalystAdapter implements AnalystAdapter {
   }
 
   private backoff(attempt: number, signal: AbortSignal): Promise<void> {
-    const ms = Math.min(this.opts.retryBaseMs * 2 ** (attempt - 1), 4000);
+    return this.sleep(Math.min(this.opts.retryBaseMs * 2 ** (attempt - 1), 4000), signal);
+  }
+
+  private sleep(ms: number, signal: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
       if (signal.aborted) return reject(abortError());
       const t = setTimeout(resolve, ms);
