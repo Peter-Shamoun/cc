@@ -89,7 +89,15 @@ test vectors in `web/src/lib/csvFilename.vectors.json`. The Content-Disposition 
   - Records live in a 20-entry in-memory ring. There's no storage, URL, console or network use.
   - The later backend plugs in with `setReporter(fn)`, which only ever sees redacted records.
 - `installGlobalErrorHandlers()` (in main.tsx) captures `error` and `unhandledrejection`. In production builds it calls `preventDefault()`, so the browser doesn't print the raw error to the console.
-- `ErrorBoundary` wraps `<App/>`. The fallback shows a generic message and a reference id, never the error text.
+- `ErrorBoundary` wraps `<App/>`. Its **crash screen** shows a generic message, never the error text, plus:
+  - **Reload** (autofocused).
+  - **Start a new chat**, which drops the `#/c/<id>` route so a conversation that crashes on load can't trap the user in a reload loop.
+  - A collapsed **"diagnostics for support"** block. The block shows exactly what **Copy diagnostics** puts on the clipboard (`web/src/lib/diagnostics.ts`):
+    - Allowed: reference id, ISO time, contract version and build mode, error class and kind, bundle frames, allowlisted context, route *kind*, browser family/major/OS, viewport, theme, online flag, and other recent error ids.
+    - Never included: the message (even redacted), conversation ids, the raw user agent, titles, or text.
+  - When a lazy chunk fails to load (dropped connection or a new deploy), the copy says so and the record carries `code: chunk_load`.
+  - `<ErrorBoundary scope="section" name="…">` is an inline "This part couldn't be displayed · Try again" card. Teams can wrap risky subtrees with it (artifact panel, charts) so one bad part doesn't take down the page.
+  - `web/src/components/ErrorBoundary.test.tsx` throws synthetic PHI (name, MRN, SSN, DOB, email) and asserts none of it reaches the screen or the clipboard.
 - **Residual:** React 18 still `console.error`s errors that a boundary catches, even in production. React 19's `createRoot({ onCaughtError })` closes this gap; do it on upgrade.
 
 **API.**
