@@ -59,9 +59,10 @@ def ok(resp):
     assert resp.status_code < 500, (resp.status_code, resp.text[:300])
     if resp.status_code >= 400:
         body = resp.json()
-        if body == {"deleted": False} and resp.status_code == 404:
-            return  # documented exception: DELETE /api/conversations/{id} (CONTRACT.md §11)
-        assert set(body) == {"error"} and isinstance(body["error"].get("code"), str) \
+        # 1.13.0: no exceptions left. Stop/delete keep their boolean next to the envelope.
+        extra = set(body) - {"error"}
+        assert extra <= {"deleted", "stopped"} and all(body[k] is False for k in extra), body
+        assert "error" in body and isinstance(body["error"].get("code"), str) \
             and isinstance(body["error"].get("message"), str), body
 
 

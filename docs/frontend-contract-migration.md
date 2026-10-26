@@ -1,4 +1,4 @@
-# ClaimClarity chat contract: changelog and migration guide (v1.0 → 1.12.0)
+# ClaimClarity chat contract: changelog and migration guide (v1.0 → 1.13.0)
 
 **For review by Claude.** This is a reading guide to `api/CONTRACT.md`, which stays the normative text, and
 `api/contract/v1.schema.json`. It covers three things:
@@ -10,9 +10,9 @@
 The adapter that produces these events from analyzer and analyst outputs is specified in
 [`frontend-analyzer-adapter.md`](frontend-analyzer-adapter.md).
 
-Every version from 1.0 to 1.12 is **additive**. A 1.0 client keeps working against a 1.12 server, because it ignores
+Every version from 1.0 to 1.13 is **additive**. A 1.0 client keeps working against a 1.13 server, because it ignores
 unknown events, fields and part types (§3). No field was removed or renamed. The one wire-visible tightening is
-1.12's error envelope on 404 and 405 (below).
+1.12's error envelope on 404 and 405, and 1.13's `not_found` for regenerate/edit 404s (below).
 
 ## 1. Version-by-version
 
@@ -31,8 +31,12 @@ unknown events, fields and part types (§3). No field was removed or renamed. Th
 | 1.10 | `regenerate.style`, "by payer" titles, CSRF and 422 docs | styles are applied server-side (`api/styles.py`) | `x-cc-csrf: 1` on cookie-session writes |
 | 1.11 | org-scoped share links, `TablePart.dataWithheld` | shares are org-scoped; data is withheld by default | render "Data not shared (N rows)" |
 | 1.12 | ordering rules as data (`stream_rules.json`) with py/ts runners; fail-safe SSE decode and reducer; 404/405 envelope | every stream must pass `check()`; unknown routes return `{"error":{code:"not_found"}}` | use `readSse`/`SseDecoder`; `reduceV1` drops malformed events |
+| 1.13 | review audit: error envelope on every 4xx (stop/delete 404s too), `ErrorCode` registry, `x-open`/`x-fallback`/`x-known`, `Timestamp`, descriptions on every def | regenerate/edit 404s are `not_found` + `legacyCode:"validation"`; send ISO-8601 UTC | read `error.code` (then `legacyCode`, then status); render unknown open-enum values with `OPEN_ENUM_FALLBACKS` |
 
 **Migration notes**
+* **1.13 errors.** If you branched on `error.code === "validation"` for a 404 from regenerate/edit, switch to
+  `not_found` (or read `legacyCode`; it stays for at least one minor). `{stopped:false}` and `{deleted:false}` now
+  also have `error`, so a generic `body.error.code` check works for every 4xx.
 * **1.12 errors.** Code that looked for FastAPI's `{"detail": …}` on a 404 or 405 must read `error.code`
   (`not_found`, `method_not_allowed`). `DELETE /api/conversations/{id}` keeps its documented 404 `{deleted:false}`.
 * **1.12 SSE.** `web/src/adapters/http.ts` `parseSse` still `JSON.parse`s each frame and throws on a bad one. An ask

@@ -347,8 +347,9 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
     clarifications: dict[str, dict] = {}
     app.state.clarifications = clarifications
 
-    def error_json(code: str, message: str, status: int):
-        return JSONResponse({"error": {"code": code, "message": message}}, status, headers=NO_STORE)
+    def error_json(code: str, message: str, status: int, legacy_code: str | None = None):
+        error = {"code": code, "message": message, **({"legacyCode": legacy_code} if legacy_code else {})}
+        return JSONResponse({"error": error}, status, headers=NO_STORE)
 
     @app.post("/api/chat")
     async def chat(body: ChatRequest, request: Request):
@@ -407,7 +408,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             target = next((m for m in msgs if m.get("id") == body.regenerate.messageId and m.get("role") == "assistant"), None)
             parent = next((m for m in msgs if target and m.get("id") == target.get("parentId")), None)
             if parent is None:
-                return error_json("validation", "Nothing to regenerate.", 404)
+                return error_json("not_found", "Nothing to regenerate.", 404, legacy_code="validation")
             question = parent.get("analyzerQuestion") or parent["text"]
             user_msg = parent
             start_extra["regenerateOf"] = body.regenerate.messageId
@@ -423,7 +424,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 edited = next((m for m in (conv or {}).get("messages", [])
                                if m.get("id") == users[-1].editOf and m.get("role") == "user"), None)
                 if edited is None:
-                    return error_json("validation", "Nothing to edit.", 404)
+                    return error_json("not_found", "Nothing to edit.", 404, legacy_code="validation")
                 start_extra["editOf"] = edited["id"]
             if body.resume:
                 now = time.time()
@@ -660,7 +661,9 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             return unauthorized()
         run = runs.get(message_id)
         if run is None or run.principal != ctx.principal:
-            return JSONResponse({"stopped": False}, 404, headers=NO_STORE)
+            # 1.13.0: the error envelope rides along, so every 4xx body has `error.code`.
+            return JSONResponse({"stopped": False, "error": {"code": "not_found", "message": "Nothing to stop."}}, 404,
+                                headers=NO_STORE)
         run.cancelled.set()
         return JSONResponse({"stopped": True}, headers=NO_STORE)
 
@@ -854,7 +857,10 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             if ok:
                 forget(ctx.principal, conversation_id)
                 shares.revoke(ctx.principal.customer, ctx.principal.user, conversation_id)
-        return JSONResponse({"deleted": ok}, 200 if ok else 404, headers=NO_STORE)
+        if not ok:  # 1.13.0: keep `deleted: false` and add the standard envelope
+            return JSONResponse({"deleted": False, "error": {"code": "not_found", "message": "Not found."}}, 404,
+                                headers=NO_STORE)
+        return JSONResponse({"deleted": ok}, headers=NO_STORE)
 
     # ---------------------------------------------------------------- share (contract 1.11.0, §17)
 
