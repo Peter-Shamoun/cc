@@ -34,6 +34,16 @@ describe('server branches (regenerate / edit, CONTRACT.md §8)', () => {
     await waitFor(() => expect(result.current.busy).toBe(false));
     expect(spy.mock.calls.at(-1)![0].regenerate).toEqual({ messageId: first });
     expect(result.current.messages).toHaveLength(2);
+    // The old answer stays reachable as version 1/2 (in place, no follow-up user turn).
+    expect(result.current.versionOf(0)).toEqual({ current: 2, total: 2, answersOnly: true });
+    expect(spy.mock.calls.at(-1)![0].messages.filter((m) => m.role === 'user')).toHaveLength(1);
+    const second = result.current.messages[1].id;
+    await act(async () => { await result.current.regenerate('concise'); });
+    await waitFor(() => expect(result.current.busy).toBe(false));
+    expect(spy.mock.calls.at(-1)![0].regenerate).toEqual({ messageId: second, style: 'concise' });
+    expect(result.current.versionOf(0)).toEqual({ current: 3, total: 3, answersOnly: true });
+    await act(async () => { await result.current.switchVersion(0, 0); });
+    expect(result.current.messages[1].id).toBe(first);
   });
 
   it('editAt sends the edit with parentId = the message before it', async () => {
@@ -65,7 +75,7 @@ describe('server branches (regenerate / edit, CONTRACT.md §8)', () => {
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({ role: 'user', text: 'first question, edited', editOf: original });
     expect(sent[0].parentId).toBeUndefined();
-    expect(result.current.versionOf(0)).toEqual({ current: 2, total: 2 });
+    expect(result.current.versionOf(0)).toEqual({ current: 2, total: 2, answersOnly: false });
   });
 
   it('http sends editOf on the wire', async () => {
@@ -92,6 +102,6 @@ describe('server branches (regenerate / edit, CONTRACT.md §8)', () => {
     const { result } = renderHook(() => useChat(adapter, store));
     await act(async () => { await result.current.open('c1'); });
     expect(result.current.messages.map((m) => m.id)).toEqual(['u1', 'a1b', 'u2e', 'a2e']);
-    expect(result.current.versionOf(2)).toEqual({ current: 2, total: 2 });
+    expect(result.current.versionOf(2)).toEqual({ current: 2, total: 2, answersOnly: false });
   });
 });

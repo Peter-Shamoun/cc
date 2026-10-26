@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { AssistantMessage, ID, TablePart, UserMessage } from './contract';
-import { newAssistantViewV1, reduceV1, type AssistantViewV1, type ChatRequest, type Usage } from '../api/contract';
+import { newAssistantViewV1, reduceV1, type AssistantViewV1, type ChatRequest, type RegenerateStyle, type Usage } from '../api/contract';
 import type { AnalystAdapter, ConnectionInfo, ConnectionState, ThreadSummary, TranscriptStore } from '../adapters/types';
 
 const CONNECTION_LABEL = { offline: 'Offline, waiting for the network…', reconnecting: 'Reconnecting…' } as const;
@@ -39,7 +39,7 @@ import { foldThread } from './threadTree';
 
 const uid = (p: string) => `${p}_${Math.random().toString(36).slice(2, 10)}`;
 /** `uiKey`: a client-only render key fixed at send, so the row doesn't remount when message.start swaps in the server id (QA-A15: the Thinking row and its timer survive). */
-export type ViewMessage = UserMessage | (AssistantViewV1 & { uiKey?: string });
+export type ViewMessage = UserMessage | (AssistantViewV1 & { uiKey?: string; regenerateStyle?: RegenerateStyle });
 
 function toView(m: UserMessage | AssistantMessage): ViewMessage {
   if (m.role === 'user') return m;
@@ -132,7 +132,7 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore, getOpti
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     const placeholder = uid('a');
-    let view: AssistantViewV1 & { uiKey?: string } = { ...newAssistantViewV1(placeholder), uiKey: placeholder };
+    let view: AssistantViewV1 & { uiKey?: string; regenerateStyle?: RegenerateStyle } = { ...newAssistantViewV1(placeholder), uiKey: placeholder };
     const startedAt = Date.now();
     history = markAnswered(history);
     const token = ++runRef.current;
@@ -186,6 +186,10 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore, getOpti
     try {
       for await (const ev of adapter.streamTurn({ conversationId: cid, messages: wire, signal: ctrl.signal, ...(opts.resume ? { resume: opts.resume } : {}), ...(opts.regenerate ? { regenerate: opts.regenerate } : {}), options: optionsRef.current?.(), onConnection })) {
         view = reduceV1(view, ev);
+        if (ev.type === 'message.start') {
+          const rs = (ev as { regenerateStyle?: RegenerateStyle }).regenerateStyle;
+          if (rs && rs !== 'default') view = { ...view, regenerateStyle: rs };
+        }
         if (ev.type === 'part' && ev.part.type === 'table' && !prefersReducedMotion() && reveal.note(view.parts) && !revealLoop.pending) revealLoop.schedule();
         // Text and reasoning deltas are batched; structural events (start, parts, steps, end) paint at once.
         if (ev.type === 'text.delta' || ev.type === 'reasoning.delta') schedule();
@@ -235,17 +239,27 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore, getOpti
 
   const stop = useCallback(() => abortRef.current?.abort(), []);
 
-  const regenerate = useCallback(async () => {
+  const regenerate = useCallback(async (style: RegenerateStyle = 'default') => {
     if (!convId || busy) return;
     const lastUserIdx = messages.map((m) => m.role).lastIndexOf('user');
     if (lastUserIdx < 0) return;
     // A server-known answer (id from message.start, not our 'a_' placeholder) is re-run with
-    // ChatRequest.regenerate so the server records a sibling instead of a second copy of the question.
+    // ChatRequest.regenerate (+ style, contract 1.10.0) so the server records a sibling instead of a second
+    // copy of the question. No follow-up user turn is sent.
     const prev = messages.slice(lastUserIdx + 1).find((m) => m.role === 'assistant');
-    const regen = prev && !prev.id.startsWith('a_') ? { messageId: prev.id } : undefined;
+    const regen = prev && !prev.id.startsWith('a_') ? (style === 'default' ? { messageId: prev.id } : { messageId: prev.id, style }) : undefined;
+    // The old answer stays reachable as a version (ChatGPT/Claude "‹ 2/2 ›"), same arrows as edits.
+    if (prev) {
+      const tail = messages.slice(lastUserIdx);
+      const b = branches[lastUserIdx] ?? { versions: [tail], idx: 0 };
+      const versions = [...b.versions];
+      versions[b.idx] = tail;
+      versions.push([messages[lastUserIdx]]);
+      setBranches((all) => ({ ...Object.fromEntries(Object.entries(all).filter(([k]) => Number(k) < lastUserIdx)), [lastUserIdx]: { versions, idx: versions.length - 1 } }));
+    }
     await store.truncateAfter(convId, messages[lastUserIdx].id);
     await run(convId, messages.slice(0, lastUserIdx + 1), { regenerate: regen });
-  }, [busy, convId, messages, run, store]);
+  }, [branches, busy, convId, messages, run, store]);
 
   const remove = useCallback(async (id: ID) => {
     await store.deleteConversation(id);
@@ -297,7 +311,9 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore, getOpti
   /** `{current, total}` for the version arrows under user message `i`, if it was ever edited. */
   const versionOf = (i: number) => {
     const b = branches[i];
-    return b ? { current: b.idx + 1, total: b.versions.length } : undefined;
+    // `answersOnly`: every version is the same question re-answered (regenerate), so the arrows sit under
+    // the answer like ChatGPT/Claude; edits keep them under the question.
+    return b ? { current: b.idx + 1, total: b.versions.length, answersOnly: b.versions.every((v) => v[0]?.id === b.versions[0][0]?.id) } : undefined;
   };
 
   // Dev/perf hook only. Activated by ?audit=1; it never talks to the network.

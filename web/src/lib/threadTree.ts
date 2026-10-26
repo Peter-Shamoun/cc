@@ -1,6 +1,6 @@
 import type { ID } from './contract';
 
-type Node = { id: ID; role: 'user' | 'assistant'; parentId?: ID; editOf?: ID };
+type Node = { id: ID; role: 'user' | 'assistant'; parentId?: ID; editOf?: ID; regenerateOf?: ID };
 
 /**
  * The server records a transcript as an append-only list (CONTRACT.md §8): a regenerated answer is
@@ -21,6 +21,7 @@ export function foldThread<M extends Node>(msgs: M[]): { visible: M[]; branches:
   msgs.forEach((m, i) => {
     const earlier = (id?: ID) => !!id && byId.has(id) && order.get(id)! < i;
     const p = earlier(m.parentId) ? m.parentId!
+      : earlier(m.regenerateOf) ? parent.get(m.regenerateOf!) ?? null // a sibling of the regenerated answer
       : earlier(m.editOf) ? parent.get(m.editOf!) ?? null // a sibling of the edited question (root if that was the first)
       : i > 0 ? msgs[i - 1].id : null;
     parent.set(m.id, p);
@@ -46,8 +47,24 @@ export function foldThread<M extends Node>(msgs: M[]): { visible: M[]; branches:
   visible.forEach((m, i) => {
     if (m.role !== 'user') return;
     const sibs = (children.get(parent.get(m.id)!) ?? []).filter((s) => s.role === 'user');
-    if (sibs.length < 2) return;
-    branches[i] = { versions: sibs.map((s) => (s.id === m.id ? visible.slice(i) : tail(s))), idx: sibs.findIndex((s) => s.id === m.id) };
+    // QA-A18: regenerated answers are assistant siblings under one question; each is a version too
+    // ("‹ 1/2 ›" survives a reload), in append order, the same shape useChat builds live.
+    const versions: M[][] = [];
+    let idx = 0;
+    for (const s of sibs) {
+      const answers = (children.get(s.id) ?? []).filter((a) => a.role === 'assistant');
+      if (s.id === m.id && answers.length > 1) {
+        for (const a of answers) {
+          if (a.id === visible[i + 1]?.id) { idx = versions.length; versions.push(visible.slice(i)); }
+          else versions.push([s, ...tail(a)]);
+        }
+      } else {
+        if (s.id === m.id) idx = versions.length;
+        versions.push(s.id === m.id ? visible.slice(i) : tail(s));
+      }
+    }
+    if (versions.length < 2) return;
+    branches[i] = { versions, idx };
   });
   return { visible, branches };
 }

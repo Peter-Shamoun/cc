@@ -17,6 +17,17 @@ describe('foldThread', () => {
     expect(ids(foldThread(msgs).visible)).toEqual(['u1', 'a1b']);
   });
 
+  it('QA-A18: regenerated answers fold into versions of their question (survives reload)', () => {
+    const msgs = [u('u1'), a('a1', 'u1'), a('a1b', 'u1')];
+    expect(foldThread(msgs).branches[0]).toEqual({ versions: [[u('u1'), a('a1', 'u1')], [u('u1'), a('a1b', 'u1')]].map((v) => v), idx: 1 });
+    // regenerateOf alone (no parentId) also links the sibling; a later turn follows the newest answer.
+    const r = [u('u1'), a('a1'), { ...a('a1b'), regenerateOf: 'a1' }, u('u2'), a('a2')];
+    const f = foldThread(r);
+    expect(ids(f.visible)).toEqual(['u1', 'a1b', 'u2', 'a2']);
+    expect(f.branches[0].versions.map(ids)).toEqual([['u1', 'a1'], ['u1', 'a1b', 'u2', 'a2']]);
+    expect(f.branches[0].idx).toBe(1);
+  });
+
   it('a turn after a regenerate follows the new answer', () => {
     const msgs = [u('u1'), a('a1', 'u1'), a('a1b', 'u1'), u('u2'), a('a2', 'u2')];
     expect(ids(foldThread(msgs).visible)).toEqual(['u1', 'a1b', 'u2', 'a2']);
