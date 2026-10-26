@@ -40,7 +40,7 @@ cd web && VITE_ANALYST_BASE=/ VITE_ANALYST_DEMO_TOKEN=demo:acme_labs:ana@xifin.e
 ```
 
 With the real analyzer (B1 on a Strands agent, Claude on Amazon Bedrock) on the simulated AWS login and two customers
-(acme_labs, acme_diagnostics). The first start builds the world (~7 min).
+(acme_labs, acme_diagnostics). The mock data ships in `mock-data/` (the world and B1's example library); the first start copies it into `--world-dir`, no build needed.
 
 ```sh
 aws sso login --profile apiservice                  # or any credentials the apiservice profile resolves
