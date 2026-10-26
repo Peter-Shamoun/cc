@@ -197,3 +197,25 @@ What changed:
 - **The chart's first render takes two tasks.** ChartView compiles Vega-Lite itself, yields a macrotask, then embeds the compiled Vega (`mode:'vega'`, `config:{}`, `hover:false`, the same as vega-embed's own VL path). Renders are pixel-identical (light, dark, 420 px). What's left (~270 ms at 6x, ~45 ms unthrottled) is Vega's own parse, dataflow and first draw.
 
 Test files: `lib/idlePrefetch.test.ts` and `components/parts/chartSplit.test.tsx`. JSONs and shots are in `shots/platform/cpu6/`.
+
+## Long sessions / memory
+
+`e2e/memory200.spec.ts` (`@perf`, Chromium) drives a 200-turn chat (`MEM_TURNS`) with contract streams (answer, chart, tool steps, report). Every 25 turns it samples the post-GC heap, DOM size, and CDP `Nodes`/`JSEventListeners`. Then it leaves the chat (Ctrl+Shift+O) and checks the old thread can be collected.
+
+- **In the chat:** the DOM stays windowed (#280, under 6k elements), listeners stay flat, and the heap grows about 20 KB a turn, which is message data only.
+- **After leaving:** listeners and DOM nodes, live plus detached, return to baseline. Before the fixes, three retainers kept the last window (3k+ nodes and about 140 listeners) as detached DOM:
+  1. **`ThreadView`:** the `scrollToIndexRef` closure held the virtualizer and its element cache. The ref is now cleared on unmount.
+  2. **`ChartView`:** Vega keeps a module-level reference to the last SVG it drew, and through it the View and `_el` (React's node). Vega now renders into a throwaway host div, which is removed on unmount.
+  3. **`AppShell`:** the scroller ResizeObserver effect captured `el`, and React's alternate fiber could keep that closure alive. The callback now reads `scroller.current`.
+- **Heap snapshots** (with retainer hunting) only run with `MEM_SNAP=<path prefix>`. Each one costs hundreds of MB, so leave it off on the shared box.
+
+## Box memory guard (`scripts/memguard.mjs`)
+
+All teams share one 15 GB box, so concurrent Playwright and Lighthouse runs OOM-killed each other. The guard prevents that:
+
+- **Automatic in Playwright:** `e2e/global-setup.ts` takes a box-wide slot before building. There are 2 slots in `/tmp/cc_heavy`, and a run also needs at least 3 GB of `MemAvailable`. If either is short, the run waits and logs who holds the slots. The slot is released at teardown.
+- **Anything else heavy:** wrap it with `npm run guarded -- <cmd>`, e.g. `npm run guarded -- npx playwright test …`. `shots` and `check:perf` are already wrapped.
+- **Settings:** `--min-gb` / `CC_GUARD_MIN_GB` (default 3), `--slots` / `CC_GUARD_SLOTS` (default 2), `--timeout` / `CC_GUARD_TIMEOUT` (default 1800 s; on timeout it exits with code 75), and `CC_GUARD_DIR`. `CC_GUARD_OFF=1` skips the guard.
+- **Crashed runs:** a run killed by the OOM killer doesn't block anyone. A slot whose pid is dead is reclaimed.
+- **Nested runs:** children of a guarded command get `CC_GUARD_HELD=1`, so they don't take a second slot.
+- **Tests:** `src/lib/memguard.test.ts`.
