@@ -32,6 +32,7 @@ from api.backends import (CANCEL_AT, MULTI_TABLE_SQL, MULTI_TABLE_TITLES, SCENAR
 from api.contract import CONTRACT_VERSION, schema as contract_schema
 from api.ids import new_id
 from api.live import Cancelled, LiveTap
+from api.temporary import DEFAULT_TTL_SECONDS as TEMPORARY_TTL, TemporaryChats
 from api.mapping import multi_table_parts, outcome_parts, prior_artifacts, report_artifacts
 from api.redact import install_access_log_redaction, install_log_redaction, install_outbound_url_redaction
 from api.security import (MAX_BODY_BYTES, SESSION_COOKIE, BodyLimitMiddleware, CsrfMiddleware, ErrorShieldMiddleware,
@@ -116,6 +117,8 @@ class ChatRequest(BaseModel):
     resume: ResumeIn | None = None
     regenerate: RegenerateIn | None = None
     scenario: str | None = Field(default=None, max_length=32)
+    #: 1.20.0: a temporary chat (§11.1): never saved, listed, titled or shared
+    temporary: bool = False
 
 
 #: Demo pacing (QA-P1/P4). With the scripted LLM, answers are paced like a real model so the streaming UI
@@ -160,6 +163,9 @@ class Settings:
     #: unfinished /api/chat runs allowed per user at once (429 rate_limited beyond it)
     max_concurrent_runs: int = int(os.environ.get("CC_API_MAX_CONCURRENT_RUNS", "3"))
     clarification_ttl_seconds: float = 1800.0
+    #: 1.20.0: idle lifetime of a temporary chat's in-process history (never written anywhere)
+    temporary_ttl_seconds: float = field(default_factory=lambda: float(os.environ.get("CC_API_TEMPORARY_TTL_SECONDS",
+                                                                                      str(TEMPORARY_TTL))))
     #: background retention sweep (store.purge_expired) interval while the app is running; 0 = off
     transcript_sweep_seconds: float = field(default_factory=lambda: float(os.environ.get("CC_TRANSCRIPT_SWEEP_SECONDS",
                                                                                          "3600")))
@@ -177,7 +183,7 @@ class AuditLog:
 
     ALLOWED = {"customer", "user", "file_id", "row_count", "conversation_id", "message_id", "parts",
                "queries", "elapsed_ms", "finish", "kind", "reason", "status", "scenario", "steps",
-               "expires_in_days", "rotated", "pinned", "archived", "rules"}
+               "expires_in_days", "rotated", "pinned", "archived", "rules", "temporary"}
 
     def __init__(self):
         self.events: list[dict] = []
@@ -231,6 +237,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         auth = DemoAuth()
     audit = AuditLog()
     store = store or make_store(audit=audit)
+    temp_chats = TemporaryChats(settings.temporary_ttl_seconds)  # 1.20.0: never persisted (api/temporary.py)
     downloads = DownloadRegistry()
     shares = ShareRegistry()
     runs: dict[str, _Run] = {}
@@ -243,6 +250,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 await asyncio.sleep(settings.transcript_sweep_seconds)
                 try:
                     removed = await asyncio.to_thread(store.purge_expired)
+                    await asyncio.to_thread(temp_chats.purge_expired)
                     if removed:
                         log.info("retention sweep removed %d conversations", removed)
                 except Exception as exc:  # noqa: BLE001 - keep sweeping
@@ -268,6 +276,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
     app.add_middleware(ErrorShieldMiddleware)  # inside SecurityHeaders: 500s get the headers too
     app.add_middleware(SecurityHeadersMiddleware)  # outermost, so the 413 carries the security headers too
     app.state.audit, app.state.store, app.state.downloads, app.state.runs = audit, store, downloads, runs
+    app.state.temp_chats = temp_chats
     app.state.settings, app.state.auth = settings, auth
     app.state.shares = shares
 
@@ -328,7 +337,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         except AuthError:
             customer = None
         return JSONResponse(capabilities_body(CONTRACT_VERSION, demo=settings.llm == "scripted", customer=customer,
-                                              sql_literal_masking=settings.sql_literal_masking), headers=NO_STORE)
+                                              sql_literal_masking=settings.sql_literal_masking,
+                                              temporary_ttl_seconds=settings.temporary_ttl_seconds), headers=NO_STORE)
 
     @app.post("/api/auth/sign-out")
     def sign_out(request: Request):
@@ -351,6 +361,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             except Exception as exc:  # noqa: BLE001 - sign-out must always clear the browser
                 log.warning("sign_out revoke failed: %s", type(exc).__name__)
         if principal is not None:
+            temp_chats.delete_all(principal)  # 1.20.0: signing out ends every temporary chat
             audit("signed_out", customer=principal.customer, user=principal.user)
         resp = Response(status_code=204, headers={**NO_STORE, "Clear-Site-Data": '"cache", "storage"'})
         for path in ("/api", "/"):  # a cookie is only removed by a matching Path; the spec'd one is /api
@@ -394,8 +405,23 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         if bad_option:
             return error_json("validation", bad_option, 422)
         conversation_id = body.conversationId or new_id("c_")
-        if not _SAFE_ID.fullmatch(conversation_id) or store.owned_by_other(ctx.principal, conversation_id):
+        if not _SAFE_ID.fullmatch(conversation_id) or store.owned_by_other(ctx.principal, conversation_id) \
+                or temp_chats.owned_by_other(ctx.principal, conversation_id):
             return error_json("access_denied", "Not found.", 404)
+        temporary = body.temporary
+        if temporary and settings.temporary_ttl_seconds <= 0:  # CC_API_TEMPORARY_TTL_SECONDS=0 turns the mode off
+            return error_json("validation", "Temporary chats are turned off.", 422)
+        if body.conversationId:
+            # 1.20.0: a chat is temporary or saved for its whole life; a turn can't move it across (§11.1)
+            if not temporary and temp_chats.has(conversation_id):
+                return error_json("validation", "A temporary chat can't be saved. Start a new chat.", 422)
+            try:
+                saved = temporary and store.get_conversation(ctx.principal, conversation_id) is not None
+            except CustomerKeyDisabled:
+                return shredded()
+            if saved:
+                return error_json("validation", "A saved chat can't become temporary. Start a temporary chat.", 422)
+        cstore = temp_chats if temporary else store
         demo = getattr(auth, "mode", "") == "demo"
         # Demo-only fault injection for the web client's 429 auto-retry (web ?fault=429, dev builds only).
         # Ignored outside demo mode; nothing is stored or run.
@@ -418,7 +444,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         scenario_hint = body.scenario if demo else None
         if body.regenerate:
             try:
-                conv = store.get_conversation(ctx.principal, conversation_id) if body.conversationId else None
+                conv = cstore.get_conversation(ctx.principal, conversation_id) if body.conversationId else None
             except CustomerKeyDisabled:
                 return shredded()
             msgs = (conv or {}).get("messages", [])
@@ -437,7 +463,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             question = reply
             edited = None
             if users[-1].editOf:
-                conv = store.get_conversation(ctx.principal, conversation_id) if body.conversationId else None
+                conv = cstore.get_conversation(ctx.principal, conversation_id) if body.conversationId else None
                 edited = next((m for m in (conv or {}).get("messages", [])
                                if m.get("id") == users[-1].editOf and m.get("role") == "user"), None)
                 if edited is None:
@@ -470,7 +496,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             if question != reply:
                 user_msg["analyzerQuestion"] = question
             try:
-                store.append_message(ctx.principal, conversation_id, user_msg)
+                cstore.append_message(ctx.principal, conversation_id, user_msg)
             except CustomerKeyDisabled:
                 return shredded()
         scenario = detect_scenario(question, scenario_hint) if demo else None
@@ -480,7 +506,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         if scenario == "report" and body.conversationId:
             # 1.19.0 (QA-C1): a follow-up report revises the branch's earlier artifacts (same artifactId, version + 1)
             try:
-                conv = store.get_conversation(ctx.principal, conversation_id)
+                conv = cstore.get_conversation(ctx.principal, conversation_id)
             except CustomerKeyDisabled:
                 return shredded()
             prior = prior_artifacts((conv or {}).get("messages", []), user_msg.get("parentId"), user_msg.get("id"))
@@ -525,7 +551,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 delay = max(delay, SLOW_FLOOR_SECONDS)
             emit({"type": "message.start", "messageId": message_id, "conversationId": conversation_id,
                   "contractVersion": CONTRACT_VERSION, "model": settings.llm, "parentId": user_msg["id"],
-                  "strategy": body.options.get("strategy", DEFAULT_STRATEGY), **start_extra})
+                  "strategy": body.options.get("strategy", DEFAULT_STRATEGY), **start_extra,
+                  **({"temporary": True} if temporary else {})})
             emit({"type": "status", "label": "Thinking"})
             tap = None
             answer = None
@@ -596,7 +623,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             title = title_from_parts(parts) if finish == "stop" else None
             if title and conversation_id:
                 try:
-                    if store.auto_title(ctx.principal, conversation_id, title):
+                    if cstore.auto_title(ctx.principal, conversation_id, title):
                         end["conversationTitle"] = title
                 except Exception as exc:  # noqa: BLE001 - a title must never break the stream
                     log.warning("auto title failed: %s", type(exc).__name__)
@@ -614,12 +641,13 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             try:
                 with purge_lock:
                     if not run.discarded.is_set():
-                        store.append_message(ctx.principal, conversation_id, record)
+                        cstore.append_message(ctx.principal, conversation_id, record)
             except Exception as exc:  # noqa: BLE001 - a history write must not hang the stream
                 log.warning("transcript append failed: %s", type(exc).__name__)
             audit("chat_message", customer=ctx.principal.customer, user=ctx.principal.user,
                   conversation_id=conversation_id, message_id=message_id, parts=len(parts), queries=usage["queries"],
-                  elapsed_ms=elapsed, finish=finish, scenario=scenario, steps=len(persisted_steps))
+                  elapsed_ms=elapsed, finish=finish, scenario=scenario, steps=len(persisted_steps),
+                  **({"temporary": True} if temporary else {}))
             run.finished_at = time.time()
             run.done = True
             run.notify()
@@ -791,6 +819,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             return unauthorized()
         with purge_lock:
             count = store.delete_all(ctx.principal)
+            temp_chats.delete_all(ctx.principal)  # 1.20.0: "Delete all chats" ends temporary ones too (not counted)
             forget(ctx.principal, None)
         return JSONResponse({"deleted": count}, headers=NO_STORE)
 
@@ -907,7 +936,9 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         except AuthError:
             return unauthorized()
         with purge_lock:
-            ok = store.delete_conversation(ctx.principal, conversation_id)
+            # 1.20.0: discarding a temporary chat (the client's "close") drops its in-process history and CSVs
+            ok = temp_chats.delete_conversation(ctx.principal, conversation_id) \
+                or store.delete_conversation(ctx.principal, conversation_id)
             if ok:
                 forget(ctx.principal, conversation_id)
                 shares.revoke(ctx.principal.customer, ctx.principal.user, conversation_id)
