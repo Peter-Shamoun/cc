@@ -154,7 +154,7 @@ function LinkSection({ api }: { api: ShareLinkApi }) {
           <span className="relative mt-0.5 flex shrink-0">
           <input id={`${id}-sw`} type="checkbox" role="switch" aria-checked={includeData} checked={includeData} disabled={working} onChange={(e) => toggle(e.target.checked)} aria-describedby={`${id}-data`} data-testid="share-include-data"
             className="peer absolute inset-0 z-10 m-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-default" />
-          <span aria-hidden className="relative h-5 w-9 shrink-0 rounded-full bg-fg/20 transition-colors peer-checked:bg-accent peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--focus)] peer-disabled:opacity-50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:translate-x-4" />
+          <span aria-hidden className="relative h-5 w-9 shrink-0 rounded-full bg-fg/20 transition-colors peer-checked:bg-accent peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--focus)] peer-disabled:opacity-50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:after:translate-x-4 peer-checked:after:bg-accent-fg" />
           </span>
         </div>
         {shared && (
