@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures';
-import { LIVE, open, ask, lastAssistant, composer, stopBtn, waitIdle, sse, gap } from './helpers';
+import { LIVE, open, ask, lastAssistant, composer, stopBtn, waitIdle, sse } from './helpers';
 
 // Coverage for the newest composer, message and table features (QA C7 prep). Live = real demo API.
 const chatPosts = (page: import('@playwright/test').Page) => {
@@ -121,7 +121,6 @@ test.describe('message features (live) @both', () => {
   });
 
   test('regenerate keeps the earlier answer as version 1/2 (ChatGPT/Claude parity, QA-A18)', async ({ page }) => {
-    gap('QA-A18');
     await open(page, LIVE);
     await ask(page, 'What is the denial rate by payer?');
     await lastAssistant(page).getByRole('button', { name: 'Regenerate' }).click();

@@ -1,5 +1,5 @@
 import { memo, useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, Code2, FileText, Minimize2, MoreHorizontal, Pencil, Plus, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Code2, FileText, Minimize2, MoreHorizontal, Pencil, Plus, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react';
 import clsx from 'clsx';
 import type { AssistantView, ChartPart, CodePart, ImagePart, Part, TablePart, UserMessage } from '../lib/contract';
 import { KNOWN_PART_TYPES } from '../lib/contract';
@@ -15,6 +15,7 @@ import { AbstainCard, ClarifyCard, EscalationNote, StoppedNote, TableSkeleton } 
 import { AnswerMeta } from './answer/AnswerMeta';
 import { escalationsOf, partsOf, stepsOf, usageOf, type AnyView } from './answer/normalize';
 import type { OnReply } from './answer/States';
+import type { RegenerateStyle } from '../api/contract';
 import { copyText, tableToTsv, visible } from '../lib/csv';
 import { MAX_FEEDBACK_COMMENT } from '../contract/feedback';
 import { feedbackFor, feedbackReasons, recordFeedback, sqlForClipboard, storedVote, type Vote } from '../lib/feedback';
@@ -94,24 +95,32 @@ export const UserBubble = memo(function UserBubble({ msg, onEdit, version, onVer
       <div className={clsx('flex items-center gap-0.5 rounded-full bg-bg transition-opacity group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100', version ? 'mt-1 opacity-100' : 'absolute right-0 top-full z-10 mt-0.5 opacity-0 [@media(hover:none)]:static [@media(hover:none)]:mt-1')} data-testid="user-actions">
         <CopyButton text={msg.text} />
         {onEdit && <IconButton label="Edit message" disabled={disabled} onClick={() => { setValue(msg.text); setEditing(true); }}><Pencil size={15} /></IconButton>}
-        {version && onVersion && (
-          <div className="flex items-center font-sans text-xs text-fg-muted" data-testid="version-nav">
-            <IconButton label="Previous version" className="h-7 w-7" disabled={disabled || version.current <= 1} onClick={() => onVersion(version.current - 2)}><ChevronLeft size={15} /></IconButton>
-            <span className="tabular-nums">{version.current}/{version.total}</span>
-            <IconButton label="Next version" className="h-7 w-7" disabled={disabled || version.current >= version.total} onClick={() => onVersion(version.current)}><ChevronRight size={15} /></IconButton>
-          </div>
-        )}
+        {version && onVersion && <VersionNav version={version} onVersion={onVersion} disabled={disabled} />}
       </div>
     </div>
   );
 });
 
-/** Regenerate menu styles. Until the contract carries a style on `regenerate`, these ask as a visible follow-up. */
-export type Refine = 'concise' | 'detailed';
-export const REFINE_PROMPT: Record<Refine, string> = { concise: 'Make that answer more concise.', detailed: 'Explain that answer in more detail.' };
+/** "‹ 2/3 ›": under an edited question, or under a regenerated answer (QA-A18). `onVersion(k)` takes a 0-based index. */
+function VersionNav({ version, onVersion, disabled }: { version: { current: number; total: number }; onVersion: (k: number) => void; disabled?: boolean }) {
+  return (
+    <div className="flex items-center font-sans text-xs text-fg-muted" data-testid="version-nav">
+      <IconButton label="Previous version" className="h-7 w-7" disabled={disabled || version.current <= 1} onClick={() => onVersion(version.current - 2)}><ChevronLeft size={15} /></IconButton>
+      <span className="tabular-nums">{version.current}/{version.total}</span>
+      <IconButton label="Next version" className="h-7 w-7" disabled={disabled || version.current >= version.total} onClick={() => onVersion(version.current)}><ChevronRight size={15} /></IconButton>
+    </div>
+  );
+}
 
-export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, onOpen, onRegenerate, onEdit, onSend, onReply, onRefine }: { msg: AnyView; isLast: boolean; onOpen: (a: Artifact) => void; onRegenerate: () => void; onEdit: (t: string) => void; onSend?: (t: string) => void; onReply?: OnReply; onRefine?: (style: Refine) => void }) {
+/** Regenerate menu styles (contract 1.10.0 `regenerate.style`): re-run in place as the next version, no follow-up turn. */
+export type Refine = Exclude<RegenerateStyle, 'default'>;
+/** Version label for a styled regeneration (`message.start.regenerateStyle` / `StoredMessage.regenerateStyle`). */
+export const STYLE_LABEL: Record<Refine, string> = { concise: 'Concise', detailed: 'Detailed' };
+
+export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, onOpen, onRegenerate, onEdit, onSend, onReply, onRefine, version, onVersion, versionBusy }: { msg: AnyView; isLast: boolean; onOpen: (a: Artifact) => void; onRegenerate: () => void; onEdit: (t: string) => void; onSend?: (t: string) => void; onReply?: OnReply; onRefine?: (style: Refine) => void; version?: { current: number; total: number }; onVersion?: (k: number) => void; versionBusy?: boolean }) {
   const msg = view as AssistantView; // legacy part renderers; v1-only data is read through `view`
+  const regenStyle = (view as { regenerateStyle?: RegenerateStyle }).regenerateStyle;
+  const styleLabel = regenStyle && regenStyle !== 'default' ? STYLE_LABEL[regenStyle] : undefined;
   const reply: OnReply | undefined = onReply ?? (onSend ? (t) => onSend(t) : undefined);
   // Feedback survives remounts (virtualized rows) in memory; see lib/feedback.ts.
   const [vote, setVoteState] = useState<Vote | null>(() => feedbackFor(view.id)?.vote ?? storedVote((view as { feedback?: unknown }).feedback));
@@ -186,13 +195,15 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
       {!msg.streaming && msg.finishReason === 'aborted' && <StoppedNote onRetry={isLast ? onRegenerate : undefined} />}
       {!msg.streaming && !empty && (
         <div className={clsx('-ml-2 mt-2 flex flex-wrap items-center gap-0.5 transition-opacity', isLast ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100')} data-testid="msg-actions">
+          {version && onVersion && <VersionNav version={version} onVersion={onVersion} disabled={versionBusy} />}
           <CopyButton text={() => messageMarkdown(view)} tip />
           <IconButton tip label="Good response" aria-pressed={vote === 'up'} onClick={() => setVote(vote === 'up' ? null : 'up')}><ThumbsUp size={16} fill={vote === 'up' ? 'currentColor' : 'none'} /></IconButton>
           <IconButton tip label="Bad response" aria-pressed={vote === 'down'} onClick={() => { const next = vote === 'down' ? null : 'down'; setVote(next); setFeedbackOpen(next === 'down'); setFeedbackSent(false); }}><ThumbsDown size={16} fill={vote === 'down' ? 'currentColor' : 'none'} /></IconButton>
-          {isLast && (onRefine
-            ? <IconButton tip label="Regenerate" aria-haspopup="menu" aria-expanded={!!regen.anchor} onClick={regen.toggle} data-testid="regenerate-menu-button"><RefreshCw size={16} /></IconButton>
-            : <IconButton tip label="Regenerate" onClick={onRegenerate}><RefreshCw size={16} /></IconButton>)}
+          {/* One click regenerates (the earlier answer stays as version 1/2, QA-A18); the chevron holds the styles. */}
+          {isLast && <IconButton tip label="Regenerate" onClick={onRegenerate}><RefreshCw size={16} /></IconButton>}
+          {isLast && onRefine && <IconButton tip label="Answer style" className="-ml-1 w-6!" aria-haspopup="menu" aria-expanded={!!regen.anchor} onClick={regen.toggle} data-testid="regenerate-menu-button"><ChevronDown size={14} /></IconButton>}
           <IconButton tip label="More actions" aria-haspopup="menu" aria-expanded={!!more.anchor} onClick={more.toggle} data-testid="more-actions"><MoreHorizontal size={16} /></IconButton>
+          {styleLabel && <span className="mx-1 rounded-full border border-line px-2 py-0.5 font-sans text-[11px] text-fg-subtle" data-testid="regen-style" title="Regenerated with this style">{styleLabel}</span>}
           <AnswerMeta usage={usage && (usage.queries > 0 || usage.costUsd !== undefined) ? usage : undefined} queries={queries.length ? nQueries : 0} repairs={steps.filter((s) => s.kind === 'repair' && s.state === 'ok').length} onSql={queries.length ? () => setSqlOpen((o) => !o) : undefined} sqlOpen={sqlOpen} />
           {feedbackSent && <span className="ml-2 font-sans text-xs text-fg-subtle">Thanks for the feedback</span>}
         </div>
