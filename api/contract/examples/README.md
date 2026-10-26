@@ -19,3 +19,5 @@ sequence drifts from these files.
 | `error.jsonl` | failure | `error` | one `error` part |
 
 Ids such as `csvFileId` are normalised, so `/api/download/<id>` will 404 when an example is replayed.
+
+`capabilities.json` is `GET /api/capabilities` from the demo backend (contract 1.4.0, CONTRACT.md §12); `web/src/contract/capabilities.ts` mirrors it for offline/mock mode.

@@ -15,7 +15,7 @@ from analyzer.answer import AnalyzerAnswer
 from analyzer.tools import is_phi_column
 
 from api.ids import new_id
-from api.store import DownloadRegistry, Principal
+from api.store import DownloadRegistry, Principal, csv_filename
 
 PREVIEW_ROWS = 50
 CHART_MAX_ROWS = 5000
@@ -66,31 +66,33 @@ def column_type(name: str, values: list) -> str:
     return "string"
 
 
-#: Billing acronyms that stay uppercase in labels and titles (QA-P5): "CARC code", not "Carc code".
-_ACRONYMS = {"carc", "rarc", "bcbs", "cpt", "npi", "icd", "hcpcs", "drg", "ndc", "pos", "eob", "id", "mrn", "ar"}
+#: Revenue-cycle acronyms kept upper-case in labels and chart titles (QA-P5: "Claims by CARC code", not "carc code").
+ACRONYMS = frozenset({"carc", "rarc", "bcbs", "cpt", "npi", "icd", "hcpcs", "drg", "eob", "era", "pos", "hmo", "ppo",
+                      "ar", "id", "mrn", "tin", "ein", "ndc", "loinc", "cms", "uhc"})
+
+
+def _word(w: str, first: bool) -> str:
+    if w.lower() in ACRONYMS:
+        return w.upper()
+    return w.capitalize() if first else w.lower()
 
 
 def humanize(name: str) -> str:
     """``carc_code`` -> ``CARC code``; ``payer_name`` -> ``Payer name``."""
-    words = name.replace("_", " ").strip().split()
-    if not words:
-        return name
-    out = [w.upper() if w.lower() in _ACRONYMS else w.lower() for w in words]
-    if out[0].islower():
-        out[0] = out[0].capitalize()
-    return " ".join(out)
+    words = [w for w in str(name).replace("_", " ").split() if w]
+    return " ".join(_word(w, i == 0) for i, w in enumerate(words)) or str(name)
 
 
 def lower_label(label: str) -> str:
-    """Lower-case a label for mid-sentence use, keeping acronyms: ``CARC code`` stays, ``Payer name`` -> ``payer name``."""
-    return " ".join(w if w.isupper() and len(w) > 1 else w.lower() for w in label.split())
+    """Mid-sentence form of a label: lower-case except acronyms (``CARC code``, ``service month``)."""
+    return " ".join(w if w.lower() in ACRONYMS and w.isupper() else w.lower() for w in label.split())
 
 
 def columns_for(names: list, rows: list) -> list[dict]:
     out = []
     for i, name in enumerate(names):
         ctype = column_type(name, [r[i] for r in rows[:200]])
-        col = {"key": name, "label": humanize(name) or name, "type": ctype}
+        col = {"key": name, "label": humanize(name), "type": ctype}
         if ctype == "currency":
             col["format"] = "$,.2f"
         elif ctype == "percent":
@@ -265,7 +267,7 @@ def answer_parts(answer: AnalyzerAnswer, principal: Principal, downloads: Downlo
     if names:
         cols = columns_for(names, rows)
         sensitivity = "limited" if phi_cols else "deidentified"
-        dl = downloads.put(principal, "result.csv", names, [[_jsonable(v) for v in r] for r in rows])
+        dl = downloads.put(principal, csv_filename("Result"), names, [[_jsonable(v) for v in r] for r in rows])
         table = {"type": "table", "id": new_id("p_"), "title": "Result", "columns": cols,
                  "rows": [[_jsonable(v) for v in r] for r in rows[:PREVIEW_ROWS]], "rowCount": len(rows),
                  "csvFileId": dl.id, "resultId": dl.id, "sensitivity": sensitivity,
@@ -274,7 +276,7 @@ def answer_parts(answer: AnalyzerAnswer, principal: Principal, downloads: Downlo
             table["sqlPartId"] = sql_id
         parts.append(table)
         if len(rows) > PREVIEW_ROWS:
-            parts.append({"type": "file", "id": new_id("p_"), "fileId": dl.id, "name": "result.csv",
+            parts.append({"type": "file", "id": new_id("p_"), "fileId": dl.id, "name": dl.name,
                           "mime": "text/csv", "sizeBytes": len(dl.csv_bytes()), "rowCount": len(rows),
                           "previewable": True, "sensitivity": sensitivity})
         chart = chart_for(cols, rows)
