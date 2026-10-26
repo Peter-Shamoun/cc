@@ -6,7 +6,7 @@ import { CodeBlock } from '../parts/CodeBlock';
 import { fmtMs, partsOf, stepsOf, type AnyView } from './normalize';
 import type { Step } from './provisional';
 
-export interface QueryInfo { id: string; label: string; sql: string; rowCount?: number; durationMs?: number; state?: Step['state']; produces: string[] }
+export interface QueryInfo { id: string; label: string; sql: string; rowCount?: number; durationMs?: number; state?: Step['state']; columns?: string[]; error?: string; produces: string[] }
 
 /**
  * Every SQL statement behind an answer, and which table each produced. Sources: tool steps with
@@ -28,7 +28,7 @@ export function queriesOf(m: AnyView): QueryInfo[] {
     const dup = out.find((q) => q.sql.trim() === s.sql!.trim());
     const prod = producedBy([s.id, s.resultId]);
     if (dup) { dup.produces = [...new Set([...dup.produces, ...prod])]; return; }
-    out.push({ id: s.id, label: s.label, sql: s.sql!, rowCount: s.rowCount, durationMs: s.durationMs, state: s.state, produces: prod });
+    out.push({ id: s.id, label: s.label, sql: s.sql!, rowCount: s.rowCount, durationMs: s.durationMs, state: s.state, columns: s.columns, error: s.kind === 'repair' ? undefined : s.error, produces: prod });
   });
   for (const c of codes) {
     const prod = producedBy([c.id]);
@@ -93,7 +93,9 @@ export function SqlInspector({ queries, onClose }: { queries: QueryInfo[]; onClo
           {q.state === 'error' && <span className="text-danger">failed, repaired below</span>}
           {q.produces.map((t) => <span key={t} className="inline-flex items-center gap-1"><Table2 size={12} aria-hidden /> produced “{t}”</span>)}
         </div>
+        {q.error && <div className="mt-2 rounded-lg border border-danger/25 bg-danger/5 px-3 py-1.5 font-mono text-xs text-fg" data-testid="inspector-error">{q.error}</div>}
         <CodeBlock code={q.sql} language="sql" title={`query ${Math.min(i, queries.length - 1) + 1} of ${queries.length}`} />
+        {q.columns && q.columns.length > 0 && <div className="mt-1 text-xs text-fg-subtle" data-testid="inspector-columns">Columns: {q.columns.map((c) => <code key={c} className="mr-1.5 font-mono">{c}</code>)}</div>}
       </div>
     </div>
   );
