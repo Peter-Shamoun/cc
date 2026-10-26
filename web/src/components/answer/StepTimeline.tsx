@@ -1,5 +1,5 @@
-import { useEffect, useId, useRef, useState } from 'react';
-import { AlertTriangle, BarChart3, Check, ChevronDown, ChevronRight, Database, GitCompare, List, ListChecks, Loader2, MoveUpRight, Search, Telescope, Wrench, X, type LucideIcon } from 'lucide-react';
+import { useEffect, useId, useState } from 'react';
+import { AlertTriangle, BarChart3, Check, ChevronDown, ChevronRight, Database, GitCompare, List, ListChecks, MoveUpRight, Search, Telescope, Wrench, X, type LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
 import { CodeBlock } from '../parts/CodeBlock';
 import { fmtMs, summarize, unresolvedFailures } from './normalize';
@@ -25,21 +25,25 @@ function useElapsed(live: boolean) {
 
 /**
  * Claude/ChatGPT-style activity disclosure: one row for the whole think-and-query phase.
- * Live: "Thinking…" with a spinner and running timer; the body lists each step as it runs
- * (each step is a single row keyed by stepId that turns from running to done; QA-A7). Done:
- * auto-collapses to "Thought for 1.2s"; expanding shows the counts ("Ran 2 queries, 1 check"),
- * the reasoning summary, then the steps (QA-A10).
+ * Live (the calmer ChatGPT way): collapsed, one muted header line naming the current step ("Running query"),
+ * no spinner or shimmer, only a short fade when the line changes (none under reduced motion), and no ticking timer
+ * (the elapsed time is kept and shown once, as "Thought for Ns").
+ * Clicking expands the steps (each a single row keyed by stepId that turns from running to done; QA-A7).
+ * Done: "Thought for 1.2s"; expanding shows the counts ("Ran 2 queries, 1 check"), the reasoning summary, then
+ * the steps (QA-A10). Screen readers hear each new step once, politely, and the final "Thought for", never the timer.
  */
+/** The live header line: the running step, else the latest step or reasoning note, else "Thinking". */
+export function currentActivity(steps: Step[], reasoning: TimelineReasoning[]): string {
+  const running = [...steps].reverse().find((s) => s.state === 'running');
+  const note = [...reasoning].reverse().map((r) => r.summary?.trim().split('\n')[0]).find(Boolean);
+  const label = running?.label ?? (note || steps.at(-1)?.label);
+  return label ? label.replace(/[.…]+$/, '') : 'Thinking';
+}
+
 export function StepTimeline({ steps, live, elapsedMs, reasoning = [] }: { steps: Step[]; live: boolean; elapsedMs?: number; reasoning?: TimelineReasoning[] }) {
-  const [open, setOpen] = useState(live);
-  const touched = useRef(false);
-  const wasLive = useRef(live);
+  // Collapsed by default, live or done; only the reader opens it (and it stays as they left it).
+  const [open, setOpen] = useState(false);
   const [mountedLive] = useState(live);
-  useEffect(() => {
-    if (wasLive.current && !live && !touched.current) setOpen(false);
-    if (!wasLive.current && live && !touched.current) setOpen(true);
-    wasLive.current = live;
-  }, [live]);
   // Ticks while live, then freezes: the frozen value is how long this answer "thought".
   const ticking = useElapsed(live);
   const bodyId = useId();
@@ -55,22 +59,24 @@ export function StepTimeline({ steps, live, elapsedMs, reasoning = [] }: { steps
   const thoughtMs = Math.max(mountedLive ? Math.max(ticking, 0) : elapsedMs ?? worked, longest);
   const stopped = steps.filter((x) => x.state === 'cancelled').length;
   // Collapsed: "Thought for 1.2s" (plus "1 stopped" if any). Expanded: the counts join the header.
-  const header = live ? 'Thinking…' : [`Thought for ${fmtMs(Math.max(thoughtMs, 1000))}`, open && steps.length ? counts : stopped ? `${stopped} stopped` : ''].filter(Boolean).join(' · ');
+  const activity = currentActivity(steps, reasoning);
+  const header = live ? activity : [`Thought for ${fmtMs(Math.max(thoughtMs, 1000))}`, open && steps.length ? counts : stopped ? `${stopped} stopped` : ''].filter(Boolean).join(' · ');
   const notes = reasoning.map((r) => r.summary?.trim()).filter(Boolean) as string[];
 
   return (
     // QA-A11: a group named by its own header, not N identical "Analysis steps" landmarks per thread.
     <div role="group" aria-labelledby={headId} className="my-3 font-sans text-sm first:mt-0" data-testid="step-timeline" data-live={live || undefined}>
-      <button type="button" id={headId} aria-expanded={open} aria-controls={bodyId} onClick={() => { touched.current = true; setOpen((o) => !o); }}
+      <button type="button" id={headId} aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen((o) => !o)}
         className="group inline-flex max-w-full items-center gap-2 rounded-lg py-1 text-left text-fg-muted transition-colors hover:text-fg" data-testid="step-summary">
-        {live ? <Loader2 size={14} className="shrink-0 animate-spin" aria-hidden /> : <ListChecks size={14} className="shrink-0" aria-hidden />}
-        <span className={clsx('truncate', live && 'shimmer')}>{header}</span>
-        {live && <span className="shrink-0 tabular-nums text-xs text-fg-subtle" aria-hidden>{fmtMs(Math.max(ticking, 0))}</span>}
+        <ListChecks size={14} className="shrink-0" aria-hidden />
+        {/* Keyed by the line so a new step fades in (cc-fade, 200 ms; reduced motion turns it off globally). */}
+        <span key={live ? activity : 'done'} className={clsx('truncate', live && 'cc-step-fade')} data-testid="step-activity">{header}</span>
         {/* QA-A22: separators so the accessible name reads "Thought for 1s, 2 failed", not "1s2 failed". */}
         {!live && errors > 0 && <span className="shrink-0 text-xs text-fg-subtle" data-testid="step-failed-count"><span className="sr-only">, </span>{errors} failed</span>}
         {!live && !errors && repaired > 0 && <span className="sr-only">, all failures repaired</span>}
         {open ? <ChevronDown size={14} className="shrink-0" aria-hidden /> : <ChevronRight size={14} className="shrink-0" aria-hidden />}
       </button>
+      {/* QA-S16: no live region here; the shell's single status region says "answering…" / "Answer complete" (no double announcements). */}
       <div id={bodyId} hidden={!open} className="step-body">
         {notes.length > 0 && (
           <div className="ml-[6px] mt-1.5 whitespace-pre-line border-l-2 border-line pl-5 leading-relaxed text-fg-muted" data-testid="reasoning-summary">{notes.join('\n\n')}</div>
@@ -100,7 +106,7 @@ function StepRow({ step, last, showAgent }: { step: Step; last: boolean; showAge
         className="flex w-full max-w-full items-center gap-2 rounded-md py-1 text-left text-fg-muted enabled:hover:text-fg">
         <Icon size={14} className="shrink-0" aria-hidden />
         <span className="sr-only">{KIND_LABEL[step.kind]}:</span>
-        <span className={clsx('min-w-0 truncate', step.state === 'running' && 'shimmer')}>{step.label}</span>
+        <span className="min-w-0 truncate">{step.label}</span>
         {step.attempt !== undefined && step.attempt > 1 && <span className="shrink-0 text-xs text-fg-subtle"><span aria-hidden>· </span><span>attempt {step.attempt}</span></span>}
         {step.state === 'ok' && <Check size={13} className="shrink-0 text-fg-subtle" aria-label="done" />}
         {step.state === 'error' && <X size={13} className="shrink-0 text-danger" aria-label="failed" />}

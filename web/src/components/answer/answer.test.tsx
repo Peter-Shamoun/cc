@@ -64,7 +64,11 @@ describe('answer surface: components', () => {
     const tl = screen.getByTestId('step-timeline');
     expect(tl).toHaveAttribute('data-live', 'true');
     expect(within(tl).getAllByTestId('step')).toHaveLength(5);
+    // Calmer disclosure: collapsed while it runs; the steps are one click away.
+    expect(screen.getByTestId('step-summary')).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(screen.getByTestId('step-summary'));
     expect(screen.getByTestId('step-summary')).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(screen.getByTestId('step-summary'));
     rerender(<AssistantTurn msg={viewOf('dup-denials')} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} />);
     expect(screen.getByTestId('step-summary')).toHaveAttribute('aria-expanded', 'false');
     // QA-A10: one "Thought for …" row; the counts join the header once it is expanded.
@@ -145,9 +149,9 @@ describe('answer surface: contract v1 events', () => {
   it('renders live steps, then escalation pill, v1 table link and rich usage', () => {
     const { rerender } = render(<AssistantTurn msg={v1(DUP_V1_STEPS.slice(0, 8))} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} />);
     expect(screen.getByTestId('step-timeline')).toHaveAttribute('data-live', 'true');
-    // QA-A7: the header no longer repeats the running step; the step appears once, as its own row.
-    expect(screen.getByTestId('step-summary').textContent).toMatch(/^Thinking…/);
-    expect(screen.getAllByText(/Re-running repaired query/)).toHaveLength(1);
+    // Calmer disclosure: the collapsed header names the running step; the step rows stay hidden until opened.
+    expect(screen.getByTestId('step-activity')).toHaveTextContent(/^Re-running repaired query$/);
+    expect(screen.getByTestId('step-summary')).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByTestId('status')).toBeNull();
     expect(screen.getByTestId('table-skeleton')).toBeInTheDocument();
     rerender(<AssistantTurn msg={v1([...DUP_V1_STEPS, ...DUP_V1_ANSWER])} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} />);
@@ -170,7 +174,7 @@ describe('answer surface: contract v1 events', () => {
     const st = (kind: string, state: string) => ({ id: kind + state + Math.random(), kind, state, label: kind }) as never;
     expect(unresolvedFailures([st('sql', 'error'), st('repair', 'error'), st('sql', 'error'), st('escalation', 'ok'), st('sql', 'ok')])).toBe(0);
     expect(unresolvedFailures([st('sql', 'ok'), st('sql', 'error')])).toBe(1);
-    expect(summarize([{ id: 'e', kind: 'explore', state: 'ok', label: 'Read schema', durationMs: 13 }])).toBe('Explored the data · 13ms');
+    expect(summarize([{ id: 'e', kind: 'explore', state: 'ok', label: 'Read schema', durationMs: 13 }])).toBe('Looked at the data · 13ms');
   });
   it('agent tags only show when more than one agent worked on the answer (QA-A6)', () => {
     const row = (id: string, agent: string) => ({ id, kind: 'sql' as const, state: 'ok' as const, label: 'Ran query', agent });
@@ -204,9 +208,18 @@ describe('answer surface: contract v1 events', () => {
     cleanup();
     const one = vi.fn();
     render(<ClarifyCard part={{ ...part, multiSelect: false }} onReply={one} active />);
-    fireEvent.change(screen.getByLabelText('Answer in your own words'), { target: { value: 'Commercial only' } });
-    fireEvent.submit(screen.getByLabelText('Answer in your own words').closest('form')!);
-    expect(one).toHaveBeenCalledWith('Commercial only', { clarificationId: 'clar-1', text: 'Commercial only' });
+    // QA-A30: no inline text box any more; free text goes through the composer, the card only hints at it.
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.getByTestId('clarify-type-hint').textContent).toBe('Or type your answer below');
+    fireEvent.click(screen.getAllByTestId('clarify-chip')[1]);
+    expect(one).toHaveBeenCalledWith('Medicaid', { clarificationId: 'clar-1', choiceIds: ['p2'] });
+    expect(screen.queryByTestId('clarify-type-hint')).toBeNull();
+    cleanup();
+    render(<ClarifyCard part={{ ...part, multiSelect: false, choices: [] }} onReply={vi.fn()} active />);
+    expect(screen.getByTestId('clarify-type-hint').textContent).toBe('Type your answer below');
+    cleanup();
+    render(<ClarifyCard part={{ ...part, multiSelect: false }} active />);
+    expect(screen.queryByTestId('clarify-type-hint')).toBeNull(); // read-only: nowhere to type
   });
 });
 

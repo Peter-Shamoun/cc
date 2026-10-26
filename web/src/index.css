@@ -116,15 +116,16 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -
 .prose-chat > :first-child { margin-top: 0; }
 .prose-chat > :last-child { margin-bottom: 0; }
 
-/* Streaming caret: ChatGPT-style dot appended to the last block. */
-/* Streamdown nests blocks (root > div.space-y > div[dir] > p): put the dot inline at the end of the
-   last text block / last list item, as ChatGPT does; fall back to after the block for tables/code. */
-.streaming-caret > div > div:last-child > :is(p, h1, h2, h3, h4, h5, h6):last-child::after,
-.streaming-caret > div > div:last-child > :is(ul, ol):last-child > li:last-child::after,
-.streaming-caret > div > div:last-child > blockquote:last-child > :last-child::after,
-.streaming-caret:not(:has(> div > div:last-child > :is(p, h1, h2, h3, h4, h5, h6, ul, ol, blockquote):last-child)) > :last-child::after,
+/* Streaming edge (ChatGPT hands-on 2026-10-26): no caret. The trailing lines of the last block fade from muted to full
+   colour as text arrives; when the stream ends the class goes and the text is uniform. A static mask, not motion, so
+   reduced motion keeps it. `.streaming-caret` stays the hook (e2e waitIdle, action-row hiding). The only dot left is
+   the empty-answer placeholder, before any text exists. */
+.streaming-caret > div > div:last-child {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 3em), rgb(0 0 0 / 0.35) 100%);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 3em), rgb(0 0 0 / 0.35) 100%);
+}
 .streaming-caret:empty::after {
-  content: ""; display: inline-block; width: 8px; height: 8px; margin-left: 0.25em;
+  content: ""; display: inline-block; width: 8px; height: 8px;
   border-radius: 9999px; background: var(--fg); vertical-align: middle;
   animation: cc-pulse 1s ease-in-out infinite;
 }
@@ -140,8 +141,6 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -
 .shiki-wrap pre { margin: 0; padding: 1rem; overflow: visible; font-size: 13px; line-height: 1.6; background: transparent !important; }
 .shiki-wrap[data-wrap] pre, .shiki-wrap[data-wrap] code { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
 .dark .shiki, .dark .shiki span { color: var(--shiki-dark) !important; }
-.shimmer { animation: cc-shimmer 1.6s linear infinite; }
-@keyframes cc-shimmer { 0%, 100% { color: var(--fg-muted); } 50% { color: var(--fg); } }
 .vega-embed { width: 100%; }
 .vega-embed summary { opacity: 0.6; }
 
@@ -155,6 +154,8 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -
 /* ---- shell motion tokens (observed: ChatGPT/Claude use short, ease-out, mostly opacity/transform) ---- */
 :root { --ease-out: cubic-bezier(.2,.8,.2,1); --dur-fast: 120ms; --dur-med: 200ms; }
 @keyframes cc-fade { from { opacity: 0 } to { opacity: 1 } }
+/* Live thinking header: a new step line fades in softly (no shimmer, no spinner). */
+.cc-step-fade { animation: cc-fade 200ms ease-out both; }
 @keyframes cc-pop { from { opacity: 0; transform: scale(.97) translateY(4px) } to { opacity: 1; transform: none } }
 @keyframes cc-rise { from { transform: translateY(8px) } to { transform: none } }
 @keyframes cc-drop { from { opacity: 0; transform: translateY(-8px) } to { opacity: 1; transform: none } }
