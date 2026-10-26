@@ -37,7 +37,7 @@ out.cards = await pg.getByTestId('artifact-card').allTextContents();
 await pg.screenshot({ path: `${OUT}/${theme}_report_autoopen.png` });
 // Sources chip + popover
 await pg.getByTestId('sources-chip').first().click();
-await pg.getByTestId('sources-popover').waitFor();
+await pg.getByTestId('sources-popover').waitFor(); await pg.waitForTimeout(1200);
 out.popover = await pg.getByTestId('sources-popover').textContent();
 await pg.screenshot({ path: `${OUT}/${theme}_sources_popover.png` });
 await pg.keyboard.press('Escape');
