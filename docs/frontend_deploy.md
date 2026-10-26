@@ -98,6 +98,7 @@ team:
 | `CC_API_MODE` | demo | not `sim` (the ccsim world) |
 | `CC_API_LLM` | `scripted` | `scripted` until sign-off (§6) |
 | `CC_API_ALLOW_PAID_API` | unset | unset unless approved (§6) |
+| `CC_API_SQL_LITERAL_MASKING` | `phi` | `phi` or `all`; never `off` (shown SQL would carry PHI literals; contract 1.14.0 §10) |
 | `CC_API_HOST` / `CC_API_PORT` | `127.0.0.1` / `8787` | behind the proxy |
 | `CC_API_MAX_BODY_BYTES` | 1 MiB | keep; set the proxy's body limit ≥ this so oversize requests get the API's 413 `payload_too_large` |
 | `CC_API_MAX_CONCURRENT_RUNS` | `3` unfinished runs per user | keep, or size to capacity |
