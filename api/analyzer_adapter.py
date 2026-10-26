@@ -13,8 +13,7 @@ Spec: ``docs/frontend-analyzer-adapter.md``. This module is the **stub**. It doe
   separate, reviewed change (see the spec, "Rollout").
 * Reasoning text never streams as-is (spec R2). Every replay/run goes through ``api.reasoning_policy.ReasoningPolicy``:
   ``"drop"`` (default) or ``"summary"`` (labels and counts only).
-* ``strategy_config`` (``api.strategy_config``) maps a contract strategy, model choice and 384-grid cell to
-  ``AnalyzerConfig`` overrides (spec R4). ``api.analyst_shim`` adapts the analyst agents' model interfaces to the
+* ``api.analyst_shim`` adapts the analyst agents' model interfaces to the
   analyzer's ``complete(**kw) -> Completion`` so ``LiveTap`` can observe them (spec R7).
 """
 from __future__ import annotations
@@ -27,7 +26,6 @@ from typing import Any, Callable, Mapping
 from analyzer.answer import AnalyzerAnswer
 from analyzer.llm import Completion, PaidAPIDisabled, ToolCall
 
-from api.capabilities import DEFAULT_STRATEGY, STRATEGY_IDS
 from api.contract import CONTRACT_VERSION
 from api.live import Cancelled, LiveTap
 from api.mapping import outcome_parts
@@ -104,36 +102,11 @@ class Recording:
     calls: list[RecordedCall]
     answer: dict                         # AnalyzerAnswer fields
     multi_candidate: bool = False
-    strategy: str | None = None          # the capabilities strategy id the run used, when recorded
 
     @classmethod
     def from_json(cls, data: dict) -> "Recording":
         return cls(question=data["question"], calls=[RecordedCall(**c) for c in data["calls"]],
-                   answer=data["answer"], multi_candidate=bool(data.get("multiCandidate")),
-                   strategy=data.get("strategy"))
-
-    @property
-    def escalated(self) -> bool:
-        """A model change within one candidate (how ``LiveTap`` detects an escalation)."""
-        seen: dict[int, str] = {}
-        for c in self.calls:
-            if seen.setdefault(c.candidate, c.model) != c.model:
-                return True
-        return False
-
-
-def adapter_strategy(strategy: str | None = None, *, multi_candidate: bool = False, escalated: bool = False) -> str:
-    """The ``message.start.strategy`` for an adapter run: always a ``GET /api/capabilities`` strategy id.
-
-    An explicit id (the request's ``options.strategy``) wins and must be known. Otherwise it is inferred from the
-    run's shape: several candidates → ``candidates``; a model change mid-run → ``cascade``; else the default."""
-    if strategy is not None:
-        if strategy not in STRATEGY_IDS:
-            raise ValueError(f"unknown strategy {strategy!r}; expected one of {sorted(STRATEGY_IDS)}")
-        return strategy
-    if multi_candidate:
-        return "candidates"
-    return "cascade" if escalated else DEFAULT_STRATEGY
+                   answer=data["answer"], multi_candidate=bool(data.get("multiCandidate")))
 
 
 class _ReplayLLM:
@@ -179,23 +152,18 @@ def events_for_recording(recording: Recording, *, principal: Principal | None = 
                          model=recording.calls[0].model if recording.calls else "none",
                          multi_candidate=recording.multi_candidate, cancelled=cancelled, principal=principal,
                          downloads=downloads, message_id=message_id, conversation_id=conversation_id,
-                         parent_id=parent_id, reasoning=reasoning,
-                         strategy=adapter_strategy(recording.strategy, multi_candidate=recording.multi_candidate,
-                                                   escalated=recording.escalated),
-                         sql_masking=sql_masking)
+                         parent_id=parent_id, reasoning=reasoning, sql_masking=sql_masking)
 
 
 def run_to_events(question: str, run: Callable[[LiveTap], AnalyzerAnswer], inner_llm: Any, *, model: str,
                   multi_candidate: bool = False, cancelled: threading.Event | None = None,
                   principal: Principal | None = None, downloads: DownloadRegistry | None = None,
                   message_id: str = "m_rec", conversation_id: str = "c_rec", parent_id: str = "u_rec",
-                  strategy: str | None = None, reasoning: str = DEFAULT_POLICY,
+                  reasoning: str = DEFAULT_POLICY,
                   sql_masking: str = SQL_MASK_DEFAULT) -> list[dict]:
     """The shared adapter pipeline: ``run(tap)`` drives an analyzer/analyst run whose model calls go through ``tap``
     (a ``LiveTap`` around ``inner_llm``) and returns the ``AnalyzerAnswer``; this function frames it as the full
-    contract stream (``message.start`` … ``message.end``, with ``seq``). Model text is filtered by ``reasoning``.
-    ``strategy`` is a capabilities id (``adapter_strategy``); ``None`` infers it from ``multi_candidate``."""
-    strategy = adapter_strategy(strategy, multi_candidate=multi_candidate)
+    contract stream (``message.start`` … ``message.end``, with ``seq``). Model text is filtered by ``reasoning``."""
     events: list[dict] = []
 
     def raw_emit(payload: dict):
@@ -206,7 +174,7 @@ def run_to_events(question: str, run: Callable[[LiveTap], AnalyzerAnswer], inner
     downloads = downloads or DownloadRegistry()
     cancelled = cancelled or threading.Event()
     emit({"type": "message.start", "messageId": message_id, "conversationId": conversation_id,
-          "contractVersion": CONTRACT_VERSION, "model": model, "parentId": parent_id, "strategy": strategy})
+          "contractVersion": CONTRACT_VERSION, "model": model, "parentId": parent_id})
     emit({"type": "status", "label": "Thinking"})
     tap = LiveTap(inner_llm, emit, cancelled=cancelled, multi_candidate=multi_candidate)
     finish = "stop"

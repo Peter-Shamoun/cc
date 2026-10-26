@@ -1,6 +1,6 @@
 # Real analyzer adapter: spec (contract 1.23.0)
 
-**Status:** a stub, for review by Claude. `api/analyzer_adapter.py`, `api/reasoning_policy.py` (R2), `api/strategy_config.py` (R4) and `api/analyst_shim.py` (R7), plus fixture-only tests in
+**Status:** a stub, for review by Claude. `api/analyzer_adapter.py`, `api/reasoning_policy.py` (R2) and `api/analyst_shim.py` (R7), plus fixture-only tests in
 `api/tests/test_analyzer_adapter.py`. The server is **not** wired to it. No paid API is called, and nothing under
 `analyzer/`, `analyst/`, `bench/` or `ccsim/` was changed (they were read only).
 
@@ -111,32 +111,9 @@ protocol need a small shim to `Completion`: see §6 (R7) and `api/analyst_shim.p
   caller passes `enable=True`. Anything else raises the analyzer's `PaidAPIDisabled`, which `api.app` already maps to
   an `error` part ("Paid model APIs are disabled on this server"). It is off by default. A test asserts that `api/app.py`
   does not reference the adapter, the switch or `allow_paid_api=True`.
-* **R4 Strategy (mapping done; not wired).** `api.strategy_config.strategy_config(strategy, model, *, grid=None,
-  customer=None, strict=False)` is a pure function that returns `StrategyConfig{overrides, fidelity, notes}`. The
-  `overrides` are valid `AnalyzerConfig(**overrides)` / `AnalyzerConfig.from_technique(overrides)`. The strategy gives
-  `capabilities.STRATEGIES[*].config`, and a non-`auto` model adds `model`. Unknown, incompatible or org-disabled
-  options raise `ValueError`, using the same rule as the API's 422. An optional 384-grid cell (factor names from
-  `research/grid/GRID_PROTOCOL.md`, read-only) refines it:
-
-  | grid factor | level → `AnalyzerConfig` | fidelity |
-  |---|---|---|
-  | `generation` | `direct_sql` → (none); `metric_spec` → `enable_metrics`; `decompose_cte` → (none) | exact / approximate / **unsupported** |
-  | `fewshot` | 1 → `enable_examples: true` (lookup tool, not pasted examples); 0 → `false` | approximate / exact |
-  | `explore` | 1 → `data_profile`, `enable_lookup` true; 0 → both false | exact |
-  | `candidates3` | 1 → `candidates: 3, candidate_selection: execution_vote`; 0 → `candidates: 1` | exact |
-  | `verifier` | 1 → `verify`, `result_checks` true (deterministic bounce, not a critic model); 0 → `verify: false` | approximate / exact |
-  | `repair` | 1 → `self_correct: errors+result_signals, max_repairs: 2`; 0 → `none`, `0` | exact |
-  | `assumptions` | no switch; `final_answer.assumptions` is always offered | approximate |
-  | `multiagent` | 1 → no planner/writer split exists | **unsupported** (0: exact) |
-
-  `verifier=1` with `repair=0` is flagged in `notes`: the analyzer's bounce needs `self_correct=errors+result_signals`.
-  `strategy="candidates"` with `candidates3=0` is a contradiction and raises. `strict=True` rejects unsupported
-  factors; otherwise they are reported in `fidelity`, so a caller never silently runs a different cell. `api.app` still
-  only echoes the strategy.
-  `message.start.strategy` from the adapter is always a `GET /api/capabilities` id (`adapter_strategy`): the request's
-  `options.strategy` when given (an unknown id raises), else inferred from the run: several candidates →
-  `candidates`, a model change mid-run → `cascade`, otherwise the default `tool_loop`. Recordings may carry
-  `"strategy"`. (Before this, the stub sent `"analyst"`, which is not a capability id.)
+* **R4 Strategy: dropped (contract 1.24.0).** There is no strategy or model choice: the server runs one shipped
+  configuration (bundle B1) from `settings.analyzer_overrides` / the `claude_code_cli` driver, never from the request.
+  `api/strategy_config.py` and `adapter_strategy` were deleted; `message.start` carries no `strategy`.
 * **R5 Usage.** Use `Completion.usage` tokens. `LiveTap` falls back to an approximation when they are missing.
   `costIsEstimate` stays true.
 * **R6 Cancel during SQL.** Done API-side in 1.20.1 (`api/cancel.py`, CONTRACT §8): the adapter must pass the
@@ -159,8 +136,7 @@ appends `{model, candidate_index, tool_results of messages[-1], completion}`, an
 1. R2 is closed in the adapter path. Wiring must call `run_to_events(..., reasoning="drop")` (or `"summary"`).
 2. Add `Settings.llm in ("anthropic","bedrock")` → `build_real_llm(settings.llm, enable=settings.allow_paid_api)`
    in `api.app`. Keep the demo default `scripted`. The test that forbids wiring then changes in the same PR.
-3. Apply R4: `AnalyzerConfig(**{**settings.analyzer_overrides, **strategy_config(strategy, model,
-   customer=principal.customer).overrides})`.
+3. Config: `AnalyzerConfig(**settings.analyzer_overrides)` (one server-side configuration; no request input).
 4. Shadow runs with recordings, and gate on `check()` == [] in CI.
 
 ## 6. Analyst-agent model shims (R7, stub)

@@ -15,14 +15,13 @@ export const REGENERATE_STYLES: readonly { style: RegenerateStyle; label: string
 
 /**
  * The /api/chat body for regenerating `messageId`. `default` sends no style (a plain re-run, understood by any
- * 1.x server). `options` (strategy/model) carry over when given.
+ * 1.x server).
  */
 export function regenerateRequest(
-  conversationId: string, messageId: string, style: RegenerateStyle = 'default', options?: ChatRequest['options'],
+  conversationId: string, messageId: string, style: RegenerateStyle = 'default',
 ): ChatRequest {
   const req: ChatRequest = {
     conversationId, messages: [], regenerate: style === 'default' ? { messageId } : { messageId, style },
   };
-  if (options) req.options = options;
   return req;
 }

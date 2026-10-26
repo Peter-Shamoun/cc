@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://cc.local/api/contract/v1.schema.json",
   "title": "CC chat stream contract",
-  "version": "1.23.0",
+  "version": "1.24.0",
   "description": "One JSON object per SSE data: line. See api/CONTRACT.md. Validate an event against #/$defs/StreamEvent.",
   "$ref": "#/$defs/StreamEvent",
   "$defs": {
@@ -1480,11 +1480,7 @@
         },
         "model": {
           "type": "string",
-          "description": "The model that starts the run (a ModelOption id other than `auto`, or the server's own id when it was `auto`). Escalations announce later models."
-        },
-        "strategy": {
-          "type": "string",
-          "description": "The StrategyOption id the run uses (GET /api/capabilities); the default when the request named none. Adapters for research agents may send another id: treat unknown ids as a plain label."
+          "description": "The model that starts the run (the server's own id; never chosen by the client). Escalations announce later models."
         },
         "parentId": {
           "$ref": "#/$defs/ID"
@@ -2366,17 +2362,7 @@
         },
         "options": {
           "type": "object",
-          "description": "Run options. `strategy` and `model` must be ids from GET /api/capabilities (unknown or incompatible: 422 validation). Omitted means the defaults. 1.21.0: options tune how the answer is produced, never which data it reads; an `IdentityScopedKey` here is 422 (§2.1). Other unknown keys are ignored.",
-          "properties": {
-            "strategy": {
-              "type": "string",
-              "maxLength": 64
-            },
-            "model": {
-              "type": "string",
-              "maxLength": 64
-            }
-          },
+          "description": "Run options. 1.24.0: there is no strategy or model choice; the server runs one analyzer configuration, so `strategy` or `model` here is 422 validation and nothing runs. 1.21.0: options tune how the answer is produced, never which data it reads; an `IdentityScopedKey` here is 422 (§2.1). Other unknown keys are ignored.",
           "additionalProperties": true,
           "propertyNames": {
             "not": {
@@ -2779,126 +2765,12 @@
       },
       "additionalProperties": false
     },
-    "CostTier": {
-      "enum": [
-        "low",
-        "medium",
-        "high"
-      ],
-      "description": "Relative cost per answer, for a picker badge. Not a price."
-    },
-    "StrategyOption": {
-      "type": "object",
-      "description": "One answer strategy a picker can offer.",
-      "required": [
-        "id",
-        "label",
-        "description",
-        "default",
-        "costTier",
-        "models",
-        "available"
-      ],
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Send as ChatRequest.options.strategy; echoed on message.start.strategy."
-        },
-        "label": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "default": {
-          "type": "boolean"
-        },
-        "costTier": {
-          "$ref": "#/$defs/CostTier"
-        },
-        "latencyTier": {
-          "enum": [
-            "fast",
-            "medium",
-            "slow"
-          ]
-        },
-        "models": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "ModelOption ids allowed with this strategy."
-        },
-        "available": {
-          "type": "boolean",
-          "description": "False: show it disabled (not enabled for this organization; see unavailableReason). Sending it anyway is a 422 validation."
-        },
-        "unavailableReason": {
-          "type": "string",
-          "description": "Why it is unavailable for this organization (show as a tooltip). Present iff available is false."
-        }
-      },
-      "additionalProperties": true
-    },
-    "ModelOption": {
-      "description": "One model a picker can offer.",
-      "type": "object",
-      "required": [
-        "id",
-        "label",
-        "default",
-        "costTier",
-        "available"
-      ],
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Send as ChatRequest.options.model. 'auto' lets the server choose."
-        },
-        "label": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "default": {
-          "type": "boolean"
-        },
-        "tier": {
-          "enum": [
-            "small",
-            "medium",
-            "large"
-          ]
-        },
-        "provider": {
-          "type": "string"
-        },
-        "costTier": {
-          "$ref": "#/$defs/CostTier"
-        },
-        "available": {
-          "type": "boolean",
-          "description": "False: show it disabled for this organization."
-        },
-        "unavailableReason": {
-          "type": "string",
-          "description": "Why it is unavailable for this organization (show as a tooltip). Present iff available is false."
-        }
-      },
-      "additionalProperties": true
-    },
     "Capabilities": {
       "type": "object",
-      "description": "GET /api/capabilities: what this server can run. Fetch once per session; no user data.",
+      "description": "GET /api/capabilities: what this server offers. Fetch once per session; no user data. 1.24.0: no strategy/model choice (the server runs one analyzer configuration).",
       "required": [
         "contractVersion",
-        "demo",
-        "defaults",
-        "strategies",
-        "models",
-        "scope"
+        "demo"
       ],
       "properties": {
         "contractVersion": {
@@ -2906,42 +2778,7 @@
         },
         "demo": {
           "type": "boolean",
-          "description": "True with the scripted demo LLM: the choice is validated and echoed but the demo scenario drives the run."
-        },
-        "defaults": {
-          "type": "object",
-          "required": [
-            "strategy",
-            "model"
-          ],
-          "properties": {
-            "strategy": {
-              "type": "string"
-            },
-            "model": {
-              "type": "string"
-            }
-          },
-          "additionalProperties": true
-        },
-        "strategies": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/StrategyOption"
-          }
-        },
-        "models": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/ModelOption"
-          }
-        },
-        "scope": {
-          "enum": [
-            "organization",
-            "public"
-          ],
-          "description": "'organization' when the request was signed in, so `available` reflects the caller's organization; 'public' otherwise (everything shows available; the chat request is still checked). This is about which strategies/models are shown as available. It is not a data scope: the data a user can query comes from their sign-in and is never chosen or shown as a choice (§2.1)."
+          "description": "True with the scripted demo LLM: the demo scenario drives the run."
         },
         "feedbackReasons": {
           "type": "array",

@@ -1,6 +1,6 @@
 # CC chat API — stream contract
 
-**Version: 1.23.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.24.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -64,7 +64,7 @@ The frontend builds against this document only; the analyzer adapts to it.
   | 410 | `transcripts_unavailable` | the customer key was destroyed (§11) | history gone |
   | 413 | `payload_too_large` (1.5; was `validation`, still sent as `legacyCode`) | request body over **1 MiB** (`CC_API_MAX_BODY_BYTES`; `maxBytes` in the body), rejected before parsing | "message too long"; not retryable |
   | 403 | `access_denied` | cookie-session write without `x-cc-csrf: 1` (see CSRF above) | client bug: add the header |
-  | 422 | `validation` / `invalid_title` | bad body, bad `options` (§12), bad title | show `message` |
+  | 422 | `validation` / `invalid_title` | bad body, bad `options` (§2.1, §12), bad title | show `message` |
   | 500 | `internal` | unhandled server fault (no detail, ever) | retry once |
   | any | `http_<status>` | a status with no dedicated code | branch on the status |
   | 429 | `rate_limited` | more than **3 unfinished runs** per user (`CC_API_MAX_CONCURRENT_RUNS`) | wait `Retry-After` seconds (sent, currently 3), then retry |
@@ -128,8 +128,7 @@ The user never picks a database, lake, schema, view or customer, and no client c
   `connection`, `scope`, `escalate`, …; the schema's enum is the list). The server answers 422 `validation` ("The data
   you can query comes from your sign-in; a request can't choose it.") and runs nothing. Headers and query parameters
   are never read for scope: only the session token (or cookie) is. Other unknown keys are still ignored.
-* Read-only context derived from the session is fine to show (for example the organization in the account menu);
-  `Capabilities.scope` is about which strategies/models show as available, not a data scope.
+* Read-only context derived from the session is fine to show (for example the organization in the account menu).
 
 ## 3. Forward compatibility (client obligations)
 
@@ -152,7 +151,7 @@ The user never picks a database, lake, schema, view or customer, and no client c
 
 | type | when | key fields |
 |---|---|---|
-| `message.start` | first | `messageId`, `conversationId`, `contractVersion`, `model?`, `strategy?`, `parentId?` (user turn), `resumeOf?` `{clarificationId, messageId}`, `regenerateOf?`, `regenerateStyle?` (1.10), `editOf?` (1.2) |
+| `message.start` | first | `messageId`, `conversationId`, `contractVersion`, `model?`, `parentId?` (user turn), `resumeOf?` `{clarificationId, messageId}`, `regenerateOf?`, `regenerateStyle?` (1.10), `editOf?` (1.2) |
 | `status` | any time | `label` (short present-tense phrase, e.g. "Running query") or `null` to clear |
 | `step.explore` | schema/data probe | `stepId`, `probe` (*open*: `list_views`, `describe_view`, `sample_values`, `lookup_glossary`, `lookup_dictionary`, `search_examples`, `profile`), `target?`, `summary`, `elapsedMs?` |
 | `step.sql_running` | a query starts | `stepId`, `sql` (full text), `purpose` (`explore`·`answer`·`candidate`·`repair`·`check`), `attempt` (1-based), `candidateId?`, `repairOf?`, `label?` |
@@ -305,8 +304,8 @@ remainder, `api.live.partition_ms`), and a stacked bar is safe to draw.
 | `checks` | the final query's result → the checks are done (the `step.check`/`step.candidates` emitted after it) |
 | `render` | `status "Writing answer"` → `message.end` |
 
-Escalation time lands in the stage that was running (usually `repair`). With parallel candidates (`candidates`
-strategy) the attribution follows the latest stage change, so treat the split as approximate. `modelMs`/`sqlMs`
+Escalation time lands in the stage that was running (usually `repair`). With parallel candidates (the demo
+`candidates` scenario) the attribution follows the latest stage change, so treat the split as approximate. `modelMs`/`sqlMs`
 remain *summed* durations and can exceed `totalMs` when candidates overlap. Example (`tool_steps.jsonl`, demo pace):
 `{"plan": 1057, "sql": 8, "repair": 356, "checks": 1, "render": 61}` for `totalMs: 1481`. Unknown extra keys may
 appear later (e.g. `queue`); clients ignore them.
@@ -531,35 +530,19 @@ Like ChatGPT's Temporary chat: a chat the user doesn't want kept. Announced by `
 * Audit: `chat_message` gains `temporary: true` (no text, as always). Deploy: `CC_API_TEMPORARY_TTL_SECONDS` (3600);
   `0` turns the mode off (no capability, `temporary: true` is 422).
 
-## 12. Capabilities: strategies and models (`GET /api/capabilities`)
+## 12. Capabilities (`GET /api/capabilities`)
 
-A picker reads what the server can run. The body is `Capabilities` (no user data, `no-store`, fetch once per session):
+What this server offers. The body is `Capabilities` (no user data, no sign-in needed, `no-store`, fetch once per
+session): `contractVersion`, `demo`, and the optional feature flags `feedbackReasons` (§13), `sqlLiteralMasking`
+(§10), `pinArchive` (§11) and `temporaryChat` (§11.1). Example: `examples/capabilities.json`.
 
-```json
-{"contractVersion": "1.4.0", "demo": true, "defaults": {"strategy": "tool_loop", "model": "auto"},
- "strategies": [{"id": "tool_loop", "label": "Standard", "description": "…", "default": true, "costTier": "low",
-                 "latencyTier": "fast", "models": ["auto", "claude-haiku-5-5", "claude-sonnet-5-5"], "available": true}, …],
- "models": [{"id": "auto", "label": "Auto", "default": true, "costTier": "low"},
-            {"id": "claude-haiku-5-5", "label": "Haiku", "tier": "small", "provider": "anthropic", "costTier": "low", "default": false}, …]}
-```
-
-* Send the choice as `ChatRequest.options.strategy` / `options.model`. Omit them for the defaults. An unknown id, or a
-  model that is not in the strategy's `models`, is a 422 `validation` before anything runs. `message.start.strategy`
-  echoes the strategy; `message.start.model` stays the model that actually ran.
-* **Per organization (1.5.0).** Signed in, the response has `scope: "organization"` and each strategy and model has
-  `available` for the caller's organization, plus `unavailableReason` when it is false: show those disabled, with
-  the reason as a tooltip. Sending one anyway is a 422 `validation` with the same reason. Signed out:
-  `scope: "public"`, everything shows available. Demo policy (`api/capabilities.py:ORG_POLICY`, or
-  `CC_API_ORG_POLICY` as JSON): `acme_diagnostics` has no Cross-check and no Sonnet; other orgs get everything.
-* `costTier` (`low|medium|high`) and `latencyTier` (`fast|medium|slow`) are relative badges, not prices; the real cost
-  of an answer is `message.end.usage.costUsd` (§7). `available: false` means show it disabled.
-* Demo strategies (`api/capabilities.py`): `tool_loop` (Standard), `cascade` (Escalate when stuck: Haiku, then Sonnet),
-  `candidates` (Cross-check: 3 candidate queries, execution vote). Each maps onto real `AnalyzerConfig` overrides, so
-  the real analyzer plugs in by reading that table. With the scripted demo LLM (`demo: true`) the choice is validated
-  and echoed, but the demo scenario (§9) still drives the run.
-* Offline / mock mode: `web/src/contract/capabilities.ts` has `loadCapabilities()` (falls back to `DEMO_CAPABILITIES`,
-  kept equal to `api/contract/examples/capabilities.json` by a test), `modelsFor()`, `defaultStrategy()` and
-  `runOptions()` (builds `options`, omitting defaults).
+**No strategy or model choice (1.24.0).** The server runs one shipped analyzer configuration, fixed in server code and
+config (analyzer bundle B1: Haiku, effort low, a single agent with the knowledge briefing; no repair, cascade or
+candidates). A request can't pick it: `ChatRequest.options.strategy` or `options.model`, with any value, is a 422
+`validation` and nothing runs. `message.start.model` still names the model that started the run, and escalations
+(§4) still announce later models, but these are labels to show, never choices. Offline / mock mode:
+`web/src/contract/capabilities.ts` has `loadCapabilities()` (falls back to `DEMO_CAPABILITIES`, kept equal to
+`examples/capabilities.json` by a test).
 
 ## 13. Answer feedback (1.7.0)
 
@@ -708,6 +691,13 @@ older references still resolve.
 
 ## Changelog
 
+* **1.24.0** (2026-10-26) — **Strategy/model picker removed** (§12; product decision: users don't choose how the
+  analyzer runs). Removed: `Capabilities.defaults`, `.strategies`, `.models` and `.scope`, the `$defs`
+  `StrategyOption`, `ModelOption` and `CostTier`, `ChatRequest.options.strategy`/`.model` and
+  `MessageStart.strategy`; `GET /api/capabilities` no longer reads the sign-in (there is no per-organization
+  availability or `CC_API_ORG_POLICY`). Fail closed: a request that still sends `options.strategy` or `options.model`
+  is 422 `validation`. This is a removal shipped as a minor, like 1.22.0: the only client is this repo's web app,
+  which drops the picker in the same change; streams only lose an optional `message.start` field.
 * **1.23.0** (2026-10-26) — **Multi-question clarification** (§6.1), additive. New `$defs` `ClarifyQuestion`,
   `ClarifyOption`, `ClarifyAnswer`; `ClarificationPart.questions?` (1–4); `ChatRequest.resume.answers?` (≤ 4); demo
   scenario `clarify_multi` (`edge/clarify_multi{,_2}.jsonl`). Invalid answers → 422 `validation`, still pending. Shared

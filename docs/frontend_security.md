@@ -182,7 +182,7 @@ No response may carry `ETag`, `Last-Modified`, `Expires` or `Age`, and forged `I
 
 | Route | Data | Result |
 |---|---|---|
-| `GET /api/health`, `/api/contract`, `/api/capabilities` | none / schema / picker options | no-store ✓ |
+| `GET /api/health`, `/api/contract`, `/api/capabilities` | none / schema / feature flags | no-store ✓ |
 | `POST /api/chat`, `GET /api/chat/{id}/stream`, `POST /api/chat/{id}/stop` | answers (SSE) | no-store ✓, `X-Accel-Buffering: no` |
 | `GET /api/download/{id}` | CSV (PHI) | no-store ✓, attachment |
 | `GET /api/transcripts`, `PUT /api/transcripts/retention` | account state | no-store ✓ |

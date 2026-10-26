@@ -258,7 +258,7 @@ export function fmtTokens(n: number): string {
 
 /** v1 `Usage` (or legacy {queries, elapsedMs}) -> footer view. */
 export function usageOf(m: AnyView): UsageView | undefined {
-  const u = m.usage as (Usage & { model?: string }) | undefined;
+  const u = m.usage as Usage | undefined;
   if (!u) return undefined;
   const l = u.latency;
   let timing: UsageView['timing'];
@@ -272,11 +272,9 @@ export function usageOf(m: AnyView): UsageView | undefined {
     if (parts.length && other > 50) parts.push({ label: 'Other', ms: other });
     timing = parts.length ? parts : undefined;
   }
-  const models = u.models?.length ? u.models : undefined;
   return {
     queries: u.queries, elapsedMs: l?.totalMs ?? u.elapsedMs,
-    model: u.model ?? (models ? modelName(models[models.length - 1].model) : undefined),
     inputTokens: u.tokens?.input, outputTokens: u.tokens?.output, cacheRead: u.tokens?.cacheRead,
-    costUsd: u.costUsd, costIsEstimate: u.costIsEstimate, firstTokenMs: l?.firstTokenMs, timing, models,
+    costUsd: u.costUsd, costIsEstimate: u.costIsEstimate, firstTokenMs: l?.firstTokenMs, timing,
   };
 }

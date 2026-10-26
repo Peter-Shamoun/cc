@@ -91,7 +91,7 @@ describe('answer surface: components', () => {
     expect(screen.getByTestId('meta-line')).toHaveTextContent('3 queries · 8.4s · ~$0.04');
     fireEvent.click(screen.getByTestId('meta-line'));
     expect(screen.getByTestId('meta-popover')).toHaveTextContent('18k in');
-    expect(screen.getByTestId('meta-models')).toHaveTextContent('Sonnet 4.5');
+    expect(screen.queryByTestId('meta-models')).toBeNull();
     fireEvent.click(screen.getByTestId('open-sql'));
     const insp = screen.getByTestId('sql-inspector');
     expect(within(insp).getAllByRole('tab').length).toBe(3);
@@ -165,7 +165,7 @@ describe('answer surface: contract v1 events', () => {
     fireEvent.click(screen.getByTestId('meta-line'));
     const pop = screen.getByTestId('meta-popover');
     expect(pop).toHaveTextContent('First token');
-    expect(pop).toHaveTextContent('Model');
+    expect(pop).not.toHaveTextContent('Haiku');
     expect(pop).toHaveTextContent('est.');
     fireEvent.click(screen.getByTestId('open-sql'));
     expect(screen.getByTestId('sql-inspector')).toHaveTextContent('produced “Duplicate-claim denial rate by provider, Q3 2026”');

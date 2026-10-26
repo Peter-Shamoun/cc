@@ -2,7 +2,7 @@
  * The ONLY module allowed to touch localStorage (spec §6.2). Keys are
  * allowlisted UI preferences; conversation data can never be written here.
  */
-export const PREF_KEYS = ['theme', 'palette', 'sidebarCollapsed', 'threadWidth', 'artifactWidth', 'enterToSend', 'strategy', 'model'] as const;
+export const PREF_KEYS = ['theme', 'palette', 'sidebarCollapsed', 'threadWidth', 'artifactWidth', 'enterToSend'] as const;
 export type PrefKey = (typeof PREF_KEYS)[number];
 const PREFIX = 'cc.pref.';
 

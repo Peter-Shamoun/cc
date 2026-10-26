@@ -1,41 +1,21 @@
-"""Adapter ``message.start.strategy`` is a capabilities id; latency stages partition ``totalMs`` exactly; the
+"""Adapter ``message.start`` names no strategy (1.24.0); latency stages partition ``totalMs`` exactly; the
 load-tolerant test budget helper."""
 import json
 import pathlib
 
 import pytest
 
-from api.analyzer_adapter import Recording, adapter_strategy, events_for_recording
-from api.capabilities import DEFAULT_STRATEGY, STRATEGY_IDS
+from api.analyzer_adapter import Recording, events_for_recording
 from api.live import STAGES, partition_ms
 from api.tests import timing
 
 FIX = pathlib.Path(__file__).with_name("fixtures") / "analyzer_runs"
-EXPECTED = {"answer": "tool_loop", "repair": "tool_loop", "clarify": "tool_loop", "no_answer": "tool_loop",
-            "refusal": "tool_loop", "phi_reasoning": "tool_loop", "escalation": "cascade",
-            "candidates": "candidates", "abstain": "candidates"}
 
 
-def _rec(name):
-    return Recording.from_json(json.loads((FIX / f"{name}.json").read_text()))
-
-
-@pytest.mark.parametrize("name", sorted(EXPECTED))
-def test_recorded_runs_announce_a_capabilities_strategy(name):
-    start = events_for_recording(_rec(name))[0]
-    assert start["type"] == "message.start" and start["strategy"] == EXPECTED[name]
-    assert start["strategy"] in STRATEGY_IDS
-
-
-def test_explicit_strategy_wins_and_must_be_known():
-    rec = _rec("answer")
-    rec.strategy = "cascade"
-    assert events_for_recording(rec)[0]["strategy"] == "cascade"
-    assert adapter_strategy("candidates") == "candidates"
-    with pytest.raises(ValueError):
-        adapter_strategy("analyst")
-    assert adapter_strategy() == DEFAULT_STRATEGY
-    assert adapter_strategy(multi_candidate=True, escalated=True) == "candidates"
+@pytest.mark.parametrize("name", sorted(p.stem for p in FIX.glob("*.json")))
+def test_recorded_runs_announce_no_strategy(name):
+    start = events_for_recording(Recording.from_json(json.loads((FIX / f"{name}.json").read_text())))[0]
+    assert start["type"] == "message.start" and "strategy" not in start
 
 
 @pytest.mark.parametrize("raw,total", [

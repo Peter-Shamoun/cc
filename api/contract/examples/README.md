@@ -21,7 +21,7 @@ sequence drifts from these files.
 
 Ids such as `csvFileId` are normalised, so `/api/download/<id>` will 404 when an example is replayed.
 
-`capabilities.json` is `GET /api/capabilities` from the demo backend (contract 1.4.0, CONTRACT.md §12); `web/src/contract/capabilities.ts` mirrors it for offline/mock mode.
+`capabilities.json` is `GET /api/capabilities` from the demo backend (CONTRACT.md §12; no strategy/model choice since 1.24.0); `web/src/contract/capabilities.ts` mirrors it for offline/mock mode.
 `feedback.json` is a `PUT …/messages/{id}/feedback` request and response (contract 1.7.0, CONTRACT.md §13), plus the `DELETE` that clears it.
 `export.md` is `GET /api/conversations/{id}/export?format=markdown` for the `answer` question (contract 1.8.0, CONTRACT.md §15). `message.end.sources` (citations, §14) appears in every answer stream.
 `report.jsonl` (1.9.0) shows partial-table streaming (`table.start`/`table.rows` before the table `part`) and the artifact spec: a `chart` artifact and an auto-opening `report` artifact (CONTRACT.md §5.1, §16).
