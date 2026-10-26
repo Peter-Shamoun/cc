@@ -122,15 +122,28 @@ export function gap(id: string) {
  * test order. For pixel baselines, hide every conversation that existed before this page first loaded.
  */
 export async function isolateHistory(page: Page) {
-  let before: Set<string> | null = null;
+  // Snapshot every existing chat (all pages, archived included) BEFORE the page loads. The sidebar now
+  // fires `?archived=exclude` and `?archived=only` in parallel (#274), so "first response wins" raced:
+  // an empty archived list could arrive first and leak every earlier chat into the baseline.
+  const before = new Set<string>();
   const idOf = (c: unknown) => String((c as { id?: unknown })?.id ?? JSON.stringify(c));
+  const headers = { authorization: 'Bearer demo:acme_labs:qa' };
+  let cursor: string | undefined;
+  for (let i = 0; i < 200; i++) {
+    const r = await page.request.get(`${LIVE}api/conversations?archived=include${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, { headers }).catch(() => null);
+    if (!r || !r.ok()) break;
+    const b = (await r.json().catch(() => ({}))) as { items?: unknown[]; next?: string };
+    for (const c of b.items ?? []) before.add(idOf(c));
+    if (!b.next) break;
+    cursor = b.next;
+  }
   await page.route(/\/api\/conversations(\?[^/]*)?$/, async (route) => {
     if (route.request().method() !== 'GET') return route.fallback();
     let res: Awaited<ReturnType<typeof route.fetch>>;
     try { res = await route.fetch(); } catch { return; } // the test ended mid-request
     let body: unknown;
     try { body = await res.json(); } catch { return route.fulfill({ response: res }).catch(() => {}); }
-    const keep = (a: unknown[]) => { if (!before) before = new Set(a.map(idOf)); return a.filter((c) => !before!.has(idOf(c))); };
+    const keep = (a: unknown[]) => a.filter((c) => !before.has(idOf(c)));
     let out: unknown = body;
     if (Array.isArray(body)) out = keep(body);
     else if (body && typeof body === 'object') {
