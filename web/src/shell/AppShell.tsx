@@ -34,7 +34,8 @@ import { useTheme } from '../lib/theme';
 import { scrollBehavior } from '../lib/motion';
 import { copyText, downloadText } from '../lib/csv';
 import { getPref, setPref } from '../lib/prefs';
-import { sessionFromEnv } from '../auth/session';
+import { sessionFromEnv, signOut } from '../auth/session';
+import { signedOutUrl } from './routes';
 import { trackInputModality } from '../lib/inputModality';
 import type { AssistantView } from '../lib/contract';
 import type { AssistantViewV1, ChatRequest } from '../api/contract';
@@ -594,6 +595,12 @@ function ShellInner() {
     onArchive: chat.canArchive ? requestArchive : undefined,
     onCollapse: () => setSidebar(false), onSearch: () => setDialog('search'),
     onSettings: () => setDialog('settings'), onShortcuts: () => setDialog('shortcuts'),
+    onSignOut: session.kind === 'none' ? undefined : () => {
+      const base = import.meta.env.VITE_ANALYST_BASE as string | undefined;
+      void signOut(!base || base === '/' ? '' : base.replace(/\/$/, ''), session, {
+        signInUrl: (import.meta.env.VITE_SIGN_IN_URL as string | undefined) || signedOutUrl(import.meta.env.BASE_URL),
+      });
+    },
   };
 
   return (
