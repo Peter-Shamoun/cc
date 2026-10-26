@@ -3,7 +3,8 @@ import { LIVE, open, ask } from './helpers';
 
 // Contract 1.3.0: message.end.conversationTitle is the server's PHI-free title. The tab shows it as soon as
 // the first answer ends, and a reload shows the same title (never the generic "New analysis").
-test.describe('chat titles (live) @both', () => {
+// Desktop only: on phones the header has no 'Chat options' title button (QA, C5).
+test.describe('chat titles (live)', () => {
   test('server title shows after the first answer and survives a reload', async ({ page }) => {
     await open(page, LIVE);
     await ask(page, 'Total paid by payer');

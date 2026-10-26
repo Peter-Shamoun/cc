@@ -22,6 +22,7 @@ import time
 from dataclasses import dataclass
 from typing import Protocol
 
+from api.feedback import apply as apply_feedback
 from api.ids import new_id
 
 DEFAULT_TITLE = "New analysis"
@@ -42,10 +43,12 @@ class TranscriptStore(Protocol):
     def append_message(self, principal: Principal, conversation_id: str, message: dict) -> None: ...
     def rename_conversation(self, principal: Principal, conversation_id: str, title: str) -> dict | None: ...
     def auto_title(self, principal: Principal, conversation_id: str, title: str) -> bool: ...
+    def set_feedback(self, principal: Principal, conversation_id: str, message_id: str, feedback: dict | None) -> str: ...
     def delete_conversation(self, principal: Principal, conversation_id: str) -> bool: ...
     def delete_all(self, principal: Principal) -> int: ...
     def set_retention(self, principal: Principal, days: int) -> None: ...
     def retention_days(self, principal: Principal) -> int | None: ...
+    def purge_expired(self, now: float | None = None) -> int: ...
     def owned_by_other(self, principal: Principal, conversation_id: str) -> bool: ...
 
 
@@ -166,6 +169,12 @@ class InMemoryTranscriptStore:
             conv["title"] = clean_title(title)
             return True
 
+    def set_feedback(self, principal, conversation_id, message_id, feedback):
+        """'ok' | 'missing' (no such conversation/message for this user) | 'not_assistant' (api.feedback.apply)."""
+        with self._lock:
+            conv = self._mine(principal, conversation_id)
+            return "missing" if conv is None else apply_feedback(conv, message_id, feedback)
+
     def owner_of(self, conversation_id):
         with self._lock:
             return self._owners.get(conversation_id)
@@ -200,6 +209,19 @@ class InMemoryTranscriptStore:
 
     def retention_days(self, principal):
         return self._retention_days.get(principal)
+
+    def purge_expired(self, now: float | None = None) -> int:
+        """Sweep every principal that set a retention, not just the ones who come back."""
+        now = time.time() if now is None else now
+        with self._lock:
+            gone = [cid for cid, c in self._items.items()
+                    if (days := self._retention_days.get(self._owners[cid])) is not None
+                    and c["updatedAt"] < now - days * 86400]
+            for cid in gone:
+                del self._items[cid], self._owners[cid]
+        if gone:
+            self._audit("transcripts_expired", row_count=len(gone))
+        return len(gone)
 
     def _mine(self, principal, conversation_id):
         conv = self._items.get(conversation_id)
@@ -247,6 +269,7 @@ class Download:
     columns: list
     rows: list
     expires_at: float
+    conversation_id: str | None = None
 
     def csv_bytes(self) -> bytes:
         buf = io.StringIO()
@@ -265,8 +288,10 @@ class DownloadRegistry:
         self._lock = threading.Lock()
         self._items: dict[str, Download] = {}
 
-    def put(self, owner: Principal, name: str, columns: list, rows: list) -> Download:
-        item = Download(new_id("f_"), owner, name, list(columns), [list(r) for r in rows], time.time() + self.ttl)
+    def put(self, owner: Principal, name: str, columns: list, rows: list,
+            conversation_id: str | None = None) -> Download:
+        item = Download(new_id("f_"), owner, name, list(columns), [list(r) for r in rows], time.time() + self.ttl,
+                        conversation_id)
         with self._lock:
             self._purge()
             self._items[item.id] = item
@@ -280,10 +305,31 @@ class DownloadRegistry:
             return None
         return item
 
+    def scoped(self, conversation_id: str | None) -> "_ScopedDownloads":
+        """A ``put``-only view that tags each download with its conversation, so deleting it can revoke them."""
+        return _ScopedDownloads(self, conversation_id)
+
+    def revoke(self, owner: Principal, conversation_id: str | None = None) -> int:
+        """Drop the owner's downloads for one conversation, or all of them when ``conversation_id`` is None."""
+        with self._lock:
+            keys = [k for k, v in self._items.items()
+                    if v.owner == owner and (conversation_id is None or v.conversation_id == conversation_id)]
+            for key in keys:
+                del self._items[key]
+        return len(keys)
+
     def _purge(self):
         now = time.time()
         for key in [k for k, v in self._items.items() if v.expires_at < now]:
             del self._items[key]
+
+
+class _ScopedDownloads:
+    def __init__(self, registry: DownloadRegistry, conversation_id: str | None):
+        self._registry, self._conversation_id = registry, conversation_id
+
+    def put(self, owner: Principal, name: str, columns: list, rows: list) -> Download:
+        return self._registry.put(owner, name, columns, rows, self._conversation_id)
 
 
 def _iso(ts: float) -> str:

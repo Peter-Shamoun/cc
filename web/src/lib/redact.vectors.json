@@ -1,0 +1,15 @@
+{
+  "_comment": "Shared by web/src/lib/redact.test.ts and api/tests/test_redact.py. Synthetic data only.",
+  "cases": [
+    {"in": "Unexpected token 'J', \"Jane Doe, DOB 01/02/1960\" is not valid JSON", "out": "Unexpected token [text], [text] is not valid JSON"},
+    {"in": "lookup failed for jane.doe+test@example.org", "out": "lookup failed for [email]"},
+    {"in": "member 123-45-6789 not found", "out": "member [ssn] not found"},
+    {"in": "call (555) 123-4567 or 555.123.4567", "out": "call [phone] or [phone]"},
+    {"in": "service on 2024-03-15 and 3/15/24", "out": "service on [date] and [date]"},
+    {"in": "MRN 99887766 and NPI 1234567890", "out": "MRN [number] and NPI [number]"},
+    {"in": "member id XQZ123456789 rejected", "out": "member id [id] rejected"},
+    {"in": "row 42 of 300 failed", "out": "row 42 of 300 failed"},
+    {"in": "TypeError: Cannot read properties of undefined (reading \u2018title\u2019)", "out": "TypeError: Cannot read properties of undefined (reading [text])"},
+    {"in": "ok m_abc12345 conv_9f8e7d6c", "out": "ok m_abc12345 conv_9f8e7d6c"}
+  ]
+}

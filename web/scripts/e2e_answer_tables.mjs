@@ -1,0 +1,45 @@
+// Table/chart parity probe: drag a column wider, keyboard-resize, sort, sticky header in a scrolled table,
+// chart hover tooltip. Usage: node scripts/e2e_answer_tables.mjs [baseUrl] [outDir]
+import { chromium } from 'playwright';
+import fs from 'node:fs';
+const [base = 'http://127.0.0.1:5211/', out = '/workspace/cc_fe/shots/answer'] = process.argv.slice(2);
+const exe = fs.existsSync('/usr/bin/google-chrome') ? '/usr/bin/google-chrome' : undefined;
+const browser = await chromium.launch({ executablePath: exe, headless: true });
+const pg = await (await browser.newContext({ viewport: { width: 1024, height: 760 } })).newPage();
+const errors = [];
+pg.on('pageerror', (e) => errors.push(String(e)));
+const box = () => pg.getByRole('textbox', { name: 'Message' });
+await pg.goto(base, { timeout: 90000 });
+await box().waitFor({ timeout: 90000 });
+await box().fill('Which CARC codes drive denials?');
+await pg.keyboard.press('Enter');
+await pg.getByRole('button', { name: 'Send message' }).waitFor({ timeout: 120000 });
+await pg.waitForTimeout(400);
+const th = pg.locator('[data-testid="msg-assistant"] table th').first();
+await th.scrollIntoViewIfNeeded();
+const w0 = (await th.boundingBox()).width;
+await th.hover();
+const sep = th.getByTestId('col-resize');
+const sb = await sep.boundingBox();
+await pg.mouse.move(sb.x + sb.width / 2, sb.y + sb.height / 2);
+await pg.mouse.down();
+await pg.mouse.move(sb.x + 120, sb.y + sb.height / 2, { steps: 6 });
+await pg.screenshot({ path: `${out}/d5_01_column_resize_drag.png` });
+await pg.mouse.up();
+const w1 = (await th.boundingBox()).width;
+await sep.focus();
+await pg.keyboard.press('ArrowLeft');
+const w2 = (await th.boundingBox()).width;
+await th.getByRole('button').click();
+const sortState = await th.getAttribute('aria-sort');
+// Chart tooltip: titled like the axes, not raw column keys.
+const bar = pg.locator('[data-testid="msg-assistant"] g.mark-rect path').first();
+await bar.scrollIntoViewIfNeeded();
+await bar.hover();
+await pg.waitForTimeout(400);
+const tip = (await pg.locator('#vg-tooltip-element').textContent().catch(() => '')) ?? '';
+await pg.screenshot({ path: `${out}/d5_02_chart_tooltip.png` });
+const res = { w0: Math.round(w0), w1: Math.round(w1), w2: Math.round(w2), sortState, tip: tip.replace(/\s+/g, ' ').slice(0, 80), errors };
+console.log(JSON.stringify(res));
+await browser.close();
+process.exit(w1 > w0 + 80 && w2 < w1 && sortState === 'ascending' && tip.length > 0 && !/_/.test(tip) && !errors.length ? 0 : 1);

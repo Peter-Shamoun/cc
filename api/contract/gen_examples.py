@@ -102,6 +102,29 @@ def capabilities_example() -> dict:
     return _client().get("/api/capabilities").json()
 
 
+def feedback_example() -> dict:
+    """PUT .../messages/{id}/feedback on a demo answer (1.7.0): request + response, ids and time normalised."""
+    client = _client()
+    evs = _post(client, {"messages": [{"id": "u_1", "role": "user", "text": "Paid amount by payer"}],
+                         "conversationId": "c_1", "scenario": "table"})
+    mid = evs[0]["messageId"]
+    request = {"rating": "down", "reasons": ["wrong_numbers"], "comment": "Totals look high for March."}
+    response = client.put(f"/api/conversations/c_1/messages/{mid}/feedback", json=request,
+                          headers=_HEADERS).json()
+    response.update(messageId="m_1", updatedAt="2026-10-25T20:00:00Z")
+    return {"method": "PUT", "path": "/api/conversations/c_1/messages/m_1/feedback", "request": request,
+            "response": response, "clear": {"method": "DELETE", "response": {"cleared": True}}}
+
+
+def export_example() -> str:
+    """GET /api/conversations/{id}/export?format=markdown for a demo answer (1.8.0); the timestamp is normalised."""
+    client = _client()
+    _post(client, {"messages": [{"id": "u_1", "role": "user", "text": "Paid amount by payer"}],
+                   "conversationId": "c_1", "scenario": "table"})
+    text = client.get("/api/conversations/c_1/export?format=markdown", headers=_HEADERS).text
+    return re.sub(r"on \d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", "on 2026-10-25T20:00:00Z", text)
+
+
 def dump(events: list[dict]) -> str:
     return "".join(json.dumps(e, ensure_ascii=False, separators=(",", ":")) + "\n" for e in events)
 
@@ -129,6 +152,10 @@ def main(argv: list[str]) -> int:
     EXAMPLES.mkdir(exist_ok=True)
     (EXAMPLES / "capabilities.json").write_text(json.dumps(capabilities_example(), indent=2) + "\n")
     print("wrote examples/capabilities.json")
+    (EXAMPLES / "feedback.json").write_text(json.dumps(feedback_example(), indent=2) + "\n")
+    print("wrote examples/feedback.json")
+    (EXAMPLES / "export.md").write_text(export_example())
+    print("wrote examples/export.md")
     for k, v in captured.items():
         (EXAMPLES / f"{k}.jsonl").write_text(dump(v))
         print(f"wrote examples/{k}.jsonl ({len(v)} events)")

@@ -58,7 +58,7 @@ export function StepTimeline({ steps, live, elapsedMs, reasoning = [] }: { steps
 
   return (
     // QA-A11: a group named by its own header, not N identical "Analysis steps" landmarks per thread.
-    <div role="group" aria-labelledby={headId} className="my-3 font-sans text-sm" data-testid="step-timeline" data-live={live || undefined}>
+    <div role="group" aria-labelledby={headId} className="my-3 font-sans text-sm first:mt-0" data-testid="step-timeline" data-live={live || undefined}>
       <button type="button" id={headId} aria-expanded={open} aria-controls={bodyId} onClick={() => { touched.current = true; setOpen((o) => !o); }}
         className="group inline-flex max-w-full items-center gap-2 rounded-lg py-1 text-left text-fg-muted transition-colors hover:text-fg" data-testid="step-summary">
         {live ? <Loader2 size={14} className="shrink-0 animate-spin" aria-hidden /> : <ListChecks size={14} className="shrink-0" aria-hidden />}

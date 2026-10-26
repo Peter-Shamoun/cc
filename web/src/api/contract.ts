@@ -14,13 +14,14 @@ import type {
   TextPart, ToolCallPart, ArtifactPart, PartBase, StreamEvent as LegacyStreamEvent,
 } from '../lib/contract';
 import { reduce as legacyReduce } from '../lib/contract';
+import type { Source } from '../contract/v1.gen';
 
 export type {
   CalloutPart, ChartPart, CodePart, Column, ColumnType, ErrorPart, FilePart, ID, ImagePart, ISODate, ReasoningPart,
   Sensitivity, StatusPart, TablePart, TextPart, ToolCallPart, ArtifactPart, PartBase,
 };
 
-export const CONTRACT_VERSION = '1.4.0';
+export const CONTRACT_VERSION = '1.8.0';
 export const CONTRACT_MAJOR = 1;
 
 // ---------------------------------------------------------------- new parts (v1)
@@ -58,6 +59,9 @@ export interface ColumnSummary { name: string; type?: ColumnType }
 export interface StepError { code: string; message: string }
 export interface ModelRef { model: string; tier?: 'small' | 'medium' | 'large'; provider?: string }
 
+/** 1.6.0 (CONTRACT.md §7): where the run's wall time went. Unknown extra stages may appear; ignore them. */
+export interface LatencyStages { plan: number; sql: number; repair: number; checks: number; render: number }
+
 export interface Usage {
   queries: number;
   elapsedMs: number;
@@ -65,7 +69,11 @@ export interface Usage {
   costUsd?: number;
   /** true when costUsd is computed from a price table rather than billed. Demo mode: always true. */
   costIsEstimate?: boolean;
-  latency?: { firstEventMs?: number; firstStepMs?: number; firstTokenMs?: number; modelMs?: number; sqlMs?: number; queueMs?: number; totalMs: number };
+  latency?: {
+    firstEventMs?: number; firstStepMs?: number; firstTokenMs?: number; modelMs?: number; sqlMs?: number; queueMs?: number; totalMs: number;
+    /** 1.6.0: wall-clock ms per stage; they sum to about totalMs. */
+    stages?: LatencyStages;
+  };
   models?: { model: string; role?: string; inputTokens: number; outputTokens: number; costUsd?: number; calls?: number }[];
 }
 
@@ -129,6 +137,8 @@ export interface MessageEndEvent extends Seq {
   type: 'message.end'; messageId: ID; finishReason: FinishReason; usage: Usage;
   /** 1.3.0: PHI-free title the server derived and already stored (first answer, generic title only). */
   conversationTitle?: string;
+  /** 1.8.0: citations, answer sources first (CONTRACT.md §14). Helpers: src/contract/sources.ts. */
+  sources?: Source[];
 }
 export interface HeartbeatEvent { type: 'heartbeat'; at?: ISODate }
 
@@ -159,6 +169,10 @@ export function isStepEvent(ev: { type: string }): ev is StepEvent {
 
 /** GET /api/capabilities: strategies + models for a picker. Generated from the schema (single source of truth). */
 export type { Capabilities, StrategyOption, ModelOption, CostTier } from '../contract/v1.gen';
+/** 1.7.0: answer feedback (CONTRACT.md §13). Client: src/contract/feedback.ts. */
+export type { Feedback, FeedbackRating, FeedbackReason, FeedbackRequest } from '../contract/v1.gen';
+/** 1.8.0: citations (§14) and conversation export (§15). */
+export type { Source, ConversationExport } from '../contract/v1.gen';
 
 // ---------------------------------------------------------------- requests
 
@@ -176,7 +190,8 @@ export interface ChatRequest {
   scenario?: 'table' | 'chart' | 'repair' | 'abstain' | 'clarify' | 'escalation' | 'error' | 'candidates' | 'slow';
 }
 
-export interface HttpError { error: { code: string; message: string } }
+/** `code` known values: see the schema. 1.5.0: `payload_too_large` (413) with `legacyCode: 'validation'` and `maxBytes`. */
+export interface HttpError { error: { code: string; message: string; legacyCode?: string; maxBytes?: number } }
 
 // ---------------------------------------------------------------- client view + reducer
 

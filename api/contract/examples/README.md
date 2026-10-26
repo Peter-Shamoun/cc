@@ -8,7 +8,7 @@ sequence drifts from these files.
 
 | file | outcome | `finishReason` | shows |
 |---|---|---|---|
-| `answer.jsonl` | final answer | `stop` | explore + SQL steps, verifier check, streamed text, `code` (SQL, `role: query`), `table` (`sqlPartId`, `csvFileId`), callouts, rich `usage` (tokens, `costUsd` estimate, latency, models) |
+| `answer.jsonl` | final answer | `stop` | explore + SQL steps, verifier check, streamed text, `code` (SQL, `role: query`), `table` (`sqlPartId`, `csvFileId`), callouts, rich `usage` (tokens, `costUsd` estimate, latency with per-stage `stages`, models) |
 | `tool_steps.jsonl` | repair loop | `stop` | `step.sql_result ok:false` (binder error) → `step.repair_attempt` → `step.sql_running {purpose: repair, attempt: 2, repairOf}` → final query → `step.check` (warn → caveat) |
 | `abstain.jsonl` | abstain | `abstain` | one `abstain` part (`category`, `reason`, `suggestions[]`); no table, no error |
 | `clarify.jsonl` | clarifying question | `needs_input` | one `clarification` part (`choices[]`, `allowFreeText`) |
@@ -21,3 +21,5 @@ sequence drifts from these files.
 Ids such as `csvFileId` are normalised, so `/api/download/<id>` will 404 when an example is replayed.
 
 `capabilities.json` is `GET /api/capabilities` from the demo backend (contract 1.4.0, CONTRACT.md §12); `web/src/contract/capabilities.ts` mirrors it for offline/mock mode.
+`feedback.json` is a `PUT …/messages/{id}/feedback` request and response (contract 1.7.0, CONTRACT.md §13), plus the `DELETE` that clears it.
+`export.md` is `GET /api/conversations/{id}/export?format=markdown` for the `answer` question (contract 1.8.0, CONTRACT.md §15). `message.end.sources` (citations, §14) appears in every answer stream.

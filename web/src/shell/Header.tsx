@@ -3,6 +3,7 @@ import { Check, ChevronDown, Copy, Database, Download, Ellipsis, Keyboard, Moon,
 import { useTheme } from '../lib/theme';
 import { IconButton } from '../components/ui';
 import { Menu, modKey, useMenu, type MenuItem } from './primitives';
+import { tierLabel, type StrategyState } from './useStrategy';
 
 export interface HeaderProps {
   showNav: boolean;
@@ -18,6 +19,8 @@ export interface HeaderProps {
   title?: string;
   onRename?: (title: string) => void;
   onDelete?: () => void;
+  /** Strategy/model picker (contract 1.4.0) in the product menu, like ChatGPT's model menu. */
+  strategy?: StrategyState;
 }
 
 /** Top bar: sidebar/new-chat when the sidebar is hidden, product menu (scope + data mode), PHI badge, Share and "…" (ChatGPT layout). */
@@ -44,12 +47,21 @@ export function Header(p: HeaderProps) {
   ];
   const dataLabel = p.adapterName === 'http' ? 'Live API' : 'Demo data';
   // Scope + data mode live in the product menu (QA-S6): ChatGPT/Claude headers stay near-empty.
-  const productItems: MenuItem[] = [
+  const st = p.strategy;
+  const productItems: MenuItem[] = st?.strategy ? [
+    { heading: 'Strategy' },
+    ...st.caps.strategies.map((s): MenuItem => ({ label: s.label, description: s.description, meta: tierLabel(s.costTier, s.latencyTier), checked: s.id === st.strategy?.id, disabled: s.available === false, title: s.unavailableReason, onSelect: () => st.setStrategy(s.id) })),
+    ...(st.models.length > 1 ? ['sep' as const, { heading: 'Model' }, ...st.models.map((m): MenuItem => ({ label: m.label, description: m.description, checked: m.id === st.model?.id, disabled: m.available === false, title: m.unavailableReason, onSelect: () => st.setModel(m.id) }))] : []),
+    'sep',
+    { label: `Data: ${dataLabel}${st.caps.demo ? ' · scripted runs' : ''}`, icon: <span className="block h-2 w-2 rounded-full bg-[#10a37f]" />, onSelect: () => {} },
+  ] : [
     { label: 'Analyst · SQL over the de-identified claims lake', icon: <Check size={16} />, onSelect: () => {} },
     'sep',
     { label: 'Scope: payer all · 2025-10..2026-09', icon: <Database size={16} />, onSelect: () => {} },
     { label: `Data: ${dataLabel}`, icon: <span className="block h-2 w-2 rounded-full bg-[#10a37f]" />, onSelect: () => {} },
   ];
+  // The picked strategy shows in the button only when it is not the default (ChatGPT shows the model name).
+  const pickLabel = st && !st.isDefault ? [st.strategy?.label, st.model && st.model.id !== st.caps.defaults.model ? st.model.label : ''].filter(Boolean).join(' · ') : '';
   const shareItems: MenuItem[] = [
     { label: 'Copy as Markdown', icon: <Copy size={16} />, onSelect: p.onCopyMarkdown },
     { label: 'Download .md', icon: <Download size={16} />, onSelect: p.onDownloadMarkdown },
@@ -69,8 +81,8 @@ export function Header(p: HeaderProps) {
           </>
         )}
         <button type="button" onClick={product.toggle} aria-haspopup="menu" aria-expanded={!!product.anchor} data-testid="product-menu" data-mode={p.adapterName}
-          className="flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-lg hover:bg-hover" aria-label={`ClaimClarity Analyst, ${dataLabel}`}>
-          <span className="whitespace-nowrap">ClaimClarity <span className={p.hasChat && p.title ? 'text-fg-subtle @max-[820px]:hidden' : 'text-fg-subtle @max-[560px]:hidden'}>Analyst</span></span>
+          className="flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-lg hover:bg-hover" aria-label={`ClaimClarity Analyst, ${pickLabel ? `${pickLabel}, ` : ''}${dataLabel}`}>
+          <span className="whitespace-nowrap">ClaimClarity <span className={p.hasChat && p.title ? 'text-fg-subtle @max-[820px]:hidden' : 'text-fg-subtle @max-[560px]:hidden'}>{pickLabel || 'Analyst'}</span></span>
           <ChevronDown size={16} className="shrink-0 text-fg-subtle" />
         </button>
         {p.hasChat && p.title && (
@@ -105,7 +117,7 @@ export function Header(p: HeaderProps) {
         )}
         <IconButton label="More options" tip tipAt="end" aria-haspopup="menu" aria-expanded={!!more.anchor} onClick={more.toggle}><Ellipsis size={18} /></IconButton>
         {share.anchor && <Menu label="Share chat" anchor={share.anchor} items={shareItems} onClose={share.close} align="end" />}
-        {product.anchor && <Menu label="ClaimClarity" anchor={product.anchor} items={productItems} onClose={product.close} />}
+        {product.anchor && <Menu label="ClaimClarity" anchor={product.anchor} items={productItems} onClose={product.close} className={st ? 'w-[min(24rem,calc(100vw-16px))]' : undefined} />}
         {more.anchor && <Menu label="More options" anchor={more.anchor} items={moreItems} onClose={more.close} align="end" />}
       </div>
     </header>

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import clsx from 'clsx';
 import { IconButton } from '../components/ui';
 
@@ -53,13 +53,21 @@ export function Dialog({ title, onClose, children, className, hideTitle, testId 
   );
 }
 
-export type MenuItem = { label: string; icon?: ReactNode; onSelect: () => void; danger?: boolean; shortcut?: string } | 'sep';
+export type MenuItem =
+  | { label: string; icon?: ReactNode; onSelect: () => void; danger?: boolean; shortcut?: string;
+      /** Second line under the label (picker rows). */ description?: string;
+      /** Right-aligned quiet note, e.g. "Low cost · Fast". */ meta?: string;
+      /** Set for radio rows (menuitemradio + aria-checked). */ checked?: boolean; disabled?: boolean;
+      /** Tooltip, e.g. why a disabled row is unavailable. */ title?: string }
+  | { heading: string }
+  | 'sep';
+const ITEM_SEL = '[role="menuitem"]:not([aria-disabled="true"]),[role="menuitemradio"]:not([aria-disabled="true"])';
 
 /**
  * Popover menu anchored to a button (thread "…" menu, account menu, share menu).
  * Roving focus: Arrow keys/Home/End move, Enter/Space pick, Esc/Tab close and return focus.
  */
-export function Menu({ anchor, items, onClose, align = 'start', side = 'bottom', label }: { anchor: HTMLElement; items: MenuItem[]; onClose: () => void; align?: 'start' | 'end'; side?: 'bottom' | 'top'; label: string }) {
+export function Menu({ anchor, items, onClose, align = 'start', side = 'bottom', label, className }: { anchor: HTMLElement; items: MenuItem[]; onClose: () => void; align?: 'start' | 'end'; side?: 'bottom' | 'top'; label: string; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   useLayoutEffect(() => {
@@ -73,7 +81,7 @@ export function Menu({ anchor, items, onClose, align = 'start', side = 'bottom',
     if (top < 8) top = r.bottom + 4;
     setPos({ top, left });
   }, [anchor, align, side]);
-  useEffect(() => { ref.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus(); }, [pos === null]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { (ref.current?.querySelector<HTMLElement>('[aria-checked="true"]') ?? ref.current?.querySelector<HTMLElement>(ITEM_SEL))?.focus(); }, [pos === null]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const down = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node) && !anchor.contains(e.target as Node)) onClose(); };
     document.addEventListener('mousedown', down);
@@ -81,7 +89,7 @@ export function Menu({ anchor, items, onClose, align = 'start', side = 'bottom',
   }, [anchor, onClose]);
   const close = () => { onClose(); anchor.focus(); };
   const onKey = (e: React.KeyboardEvent) => {
-    const els = [...(ref.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
+    const els = [...(ref.current?.querySelectorAll<HTMLElement>(ITEM_SEL) ?? [])];
     const i = els.indexOf(document.activeElement as HTMLElement);
     const go = (n: number) => { e.preventDefault(); els[(n + els.length) % els.length]?.focus(); };
     if (e.key === 'ArrowDown') go(i + 1);
@@ -92,14 +100,25 @@ export function Menu({ anchor, items, onClose, align = 'start', side = 'bottom',
   };
   return createPortal( // oxlint-disable-next-line jsx-a11y/interactive-supports-focus -- arrow keys delegated from focused menuitems (roving tabindex)
     <div ref={ref} role="menu" aria-label={label} onKeyDown={onKey} style={pos ?? { top: -9999, left: -9999 }}
-      className="fixed z-[60] min-w-[200px] rounded-2xl border border-line bg-elev p-1.5 font-sans text-sm text-fg shadow-[0_8px_30px_rgba(0,0,0,0.16)] motion-safe:animate-[cc-pop_120ms_ease-out]">
+      className={clsx(className, "fixed z-[60] min-w-[200px] rounded-2xl border border-line bg-elev p-1.5 font-sans text-sm text-fg shadow-[0_8px_30px_rgba(0,0,0,0.16)] motion-safe:animate-[cc-pop_120ms_ease-out]")}>
       {items.map((it, i) => // oxlint-disable-next-line jsx-a11y/control-has-associated-label -- non-focusable menu separator needs no label
-        it === 'sep' ? <div key={`s${i}`} role="separator" className="my-1 h-px bg-line" /> : (
-          <button key={it.label} type="button" role="menuitem" tabIndex={-1} onClick={() => { onClose(); it.onSelect(); }}
-            className={clsx('flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left outline-none hover:bg-hover focus-visible:bg-hover focus-visible:outline-none', it.danger && 'text-danger')}>
-            {it.icon && <span className="shrink-0 opacity-80">{it.icon}</span>}
-            <span className="flex-1">{it.label}</span>
+        it === 'sep' ? <div key={`s${i}`} role="separator" className="my-1 h-px bg-line" /> : 'heading' in it ? (
+          <div key={`h${i}`} role="presentation" className="px-2.5 pb-1 pt-2 text-xs font-medium text-fg-subtle">{it.heading}</div>
+        ) : (
+          <button key={it.label} type="button" role={it.checked === undefined ? 'menuitem' : 'menuitemradio'} aria-checked={it.checked} aria-disabled={it.disabled || undefined} tabIndex={-1}
+            onClick={() => { if (it.disabled) return; onClose(); it.onSelect(); }}
+            title={it.title}
+            className={clsx('flex w-full gap-2.5 rounded-lg px-2.5 py-2 text-left outline-none focus-visible:outline-none', it.description ? 'items-start' : 'items-center', it.disabled ? 'cursor-not-allowed text-fg-subtle' : 'hover:bg-hover focus-visible:bg-hover', it.danger && 'text-danger')}>
+            {it.icon && <span className={clsx('shrink-0 opacity-80', it.description && 'mt-0.5')}>{it.icon}</span>}
+            <span className="min-w-0 flex-1">
+              <span className="flex items-baseline gap-3">
+                <span className="min-w-0 truncate">{it.label}</span>
+                {it.meta && <span className="ml-auto shrink-0 whitespace-nowrap text-xs text-fg-subtle">{it.meta}</span>}
+              </span>
+              {it.description && <span className="block text-[13px] leading-5 text-fg-subtle">{it.description}</span>}
+            </span>
             {it.shortcut && <kbd className="font-sans text-xs text-fg-subtle">{it.shortcut}</kbd>}
+            {it.checked !== undefined && <Check size={16} aria-hidden className={clsx('shrink-0', it.description && 'mt-0.5', !it.checked && 'invisible')} />}
           </button>
         ),
       )}

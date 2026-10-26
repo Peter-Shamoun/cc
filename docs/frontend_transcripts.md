@@ -21,8 +21,19 @@ same shape as the simulator's design, adapted to the API's message format (parts
 * `user_hash` = SHA-256(customer, user) — no email/sub in object names.
 * The customer key is `api.transcripts.Keyring`, a local stand-in for the KMS CMK `alias/claimclarity/{customer}/transcripts`.
   `crypto_shred_customer` disables it; afterwards every read for that customer returns **410 `transcripts_unavailable`**.
-* "Delete all my chats" removes every object under the user prefix, including `dek.bin`.
-* Retention: 90 days (`TRANSCRIPT_RETENTION_DAYS`), or shorter per user; enforced on access.
+* "Delete all my chats" removes every object under the user prefix, including `dek.bin`, except `retention.json`
+  (the user's setting, not chat data).
+* Deleting also clears what lives outside the store. Under one lock with the delete, the API: discards in-flight
+  runs for that conversation (they're cancelled, their final transcript write is skipped so the chat can't be
+  resurrected, and their resume buffers are dropped at the next gc); removes pending clarifications (they hold the
+  question text); and revokes the conversation's CSV downloads (`DownloadRegistry.revoke`). "Delete all" does the
+  same for every conversation of that user.
+* Retention: 90 days (`TRANSCRIPT_RETENTION_DAYS`), or shorter per user. The user's choice is persisted as
+  `{user prefix}retention.json` (`{"days": n}`, no PHI), so it survives restarts. It's enforced on access **and** by
+  `store.purge_expired()`, which sweeps every user, including ones who never come back. The app runs the sweep once
+  at startup and then every `CC_TRANSCRIPT_SWEEP_SECONDS` (default 3600; 0 = off) from its lifespan. When a sweep
+  leaves a user with no conversations, it also deletes their wrapped `dek.bin` (a per-user crypto-shred; the next
+  write makes a new key). Audit: `transcripts_expired` (count only).
 * `CC_TRANSCRIPT_DIR` stores blobs on disk (0600 files, 0700 dirs, atomic writes, no path traversal);
   `CC_TRANSCRIPT_KEYS_DIR` keeps the demo keys across restarts. Unset = in memory.
 * Production swaps `DirBlobs` for the S3 prefix and `Keyring` for KMS; the store code does not change.
