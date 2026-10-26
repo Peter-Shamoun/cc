@@ -23,7 +23,7 @@ export type {
   Sensitivity, StatusPart, TablePart, TextPart, ToolCallPart, ArtifactPart, PartBase,
 };
 
-export const CONTRACT_VERSION = '1.20.1';
+export const CONTRACT_VERSION = '1.21.0';
 export const CONTRACT_MAJOR = 1;
 
 // ---------------------------------------------------------------- new parts (v1)
@@ -210,6 +210,10 @@ export interface ChatRequest {
   /** `editOf`: id of an earlier user message this one replaces (its sibling; editing the first question makes a new root). */
   messages: { id?: ID; role: 'user'; text: string; parentId?: ID; editOf?: ID }[];
   /** 1.4.0: `strategy` / `model` are ids from GET /api/capabilities (see `Capabilities`). */
+  /**
+   * 1.21.0 (CONTRACT.md §2.1): options tune how the answer is produced, never which data it reads. The customer,
+   * database, schema and tables come from the sign-in; an `IdentityScopedKey` here or at the top level is 422.
+   */
   options?: { strategy?: string; model?: string; [k: string]: unknown };
   /** Answer a ClarificationPart. `messages` carries the user's reply as a normal user turn. */
   resume?: { clarificationId: ID; choiceIds?: ID[]; text?: string };

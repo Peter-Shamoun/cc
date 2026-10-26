@@ -1,5 +1,5 @@
 {
-  "contractVersion": "1.20.1",
+  "contractVersion": "1.21.0",
   "demo": true,
   "scope": "public",
   "defaults": {

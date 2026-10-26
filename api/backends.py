@@ -107,8 +107,34 @@ _STATUS = ["paid", "paid", "paid", "denied", "partial", "pending"]
 _CARC = ["CO-45", "CO-97", "PR-1", "CO-16", "CO-50", "PR-2"]
 
 
-def demo_connection(customer: str, n_claims: int = 1200, seed: int = 11) -> duckdb.DuckDBPyConnection:
-    """Synthetic sem.* views. Every value is generated; ``name_first`` exists only to exercise redaction."""
+#: The demo's stand-in for the identity provider plus each customer's semantic-layer manifest. In production the
+#: Cognito id token's ``custom:customer`` claim names the tenant and ``ccsim.query.open_session`` builds the session
+#: from that customer's manifest (sem.* only; lossless.* only when escalating, which chat never does). Here the demo
+#: token ``demo:<customer>:<user>`` plays the id token and this table plays the manifest. Nothing in a request body,
+#: query string or header other than the session token can choose the customer or the relations (CONTRACT §2.1).
+DEMO_DIRECTORY: dict[str, tuple[str, ...]] = {
+    "acme_labs": ("sem.claims",),
+    "acme_diagnostics": ("sem.claims",),
+}
+DEMO_RELATIONS = frozenset({"sem.claims"})  # the relations demo_connection knows how to synthesise
+
+
+@dataclass(frozen=True)
+class DemoIdentity:
+    """What the demo token proves, like a verified id token's claims: who, which tenant, which relations."""
+    customer: str
+    user: str
+    relations: tuple[str, ...]
+
+
+def demo_connection(customer: str, n_claims: int = 1200, seed: int = 11,
+                    relations: tuple[str, ...] = ("sem.claims",)) -> duckdb.DuckDBPyConnection:
+    """Synthetic sem.* views, exactly ``relations`` (from the identity), nothing else. Every value is generated;
+    ``name_first`` exists only to exercise redaction. Like the production session, the connection can't read files
+    or the network and its configuration is locked once built."""
+    unknown = set(relations) - DEMO_RELATIONS
+    if unknown or not relations:
+        raise ValueError(f"no demo data for {sorted(unknown) or 'an empty relation list'}")
     rng = random.Random(f"{customer}:{seed}")
     prefix = "".join(word[0] for word in customer.split("_") if word).upper()
     con = duckdb.connect()
@@ -124,13 +150,19 @@ def demo_connection(customer: str, n_claims: int = 1200, seed: int = 11) -> duck
         rows.append((f"{prefix}{100000 + i}", rng.choice(_PAYERS), start + dt.timedelta(days=rng.randrange(360)), status,
                      charge, paid, rng.choice(_CARC) if status in ("denied", "partial") else None, f"Synthetic{i % 37}"))
     con.executemany("INSERT INTO sem.claims VALUES (?, ?, ?, ?, ?, ?, ?, ?)", rows)
+    con.execute("SET enable_external_access = false")
+    con.execute("SET lock_configuration = true")
     return con
 
 
 class DemoOpener:
-    def __init__(self, con, principal: Principal):
+    """Opens a session for the identity's customer only (the open_session analogue): the handle's customer and
+    user come from the token, and the cursor sees only that customer's relations."""
+
+    def __init__(self, con, principal: Principal, relations: tuple[str, ...] = ("sem.claims",)):
         self.con = con
         self.principal = principal
+        self.relations = relations
 
     def open(self, escalate: bool) -> SessionHandle:
         assert not escalate
@@ -141,19 +173,25 @@ class DemoAuth:
     mode = "demo"
     _TOKEN = re.compile(r"demo:([a-z0-9_]{2,40}):([A-Za-z0-9_.@+-]{1,80})")
 
-    def __init__(self, customers=("acme_labs", "acme_diagnostics")):
-        self.customers = set(customers)
+    def __init__(self, customers=tuple(DEMO_DIRECTORY)):
+        self.directory = {c: DEMO_DIRECTORY.get(c, ("sem.claims",)) for c in customers}
+        self.customers = set(self.directory)
         self._cons: dict[str, duckdb.DuckDBPyConnection] = {}
 
-    def authenticate(self, token: str, request_id: str) -> AuthContext:
+    def verify(self, token: str) -> DemoIdentity:
+        """The id-token check: the customer and its relations come from the token and the directory, never the request."""
         m = self._TOKEN.fullmatch(token or "")
-        if not m or m.group(1) not in self.customers:
+        if not m or m.group(1) not in self.directory:
             raise AuthError("invalid or expired session")
-        principal = Principal(m.group(1), m.group(2))
-        con = self._cons.get(principal.customer)
+        return DemoIdentity(m.group(1), m.group(2), self.directory[m.group(1)])
+
+    def authenticate(self, token: str, request_id: str) -> AuthContext:
+        ident = self.verify(token)
+        principal = Principal(ident.customer, ident.user)
+        con = self._cons.get(ident.customer)
         if con is None:
-            con = self._cons[principal.customer] = demo_connection(principal.customer)
-        return AuthContext(principal, NoEscalateOpener(DemoOpener(con, principal)))
+            con = self._cons[ident.customer] = demo_connection(ident.customer, relations=ident.relations)
+        return AuthContext(principal, NoEscalateOpener(DemoOpener(con, principal, ident.relations)))
 
     def sign_out(self, token: str) -> None:
         """Demo tokens are stateless and synthetic; nothing to revoke. The route still clears the browser."""
