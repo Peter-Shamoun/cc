@@ -50,10 +50,11 @@ def test_outbound_shape():
 
 
 def test_test_client_request_log_has_no_ids(client, caplog):
-    caplog.set_level(logging.INFO, logger="httpx")
+    for name in ("httpx", "httpx2"):
+        caplog.set_level(logging.INFO, logger=name)
     client.get("/api/shared/sh_SyntheticShareId42", headers=H)
     client.get("/api/conversations/c_synthetic_7?q=Jane", headers=H)
-    text = "\n".join(r.getMessage() for r in caplog.records if r.name == "httpx")
+    text = "\n".join(r.getMessage() for r in caplog.records if r.name in ("httpx", "httpx2"))
     assert "HTTP Request" in text
     assert "sh_SyntheticShareId42" not in text and "c_synthetic_7" not in text and "Jane" not in text
     assert "/api/:id/:id" in text  # 1.22: no share route, so the stale path is fully shaped

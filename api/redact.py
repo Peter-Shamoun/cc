@@ -163,11 +163,13 @@ def outbound_shape(url: object) -> str:
 
 
 OUTBOUND_FILTER = OutboundUrlFilter()
+#: httpx2 (the client newer Starlette TestClients use) logs the same message under its own logger name
+OUTBOUND_REQUEST_LOGGERS = ("httpx", "httpx2", "httpcore")
 
 
 def install_outbound_url_redaction() -> None:
     """Idempotent."""
-    for name in ("httpx", "httpcore"):
+    for name in OUTBOUND_REQUEST_LOGGERS:
         lg = logging.getLogger(name)
         if OUTBOUND_FILTER not in lg.filters:
             lg.addFilter(OUTBOUND_FILTER)
