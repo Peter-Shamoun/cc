@@ -47,6 +47,9 @@ export function checkHeaders(kind, headers) {
     if (!script.some((s) => /^'nonce-[A-Za-z0-9+/_=-]{16,}'$/.test(s))) p.push('CSP: script-src needs a nonce');
     if (!has('object-src', "'none'")) p.push("CSP: object-src must be 'none'");
     if (!has('base-uri', "'none'")) p.push("CSP: base-uri must be 'none'");
+    if (!has('require-trusted-types-for', "'script'")) p.push("CSP: require-trusted-types-for 'script' missing (Trusted Types)");
+    const tt = csp['trusted-types'] ?? [];
+    if (tt.some((s) => s === '*' || s === "'allow-duplicates'") && kind === 'html') p.push('CSP: trusted-types must name policies, not * or allow-duplicates (prod)');
     if (kind === 'html') need('Cache-Control', (v) => /\bno-store\b/.test(v), 'HTML must be no-store');
     if (kind === 'asset') need('Cache-Control', (v) => /\bno-store\b/.test(v) || /\bimmutable\b/.test(v), 'hashed assets: no-store or immutable');
   }
