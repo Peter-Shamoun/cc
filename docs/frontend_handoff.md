@@ -126,32 +126,113 @@ server answers `stream_gone` and the client reloads the saved answer. Stop is `P
 
 ## 5. Connecting the real analyzer
 
-<!-- SECTION: contract (analyzer adapter). The Contract team owns this section and replaces this placeholder. -->
+<!-- SECTION: contract (analyzer adapter). Owner: contract team. Contract 1.22.0 on this branch; 1.23.0 (multi-question clarify) is additive and does not change the wiring. -->
 
-*Until the Contract team's section lands, this is the summary of `docs/frontend-analyzer-adapter.md` (read it in full
-before wiring):*
+**Status:** the adapter exists and is tested from fixtures only. It is **not wired**: `api/app.py` never imports it,
+and a test (`api/tests/test_analyzer_adapter.py`) enforces that. No paid API has ever been called. Nothing under
+`analyzer/`, `analyst/`, `bench/` or `ccsim/` was changed. The full spec is in
+[`frontend-analyzer-adapter.md`](frontend-analyzer-adapter.md). This section is the how-to.
 
-- **Today:** `POST /api/chat` already runs the full pipeline (`LiveTap` → `mapping.outcome_parts` →
-  `stream_parts.emit_parts`) with `ScriptedLLM`. Wiring the real analyzer means changing **only the LLM object** given
-  to `LiveTap`, plus the analyzer config. `api/app.py` deliberately does not import the adapter yet (a test enforces
-  this; that test changes in the wiring PR).
-- **Paid-API switch (R3):** `api.analyzer_adapter.build_real_llm(kind, enable=...)` returns the analyzer's
-  `AnthropicLLM`/`BedrockLLM(allow_paid_api=True)` only if `CC_API_ALLOW_PAID_API` is exactly
-  `i-understand-this-calls-a-paid-model-api` **and** `enable=True`. Otherwise it raises `PaidAPIDisabled`, which the
-  API shows as "Paid model APIs are disabled on this server".
-- **PHI in reasoning (R2):** wire through `run_to_events(..., reasoning="drop")` (the default). Raw model text is
-  never streamed. `"summary"` builds a labels-and-counts summary only. There is no raw mode.
-- **Shown SQL:** literals are masked by `api.sql_mask` (`CC_API_SQL_LITERAL_MASKING=phi`, never `off`).
-- **Strategy (R4):** `api.strategy_config.strategy_config(strategy, model, customer=principal.customer).overrides`
-  → `AnalyzerConfig(**{**settings.analyzer_overrides, **overrides})`. The ids come from `GET /api/capabilities`.
-- **Stop during SQL (R6):** pass the request's opener through `api.cancel.CancellableOpener`. The live
-  `SessionHandle.con` must expose `interrupt()` or `cancel()`.
-- **Sessions:** per request from the user's Cognito token via `analyzer.opener.QueryPathOpener` →
-  `ccsim.query.open_session` (production does the same with the real AWS). Chat never escalates
-  (`NoEscalateOpener`).
-- **Rollout order:** (1) wiring with `reasoning="drop"`; (2) `Settings.llm in ("anthropic","bedrock")` →
-  `build_real_llm(settings.llm, enable=settings.allow_paid_api)`, demo default stays `scripted`; (3) strategy
-  overrides; (4) shadow runs on recordings, gated on `check() == []`.
+**5.1 What already runs the real code path.** `POST /api/chat` already drives the real `analyzer.loop.Analyzer`
+against a real session opener. Only the LLM is scripted (`ScriptedLLM`, `api/backends.py: make_llm`). Every model call
+goes through `api.live.LiveTap`, which turns calls and tool results into `step.*` / `status` / `escalation` events.
+`api.mapping.outcome_parts` turns the `AnalyzerAnswer` into parts, and `api.stream_parts.emit_parts` streams them.
+Connecting the real analyzer therefore means **swapping the LLM object and applying config**. The event mapping does
+not change.
+
+**5.2 Functions (all in `api/`)**
+
+| function | file | role |
+|---|---|---|
+| `build_real_llm(kind, *, enable)` | `analyzer_adapter.py` | `AnthropicLLM` / `BedrockLLM(allow_paid_api=True)`, but only if `enable=True` **and** the env switch is set; otherwise raises `PaidAPIDisabled` |
+| `paid_api_enabled(env=None)` | `analyzer_adapter.py` | true only when `CC_API_ALLOW_PAID_API` is the exact phrase |
+| `run_to_events(question, run, inner_llm, *, model, reasoning="drop", sql_masking="phi", cancelled, principal, downloads, strategy)` | `analyzer_adapter.py` | the full framed stream (`message.start` … `message.end`) for one run; wraps `emit` in the reasoning policy and SQL masking |
+| `adapter_strategy(strategy, *, multi_candidate, escalated)` | `analyzer_adapter.py` | the capabilities id for `message.start.strategy` |
+| `answer_from_bench(answer, *, columns)` | `analyzer_adapter.py` | `analyst/` (`bench.agents.Answer`) → `AnalyzerAnswer` |
+| `events_for_recording(recording)` | `analyzer_adapter.py` | replays a recorded real run with no model, network or DB (CI) |
+| `strategy_config(strategy, model, *, customer, grid=None, strict=False)` | `strategy_config.py` | strategy/model (and optional grid cell) → `AnalyzerConfig` overrides + fidelity notes |
+| `ToolLoopShim`, `TextRoleShim`, `SingleShotShim` | `analyst_shim.py` | adapt the `analyst/` agents' model interfaces onto `LiveTap` |
+| `CancellableOpener(opener, cancelled)` | `cancel.py` | Stop interrupts the running SQL; already used by `/api/chat` |
+| `SimAuth(aws, deployment)` | `backends.py` | Cognito id token → `Principal(custom:customer, email)`; sessions only through `ccsim.query.open_session` (`QueryPathOpener`) wrapped in `NoEscalateOpener` |
+
+**5.3 The wiring PR (one reviewed PR; about 20 lines in `api/app.py`)**
+1. In `create_app`, when `settings.llm in ("anthropic", "bedrock")`, build the model with
+   `build_real_llm(settings.llm, enable=True)` instead of `make_llm(...)`. Keep `scripted` as the default. The test
+   that forbids importing the adapter from `api/app.py` changes in the same PR.
+2. Config: `AnalyzerConfig(**{**settings.analyzer_overrides, **strategy_config(body.options.get("strategy",
+   DEFAULT_STRATEGY), body.options.get("model", "auto"), customer=ctx.principal.customer).overrides})`. This
+   replaces the demo-only `SCENARIO_CONFIG` merge. Drop `scenario` for real runs: it is a demo knob.
+3. Wrap `emit` with `ReasoningPolicy("drop")` (add a setting if you want `summary`; no env var exists yet) (`api/reasoning_policy.py`), as `run_to_events`
+   does. The demo path doesn't need it (scripted text is synthetic), but a real model's text can quote rows.
+4. Keep `CancellableOpener`, `NoEscalateOpener`, `mask_event`/`mask_part` and the audit allowlist exactly as they are.
+5. Auth: `create_app(auth=SimAuth(aws, deployment))` with `CC_API_AUTH` set to something other than `demo`.
+   `create_app` refuses to start without an explicit backend in that case. The data scope comes **only** from the
+   token (`custom:customer` → `open_session` → the manifest's allowed relations). The request can't choose it:
+   `IdentityScopedKey` keys are rejected with 422 (CONTRACT §2.1).
+
+**5.4 The paid switch (two locks, both required)**
+- Deployment: `CC_API_ALLOW_PAID_API=i-understand-this-calls-a-paid-model-api` (that exact string; anything else
+  counts as off).
+- Code: `build_real_llm(..., enable=True)`.
+- If either is missing, the run ends with an `error` part ("Paid model APIs are disabled on this server",
+  `finishReason: "error"`) and **no request leaves the box**. `CC_API_LLM=anthropic` on its own is safe: today's
+  `make_llm` builds `AnthropicLLM()` without `allow_paid_api`, which raises `PaidAPIDisabled` on the first call.
+
+**5.5 Environment variables**
+
+| var | default | meaning |
+|---|---|---|
+| `CC_API_LLM` | `scripted` | `scripted` (offline demo) / `anthropic` / `bedrock`; `/api/health` reports it, and `Capabilities.demo` is true only for `scripted` |
+| `CC_API_ALLOW_PAID_API` | unset | the paid switch above |
+| `CC_API_AUTH` | `demo` | anything else requires `create_app(auth=SimAuth(...))` |
+| `CC_API_MODE` | — | **mentioned in docstrings but not read by any code.** Sim/prod mode is selected only by passing `auth=SimAuth(...)` to `create_app` (with `CC_API_AUTH` ≠ `demo`) |
+| `CC_API_SQL_LITERAL_MASKING` | `phi` | shown-SQL literal masking: `phi` / `all` / `off`; an unknown value means `phi` |
+| `CC_API_ORG_POLICY` | demo policy (JSON, same shape as `capabilities.ORG_POLICY`) | per-org disabled strategies/models (same rule as the 422 and `strategy_config`) |
+| `CC_API_MAX_CONCURRENT_RUNS` | `3` | per-user run cap |
+| `CC_API_TEMPORARY_TTL_SECONDS` | `3600` | temporary chat TTL; `≤0` turns it off |
+| `CC_API_DEMO_PACE`, `CC_API_MODEL_DELAY_SECONDS`, `CC_API_STREAM_DELAY_SECONDS` | demo pacing | **set `CC_API_DEMO_PACE=0` for real models** (pacing applies only to `scripted`, but be explicit) |
+| `CC_API_HEARTBEAT_SECONDS`, `CC_API_DISCONNECT_GRACE_SECONDS`, `CC_API_MAX_BODY_BYTES` | 15 / 10 / cap | transport |
+
+The complete list, enforced by `api/tests/test_deploy_doc.py`, is `docs/frontend_deploy.md` §8.
+
+**5.6 Strategy mapping (`capabilities.STRATEGIES[*].config` → `AnalyzerConfig`)**
+
+| capabilities id | label | overrides |
+|---|---|---|
+| `tool_loop` (default) | Standard | `{}` (base: glossary basic, no dictionary/profile, row_limit 5000, candidates 1, cascade off) |
+| `cascade` | Escalate when stuck | `cascade: "haiku_then_sonnet"` |
+| `candidates` | Cross-check | `candidates: 3, candidate_selection: "execution_vote"` |
+
+A non-`auto` model adds `model`. An org-disabled or unknown strategy/model raises `ValueError`, matching the API's
+422. The optional 384-grid cell mapping and its fidelity flags (`multiagent` and `decompose_cte` are
+**unsupported**) are in the adapter spec §3 R4. `message.start.strategy` is always a capabilities id
+(`adapter_strategy`).
+
+**5.7 PHI defaults (keep them all)**
+- Reasoning: `drop`. No model text reaches the client. `summary` is opt-in and built only from labels and counts,
+  then checked with `phi_findings()` (fail closed). There is no raw mode.
+- Shown SQL: `phi` masking (literals compared with PHI-bearing columns become `?`, plus `maskedLiterals`). The
+  executed SQL is unchanged.
+- `step.sql_result` carries column names and counts only, never row values. Error text goes through `scrub()`.
+- Audit: an allowlist of fields only (no SQL, rows or question text). Access logs record route shapes, and IPs are
+  truncated.
+- Escalation (`lossless.*`) is never granted from chat (`NoEscalateOpener`).
+- Live multi-question clarify needs an analyzer `ask` spec change (`analyzer/tools.py` has only `question`).
+  Until then, live clarifications are single-question. This is logged under BACKEND-FIT in NOTES.
+
+**5.8 How to verify (in order; the first three are free)**
+1. `pytest api/tests/test_analyzer_adapter.py api/tests/test_adapter_r2_r4_r7.py api/tests/test_adapter_strategy_and_timing.py`: 9 recorded shapes plus
+   synthetic-PHI runs are schema-valid, conformant (`api.contract.conformance.check(events) == []`) and PHI-free.
+2. Record a real run in a sandbox (wrap the LLM so each `complete()` appends `{model, candidate_index,
+   tool_results, completion}`), **scrub row values**, add it under `api/tests/fixtures/analyzer_runs/`, and run
+   `events_for_recording` in CI.
+3. Full gates: `pytest api/tests`, `python -m api.contract.gen_ts --check`, `python -m api.contract.make_plot_cases --check`,
+   and in `web/` run tsc, oxlint, vitest and build.
+4. A paid smoke test needs Peter's sign-off: in a non-prod deployment set the switch, send one synthetic question per
+   strategy, and confirm `/api/health` shows the LLM, that the stream passes `check()`, that there is no
+   `reasoning.delta` under `drop`, that Stop returns `aborted` within 1 s during SQL, and that the audit log has no
+   SQL or row values.
+5. Shadow runs: replay recorded questions and gate on `check() == []` and on the PHI scan before turning it on for users.
 
 <!-- /SECTION: contract -->
 
@@ -219,6 +300,15 @@ Shell, at the 12:20 AM finalize:
 - Quote-a-selection chip in the composer: **not built**.
 - Response preferences settings section: **not built**.
 - ChatGPT-style single-row pill composer: **not built** (prototype dropped).
+
+Contract, at the 12:20 AM finalize:
+
+- Multi-question clarification (Claude-style: 1–4 questions, 12-character headers, 2–4 described options,
+  multi-select, Other, Skip): **built in the contract** as 1.23.0 (`ClarificationPart.questions`,
+  `resume.answers`, demo scenario `clarify_multi`, helpers `web/src/contract/clarify.ts`). Demo only: live needs the
+  analyzer `ask` spec to carry `questions` (BACKEND-FIT). The answer team renders the form.
+- Context-full error code: **not built** (not started at the finalize).
+- Suggested follow-ups and response preferences: **not built** (dropped at the finalize).
 
 ## 9. Team sections
 
