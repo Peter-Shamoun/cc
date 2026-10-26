@@ -1,6 +1,6 @@
 # CC chat API — stream contract
 
-**Version: 1.2.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.3.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -82,7 +82,7 @@ The frontend builds against this document only; the analyzer adapts to it.
 | `code.delta` | streamed code part | `partId`, `delta` |
 | `part` | a complete part (see §5) | `part` |
 | `part.patch` | update a part | `partId`, `patch` |
-| `message.end` | last | `messageId`, `finishReason`, `usage` (§7) |
+| `message.end` | last | `messageId`, `finishReason`, `usage` (§7), `conversationTitle?` (§11) |
 | `heartbeat` | every ≤15 s of silence | `at?`; no `seq`, no SSE `id` |
 
 `finishReason`:
@@ -199,7 +199,44 @@ from the demo backend by `python -m api.contract.gen_examples` and checked by `a
   Don't add inline `<script>` to index.html; put it in `web/public/` instead.
 * `error.details` and `step.*.error.message` are scrubbed (quoted literals and long digit runs masked) and ≤500 chars.
 
+## 11. Conversation history (REST)
+
+All JSON, `Cache-Control: no-store`, scoped to the signed-in user: another user's conversation is a 404, never a 403.
+Shapes are schema `$defs`, so the TS types are generated and gated like the stream (`web/src/contract/compat.test.ts`
+checks `web/src/adapters/conversationsApi.ts` against them).
+
+| Route | Body | Response |
+|---|---|---|
+| `GET /api/transcripts` | | `TranscriptsInfo {mode: "ephemeral"\|"persisted", persisted, retentionDays}` |
+| `PUT /api/transcripts/retention` | `{days}` | `{mode, retentionDays}` |
+| `GET /api/conversations?cursor=` | | `ConversationPage {items: ConversationSummary[], next?}` |
+| `POST /api/conversations/search` | `SearchRequest {q, cursor?}` (POST: the text may be PHI) | `ConversationPage`, items carry `snippet` |
+| `GET /api/conversations/{id}` | | `Conversation {id, title, updatedAt, messages: StoredMessage[]}` |
+| `PATCH /api/conversations/{id}` | `RenameRequest {title}` | `RenameResponse {id, title, updatedAt}`; 422 `invalid_title` |
+| `DELETE /api/conversations/{id}` | | `{deleted: true}`, or 404 `{deleted: false}` |
+| `DELETE /api/conversations` | | `{deleted: <count>}` |
+
+Errors (`HttpError`): `not_found` (404), `invalid_title` (422), `transcripts_unavailable` (410: the customer key was destroyed, so the history is gone).
+
+**`StoredMessage`.** User messages carry `text`, `parentId?` and `editOf?`. Assistant messages carry `parts`,
+`finishReason`, `usage`, `regenerateOf?` and `steps`. **`steps` are the flat `step.*` / `escalation` events in stream
+order, and that form is canonical**: rebuild the timeline with the same reducer as the live stream (`reduceV1`), so
+live and reloaded views cannot diverge. An aborted answer is stored with no parts and no steps.
+
+**Titles.** A conversation starts as `"New analysis"`. A question can hold PHI, so the server never echoes it as a
+title. On the first finished answer (`finishReason: "stop"`) of a conversation that still has the generic title, the
+server derives one from the result's **column identifiers** only (`api/titles.py`: "Paid amount by payer name",
+"Claims by CARC code"), stores it, and sends it as `message.end.conversationTitle`. The derivation fails closed: a
+PHI column, a non-identifier, or any word outside a fixed analytics vocabulary means no title. A user rename always
+wins and is never overwritten. Clients show `conversationTitle` right away and can keep their own local title only
+while the server title is still the generic one.
+
 ## Changelog
+
+* **1.3.0** (2026-10-25) — `message.end.conversationTitle` (PHI-free server title, §11); conversation REST shapes as
+  schema `$defs` (`ConversationSummary`, `ConversationPage`, `Conversation`, `StoredMessage`, `TranscriptsInfo`,
+  `RenameRequest`, `RenameResponse`, `SearchRequest`) with a TS drift gate; flat stored `steps` documented as
+  canonical. Additive.
 
 * **1.2.0** (2026-10-25) — `editOf` on the ChatRequest user message and on `message.start`, so an edit of the first
   question (no parent) can be expressed. Additive.

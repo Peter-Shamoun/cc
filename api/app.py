@@ -29,6 +29,7 @@ from api.live import Cancelled, LiveTap
 from api.mapping import outcome_parts
 from api.security import MAX_BODY_BYTES, BodyLimitMiddleware, SecurityHeadersMiddleware
 from api.store import DownloadRegistry, Principal
+from api.titles import title_from_parts
 from api.transcripts import CustomerKeyDisabled, make_store
 
 log = logging.getLogger("cc.api")
@@ -400,7 +401,15 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             emit({"type": "status", "label": None})
             usage = (tap.usage(elapsed, marks.get("first_event"), marks.get("first_token")) if tap is not None
                      else {"queries": 0, "elapsedMs": elapsed})
-            emit({"type": "message.end", "messageId": message_id, "finishReason": finish, "usage": usage})
+            end = {"type": "message.end", "messageId": message_id, "finishReason": finish, "usage": usage}
+            title = title_from_parts(parts) if finish == "stop" else None
+            if title and conversation_id:
+                try:
+                    if store.auto_title(ctx.principal, conversation_id, title):
+                        end["conversationTitle"] = title
+                except Exception as exc:  # noqa: BLE001 - a title must never break the stream
+                    log.warning("auto title failed: %s", type(exc).__name__)
+            emit(end)
             kept = list(reasoning.values()) + parts if finish != "aborted" else []
             record = {"id": message_id, "role": "assistant", "parts": kept, "createdAt": _iso(time.time()),
                       "parentId": user_msg["id"], "finishReason": finish, "usage": usage,
