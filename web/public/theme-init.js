@@ -1,2 +1,2 @@
 /* Theme only (no PHI): runs before paint to avoid a flash. External file so the CSP needs no inline script. */
-try { var t = localStorage.getItem('cc.pref.theme'), p = localStorage.getItem('cc.pref.palette'); if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('dark'); document.documentElement.dataset.palette = p === 'paper' ? 'paper' : 'neutral'; } catch (e) {}
+try { var t = localStorage.getItem('cc.pref.theme'), p = localStorage.getItem('cc.pref.palette'); if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('dark'); document.documentElement.dataset.palette = p === 'paper' ? 'paper' : 'neutral'; } catch {}

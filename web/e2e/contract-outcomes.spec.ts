@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures';
-import { LIVE, open, ask, lastAssistant, injectStream, turn, textPart, composer, stopBtn, waitIdle, gap } from './helpers';
+import { LIVE, open, ask, lastAssistant, injectStream, turn, textPart, composer, stopBtn, waitIdle } from './helpers';
 
 /**
  * Every outcome the winning analyzer bundle may produce (Claude's list, 2026-10-25), driven through the
