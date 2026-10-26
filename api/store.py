@@ -42,7 +42,8 @@ class TranscriptStore(Protocol):
     def list_conversations(self, principal: Principal, cursor: str | None = None, query: str | None = None,
                            archived: str = "include") -> dict: ...
     def get_conversation(self, principal: Principal, conversation_id: str) -> dict | None: ...
-    def append_message(self, principal: Principal, conversation_id: str, message: dict) -> None: ...
+    def append_message(self, principal: Principal, conversation_id: str, message: dict, *,
+                       create_if_missing: bool = True) -> None: ...
     def rename_conversation(self, principal: Principal, conversation_id: str, title: str) -> dict | None: ...
     def update_conversation(self, principal: Principal, conversation_id: str, *, title: str | None = None,
                             pinned: bool | None = None, archived: bool | None = None) -> dict | None: ...
@@ -183,10 +184,13 @@ class InMemoryTranscriptStore:
             return {"id": conv["id"], "title": conv["title"], "updatedAt": _iso(conv["updatedAt"]), **flags(conv),
                     "messages": [dict(m) for m in conv["messages"]]}
 
-    def append_message(self, principal, conversation_id, message):
+    def append_message(self, principal, conversation_id, message, *, create_if_missing=True):
+        """``create_if_missing=False`` (a run's final answer) skips a conversation that was deleted meanwhile."""
         with self._lock:
             conv = self._items.get(conversation_id)
             if conv is None:
+                if not create_if_missing:
+                    return
                 conv = {"id": conversation_id, "title": DEFAULT_TITLE, "updatedAt": time.time(), "messages": []}
                 self._items[conversation_id] = conv
                 self._owners[conversation_id] = principal
