@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
-import { LIVE, open, ask, composer, gap, waitIdle } from './helpers';
+import { LIVE, open, ask, composer, waitIdle } from './helpers';
 
 // QA keyboard-only walkthrough + screen-reader announcement audit (desktop, live demo API).
 const active = (page: Page) => page.evaluate(() => {
