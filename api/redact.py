@@ -140,3 +140,34 @@ def install_access_log_redaction(routes) -> None:
     for h in lg.handlers:
         if ACCESS_FILTER not in h.filters:
             h.addFilter(ACCESS_FILTER)
+
+
+# ---- outbound / test-client request log -----------------------------------------------------------------------------
+# httpx logs every request it makes as ``HTTP Request: <method> <full url> ...``. That covers the API's own outbound
+# calls (model providers, IdP) and Starlette's TestClient, which logs ``http://testserver/api/shared/<share id>``.
+# Keep the origin, shape the path the same way as the access log, and drop the query string.
+
+class OutboundUrlFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        a = record.args
+        if isinstance(a, tuple) and len(a) >= 2 and isinstance(record.msg, str) and record.msg.startswith("HTTP Request"):
+            record.args = (a[0], outbound_shape(a[1]), *a[2:])
+        return True
+
+
+def outbound_shape(url: object) -> str:
+    m = re.match(r"^([a-zA-Z][a-zA-Z0-9+.-]*://[^/?#]*)([^?#]*)", str(url))
+    if not m:
+        return ":url"
+    return m.group(1) + path_shape(m.group(2) or "/", ACCESS_FILTER.static).split("?", 1)[0]
+
+
+OUTBOUND_FILTER = OutboundUrlFilter()
+
+
+def install_outbound_url_redaction() -> None:
+    """Idempotent."""
+    for name in ("httpx", "httpcore"):
+        lg = logging.getLogger(name)
+        if OUTBOUND_FILTER not in lg.filters:
+            lg.addFilter(OUTBOUND_FILTER)
