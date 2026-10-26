@@ -34,4 +34,20 @@ describe('foldThread', () => {
     const msgs = [u('u1'), a('a1', 'nope'), u('u2', 'a9')];
     expect(ids(foldThread(msgs).visible)).toEqual(['u1', 'a1', 'u2']);
   });
+
+  it('editOf without parentId makes an edited first question a new root version (contract 1.2)', () => {
+    const msgs = [u('u1'), a('a1', 'u1'), u('u2'), a('a2', 'u2'), { id: 'u1e', role: 'user' as const, editOf: 'u1' }, a('a1e', 'u1e')];
+    const { visible, branches } = foldThread(msgs);
+    expect(ids(visible)).toEqual(['u1e', 'a1e']);
+    expect(branches[0].idx).toBe(1);
+    expect(branches[0].versions.map(ids)).toEqual([['u1', 'a1', 'u2', 'a2'], ['u1e', 'a1e']]);
+  });
+
+  it('editOf on a later question folds like parentId (sibling of the edited one)', () => {
+    const msgs = [u('u1'), a('a1', 'u1'), u('u2'), a('a2', 'u2'), { id: 'u2e', role: 'user' as const, editOf: 'u2' }, a('a2e', 'u2e')];
+    const { visible, branches } = foldThread(msgs);
+    expect(ids(visible)).toEqual(['u1', 'a1', 'u2e', 'a2e']);
+    expect(branches[2].versions.map(ids)).toEqual([['u2', 'a2'], ['u2e', 'a2e']]);
+  });
 });
+

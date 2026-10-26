@@ -152,6 +152,8 @@ export interface AssistantMessage {
 }
 export interface UserMessage {
   id: ID; role: 'user'; text: string; attachments?: FilePart[]; createdAt: ISODate; parentId?: ID;
+  /** Contract 1.2: the user message this one edits (its sibling; editing the first question makes a new root). */
+  editOf?: ID;
 }
 export type Message = UserMessage | AssistantMessage;
 
