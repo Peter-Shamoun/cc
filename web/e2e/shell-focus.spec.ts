@@ -63,3 +63,26 @@ test.describe('chat open on touch (mock) @mobile', () => {
     await expect(composer(page)).not.toBeFocused();
   });
 });
+
+test.describe('composer focus style (QA-S15) @desktop', () => {
+  test('a soft border on click/auto focus, the strong ring only for keyboard navigation', async ({ page }) => {
+    await open(page, MOCK);
+    const box = page.locator('.cc-composer').first();
+    await expect(composer(page)).toBeFocused();
+    const ring = () => box.evaluate((el) => getComputedStyle(el).boxShadow);
+    const focusColor = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--focus').trim());
+    expect(focusColor).not.toBe('');
+    await expect.poll(ring).toMatch(/^rgba?\([^)]*\) 0px 0px 0px 1px, rgba\(0, 0, 0, 0\.08\) 0px 6px 20px 0px$/);
+    const soft = await ring();
+    await composer(page).click();
+    expect(await ring()).toBe(soft);
+    // Keyboard: Tab away and back in.
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Tab');
+    await expect(composer(page)).toBeFocused();
+    await expect.poll(ring).toMatch(/^rgba?\([^)]*\) 0px 0px 0px 2px, rgba\(0, 0, 0, 0\.08\) 0px 6px 20px 0px$/);
+    // A click drops back to the soft style.
+    await composer(page).click();
+    await expect.poll(ring).toBe(soft);
+  });
+});
