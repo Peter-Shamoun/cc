@@ -9,6 +9,7 @@ import { useAdapter, useBlobUrl } from '../../adapters/context';
 import { CodeBlock } from './CodeBlock';
 import { imageDisplayBox } from '../../render/imageFrame';
 import { fmtMs } from '../answer/normalize';
+import { useExpired } from '../../lib/useExpired';
 
 function fmtBytes(n: number) {
   return n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`;
@@ -23,7 +24,7 @@ export const Inline = ({ text }: { text: string }) => (
 
 export function FileCard({ part, onPreview }: { part: FilePart; onPreview?: () => void }) {
   const adapter = useAdapter();
-  const expired = part.expiresAt ? Date.parse(part.expiresAt) < Date.now() : false;
+  const expired = useExpired(part.expiresAt);
   const isCsv = part.mime === 'text/csv';
   const download = async () => {
     if (!adapter || expired) return;

@@ -111,7 +111,7 @@ remove it.
 
 ### Warning ratchet
 
-`npm run lint` (and the CI lint step) runs `oxlint --max-warnings 28`. The count can't grow while the burn-down is in progress.
+`npm run lint` (and the CI lint step) runs `oxlint --max-warnings 20`. The count can't grow while the burn-down is in progress.
 - **If your PR adds a warning,** fix it or add an `oxlint-disable-next-line <rule> -- <reason>` comment. Don't raise the number.
 - **If your PR fixes warnings,** lower the number in `web/package.json` in the same PR.
 - **At 0,** platform switches the remaining rules to `error` and drops the flag.
