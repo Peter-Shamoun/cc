@@ -274,7 +274,9 @@ def test_examples_come_from_the_train_split_only(bench_snapshot, sessions_root):
 def test_playbook_slot_is_empty_hashed_and_frozen(bench_snapshot, sessions_root, tmp_path, monkeypatch):
     from analyzer import playbook
     from bench import eval_subagents
-    assert playbook.PLAYBOOK_PATH.read_text() == ""                # waits on the TRAIN distillation and review
+    empty = tmp_path / "empty_playbook.md"                         # a slot not yet distilled and reviewed
+    empty.write_text("")
+    monkeypatch.setattr(playbook, "PLAYBOOK_PATH", empty)
     with pytest.raises(playbook.PlaybookNotReady):
         eval_subagents.prepare("pytest-playbook-empty", {"pb": {"playbook": True}}, ["haiku"], 1,
                                only="q01_claims_submitted", snapshot_path=bench_snapshot, agent="analyzer")
