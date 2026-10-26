@@ -74,3 +74,40 @@ export function readableBars(spec: Record<string, unknown>): Record<string, unkn
   const height = Math.min(Math.max(labels.size * 28, 140), 640);
   return { ...spec, encoding: flipped, height };
 }
+
+/**
+ * ChatGPT/Claude charts always answer a hover. Single-view specs that set no tooltip get
+ * `mark.tooltip: true` (Vega-Lite then shows every encoded field). Explicit tooltips, including
+ * `tooltip: false` / `null`, and layered or composed specs are left alone.
+ */
+export function withTooltips(spec: Record<string, unknown>): Record<string, unknown> {
+  if (spec.layer || spec.facet || spec.repeat || spec.concat || spec.hconcat || spec.vconcat) return spec;
+  const mark = spec.mark;
+  if (mark === undefined) return spec;
+  if (isRecord(spec.encoding) && 'tooltip' in spec.encoding) return titledTooltips(spec);
+  if (isRecord(mark)) return 'tooltip' in mark ? spec : { ...spec, mark: { ...mark, tooltip: true } };
+  return typeof mark === 'string' ? { ...spec, mark: { type: mark, tooltip: true } } : spec;
+}
+
+/**
+ * Tooltip rows read like the axes ("CARC code: CO-97", "Denial rate: 20.6%"), not raw column keys
+ * ("carc_code"). Untitled tooltip fields borrow the title and number format of the channel that
+ * plots the same field. Call before readableBars, which blanks the category axis title.
+ */
+export function titledTooltips(spec: Record<string, unknown>): Record<string, unknown> {
+  const enc = spec.encoding;
+  if (!isRecord(enc) || !Array.isArray(enc.tooltip)) return spec;
+  const channels = Object.entries(enc).filter(([k, v]) => k !== 'tooltip' && isRecord(v) && typeof v.field === 'string') as [string, Enc][];
+  let changed = false;
+  const tooltip = enc.tooltip.map((t: unknown) => {
+    if (!isRecord(t) || typeof t.field !== 'string') return t;
+    const ch = channels.find(([, v]) => v.field === t.field)?.[1];
+    if (!ch) return t;
+    const title = t.title ?? ch.title ?? ch.axis?.title ?? (isRecord(ch.legend) ? ch.legend.title : undefined);
+    const format = t.format ?? ch.format ?? ch.axis?.format;
+    const next = { ...t, ...(title != null && t.title === undefined ? { title } : {}), ...(format != null && t.format === undefined ? { format } : {}) };
+    if (Object.keys(next).length !== Object.keys(t).length) changed = true;
+    return next;
+  });
+  return changed ? { ...spec, encoding: { ...enc, tooltip } } : spec;
+}
