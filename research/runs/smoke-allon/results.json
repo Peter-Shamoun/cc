@@ -1,0 +1,98 @@
+{
+ "run": "smoke-allon",
+ "summary": [
+  {
+   "config": "all_on",
+   "model": "haiku",
+   "runs": 3,
+   "accuracy": 0.667,
+   "pass_all_repeats": 0.667,
+   "mean_tool_calls": 2,
+   "mean_tool_errors": 0.33,
+   "no_answer": 1
+  }
+ ],
+ "results": [
+  {
+   "question_id": "f_payer_denial_rate__acme-health-plan",
+   "model": "haiku",
+   "technique_config": {
+    "enable_metrics": true,
+    "enable_lookup": true,
+    "glossary": "pitfalls",
+    "data_dictionary": true,
+    "data_profile": true,
+    "enable_examples": true,
+    "sql_error_hints": true,
+    "result_checks": true,
+    "effort": "high",
+    "context_style": "procedural"
+   },
+   "tool_calls": 3,
+   "tool_errors": 1,
+   "final_kind": "answer",
+   "correct": true,
+   "why": "ok",
+   "sql": "SELECT payer_name, COUNT(DISTINCT claim_payer_key) AS remitted_claims, COUNT(DISTINCT claim_payer_key) FILTER (WHERE is_denied) AS denied_claims, 100.0 * COUNT(DISTINCT claim_payer_key) FILTER (WHERE is_denied) / NULLIF(COUNT(DISTINCT claim_payer_key), 0) AS denial_rate_pct FROM sem.remit_claims WHERE is_current_adjudication AND payer_key = 'ACME_HEALTH_PLAN' GROUP BY payer_name",
+   "via": "sql",
+   "answer_text": "Acme Health Plan's denial rate is 23.47% (115 denied of 490 remitted claims). Each claim is counted once per payer using its current 835 adjudication (is_current_adjudication), and denied means recorded denial (CLP02=4) or denial signal v3.",
+   "config": "all_on",
+   "repeat": 0,
+   "category": "denials",
+   "difficulty": "easy"
+  },
+  {
+   "question_id": "a_f494340e13",
+   "model": "haiku",
+   "technique_config": {
+    "enable_metrics": true,
+    "enable_lookup": true,
+    "glossary": "pitfalls",
+    "data_dictionary": true,
+    "data_profile": true,
+    "enable_examples": true,
+    "sql_error_hints": true,
+    "result_checks": true,
+    "effort": "high",
+    "context_style": "procedural"
+   },
+   "tool_calls": 3,
+   "tool_errors": 0,
+   "final_kind": "answer",
+   "correct": true,
+   "why": "ok",
+   "sql": "SELECT procedure_code, COUNT(*) AS denied_line_count, SUM(line_charge_amount) AS total_billed_charge FROM sem.remit_lines WHERE is_current_adjudication AND line_is_denied GROUP BY procedure_code ORDER BY denied_line_count DESC, procedure_code LIMIT 10",
+   "via": "sql",
+   "answer_text": "The top 10 procedure codes by denied 835 service-line count on current adjudications are: 36415 (111 lines, 888.00 billed), 80061 (62, 3596.00), 85025 (60, 1920.00), 80053 (55, 3520.00), 83036 (52, 2392.00), 87798 (47, 17578.00), G0480 (41, 10209.00), 80307 (31, 3038.00), 81479 (31, 66650.00), and 84443 (30, 2130.00). Lines were taken from sem.remit_lines with is_current_adjudication and line_is_d",
+   "config": "all_on",
+   "repeat": 0,
+   "category": "denial_management",
+   "difficulty": "medium"
+  },
+  {
+   "question_id": "a_923951a050",
+   "model": "haiku",
+   "technique_config": {
+    "enable_metrics": true,
+    "enable_lookup": true,
+    "glossary": "pitfalls",
+    "data_dictionary": true,
+    "data_profile": true,
+    "enable_examples": true,
+    "sql_error_hints": true,
+    "result_checks": true,
+    "effort": "high",
+    "context_style": "procedural"
+   },
+   "tool_calls": 0,
+   "tool_errors": 0,
+   "final_kind": null,
+   "correct": false,
+   "why": "no answer (nothing submitted)",
+   "config": "all_on",
+   "repeat": 0,
+   "category": "denial_rework",
+   "difficulty": "hard"
+  }
+ ]
+}

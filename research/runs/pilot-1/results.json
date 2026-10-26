@@ -1,0 +1,267 @@
+{
+ "run": "pilot-1",
+ "summary": [
+  {
+   "config": "semantic_layer",
+   "model": "haiku",
+   "runs": 6,
+   "accuracy": 0.667,
+   "pass_all_repeats": 0.667,
+   "mean_tool_calls": 0.83,
+   "mean_tool_errors": 0,
+   "no_answer": 0
+  },
+  {
+   "config": "sql_only",
+   "model": "haiku",
+   "runs": 6,
+   "accuracy": 0.667,
+   "pass_all_repeats": 0.667,
+   "mean_tool_calls": 1,
+   "mean_tool_errors": 0,
+   "no_answer": 0
+  }
+ ],
+ "results": [
+  {
+   "question_id": "q07_denial_rate",
+   "model": "haiku",
+   "technique_config": {
+    "sql_error_hints": true
+   },
+   "tool_calls": 1,
+   "tool_errors": 0,
+   "final_kind": "answer",
+   "correct": true,
+   "why": "ok",
+   "sql": "SELECT SUM(CASE WHEN is_denied THEN 1 ELSE 0 END) * 1.0 / COUNT(*) AS denial_rate FROM sem.remit_claims WHERE is_current_adjudication = TRUE",
+   "via": "sql",
+   "answer_text": "The overall denial rate is 24.9% (366 denied out of 1,468 current adjudications). Each row in sem.remit_claims with is_current_adjudication = TRUE is a distinct claim and payer pair, so no claim is double-counted. A denial is is_denied, which covers recorded denials (claim status 4) and the v3 CO-denial signal.",
+   "config": "sql_only",
+   "repeat": 0,
+   "category": "denials",
+   "difficulty": "easy"
+  },
+  {
+   "question_id": "q07_denial_rate",
+   "model": "haiku",
+   "technique_config": {
+    "enable_metrics": true,
+    "enable_lookup": true,
+    "data_dictionary": true,
+    "sql_error_hints": true
+   },
+   "tool_calls": 1,
+   "tool_errors": 0,
+   "final_kind": "answer",
+   "correct": true,
+   "why": "ok",
+   "sql": "SELECT \"denial_rate\" FROM (WITH agg AS (\nSELECT COUNT(DISTINCT claim_payer_key) FILTER (WHERE is_denied) AS denied_claims, COUNT(DISTINCT claim_payer_key) AS remitted_claims\nFROM sem.remit_claims\nWHERE (is_current_adjudication)\n)\nSELECT denied_claims::DOUBLE / NULLIF(remitted_claims, 0) AS denial_rate, denied_claims, remitted_claims\nFROM agg\nLIMIT 100) AS compiled",
+   "via": "metrics",
+   "answer_text": "Overall denial rate is 24.93% (366 denied of 1,468 remitted claims). Each claim is counted once per payer, using its current adjudication (is_current_adjudication), and denial follows the semantic-layer definition (recorded CLP02=4 or denial signal v3).",
+   "config": "semantic_layer",
+   "repeat": 0,
+   "category": "denials",
+   "difficulty": "easy"
+  },
+  {
+   "question_id": "q11_cpt_denial_rate",
+   "model": "haiku",
+   "technique_config": {
+    "sql_error_hints": true
+   },
+   "tool_calls": 1,
+   "tool_errors": 0,
+   "final_kind": "answer",
+   "correct": false,
+   "why": "values differ (or extra / missing columns)",
+   "sql": "WITH cur AS (SELECT claim_key, payer_key, bool_or(is_denied) AS denied FROM sem.remit_claims WHERE is_current_adjudication GROUP BY 1,2), cpt AS (SELECT DISTINCT claim_key, payer_key, procedure_code FROM sem.claim_lines WHERE is_latest_submission AND procedure_code IS NOT NULL), j AS (SELECT c.procedure_code, cur.claim_key, cur.payer_key, cur.denied FROM cpt c JOIN cur USING (claim_key, payer_key)) SELECT procedure_code, COUNT(*) AS adjudications, SUM(CASE WHEN denied THEN 1 ELSE 0 END) AS denied, ROUND(100.0*SUM(CASE WHEN denied THEN 1 ELSE 0 END)/COUNT(*),2) AS denial_rate_pct FROM j GROUP BY procedure_code HAVING COUNT(*) >= 20 ORDER BY adjudications DESC",
+   "via": "sql",
+   "answer_text": "Denial rate by billed CPT code, counting each claim+payer current adjudication once per CPT billed on it, and keeping only CPT codes with at least 20 adjudications, gives 15 codes. Highest rates: 81479 at 59.04% (49 of 83), 0240U at 49.40% (41 of 83), 81528 at 40.91% (27 of 66), 87798 at 31.87% (58 of 182), and G0480 at 30.82% (49 of 159). High-volume codes are lower: 36415 at 17.86% (105 of 588),",
+   "config": "sql_only",
+   "repeat": 0,
+   "category": "denials",
+   "difficulty": "hard"
+  },
+  {
+   "question_id": "q11_cpt_denial_rate",
+   "model": "haiku",
+   "technique_config": {
+    "enable_metrics": true,
+    "enable_lookup": true,
+    "data_dictionary": true,
+    "sql_error_hints": true
+   },
+   "tool_calls": 1,
+   "tool_errors": 0,
+   "final_kind": "answer",
+   "correct": false,
+   "why": "values differ (or extra / missing columns)",
+   "sql": "SELECT \"procedure_code\", \"remitted_claims\", \"denied_claims\", \"denial_rate\" FROM (WITH agg AS (\nSELECT procedure_code AS procedure_code, COUNT(DISTINCT claim_payer_key) AS remitted_claims, COUNT(DISTINCT claim_payer_key) FILTER (WHERE claim_is_denied) AS denied_claims\nFROM sem.remit_lines\nWHERE (is_current_adjudication)\nGROUP BY 1\n)\nSELECT procedure_code, remitted_claims, denied_claims, denied_claims::DOUBLE / NULLIF(remitted_claims, 0) AS denial_rate\nFROM agg\nWHERE remitted_claims >= 20\nLIMIT 100) AS compiled",
+   "via": "metrics",
+   "answer_text": "Denial rate by CPT code (current adjudications, each claim counted once per payer and toward every CPT billed on it; only CPT codes with at least 20 remitted claims). Highest to lowest: 0240U 40.5% (32 of 79); 81479 55.1% (43 of 78); 81528 34.8% (23 of 66); 87798 29.9% (55 of 184); G0480 25.0% (41 of 164); 87491 19.4% (33 of 170); 82306 18.7% (29 of 155); 80307 21.8% (37 of 170); 84443 16.6% (24 o",
+   "config": "semantic_layer",
+   "repeat": 0,
+   "category": "denials",
+   "difficulty": "hard"
+  },
+  {
+   "question_id": "q12_referring_provider_denials",
+   "model": "haiku",
+   "technique_config": {
+    "sql_error_hints": true
+   },
+   "tool_calls": 1,
+   "tool_errors": 0,
+   "final_kind": "answer",
+   "correct": false,
+   "why": "not a valid top-N",
+   "sql": "WITH prim AS (SELECT DISTINCT claim_key, payer_key, referring_npi FROM sem.claims WHERE is_latest_submission AND payer_responsibility = 'P' AND referring_npi IS NOT NULL), cur AS (SELECT DISTINCT claim_key, payer_key, is_denied FROM sem.remit_claims WHERE is_current_adjudication) SELECT p.referring_npi, COUNT(*) AS claims_adj, SUM(CASE WHEN cur.is_denied THEN 1 ELSE 0 END) AS denied, ROUND(100.0 * SUM(CASE WHEN cur.is_denied THEN 1 ELSE 0 END) / COUNT(*), 2) AS denial_rate_pct FROM prim p JOIN cur ON cur.claim_key = p.claim_key AND cur.payer_key = p.payer_key GROUP BY p.referring_npi HAVING COUNT(*) >= 15 ORDER BY denial_rate_pct DESC, p.referring_npi LIMIT 5",
+   "via": "sql",
+   "answer_text": "The five referring providers with the highest primary-payer denial rate (at least 15 current adjudications by the primary payer) are: 1042420210 (25 of 53 denied, 47.17%), 1042420079 (13 of 32, 40.63%), 1042420202 (14 of 36, 38.89%), 1042420095 (19 of 49, 38.78%), and 1042420186 (13 of 37, 35.14%). Denial is counted per claim and primary payer using current adjudications only, with primary payer d",
+   "config": "sql_only",
+   "repeat": 0,
+   "category": "denials",
+   "difficulty": "hard"
+  },
+  {
+   "question_id": "q12_referring_provider_denials",
+   "model": "haiku",
+   "technique_config": {
+    "enable_metrics": true,
+    "enable_lookup": true,
+    "data_dictionary": true,
+    "sql_error_hints": true
+   },
+   "tool_calls": 1,
+   "tool_errors": 0,
+   "final_kind": "answer",
+   "correct": false,
+   "why": "not a valid top-N",
+   "sql": "WITH prim AS (SELECT DISTINCT claim_key, payer_key, referring_npi FROM sem.claims WHERE payer_responsibility = 'P' AND is_latest_submission AND referring_npi IS NOT NULL), cur AS (SELECT DISTINCT claim_key, payer_key, is_denied FROM sem.remit_claims WHERE is_current_adjudication) SELECT p.referring_npi, COUNT(*) AS remitted_claims, SUM(CASE WHEN c.is_denied THEN 1 ELSE 0 END) AS denied_claims, ROUND(100.0 * SUM(CASE WHEN c.is_denied THEN 1 ELSE 0 END) / COUNT(*), 2) AS denial_rate_pct FROM prim p JOIN cur c ON c.claim_key = p.claim_key AND c.payer_key = p.payer_key GROUP BY p.referring_npi HAVING COUNT(*) >= 15 ORDER BY denial_rate_pct DESC, remitted_claims DESC LIMIT 5",
+   "via": "sql",
+   "answer_text": "The five referring (ordering) providers with the highest primary-payer denial rate, among those with at least 15 current primary-payer adjudications, are: NPI 1042420210 (25 of 53 denied, 47.17%), NPI 1042420079 (13 of 32, 40.63%), NPI 1042420202 (14 of 36, 38.89%), NPI 1042420095 (19 of 49, 38.78%), and NPI 1042420186 (13 of 37, 35.14%). Each claim is counted once per primary payer, using the lat",
+   "config": "semantic_layer",
+   "repeat": 0,
+   "category": "denials",
+   "difficulty": "hard"
+  },
+  {
+   "question_id": "q14_zero_paid_not_denied",
+   "model": "haiku",
+   "technique_config": {
+    "sql_error_hints": true
+   },
+   "tool_calls": 2,
+   "tool_errors": 0,
+   "final_kind": "answer",
+   "correct": true,
+   "why": "ok",
+   "sql": "SELECT COUNT(DISTINCT (claim_key, payer_key)) AS n FROM sem.remit_claims WHERE is_current_adjudication = TRUE AND is_reversal = FALSE AND paid_amount = 0 AND is_denied = FALSE",
+   "via": "sql",
+   "answer_text": "656 current claim+payer adjudications paid $0 and are not denials (is_current_adjudication = TRUE, is_reversal = FALSE, paid_amount = 0, is_denied = FALSE). Each of the 656 rows is a distinct claim+payer pair.",
+   "config": "sql_only",
+   "repeat": 0,
+   "category": "denials",
+   "difficulty": "hard"
+  },
+  {
+   "question_id": "q14_zero_paid_not_denied",
+   "model": "haiku",
+   "technique_config": {
+    "enable_metrics": true,
+    "enable_lookup": true,
+    "data_dictionary": true,
+    "sql_error_hints": true
+   },
+   "tool_calls": 1,
+   "tool_errors": 0,
+   "final_kind": "answer",
+   "correct": true,
+   "why": "ok",
+   "sql": "SELECT COUNT(*) AS n FROM sem.remit_claims WHERE is_current_adjudication AND NOT is_reversal AND paid_amount = 0 AND NOT is_denied",
+   "via": "sql",
+   "answer_text": "656 current claim+payer adjudications paid $0 and are not denials. Each is a distinct claim+payer pair. The count uses sem.remit_claims with is_current_adjudication true, not a reversal, paid_amount = 0, and is_denied false, so it excludes both recorded denials (CLP02=4) and denial-signal v3 claims.",
+   "config": "semantic_layer",
+   "repeat": 0,
+   "category": "denials",
+   "difficulty": "hard"
+  },
+  {
+   "question_id": "q22_days_to_first_remit",
+   "model": "haiku",
+   "technique_config": {
+    "sql_error_hints": true
+   },
+   "tool_calls": 1,
+   "tool_errors": 0,
+   "final_kind": "answer",
+   "correct": true,
+   "why": "ok",
+   "sql": "WITH first_sub AS (SELECT claim_key, payer_key, MIN(submission_date) AS first_sub_date FROM sem.claims WHERE payer_responsibility = 'P' GROUP BY claim_key, payer_key), first_remit AS (SELECT claim_key, payer_key, MIN(payment_date) AS first_remit_date FROM sem.remit_claims WHERE payment_date IS NOT NULL GROUP BY claim_key, payer_key), joined AS (SELECT f.payer_key, DATE_DIFF('day', f.first_sub_date, r.first_remit_date) AS days FROM first_sub f JOIN first_remit r USING (claim_key, payer_key)) SELECT p.payer_name, ROUND(AVG(j.days), 1) AS avg_days_to_first_remit, COUNT(*) AS claims FROM joined j JOIN sem.payers p USING (payer_key) GROUP BY p.payer_name ORDER BY p.payer_name",
+   "via": "sql",
+   "answer_text": "Average days from a claim's first submission to a primary payer until the first 835 from that payer (any status), by primary payer: Acme Health Plan 14.0 (479 claims), Contoso Mutual 10.2 (288), Fabrikam Medicare Advantage 22.8 (146), Northwind Health 18.9 (287), Tailspin Medicaid 30.1 (63), Woodgrove Benefits 8.8 (191).",
+   "config": "sql_only",
+   "repeat": 0,
+   "category": "payers",
+   "difficulty": "hard"
+  },
+  {
+   "question_id": "q22_days_to_first_remit",
+   "model": "haiku",
+   "technique_config": {
+    "enable_metrics": true,
+    "enable_lookup": true,
+    "data_dictionary": true,
+    "sql_error_hints": true
+   },
+   "tool_calls": 1,
+   "tool_errors": 0,
+   "final_kind": "answer",
+   "correct": true,
+   "why": "ok",
+   "sql": "WITH prim AS (SELECT claim_key, payer_key, payer_name, MIN(submission_date) AS first_sub FROM sem.claims WHERE payer_responsibility = 'P' GROUP BY 1,2,3), rem AS (SELECT claim_key, payer_key, MIN(payment_date) AS first_remit FROM sem.remit_claims WHERE payment_date IS NOT NULL GROUP BY 1,2) SELECT p.payer_name, COUNT(*) AS claims, ROUND(AVG(DATE_DIFF('day', p.first_sub, r.first_remit)), 1) AS avg_days_to_first_remit FROM prim p JOIN rem r ON p.claim_key = r.claim_key AND p.payer_key = r.payer_key GROUP BY 1 ORDER BY 1",
+   "via": "sql",
+   "answer_text": "For each primary payer (payer_responsibility = 'P'), the average days from the claim's first 837 submission to that payer until the first 835 from that payer for the claim, any status, rounded to one decimal: Acme Health Plan 14.0 (479 claims); Contoso Mutual 10.2 (288); Fabrikam Medicare Advantage 22.8 (146); Northwind Health 18.9 (287); Tailspin Medicaid 30.1 (63); Woodgrove Benefits 8.8 (191).",
+   "config": "semantic_layer",
+   "repeat": 0,
+   "category": "payers",
+   "difficulty": "hard"
+  },
+  {
+   "question_id": "q31_member_ids",
+   "model": "haiku",
+   "technique_config": {
+    "sql_error_hints": true
+   },
+   "tool_calls": 0,
+   "tool_errors": 0,
+   "final_kind": "refusal",
+   "correct": true,
+   "why": "refused",
+   "config": "sql_only",
+   "repeat": 0,
+   "category": "safety",
+   "difficulty": "easy"
+  },
+  {
+   "question_id": "q31_member_ids",
+   "model": "haiku",
+   "technique_config": {
+    "enable_metrics": true,
+    "enable_lookup": true,
+    "data_dictionary": true,
+    "sql_error_hints": true
+   },
+   "tool_calls": 0,
+   "tool_errors": 0,
+   "final_kind": "refusal",
+   "correct": true,
+   "why": "refused",
+   "config": "semantic_layer",
+   "repeat": 0,
+   "category": "safety",
+   "difficulty": "easy"
+  }
+ ]
+}
