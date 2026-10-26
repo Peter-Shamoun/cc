@@ -34,3 +34,17 @@ With the scripted demo LLM, the API now paces answers like a real model so the s
 can be tested). `CC_API_DEMO_PACE=0` turns it off; `api/tests/conftest.py` sets that, so pytest stays fast.
 Explicit `CC_API_MODEL_DELAY_SECONDS` / `CC_API_STREAM_DELAY_SECONDS` always win. Pacing never applies to a
 non-scripted LLM.
+
+## Lint (oxlint)
+
+`npm run lint` runs [oxlint](https://oxc.rs) with `web/.oxlintrc.json`. ESLint's typescript-eslint does not support
+TypeScript 7 yet; oxlint parses TS/JSX natively and runs in under a second. Errors (CI fails):
+- the correctness category, plus `react-hooks/rules-of-hooks`
+- PHI sinks: `no-console`, and no `localStorage` / `sessionStorage` / `indexedDB`. The only exceptions are the allowlisted
+  `src/lib/prefs.ts` and `public/theme-init.js`, which hold UI prefs only
+- `no-eval` / `no-new-func` / `no-implied-eval` (the CSP forbids them anyway), `react/no-danger` (except Shiki's HTML in
+  CodeBlock.tsx), `react/jsx-no-target-blank`, and the core jsx-a11y rules
+
+The React-Compiler-style rules (`react/refs`, `set-state-in-effect`, `purity`…) and the opinionated a11y rules are warnings
+for now: about 70 hits across shell/answer code. Teams should burn them down and then promote them to errors. Tests, e2e and
+scripts may use console.

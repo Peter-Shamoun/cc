@@ -12,7 +12,8 @@
     "e2e": "playwright test --workers=1 -c e2e/playwright.config.ts --project=desktop --project=mobile",
     "e2e:perf": "playwright test -c e2e/playwright.config.ts --project=perf",
     "e2e:update": "playwright test -c e2e/playwright.config.ts --project=desktop --project=mobile --update-snapshots -g visual",
-    "check:csp": "node scripts/csp_check.mjs"
+    "check:csp": "node scripts/csp_check.mjs",
+    "lint": "oxlint -c .oxlintrc.json"
   },
   "dependencies": {
     "@streamdown/math": "^1.0.3",
@@ -43,6 +44,7 @@
     "@vitejs/plugin-react": "^6.1.2",
     "axe-core": "^4.10.3",
     "jsdom": "^29.1.1",
+    "oxlint": "^1.89.0",
     "playwright": "^1.64.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
