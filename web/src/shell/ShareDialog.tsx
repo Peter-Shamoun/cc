@@ -50,7 +50,7 @@ export function ShareDialog(p: ShareDialogProps) {
 
         {p.link ? <LinkSection api={p.link} expiry={p.expiry} /> : (
           <section aria-labelledby="share-link-h">
-            <h3 id="share-link-h" className="mb-2 text-xs font-medium uppercase tracking-wide text-fg-subtle">Link</h3>
+            <h3 id="share-link-h" className="mb-2 text-sm font-medium text-fg-muted">Link</h3>
             <div className="flex items-center gap-3 rounded-xl border border-line px-3 py-2.5">
               <Lock size={16} aria-hidden className="shrink-0 text-fg-subtle" />
               <div className="min-w-0 flex-1">
@@ -66,7 +66,7 @@ export function ShareDialog(p: ShareDialogProps) {
         )}
 
         <section aria-labelledby="share-export-h">
-          <h3 id="share-export-h" className="mb-2 text-xs font-medium uppercase tracking-wide text-fg-subtle">Export</h3>
+          <h3 id="share-export-h" className="mb-2 text-sm font-medium text-fg-muted">Export</h3>
           <div className="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
             <Action icon={<Copy size={16} />} label="Copy as Markdown" onClick={p.onCopyMarkdown} />
             <Action icon={<FileText size={16} />} label="Download Markdown" hint=".md" onClick={p.onDownloadMarkdown} />
@@ -135,7 +135,7 @@ function LinkSection({ api, expiry }: { api: ShareLinkApi; expiry?: ShareDialogP
   const fmt = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   return (
     <section aria-labelledby="share-link-h" data-testid="share-link" aria-busy={state.kind === 'loading' || working}>
-      <h3 id="share-link-h" className="mb-2 text-xs font-medium uppercase tracking-wide text-fg-subtle">Link</h3>
+      <h3 id="share-link-h" className="mb-2 text-sm font-medium text-fg-muted">Link</h3>
       <div className="rounded-xl border border-line">
         <div className="flex items-center gap-3 px-3 py-2.5">
           <Lock size={16} aria-hidden className="shrink-0 text-fg-subtle" />
