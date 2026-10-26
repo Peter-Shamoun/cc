@@ -92,14 +92,14 @@ function fromView(v: StepView, all: StepView[], finished: boolean, aborted: bool
       const rr = rerun && find(rerun, 'step.sql_result');
       const rstate: Step['state'] = rr ? (rr.ok ? 'ok' : 'error') : finished ? (rerun ? 'cancelled' : 'ok') : 'running';
       return {
-        ...base, kind: 'repair', label: r.explanation ? `Repairing: ${r.explanation}` : 'Repairing the query', state: rstate,
+        ...base, kind: 'repair', label: rstate === 'running' ? 'Repairing the query' : 'Repaired the query', message: r.explanation, state: rstate,
         error: r.error.message, previousSql: sqlOf(all, r.failedStepId), sql: r.revisedSql, attempt: r.attempt, maxAttempts: r.maxAttempts,
       };
     }
     case 'check': {
       const cs = v.events.filter((e): e is Extract<StepEvent, { type: 'step.check' }> => e.type === 'step.check');
       const checks: CheckResult[] = cs.map((c) => ({ name: humanize(c.check), passed: c.verdict === 'pass', verdict: c.verdict, detail: c.message }));
-      const label = cs.length === 1 ? `Checked: ${checks[0].name.toLowerCase()}` : `Ran ${cs.length} checks`;
+      const label = cs.length === 1 ? (/^verif/i.test(cs[0].check) ? 'Verified the result' : `Checked ${checks[0].name.toLowerCase()}`) : `Ran ${cs.length} checks`;
       return { ...base, kind: 'check', label, state, checks };
     }
     case 'explore': {
@@ -172,7 +172,9 @@ export const escalationsOf = (m: AnyView): EscalationEvent[] => ('escalations' i
 
 /** Failed steps that no later repair step fixed. */
 export function unresolvedFailures(steps: Step[]): number {
-  return steps.filter((s, i) => s.state === 'error' && s.kind !== 'repair' && !steps.slice(i + 1).some((r) => r.kind === 'repair' && r.state === 'ok')).length;
+  // A failure is resolved when a later repair or query succeeded (repair → re-run, or escalation → fresh query).
+  const recovered = (i: number) => steps.slice(i + 1).some((r) => (r.kind === 'repair' || r.kind === 'sql') && (r.state === 'ok' || r.state === 'warn'));
+  return steps.filter((s, i) => s.state === 'error' && s.kind !== 'escalation' && !recovered(i)).length;
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -189,7 +191,8 @@ export function summarize(steps: Step[], elapsedMs?: number): string {
   const n = (k: StepKind) => steps.filter((s) => s.kind === k).length;
   const checks = steps.filter((s) => s.kind === 'check').reduce((a, s) => a + (s.checks?.length || 1), 0);
   const bits: string[] = [];
-  const q = n('sql') + n('explore');
+  // Schema/metadata reads (explore without SQL) aren't "queries"; a run with only those reads as exploring.
+  const q = n('sql') + steps.filter((s) => s.kind === 'explore' && s.sql).length;
   if (q) bits.push(plural(q, 'query', 'queries'));
   if (n('repair')) bits.push(plural(n('repair'), 'repair'));
   if (checks) bits.push(plural(checks, 'check'));
@@ -197,7 +200,7 @@ export function summarize(steps: Step[], elapsedMs?: number): string {
   if (n('schema') + n('search')) bits.push(plural(n('schema') + n('search'), 'lookup'));
   if (n('chart')) bits.push(plural(n('chart'), 'chart'));
   if (n('other')) bits.push(plural(n('other'), 'other step'));
-  let s = bits.length ? `Ran ${bits.join(', ')}` : `Used ${plural(steps.length, 'tool')}`;
+  let s = bits.length ? `Ran ${bits.join(', ')}` : n('explore') ? 'Explored the data' : `Used ${plural(steps.length, 'tool')}`;
   const stopped = steps.filter((x) => x.state === 'cancelled').length;
   if (stopped) s += `, ${stopped} stopped`;
   const ms = elapsedMs ?? steps.reduce((a, b) => a + (b.durationMs ?? 0), 0);

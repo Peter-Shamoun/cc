@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import App from '../../App';
 import { reduce, newAssistantView, type AssistantView, type StreamEvent, type ToolCallPart } from '../../lib/contract';
 import { AssistantTurn, messageMarkdown } from '../Message';
-import { pastTense, stepsOf, summarize, toStep, fmtUsd } from './normalize';
+import { pastTense, unresolvedFailures, stepsOf, summarize, toStep, fmtUsd } from './normalize';
 import { queriesOf } from './SqlInspector';
 import { ANSWER_FIXTURES } from '../../fixtures/answer';
 import { DUP_V1_ANSWER, DUP_V1_STEPS } from '../../fixtures/answerV1';
@@ -126,7 +126,7 @@ describe('answer surface: contract v1 events', () => {
     expect(steps[6].checks).toHaveLength(3);
     expect(steps[6].state).toBe('warn');
     expect(steps[5].candidates?.find((c) => c.chosen)?.id).toBe('a');
-    expect(summarize(steps, 8400)).toBe('Ran 4 queries, 1 repair, 3 checks, compared candidates · 8.4s');
+    expect(summarize(steps, 8400)).toBe('Ran 3 queries, 1 repair, 3 checks, compared candidates · 8.4s');
   });
   it('renders live steps, then escalation pill, v1 table link and rich usage', () => {
     const { rerender } = render(<AssistantTurn msg={v1(DUP_V1_STEPS.slice(0, 8))} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} />);
@@ -148,6 +148,12 @@ describe('answer surface: contract v1 events', () => {
     expect(pop).toHaveTextContent('est.');
     fireEvent.click(screen.getByTestId('open-sql'));
     expect(screen.getByTestId('sql-inspector')).toHaveTextContent('produced “Duplicate-claim denial rate by provider, Q3 2026”');
+  });
+  it('failures recovered by a later successful query are not flagged', () => {
+    const st = (kind: string, state: string) => ({ id: kind + state + Math.random(), kind, state, label: kind }) as never;
+    expect(unresolvedFailures([st('sql', 'error'), st('repair', 'error'), st('sql', 'error'), st('escalation', 'ok'), st('sql', 'ok')])).toBe(0);
+    expect(unresolvedFailures([st('sql', 'ok'), st('sql', 'error')])).toBe(1);
+    expect(summarize([{ id: 'e', kind: 'explore', state: 'ok', label: 'Read schema', durationMs: 13 }])).toBe('Explored the data · 13 ms');
   });
   it('server present-tense labels read as past tense once a step finishes', () => {
     const base = [{ type: 'message.start', messageId: 'm', conversationId: 'c', contractVersion: '1.0.0', seq: 0 }, { type: 'step.sql_running', stepId: 's', sql: 'SELECT 1', purpose: 'answer', attempt: 1, label: 'Running query', seq: 1 }] as V1Event[];
