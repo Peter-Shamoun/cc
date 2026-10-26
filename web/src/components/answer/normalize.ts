@@ -49,9 +49,14 @@ const PROBE: Record<string, string> = {
   lookup_dictionary: 'Looked up data dictionary', search_examples: 'Searched examples', profile: 'Profiled',
 };
 const PURPOSE: Record<string, string> = { explore: 'Probed the data', answer: 'Ran query', candidate: 'Ran candidate query', repair: 'Re-ran repaired query', check: 'Ran check query' };
+const PRESENT: Record<string, string> = { explore: 'Probing the data', answer: 'Running query', candidate: 'Running candidate query', repair: 'Re-running repaired query', check: 'Running check query' };
 const CHECK: Record<string, string> = { verifier: 'Verifier', row_count: 'Row count', null_share: 'Null share', join_fanout: 'Join fan-out', date_range: 'Date range', definition: 'Metric definition' };
 const humanize = (s: string) => (CHECK[s] ?? s.replace(/[_-]+/g, ' ').replace(/^./, (c) => c.toUpperCase()));
 export const modelName = (m: string) => m.replace(/^claude-/, '').replace(/-\d{6,8}$/, '').replace(/(\d)-(\d)/g, '$1.$2').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+const PAST: [RegExp, string][] = [[/^Running\b/, 'Ran'], [/^Re-running\b/, 'Re-ran'], [/^Checking\b/, 'Checked'], [/^Exploring\b/, 'Explored'], [/^Probing\b/, 'Probed'], [/^Comparing\b/, 'Compared'], [/^Repairing\b/, 'Repaired'], [/^Fixing\b/, 'Fixed']];
+/** Server labels are present tense ("Running query"); a finished row reads in past tense. */
+export const pastTense = (l: string) => PAST.reduce((a, [re, to]) => a.replace(re, to), l);
 
 const find = <T extends StepEvent['type']>(v: StepView, t: T) => v.events.find((e) => e.type === t) as Extract<StepEvent, { type: T }> | undefined;
 
@@ -68,7 +73,10 @@ function fromView(v: StepView, all: StepView[], finished: boolean, aborted: bool
       const run = find(v, 'step.sql_running');
       const res = find(v, 'step.sql_result');
       const purpose = run?.purpose ?? 'answer';
-      const label = run?.label ?? (purpose === 'candidate' && run?.candidateId ? `Ran candidate ${run.candidateId}` : PURPOSE[purpose] ?? 'Ran query');
+      const done = !!res;
+      const generic = !run?.label || /^(running|ran) (the )?query$/i.test(run.label);
+      let label = generic ? (done ? PURPOSE : PRESENT)[purpose] ?? 'Ran query' : done ? pastTense(run!.label!) : run!.label!;
+      if (purpose === 'candidate' && run?.candidateId) label = `Candidate ${run.candidateId}: ${generic ? (done ? 'ran' : 'running') : label}`;
       return {
         ...base, kind: purpose === 'explore' ? 'explore' : 'sql', label,
         state: !res && (aborted || !finished) ? (finished ? 'cancelled' : 'running') : state,
@@ -144,6 +152,16 @@ export function stepsOf(m: AnyView): Step[] {
     const s = v.kind === 'escalation' ? null : fromView({ ...v, events: v.events.filter((e) => e.type !== 'escalation') } as StepView, v1, finished, aborted);
     if (s) steps.push(s);
     for (const e of v.events) if (e.type === 'escalation') steps.push(escalationStep(e, esc++));
+  }
+  // Candidate runs fold into their comparison row once it arrives (one row, not N parallel queries).
+  const cand = v1.filter((v) => v.kind === 'candidates');
+  if (cand.length) {
+    const runs = new Map(v1.filter((v) => v.kind === 'sql' && find(v, 'step.sql_running')?.purpose === 'candidate').map((v) => [v.stepId, v]));
+    for (let i = steps.length - 1; i >= 0; i--) if (runs.has(steps[i].id)) steps.splice(i, 1);
+    for (const s of steps) if (s.kind === 'candidates' && s.durationMs === undefined) {
+      const ms = [...runs.values()].reduce((a, v) => a + (find(v, 'step.sql_result')?.elapsedMs ?? 0), 0);
+      if (ms) s.durationMs = ms;
+    }
   }
   const legacy = partsOf(m).filter((p): p is ToolCallPart => p.type === 'tool_call').map(toStep);
   const all = mergeChecks([...steps, ...legacy]);

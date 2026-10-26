@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import App from '../../App';
 import { reduce, newAssistantView, type AssistantView, type StreamEvent, type ToolCallPart } from '../../lib/contract';
 import { AssistantTurn, messageMarkdown } from '../Message';
-import { stepsOf, summarize, toStep, fmtUsd } from './normalize';
+import { pastTense, stepsOf, summarize, toStep, fmtUsd } from './normalize';
 import { queriesOf } from './SqlInspector';
 import { ANSWER_FIXTURES } from '../../fixtures/answer';
 import { DUP_V1_ANSWER, DUP_V1_STEPS } from '../../fixtures/answerV1';
@@ -117,20 +117,21 @@ const v1 = (evs: V1Event[]) => evs.reduce((m, e) => reduceV1(m, e), newAssistant
 describe('answer surface: contract v1 events', () => {
   it('maps step.* events into the timeline, merges checks, and pairs repair with its re-run', () => {
     const steps = stepsOf(v1([...DUP_V1_STEPS, ...DUP_V1_ANSWER]));
-    expect(steps.map((s) => s.kind)).toEqual(['explore', 'explore', 'sql', 'repair', 'sql', 'sql', 'candidates', 'check', 'escalation']);
+    // candidate runs fold into the comparison row
+    expect(steps.map((s) => s.kind)).toEqual(['explore', 'explore', 'sql', 'repair', 'sql', 'candidates', 'check', 'escalation']);
     const repair = steps[3];
     expect(repair.state).toBe('ok');
     expect(repair.previousSql).toMatch(/month, COUNT/);
     expect(repair.error).toMatch(/Binder Error/);
-    expect(steps[7].checks).toHaveLength(3);
-    expect(steps[7].state).toBe('warn');
-    expect(steps[6].candidates?.find((c) => c.chosen)?.id).toBe('a');
-    expect(summarize(steps, 8400)).toBe('Ran 5 queries, 1 repair, 3 checks, compared candidates · 8.4s');
+    expect(steps[6].checks).toHaveLength(3);
+    expect(steps[6].state).toBe('warn');
+    expect(steps[5].candidates?.find((c) => c.chosen)?.id).toBe('a');
+    expect(summarize(steps, 8400)).toBe('Ran 4 queries, 1 repair, 3 checks, compared candidates · 8.4s');
   });
   it('renders live steps, then escalation pill, v1 table link and rich usage', () => {
     const { rerender } = render(<AssistantTurn msg={v1(DUP_V1_STEPS.slice(0, 8))} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} />);
     expect(screen.getByTestId('step-timeline')).toHaveAttribute('data-live', 'true');
-    expect(screen.getByTestId('step-summary')).toHaveTextContent('Re-ran repaired query…');
+    expect(screen.getByTestId('step-summary')).toHaveTextContent('Re-running repaired query…');
     expect(screen.getByTestId('table-skeleton')).toBeInTheDocument();
     rerender(<AssistantTurn msg={v1([...DUP_V1_STEPS, ...DUP_V1_ANSWER])} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} />);
     expect(screen.getByTestId('step-summary')).toHaveAttribute('aria-expanded', 'false');
@@ -147,6 +148,12 @@ describe('answer surface: contract v1 events', () => {
     expect(pop).toHaveTextContent('est.');
     fireEvent.click(screen.getByTestId('open-sql'));
     expect(screen.getByTestId('sql-inspector')).toHaveTextContent('produced “Duplicate-claim denial rate by provider, Q3 2026”');
+  });
+  it('server present-tense labels read as past tense once a step finishes', () => {
+    const base = [{ type: 'message.start', messageId: 'm', conversationId: 'c', contractVersion: '1.0.0', seq: 0 }, { type: 'step.sql_running', stepId: 's', sql: 'SELECT 1', purpose: 'answer', attempt: 1, label: 'Running query', seq: 1 }] as V1Event[];
+    expect(stepsOf(v1(base))[0].label).toBe('Running query');
+    expect(stepsOf(v1([...base, { type: 'step.sql_result', stepId: 's', ok: true, elapsedMs: 5, rowCount: 1, seq: 2 } as V1Event]))[0].label).toBe('Ran query');
+    expect(pastTense('Checking join fan-out')).toBe('Checked join fan-out');
   });
   it('aborted v1 runs mark in-flight steps as stopped', () => {
     const evs = [...DUP_V1_STEPS.slice(0, 5), { type: 'message.end', messageId: 'm-v1', finishReason: 'aborted', usage: { queries: 1, elapsedMs: 900 }, seq: 99 } as V1Event];
