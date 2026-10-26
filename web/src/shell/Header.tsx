@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, Copy, Download, Ellipsis, Keyboard, MessageCircleDashed, Moon, PanelLeft, Pencil, Settings, Share, ShieldCheck, SquarePen, Sun, Trash2 } from 'lucide-react';
+import { ChevronDown, Copy, Download, Ellipsis, Keyboard, MessageCircleDashed, Moon, PanelLeft, Pencil, Settings, ShieldCheck, SquarePen, Sun, Trash2 } from 'lucide-react';
 import { useTheme } from '../lib/theme';
 import { IconButton } from '../components/ui';
 import { Menu, modKey, useMenu, type MenuItem } from './primitives';
@@ -19,8 +19,8 @@ export interface HeaderProps {
   title?: string;
   onRename?: (title: string) => void;
   onDelete?: () => void;
-  /** Opens the Share & export dialog (replaces the share menu when set). */
-  onShare?: () => void;
+  /** Server JSON export (live API only). */
+  onDownloadJson?: () => void;
   /** Strategy/model picker (contract 1.4.0) in the product menu, like ChatGPT's model menu. */
   strategy?: StrategyState;
   /** Temporary chat toggle (QA-S22, ChatGPT-style): shown only when set. */
@@ -28,10 +28,9 @@ export interface HeaderProps {
   onTemporary?: (on: boolean) => void;
 }
 
-/** Top bar: sidebar/new-chat when the sidebar is hidden, product menu (strategy + data mode), PHI badge, Share and "…" (ChatGPT layout). */
+/** Top bar: sidebar/new-chat when the sidebar is hidden, product menu (strategy + data mode), PHI badge and "…". No sharing (Peter 12:15 AM): copy/export live in the title menu. */
 export function Header(p: HeaderProps) {
   const { mode, toggleMode } = useTheme();
-  const share = useMenu();
   const more = useMenu();
   const product = useMenu();
   const titleMenu = useMenu();
@@ -47,7 +46,9 @@ export function Header(p: HeaderProps) {
   };
   const titleItems: MenuItem[] = [
     { label: 'Rename', icon: <Pencil size={16} />, onSelect: () => setRenaming(true) },
+    { label: 'Copy as Markdown', icon: <Copy size={16} />, onSelect: p.onCopyMarkdown },
     { label: 'Export as Markdown', icon: <Download size={16} />, onSelect: p.onDownloadMarkdown },
+    ...(p.onDownloadJson ? [{ label: 'Export as JSON', icon: <Download size={16} />, onSelect: p.onDownloadJson }] : []),
     ...(p.onDelete ? ['sep' as const, { label: 'Delete', icon: <Trash2 size={16} />, danger: true, onSelect: p.onDelete }] : []),
   ];
   const dataLabel = p.adapterName === 'http' ? 'Live API' : 'Demo data';
@@ -65,10 +66,6 @@ export function Header(p: HeaderProps) {
   ];
   // The picked strategy shows in the button only when it is not the default (ChatGPT shows the model name).
   const pickLabel = st && !st.isDefault ? [st.strategy?.label, st.model && st.model.id !== st.caps.defaults.model ? st.model.label : ''].filter(Boolean).join(' · ') : '';
-  const shareItems: MenuItem[] = [
-    { label: 'Copy as Markdown', icon: <Copy size={16} />, onSelect: p.onCopyMarkdown },
-    { label: 'Download .md', icon: <Download size={16} />, onSelect: p.onDownloadMarkdown },
-  ];
   const moreItems: MenuItem[] = [
     { label: mode === 'dark' ? 'Light mode' : 'Dark mode', icon: mode === 'dark' ? <Sun size={16} /> : <Moon size={16} />, onSelect: toggleMode },
     { label: 'Settings', icon: <Settings size={16} />, onSelect: p.onSettings },
@@ -110,11 +107,6 @@ export function Header(p: HeaderProps) {
       </div>
       <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
         <span className="hidden items-center gap-1 px-1.5 text-xs text-fg-subtle @[440px]:inline-flex" title="PHI mode, set by the server" data-testid="phi-badge"><ShieldCheck size={13} strokeWidth={1.75} aria-hidden /> De-identified</span>
-        {p.hasChat && (
-          <button type="button" onClick={p.onShare ?? share.toggle} aria-haspopup={p.onShare ? 'dialog' : 'menu'} aria-expanded={p.onShare ? undefined : !!share.anchor} data-testid="share-button" className="flex h-9 items-center gap-1.5 rounded-full border border-line px-3 text-sm hover:bg-hover @max-[600px]:w-9 @max-[600px]:justify-center @max-[600px]:px-0" aria-label="Share chat">
-            <Share size={15} /> <span className="@max-[600px]:hidden">Share</span>
-          </button>
-        )}
         {p.onTemporary && (
           <IconButton label={p.temporary ? 'Turn off temporary chat' : 'Turn on temporary chat'} tip tipAt="end" aria-pressed={!!p.temporary} data-testid="temporary-toggle"
             onClick={() => p.onTemporary?.(!p.temporary)} className={p.temporary ? 'bg-hover text-fg' : undefined}>
@@ -125,7 +117,6 @@ export function Header(p: HeaderProps) {
           <IconButton label="New chat" onClick={p.onNewChat} className="sm:hidden"><SquarePen size={18} /></IconButton>
         )}
         <IconButton label="More options" tip tipAt="end" aria-haspopup="menu" aria-expanded={!!more.anchor} onClick={more.toggle}><Ellipsis size={18} /></IconButton>
-        {share.anchor && <Menu label="Share chat" anchor={share.anchor} items={shareItems} onClose={share.close} align="end" />}
         {product.anchor && <Menu label="CC" anchor={product.anchor} items={productItems} onClose={product.close} className={st ? 'w-[min(24rem,calc(100vw-16px))]' : undefined} />}
         {more.anchor && <Menu label="More options" anchor={more.anchor} items={moreItems} onClose={more.close} align="end" />}
       </div>

@@ -8,10 +8,11 @@ import { cookieSession } from '../auth/session';
 afterEach(cleanup);
 
 describe('path routes', () => {
-  it('maps the app root, shares, signed-out and everything else', () => {
+  it('maps the app root, signed-out and everything else (no share pages: /shared/* is a 404)', () => {
     expect(routeFromLocation('/', '')).toEqual({ kind: 'app' });
     expect(routeFromLocation('/index.html', '')).toEqual({ kind: 'app' });
-    expect(routeFromLocation('/shared/sh_abc', '')).toEqual({ kind: 'shared', id: 'sh_abc' });
+    expect(routeFromLocation('/shared/sh_abc', '')).toEqual({ kind: 'not-found' });
+    expect(routeFromLocation('/share/sh_abc', '')).toEqual({ kind: 'not-found' });
     expect(routeFromLocation('/signed-out', '')).toEqual({ kind: 'signed-out', expired: false });
     expect(routeFromLocation('/signed-out', '?reason=expired')).toEqual({ kind: 'signed-out', expired: true });
     expect(routeFromLocation('/nope', '')).toEqual({ kind: 'not-found' });

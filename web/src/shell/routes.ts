@@ -1,12 +1,9 @@
-import { shareIdFromPath } from '../contract/share';
-
 /**
  * Path routes. The app itself uses hash routes (`#/c/<id>`) under one path, the base. Anything else is a known
  * page or a 404, like ChatGPT/Claude, instead of silently showing an empty chat for a mistyped link.
  */
 export type Route =
   | { kind: 'app' }
-  | { kind: 'shared'; id: string }
   | { kind: 'signed-out'; expired: boolean }
   | { kind: 'not-found' };
 
@@ -14,8 +11,6 @@ export const SIGNED_OUT = 'signed-out';
 
 export function routeFromLocation(pathname: string, search: string, base = '/'): Route {
   const b = base.endsWith('/') ? base : `${base}/`;
-  const share = shareIdFromPath(pathname);
-  if (share) return { kind: 'shared', id: share };
   if (pathname === b || pathname === b.slice(0, -1) || pathname === `${b}index.html`) return { kind: 'app' };
   if (pathname === `${b}${SIGNED_OUT}` || pathname === `${b}${SIGNED_OUT}/`) {
     return { kind: 'signed-out', expired: new URLSearchParams(search).get('reason') === 'expired' };

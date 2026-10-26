@@ -18,6 +18,14 @@ test.describe('path routes @both', () => {
     await expect(page.getByTestId('not-found')).toBeVisible();
   });
 
+  test('sharing is gone: /shared/<id> and /share/<id> are the normal 404 (Peter 12:15 AM)', async ({ page }) => {
+    for (const path of ['/shared/sh_abc', '/share/sh_abc']) {
+      await page.goto(new URL(path, MOCK).href);
+      await expect(page.getByRole('heading', { level: 1, name: 'Page not found' })).toBeVisible();
+      await expect(page.getByTestId('shared-view')).toHaveCount(0);
+    }
+  });
+
   test('the expired-session page is plain and accessible in dark mode too', async ({ page }) => {
     await open(page, MOCK, 'dark');
     await page.goto(new URL('/signed-out?reason=expired', MOCK).href);
