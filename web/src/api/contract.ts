@@ -21,7 +21,7 @@ export type {
   Sensitivity, StatusPart, TablePart, TextPart, ToolCallPart, ArtifactPart, PartBase,
 };
 
-export const CONTRACT_VERSION = '1.8.0';
+export const CONTRACT_VERSION = '1.9.0';
 export const CONTRACT_MAJOR = 1;
 
 // ---------------------------------------------------------------- new parts (v1)
@@ -131,6 +131,12 @@ export interface TextEndEvent extends Seq { type: 'text.end'; partId: ID }
 export interface ReasoningDeltaEvent extends Seq { type: 'reasoning.delta'; partId: ID; delta: string }
 export interface ReasoningEndEvent extends Seq { type: 'reasoning.end'; partId: ID; durationMs: number }
 export interface CodeDeltaEvent extends Seq { type: 'code.delta'; partId: ID; delta: string }
+/** 1.9.0 (§5.1): a table starts streaming; rows follow in table.rows, then the complete `part` (same id) replaces it. */
+export interface TableStartEvent extends Seq {
+  type: 'table.start'; partId: ID; columns: Column[]; title?: string; sensitivity?: Sensitivity; stepId?: ID; sqlPartId?: ID;
+}
+/** 1.9.0: preview rows; `offset` = index of the first row, so a replayed chunk overwrites instead of duplicating. */
+export interface TableRowsEvent extends Seq { type: 'table.rows'; partId: ID; offset: number; rows: unknown[][] }
 export interface PartEvent extends Seq { type: 'part'; part: Part }
 export interface PartPatchEvent extends Seq { type: 'part.patch'; partId: ID; patch: Record<string, unknown> }
 export interface MessageEndEvent extends Seq {
@@ -147,12 +153,12 @@ export type StepEvent = StepSqlRunningEvent | StepSqlResultEvent | StepRepairAtt
 export type StreamEvent =
   | MessageStartEvent | StatusEvent | StepEvent | EscalationEvent
   | TextStartEvent | TextDeltaEvent | TextEndEvent | ReasoningDeltaEvent | ReasoningEndEvent | CodeDeltaEvent
-  | PartEvent | PartPatchEvent | MessageEndEvent | HeartbeatEvent;
+  | TableStartEvent | TableRowsEvent | PartEvent | PartPatchEvent | MessageEndEvent | HeartbeatEvent;
 
 export const EVENT_TYPES = [
   'message.start', 'status', 'step.sql_running', 'step.sql_result', 'step.repair_attempt', 'step.check', 'step.explore',
   'step.candidates', 'escalation', 'text.start', 'text.delta', 'text.end', 'reasoning.delta', 'reasoning.end',
-  'code.delta', 'part', 'part.patch', 'message.end', 'heartbeat',
+  'code.delta', 'table.start', 'table.rows', 'part', 'part.patch', 'message.end', 'heartbeat',
 ] as const satisfies readonly StreamEvent['type'][];
 
 export const PART_TYPES = [
@@ -211,6 +217,10 @@ export interface AssistantViewV1 extends Omit<LegacyAssistantView, 'finishReason
   usage?: Usage;
   contractVersion?: string;
   lastSeq: number;
+  /** 1.9.0: ids of table parts still streaming (table.start seen, complete `part` not yet). Show a "loading rows" hint. */
+  streamingTables?: ID[];
+  /** 1.8.0: message.end.sources. */
+  sources?: Source[];
 }
 
 export function newAssistantViewV1(id: ID): AssistantViewV1 {
@@ -269,9 +279,31 @@ export function reduceV1(m: AssistantViewV1, ev: StreamEvent | { type: string; s
       return { ...m, id: e.messageId, streaming: true, contractVersion: e.contractVersion };
     case 'message.end': {
       const steps = m.steps.map((s) => (s.state === 'running' ? { ...s, state: e.finishReason === 'aborted' ? 'error' as const : 'ok' as const } : s));
-      return { ...m, steps, streaming: false, status: null, openText: [], finishReason: e.finishReason, usage: e.usage };
+      // a table whose complete part never came is partial: drop it (1.9.0, CONTRACT.md §5.1)
+      const partial = new Set(m.streamingTables ?? []);
+      const parts = partial.size ? m.parts.filter((p) => !partial.has(p.id)) : m.parts;
+      return { ...m, steps, parts, streamingTables: [], streaming: false, status: null, openText: [], finishReason: e.finishReason, usage: e.usage, sources: e.sources };
     }
-    case 'part': case 'part.patch': case 'text.start': case 'text.delta': case 'text.end':
+    case 'table.start': {
+      if (m.parts.some((p) => p.id === e.partId)) return m;
+      const table = { type: 'table', id: e.partId, columns: e.columns, rows: [], rowCount: 0, title: e.title, sensitivity: e.sensitivity, stepId: e.stepId, sqlPartId: e.sqlPartId } as unknown as Part;
+      return { ...m, parts: [...m.parts, table], streamingTables: [...(m.streamingTables ?? []), e.partId] };
+    }
+    case 'table.rows': {
+      if (!(m.streamingTables ?? []).includes(e.partId)) return m;
+      return { ...m, parts: m.parts.map((p) => {
+        if (p.id !== e.partId || p.type !== 'table') return p;
+        const rows = p.rows.slice(0, e.offset);
+        rows.push(...e.rows);
+        return { ...p, rows, rowCount: Math.max(p.rowCount, rows.length) };
+      }) };
+    }
+    case 'part': {
+      const next = { ...m, streamingTables: (m.streamingTables ?? []).filter((id) => id !== e.part.id) };
+      const legacy = legacyReduce(next as unknown as LegacyAssistantView, e as unknown as LegacyStreamEvent);
+      return { ...next, parts: legacy.parts as Part[], status: legacy.status, openText: legacy.openText };
+    }
+    case 'part.patch': case 'text.start': case 'text.delta': case 'text.end':
     case 'reasoning.delta': case 'reasoning.end': case 'code.delta': case 'status': {
       const legacy = legacyReduce(m as unknown as LegacyAssistantView, e as unknown as LegacyStreamEvent);
       return { ...m, parts: legacy.parts as Part[], status: legacy.status, openText: legacy.openText };

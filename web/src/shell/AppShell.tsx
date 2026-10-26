@@ -18,7 +18,9 @@ import { Header } from './Header';
 import { useStrategy } from './useStrategy';
 import { OfflineBanner } from './OfflineBanner';
 import { useOnline } from '../lib/useOnline';
+import { usePrinting } from '../lib/usePrinting';
 import { SearchDialog } from './SearchDialog';
+import { ShareDialog } from './ShareDialog';
 import { SettingsDialog, ShortcutsDialog } from './SettingsDialog';
 import { ToastProvider, useFocusTrap, useToast } from './primitives';
 import { NEW_CHAT_KEY, moveDraft } from './drafts';
@@ -28,14 +30,18 @@ import { useTheme } from '../lib/theme';
 import { scrollBehavior } from '../lib/motion';
 import { copyText, downloadText } from '../lib/csv';
 import { getPref, setPref } from '../lib/prefs';
+import { sessionFromEnv } from '../auth/session';
 import type { AssistantView } from '../lib/contract';
 import type { AssistantViewV1, ChatRequest } from '../api/contract';
+
+/** One auth session for both adapters (src/auth/session.ts): demo token, real-backend cookie, or none. */
+const session = sessionFromEnv();
 
 function makeAdapter(): AnalystAdapter {
   const base = import.meta.env.VITE_ANALYST_BASE as string | undefined;
   // VITE_ANALYST_BASE: '' or unset = offline mock; '/' = same origin (vite proxies /api to :8787); else an absolute URL.
   if (base === undefined || base === '') return new MockAnalystAdapter();
-  return new HttpAnalystAdapter(base === '/' ? '' : base.replace(/\/$/, ''), import.meta.env.VITE_ANALYST_DEMO_TOKEN as string | undefined, demoFaultOption());
+  return new HttpAnalystAdapter(base === '/' ? '' : base.replace(/\/$/, ''), session, demoFaultOption());
 }
 
 /**
@@ -55,7 +61,7 @@ function demoFaultOption(): { demoFault?: 'rate_limited' } {
 function makeStore(adapter: AnalystAdapter): TranscriptStore {
   const base = import.meta.env.VITE_ANALYST_BASE as string | undefined;
   if (adapter.name !== 'http' || import.meta.env.VITE_TRANSCRIPTS === 'memory' || base === undefined) return new MemoryTranscriptStore();
-  return new HttpTranscriptStore(base === '/' ? '' : base.replace(/\/$/, ''), import.meta.env.VITE_ANALYST_DEMO_TOKEN as string | undefined);
+  return new HttpTranscriptStore(base === '/' ? '' : base.replace(/\/$/, ''), session);
 }
 
 const phoneQuery = () => (typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 767px)') : null);
@@ -118,7 +124,7 @@ function ShellInner() {
   }, [mobile]);
   const closeDrawer = () => { if (mobile) setDrawerOpen(false); };
 
-  const [dialog, setDialog] = useState<null | 'search' | 'settings' | 'shortcuts'>(null);
+  const [dialog, setDialog] = useState<null | 'search' | 'settings' | 'shortcuts' | 'share'>(null);
   const [enterToSend, setEnterToSendState] = useState(() => getPref('enterToSend') !== '0');
   const setEnterToSend = (v: boolean) => { setEnterToSendState(v); setPref('enterToSend', v ? '1' : '0'); };
 
@@ -186,6 +192,21 @@ function ShellInner() {
   const currentTitle = threads.find((t) => t.id === chat.convId)?.title ?? 'Chat';
   const downloadMd = (title: string, md: string) => { downloadText(exportFilename(title), md, 'text/markdown'); toast({ text: 'Chat exported as Markdown' }); };
   const exportCurrent = () => { if (chat.messages.length) downloadMd(currentTitle, transcriptMarkdown(currentTitle, chat.messages)); };
+  // Contract 1.8.0 §15: the server's own export, when the chat is stored server-side.
+  const serverExport = adapter instanceof HttpAnalystAdapter && chat.convId && !chat.busy
+    ? async (format: 'json' | 'markdown') => {
+      try {
+        const { blob, filename } = await adapter.exportConversation(chat.convId!, format);
+        const url = URL.createObjectURL(blob);
+        const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        toast({ text: format === 'json' ? 'Chat exported as JSON' : 'Chat exported as Markdown' });
+      } catch {
+        toast({ text: "Couldn't export this chat. Try again." });
+      }
+    }
+    : undefined;
   const copyCurrent = async () => { if (await copyText(transcriptMarkdown(currentTitle, chat.messages))) toast({ text: 'Copied chat as Markdown' }); };
   const exportThread = async (id: string) => {
     const c = await store.getConversation(id);
@@ -202,6 +223,8 @@ function ShellInner() {
     if (last && (await copyText(messageMarkdown(last as unknown as AssistantView)))) toast({ text: 'Copied last response' });
   };
   const focusComposer = () => document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message"]')?.focus();
+  /** Touch-first devices: don't focus the composer on our own (it pops the on-screen keyboard), like the ChatGPT/Claude apps. */
+  const coarse = () => !!window.matchMedia?.('(pointer: coarse)').matches;
 
   const onCommand = (c: SlashCommand) => {
     switch (c.action) {
@@ -371,7 +394,15 @@ function ShellInner() {
   const edit = (t: string) => setDraftPush((d) => ({ text: t, n: (d?.n ?? 0) + 1 }));
   const empty = messages.length === 0 && !opening;
   const draftKey = chat.convId ?? NEW_CHAT_KEY;
-  const send = (t: string, resume?: ChatRequest['resume']) => { atBottomRef.current = true; setAtBottom(true); chat.send(t, resume ? { resume } : undefined); };
+  const send = (t: string, resume?: ChatRequest['resume']) => {
+    // The first send swaps the centered empty-state composer for the docked one (a remount), which used to
+    // drop focus to <body>. Keep typing focus where it was, like ChatGPT/Claude: from the composer, or from a
+    // starter card on a fine pointer (a phone keeps its keyboard closed after tapping a card).
+    const a = document.activeElement;
+    const keep = a?.matches('textarea[aria-label="Message"]') || (!!a?.closest('[data-testid="starter-cards"]') && !coarse());
+    atBottomRef.current = true; setAtBottom(true); chat.send(t, resume ? { resume } : undefined);
+    if (keep) requestAnimationFrame(() => { if (!document.activeElement || document.activeElement === document.body) focusComposer(); });
+  };
   /** Up-arrow in an empty composer edits the last question in place (ChatGPT behaviour, QA-S8). */
   const editLast = () => {
     const users = scroller.current?.querySelectorAll<HTMLElement>('[data-testid="msg-user"]');
@@ -385,6 +416,7 @@ function ShellInner() {
     return true;
   };
   const online = useOnline();
+  const printing = usePrinting();
   const composer = (autoFocus: boolean, placeholder?: string) => (
     <>
       {!online && <OfflineBanner />}
@@ -423,7 +455,7 @@ function ShellInner() {
   const sidebarProps = {
     threads, activeId: chat.convId, storeMode: store.mode, canPin: chat.canPin,
     onSelect: (id: string) => { void openChat(id); closeDrawer(); },
-    onNew: () => { chat.newChat(); closeDrawer(); requestAnimationFrame(focusComposer); },
+    onNew: () => { chat.newChat(); closeDrawer(); if (!coarse()) requestAnimationFrame(focusComposer); },
     onDelete: requestDelete, onRename: chat.rename, onPin: chat.pin, onExport: exportThread,
     onCollapse: () => setSidebar(false), onSearch: () => setDialog('search'),
     onSettings: () => setDialog('settings'), onShortcuts: () => setDialog('shortcuts'),
@@ -437,8 +469,9 @@ function ShellInner() {
         {sidebarVisible && (mobile ? <div ref={drawerRef}><Sidebar {...sidebarProps} drawer /></div> : <Sidebar {...sidebarProps} />)}
         {!sidebarVisible && !mobile && <SidebarRail onExpand={() => setSidebar(true)} onNew={sidebarProps.onNew} onSearch={() => setDialog('search')} onSettings={() => setDialog('settings')} />}
         <main className="relative flex min-w-0 flex-1 flex-col font-sans md:min-w-[400px]" aria-label="Chat">
+          {!empty && <p className="hidden pb-4 text-lg font-semibold print:block" data-testid="print-title">{currentTitle}</p>}
           <Header strategy={strategy} showNav={mobile} onOpenSidebar={() => setSidebar(true)} onNewChat={sidebarProps.onNew} adapterName={adapter.name}
-            hasChat={!empty} onCopyMarkdown={copyCurrent} onDownloadMarkdown={exportCurrent} onSettings={() => setDialog('settings')} onShortcuts={() => setDialog('shortcuts')}
+            hasChat={!empty} onShare={() => setDialog('share')} onCopyMarkdown={copyCurrent} onDownloadMarkdown={exportCurrent} onSettings={() => setDialog('settings')} onShortcuts={() => setDialog('shortcuts')}
             title={chat.convId ? threads.find((t) => t.id === chat.convId)?.title : undefined}
             onRename={(t) => { if (chat.convId) chat.rename(chat.convId, t); }} onDelete={() => { if (chat.convId) requestDelete(chat.convId); }} />
 
@@ -446,7 +479,7 @@ function ShellInner() {
             <div className="flex flex-1 flex-col items-center justify-center px-4 pb-[12vh] max-sm:justify-end max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]" data-testid="empty-state">
               <h1 className="mb-7 text-center tracking-tight max-sm:mb-auto max-sm:mt-auto" style={{ fontFamily: 'var(--heading-font)', fontSize: 'var(--empty-size)', fontWeight: 'var(--empty-weight)' as never }}>What should we look into?</h1>
               <div className="flex w-full max-w-[48rem] flex-col" id="composer">
-                {composer(true)}
+                {composer(!coarse())}
                 <StarterCards onPick={(p) => send(p)} />
               </div>
             </div>
@@ -456,7 +489,7 @@ function ShellInner() {
               <div ref={scroller} tabIndex={0} role="region" aria-label="Conversation" onScroll={(e) => onScroll(e.currentTarget)} onWheel={(e) => markUserScroll(e)} onTouchMove={() => markUserScroll()} onPointerDown={() => markUserScroll()} onKeyDown={() => markUserScroll()} className="flex-1 overflow-y-auto [overflow-anchor:none] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--focus)]" data-testid="thread-scroller">
                 <div ref={content} className="mx-auto flex max-w-[48rem] flex-col gap-6 px-4 pb-10 pt-4 md:px-6" role={virtualList ? undefined : 'log'} aria-live={virtualList ? undefined : 'polite'} aria-relevant={virtualList ? undefined : 'additions'} aria-busy={virtualList ? undefined : chat.busy} aria-label={virtualList ? undefined : 'Messages'}>
                   <h1 className="sr-only" data-testid="thread-title">{currentTitle}</h1>
-                  {opening ? <ThreadSkeleton /> : <ThreadView messages={messages} busy={chat.busy} actions={threadActions} scrollRef={scroller} scrollToIndexRef={scrollToIndexRef} />}
+                  {opening ? <ThreadSkeleton /> : <ThreadView messages={messages} busy={chat.busy} actions={threadActions} scrollRef={scroller} scrollToIndexRef={scrollToIndexRef} renderAll={printing} />}
                 </div>
               </div>
               <div className="relative mx-auto w-full max-w-[48rem] px-4 md:px-6" id="composer">
@@ -477,6 +510,12 @@ function ShellInner() {
         {artifact && <ArtifactPanel artifact={artifact} onClose={() => setArtifact(null)} />}
       </div>
       {dialog === 'search' && <SearchDialog threads={threads} search={searchStore} onOpen={openFromSearch} onNew={sidebarProps.onNew} onClose={() => setDialog(null)} />}
+      {dialog === 'share' && (
+        <ShareDialog title={currentTitle} firstQuestion={chat.messages.find((m) => m.role === 'user')?.text} messageCount={chat.messages.length}
+          onClose={() => setDialog(null)} onCopyMarkdown={() => { void copyCurrent(); }} onDownloadMarkdown={exportCurrent}
+          onDownloadJson={serverExport ? () => serverExport('json') : undefined}
+          onPrint={() => { setDialog(null); requestAnimationFrame(() => window.print()); }} />
+      )}
       {dialog === 'settings' && <SettingsDialog onClose={() => setDialog(null)} storeMode={store.mode} enterToSend={enterToSend} setEnterToSend={setEnterToSend} onExportAll={exportAll} threadCount={threads.length} />}
       {dialog === 'shortcuts' && <ShortcutsDialog onClose={() => setDialog(null)} />}
     </AdapterCtx.Provider>

@@ -56,6 +56,12 @@ function securityHeadersPlugin(devNonce: string): Plugin {
 }
 
 export default defineConfig(({ command }) => {
+  // A token in the bundle is public. Only the demo API's synthetic `demo:<customer>:<user>` shape may be built in;
+  // the real backend uses the cc_session cookie (src/auth/session.ts).
+  const demoToken = env.VITE_ANALYST_DEMO_TOKEN;
+  if (command === 'build' && demoToken && !/^demo:[a-z0-9_]{2,40}:[A-Za-z0-9_.@+-]{1,80}$/.test(demoToken)) {
+    throw new Error('VITE_ANALYST_DEMO_TOKEN is not a demo token; refusing to bake a credential into the bundle');
+  }
   const devNonce = newNonce();
   const api = env.CC_API_URL ?? 'http://127.0.0.1:8787';
   return {

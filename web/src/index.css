@@ -167,3 +167,18 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* Print / Save as PDF (Share dialog): just the conversation, light, full length. No sidebar, header, composer,
+   per-message actions or toasts; the scroll container lets the thread flow across pages. */
+@media print {
+  html, body, #root { height: auto !important; overflow: visible !important; background: #fff !important; }
+  [data-testid="sidebar"], [data-testid="sidebar-rail"], [data-testid="app-header"], #composer, [data-testid="msg-actions"],
+  [data-testid="toasts"], [data-testid="jump-latest"], [data-testid="offline-banner"], .cc-tip { display: none !important; }
+  #root > div, main, [data-testid="thread-scroller"] { display: block !important; height: auto !important; overflow: visible !important; }
+  @page { margin: 16mm 14mm; }
+  [data-message-id] { min-height: 0 !important; content-visibility: visible !important; contain: none !important; }
+  [data-testid="msg-user"] { break-inside: avoid-page; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  [data-testid="print-title"] { padding-left: 1rem; padding-right: 1rem; }
+  .prose-chat pre, .prose-chat table, figure { break-inside: avoid; }
+  a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.85em; color: #555; }
+}

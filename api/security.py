@@ -156,3 +156,33 @@ class ErrorShieldMiddleware:
                 (b"content-type", b"application/json"), (b"content-length", str(len(body)).encode()),
                 (b"cache-control", b"no-store")]})
             await send({"type": "http.response.body", "body": body})
+
+
+CSRF_HEADER = "x-cc-csrf"
+SESSION_COOKIE = "cc_session"
+_SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+
+class CsrfMiddleware:
+    """Cookie-authenticated mutations must carry ``x-cc-csrf: 1``. A cross-site page can't add a custom header
+    without a CORS preflight, and the API grants none. Bearer-token requests (demo) aren't cookie-borne, so they
+    don't need it. Applies to /api/* POST/PUT/PATCH/DELETE when the request carries the ``cc_session`` cookie and no
+    Authorization header. Answers 403 ``access_denied`` (the client's "Not available" card), never 401: the session
+    is fine, the request isn't."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope["method"] not in _SAFE_METHODS and scope["path"].startswith("/api/"):
+            headers = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope.get("headers", [])}
+            has_cookie = any(part.strip().startswith(f"{SESSION_COOKIE}=")
+                             for part in headers.get("cookie", "").split(";"))
+            if has_cookie and "authorization" not in headers and headers.get(CSRF_HEADER) != "1":
+                body = b'{"error":{"code":"access_denied","message":"Missing CSRF header."}}'
+                await send({"type": "http.response.start", "status": 403, "headers": [
+                    (b"content-type", b"application/json"), (b"content-length", str(len(body)).encode()),
+                    (b"cache-control", b"no-store")]})
+                await send({"type": "http.response.body", "body": body})
+                return
+        await self.app(scope, receive, send)
