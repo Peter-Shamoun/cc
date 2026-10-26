@@ -7,6 +7,7 @@ import { downloadBlob } from '../../lib/csv';
 import { IconButton } from '../ui';
 import { useAdapter, useBlobUrl } from '../../adapters/context';
 import { CodeBlock } from './CodeBlock';
+import { imageDisplayBox } from '../../render/imageFrame';
 
 function fmtBytes(n: number) {
   return n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`;
@@ -49,16 +50,19 @@ export function ImageView({ part, onOpen }: { part: ImagePart; onOpen?: () => vo
   const { url, err } = useBlobUrl(part.blobId);
   const [lightbox, setLightbox] = useState(false);
   const adapter = useAdapter();
-  const ratio = `${part.width} / ${part.height}`;
+  const box = imageDisplayBox(part.width, part.height);
+  const frame = { width: box.width, height: box.height };
   return (
-    <figure className="group/img relative my-4 max-w-full" data-testid="image" style={{ width: Math.min(part.width, 768) }}>
-      {err ? (
-        <div className="flex items-center justify-center rounded-xl border border-line text-sm text-fg-subtle" style={{ aspectRatio: ratio }}>Image unavailable</div>
-      ) : url ? (
-        <img src={url} alt={part.alt} onClick={() => setLightbox(true)} className="max-h-[480px] w-full cursor-zoom-in rounded-xl border border-line bg-white object-contain" style={{ aspectRatio: ratio }} />
-      ) : (
-        <div className="animate-pulse rounded-xl bg-muted" style={{ aspectRatio: ratio }} />
-      )}
+    <figure className="group/img relative my-4 max-w-full" data-testid="image" style={{ width: box.width }}>
+      <div data-testid="image-frame" style={frame}>
+        {err ? (
+          <div className="flex h-full w-full items-center justify-center rounded-xl border border-line text-sm text-fg-subtle">Image unavailable</div>
+        ) : url ? (
+          <img src={url} alt={part.alt} onClick={() => setLightbox(true)} className="h-full w-full cursor-zoom-in rounded-xl border border-line bg-white object-contain" />
+        ) : (
+          <div className="h-full w-full animate-pulse rounded-xl bg-muted" data-testid="image-skeleton" />
+        )}
+      </div>
       <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover/img:opacity-100">
         <IconButton label="Download image" className="bg-elev/90 shadow" onClick={async () => adapter && downloadBlob(`claimclarity_figure.${part.mime === 'image/svg+xml' ? 'svg' : 'png'}`, await adapter.fetchBlob(part.blobId))}><Download size={15} /></IconButton>
         <IconButton label="Expand image" className="bg-elev/90 shadow" onClick={onOpen ?? (() => setLightbox(true))}><Maximize2 size={14} /></IconButton>
