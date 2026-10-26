@@ -6,6 +6,7 @@ import type { TablePart } from '../../lib/contract';
 import { csvFilename, downloadBlob, downloadText, formatCell, isNumeric, tableToCsv, tableToTsv } from '../../lib/csv';
 import { CopyButton, IconButton } from '../ui';
 import { useAdapter } from '../../adapters/context';
+import { ErrorBoundary } from '../ErrorBoundary';
 
 const VIRTUALIZE_AT = 200;
 const ROW_H = 37;
@@ -42,7 +43,18 @@ function compareCells(a: unknown, b: unknown, numeric: boolean): number {
   return String(a).localeCompare(String(b), undefined, { numeric: true });
 }
 
-export const DataTable = memo(function DataTable({ part, onOpen, full }: { part: TablePart; onOpen?: () => void; full?: boolean }) {
+type DataTableProps = { part: TablePart; onOpen?: () => void; full?: boolean };
+
+/** A table that fails to render becomes an inline "Try again" card; the rest of the answer stays. */
+export const DataTable = memo(function DataTable(props: DataTableProps) {
+  return (
+    <ErrorBoundary scope="section" name="DataTable" resetKey={props.part}>
+      <DataTableView {...props} />
+    </ErrorBoundary>
+  );
+});
+
+const DataTableView = memo(function DataTableView({ part, onOpen, full }: DataTableProps) {
   const adapter = useAdapter();
   const [sort, setSort] = useState<Sort>(null);
   const [filter, setFilter] = useState('');
