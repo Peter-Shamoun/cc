@@ -36,7 +36,7 @@ export function messageMarkdown(m: AnyView): string {
         case 'callout': return `**${p.title ?? p.variant}**\n${p.items.map((i) => `- ${i.text}`).join('\n')}`;
         case 'table': {
           const cols = p.columns.map((c, i) => [c, i] as const).filter(([c]) => visible(c));
-          return [`| ${cols.map(([c]) => c.label).join(' | ')} |`, `|${cols.map(() => '---').join('|')}|`, ...p.rows.map((r) => `| ${cols.map(([, i]) => String(r[i] ?? '')).join(' | ')} |`)].join('\n');
+          return [`| ${cols.map(([c]) => c.label).join(' | ')} |`, `|${cols.map(() => '---').join('|')}|`, ...p.rows.map((r) => `| ${cols.map(([, i]) => String(r[i] ?? '')).join(' | ')} |`), ...(p.dataWithheld ? [`\n_Data not shared (${p.rowCount} rows)_`] : [])].join('\n');
         }
         default: return '';
       }
