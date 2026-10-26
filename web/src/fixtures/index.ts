@@ -5,10 +5,10 @@
  */
 import type { Column, Part } from '../lib/contract';
 import { ANSWER_FIXTURES } from './answer';
-import type { UsageDetail } from '../components/answer/provisional';
+import type { Usage } from '../api/contract';
 
 export type FixtureStep = Part | { status: string };
-export interface Fixture { id: string; title: string; prompt: string; match: RegExp; queries: number; steps: FixtureStep[]; usage?: Partial<UsageDetail>; hidden?: boolean }
+export interface Fixture { id: string; title: string; prompt: string; match: RegExp; queries: number; steps: FixtureStep[]; usage?: Partial<Usage>; hidden?: boolean }
 
 const payers: [string, number, number][] = [
   ['Northwind Health Plan', 18432, 0.142],

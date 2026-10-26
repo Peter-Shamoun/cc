@@ -13,8 +13,8 @@ import { StepTimeline } from './answer/StepTimeline';
 import { queriesOf, queryForTable, SqlInspector, TableSql } from './answer/SqlInspector';
 import { AbstainCard, ClarifyCard, EscalationNote, StoppedNote, TableSkeleton } from './answer/States';
 import { AnswerMeta } from './answer/AnswerMeta';
-import { stepsOf, usage as usageOf } from './answer/normalize';
-import type { AbstainPart, AnyPart, ClarifyPart, EscalationPart } from './answer/provisional';
+import { escalationsOf, partsOf, stepsOf, usageOf, type AnyView } from './answer/normalize';
+import type { OnReply } from './answer/States';
 import { tableToTsv, visible } from '../lib/csv';
 
 export type Artifact = { part: TablePart | ChartPart | CodePart | ImagePart; title: string; version?: number; related: Part[] };
@@ -75,45 +75,55 @@ export function UserBubble({ msg, onEdit, version, onVersion, disabled }: { msg:
   );
 }
 
-export function AssistantTurn({ msg, isLast, onOpen, onRegenerate, onEdit, onSend }: { msg: AssistantView; isLast: boolean; onOpen: (a: Artifact) => void; onRegenerate: () => void; onEdit: (t: string) => void; onSend?: (t: string) => void }) {
+export function AssistantTurn({ msg: view, isLast, onOpen, onRegenerate, onEdit, onSend, onReply }: { msg: AnyView; isLast: boolean; onOpen: (a: Artifact) => void; onRegenerate: () => void; onEdit: (t: string) => void; onSend?: (t: string) => void; onReply?: OnReply }) {
+  const msg = view as AssistantView; // legacy part renderers; v1-only data is read through `view`
+  const reply: OnReply | undefined = onReply ?? (onSend ? (t) => onSend(t) : undefined);
   const [vote, setVote] = useState<'up' | 'down' | null>(msg.feedback ?? null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [sqlOpen, setSqlOpen] = useState(false);
   const open = (part: Artifact['part'], title?: string, version?: number) => onOpen({ part, title: title ?? ((('title' in part && part.title) || (part.type === 'image' ? part.alt : 'Artifact')) as string), version, related: msg.parts });
 
-  // All tool steps render as one live timeline at the position of the first step (Claude/ChatGPT).
-  const steps = stepsOf(msg);
-  const usage = usageOf(msg);
-  const queries = queriesOf(msg);
-  const tables = msg.parts.filter((p): p is TablePart => p.type === 'table');
+  // All steps (v1 step.* events and legacy tool_call parts) render as one live timeline (Claude/ChatGPT).
+  const parts = partsOf(view);
+  const steps = stepsOf(view);
+  const usage = usageOf(view);
+  const queries = queriesOf(view);
+  const escalations = escalationsOf(view);
+  const tables = parts.filter((p): p is TablePart => p.type === 'table');
   const linkedSql = new Set(tables.map((t) => t.sqlPartId).filter(Boolean));
   const sqlRunning = msg.streaming && steps.some((s) => s.state === 'running' && (s.kind === 'sql' || s.kind === 'repair'));
-  // Live until answer text starts after the last step; then it collapses to its summary line.
-  const lastTool = msg.parts.map((p) => p.type).lastIndexOf('tool_call');
-  const answering = msg.parts.some((p, i) => i > lastTool && (p.type === 'text' || (p.type as string) === 'abstain' || (p.type as string) === 'clarify'));
+  // Live until the answer starts after the last step; then it collapses to its summary line.
+  const ANSWER = ['text', 'table', 'chart', 'image', 'abstain', 'clarification', 'error'];
+  const lastTool = parts.map((p) => p.type).lastIndexOf('tool_call');
+  const answering = parts.some((p, i) => i > lastTool && ANSWER.includes(p.type));
   const timelineLive = msg.streaming && !answering;
+  const timeline = steps.length > 0 ? <StepTimeline key="timeline" steps={steps} live={timelineLive} elapsedMs={usage?.elapsedMs} /> : null;
   const blocks: ReactNode[] = [];
   let timelineDone = false;
-  for (const p of msg.parts as AnyPart[]) {
-    if (p.type === 'tool_call') {
-      if (!timelineDone) blocks.push(<StepTimeline key="timeline" steps={steps} live={timelineLive} elapsedMs={usage?.elapsedMs} />);
-      timelineDone = true;
-      continue;
-    }
+  const placeTimeline = () => {
+    if (timelineDone) return;
+    timelineDone = true;
+    if (timeline) blocks.push(timeline);
+    escalations.forEach((e, i) => blocks.push(<EscalationNote key={`esc-${i}`} ev={e} />));
+  };
+  for (const p of parts) {
+    if (p.type === 'tool_call') { placeTimeline(); continue; }
+    // v1 steps aren't parts: the timeline goes before the first non-reasoning part.
+    if (p.type !== 'reasoning' && p.type !== 'status') placeTimeline();
     if (p.type === 'code' && p.role === 'query' && linkedSql.has(p.id)) continue; // shown under its table
-    if (p.type === 'abstain') { blocks.push(<AbstainCard key={p.id} part={p as AbstainPart} onSend={onSend} />); continue; }
-    if (p.type === 'clarify') { blocks.push(<ClarifyCard key={p.id} part={p as ClarifyPart} onSend={onSend} active={isLast && !msg.streaming} />); continue; }
-    if (p.type === 'escalation') { blocks.push(<EscalationNote key={p.id} part={p as EscalationPart} />); continue; }
+    if (p.type === 'abstain') { blocks.push(<AbstainCard key={p.id} part={p} onReply={reply} />); continue; }
+    if (p.type === 'clarification') { blocks.push(<ClarifyCard key={p.id} part={p} onReply={reply} active={isLast && !msg.streaming} />); continue; }
     blocks.push(<PartView key={p.id} part={p as Part} msg={msg} open={open} onRetry={onRegenerate} onEdit={onEdit} />);
     if (p.type === 'table') {
-      const q = queryForTable(msg, p);
+      const q = queryForTable(view, p);
       if (q) blocks.push(<TableSql key={`sql-${p.id}`} query={q} />);
     }
   }
+  placeTimeline();
   if (sqlRunning) blocks.push(<TableSkeleton key="skeleton" />);
 
-  const empty = msg.parts.length === 0;
+  const empty = parts.length === 0 && steps.length === 0;
   const nQueries = usage?.queries ?? queries.length;
   return (
     <div className="group" data-testid="msg-assistant" aria-live={msg.streaming ? 'polite' : undefined} aria-busy={msg.streaming}>
@@ -130,7 +140,7 @@ export function AssistantTurn({ msg, isLast, onOpen, onRegenerate, onEdit, onSen
           <IconButton label="Good response" aria-pressed={vote === 'up'} onClick={() => setVote(vote === 'up' ? null : 'up')}><ThumbsUp size={16} fill={vote === 'up' ? 'currentColor' : 'none'} /></IconButton>
           <IconButton label="Bad response" aria-pressed={vote === 'down'} onClick={() => { const next = vote === 'down' ? null : 'down'; setVote(next); setFeedbackOpen(next === 'down'); setFeedbackSent(false); }}><ThumbsDown size={16} fill={vote === 'down' ? 'currentColor' : 'none'} /></IconButton>
           {isLast && <IconButton label="Regenerate" onClick={onRegenerate}><RefreshCw size={16} /></IconButton>}
-          <AnswerMeta usage={usage && (usage.queries > 0 || usage.costUsd !== undefined) ? usage : undefined} queries={queries.length ? nQueries : 0} onSql={queries.length ? () => setSqlOpen((o) => !o) : undefined} sqlOpen={sqlOpen} />
+          <AnswerMeta usage={usage && (usage.queries > 0 || usage.costUsd !== undefined) ? usage : undefined} queries={queries.length ? nQueries : 0} repairs={steps.filter((s) => s.kind === 'repair' && s.state === 'ok').length} onSql={queries.length ? () => setSqlOpen((o) => !o) : undefined} sqlOpen={sqlOpen} />
           {feedbackSent && <span className="ml-2 font-sans text-xs text-fg-subtle">Thanks for the feedback</span>}
         </div>
       )}

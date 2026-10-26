@@ -1,12 +1,12 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { AlertTriangle, BarChart3, Check, ChevronDown, ChevronRight, Database, GitCompare, List, ListChecks, Loader2, Search, Telescope, Wrench, X, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, BarChart3, Check, ChevronDown, ChevronRight, Database, GitCompare, List, ListChecks, Loader2, Search, Sparkles, Telescope, Wrench, X, type LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
 import { CodeBlock } from '../parts/CodeBlock';
 import { fmtMs, summarize, unresolvedFailures } from './normalize';
-import type { Step, StepKind } from './provisional';
+import type { CheckResult, Step, StepKind } from './provisional';
 
-const ICON: Record<StepKind, LucideIcon> = { sql: Database, repair: Wrench, check: ListChecks, explore: Telescope, candidates: GitCompare, chart: BarChart3, schema: List, search: Search, other: Wrench };
-const KIND_LABEL: Record<StepKind, string> = { sql: 'Query', repair: 'Repair', check: 'Check', explore: 'Probe', candidates: 'Candidates', chart: 'Chart', schema: 'Schema', search: 'Search', other: 'Step' };
+const ICON: Record<StepKind, LucideIcon> = { sql: Database, repair: Wrench, check: ListChecks, explore: Telescope, candidates: GitCompare, escalation: Sparkles, chart: BarChart3, schema: List, search: Search, other: Wrench };
+const KIND_LABEL: Record<StepKind, string> = { sql: 'Query', repair: 'Repair', check: 'Check', explore: 'Probe', candidates: 'Candidates', escalation: 'Escalation', chart: 'Chart', schema: 'Schema', search: 'Search', other: 'Step' };
 
 /** Ticks while `live`, for the running timer in the header. */
 function useElapsed(live: boolean) {
@@ -67,7 +67,7 @@ function StepRow({ step, last }: { step: Step; last: boolean }) {
   const [open, setOpen] = useState(false);
   const Icon = ICON[step.kind];
   const meta = [step.rowCount !== undefined && `${step.rowCount.toLocaleString()} rows`, step.durationMs !== undefined && fmtMs(step.durationMs)].filter(Boolean).join(' · ');
-  const dot = step.state === 'running' || step.state === 'cancelled' ? 'border-fg-subtle bg-bg' : step.state === 'error' ? 'border-danger bg-danger' : step.kind === 'repair' ? 'border-[var(--callout-bar)] bg-[var(--callout-bar)]' : 'border-line-strong bg-bg';
+  const dot = step.state === 'running' || step.state === 'cancelled' ? 'border-fg-subtle bg-bg' : step.state === 'error' ? 'border-danger bg-danger' : step.state === 'warn' ? 'border-[#e8b339] bg-[#e8b339]' : step.kind === 'repair' ? 'border-[var(--callout-bar)] bg-[var(--callout-bar)]' : 'border-line-strong bg-bg';
   return (
     <li className={clsx('relative step-enter', !last && 'pb-1')} data-testid="step" data-kind={step.kind} data-state={step.state}>
       <span className={clsx('absolute -left-[26.5px] top-[9px] flex h-[11px] w-[11px] items-center justify-center rounded-full border-2', dot)} aria-hidden>
@@ -81,6 +81,7 @@ function StepRow({ step, last }: { step: Step; last: boolean }) {
         {step.attempt !== undefined && <span className="shrink-0 rounded-full border border-line px-1.5 text-[11px] text-fg-subtle">attempt {step.attempt}</span>}
         {step.state === 'ok' && <Check size={13} className="shrink-0 text-[#10a37f]" aria-label="done" />}
         {step.state === 'error' && <X size={13} className="shrink-0 text-danger" aria-label="failed" />}
+        {step.state === 'warn' && <AlertTriangle size={13} className="shrink-0 text-[#b7791f] dark:text-[#e8b339]" aria-label="warning" />}
         {step.state === 'cancelled' && <span className="shrink-0 text-xs text-fg-subtle">stopped</span>}
         {meta && <span className="shrink-0 tabular-nums text-xs text-fg-subtle">{meta}</span>}
         {step.agent && <span className="shrink-0 rounded-full border border-line px-1.5 text-[11px] text-fg-subtle">{step.agent}</span>}
@@ -108,12 +109,12 @@ function StepRow({ step, last }: { step: Step; last: boolean }) {
   );
 }
 
-function ChecksList({ checks }: { checks: { name: string; passed: boolean; detail?: string }[] }) {
+function ChecksList({ checks }: { checks: CheckResult[] }) {
   return (
     <ul className="space-y-1 text-[13px]" data-testid="checks">
       {checks.map((c) => (
         <li key={c.name} className="flex items-start gap-2">
-          {c.passed ? <Check size={14} className="mt-0.5 shrink-0 text-[#10a37f]" aria-label="passed" /> : <X size={14} className="mt-0.5 shrink-0 text-danger" aria-label="failed" />}
+          {c.passed ? <Check size={14} className="mt-0.5 shrink-0 text-[#10a37f]" aria-label="passed" /> : c.verdict === 'warn' ? <AlertTriangle size={14} className="mt-0.5 shrink-0 text-[#b7791f] dark:text-[#e8b339]" aria-label="warning" /> : <X size={14} className="mt-0.5 shrink-0 text-danger" aria-label="failed" />}
           <span><span className="text-fg">{c.name}</span>{c.detail && <span className="text-fg-subtle"> · {c.detail}</span>}</span>
         </li>
       ))}
