@@ -12,7 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.app import Settings, build_claude_code_cli_driver, create_app
-from api.backends import DemoAuth
+from api.backends import DemoAuth, SimAuth
 from api.claude_code_cli_driver import AnalyzerRunFailed, ClaudeCodeCliDriver
 from api.live import Cancelled, LiveTap
 from api.tests.conftest import LABS, events, parts
@@ -187,7 +187,12 @@ def test_cli_layer_refuses_what_it_cannot_honour(tiny_snapshot):
     with pytest.raises(RuntimeError, match="CC_API_ANALYZER_SNAPSHOT"):
         build_claude_code_cli_driver(Settings(analyzer_interaction="claude_code_cli", analyzer_snapshot_path=None),
                                      DemoAuth())
-    with pytest.raises(RuntimeError, match="demo auth only"):
-        build_claude_code_cli_driver(Settings(analyzer_interaction="claude_code_cli",
-                                              analyzer_snapshot_path=str(tiny_snapshot)), object())
+    cli_settings = Settings(analyzer_interaction="claude_code_cli", analyzer_snapshot_path=str(tiny_snapshot))
+    assert not build_claude_code_cli_driver(cli_settings, DemoAuth()).queries_signed_in_customer
+    assert build_claude_code_cli_driver(cli_settings, SimAuth(None, None)).queries_signed_in_customer  # run channel
+    with pytest.raises(RuntimeError, match="supports demo auth"):
+        build_claude_code_cli_driver(cli_settings, object())
+    # a driver passed in directly is checked the same way: a snapshot driver never serves a real sign-in
+    with pytest.raises(RuntimeError, match="supports demo auth"):
+        create_app(auth=SimAuth(None, None), settings=Settings(), claude_code_cli_driver=ClaudeCodeCliDriver(tiny_snapshot))
     assert build_claude_code_cli_driver(Settings(analyzer_interaction="model_api"), DemoAuth()) is None

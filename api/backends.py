@@ -93,7 +93,9 @@ class SimAuth:
         customer = claims.get("custom:customer")
         if not customer:
             raise AuthError("token has no customer")
-        principal = Principal(customer, claims.get("email") or claims["sub"])
+        # keyed by the immutable subject: an email address can be reassigned to another person, who must not
+        # inherit the previous holder's conversations
+        principal = Principal(customer, claims["sub"])
         opener = NoEscalateOpener(QueryPathOpener(self.aws, self.deployment, token, request_id=request_id))
         return AuthContext(principal, opener)
 

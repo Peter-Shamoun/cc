@@ -3,7 +3,10 @@
     python -m analyzer.cli --session <dir> <command>
 
 Each command opens a snapshot session through ``SnapshotOpener`` (the bench's
-sandboxed DuckDB, not a second query path). Model SQL still goes through the
+sandboxed DuckDB, not a second query path). A session created by the chat API for a signed-in user instead carries
+``data_channel`` in session.json: the command is then sent over that run's channel (``analyzer.run_channel``) and runs
+inside the API process against the run's reader session (``ccsim.query.open_session``); this process never opens a
+connection, sees a credential, or names a customer. Model SQL still goes through the
 guard. ``escalate`` is the only command that mounts ``lossless.*``, and it
 appends an audit record before the next command is allowed to see those views.
 
@@ -109,7 +112,17 @@ def repairs_used(calls: list[dict]) -> int:
     return sum(1 for call in calls if call.get("command") == "answer" and call.get("used_repair"))
 
 
-def _tools(session_dir: Path) -> tuple[ToolLayer, dict]:
+def _session_opener(meta: dict, opener):
+    """The opener a command queries through. A session whose data is reached over its run channel never falls back
+    to a local snapshot: only the API process that holds the run's reader session may answer for it."""
+    if opener is not None:
+        return opener
+    if meta.get("data_channel"):
+        raise ToolError("this session's data is only reachable through its run channel")
+    return SnapshotOpener(meta["snapshot_path"])
+
+
+def _tools(session_dir: Path, opener=None) -> tuple[ToolLayer, dict]:
     meta = json.loads((session_dir / "session.json").read_text())
     config = config_from_meta(meta, for_subagent=True)
 
@@ -117,7 +130,7 @@ def _tools(session_dir: Path) -> tuple[ToolLayer, dict]:
         with open(_audit_path(session_dir), "a") as handle:
             handle.write(json.dumps(record, default=str) + "\n")
 
-    tools = ToolLayer(SnapshotOpener(meta["snapshot_path"]), config, question_id=meta.get("question_id"),
+    tools = ToolLayer(_session_opener(meta, opener), config, question_id=meta.get("question_id"),
                       question_family=meta.get("question_family"), audit_sink=sink,
                       restored_escalation=_load_escalated(session_dir),
                       restored_query_seconds=_query_seconds_spent(session_dir))
@@ -305,13 +318,13 @@ def _select(session_dir: Path, meta: dict, choice: str, reason: str) -> dict:
     return {"recorded": True}
 
 
-def _run(session_dir: Path, command: str, argument: dict):
+def _run(session_dir: Path, command: str, argument: dict, opener=None):
     meta = json.loads((session_dir / "session.json").read_text())
     if command == "verdict":
         return _verdict(session_dir, meta, argument["verdict_json"])
     if command == "select":
         return _select(session_dir, meta, argument["choice"], argument.get("reason") or "")
-    tools, meta = _tools(session_dir)
+    tools, meta = _tools(session_dir, opener)
     if command == "list":
         return {"relations": tools.list_relations()}
     if command == "describe":
@@ -425,31 +438,46 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv=None) -> int:
+def execute(argv: list[str], opener=None) -> tuple[int, str]:
+    """One command: (exit code, what it prints). ``opener`` is the run's reader session when the API runs the command
+    for a session's run channel; otherwise the session's snapshot is opened."""
     args = build_parser().parse_args(argv)
     session_dir = Path(args.session)
     if args.command == "briefing":
         from analyzer.harness import OrchestratedSession, build_subagent_prompt
         from analyzer.playbook import PlaybookNotReady
         try:
-            print(build_subagent_prompt(session_dir))
+            return 0, build_subagent_prompt(session_dir)
         except (OrchestratedSession, PlaybookNotReady) as exc:
-            print(f"ERROR: {exc}")
-            return 1
-        return 0
+            return 1, f"ERROR: {exc}"
     argument = {key: value for key, value in vars(args).items() if key not in {"session", "command"} and value is not None}
     if args.command in {"sql", "probe"}:
         argument = {"sql": args.query}
     try:
-        result = _run(session_dir, args.command, argument)
+        result = _run(session_dir, args.command, argument, opener)
     except (ToolError, GuardError, json.JSONDecodeError) as exc:
         _log(session_dir, args.command, argument, False, str(exc)[:300],
              used_repair=isinstance(exc, AnswerNotRecorded))
-        print(f"ERROR: {exc}")
-        return 1
+        return 1, f"ERROR: {exc}"
     _log(session_dir, args.command, argument, True, _summary(args.command, result))
-    print(result if isinstance(result, str) else json.dumps(result, default=str))
-    return 0
+    return 0, result if isinstance(result, str) else json.dumps(result, default=str)
+
+
+def main(argv=None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    args = build_parser().parse_args(argv)
+    meta_path = Path(args.session) / "session.json"
+    meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
+    if meta.get("data_channel"):
+        from analyzer.run_channel import RunChannelError, send_command
+        try:
+            exit_code, output = send_command(Path(args.session), argv)
+        except RunChannelError as exc:
+            exit_code, output = 1, f"ERROR: {exc}"
+    else:
+        exit_code, output = execute(argv)
+    print(output)
+    return exit_code
 
 
 if __name__ == "__main__":

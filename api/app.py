@@ -29,7 +29,7 @@ from analyzer.loop import Analyzer
 from analyzer.tools import ToolLayer
 
 from api.backends import (CANCEL_AT, MULTI_TABLE_SQL, MULTI_TABLE_TITLES, SCENARIO_CONFIG, AuthError, DemoAuth,
-                          detect_scenario, make_llm)
+                          SimAuth, detect_scenario, make_llm)
 from api.contract import CONTRACT_VERSION, schema as contract_schema
 from api.ids import new_id
 from api.live import Cancelled, LiveTap
@@ -267,13 +267,27 @@ def build_claude_code_cli_driver(settings: Settings, auth):
                            f"{', '.join(ANALYZER_INTERACTIONS)}")
     if settings.analyzer_interaction != "claude_code_cli":
         return None
-    if not isinstance(auth, DemoAuth):
-        raise RuntimeError("claude_code_cli queries a bench snapshot, not the signed-in customer's data: "
-                           "it runs with demo auth only")
     if not settings.analyzer_snapshot_path:
-        raise RuntimeError("claude_code_cli needs CC_API_ANALYZER_SNAPSHOT (a bench snapshot directory)")
+        raise RuntimeError("claude_code_cli needs CC_API_ANALYZER_SNAPSHOT (a bench snapshot directory: the briefing's "
+                           "example library, and the data itself with demo auth)")
     from api.claude_code_cli_driver import ClaudeCodeCliDriver
-    return ClaudeCodeCliDriver(Path(settings.analyzer_snapshot_path))
+    # demo auth: the CLI queries the bench snapshot. SimAuth: every query goes through the signed-in user's opener
+    # (the customer comes from the verified token), served to the worker over the run channel.
+    driver = ClaudeCodeCliDriver(Path(settings.analyzer_snapshot_path),
+                                 queries_signed_in_customer=not isinstance(auth, DemoAuth))
+    check_claude_code_cli_auth(driver, auth)
+    return driver
+
+
+def check_claude_code_cli_auth(driver, auth) -> None:
+    """Fail closed on any auth the claude_code_cli path does not support, whoever built the driver: demo auth with
+    the snapshot, SimAuth with the run channel over the signed-in user's opener. Nothing else."""
+    if isinstance(auth, DemoAuth):
+        return
+    if isinstance(auth, SimAuth) and driver.queries_signed_in_customer:
+        return
+    raise RuntimeError("claude_code_cli supports demo auth (bench snapshot) and SimAuth (the signed-in customer's "
+                       f"data over the run channel); not {type(auth).__name__} with this driver")
 
 
 def create_app(auth=None, settings: Settings | None = None, store=None, llm_factory=None,
@@ -287,6 +301,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                                "(create_app(auth=...)); refusing to fall back to demo tokens")
         auth = DemoAuth()
     cli_driver = claude_code_cli_driver or build_claude_code_cli_driver(settings, auth)
+    if cli_driver is not None:
+        check_claude_code_cli_auth(cli_driver, auth)
     scripted_demo = settings.llm == "scripted" and cli_driver is None
     audit = AuditLog()
     store = store or make_store(audit=audit)
@@ -301,22 +317,30 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             while True:
                 await asyncio.sleep(settings.transcript_sweep_seconds)
                 try:
-                    removed = await asyncio.to_thread(store.purge_expired)
+                    removed = await asyncio.to_thread(store.purge_expired) if purges_store else 0
                     await asyncio.to_thread(temp_chats.purge_expired)
+                    if cli_driver is not None:
+                        await asyncio.to_thread(cli_driver.sweep_expired_sessions)
                     if removed:
                         log.info("retention sweep removed %d conversations", removed)
                 except Exception as exc:  # noqa: BLE001 - keep sweeping
                     log.warning("retention sweep failed: %s", type(exc).__name__)
 
         task = None
-        if settings.transcript_sweep_seconds > 0 and hasattr(store, "purge_expired"):
-            await asyncio.to_thread(store.purge_expired)  # once at startup: catch up on what expired while down
+        purges_store = hasattr(store, "purge_expired")
+        if cli_driver is not None:
+            await asyncio.to_thread(cli_driver.sweep_expired_sessions)  # folders a crashed process left behind
+        if settings.transcript_sweep_seconds > 0 and (purges_store or cli_driver is not None):
+            if purges_store:
+                await asyncio.to_thread(store.purge_expired)  # once at startup: catch up on what expired while down
             task = asyncio.create_task(sweep())
         try:
             yield
         finally:
             if task:
                 task.cancel()
+            if cli_driver is not None:
+                cli_driver.shutdown()  # workers run in their own process groups: they would outlive the API
 
     app = FastAPI(title="CC chat API", version="0.1.0", docs_url=None, redoc_url=None, openapi_url=None,
                   lifespan=lifespan)
@@ -633,11 +657,14 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             emit({"type": "status", "label": "Thinking"})
             tap = None
             answer = None
+            cli_sessions: list = []
             opener = CancellableOpener(ctx.opener, run.cancelled).start()  # Stop interrupts the running SQL
             try:
                 if cli_driver is not None:
                     tap = LiveTap(None, emit, cancelled=run.cancelled, started=started)
-                    answer = cli_driver.answer(question, tap, run.cancelled)
+                    answer = cli_driver.answer(question, tap, run.cancelled,
+                                               opener=opener if cli_driver.queries_signed_in_customer else None,
+                                               prepared_sessions=cli_sessions)
                 else:
                     config = AnalyzerConfig(**overrides)
                     inner = llm_factory() if llm_factory else make_llm(settings.llm, scenario)
@@ -732,6 +759,11 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                   elapsed_ms=elapsed, finish=finish, scenario=scenario, steps=len(persisted_steps),
                   **({"temporary": True} if temporary else {}),
                   **({"interrupts": opener.interrupts} if opener.interrupts else {}))
+            for session_dir in cli_sessions:  # persisted above: the session folder (question text) is not needed
+                try:
+                    cli_driver.discard_session(session_dir)
+                except Exception as exc:  # noqa: BLE001 - the retention sweep removes it later
+                    log.warning("session folder cleanup failed: %s", type(exc).__name__)
             run.finished_at = time.time()
             run.done = True
             run.notify()
