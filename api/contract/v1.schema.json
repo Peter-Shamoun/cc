@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://claimclarity.local/api/contract/v1.schema.json",
   "title": "ClaimClarity chat stream contract",
-  "version": "1.21.0",
+  "version": "1.22.0",
   "description": "One JSON object per SSE data: line. See api/CONTRACT.md. Validate an event against #/$defs/StreamEvent.",
   "$ref": "#/$defs/StreamEvent",
   "$defs": {
@@ -19,7 +19,7 @@
       "description": "1.13.0: ISO-8601 UTC timestamp, e.g. 2026-10-25T19:00:00Z. Clients must also accept fractional seconds and a numeric offset."
     },
     "Sensitivity": {
-      "description": "Closed. Data classification of a part; `phi` content is never persisted in a share or export.",
+      "description": "Closed. Data classification of a part; `phi` content is never persisted in an export.",
       "enum": [
         "none",
         "deidentified",
@@ -552,7 +552,7 @@
         },
         "csvFileId": {
           "$ref": "#/$defs/ID",
-          "description": "Download id: `GET /api/download/{csvFileId}` (auth, short-lived). Absent when the result is not downloadable (e.g. `dataWithheld`)."
+          "description": "Download id: `GET /api/download/{csvFileId}` (auth, short-lived). Absent when the result is not downloadable."
         },
         "sqlPartId": {
           "$ref": "#/$defs/ID"
@@ -581,10 +581,6 @@
             }
           },
           "additionalProperties": true
-        },
-        "dataWithheld": {
-          "type": "boolean",
-          "description": "1.11.0: only in a SharedConversation shared without data. `rows` is empty, while `columns` and `rowCount` are real."
         }
       },
       "additionalProperties": true
@@ -2445,7 +2441,7 @@
         },
         "temporary": {
           "type": "boolean",
-          "description": "1.20.0: a temporary chat (CONTRACT.md §11.1), like ChatGPT's Temporary chat: never saved, listed, searched, titled, exported, rated or shared. Send it on every turn of that chat; a turn that would move a chat between temporary and saved is 422 `validation`. Only when `Capabilities.temporaryChat` is present."
+          "description": "1.20.0: a temporary chat (CONTRACT.md §11.1), like ChatGPT's Temporary chat: never saved, listed, searched, titled, exported or rated. Send it on every turn of that chat; a turn that would move a chat between temporary and saved is 422 `validation`. Only when `Capabilities.temporaryChat` is present."
         }
       },
       "additionalProperties": true,
@@ -2946,26 +2942,6 @@
           "x-fallback": "phi",
           "description": "1.14.0: how the server masks literals in shown SQL (CONTRACT.md §10). `phi` (default): literals compared with PHI-bearing columns, and identifier-like values; `all`: every string literal and compared number; `off`: verbatim. Open (render an unknown value as `phi`). Absent from pre-1.14 servers: assume `off`."
         },
-        "shareExpiry": {
-          "type": "object",
-          "required": [
-            "options",
-            "default"
-          ],
-          "description": "1.15.0: share-link lifetimes for the share dialog (§17). Absent from pre-1.15 servers: links never expire.",
-          "properties": {
-            "options": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ShareExpiryDays"
-              }
-            },
-            "default": {
-              "$ref": "#/$defs/ShareExpiryDays"
-            }
-          },
-          "additionalProperties": true
-        },
         "pinArchive": {
           "type": "boolean",
           "description": "1.17.0: true when PATCH /api/conversations/{id} persists `pinned` / `archived` server-side. Absent on older servers: hide Pin/Archive or keep them client-only."
@@ -3345,123 +3321,6 @@
       ],
       "description": "1.10.0: how a regenerated answer is restyled (CONTRACT.md §8.1). `default` means a plain re-run. `concise` cuts the prose to its first sentence and drops a chart that duplicates a table. `detailed` adds a 'How this was computed' paragraph. Tables, SQL, artifacts and every assumption/caveat callout are always kept."
     },
-    "ShareRequest": {
-      "type": "object",
-      "description": "1.11.0: PUT /api/conversations/{id}/share body (CONTRACT.md §17). 1.15.0: `expiresInDays`; turning `includeData` on issues a new share id.",
-      "properties": {
-        "includeData": {
-          "type": "boolean",
-          "default": false,
-          "description": "Share the stored preview rows (≤ 50 per table, never the CSV). Default false: tables are shown without rows, and charts and data artifacts are left out. 1.15.0: turning it on (false→true) issues a NEW share id and revokes the old one (S1); turning it off keeps the id."
-        },
-        "expiresInDays": {
-          "$ref": "#/$defs/ShareExpiryDays",
-          "description": "1.15.0: 7, 30 or 90 days from this request. Omitted: keep the current expiry (a new or rotated share gets 30)."
-        }
-      },
-      "additionalProperties": false
-    },
-    "ShareLink": {
-      "type": "object",
-      "description": "1.11.0: the active share of a conversation. Read-only, org-scoped and revocable. 1.15.0: expires (`expiresAt`), and widening data issues a new id (`rotated`).",
-      "required": [
-        "shareId",
-        "conversationId",
-        "url",
-        "scope",
-        "includeData",
-        "createdAt"
-      ],
-      "properties": {
-        "shareId": {
-          "$ref": "#/$defs/ID"
-        },
-        "conversationId": {
-          "$ref": "#/$defs/ID"
-        },
-        "url": {
-          "type": "string",
-          "pattern": "^/shared/[A-Za-z0-9_-]+(?![\\s\\S])",
-          "description": "App-relative path. The viewer must be signed in to the same organization."
-        },
-        "scope": {
-          "const": "organization"
-        },
-        "includeData": {
-          "type": "boolean"
-        },
-        "createdAt": {
-          "$ref": "#/$defs/Timestamp"
-        },
-        "expiresAt": {
-          "$ref": "#/$defs/Timestamp",
-          "description": "1.15.0: when the link stops working (the viewer then gets 404, like a revoked link). Show it in the share dialog. Absent from pre-1.15 servers: no expiry."
-        },
-        "expiresInDays": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "1.15.0: the lifetime chosen (7, 30 or 90 today), to preselect the dialog's choice."
-        },
-        "rotated": {
-          "type": "boolean",
-          "description": "1.15.0: true when this PUT widened `includeData` and so replaced the share id; the old link is revoked. Tell the owner to send the new link."
-        }
-      },
-      "additionalProperties": true
-    },
-    "SharedConversation": {
-      "type": "object",
-      "description": "1.11.0: GET /api/shared/{shareId}. The owner's conversation, read-only. Feedback, file ids and (unless includeData) rows are removed. 1.15.0: with `includeData: false`, SQL is withheld too (`sqlWithheld`).",
-      "required": [
-        "shareId",
-        "messages",
-        "includeData",
-        "createdAt"
-      ],
-      "properties": {
-        "shareId": {
-          "$ref": "#/$defs/ID"
-        },
-        "title": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "updatedAt": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Timestamp"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Null when the conversation has not changed since it was shared."
-        },
-        "includeData": {
-          "type": "boolean"
-        },
-        "createdAt": {
-          "$ref": "#/$defs/Timestamp"
-        },
-        "messages": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/StoredMessage"
-          }
-        },
-        "expiresAt": {
-          "$ref": "#/$defs/Timestamp",
-          "description": "1.15.0: when this link expires."
-        },
-        "sqlWithheld": {
-          "type": "boolean",
-          "description": "1.15.0 (QA-S18): true when `includeData` is false. SQL `code` parts are removed, `table.sqlPartId` is dropped, and SQL in steps (`sql`, `revisedSql`, `candidates[].sql`) and in `tool_call.input.sql` is the empty string. Say \"SQL not shared\" instead of an empty code block."
-        }
-      },
-      "additionalProperties": true
-    },
     "ErrorCode": {
       "type": "string",
       "x-open": true,
@@ -3480,14 +3339,6 @@
         "internal"
       ],
       "description": "1.13.0: `HttpError.error.code`. Open: branch on the known values, and on the HTTP status for anything else. A server may send `http_<status>` for a status with no dedicated code. When a code gets more specific the old one stays in `legacyCode` for at least one minor version."
-    },
-    "ShareExpiryDays": {
-      "enum": [
-        7,
-        30,
-        90
-      ],
-      "description": "1.15.0 (S4): how long a share link lives, in days. 30 is the default. Closed: the server rejects other values with 422."
     },
     "ConversationArchivedFilter": {
       "type": "string",

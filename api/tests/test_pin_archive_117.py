@@ -200,15 +200,6 @@ def test_persisted_flags_are_sealed_and_survive_restart(tmp_path):
     assert b"pinned" not in meta  # flags live in the sealed body, metadata carries nothing new
 
 
-def test_shared_view_does_not_leak_flags(client):
-    _, evs = ask(client, "Paid amount by payer")
-    cid = evs[0]["conversationId"]
-    _patch(client, cid, pinned=True)
-    link = client.put(f"/api/conversations/{cid}/share", headers=LABS, json={}).json()
-    view = client.get(f"/api/shared/{link['shareId']}", headers=COLLEAGUE).json()
-    assert "pinned" not in view and "archived" not in view
-
-
 def test_capability_flag(client):
     caps = client.get("/api/capabilities", headers=LABS).json()
     assert caps["pinArchive"] is True

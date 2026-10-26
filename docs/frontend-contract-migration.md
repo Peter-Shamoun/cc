@@ -1,4 +1,4 @@
-# ClaimClarity chat contract: changelog and migration guide (v1.0 → 1.21.0)
+# ClaimClarity chat contract: changelog and migration guide (v1.0 → 1.22.0)
 
 **For review by Claude.** This is a reading guide to `api/CONTRACT.md`, which stays the normative text, and
 `api/contract/v1.schema.json`. It covers three things:
@@ -10,8 +10,8 @@
 The adapter that produces these events from analyzer and analyst outputs is specified in
 [`frontend-analyzer-adapter.md`](frontend-analyzer-adapter.md).
 
-Every version from 1.0 to 1.21 is **additive**. A 1.0 client keeps working against a 1.21 server, because it ignores
-unknown events, fields and part types (§3). No field was removed or renamed. The one wire-visible tightening is
+Every version from 1.0 to 1.21 is **additive**, and 1.22 removes one feature, sharing. A 1.0 client keeps working against a 1.22 server, because it ignores
+unknown events, fields and part types (§3). No stream field was removed or renamed. 1.22 removes only the share REST routes and shapes (below). The one wire-visible tightening is
 1.12's error envelope on 404 and 405, and 1.13's `not_found` for regenerate/edit 404s (below).
 
 ## 1. Version-by-version
@@ -41,11 +41,13 @@ unknown events, fields and part types (§3). No field was removed or renamed. Th
 | 1.20 | temporary chat: `ChatRequest.temporary`, `MessageStart.temporary`, `Capabilities.temporaryChat` (§11.1) | hold it in memory only (TTL, per-user cap); 404 for list/GET/share/export/feedback; 422 on crossing | offer the toggle only when `temporaryChat` is present; send `temporary: true` every turn; `DELETE` on leaving |
 | 1.20.1 | no shape change: `/stop` interrupts a running query (§8), `aborted` within 1 s during SQL too | wrap the session opener and interrupt this run's cursors on cancel (`api/cancel.py`) | nothing; "Stopping…" is now brief |
 | 1.21 | BACKEND-FIT (§2.1): `IdentityScopedKey`; data scope only from the identity | 422 on a scoped key in `ChatRequest`/`options`; scope only from the token → session opener | remove any database/schema/source picker; never send scope keys |
+| 1.22 | **sharing removed** (§17): share routes, `ShareRequest`/`ShareLink`/`SharedConversation`/`ShareExpiryDays`, `TablePart.dataWithheld`, `Capabilities.shareExpiry` | every `/api/share*`, `/api/shared/*` and `/api/conversations/{id}/share` path is the standard 404 envelope | remove the Share button, dialog and shared view/route |
 
 **Migration notes**
 * **1.19 patterns.** Only ids that were already invalid in JS (a trailing `\n`) are now rejected by the server too.
 * **1.20 temporary chat.** Clients that never send `temporary` see no change. The flag must be repeated on every turn; dropping it mid-chat is a 422, not a silent save.
 * **1.21 data scope.** No released client sends a scoped key, so nothing breaks. A UI that showed a data-source chip ("Claims lake · sem.*") should remove it: it never changed anything server-side.
+* **1.22 sharing removed.** This is the first removal. Clients that never shared see no change. A 1.11–1.21 client that calls the share routes gets the standard 404 envelope (which it already showed as "not shared" or "link unavailable"), and capabilities no longer carry `shareExpiry` (pre-1.15 servers didn't either). Links already handed out stop resolving; the demo kept shares in memory only, so no stored data needs migrating. Drop `src/contract/share.ts` imports, the share dialog, and the `/shared/<id>` route.
 * **1.18 plots.** Nothing breaks: `spec` and `data.values` are still sent (now derived from `plot`). A chart
   stored before 1.18 has no `plot` and still renders from its sanitized `spec`. A server-side chart that fails the
   gate is simply absent (a table takes its place if there was none), so never assume a chart follows a table.
@@ -107,7 +109,7 @@ acceptance test for any backend: `api.contract.conformance.check` in Python, `ch
 | `table.rows` timing | streamed from the finished part after the analysis ends | can stream as the DB returns rows, with the same events |
 | `report` artifacts (§16) | `report_artifacts` reshapes the demo answer | a real artifact producer, or none |
 | `regenerate.style` | applied server-side to finished parts (`api/styles.py`), for every backend | may also become a prompt hint; the output shape is fixed |
-| shares (§17), feedback (§13), downloads | in-memory registries; lost on restart (`ShareRegistry`, `DownloadRegistry` 15-minute TTL) | persistent stores |
+| feedback (§13), downloads | in-memory registries; lost on restart (`DownloadRegistry` 15-minute TTL) | persistent stores |
 | `step.check.check` | only `verifier` is emitted | `row_count`, `null_share`, `join_fanout`, … when the analyzer gains those checks |
 | `escalation.trigger` | only `repair_exhausted` / `verifier_fail` | `low_confidence`, `complexity`, `disagreement`, `user` are reserved |
 | `step.candidates.score` / `label` | not emitted | optional |

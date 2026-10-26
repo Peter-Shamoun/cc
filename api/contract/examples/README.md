@@ -25,7 +25,6 @@ Ids such as `csvFileId` are normalised, so `/api/download/<id>` will 404 when an
 `feedback.json` is a `PUT …/messages/{id}/feedback` request and response (contract 1.7.0, CONTRACT.md §13), plus the `DELETE` that clears it.
 `export.md` is `GET /api/conversations/{id}/export?format=markdown` for the `answer` question (contract 1.8.0, CONTRACT.md §15). `message.end.sources` (citations, §14) appears in every answer stream.
 `report.jsonl` (1.9.0) shows partial-table streaming (`table.start`/`table.rows` before the table `part`) and the artifact spec: a `chart` artifact and an auto-opening `report` artifact (CONTRACT.md §5.1, §16).
-`share.json` (1.11.0) shows `PUT .../share` (default `includeData: false`), the colleague's `GET /api/shared/{id}` view (table rows withheld, no chart, no feedback) and revoke (CONTRACT.md §17).
 
 ## Edge cases (1.16.0)
 

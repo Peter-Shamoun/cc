@@ -1,5 +1,5 @@
 """1.20.0 temporary chat (CONTRACT.md §11.1), like ChatGPT's Temporary chat: never saved (not in the store, not on
-disk), never listed or searched, no title, can't be exported, rated or shared; edit and regenerate still work inside
+disk), never listed or searched, no title, can't be exported or rated; edit and regenerate still work inside
 it; discard, delete-all, sign-out and the idle TTL drop it."""
 from __future__ import annotations
 
