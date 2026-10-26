@@ -10,7 +10,7 @@ describe('parity pass 1 (side by side with ChatGPT/Claude)', () => {
     expect(s).toMatch(/<mark className="bg-transparent font-semibold text-fg"/);
   });
   it('dialog section labels are sentence case, not tracked uppercase', () => {
-    for (const f of ['./ShareDialog.tsx', './SettingsDialog.tsx', './SearchDialog.tsx']) expect(src(f)).not.toMatch(/uppercase tracking/);
+    for (const f of ['./SettingsDialog.tsx', './SearchDialog.tsx']) expect(src(f)).not.toMatch(/uppercase tracking/);
   });
   it('"Jump to latest" floats clear of the composer with a light shadow', () => {
     const s = src('./AppShell.tsx');

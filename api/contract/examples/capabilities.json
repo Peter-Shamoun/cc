@@ -1,5 +1,5 @@
 {
-  "contractVersion": "1.21.0",
+  "contractVersion": "1.23.0",
   "demo": true,
   "scope": "public",
   "defaults": {
@@ -125,14 +125,6 @@
     }
   ],
   "sqlLiteralMasking": "phi",
-  "shareExpiry": {
-    "options": [
-      7,
-      30,
-      90
-    ],
-    "default": 30
-  },
   "pinArchive": true,
   "temporaryChat": {
     "ttlSeconds": 3600

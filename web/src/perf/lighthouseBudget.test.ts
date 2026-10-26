@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { evaluate, formatRows, median } from '../../scripts/lighthouse_budget.mjs';
+import { evaluate, formatRows, loadByteWeight, median } from '../../scripts/lighthouse_budget.mjs';
 import config from '../../scripts/perf_budget.json';
 
 const budget = { categories: { performance: 0.9, accessibility: 1 }, metrics: { 'largest-contentful-paint': 2500, 'cumulative-layout-shift': 0.02 } };
@@ -37,7 +37,39 @@ describe('lighthouse budget', () => {
     for (const p of Object.values(config.presets)) {
       expect(p.categories.accessibility).toBe(1);
       expect(p.metrics['cumulative-layout-shift']).toBeLessThanOrEqual(0.1);
-      expect(p.metrics['total-byte-weight']).toBeLessThanOrEqual(400 * 1024);
+      expect(p.metrics['load-byte-weight']).toBeLessThanOrEqual(400 * 1024); // the cold load
+      expect(p.metrics['total-byte-weight']).toBeLessThanOrEqual(800 * 1024); // plus the idle prefetch
     }
+  });
+
+  describe('load-byte-weight (the cold load, without the idle prefetch)', () => {
+    const net = (load: number, reqs: [number, number][]) => ({
+      categories: {},
+      audits: {
+        metrics: { details: { items: [{ observedLoad: load }] } },
+        'network-requests': { details: { items: reqs.map(([t, size]) => ({ networkRequestTime: t, transferSize: size })) } },
+        'total-byte-weight': { numericValue: reqs.reduce((n, [, b]) => n + b, 0) },
+      },
+    });
+    // Shape of the 00:40 run: html + entry js + runtime + css by load (74 ms), then the prefetched chunks.
+    const real = net(74, [[1, 10116], [21, 164482], [22, 2124], [22, 18210], [171, 147858], [227, 82482], [256, 107406], [256, 184164]]);
+
+    it('counts only requests started by the load event', () => {
+      expect(loadByteWeight(real)).toBe(10116 + 164482 + 2124 + 18210);
+      expect(loadByteWeight(net(100, [[100, 5], [101, 7]]))).toBe(5); // at load counts, after load doesn't
+    });
+    it('is budgeted separately from the prefetch-inclusive total', () => {
+      const b = { categories: {}, metrics: { 'load-byte-weight': 358400, 'total-byte-weight': 819200 } };
+      expect(evaluate('desktop', [real], b).rows.map((r) => [r.key, r.ok])).toEqual([['load-byte-weight', true], ['total-byte-weight', true]]);
+      // a cold-load regression (a big chunk pulled into the entry) still fails even though the total is fine
+      const heavy = net(74, [[1, 10116], [21, 400000], [171, 100000]]);
+      expect(evaluate('desktop', [heavy], b).rows.find((r) => r.key === 'load-byte-weight')?.ok).toBe(false);
+    });
+    it('fails closed when the report lacks the network or metrics audits', () => {
+      const bare = { categories: {}, audits: { 'total-byte-weight': { numericValue: 1 } } };
+      expect(loadByteWeight(bare)).toBeNull();
+      const row = evaluate('mobile', [bare], { categories: {}, metrics: { 'load-byte-weight': 358400 } }).rows[0];
+      expect(row.ok).toBe(false);
+    });
   });
 });

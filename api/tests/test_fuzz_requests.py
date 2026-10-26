@@ -48,7 +48,6 @@ VALID = {
     ("post", "/api/chat"): {"messages": [{"id": "u1", "role": "user", "text": "Denials by payer last quarter"}],
                             "options": {}, "regenerate": None, "resume": None},
     ("put", "/api/conversations/{c}/messages/{m}/feedback"): {"rating": "down", "reasons": ["wrong_numbers"], "comment": "x"},
-    ("put", "/api/conversations/{c}/share"): {"includeData": True},
     ("patch", "/api/conversations/{c}"): {"title": "Renamed"},
     ("post", "/api/conversations/search"): {"q": "denials", "cursor": None},
     ("put", "/api/transcripts/retention"): {"days": 30},

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { newAssistantView, reduce, type AssistantView, type StreamEvent } from '../../lib/contract';
 import { newAssistantViewV1, reduceV1, type AssistantViewV1, type StreamEvent as V1Event } from '../../api/contract';
 import { AssistantTurn } from '../Message';
@@ -97,22 +97,5 @@ describe('masked SQL is never offered as runnable', () => {
     const two = sqlForClipboard([{ label: 'a', sql: MASKED, maskedLiterals: 1 }, { label: 'b', sql: 'SELECT 1' }]);
     expect(two).toContain('-- 1. a\n-- Patient values hidden: 1 value is shown as ?.');
     expect(two).toContain('-- 2. b\nSELECT 1;');
-  });
-});
-
-describe('shared view with SQL withheld (1.15.0)', () => {
-  const shared = { ...table, sqlPartId: undefined };
-  it('says "SQL not shared" under tables instead of View SQL', () => {
-    render(<AssistantTurn msg={viewParts([shared])} isLast={false} onOpen={noop} onRegenerate={noop} onEdit={noop} sqlWithheld />);
-    expect(screen.getByTestId('sql-withheld')).toHaveTextContent('SQL not shared');
-    expect(screen.queryByRole('button', { name: /View SQL/i })).toBeNull();
-  });
-  it('nothing extra without the flag, and a real query still wins', () => {
-    render(<AssistantTurn msg={viewParts([shared])} isLast={false} onOpen={noop} onRegenerate={noop} onEdit={noop} />);
-    expect(screen.queryByTestId('sql-withheld')).toBeNull();
-    cleanup();
-    render(<AssistantTurn msg={viewParts([table, query()])} isLast={false} onOpen={noop} onRegenerate={noop} onEdit={noop} sqlWithheld />);
-    expect(screen.queryByTestId('sql-withheld')).toBeNull();
-    expect(within(document.body).getByRole('button', { name: /View SQL/i })).toBeTruthy();
   });
 });

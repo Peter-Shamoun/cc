@@ -2,7 +2,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fetchRetrying, readJsonCapped, ResponseTooLargeError } from './fetchGuard';
 import { ConversationsApi, ConversationsApiError } from '../adapters/conversationsApi';
-import { loadShared } from '../contract/share';
 import { loadCapabilities, DEMO_CAPABILITIES } from '../contract/capabilities';
 
 const r429 = (h: Record<string, string> = {}) => new Response(JSON.stringify({ error: { code: 'rate_limited', message: '' } }), { status: 429, headers: h });
@@ -71,17 +70,6 @@ describe('callers', () => {
     const api2 = new ConversationsApi('', undefined, (async () => big) as never);
     await expect(api2.list()).rejects.toMatchObject({ code: 'response_too_large' });
     await expect(api2.list().catch((e) => e)).resolves.toBeInstanceOf(ConversationsApiError);
-  });
-
-  it('shared view load retries a 429 and refuses a 33 MiB body', async () => {
-    vi.useFakeTimers();
-    const seq = [r429({ 'retry-after': '1' }), ok({ shareId: 'sh_x', messages: [] })];
-    const p = loadShared('sh_x', { fetchImpl: (async () => seq.shift()!) as never });
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(await p).toMatchObject({ shareId: 'sh_x' });
-    vi.useRealTimers();
-    const big = new Response('{}', { headers: { 'content-length': String(33 * 1024 * 1024) } });
-    await expect(loadShared('sh_x', { fetchImpl: (async () => big) as never })).rejects.toBeInstanceOf(ResponseTooLargeError);
   });
 
   it('capabilities: a 429 is waited out instead of silently falling back to the demo set', async () => {

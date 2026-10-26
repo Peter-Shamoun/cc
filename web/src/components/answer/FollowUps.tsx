@@ -4,7 +4,7 @@ import { CornerDownRight } from 'lucide-react';
  * Suggested follow-ups under the last answer (ChatGPT-style: a few plain rows, no chips, no sparkle).
  * Provisional until the contract adds them: a `follow_ups` part `{ items: [{ id, text }] }`. The demo server can
  * script them; the real analyzer must emit them without an extra paid call (BACKEND-FIT). At most 3, last turn only,
- * hidden while streaming and on shared/read-only views. One click sends the text as the next question.
+ * hidden while streaming. One click sends the text as the next question.
  */
 export type FollowUpsPart = { type: 'follow_ups'; id: string; items: { id: string; text: string }[] };
 export const isFollowUps = (p: { type: string }): p is FollowUpsPart => p.type === 'follow_ups' && Array.isArray((p as FollowUpsPart).items);

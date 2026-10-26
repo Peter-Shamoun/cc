@@ -136,7 +136,6 @@ export const DEMO_CAPABILITIES: Capabilities = {
     }
   ],
   "sqlLiteralMasking": "phi",
-  "shareExpiry": { "options": [7, 30, 90], "default": 30 },
   "pinArchive": true,
   "temporaryChat": { "ttlSeconds": 3600 },
 };

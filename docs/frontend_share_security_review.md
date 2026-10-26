@@ -1,5 +1,7 @@
 # Security review: conversation sharing
 
+> **Superseded (2026-10-26):** sharing was removed in contract 1.22.0 (CONTRACT §17). This review is kept as history only; nothing here is in force.
+
 **Scope:**
 - Contract 1.11.0 §17: `api/share.py`; the share routes in `api/app.py`; `web/src/shell/SharedView.tsx`; `web/src/contract/share.ts`; the share dialog.
 - Reviewed by platform on 2026-10-25 against sota@773854a. Demo backend only. The real backend inherits the API behaviour and must meet the "Real backend" requirements below.
