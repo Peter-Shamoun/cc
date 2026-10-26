@@ -96,6 +96,25 @@ def event_shape(schema: dict, name: str) -> dict:
     return {f: _kinds(schema, d["properties"].get(f, {})) for f in d.get("required", []) if f not in ("type", "seq")}
 
 
+def open_enums(schema: dict) -> dict:
+    """1.13.0: every ``x-open`` node, keyed by ``Def.field.sub`` path: {fallback} for open enums, {known} for strings."""
+    out: dict = {}
+
+    def walk(node, path):
+        if not isinstance(node, dict):
+            return
+        if node.get("x-open"):
+            out[path] = {"fallback": node["x-fallback"]} if "enum" in node else {"known": list(node.get("x-known", []))}
+        for k, v in node.get("properties", {}).items():
+            walk(v, f"{path}.{k}")
+        if isinstance(node.get("items"), dict):
+            walk(node["items"], path)
+
+    for name, d in schema["$defs"].items():
+        walk(d, name)
+    return out
+
+
 def generate(schema: dict) -> str:
     version = schema["version"]
     lines = ["/* eslint-disable */",
@@ -124,6 +143,15 @@ def generate(schema: dict) -> str:
     lines.append("/** 1.12.0: required fields of each event and their JSON kinds, for `wellFormed()` (fail-safe reducer input). */")
     lines.append("export const EVENT_SHAPES: Record<string, Record<string, readonly string[]>> = "
                  + json.dumps(shapes, separators=(", ", ": ")) + ";")
+    opens = open_enums(schema)
+    lines.append("/** 1.13.0: enums a newer server may extend (CONTRACT.md §3). Render an unknown value as `fallback`. */")
+    lines.append("export const OPEN_ENUM_FALLBACKS: Record<string, string> = "
+                 + json.dumps({k: v["fallback"] for k, v in opens.items() if "fallback" in v}, separators=(", ", ": "))
+                 + ";")
+    lines.append("/** 1.13.0: open string fields and the values known in this version. Anything else is valid. */")
+    lines.append("export const OPEN_KNOWN_VALUES: Record<string, readonly string[]> = "
+                 + json.dumps({k: v["known"] for k, v in opens.items() if "known" in v}, separators=(", ", ": "))
+                 + ";")
     lines.append("export type PartType = Part['type'];")
     lines.append("export type StreamEventType = StreamEvent['type'];")
     return "\n".join(lines) + "\n"
