@@ -4,6 +4,8 @@ import { newAssistantViewV1, reduceV1, type AssistantViewV1, type ChatRequest, t
 import type { AnalystAdapter, ConnectionInfo, ConnectionState, ThreadSummary, TranscriptStore } from '../adapters/types';
 
 const CONNECTION_LABEL = { offline: 'Offline, waiting for the network…', reconnecting: 'Reconnecting…' } as const;
+/** A stream that drops and is back within this long shows nothing (most blips reconnect in ~0.3 s). */
+export const RECONNECT_QUIET_MS = 1000;
 const RATE_LIMIT_PREFIX = 'Busy right now';
 /** Client transport statuses (offline, reconnecting, 429 countdown); these show even while the step timeline is live. */
 export function isTransportStatus(s: string | null | undefined): boolean {
@@ -176,13 +178,28 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore, getOpti
     // server's own status comes back once the replay resumes.
     let serverStatus: string | null = null;
     let countdown: ReturnType<typeof setInterval> | undefined;
-    const stopCountdown = () => { if (countdown !== undefined) { clearInterval(countdown); countdown = undefined; } };
+    // Calm reconnects (ChatGPT/Claude): a dropped stream that is back within RECONNECT_QUIET_MS shows and announces
+    // nothing; only a reconnect that takes longer puts "Reconnecting…" under the answer.
+    let quiet: ReturnType<typeof setTimeout> | undefined;
+    const stopCountdown = () => {
+      if (countdown !== undefined) { clearInterval(countdown); countdown = undefined; }
+      if (quiet !== undefined) { clearTimeout(quiet); quiet = undefined; }
+    };
     const isTransport = isTransportStatus;
     const onConnection = (state: ConnectionState, info?: ConnectionInfo) => {
       stopCountdown();
       if (!view.streaming || !current()) return;
-      if (state === 'live') { view = { ...view, status: serverStatus }; set(); return; }
+      if (state === 'live') { if (isTransport(view.status)) { view = { ...view, status: serverStatus }; set(); } return; }
       if (!isTransport(view.status)) serverStatus = view.status ?? null;
+      if (state === 'reconnecting' && !isTransport(view.status)) {
+        quiet = setTimeout(() => {
+          quiet = undefined;
+          if (!view.streaming || !current()) return;
+          view = { ...view, status: CONNECTION_LABEL.reconnecting };
+          set();
+        }, RECONNECT_QUIET_MS);
+        return;
+      }
       if (state === 'rate_limited') {
         // 429 + Retry-After: the adapter waits and retries on its own; count the wait down once a second.
         const until = Date.now() + (info?.retryInMs ?? 0);

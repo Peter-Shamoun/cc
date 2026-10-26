@@ -221,7 +221,7 @@ test.describe('answer edge cases', () => {
     const t0 = await head.textContent();
     await page.waitForTimeout(1100);
     expect(await head.textContent()).toBe(t0); // nothing ticks
-    await expect(a.getByTestId('step-announce')).toHaveAttribute('aria-live', 'polite');
+    await expect(a.getByTestId('step-timeline').locator('[aria-live]')).toHaveCount(0); // QA-S16: the shell status region announces
     await waitIdle(page);
     await expect(a.getByTestId('step-activity')).toHaveText(/^Thought for \d/);
     await expect(head).toHaveAttribute('aria-expanded', 'false');

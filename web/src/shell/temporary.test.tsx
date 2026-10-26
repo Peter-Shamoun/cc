@@ -54,7 +54,6 @@ describe('temporary chat in the shell (QA-S22)', () => {
     expect(screen.getAllByTestId('msg-user')).toHaveLength(1);
     expect(rows()).toHaveLength(0);
     expect(window.location.hash).toBe('');
-    expect(screen.getByTestId('share-button')).toHaveAttribute('aria-haspopup', 'menu');
     // Still shown on a temp chat with messages, so it can be left.
     fireEvent.click(screen.getByTestId('temporary-toggle'));
     await waitFor(() => expect(screen.queryAllByTestId('msg-user')).toHaveLength(0));

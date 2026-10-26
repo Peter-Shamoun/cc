@@ -24,5 +24,5 @@ def test_every_api_env_var_is_in_the_deploy_checklist():
 
 def test_peter_items_stay_in_the_checklist():
     for must in ("GlobalSignOut", "Nothing rewrites `/assets/`", "Subresource Integrity", "__CC_CSP_NONCE__",
-                 "Clear-Site-Data", "text/event-stream", "**S1**", "**S4**", "30 days"):
+                 "Clear-Site-Data", "text/event-stream", "Sharing: removed"):
         assert must in DOC, must

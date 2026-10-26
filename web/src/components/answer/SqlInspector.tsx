@@ -50,11 +50,6 @@ export function queryForTable(m: AnyView, t: TablePart): QueryInfo | undefined {
   return qs.find((q) => ids.includes(q.id)) ?? qs.find((q) => q.produces.includes(t.title ?? 'Result'));
 }
 
-/** Shared view made without data (contract 1.15.0 `sqlWithheld`): say the SQL wasn't shared instead of a dead "View SQL". */
-export function SqlWithheldNote() {
-  return <div className="-mt-1 mb-3 inline-flex items-center gap-1 font-sans text-xs text-fg-subtle" data-testid="sql-withheld"><Code2 size={13} aria-hidden /> SQL not shared</div>;
-}
-
 /** Inline "Query ▸" disclosure under a table, ChatGPT "View analysis" style. */
 export function TableSql({ query }: { query: QueryInfo }) {
   const [open, setOpen] = useState(false);

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { ClarifyForm, DOCK_ID, shortHeader, summarizeAnswers } from './ClarifyForm';
+import { ClarifyForm, DOCK_ID, shortHeader, toAnswers } from './ClarifyForm';
+import { validateClarifyAnswers } from '../../contract/clarify';
 import { CLARIFY_FORM } from '../../fixtures/clarifyForm';
 import { AssistantTurn } from '../Message';
 import type { AssistantViewV1 } from '../../api/contract';
@@ -46,8 +47,10 @@ describe('multi-question clarify, Claude-style (one at a time, docked above the 
     fireEvent.click(options()[2]);
     expect(screen.getByTestId('clarify-next')).toHaveTextContent('Submit');
     fireEvent.click(screen.getByTestId('clarify-next'));
-    expect(reply).toHaveBeenCalledWith('Metric: Dollar rate; Period: skipped; Split by: Payer, Denial reason',
-      { clarificationId: 'clf_demo1', choiceIds: ['dollar_rate', 'payer', 'carc'], text: 'Metric: Dollar rate; Period: skipped; Split by: Payer, Denial reason' });
+    // Contract 1.23.0: resume.answers, one per question; the visible turn is clarifySummary.
+    expect(reply).toHaveBeenCalledWith('Metric: Dollar rate; Period: no preference; Split by: Payer, Denial reason',
+      { clarificationId: 'clf_demo1', answers: [{ questionId: 'metric', choiceIds: ['dollar_rate'] }, { questionId: 'period', skipped: true }, { questionId: 'split', choiceIds: ['payer', 'carc'] }] });
+    expect(validateClarifyAnswers(CLARIFY_FORM.questions, reply.mock.calls[0][1].answers)).toBeNull();
     // Settled: the panel goes; one muted line echoes the answers.
     expect(screen.queryAllByTestId('clarify-option')).toHaveLength(0);
     expect(screen.getByTestId('clarify-answered')).toHaveTextContent('Metric: Dollar rate');
@@ -85,7 +88,7 @@ describe('multi-question clarify, Claude-style (one at a time, docked above the 
   });
 
   it('caps at 4 questions × 4 options and 12-character headers', () => {
-    const many = { ...CLARIFY_FORM, questions: Array.from({ length: 6 }, (_, i) => ({ id: `q${i}`, header: `Header number ${i}`, question: `Q${i}?`, options: Array.from({ length: 6 }, (_, j) => ({ id: `o${j}`, label: `O${j}` })) })) };
+    const many = { ...CLARIFY_FORM, questions: Array.from({ length: 6 }, (_, i) => ({ id: `q${i}`, header: `Header number ${i}`, question: `Q${i}?`, options: Array.from({ length: 6 }, (_, j) => ({ id: `o${j}`, label: `O${j}`, description: `D${j}` })) })) };
     render(<ClarifyForm part={many} active />);
     expect(tabs()).toHaveLength(4);
     expect(options()).toHaveLength(4);
@@ -115,9 +118,21 @@ describe('multi-question clarify, Claude-style (one at a time, docked above the 
     expect(container.innerHTML).not.toMatch(/gradient|shadow-|purple|blue-|indigo|rounded-full/);
   });
 
-  it('summarizeAnswers keeps question order and treats empty as skipped', () => {
+  it('toAnswers: question order, empty = skipped, single-select Other replaces a pick, always valid for the server', () => {
     const qs = CLARIFY_FORM.questions;
-    expect(summarizeAnswers(qs, {}).text).toBe('Metric: skipped; Period: skipped; Split by: skipped');
+    expect(toAnswers(qs, {})).toEqual(qs.map((q) => ({ questionId: q.id, skipped: true })));
+    const out = toAnswers(qs, {
+      metric: { picked: ['count_rate'], other: ' Paid ratio ', skipped: false },
+      period: { picked: ['q3', 'ytd'], other: '', skipped: false },
+      split: { picked: ['payer'], other: 'Region', skipped: false },
+    });
+    expect(out).toEqual([
+      { questionId: 'metric', otherText: 'Paid ratio' },
+      { questionId: 'period', choiceIds: ['q3'] },
+      { questionId: 'split', choiceIds: ['payer'], otherText: 'Region' },
+    ]);
+    expect(validateClarifyAnswers(qs, out)).toBeNull();
+    expect(toAnswers(qs, { metric: { picked: ['count_rate'], other: '', skipped: true } })[0]).toEqual({ questionId: 'metric', skipped: true });
   });
 
   it('AssistantTurn renders the Claude-style form for a clarification with questions[], the single card otherwise', () => {

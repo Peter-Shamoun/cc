@@ -40,9 +40,9 @@ from api.security import (MAX_BODY_BYTES, SESSION_COOKIE, BodyLimitMiddleware, C
                           HeadMiddleware, SecurityHeadersMiddleware)
 from api.store import DownloadRegistry, Principal
 from api.feedback import MAX_COMMENT, check as check_feedback, record as feedback_record
+from api.clarify import legacy_answers, summary as clarify_summary, validate_answers
 from api.capabilities import DEFAULT_STRATEGY, capabilities as capabilities_body, check_options
 from api.export import FORMATS as EXPORT_FORMATS, as_json as export_json, as_markdown as export_markdown, filename as export_filename
-from api.share import ShareRegistry, link as share_link, shared_view
 from api.sources import sources_for
 from api.sql_mask import POLICIES as SQL_MASK_POLICIES, mask_event, mask_part, policy_from_env as sql_mask_policy_from_env
 from api.plot import gate_parts
@@ -76,11 +76,6 @@ class FeedbackIn(BaseModel):
     comment: str | None = Field(default=None, max_length=MAX_COMMENT)
 
 
-class ShareIn(BaseModel):
-    includeData: bool = False
-    expiresInDays: Literal[7, 30, 90] | None = None  # 1.15.0 (S4): None keeps the current expiry; new shares get 30
-
-
 class SearchIn(BaseModel):
     q: str = Field(default="", max_length=200)
     cursor: str | None = Field(default=None, max_length=16)
@@ -100,10 +95,19 @@ class ChatMessageIn(BaseModel):
     editOf: str | None = Field(default=None, pattern=_ID)
 
 
+class ClarifyAnswerIn(BaseModel):
+    questionId: str = Field(pattern=_ID)
+    choiceIds: list[str] = Field(default_factory=list, max_length=4)
+    otherText: str | None = Field(default=None, max_length=500)
+    skipped: bool = False
+
+
 class ResumeIn(BaseModel):
     clarificationId: str = Field(pattern=_ID)
     choiceIds: list[str] = Field(default_factory=list, max_length=8)
     text: str | None = Field(default=None, max_length=2000)
+    #: 1.23.0: answers to a multi-question clarification (§6.1)
+    answers: list[ClarifyAnswerIn] | None = Field(default=None, max_length=4)
 
 
 class RegenerateIn(BaseModel):
@@ -123,7 +127,7 @@ class ChatRequest(BaseModel):
     resume: ResumeIn | None = None
     regenerate: RegenerateIn | None = None
     scenario: str | None = Field(default=None, max_length=32)
-    #: 1.20.0: a temporary chat (§11.1): never saved, listed, titled or shared
+    #: 1.20.0: a temporary chat (§11.1): never saved, listed or titled
     temporary: bool = False
 
 
@@ -189,7 +193,7 @@ class AuditLog:
 
     ALLOWED = {"customer", "interrupts", "user", "file_id", "row_count", "conversation_id", "message_id", "parts",
                "queries", "elapsed_ms", "finish", "kind", "reason", "status", "scenario", "steps",
-               "expires_in_days", "rotated", "pinned", "archived", "rules", "temporary"}
+               "pinned", "archived", "rules", "temporary"}
 
     def __init__(self):
         self.events: list[dict] = []
@@ -245,7 +249,6 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
     store = store or make_store(audit=audit)
     temp_chats = TemporaryChats(settings.temporary_ttl_seconds)  # 1.20.0: never persisted (api/temporary.py)
     downloads = DownloadRegistry()
-    shares = ShareRegistry()
     runs: dict[str, _Run] = {}
     purge_lock = threading.Lock()  # a delete and a run's final transcript write never interleave
 
@@ -284,7 +287,6 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
     app.state.audit, app.state.store, app.state.downloads, app.state.runs = audit, store, downloads, runs
     app.state.temp_chats = temp_chats
     app.state.settings, app.state.auth = settings, auth
-    app.state.shares = shares
 
     def authed(request: Request, request_id: str):
         return auth.authenticate(_token(request), request_id)
@@ -486,9 +488,21 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 pending = clarifications.get(body.resume.clarificationId)
                 if pending is None or pending["principal"] != ctx.principal or pending["conversation_id"] != conversation_id:
                     return error_json("clarification_expired", "That question has expired; send it as a new question.", 409)
+                questions = pending.get("questions") or []
+                if body.resume.answers is not None:
+                    answers = [a.model_dump(exclude_none=True) for a in body.resume.answers]
+                    problem = validate_answers(questions, answers) if questions else \
+                        "This question has no parts to answer; send choiceIds or text."
+                    if problem:  # the pending question stays answerable
+                        return error_json("validation", problem, 422)
+                elif questions:  # 1.23.0: a pre-1.23 client answered the first question through `choices`
+                    answers = legacy_answers(questions, body.resume.choiceIds, body.resume.text or reply)
                 del clarifications[body.resume.clarificationId]
-                labels = [c["label"] for c in pending["choices"] if c["id"] in set(body.resume.choiceIds)]
-                answer_text = "; ".join(labels) or (body.resume.text or reply)
+                if questions:
+                    answer_text = clarify_summary(questions, answers)
+                else:
+                    labels = [c["label"] for c in pending["choices"] if c["id"] in set(body.resume.choiceIds)]
+                    answer_text = "; ".join(labels) or (body.resume.text or reply)
                 question = f"{pending['question']}\nClarification: {answer_text}"
                 start_extra["resumeOf"] = {"clarificationId": body.resume.clarificationId,
                                            "messageId": pending["message_id"]}
@@ -614,9 +628,10 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                     clarifications[part["clarificationId"]] = {
                         "principal": ctx.principal, "conversation_id": conversation_id, "question": question,
                         "message_id": message_id, "choices": part.get("choices", []), "scenario": scenario,
+                        "questions": part.get("questions", []),
                         "expires": time.time() + settings.clarification_ttl_seconds}
 
-            parts = [mask_part(p, sql_policy) for p in parts]   # persisted, shared and exported copies too
+            parts = [mask_part(p, sql_policy) for p in parts]   # persisted and exported copies too
             parts, dropped = gate_parts(parts)  # 1.18.0: validate every PlotSpec before emitting
             for rules in dropped:
                 audit("chart_dropped", customer=ctx.principal.customer, user=ctx.principal.user,
@@ -954,79 +969,13 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 or store.delete_conversation(ctx.principal, conversation_id)
             if ok:
                 forget(ctx.principal, conversation_id)
-                shares.revoke(ctx.principal.customer, ctx.principal.user, conversation_id)
         if not ok:  # 1.13.0: keep `deleted: false` and add the standard envelope
             return JSONResponse({"deleted": False, "error": {"code": "not_found", "message": "Not found."}}, 404,
                                 headers=NO_STORE)
         return JSONResponse({"deleted": ok}, headers=NO_STORE)
 
-    # ---------------------------------------------------------------- share (contract 1.11.0, §17)
-
-    def _own_conversation(request: Request, conversation_id: str):
-        """(ctx, None) when the caller owns the conversation, else (None, error response)."""
-        try:
-            ctx = authed(request, new_id("r"))
-        except AuthError:
-            return None, unauthorized()
-        try:
-            conv = store.get_conversation(ctx.principal, conversation_id) if _SAFE_ID.fullmatch(conversation_id) else None
-        except CustomerKeyDisabled:
-            return None, shredded()
-        return (ctx, None) if conv is not None else (None, not_found())
-
-    @app.get("/api/conversations/{conversation_id}/share")
-    def get_share(conversation_id: str, request: Request):
-        ctx, err = _own_conversation(request, conversation_id)
-        if err is not None:
-            return err
-        share = shares.for_conversation(ctx.principal.customer, ctx.principal.user, conversation_id)
-        return JSONResponse(share_link(share), headers=NO_STORE) if share else not_found()
-
-    @app.put("/api/conversations/{conversation_id}/share")
-    def put_share(conversation_id: str, body: ShareIn, request: Request):
-        """Create (or update) the org-scoped read-only link. ``includeData`` defaults to false. 1.15.0: widening
-        ``includeData`` issues a new id and revokes the old one (S1); ``expiresInDays`` is 7, 30 (default) or 90 (S4)."""
-        ctx, err = _own_conversation(request, conversation_id)
-        if err is not None:
-            return err
-        share = shares.put(ctx.principal.customer, ctx.principal.user, conversation_id, body.includeData,
-                           body.expiresInDays)
-        audit("conversation_shared", customer=ctx.principal.customer, user=ctx.principal.user,
-              conversation_id=conversation_id, kind="with_data" if body.includeData else "no_data",
-              expires_in_days=share.expires_in_days, rotated=share.rotated)
-        return JSONResponse(share_link(share), headers=NO_STORE)
-
-    @app.delete("/api/conversations/{conversation_id}/share")
-    def delete_share(conversation_id: str, request: Request):
-        ctx, err = _own_conversation(request, conversation_id)
-        if err is not None:
-            return err
-        if not shares.revoke(ctx.principal.customer, ctx.principal.user, conversation_id):
-            return not_found()
-        audit("conversation_share_revoked", customer=ctx.principal.customer, user=ctx.principal.user,
-              conversation_id=conversation_id)
-        return JSONResponse({"revoked": True}, headers=NO_STORE)
-
-    @app.get("/api/shared/{share_id}")
-    def get_shared(share_id: str, request: Request):
-        """Read-only view for any signed-in user of the same organization. 404 for unknown, revoked, deleted or
-        other-organization shares alike, so a link reveals nothing outside the org."""
-        try:
-            ctx = authed(request, new_id("r"))
-        except AuthError:
-            return unauthorized()
-        share = shares.get(share_id, ctx.principal.customer) if _SAFE_ID.fullmatch(share_id) else None
-        if share is None:
-            return not_found()
-        try:
-            conv = store.get_conversation(Principal(share.customer, share.user), share.conversation_id)
-        except CustomerKeyDisabled:
-            return shredded()
-        if conv is None:
-            return not_found()
-        audit("shared_conversation_viewed", customer=ctx.principal.customer, user=ctx.principal.user,
-              conversation_id=share.conversation_id, kind="with_data" if share.include_data else "no_data")
-        return JSONResponse(shared_view(share, conv), headers={**NO_STORE, "Referrer-Policy": "no-referrer"})
+    # 1.22.0: sharing was removed (former §17). /api/conversations/{id}/share and /api/shared/{id} are
+    # unmatched routes now, so they get the standard 404 envelope from the handler above.
 
     install_access_log_redaction(app.routes)  # after every route is registered
     return app

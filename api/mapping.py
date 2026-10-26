@@ -14,6 +14,7 @@ from decimal import Decimal
 from analyzer.answer import AnalyzerAnswer
 from analyzer.tools import is_phi_column
 
+from api.clarify import normalize_questions
 from api.ids import new_id
 from api.plot import check_plot, to_vega_lite
 from api.store import DownloadRegistry, Principal, csv_filename
@@ -240,8 +241,15 @@ def outcome_parts(answer: AnalyzerAnswer, principal: Principal, downloads: Downl
         choices = [{"id": str(c.get("id") or f"c{i}")[:64], "label": str(c.get("label") or "")[:200],
                     **({"description": str(c["description"])} if c.get("description") else {})}
                    for i, c in enumerate(args.get("choices") or []) if isinstance(c, dict) and c.get("label")]
+        questions = normalize_questions(args.get("questions"))  # 1.23.0 (§6.1); demo args only until the analyzer's ask spec has it
         part = {"type": "clarification", "id": new_id("p_"), "clarificationId": new_id("q_"),
-                "question": answer.text or str(args.get("question") or ""), "allowFreeText": True}
+                "question": answer.text or str(args.get("question") or "") or "A few quick questions first:",
+                "allowFreeText": True}
+        if questions:
+            part["questions"] = questions
+            choices = choices or [dict(o) for o in questions[0]["options"]]  # pre-1.23 clients answer question 1
+            if questions[0].get("multiSelect"):
+                part["multiSelect"] = True
         if choices:
             part["choices"] = choices[:8]
         return prefix + [part], "needs_input"

@@ -10,6 +10,7 @@ test.describe('backend fit @both', () => {
   test('composer has no data-source / scope selector (QA-BF1)', async ({ page }) => {
     await open(page, LIVE);
     await expect(composer(page)).toBeVisible();
+    // QA-BF1 verified fixed by #299 (C10): ratchet removed, now a regression guard.
     const form = page.locator('#composer form');
     await expect(form.getByRole('button', { name: /lake|sem\.\*|scope|data source|database/i })).toHaveCount(0);
     await expect(page.getByText(/Claims lake/i)).toHaveCount(0);

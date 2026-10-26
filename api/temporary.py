@@ -1,7 +1,7 @@
 """Temporary chats (contract 1.20.0, CONTRACT.md §11.1), like ChatGPT's Temporary chat.
 
 A turn sent with ``temporary: true`` is never written to the transcript store: it is not listed, not searchable, not
-exportable, can't be shared or rated, and gets no server title. Its history lives only in this process, so edit,
+exportable, can't be rated, and gets no server title. Its history lives only in this process, so edit,
 regenerate and clarify-resume still work inside the open chat, and it is dropped after ``ttl_seconds`` without
 activity, on sign-out-all/delete, or when the process restarts. Nothing here touches disk.
 """

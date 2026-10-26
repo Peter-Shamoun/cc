@@ -40,6 +40,9 @@ EDGE: dict[str, tuple[str, str, str]] = {
     "clarify_nested_2": ("", "clarify_nested", "needs_input"),
     "clarify_nested_3": ("", "clarify_nested", "stop"),
     "escalation_abstain": ("How many appeals did we win?", "escalation_abstain", "abstain"),
+    # 1.23.0 (§6.1): one multi-question form, then the answer after resume.answers
+    "clarify_multi": ("Denial rate breakdown please", "clarify_multi", "needs_input"),
+    "clarify_multi_2": ("", "clarify_multi", "stop"),
     "cancel_plan": ("Paid amount by payer", "cancel_plan", "aborted"),
     "cancel_sql": ("Paid amount by payer", "cancel_sql", "aborted"),
     "cancel_repair": ("Top denial reason codes", "cancel_repair", "aborted"),
@@ -50,6 +53,9 @@ EDGE: dict[str, tuple[str, str, str]] = {
 EDGE_DIR = EXAMPLES / "edge"
 #: the choice picked at each nested clarification (by label)
 NESTED_PICKS = ("By billed dollars", "Last 90 days")
+#: 1.23.0: the answers sent for the multi-question example (a pick, a pick, a skip)
+MULTI_ANSWERS = [{"questionId": "metric", "choiceIds": ["dollars"]}, {"questionId": "period", "choiceIds": ["last_90"]},
+                 {"questionId": "group", "skipped": True}]
 
 #: extra example: the answer that follows picking the first clarify choice (message.start.resumeOf).
 RESUME = "clarify_resume"
@@ -139,7 +145,7 @@ def capture_edge(model_delay: float = 0.0) -> dict[str, list[dict]]:
     client = _client(model_delay)
     out: dict[str, list[dict]] = {}
     for name, (question, scenario, _finish) in EDGE.items():
-        if name.startswith("clarify_nested_"):
+        if name.startswith(("clarify_nested_", "clarify_multi_")):
             continue
         out[name] = _post(client, {"messages": [{"id": "u_1", "role": "user", "text": question}], "scenario": scenario})
     chain = [out["clarify_nested"]]
@@ -154,7 +160,14 @@ def capture_edge(model_delay: float = 0.0) -> dict[str, list[dict]]:
     n = 0
     for name, stream in zip(("clarify_nested", "clarify_nested_2", "clarify_nested_3"), chain):
         out[name], n = flat[n: n + len(stream)], n + len(stream)
-    return {k: (v if k.startswith("clarify_nested") else normalise(v)) for k, v in out.items()}
+    first = out["clarify_multi"]
+    clar = next(e["part"] for e in first if e["type"] == "part" and e["part"]["type"] == "clarification")
+    second = _post(client, {"messages": [{"id": "u_2", "role": "user", "text": "Metric: By billed dollars; Period: Last 90 days; Group by: By payer"}],
+                            "conversationId": first[0]["conversationId"],
+                            "resume": {"clarificationId": clar["clarificationId"], "answers": MULTI_ANSWERS}})
+    flat = normalise(first + second)
+    out["clarify_multi"], out["clarify_multi_2"] = flat[: len(first)], flat[len(first):]
+    return {k: (v if k.startswith(("clarify_nested", "clarify_multi")) else normalise(v)) for k, v in out.items()}
 
 
 def load_edge(name: str) -> list[dict]:
@@ -178,32 +191,6 @@ def feedback_example() -> dict:
     response.update(messageId="m_1", updatedAt="2026-10-25T20:00:00Z")
     return {"method": "PUT", "path": "/api/conversations/c_1/messages/m_1/feedback", "request": request,
             "response": response, "clear": {"method": "DELETE", "response": {"cleared": True}}}
-
-
-def share_example() -> dict:
-    """PUT .../share then GET /api/shared/{id} by a colleague in the same org (1.11.0); ids and times normalised.
-    1.15.0: the link expires (default 30 days), and widening to `includeData: true` rotates the id (`rotated`)."""
-    client = _client()
-    _post(client, {"messages": [{"id": "u_1", "role": "user", "text": "Paid amount by service month"}],
-                   "conversationId": "c_1", "scenario": "chart"})
-    link = client.put("/api/conversations/c_1/share", json={}, headers=_HEADERS).json()
-    colleague = {**_HEADERS, "Authorization": _HEADERS["Authorization"].rsplit(":", 1)[0] + ":colleague"}
-    view = client.get(f"/api/shared/{link['shareId']}", headers=colleague).json()
-    widened = client.put("/api/conversations/c_1/share", json={"includeData": True, "expiresInDays": 7},
-                         headers=_HEADERS).json()
-    raw = json.dumps({"link": link, "view": view, "widened": widened})
-    raw = raw.replace(link["shareId"], "sh_1").replace(widened["shareId"], "sh_2")
-    raw = re.sub(r'("expiresAt": )"[^"]+"', r'\1"EXPIRES"', raw)
-    raw = re.sub(r'"\d{4}-\d\d-\d\dT[0-9:.]+Z"', '"2026-10-25T20:00:00Z"', raw)
-    out = json.loads(json.dumps(normalise([json.loads(raw)])[0]))
-    out["link"]["expiresAt"] = out["view"]["expiresAt"] = "2026-11-24T20:00:00Z"
-    out["widened"]["expiresAt"] = "2026-11-01T20:00:00Z"
-    return {"share": {"method": "PUT", "path": "/api/conversations/c_1/share", "request": {}, "response": out["link"]},
-            "view": {"method": "GET", "path": "/api/shared/sh_1", "response": out["view"]},
-            "widen": {"method": "PUT", "path": "/api/conversations/c_1/share",
-                      "request": {"includeData": True, "expiresInDays": 7}, "response": out["widened"],
-                      "note": "Widening issues a new id; GET /api/shared/sh_1 is now 404."},
-            "revoke": {"method": "DELETE", "path": "/api/conversations/c_1/share", "response": {"revoked": True}}}
 
 
 def export_example() -> str:
@@ -246,8 +233,6 @@ def main(argv: list[str]) -> int:
     print("wrote examples/capabilities.json")
     (EXAMPLES / "feedback.json").write_text(json.dumps(feedback_example(), indent=2) + "\n")
     print("wrote examples/feedback.json")
-    (EXAMPLES / "share.json").write_text(json.dumps(share_example(), indent=2, ensure_ascii=False) + "\n")
-    print("wrote examples/share.json")
     (EXAMPLES / "export.md").write_text(export_example())
     print("wrote examples/export.md")
     for k, v in captured.items():

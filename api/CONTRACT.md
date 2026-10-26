@@ -1,6 +1,6 @@
 # ClaimClarity chat API — stream contract
 
-**Version: 1.21.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.23.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -255,6 +255,33 @@ A chart streams like a table (§5.1): `chart.start {partId, plot: PlotHeader, al
 4. Unknown/expired/already-answered `clarificationId` → HTTP 409 `{"error": {"code": "clarification_expired"}}`;
    the UI then just sends the text as a fresh question.
 
+### 6.1 Multi-question clarification (1.23.0)
+
+Modelled on Claude's ask-the-user form. A `clarification` part may carry `questions` (1–4 `ClarifyQuestion`s) that the
+user answers together in one form:
+
+* `ClarifyQuestion {id, header, question, options, multiSelect?}`: `header` is a chip label of **12 characters or
+  fewer**; `question` ≤ 500; `options` are **2–4** `{id, label ≤ 60, description ≤ 200}`, every description required.
+  `multiSelect` lets the user pick several.
+* Every question also offers **Other** (free text, ≤ 500, collapsed to one line) and **Skip**. The UI adds these; they
+  are not options in the list.
+* With `questions`, the part's `question` is the lead-in (default "A few quick questions first:"), and `choices`
+  mirrors question 1 (plus `multiSelect` when Q1 has it), so a pre-1.23 client still shows a usable single question.
+* **Reply:** `resume: {clarificationId, answers: ClarifyAnswer[]}` with `ClarifyAnswer {questionId, choiceIds?
+  (unique, offered ids), otherText?, skipped?}`. A question with no answer counts as skipped; `answers: []` skips them
+  all. Single-select questions take one value (a choice **or** Other).
+* **Validation → 422 `validation`** with a user-safe message, and the clarification **stays pending** so the user can fix
+  it: too many answers; an unknown or repeated `questionId`; a skipped answer with values; an empty non-skipped answer;
+  an unoffered or repeated choice; more than one value on a single-select question; `answers` on a part without
+  `questions`.
+* **Legacy resume** (`choiceIds`/`text` without `answers`) on a multi-question part answers question 1; the rest count
+  as skipped.
+* The analyzer receives one line, `Clarification: Header: value[, value]; Header: no preference` (`api/clarify.py`
+  `summary`, mirrored by `web/src/contract/clarify.ts` `clarifySummary`; both run `api/contract/clarify_cases.json`).
+  Use the same line as the user turn's visible `text` so the transcript matches.
+* **Live mode:** the analyzer's `ask` tool spec carries one `question` only, so live runs still send single questions
+  until the analyzer side adds `questions` (BACKEND-FIT). The demo scenario `clarify_multi` shows the full shape.
+
 ## 7. Usage, cost and latency (`message.end.usage`)
 
 `queries`, `elapsedMs` (required); `tokens? {input, output, cacheRead?, cacheWrite?}`; `costUsd?` with
@@ -381,6 +408,7 @@ Request-only (`ChatRequest.scenario`; no keywords), so e2e tests can pin them. E
 | `multi_table` | stop | **Two tables** in one answer ("By payer", "By claim status"), each with its own SQL `code` part via `sqlPartId`, and a chart per table (`tablePartId`). The second query also streams as steps. |
 | `long_sql` | stop | A ~4.4 KB, 100+ line query (7 CTEs) in `step.sql_running.sql` and the `code` part. Test wrap/scroll/copy/collapse. |
 | `many_repairs` | stop | Four failing queries, each followed by `step.repair_attempt` and a rerun (attempts 2–5), then the answer. |
+| `clarify_multi` | needs_input → stop | 1.23.0 (§6.1): one form with three questions (Metric, Period, Group by — the last multi-select), answered together with `resume.answers`, then the answer (`edge/clarify_multi{,_2}.jsonl`; the example picks dollars and last 90 days and skips Group by). Keyword: "denial rate breakdown" or "ask me a few questions". |
 | `clarify_nested` | needs_input → needs_input → stop | Asks (count vs dollars); after the resume it asks **again** (time window); after the second resume it answers. `resumeOf` chains each message to the one before (`edge/clarify_nested{,_2,_3}.jsonl`). |
 | `escalation_abstain` | abstain | The small model gives up → `escalation` → the larger model also abstains (`abstain` part with suggestions; two models in usage). A refusal itself never escalates. |
 | `cancel_plan` | aborted | Stop while planning, before any SQL. |
@@ -421,7 +449,7 @@ In the `cancel_*` scenarios the **server presses Stop itself** when the stage's 
 * `error.details` and `step.*.error.message` are scrubbed (quoted literals and long digit runs masked) and ≤500 chars.
 * **Shown SQL masks PHI-bearing literals (1.14.0).** The SQL a run *executes* is unchanged; the SQL it *shows*
   (`step.sql_running.sql`, `step.repair_attempt.revisedSql`, `step.candidates[].sql`, the `code` part with `role: query`, legacy `tool_call` input, and
-  therefore transcripts, shares and exports) has literals replaced by `?`, and the event/part carries
+  therefore transcripts and exports) has literals replaced by `?`, and the event/part carries
   `maskedLiterals: <n>`. The server policy is `Capabilities.sqlLiteralMasking` (env `CC_API_SQL_LITERAL_MASKING`;
   an unknown value means `phi`, so a typo never turns it off):
 
@@ -466,7 +494,7 @@ announced by `Capabilities.pinArchive: true`; older servers lack it, so keep pin
 * The plain list returns **pinned chats first** (most recently pinned on top), then the rest newest first, so pins are
   on page 1 whatever their age. Search results stay newest first. `?archived=exclude` is the sidebar,
   `?archived=only` is Settings → Archived chats; the default `include` keeps pre-1.17 clients unchanged. Archived
-  chats stay searchable and openable. Shared views (§17) never show the flags.
+  chats stay searchable and openable.
 * Audit: `conversation_flags` with `pinned` / `archived` only (no title, no text).
 
 **`StoredMessage`.** User messages carry `text`, `parentId?` and `editOf?`. Assistant messages carry `parts`,
@@ -493,8 +521,8 @@ Like ChatGPT's Temporary chat: a chat the user doesn't want kept. Announced by `
   dropped after `ttlSeconds` idle, on `DELETE /api/conversations/{id}` (the client's "discard" on leaving the chat), on
   `DELETE /api/conversations` (not counted in `deleted`), and on sign-out. At most 20 per user (least recently used
   goes first).
-* **Never listed or reachable as history.** Not in the list or search; `GET`, `PATCH`, export, share and feedback on
-  its id are 404 `access_denied`, so it can't be shared, renamed, pinned or rated.
+* **Never listed or reachable as history.** Not in the list or search; `GET`, `PATCH`, export and feedback on
+  its id are 404 `access_denied`, so it can't be renamed, pinned or rated.
 * **No title.** `message.end` never carries `conversationTitle`.
 * **No crossing.** A temporary turn on a saved chat's id, or a saved turn on a temporary chat's id, is 422
   `validation` ("Start a new chat"). Another user's id is 404.
@@ -665,50 +693,31 @@ the declared fields, x/y/series present and well typed, finiteness, series count
   (`buildSpec`, `ChartView`) draws only from a valid `plot`; a chart without `plot` (stored before 1.18) still
   renders from its sanitized `spec`.
 
-## 17. Share inside the organization (1.11.0)
+## 17. Sharing (removed in 1.22.0)
 
-A share is a **read-only, org-scoped, revocable** link to one conversation. There are no public links: the viewer
-must be signed in to the same organization (customer). A conversation has at most one active share.
-
-| Request | Body | Response |
-|---|---|---|
-| `GET /api/conversations/{id}/share` | | `ShareLink`, or 404 `not_found` when not shared |
-| `PUT /api/conversations/{id}/share` | `ShareRequest {includeData?: false, expiresInDays?: 7\|30\|90}` | `ShareLink {shareId, conversationId, url, scope: "organization", includeData, createdAt, expiresAt, expiresInDays, rotated?}`. Same `shareId` unless data is widened (below); 422 for another `expiresInDays` |
-| `DELETE /api/conversations/{id}/share` | | `{revoked: true}`, or 404 when there was none |
-| `GET /api/shared/{shareId}` | | `SharedConversation {shareId, title, updatedAt, includeData, createdAt, expiresAt, sqlWithheld?, messages: StoredMessage[]}` |
-
-* Only the owner can manage a share. Anyone else gets a 404, like any other user's conversation (§1).
-* The viewer gets **404 `not_found`** for an unknown, revoked, **expired**, other-organization or
-  deleted-conversation share alike, so a link reveals nothing. 401 when signed out, 410 `transcripts_unavailable` after crypto-shredding.
-  Deleting the conversation revokes its share.
-* **Data is withheld by default.** With `includeData: false`, tables keep `columns` and `rowCount`, but `rows: []`
-  and `dataWithheld: true` (`TablePart.dataWithheld`, 1.11). `chart` parts and `table`/`chart`/`report`/`image`
-  artifacts are left out. **SQL is withheld too (1.15.0, QA-S18)**: SQL `code` parts are removed, `table.sqlPartId`
-  is dropped, SQL strings in stored steps (`sql`, `revisedSql`, `candidates[].sql`) and `tool_call.input.sql` are
-  `""`, and the view says `sqlWithheld: true` (show "SQL not shared"). Prose, steps, callouts and sources stay. With `includeData: true`, the stored preview
-  rows (≤ 50 per table) are shared. **Never shared:** the CSV (`csvFileId` is removed), `feedback`, and the owner's
-  identity.
-* **Widening rotates the link (1.15.0, S1).** A PUT that turns `includeData` from false to true issues a **new**
-  `shareId` and revokes the old one, so a link handed out for a data-free view never starts showing rows. The
-  response has `rotated: true`; the dialog must show the new link and say the old one stopped working. Narrowing
-  (true→false) or an unchanged `includeData` keeps the id.
-* **Expiry (1.15.0, S4).** Every share expires. `expiresInDays` is 7, **30 (default)** or 90, counted from the PUT
-  that set it; a PUT without it keeps the current expiry (a new or rotated share gets 30 days). `Capabilities.shareExpiry`
-  lists the options and default. The dialog shows the expiry (`expiresAt`, e.g. "Expires Nov 24 · in 30 days";
-  `shareDaysLeft()` in `web/src/contract/share.ts`). An expired share is gone: viewer 404 as above, and the owner's GET
-  is 404 "not shared". A share from a pre-1.15 server has no `expiresAt` (no expiry).
-* `url` is the app path `/shared/<shareId>`. The share id has 144 random bits and is a capability inside the org:
-  don't log it. The response is `no-store` with `Referrer-Policy: no-referrer`.
-* UI: the share dialog defaults to "Without result data", with an opt-in toggle. Show `rowCount` and "data not
-  shared" for withheld tables. The view is read-only, with no composer and no regenerate.
-* Audit: `conversation_shared` / `conversation_share_revoked` / `shared_conversation_viewed`, with `kind` =
-  `with_data`|`no_data` (and `expires_in_days`, `rotated` on `conversation_shared`, 1.15) and never the share id.
-* Demo: shares are kept in memory (they are lost on restart). A real backend persists them with the transcript.
-* Client: `getShare`, `setShare`, `revokeShare`, `loadShared` and `shareIdFromPath` in `web/src/contract/share.ts`.
-  Example: `examples/share.json`.
+Sharing was removed in 1.22.0 (product decision, 2026-10-26). There are no share links, no shared views and no share
+settings. `GET`/`PUT`/`DELETE /api/conversations/{id}/share`, `GET /api/shared/{shareId}` and any other
+`/api/share*` path are unmatched routes, so every method answers with the standard 404 envelope
+`{"error": {"code": "not_found", "message": "Not found."}}` (§1), signed in or not. The schemas `ShareRequest`,
+`ShareLink`, `SharedConversation` and `ShareExpiryDays`, `TablePart.dataWithheld` and `Capabilities.shareExpiry` are
+gone. A conversation is visible only to its owner (§1). Clients drop the share UI, and an old `/shared/<id>` app link
+lands on the client's not-found view. Test: `api/tests/test_share_removed_122.py`. The section number is kept so
+older references still resolve.
 
 ## Changelog
 
+* **1.23.0** (2026-10-26) — **Multi-question clarification** (§6.1), additive. New `$defs` `ClarifyQuestion`,
+  `ClarifyOption`, `ClarifyAnswer`; `ClarificationPart.questions?` (1–4); `ChatRequest.resume.answers?` (≤ 4); demo
+  scenario `clarify_multi` (`edge/clarify_multi{,_2}.jsonl`). Invalid answers → 422 `validation`, still pending. Shared
+  cases `api/contract/clarify_cases.json` (Python + TS); helpers `api/clarify.py`, `web/src/contract/clarify.ts`.
+  Older clients: `choices` mirrors question 1 and a legacy resume answers it.
+* **1.22.0** (2026-10-26) — **Sharing removed** (§17). The routes `GET`/`PUT`/`DELETE /api/conversations/{id}/share`
+  and `GET /api/shared/{shareId}` are gone (they are now standard 404 envelopes, like every `/api/share*` path), along
+  with the in-memory share registry, expiry and rotation, and the share audit events. These schemas are removed:
+  `ShareRequest`, `ShareLink`, `SharedConversation`, `ShareExpiryDays`, `TablePart.dataWithheld` and
+  `Capabilities.shareExpiry`. `examples/share.json`, `web/src/contract/share.ts` and the share re-exports in
+  `web/src/api/contract.ts` are removed too. This is a removal, but the client already treated a missing
+  `shareExpiry` and a 404 share as "no sharing", and nothing on the stream changes.
 * **1.21.0** (2026-10-26) — BACKEND-FIT (§2.1). No field ever let the client choose a data source, scope,
   schema or customer; this release makes that a rule. New `IdentityScopedKey` enum, enforced with `propertyNames` on
   `ChatRequest` and `ChatRequest.options`: such a key is 422 `validation` and nothing runs. The demo session's
@@ -721,7 +730,7 @@ must be signed in to the same organization (customer). A conversation has at mos
   statements are untouched. `analyzer/` unchanged.
 * **1.20.0** (2026-10-25) — Temporary chat (§11.1), additive. `ChatRequest.temporary`, `MessageStart.temporary`
   (`true` when set) and `Capabilities.temporaryChat {ttlSeconds}`. A temporary chat is held in memory for its idle
-  TTL only: never stored, listed, searched, titled, exported, rated or shared; discard with `DELETE`; a chat can't move
+  TTL only: never stored, listed, searched, titled, exported, rated or shared (sharing itself was removed in 1.22); discard with `DELETE`; a chat can't move
   between temporary and saved (422).
 * **1.19.0** (2026-10-25) — Edge fixes, no new fields. (1) **No id or pattern accepts a trailing newline.**
   Python's `re` `$` also matches before a final `\n` (and `\d` matches any Unicode digit), so `ID`,

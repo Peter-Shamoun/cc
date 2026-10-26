@@ -43,12 +43,10 @@ describe('suggested follow-ups', () => {
     const actions = screen.getByTestId('msg-actions');
     expect(actions.compareDocumentPosition(nav) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
-  it('hidden on older turns, while streaming, on read-only views and without onSend', () => {
+  it('hidden on older turns, while streaming and without onSend', () => {
     const { rerender } = render(<AssistantTurn msg={withFU()} isLast={false} onOpen={noop} onRegenerate={noop} onEdit={noop} onSend={noop} />);
     expect(screen.queryByTestId('follow-ups')).toBeNull();
     rerender(<AssistantTurn msg={withFU(ITEMS, false)} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} onSend={noop} />);
-    expect(screen.queryByTestId('follow-ups')).toBeNull();
-    rerender(<AssistantTurn msg={withFU()} isLast readOnly onOpen={noop} onRegenerate={noop} onEdit={noop} onSend={noop} />);
     expect(screen.queryByTestId('follow-ups')).toBeNull();
     rerender(<AssistantTurn msg={withFU()} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} />);
     expect(screen.queryByTestId('follow-ups')).toBeNull();
@@ -93,7 +91,7 @@ describe('Ask to change response…', () => {
     fireEvent.blur(input);
     expect(screen.queryByTestId('change-response')).toBeNull();
   });
-  it('not offered without onSend (shared view)', () => {
+  it('not offered without onSend', () => {
     render(<AssistantTurn msg={withFU([])} isLast onOpen={noop} onRegenerate={noop} onEdit={noop} onRefine={noop} />);
     fireEvent.click(screen.getByTestId('regenerate-menu-button'));
     expect(screen.queryByRole('menuitem', { name: /Ask to change response/ })).toBeNull();

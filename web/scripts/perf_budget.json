@@ -1,14 +1,14 @@
 {
-  "$comment": "Lighthouse lab budgets for the cold load of the production (mock) build served by vite preview. Baseline 2026-10-25: desktop perf 1.00, LCP 0.58 s, TBT 5 ms; mobile perf 0.92, LCP 2.65 s, TBT 118 ms; 296 KB transferred. Budgets leave headroom for CI variance; tighten, don't loosen (docs/frontend_ci.md). QA-P8 (boot shell, lazy markdown, stylesheet out of <head>), median of 3: mobile perf 0.98, FCP/LCP 1.81 s, TBT 0, CLS 0; desktop 1.00, FCP 0.41 s. Mobile tightened 0.85 -> 0.90, FCP 3200 -> 2500, LCP 3500 -> 2500, TTI 4000 -> 3000. After #221 (boot shell + lazy markdown) mobile perf raised 0.90 -> 0.95.",
+  "$comment": "Lighthouse lab budgets for the cold load of the production (mock) build served by vite preview. Baseline 2026-10-25: desktop perf 1.00, LCP 0.58 s, TBT 5 ms; mobile perf 0.92, LCP 2.65 s, TBT 118 ms; 296 KB transferred. Budgets leave headroom for CI variance; tighten, don't loosen (docs/frontend_ci.md). QA-P8 (boot shell, lazy markdown, stylesheet out of <head>), median of 3: mobile perf 0.98, FCP/LCP 1.81 s, TBT 0, CLS 0; desktop 1.00, FCP 0.41 s. Mobile tightened 0.85 -> 0.90, FCP 3200 -> 2500, LCP 3500 -> 2500, TTI 4000 -> 3000. After #221 (boot shell + lazy markdown) mobile perf raised 0.90 -> 0.95. Bytes: load-byte-weight (derived: requests started by the load event, ~190 KB) keeps the 350 KB cold-load budget; total-byte-weight now includes the idle prefetch of the Markdown/KaTeX/Vega chunks after load (~725 KB) and is capped at 800 KB, the bundle budget's total JS.",
   "lighthouse": "12.8.2",
   "presets": {
     "desktop": {
       "categories": { "performance": 0.95, "accessibility": 1, "best-practices": 0.95 },
-      "metrics": { "first-contentful-paint": 1000, "largest-contentful-paint": 1200, "total-blocking-time": 150, "cumulative-layout-shift": 0.02, "interactive": 1500, "total-byte-weight": 358400 }
+      "metrics": { "first-contentful-paint": 1000, "largest-contentful-paint": 1200, "total-blocking-time": 150, "cumulative-layout-shift": 0.02, "interactive": 1500, "load-byte-weight": 358400, "total-byte-weight": 819200 }
     },
     "mobile": {
       "categories": { "performance": 0.95, "accessibility": 1, "best-practices": 0.95 },
-      "metrics": { "first-contentful-paint": 2500, "largest-contentful-paint": 2500, "total-blocking-time": 300, "cumulative-layout-shift": 0.02, "interactive": 3000, "total-byte-weight": 358400 }
+      "metrics": { "first-contentful-paint": 2500, "largest-contentful-paint": 2500, "total-blocking-time": 300, "cumulative-layout-shift": 0.02, "interactive": 3000, "load-byte-weight": 358400, "total-byte-weight": 819200 }
     }
   }
 }

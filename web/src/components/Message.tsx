@@ -10,7 +10,7 @@ import { ChartView } from './parts/ChartView';
 import { ArtifactCard, Callout, ErrorView, FileCard, ImageView, ReasoningView, Unsupported } from './parts/misc';
 import { CopyButton, IconButton } from './ui';
 import { StepTimeline } from './answer/StepTimeline';
-import { queriesOf, queryForTable, SqlInspector, SqlWithheldNote, TableSql } from './answer/SqlInspector';
+import { queriesOf, queryForTable, SqlInspector, TableSql } from './answer/SqlInspector';
 import { AbstainCard, ClarifyCard, EscalationNote, StoppedNote, TableSkeleton } from './answer/States';
 import { ClarifyForm, isMultiClarification } from './answer/ClarifyForm';
 import { FollowUps, isFollowUps } from './answer/FollowUps';
@@ -200,7 +200,7 @@ export type Refine = Exclude<RegenerateStyle, 'default'>;
 /** Version label for a styled regeneration (`message.start.regenerateStyle` / `StoredMessage.regenerateStyle`). */
 export const STYLE_LABEL: Record<Refine, string> = { concise: 'Concise', detailed: 'Detailed' };
 
-export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, onOpen, onRegenerate, onEdit, onSend, onReply, onRefine, version, onVersion, versionBusy, readOnly, sqlWithheld, onBranch }: { msg: AnyView; isLast: boolean; onOpen: (a: Artifact) => void; onRegenerate: () => void; onEdit: (t: string) => void; onSend?: (t: string) => void; onReply?: OnReply; onRefine?: (style: Refine) => void; version?: { current: number; total: number }; onVersion?: (k: number) => void; versionBusy?: boolean; /** Shared /shared/:id view: no actions, feedback, retry, edits or replies. */ readOnly?: boolean; /** Shared without data (contract 1.15.0): SQL was withheld; tables say "SQL not shared". */ sqlWithheld?: boolean; /** QA-S41 (shell): "Branch in new chat" in More actions. */ onBranch?: () => void }) {
+export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, onOpen, onRegenerate, onEdit, onSend, onReply, onRefine, version, onVersion, versionBusy, onBranch }: { msg: AnyView; isLast: boolean; onOpen: (a: Artifact) => void; onRegenerate: () => void; onEdit: (t: string) => void; onSend?: (t: string) => void; onReply?: OnReply; onRefine?: (style: Refine) => void; version?: { current: number; total: number }; onVersion?: (k: number) => void; versionBusy?: boolean; /** QA-S41 (shell): "Branch in new chat" in More actions. */ onBranch?: () => void }) {
   const msg = view as AssistantView; // legacy part renderers; v1-only data is read through `view`
   // Which turn was streaming on screen in this row (uiKey survives the server-id swap; a version switch changes it),
   // so text that lands in one network chunk still flows in, while history and old versions show at once.
@@ -260,13 +260,12 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
     if (p.type === 'reasoning' && timeline) continue; // shown inside the timeline
     if (p.type === 'code' && p.role === 'query' && linkedSql.has(p.id)) continue; // shown under its table
     if (isFollowUps(p as { type: string })) continue; // rendered once, under the action row
-    if (p.type === 'abstain') { blocks.push(<AbstainCard key={p.id} part={p} onReply={readOnly ? undefined : reply} />); continue; }
-    if (p.type === 'clarification') { const C = isMultiClarification(p) ? ClarifyForm : ClarifyCard; blocks.push(<C key={p.id} part={p as never} onReply={readOnly ? undefined : reply} active={!readOnly && isLast && !msg.streaming} />); continue; }
-    blocks.push(<PartView key={p.id} part={p as Part} msg={msg} liveTurn={liveTurn} open={open} openArtifact={onOpen} onRetry={readOnly ? undefined : onRegenerate} onEdit={readOnly ? undefined : onEdit} onAsk={readOnly || msg.streaming ? undefined : onSend} />);
+    if (p.type === 'abstain') { blocks.push(<AbstainCard key={p.id} part={p} onReply={reply} />); continue; }
+    if (p.type === 'clarification') { const C = isMultiClarification(p) ? ClarifyForm : ClarifyCard; blocks.push(<C key={p.id} part={p as never} onReply={reply} active={isLast && !msg.streaming} />); continue; }
+    blocks.push(<PartView key={p.id} part={p as Part} msg={msg} liveTurn={liveTurn} open={open} openArtifact={onOpen} onRetry={onRegenerate} onEdit={onEdit} onAsk={msg.streaming ? undefined : onSend} />);
     if (p.type === 'table') {
       const q = queryForTable(view, p);
       if (q) blocks.push(<TableSql key={`sql-${p.id}`} query={q} />);
-      else if (sqlWithheld) blocks.push(<SqlWithheldNote key={`sql-${p.id}`} />);
     }
   }
   placeTimeline();
@@ -289,11 +288,11 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
       )}
       {isLast && <TransportAnnouncer status={msg.streaming ? msg.status : null} />}
       {/* ChatGPT/Claude: one retry per turn. With content, Regenerate sits in the action row; the note only carries Retry when nothing came back. */}
-      {!msg.streaming && msg.finishReason === 'aborted' && <StoppedNote onRetry={isLast && !readOnly && empty ? onRegenerate : undefined} />}
+      {!msg.streaming && msg.finishReason === 'aborted' && <StoppedNote onRetry={isLast && empty ? onRegenerate : undefined} />}
       {/* A failed turn used no data for an answer: no Sources chip. */}
       {/* QA-A31: like Claude/ChatGPT, sources only when something was actually consulted (a query ran or data came back), not on a clarify or abstain. */}
       {!msg.streaming && !failed && consulted((view as { steps?: { kind: string; state: string }[] }).steps, parts) && <SourcesChip sources={(view as { sources?: Source[] }).sources} parts={parts} />}
-      {!readOnly && !msg.streaming && !empty && (
+      {!msg.streaming && !empty && (
         <div className={clsx('-ml-2 mt-2 flex flex-wrap items-center gap-0.5 transition-opacity', isLast ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100')} data-testid="msg-actions">
           {version && onVersion && <VersionNav version={version} onVersion={onVersion} disabled={versionBusy} />}
           <CopyButton text={() => messageMarkdown(view)} tip />
@@ -311,8 +310,8 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
           {feedbackSent && <span className="ml-2 font-sans text-xs text-fg-subtle">Thanks for the feedback</span>}
         </div>
       )}
-      {changing && isLast && !readOnly && !msg.streaming && onSend && <ChangeResponse onSubmit={onSend} onClose={(cancelled) => { setChanging(false); if (cancelled) rootRef.current?.querySelector<HTMLElement>('[data-testid="regenerate-menu-button"]')?.focus(); }} />}
-      {isLast && !readOnly && !msg.streaming && onSend && (() => { const f = (parts as { type: string }[]).find(isFollowUps); return f ? <FollowUps part={f} onSend={onSend} /> : null; })()}
+      {changing && isLast && !msg.streaming && onSend && <ChangeResponse onSubmit={onSend} onClose={(cancelled) => { setChanging(false); if (cancelled) rootRef.current?.querySelector<HTMLElement>('[data-testid="regenerate-menu-button"]')?.focus(); }} />}
+      {isLast && !msg.streaming && onSend && (() => { const f = (parts as { type: string }[]).find(isFollowUps); return f ? <FollowUps part={f} onSend={onSend} /> : null; })()}
       {regen.anchor && onRefine && (
         <Menu anchor={regen.anchor} onClose={regen.close} label="Regenerate" items={[
           { label: 'Try again', icon: <RefreshCw size={15} />, onSelect: onRegenerate },

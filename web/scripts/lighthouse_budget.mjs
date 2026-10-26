@@ -22,6 +22,23 @@ export function median(xs) {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
+/**
+ * Bytes of the cold load: requests that started at or before the page's load event. The idle prefetch
+ * (src/lib/idlePrefetch.ts) deliberately fetches the Markdown/KaTeX/Vega chunks after load, while the user reads;
+ * Lighthouse's `total-byte-weight` counts those too, so it can't measure the cold load any more. null if the report
+ * lacks the network or metrics audits.
+ */
+export function loadByteWeight(report) {
+  const reqs = report.audits?.['network-requests']?.details?.items;
+  const load = report.audits?.metrics?.details?.items?.[0]?.observedLoad;
+  if (!Array.isArray(reqs) || typeof load !== 'number') return null;
+  return reqs.filter((r) => typeof r.networkRequestTime === 'number' && r.networkRequestTime <= load)
+    .reduce((n, r) => n + (r.transferSize ?? 0), 0);
+}
+
+/** Metrics this script derives from a report (not Lighthouse audits). */
+const DERIVED = { 'load-byte-weight': loadByteWeight };
+
 /** Pure check of one preset's reports against its budget: categories are minimums, metrics maximums. */
 export function evaluate(preset, reports, budget) {
   const errors = [];
@@ -37,7 +54,7 @@ export function evaluate(preset, reports, budget) {
     rows.push({ preset, key, value, limit, ok: value !== null && value >= limit, kind: 'category' });
   }
   for (const [key, limit] of Object.entries(budget.metrics)) {
-    const vals = ok.map((r) => r.audits[key]?.numericValue).filter((v) => typeof v === 'number');
+    const vals = ok.map((r) => (DERIVED[key] ? DERIVED[key](r) : r.audits[key]?.numericValue)).filter((v) => typeof v === 'number');
     const value = vals.length ? median(vals) : null;
     rows.push({ preset, key, value, limit, ok: value !== null && value <= limit, kind: 'metric' });
   }

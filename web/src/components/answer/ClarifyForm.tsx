@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import { Check } from 'lucide-react';
-import type { ClarificationPart } from '../../api/contract';
+import type { ClarificationPart, ClarifyAnswer, ClarifyQuestion } from '../../api/contract';
+import { clarifyRequest, clarifySummary } from '../../contract/clarify';
 import { Inline } from '../parts/misc';
 import { useExpired } from '../../lib/useExpired';
 import type { OnReply } from './States';
@@ -13,13 +14,11 @@ import type { OnReply } from './States';
  * header (≤12 chars, shown as a quiet tab), 2–4 options with a one-line description, multi-select where allowed, an
  * "Other" free-text row and Skip. Typing in the composer still works (shell routes it as the answer, QA-A30).
  * Neutral by rule: one hairline-bordered panel, no colour accents, no animation beyond the app's focus ring.
- * Provisional shape (contract is adding the parts); the reply resumes the run with today's contract fields:
- * every picked choice id plus a readable "Header: answer; …" text.
+ * Contract 1.23.0 (CONTRACT.md §6.1): `ClarificationPart.questions`; the reply is `resume.answers` (one
+ * ClarifyAnswer per question) and the visible user turn is `clarifySummary` ("Metric: …; Period: no preference").
  * Placement: portals into `#cc-composer-dock` when the shell provides it; until then it renders at the end of the
  * last answer, sticky to the bottom of the thread, which reads the same when the reader is at the bottom.
  */
-export type ClarifyOption = { id: string; label: string; description?: string };
-export type ClarifyQuestion = { id: string; header: string; question: string; options: ClarifyOption[]; multiSelect?: boolean };
 export type MultiClarification = ClarificationPart & { questions: ClarifyQuestion[] };
 
 export const isMultiClarification = (p: ClarificationPart): p is MultiClarification =>
@@ -39,10 +38,15 @@ export function answerLabel(q: ClarifyQuestion, a: Ans | undefined): string {
   return labels.join(', ') || 'skipped';
 }
 
-/** "Metric: Claim count rate; Period: skipped" — echoed under the question and sent as the resume text. */
-export function summarizeAnswers(qs: ClarifyQuestion[], answers: Record<string, Ans>): { text: string; choiceIds: string[] } {
-  const choiceIds = qs.flatMap((q) => (answers[q.id]?.skipped ? [] : answers[q.id]?.picked ?? []));
-  return { text: qs.map((q) => `${q.header}: ${answerLabel(q, answers[q.id])}`).join('; '), choiceIds };
+/** The contract answers (one per question, in order). Single-select: Other replaces a pick. Nothing chosen = skipped. */
+export function toAnswers(qs: readonly ClarifyQuestion[], answers: Record<string, Ans>): ClarifyAnswer[] {
+  return qs.map((q) => {
+    const a = answers[q.id];
+    const other = a?.other.trim() ?? '';
+    const picked = a && !a.skipped ? (q.multiSelect ? a.picked : other ? [] : a.picked.slice(0, 1)) : [];
+    if (!a || a.skipped || (!picked.length && !other)) return { questionId: q.id, skipped: true };
+    return { questionId: q.id, ...(picked.length ? { choiceIds: picked } : {}), ...(other ? { otherText: other } : {}) };
+  });
 }
 
 function useDock(active: boolean) {
@@ -64,9 +68,10 @@ export function ClarifyForm({ part, onReply, active }: { part: MultiClarificatio
   const a = answers[q.id];
 
   const finish = (all: Record<string, Ans>) => {
-    const { text, choiceIds } = summarizeAnswers(qs, all);
+    const list = toAnswers(qs, all);
+    const text = clarifySummary(qs, list);
     setSent(text);
-    onReply?.(text, { clarificationId: part.clarificationId, ...(choiceIds.length ? { choiceIds } : {}), text });
+    onReply?.(text, clarifyRequest(part.clarificationId, list));
   };
   /** Record this question's answer, then move on (or send after the last one). */
   const commit = (next: Ans) => {

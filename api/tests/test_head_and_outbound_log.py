@@ -43,7 +43,7 @@ def test_head_does_not_unlock_post_only_routes(client):
 
 
 def test_outbound_shape():
-    assert outbound_shape("http://testserver/api/shared/sh_AbC123?x=1") == "http://testserver/api/shared/:id"
+    assert outbound_shape("http://testserver/api/shared/sh_AbC123?x=1") == "http://testserver/api/:id/:id"
     assert outbound_shape("https://idp.example/oauth2/token") .startswith("https://idp.example/")
     assert "sh_" not in outbound_shape("https://h/api/shared/sh_secret#frag")
     assert outbound_shape("not a url") == ":url"
@@ -56,4 +56,4 @@ def test_test_client_request_log_has_no_ids(client, caplog):
     text = "\n".join(r.getMessage() for r in caplog.records if r.name == "httpx")
     assert "HTTP Request" in text
     assert "sh_SyntheticShareId42" not in text and "c_synthetic_7" not in text and "Jane" not in text
-    assert "/api/shared/:id" in text
+    assert "/api/:id/:id" in text  # 1.22: no share route, so the stale path is fully shaped

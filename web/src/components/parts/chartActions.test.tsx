@@ -82,7 +82,7 @@ describe('chart: click a bar to ask about it', () => {
     expect(screen.queryByTestId('chart-ask')).toBeNull();
     expect(ask).not.toHaveBeenCalled();
   });
-  it('without onAsk (artifact panel, shared view, streaming) a click does nothing', async () => {
+  it('without onAsk (artifact panel, streaming) a click does nothing', async () => {
     await mount();
     act(() => h.click!({}, { datum: { payer: 'Summit', rate: 0.07 } }));
     expect(screen.queryByTestId('chart-ask')).toBeNull();
