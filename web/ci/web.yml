@@ -31,6 +31,8 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - name: Lint (licences + static safety checks)
         run: node scripts/license_audit.mjs
+      - name: Lint (oxlint: hooks, PHI sinks, eval, a11y basics)
+        run: npm run -s lint
       - name: Typecheck
         run: npx tsc -b
       - name: Unit tests (incl. CSP, PHI-sink and licence tests)
