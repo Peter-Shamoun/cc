@@ -6,18 +6,18 @@ test.describe('answer edge cases', () => {
   test('reload mid-stream: one question, one finished answer, nothing stuck', async ({ page }) => {
     await open(page, LIVE);
     const q = `Total paid by payer (reload ${Date.now() % 100000})`;
+    // Stop shows optimistically, before POST /api/chat is sent (#283/#285 timing). Reload only once the server
+    // has accepted the run (response headers), otherwise the chat never existed and there is nothing to reopen.
+    const accepted = page.waitForResponse((r) => r.url().includes('/api/chat') && r.request().method() === 'POST');
     await ask(page, q, { wait: false });
     await expect(stopBtn(page)).toBeVisible();
+    await accepted;
+    const id = new URL(page.url()).hash.match(/\/c\/([^/?]+)/)?.[1];
+    expect(id, 'chat id in the URL').toBeTruthy();
     await page.reload();
     await expect(composer(page)).toBeVisible();
-    // With history off (shell #282: chats live in memory only) a reload starts fresh by design: nothing can be stuck.
-    if (await page.getByText(/History off/).count() && !(await page.getByTestId('msg-user').count())) {
-      await expect(page.locator('.streaming-caret')).toHaveCount(0);
-      await expect(stopBtn(page)).toHaveCount(0);
-      return;
-    }
-    // Reopen the chat if the reload landed on a fresh screen.
-    if (!(await page.getByTestId('msg-user').filter({ hasText: q }).count())) await page.getByRole('navigation', { name: 'Chats' }).getByRole('button', { name: q, exact: true }).click();
+    // Reopen by id if the reload landed on a fresh screen (the sidebar title is the server's auto-title, not q).
+    if (!(await page.getByTestId('msg-user').filter({ hasText: q }).count())) await page.goto(`${LIVE}#/c/${id}`);
     await waitIdle(page);
     await expect(page.getByTestId('msg-user').filter({ hasText: q })).toHaveCount(1);
     await expect(page.getByTestId('msg-assistant')).toHaveCount(1);
