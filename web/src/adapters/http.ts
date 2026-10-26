@@ -3,6 +3,7 @@ import { asSession, type AuthSession } from '../auth/session';
 import type { HttpError } from '../api/contract';
 import type { AnalystAdapter, AnyStreamEvent } from './types';
 import { loadCapabilities } from '../contract/capabilities';
+import { exportUrl, exportFilename as serverExportFilename, type ExportFormat } from '../contract/sources';
 import type { Capabilities } from '../contract/v1.gen';
 
 /**
@@ -263,6 +264,13 @@ export class HttpAnalystAdapter implements AnalystAdapter {
   /** GET /api/capabilities, signed in so `available` reflects the caller's organization (contract 1.5.0 scope). */
   capabilities(): Promise<Capabilities> {
     return loadCapabilities(this.base, (u, init) => fetch(u, { ...init, headers: this.headers((init?.headers ?? {}) as Record<string, string>) }));
+  }
+
+  /** GET /api/conversations/{id}/export (contract 1.8.0 §15): the server's own Markdown/JSON, named by Content-Disposition. */
+  async exportConversation(id: string, format: ExportFormat): Promise<{ blob: Blob; filename: string }> {
+    const res = await fetch(exportUrl(id, format, this.base), { credentials: 'same-origin', cache: 'no-store', headers: this.headers() });
+    if (!res.ok) throw new Error(`export ${res.status}`);
+    return { blob: await res.blob(), filename: serverExportFilename(res.headers.get('content-disposition'), format) };
   }
 
   async fetchBlob(id: string): Promise<Blob> {
