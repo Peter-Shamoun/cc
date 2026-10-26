@@ -13,7 +13,7 @@
     "e2e:perf": "playwright test -c e2e/playwright.config.ts --project=perf",
     "e2e:update": "playwright test -c e2e/playwright.config.ts --project=desktop --project=mobile --update-snapshots -g visual",
     "check:csp": "node scripts/csp_check.mjs",
-    "lint": "oxlint -c .oxlintrc.json --max-warnings 20",
+    "lint": "oxlint -c .oxlintrc.json --max-warnings 1",
     "check:headers": "node scripts/header_check.mjs",
     "check:perf": "node scripts/lighthouse_budget.mjs",
     "audit": "npm audit --audit-level=low"

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown } from 'lucide-react';
-import { useLatest } from '../lib/useLatest';
 import clsx from 'clsx';
 import { useChat } from '../lib/useChat';
 import { MockAnalystAdapter } from '../adapters/mock';
@@ -33,6 +32,7 @@ import { scrollBehavior } from '../lib/motion';
 import { copyText, downloadText } from '../lib/csv';
 import { getPref, setPref } from '../lib/prefs';
 import { sessionFromEnv } from '../auth/session';
+import { trackInputModality } from '../lib/inputModality';
 import type { AssistantView } from '../lib/contract';
 import type { AssistantViewV1, ChatRequest } from '../api/contract';
 
@@ -80,11 +80,13 @@ export function AppShell() {
 }
 
 const focusComposer = () => document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message"]')?.focus();
+/** Touch-first device: don't raise the on-screen keyboard unasked. */
+const coarse = () => !!window.matchMedia?.('(pointer: coarse)').matches;
 
 function ShellInner() {
   const auditOn = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('audit');
   const renderStart = useRef(0);
-  // oxlint-disable-next-line react/purity, react/refs -- ?audit=1 perf probe only: stamps the render start on purpose
+  // oxlint-disable-next-line react/purity, react/refs -- ?audit render profiling only: the render's own start time is the point
   if (auditOn) renderStart.current = performance.now();
   const adapter = useMemo(() => makeAdapter(), []);
   const store = useMemo(() => makeStore(adapter), [adapter]);
@@ -93,7 +95,8 @@ function ShellInner() {
   const chat = useChat(adapter, store, strategy.options);
   // Contract 1.7.0 (§13): thumbs, reason ids and the comment go to the server for server-known answers
   // (never our 'a_' placeholders). Reason chips follow the server's Capabilities.feedbackReasons.
-  const convRef = useLatest(chat.convId);
+  const convRef = useRef(chat.convId);
+  useLayoutEffect(() => { convRef.current = chat.convId; });
   useEffect(() => { setFeedbackCapabilities(strategy.caps); }, [strategy.caps]);
   useEffect(() => {
     if (!(adapter instanceof HttpAnalystAdapter)) return;
@@ -103,7 +106,7 @@ function ShellInner() {
       await adapter.feedback(cid, f.messageId, toFeedbackRequest(f));
     });
     return () => setFeedbackSink(null);
-  }, [adapter, convRef]);
+  }, [adapter]);
   // Opening a stored chat can take a round trip (server history): after a short grace period show a
   // thread skeleton instead of the empty state or the previous chat (ChatGPT/Claude behaviour).
   const [opening, setOpening] = useState<string | null>(() => (store instanceof HttpTranscriptStore ? routeId() : null));
@@ -111,7 +114,6 @@ function ShellInner() {
     const t = setTimeout(() => setOpening(id), 120);
     try { await chat.open(id); } finally { clearTimeout(t); setOpening(null); }
   };
-  const openChatRef = useLatest(openChat);
   // Server store: re-render once the history mode is known; reopen a routed chat after reload (ids only in the URL).
   const [, setStoreReady] = useState(false);
   const bootRoute = useRef(routeId());
@@ -189,14 +191,15 @@ function ShellInner() {
       const id = routeId();
       if (id === chat.convId) return;
       routing.current = true;
-      if (id && chat.threads.some((t) => t.id === id)) await openChatRef.current(id);
+      if (id && chat.threads.some((t) => t.id === id)) await openChat(id);
       else chat.newChat();
       routing.current = false;
     };
     window.addEventListener('popstate', on);
     window.addEventListener('hashchange', on);
     return () => { window.removeEventListener('popstate', on); window.removeEventListener('hashchange', on); };
-  }, [chat, openChatRef]);
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- openChat only wraps chat.open (covered by `chat`) with the skeleton timer
+  }, [chat]);
   // A route to a chat this tab doesn't hold (memory-only history, so: after reload) falls back to a new chat.
   useEffect(() => { if (routeId() && !chat.convId && !(store instanceof HttpTranscriptStore)) window.history.replaceState(null, '', window.location.pathname + window.location.search); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -242,7 +245,6 @@ function ShellInner() {
     if (last && (await copyText(messageMarkdown(last as unknown as AssistantView)))) toast({ text: 'Copied last response' });
   };
   /** Touch-first devices: don't focus the composer on our own (it pops the on-screen keyboard), like the ChatGPT/Claude apps. */
-  const coarse = () => !!window.matchMedia?.('(pointer: coarse)').matches;
   /**
    * After opening a chat from the sidebar or search, a desktop user can type the follow-up right away
    * (ChatGPT/Claude). Not on touch (no surprise keyboard), and never steal focus from another field the
@@ -271,7 +273,9 @@ function ShellInner() {
   };
 
   // ---- global shortcuts (see shell/shortcuts.ts) ----
-  const keys = useLatest((e: KeyboardEvent) => {
+  const keys = useRef<(e: KeyboardEvent) => void>(() => {});
+  useEffect(() => trackInputModality(), []);
+  const onKeys = (e: KeyboardEvent) => {
     const mod = e.metaKey || e.ctrlKey;
     const k = e.key.toLowerCase();
     if (mod && !e.shiftKey && k === 'k') { e.preventDefault(); setDialog((d) => (d === 'search' ? null : 'search')); }
@@ -285,22 +289,24 @@ function ShellInner() {
     else if (k === 'escape' && mobile && drawerOpen) { setDrawerOpen(false); }
     // Esc stops a streaming reply (Claude) when focus is in the composer or nowhere in particular.
     else if (k === 'escape' && chat.busy && !e.defaultPrevented && !dialog && (document.activeElement === document.body || document.activeElement?.closest('[data-testid="composer"]'))) { e.preventDefault(); chat.stop(); }
-  });
+  };
+  useLayoutEffect(() => { keys.current = onKeys; });
   useEffect(() => {
     const on = (e: KeyboardEvent) => keys.current(e);
     window.addEventListener('keydown', on);
     return () => window.removeEventListener('keydown', on);
-  }, [keys]);
+  }, []);
 
   const drawerRef = useRef<HTMLDivElement>(null);
   useFocusTrap(drawerRef, mobile && drawerOpen);
 
   // ---- artifact panel ----
   const [artifact, setArtifact] = useState<Artifact | null>(null);
-  // oxlint-disable-next-line react/set-state-in-effect -- opening a wide artifact makes room once; the sidebar stays user-controlled after
-  useEffect(() => { if (artifact && window.innerWidth < 1400 && !mobile) setSidebar(false); }, [artifact]); // eslint-disable-line react-hooks/exhaustive-deps
-  // oxlint-disable-next-line react/set-state-in-effect -- switching chats closes the previous chat's artifact panel
-  useEffect(() => setArtifact(null), [chat.convId]);
+  // Opening an artifact on a narrower desktop makes room by collapsing the sidebar (an event, not an effect).
+  const openArtifact = (a: Artifact | null) => {
+    setArtifact(a);
+    if (a && window.innerWidth < 1400 && !mobile) setSidebar(false);
+  };
 
   // ---- scrolling: pin each new question (the first one too, QA-S3) to the top while its answer streams ----
   const [draft, setDraftPush] = useState<{ text: string; n: number } | undefined>();
@@ -312,8 +318,9 @@ function ShellInner() {
   const pinned = useRef(false);
   const lastLen = useRef(0);
   const { messages } = chat;
-  const messagesRef = useLatest(messages);
-  const busyRef = useLatest(chat.busy);
+  const messagesRef = useRef(messages);
+  const busyRef = useRef(chat.busy);
+  useLayoutEffect(() => { messagesRef.current = messages; busyRef.current = chat.busy; });
   const virtualList = messages.length > 30;
   useEffect(() => {
     const el = scroller.current;
@@ -353,8 +360,7 @@ function ShellInner() {
     ro.observe(inner);
     return () => ro.disconnect();
   }, [messages.length === 0]); // eslint-disable-line react-hooks/exhaustive-deps
-// oxlint-disable-next-line react/set-state-in-effect -- a new chat starts at the bottom, unpinned
-  useEffect(() => { pinned.current = false; lastLen.current = 0; atBottomRef.current = true; setAtBottom(true); }, [chat.convId]);
+  useEffect(() => { pinned.current = false; lastLen.current = 0; atBottomRef.current = true; }, [chat.convId]);
   // Only a scroll the reader made can release the pin (QA-S12). While pinned, the reserved space under the
   // question leaves the view "at the bottom", so a programmatic scroll or a layout clamp must not count.
   const userScrollAt = useRef(0);
@@ -394,8 +400,14 @@ function ShellInner() {
     }
     wasBusy.current = chat.busy;
   }, [chat.busy]); // eslint-disable-line react-hooks/exhaustive-deps
-// oxlint-disable-next-line react/set-state-in-effect -- the live region must not carry the previous chat's status
-  useEffect(() => setAnnounce(''), [chat.convId]);
+  // Per-chat view state resets while rendering the new chat (React's "adjust state on prop change"), not in an effect.
+  const [viewConv, setViewConv] = useState(chat.convId);
+  if (viewConv !== chat.convId) {
+    setViewConv(chat.convId);
+    setArtifact(null);
+    setAtBottom(true);
+    setAnnounce('');
+  }
   // Streaming text is announced as a suffix on a timer, not on every token. Clearing the timer
   // from the message effect would reset it at 60fps and the region would stay silent.
   const announcedLen = useRef(0);
@@ -421,7 +433,7 @@ function ShellInner() {
     };
     tick();
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [chat.busy, busyRef, messagesRef]);
+  }, [chat.busy]);
 
   const edit = (t: string) => setDraftPush((d) => ({ text: t, n: (d?.n ?? 0) + 1 }));
   const empty = messages.length === 0 && !opening;
@@ -459,7 +471,7 @@ function ShellInner() {
     editAt: (i, t) => { atBottomRef.current = true; setAtBottom(true); chat.editAt(i, t); },
     switchVersion: chat.switchVersion,
     versionOf: chat.versionOf,
-    openArtifact: setArtifact,
+    openArtifact,
     regenerate: chat.regenerate,
     editIntoComposer: edit,
     send,
