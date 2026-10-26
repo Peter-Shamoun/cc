@@ -72,7 +72,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
     await fetch(`${this.base}/api/chat/${encodeURIComponent(this.current)}/stop`, { method: 'POST', credentials: 'same-origin', headers: this.headers() }).catch(() => undefined);
   }
 
-  async *streamTurn({ conversationId, messages, signal, resume, regenerate }: Parameters<AnalystAdapter['streamTurn']>[0]): AsyncIterable<AnyStreamEvent> {
+  async *streamTurn({ conversationId, messages, signal, resume, regenerate, onConnection }: Parameters<AnalystAdapter['streamTurn']>[0]): AsyncIterable<AnyStreamEvent> {
     // The server takes user turns only; prior assistant prose is reconstructed server-side.
     const users = messages.filter((m) => m.role === 'user').map(({ id, role, text, parentId }) => ({ id, role, text, ...(parentId ? { parentId } : {}) }));
     let body = JSON.stringify({ conversationId, messages: users, ...(resume ? { resume } : {}), ...(regenerate ? { regenerate } : {}) });
@@ -92,6 +92,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
     let messageId: string | null = null;
     let lastSeq = -1;
     let retries = 0;
+    let dropped = false; // between a drop and the first replayed event
     let resumeFallback = !!resume;
     try {
       for (;;) {
@@ -109,8 +110,8 @@ export class HttpAnalystAdapter implements AnalystAdapter {
           });
         } catch (e) {
           if (wire.signal.aborted || signal.aborted) throw abortError();
-          if (messageId !== null && isOffline()) { await this.waitOnline(signal); continue; } // offline: wait, don't burn retries
-          if (messageId !== null && retries < this.opts.maxRetries) { await this.backoff(++retries, signal); continue; }
+          if (messageId !== null && isOffline()) { onConnection?.('offline'); dropped = true; await this.waitOnline(signal); continue; } // offline: wait, don't burn retries
+          if (messageId !== null && retries < this.opts.maxRetries) { onConnection?.('reconnecting'); dropped = true; await this.backoff(++retries, signal); continue; }
           if (messageId !== null) throw e;
           // Never reached the server: say why, as a retryable error part (Retry = regenerate).
           yield { type: 'part', part: networkError() };
@@ -130,7 +131,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
           continue;
         }
         if (!res.ok || !res.body) {
-          if (messageId !== null && res.status >= 500 && retries < this.opts.maxRetries) { await this.backoff(++retries, signal); continue; }
+          if (messageId !== null && res.status >= 500 && retries < this.opts.maxRetries) { onConnection?.('reconnecting'); dropped = true; await this.backoff(++retries, signal); continue; }
           if (messageId !== null) throw new Error(`replay ${res.status}`); // the run is gone: useChat shows "Connection lost"
           yield { type: 'part', part: await httpError(res) };
           yield { type: 'message.end', messageId: '', finishReason: 'error' };
@@ -146,6 +147,7 @@ export class HttpAnalystAdapter implements AnalystAdapter {
             }
             if (ev.type === 'message.start') this.current = messageId = ev.messageId;
             retries = 0;
+            if (dropped) { dropped = false; onConnection?.('live'); }
             yield ev;
             if (ev.type === 'message.end') return;
           }
@@ -155,8 +157,10 @@ export class HttpAnalystAdapter implements AnalystAdapter {
         }
         // The stream closed without message.end: a dropped connection.
         if (signal.aborted) throw abortError();
-        if (isOffline()) { await this.waitOnline(signal); continue; }
+        if (isOffline()) { onConnection?.('offline'); dropped = true; await this.waitOnline(signal); continue; }
         if (messageId === null || retries >= this.opts.maxRetries) throw new Error('stream dropped');
+        onConnection?.('reconnecting');
+        dropped = true;
         await this.backoff(++retries, signal);
       }
     } finally {
