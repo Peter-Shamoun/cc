@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { BarChart3, FileSearch, TrendingUp, Users, type LucideIcon } from 'lucide-react';
 
 export interface Starter { title: string; hint: string; prompt: string; icon: LucideIcon }
@@ -15,9 +16,27 @@ export const STARTERS: Starter[] = [
  * The hint is decoration; each button's accessible name is just its title.
  */
 export function StarterCards({ onPick }: { onPick: (prompt: string) => void }) {
+  // QA-S11: fade only the edge that has more cards behind it, so the row reads as swipeable without
+  // dimming the first card at rest (or the last one once you've scrolled to the end).
+  const row = useRef<HTMLDivElement>(null);
+  const [edge, setEdge] = useState({ start: true, end: true });
+  const measure = useCallback(() => {
+    const el = row.current;
+    if (!el) return;
+    const start = el.scrollLeft <= 1, end = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
+    setEdge((e) => (e.start === start && e.end === end ? e : { start, end }));
+  }, []);
+  useEffect(() => {
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [measure]);
+  const fade = `linear-gradient(to right, ${edge.start ? '#000' : 'transparent'}, #000 1.5rem, #000 calc(100% - 2.5rem), ${edge.end ? '#000' : 'transparent'})`;
   return (
-    <div role="group" aria-label="Suggestions" data-testid="starter-cards"
-      className="mt-4 grid grid-cols-2 gap-2 max-sm:order-first max-sm:-mx-4 max-sm:mb-3 max-sm:mt-0 max-sm:flex max-sm:overflow-x-auto max-sm:px-4 max-sm:pb-1 max-sm:scrollbar-none max-sm:[mask-image:linear-gradient(to_right,transparent,#000_1rem,#000_calc(100%-2rem),transparent)]">
+    <div ref={row} role="group" aria-label="Suggestions" data-testid="starter-cards" onScroll={measure}
+      data-fade={[!edge.start && 'start', !edge.end && 'end'].filter(Boolean).join(' ') || undefined}
+      style={{ ['--cc-fade' as string]: fade }}
+      className="mt-4 grid grid-cols-2 gap-2 max-sm:order-first max-sm:-mx-4 max-sm:mb-3 max-sm:mt-0 max-sm:flex max-sm:overflow-x-auto max-sm:px-4 max-sm:pb-1 max-sm:scrollbar-none max-sm:[mask-image:var(--cc-fade)]">
       {STARTERS.map((s, i) => (
         <button key={s.prompt} type="button" onClick={() => onPick(s.prompt)} style={{ animationDelay: `${i * 40}ms` }} data-testid="starter-card"
           className="group flex min-w-0 items-start gap-3 rounded-2xl border border-line bg-bg px-4 py-3 text-left transition-colors hover:bg-hover motion-safe:animate-[cc-rise_240ms_ease-out_both] max-sm:shrink-0">
