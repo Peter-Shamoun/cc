@@ -2,8 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ShareDialog, type ShareLinkApi } from './ShareDialog';
 import type { ShareExpiryDays, ShareLink } from '../contract/v1.gen';
+import { noteServerDate, resetServerClock } from '../lib/serverClock';
 
-afterEach(() => { cleanup(); vi.useRealTimers(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); resetServerClock(); });
 
 const DAY = 86_400_000;
 const link = (o: Partial<ShareLink> = {}): ShareLink => {
@@ -57,6 +58,14 @@ describe('share link expiry and rotation (contract 1.15.0)', () => {
     expect((screen.getByTestId('share-url') as HTMLInputElement).value).toBe(`${window.location.origin}/shared/sh_b`);
     expect(screen.getByRole('status')).toHaveTextContent('New link created. The old link no longer works.');
     expect(screen.getByText(/charts and SQL are shared/)).toBeInTheDocument();
+  });
+
+  it('counts days left on the server clock, not a skewed device clock', async () => {
+    // The device runs 10 days behind the server: the device would say 30 days are left, the server says 20.
+    noteServerDate(new Date(Date.now() + 10 * DAY).toUTCString());
+    setup(link({ expiresAt: new Date(Date.now() + 30 * DAY - 60_000).toISOString(), expiresInDays: 30 }));
+    await screen.findByTestId('share-url');
+    expect(screen.getByTestId('share-dates')).toHaveTextContent('in 20 days');
   });
 
   it('a pre-1.15 server (no shareExpiry, no expiresAt) shows no picker and no expiry date', async () => {
