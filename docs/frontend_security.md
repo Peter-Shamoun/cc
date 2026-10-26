@@ -133,6 +133,18 @@ test vectors in `web/src/lib/csvFilename.vectors.json`. The Content-Disposition 
 - A token baked into the bundle is public. `vite build` and `sessionFromEnv()` refuse a `VITE_ANALYST_DEMO_TOKEN` that isn't the synthetic `demo:<customer>:<user>` shape.
 - `onExpired` for cookie sessions sends the user to `VITE_SIGN_IN_URL?next=<pathname>`, once, with no query or hash.
 
+### Sign-out
+
+**`POST /api/auth/sign-out` → 204** (`api/app.py`, tested in `api/tests/test_sign_out.py`). The real backend inherits it unchanged.
+- **Server side:** the route calls `AuthBackend.sign_out(token)` with whatever token the request carried, even an expired one. The real backend revokes the session there (Cognito `GlobalSignOut` or deleting the session row), so a copied cookie stops working. `DemoAuth` and `SimAuth` make it a no-op, since their tokens are stateless. A backend without the method, or one that raises, still gets the browser wipe. Only the exception type is logged, never the token.
+- **Browser side, always:**
+  - `Clear-Site-Data: "cache", "storage"` wipes this origin's HTTP cache, localStorage (UI prefs), sessionStorage, IndexedDB, Cache Storage and any service worker. That's the last line of defence on a shared billing-office PC.
+  - Two expired `cc_session` cookies, `Path=/api` (the spec'd path) and `Path=/`, both `HttpOnly; Secure; SameSite=Strict; Max-Age=0`. A cookie is only removed by a matching `Path`.
+  - The route doesn't send `"cookies"` in Clear-Site-Data, because that clears every cookie on the registrable domain, signing users out of sibling apps.
+- **CSRF:** a cookie-borne sign-out needs `x-cc-csrf: 1` like every write, so a third-party page can't force a sign-out (403, no wipe).
+- **Audit:** `signed_out` is recorded with customer and user only, and only when the token was still valid.
+- **Client:** `signOut(base, session, {signInUrl})` in `web/src/auth/session.ts` POSTs and then navigates to sign-in, or reloads. The navigation also drops in-memory drafts and answers. It navigates away even when the request fails (offline), because the user asked to leave. No UI calls it yet: shell should wire a "Sign out" item once the real backend exists, since demo mode has no sign-in to return to.
+
 ## Caching and offline
 
 **Decision: no service worker and no offline shell.** The app ships no worker script, manifest, Cache Storage or IndexedDB. `web/src/security/noServiceWorker.test.ts` enforces this.
@@ -148,7 +160,7 @@ What covers fast loads instead:
 - the lazy chunks
 - the browser HTTP cache for content-hashed assets (code, no PHI; `immutable` is allowed by `header_rules.mjs`)
 
-When to revisit: only if a real offline requirement appears. Even then, cache hashed static assets only, never `/api/` or HTML, and send `Clear-Site-Data: "cache", "storage"` on sign-out. The real backend's sign-out route should send that header regardless (see "Session / auth boundary").
+When to revisit: only if a real offline requirement appears. Even then, cache hashed static assets only, never `/api/` or HTML, and rely on the sign-out route's `Clear-Site-Data: "cache", "storage"` (see "Sign-out") to purge it.
 
 ### Cache-control audit of every API route
 
