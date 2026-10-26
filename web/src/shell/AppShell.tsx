@@ -65,6 +65,13 @@ function ShellInner() {
   const adapter = useMemo(makeAdapter, []);
   const store = useMemo(() => makeStore(adapter), [adapter]);
   const chat = useChat(adapter, store);
+  // Opening a stored chat can take a round trip (server history): after a short grace period show a
+  // thread skeleton instead of the empty state or the previous chat (ChatGPT/Claude behaviour).
+  const [opening, setOpening] = useState<string | null>(() => (store instanceof HttpTranscriptStore ? routeId() : null));
+  const openChat = async (id: string) => {
+    const t = setTimeout(() => setOpening(id), 120);
+    try { await chat.open(id); } finally { clearTimeout(t); setOpening(null); }
+  };
   // Server store: re-render once the history mode is known; reopen a routed chat after reload (ids only in the URL).
   const [, setStoreReady] = useState(false);
   const bootRoute = useRef(routeId());
@@ -73,7 +80,7 @@ function ShellInner() {
     store.ready.then(() => {
       setStoreReady(true);
       const id = bootRoute.current;
-      if (id) chat.open(id);
+      if (id) void openChat(id); else setOpening(null);
     });
   }, [store]); // eslint-disable-line react-hooks/exhaustive-deps
   const toast = useToast();
@@ -142,7 +149,7 @@ function ShellInner() {
       const id = routeId();
       if (id === chat.convId) return;
       routing.current = true;
-      if (id && chat.threads.some((t) => t.id === id)) await chat.open(id);
+      if (id && chat.threads.some((t) => t.id === id)) await openChat(id);
       else chat.newChat();
       routing.current = false;
     };
@@ -324,7 +331,7 @@ function ShellInner() {
   }, [chat.busy]);
 
   const edit = (t: string) => setDraftPush((d) => ({ text: t, n: (d?.n ?? 0) + 1 }));
-  const empty = messages.length === 0;
+  const empty = messages.length === 0 && !opening;
   const draftKey = chat.convId ?? NEW_CHAT_KEY;
   const send = (t: string, resume?: ChatRequest['resume']) => { atBottomRef.current = true; setAtBottom(true); chat.send(t, resume ? { resume } : undefined); };
   /** Up-arrow in an empty composer edits the last question in place (ChatGPT behaviour, QA-S8). */
@@ -363,7 +370,7 @@ function ShellInner() {
   });
   const searchStore = useCallback((q: string) => store.search?.(q) ?? Promise.resolve([]), [store]);
   const openFromSearch = async (id: string, messageId?: string) => {
-    await chat.open(id);
+    await openChat(id);
     closeDrawer();
     if (messageId) requestAnimationFrame(() => requestAnimationFrame(() => {
       const target = document.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(messageId)}"]`);
@@ -373,7 +380,7 @@ function ShellInner() {
 
   const sidebarProps = {
     threads, activeId: chat.convId, storeMode: store.mode, canPin: chat.canPin,
-    onSelect: (id: string) => { chat.open(id); closeDrawer(); },
+    onSelect: (id: string) => { void openChat(id); closeDrawer(); },
     onNew: () => { chat.newChat(); closeDrawer(); requestAnimationFrame(focusComposer); },
     onDelete: requestDelete, onRename: chat.rename, onPin: chat.pin, onExport: exportThread,
     onCollapse: () => setSidebar(false), onSearch: () => setDialog('search'),
@@ -412,7 +419,7 @@ function ShellInner() {
               <div ref={scroller} tabIndex={0} role="region" aria-label="Conversation" onScroll={(e) => onScroll(e.currentTarget)} className="flex-1 overflow-y-auto [overflow-anchor:none] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--focus)]" data-testid="thread-scroller">
                 <div ref={content} className="mx-auto flex max-w-[48rem] flex-col gap-6 px-4 pb-10 pt-4 md:px-6" role={virtualList ? undefined : 'log'} aria-live={virtualList ? undefined : 'polite'} aria-relevant={virtualList ? undefined : 'additions'} aria-busy={virtualList ? undefined : chat.busy} aria-label={virtualList ? undefined : 'Messages'}>
                   <h1 className="sr-only" data-testid="thread-title">{currentTitle}</h1>
-                  <ThreadView messages={messages} busy={chat.busy} actions={threadActions} scrollRef={scroller} scrollToIndexRef={scrollToIndexRef} />
+                  {opening ? <ThreadSkeleton /> : <ThreadView messages={messages} busy={chat.busy} actions={threadActions} scrollRef={scroller} scrollToIndexRef={scrollToIndexRef} />}
                 </div>
               </div>
               <div className="relative mx-auto w-full max-w-[48rem] px-4 md:px-6" id="composer">
@@ -436,5 +443,22 @@ function ShellInner() {
       {dialog === 'settings' && <SettingsDialog onClose={() => setDialog(null)} storeMode={store.mode} enterToSend={enterToSend} setEnterToSend={setEnterToSend} onExportAll={exportAll} threadCount={threads.length} />}
       {dialog === 'shortcuts' && <ShortcutsDialog onClose={() => setDialog(null)} />}
     </AdapterCtx.Provider>
+  );
+}
+
+/** Placeholder thread while a stored chat loads: a question bubble and a few answer lines, shimmering. */
+function ThreadSkeleton() {
+  return (
+    <div className="flex flex-col gap-6" data-testid="thread-skeleton">
+      <span className="sr-only" role="status">Loading chat…</span>
+      {[0, 1].map((k) => (
+        <div key={k} className="flex flex-col gap-6" aria-hidden>
+          <div className="skeleton ml-auto h-11 w-[min(60%,22rem)] rounded-3xl" />
+          <div className="flex flex-col gap-2.5">
+            {[92, 98, 85, k ? 40 : 64].map((w, i) => <div key={i} className="skeleton h-3.5 rounded" style={{ width: `${w}%` }} />)}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
