@@ -1,4 +1,5 @@
 import type { ChartPart } from '../lib/contract';
+import { parsePlot, plotToVegaLite } from '../contract/plot';
 
 const DANGEROUS_PROTOCOL = /^(javascript|data|vbscript|file|blob):/i;
 
@@ -25,6 +26,13 @@ function sanitize(value: unknown): unknown {
 
 /** Inline `part.data.values` only. Spec `data.url` (including nested layers) is removed. */
 export function buildSpec(part: ChartPart): Record<string, unknown> {
+  // 1.18.0: a valid strict `plot` is the source; the spec is derived from it (contract §16.1). Pre-1.18 parts use `spec`.
+  const plot = part?.plot !== undefined ? parsePlot(part.plot) : null;
+  if (plot) {
+    const derived = sanitize(plotToVegaLite(plot)) as Record<string, unknown>;
+    delete derived.data;
+    return { ...derived, data: { values: plot.data } };
+  }
   const cleaned = (isRecord(part?.spec) ? sanitize(part.spec) : {}) as Record<string, unknown>;
   delete cleaned.data;
   const values = Array.isArray(part?.data?.values) ? part.data.values : [];
@@ -33,7 +41,7 @@ export function buildSpec(part: ChartPart): Record<string, unknown> {
 
 /** Spec §4.5: SVG under 2k marks, canvas above that so a huge series cannot build a giant DOM. */
 export function chartRenderer(part: ChartPart): 'svg' | 'canvas' {
-  const n = part?.data?.values?.length ?? 0;
+  const n = part?.plot?.data?.length ?? part?.data?.values?.length ?? 0;
   return n > 2000 ? 'canvas' : 'svg';
 }
 

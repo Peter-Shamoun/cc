@@ -37,6 +37,15 @@ def matches(t, pattern: str) -> bool:
     return isinstance(t, str) and (t.startswith(pattern[:-1]) if pattern.endswith(".*") else t == pattern)
 
 
+def _has(container, k) -> bool:
+    """``k in container`` that never raises: an unhashable key (a JSON object or array) is never present, the way an
+    object key never matches in the TS runner's Map/Set."""
+    try:
+        return k in container
+    except TypeError:
+        return False
+
+
 def _any(t, patterns) -> bool:
     return any(matches(t, p) for p in patterns)
 
@@ -83,7 +92,7 @@ def _seq(r, evs, _):
     want = r.get("start", 0)
     for i, e in evs:
         s = e.get("seq")
-        if not isinstance(s, int) or isinstance(s, bool) or s != want:
+        if not (_int(s) or (isinstance(s, int) and not isinstance(s, bool))) or s != want:
             return [Violation(r["id"], i, f"seq {s!r}, expected {want}")]
         want += 1
     return []
@@ -120,7 +129,7 @@ def _ref(r, evs, _):
     for i, e in evs:
         if matches(e["type"], r["type"]):
             v = get(e, r["field"])
-            if v is not None and v not in known:
+            if v is not None and not _has(known, v):
                 out.append(Violation(r["id"], i, f"{r['field']} {v!r} does not name an earlier {r['target']}"))
         if matches(e["type"], r["target"]) and all(get(e, k) == want for k, want in r.get("where", {}).items()):
             t = get(e, r["targetField"])
@@ -136,17 +145,17 @@ def _span(r, evs, finish):
         t = e["type"]
         if t == r["open"]:
             k = get(e, r["key"])
-            if not isinstance(k, str) or k in state:
+            if not isinstance(k, str) or _has(state, k):
                 out.append(Violation(r["id"], i, f"{t} {k!r} opened twice or without a key"))
             else:
                 state[k] = "open"
         elif t in r["inner"]:
             k = get(e, r["key"])
-            if state.get(k) != "open":
+            if not _has(state, k) or state[k] != "open":
                 out.append(Violation(r["id"], i, f"{t} {k!r} outside its {r['open']} … {r['close'][0]}"))
         elif t in r["close"]:
             k = get(e, r["closeKey"])
-            if k in state:
+            if _has(state, k):
                 if state[k] != "open":
                     out.append(Violation(r["id"], i, f"{t} {k!r} closed twice"))
                 state[k] = "closed"
@@ -178,6 +187,101 @@ def _finish_requires(r, evs, finish):
     return [Violation(r["id"], -1, f"finishReason {finish} without a {r['partType']} part")]
 
 
+def _rows_seen(r, evs):
+    """Per key: the rows streamed so far, by offset (a replay overwrites)."""
+    acc: dict = {}
+    for i, e in evs:
+        if e["type"] == r["inner"]:
+            k, off, rows = get(e, r["key"]), get(e, "offset"), get(e, r["rowsField"])
+            if isinstance(k, str) and _int(off) and isinstance(rows, list):
+                buf = acc.setdefault(k, [])
+                for j, row in enumerate(rows):
+                    if off + j < len(buf):
+                        buf[off + j] = row
+                    elif off + j == len(buf):
+                        buf.append(row)
+        yield i, e, acc
+
+
+def _int(v) -> bool:
+    """A non-negative integer the way JSON (and the TS runner's ``Number.isInteger``) sees it: ``3.0`` counts."""
+    return (isinstance(v, int) and not isinstance(v, bool) and v >= 0) or (
+        isinstance(v, float) and v.is_integer() and v >= 0)
+
+
+def _contiguous(r, evs, _):
+    count: dict = {}
+    out = []
+    for i, e in evs:
+        if e["type"] not in r["types"]:
+            continue
+        k, off, rows = get(e, r["key"]), get(e, r["offsetField"]), get(e, r["rowsField"])
+        if not _int(off) or not isinstance(rows, list):
+            out.append(Violation(r["id"], i, f"{e['type']} needs an integer {r['offsetField']} ≥ 0 and a list"))
+            continue
+        key = (e["type"], json.dumps(k, ensure_ascii=False, default=str))  # TS: JSON.stringify
+        have = count.get(key, 0)
+        if off > have:
+            out.append(Violation(r["id"], i, f"{e['type']} {k!r} offset {off} skips rows (have {have})"))
+            continue
+        count[key] = max(have, off + len(rows))
+    return out
+
+
+def _prefix(r, evs, _):
+    out = []
+    for i, e, acc in _rows_seen(r, evs):
+        if e["type"] == r["close"]:
+            k = get(e, r["closeKey"])
+            if isinstance(k, str) and acc.get(k):
+                final = get(e, r["closeRowsField"])
+                got = acc[k]
+                if not isinstance(final, list) or final[: len(got)] != got:
+                    out.append(Violation(r["id"], i, f"streamed {r['inner']} for {k!r} differ from the final part"))
+    return out
+
+
+def _matches(r, evs, _):
+    opened: dict = {}
+    out = []
+    for i, e in evs:
+        if e["type"] == r["open"]:
+            if isinstance(get(e, r["key"]), str):
+                opened[get(e, r["key"])] = get(e, r["field"])
+        elif e["type"] == r["close"]:
+            k = get(e, r["closeKey"])
+            if isinstance(k, str) and k in opened:
+                final = get(e, r["closeField"])
+                cut = {a: b for a, b in final.items() if a not in r.get("omit", [])} if isinstance(final, dict) else final
+                if cut != opened[k]:
+                    out.append(Violation(r["id"], i, f"{r['closeField']} of {k!r} differs from its {r['open']}"))
+    return out
+
+
+def _plot(r, evs, _):
+    from api.plot import check_plot
+    out = []
+    for i, e in evs:
+        if not matches(e["type"], r["type"]) or not all(get(e, p) == v for p, v in r.get("where", {}).items()):
+            continue
+        cur = e
+        present = True
+        for k in r["field"].split("."):
+            if not isinstance(cur, dict) or k not in cur:
+                present = False
+                break
+            cur = cur[k]
+        if not present:
+            if not r.get("optional"):
+                out.append(Violation(r["id"], i, f"{r['field']} missing"))
+            continue
+        bad = check_plot(cur, header=bool(r.get("header")))
+        if bad:
+            out.append(Violation(r["id"], i, f"{r['field']} invalid: {', '.join(bad)}"))
+    return out
+
+
 _RUNNERS = {"first": _first, "last": _last, "count": _count, "seq": _seq, "same": _same, "enum": _enum,
             "unique": _unique, "ref": _ref, "span": _span, "none_after": _none_after,
-            "finish_requires": _finish_requires}
+            "finish_requires": _finish_requires, "contiguous": _contiguous, "prefix": _prefix, "matches": _matches,
+            "plot": _plot}

@@ -156,6 +156,117 @@ export const STREAM_RULES = {
       "doc": "table.start → table.rows* → the complete part with the same id (1.9)"
     },
     {
+      "id": "chart.span",
+      "kind": "span",
+      "open": "chart.start",
+      "inner": [
+        "chart.points"
+      ],
+      "close": [
+        "part"
+      ],
+      "key": "partId",
+      "closeKey": "part.id",
+      "closeWithoutOpenOk": true,
+      "unclosedOk": [
+        "aborted",
+        "error"
+      ],
+      "doc": "1.18.0: chart.start → chart.points* → the complete chart `part` with the same id (§5.2)"
+    },
+    {
+      "id": "rows.contiguous",
+      "kind": "contiguous",
+      "types": [
+        "table.rows",
+        "chart.points"
+      ],
+      "key": "partId",
+      "offsetField": "offset",
+      "rowsField": "rows",
+      "doc": "1.18.0: a rows/points chunk starts at or before the rows received so far (no gaps; a replay may overlap)"
+    },
+    {
+      "id": "table.rows.final",
+      "kind": "prefix",
+      "inner": "table.rows",
+      "close": "part",
+      "key": "partId",
+      "closeKey": "part.id",
+      "rowsField": "rows",
+      "closeRowsField": "part.rows",
+      "doc": "1.18.0: streamed table rows are a prefix of the complete part's rows"
+    },
+    {
+      "id": "chart.points.final",
+      "kind": "prefix",
+      "inner": "chart.points",
+      "close": "part",
+      "key": "partId",
+      "closeKey": "part.id",
+      "rowsField": "rows",
+      "closeRowsField": "part.plot.data",
+      "doc": "1.18.0: streamed chart points are a prefix of the complete part's plot.data"
+    },
+    {
+      "id": "chart.header.final",
+      "kind": "matches",
+      "open": "chart.start",
+      "close": "part",
+      "key": "partId",
+      "closeKey": "part.id",
+      "field": "plot",
+      "closeField": "part.plot",
+      "omit": [
+        "data"
+      ],
+      "doc": "1.18.0: the complete part's plot (without data) equals the chart.start header"
+    },
+    {
+      "id": "chart.start.plot",
+      "kind": "plot",
+      "type": "chart.start",
+      "field": "plot",
+      "header": true,
+      "doc": "1.18.0: chart.start.plot is a valid PlotHeader (§16.1)"
+    },
+    {
+      "id": "chart.part.plot",
+      "kind": "plot",
+      "type": "part",
+      "where": {
+        "part.type": "chart"
+      },
+      "field": "part.plot",
+      "header": false,
+      "optional": true,
+      "doc": "1.18.0: a chart part's plot, when present, is a valid PlotSpec (§16.1)"
+    },
+    {
+      "id": "chart.table.target",
+      "kind": "ref",
+      "type": "part",
+      "field": "part.tablePartId",
+      "target": "part",
+      "targetField": "part.id",
+      "where": {
+        "part.type": "table"
+      },
+      "doc": "1.18.0: chart.tablePartId names an earlier table part"
+    },
+    {
+      "id": "chart.start.table",
+      "kind": "ref",
+      "type": "chart.start",
+      "field": "tablePartId",
+      "target": "part",
+      "targetField": "part.id",
+      "where": {
+        "part.type": "table"
+      },
+      "doc": "1.18.0: chart.start.tablePartId names an earlier table part"
+    },
+    {
       "id": "patch.target",
       "kind": "ref",
       "type": "part.patch",
@@ -179,6 +290,7 @@ export const STREAM_RULES = {
       "anchor": [
         "text.start",
         "table.start",
+        "chart.start",
         "part"
       ],
       "anchorExcept": {

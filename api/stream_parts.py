@@ -2,7 +2,9 @@
 
 The live server (``api.app``) and the analyzer adapter (``api.analyzer_adapter``) share this code, so a real
 analyzer run and the demo stream the same way: text as ``text.start``/``text.delta``/``text.end``; a table with
-rows as ``table.start`` + ``table.rows`` chunks, then the complete ``part``; and every other part as one ``part``.
+rows as ``table.start`` + ``table.rows`` chunks, then the complete ``part``; a chart with a ``plot`` (1.18.0) as
+``chart.start`` (the PlotHeader) + ``chart.points`` chunks, then the complete ``part``; and every other part as one
+``part``. Charts reach here already validated (``api.plot.gate_parts``).
 """
 from __future__ import annotations
 
@@ -11,6 +13,8 @@ import time
 from typing import Callable, Iterable
 
 TABLE_CHUNK_ROWS = 10
+#: points per ``chart.points`` event (contract 1.18.0, PlotSpec ``x-caps.chunkPoints``)
+CHART_CHUNK_POINTS = 50
 
 
 def text_chunks(text: str, size: int = 24) -> Iterable[str]:
@@ -58,6 +62,21 @@ def emit_parts(parts: list[dict], emit: Callable[[dict], None], *, cancelled: th
                     break
                 emit({"type": "table.rows", "partId": part["id"], "offset": offset,
                       "rows": rows[offset:offset + TABLE_CHUNK_ROWS]})
+                if delay:
+                    time.sleep(delay)
+        if part["type"] == "chart" and isinstance(part.get("plot"), dict) and part["plot"].get("data"):
+            plot = part["plot"]
+            start = {"type": "chart.start", "partId": part["id"], "plot": {k: v for k, v in plot.items() if k != "data"}}
+            for key in ("alt", "tablePartId", "sensitivity"):
+                if part.get(key) is not None:
+                    start[key] = part[key]
+            emit(start)
+            points = plot["data"]
+            for offset in range(0, len(points), CHART_CHUNK_POINTS):
+                if stop.is_set():
+                    break
+                emit({"type": "chart.points", "partId": part["id"], "offset": offset,
+                      "rows": points[offset:offset + CHART_CHUNK_POINTS]})
                 if delay:
                     time.sleep(delay)
         emit({"type": "part", "part": part})

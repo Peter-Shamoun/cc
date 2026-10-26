@@ -43,6 +43,7 @@ from api.export import FORMATS as EXPORT_FORMATS, as_json as export_json, as_mar
 from api.share import ShareRegistry, link as share_link, shared_view
 from api.sources import sources_for
 from api.sql_mask import POLICIES as SQL_MASK_POLICIES, mask_event, mask_part, policy_from_env as sql_mask_policy_from_env
+from api.plot import gate_parts
 from api.stream_parts import emit_parts
 from api.styles import apply_style
 from api.titles import title_from_parts
@@ -175,7 +176,7 @@ class AuditLog:
 
     ALLOWED = {"customer", "user", "file_id", "row_count", "conversation_id", "message_id", "parts",
                "queries", "elapsed_ms", "finish", "kind", "reason", "status", "scenario", "steps",
-               "expires_in_days", "rotated", "pinned", "archived"}
+               "expires_in_days", "rotated", "pinned", "archived", "rules"}
 
     def __init__(self):
         self.events: list[dict] = []
@@ -568,6 +569,10 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                         "expires": time.time() + settings.clarification_ttl_seconds}
 
             parts = [mask_part(p, sql_policy) for p in parts]   # persisted, shared and exported copies too
+            parts, dropped = gate_parts(parts)  # 1.18.0: validate every PlotSpec before emitting
+            for rules in dropped:
+                audit("chart_dropped", customer=ctx.principal.customer, user=ctx.principal.user,
+                      message_id=message_id, rules=",".join(rules))  # rule ids only, never values
             if not emit_parts(parts, emit, cancelled=run.cancelled, delay=settings.stream_delay_seconds,
                               on_part=remember_clarification):
                 finish = "aborted"
