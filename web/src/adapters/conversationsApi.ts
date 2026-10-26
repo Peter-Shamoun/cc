@@ -12,7 +12,12 @@ const DETAIL_MAX_BYTES = 32 * 1024 * 1024;
  * Search is a POST so the search text (possibly PHI) never appears in a URL.
  */
 export type TranscriptMode = 'ephemeral' | 'persisted';
-export interface ConversationSummary { id: ID; title: string; updatedAt: ISODate; messageCount: number; snippet?: string }
+/** 1.17.0: `pinned` / `archived` (always sent by 1.17+ servers; see Capabilities.pinArchive). */
+export interface ConversationSummary { id: ID; title: string; updatedAt: ISODate; messageCount: number; snippet?: string; pinned?: boolean; archived?: boolean }
+/** 1.17.0: GET /api/conversations?archived= and search: include (default) / exclude (sidebar) / only (Archived chats). */
+export type ArchivedFilter = 'include' | 'exclude' | 'only';
+/** PATCH /api/conversations/{id} response. */
+export interface ConversationUpdate { id: ID; title: string; updatedAt: ISODate; pinned?: boolean; archived?: boolean }
 export interface ConversationPage { items: ConversationSummary[]; next?: string }
 export interface ConversationDetail { id: ID; title: string; updatedAt: ISODate; messages: Message[] }
 export interface TranscriptInfo { mode: TranscriptMode; persisted: boolean; retentionDays: number | null }
@@ -46,15 +51,27 @@ export class ConversationsApi {
   }
 
   info() { return this.call<TranscriptInfo>('GET', '/api/transcripts'); }
-  list(cursor?: string) {
-    return this.call<ConversationPage>('GET', `/api/conversations${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`);
+  list(cursor?: string, archived?: ArchivedFilter) {
+    const qs = new URLSearchParams();
+    if (cursor) qs.set('cursor', cursor);
+    if (archived) qs.set('archived', archived);
+    const q = qs.toString();
+    return this.call<ConversationPage>('GET', `/api/conversations${q ? `?${q}` : ''}`);
   }
-  search(q: string, cursor?: string) { return this.call<ConversationPage>('POST', '/api/conversations/search', { q, cursor }); }
+  search(q: string, cursor?: string, archived?: ArchivedFilter) {
+    return this.call<ConversationPage>('POST', '/api/conversations/search', archived ? { q, cursor, archived } : { q, cursor });
+  }
   async get(id: ID): Promise<ConversationDetail | undefined> {
     try { return await this.call<ConversationDetail>('GET', `/api/conversations/${encodeURIComponent(id)}`, undefined, DETAIL_MAX_BYTES); }
     catch (e) { if (e instanceof ConversationsApiError && e.status === 404) return undefined; throw e; }
   }
-  rename(id: ID, title: string) { return this.call<{ id: ID; title: string; updatedAt: ISODate }>('PATCH', `/api/conversations/${encodeURIComponent(id)}`, { title }); }
+  rename(id: ID, title: string) { return this.update(id, { title }); }
+  /** 1.17.0: pin / archive persist server-side (archiving drops the pin; pinning unarchives). */
+  setPinned(id: ID, pinned: boolean) { return this.update(id, { pinned }); }
+  setArchived(id: ID, archived: boolean) { return this.update(id, { archived }); }
+  update(id: ID, patch: { title?: string; pinned?: boolean; archived?: boolean }) {
+    return this.call<ConversationUpdate>('PATCH', `/api/conversations/${encodeURIComponent(id)}`, patch);
+  }
   async remove(id: ID): Promise<boolean> {
     try { return (await this.call<{ deleted: boolean }>('DELETE', `/api/conversations/${encodeURIComponent(id)}`)).deleted; }
     catch (e) { if (e instanceof ConversationsApiError && e.status === 404) return false; throw e; }

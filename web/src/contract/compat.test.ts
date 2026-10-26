@@ -77,6 +77,10 @@ same<CA.ConversationSummary, G.ConversationSummary>(true);
 same<CA.ConversationPage, G.ConversationPage>(true);
 same<CA.TranscriptInfo, G.TranscriptsInfo>(true);
 same<Awaited<ReturnType<CA.ConversationsApi['rename']>>, G.RenameResponse>(true);
+// 1.17.0 pin / archive
+same<Awaited<ReturnType<CA.ConversationsApi['update']>>, G.RenameResponse>(true);
+same<Parameters<CA.ConversationsApi['update']>[1], G.RenameRequest>(true);
+same<CA.ArchivedFilter, G.ConversationArchivedFilter>(true);
 same<CA.ConversationDetail['id'], G.Conversation['id']>(true);
 
 describe('contract drift (schema -> TS)', () => {

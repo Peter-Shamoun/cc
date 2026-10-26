@@ -19,7 +19,7 @@ CLOSED = {"Sensitivity", "MessageEnd.finishReason", "StoredMessage.finishReason"
           "ChatRequest.messages.role", "ChatRequest.scenario", "Capabilities.scope", "RegenerateStyle", "FeedbackRating",
           "ImagePart.mime", "TranscriptsInfo.mode", "CostTier", "StrategyOption.latencyTier", "ModelOption.tier",
           "Source.role", "ToolCallPart.state", "StepCheck.verdict",
-          "ShareExpiryDays",}
+          "ShareExpiryDays", "ConversationArchivedFilter",}
 
 
 def _walk(node, path):
