@@ -15,6 +15,8 @@ test.describe('fidelity (mock) @desktop', () => {
     expect(stroke).toBe('1.75px');
     await page.keyboard.press('ControlOrMeta+,');
     const shadow = await page.getByRole('dialog').evaluate((el) => getComputedStyle(el).boxShadow);
-    expect(shadow).toBe('rgba(0, 0, 0, 0.12) 0px 8px 32px 0px');
+    // Tailwind 4 stacks empty ring/inset layers in front of the shadow: compare the visible layers only.
+    const visible = shadow.split(/,\s*(?=rgba)/).filter((l) => !l.startsWith('rgba(0, 0, 0, 0)'));
+    expect(visible).toEqual(['rgba(0, 0, 0, 0.12) 0px 8px 32px 0px']);
   });
 });
