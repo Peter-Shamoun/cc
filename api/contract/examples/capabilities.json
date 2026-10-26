@@ -1,0 +1,76 @@
+{
+  "contractVersion": "1.4.0",
+  "demo": true,
+  "defaults": {
+    "strategy": "tool_loop",
+    "model": "auto"
+  },
+  "strategies": [
+    {
+      "id": "tool_loop",
+      "label": "Standard",
+      "description": "One model explores the data, writes and checks SQL, and repairs it if a query fails.",
+      "costTier": "low",
+      "latencyTier": "fast",
+      "models": [
+        "auto",
+        "claude-haiku-5-5",
+        "claude-sonnet-5-5"
+      ],
+      "default": true,
+      "available": true
+    },
+    {
+      "id": "cascade",
+      "label": "Escalate when stuck",
+      "description": "Starts on a small, fast model and hands over to a larger one if it can't produce a verified answer.",
+      "costTier": "medium",
+      "latencyTier": "medium",
+      "models": [
+        "auto"
+      ],
+      "default": false,
+      "available": true
+    },
+    {
+      "id": "candidates",
+      "label": "Cross-check",
+      "description": "Writes several candidate queries, runs them all, and answers with the result they agree on.",
+      "costTier": "high",
+      "latencyTier": "slow",
+      "models": [
+        "auto",
+        "claude-sonnet-5-5"
+      ],
+      "default": false,
+      "available": true
+    }
+  ],
+  "models": [
+    {
+      "id": "auto",
+      "label": "Auto",
+      "description": "The server picks the model for the strategy.",
+      "costTier": "low",
+      "default": true
+    },
+    {
+      "id": "claude-haiku-5-5",
+      "label": "Haiku",
+      "description": "Small and fast.",
+      "tier": "small",
+      "provider": "anthropic",
+      "costTier": "low",
+      "default": false
+    },
+    {
+      "id": "claude-sonnet-5-5",
+      "label": "Sonnet",
+      "description": "Larger; better on hard questions.",
+      "tier": "medium",
+      "provider": "anthropic",
+      "costTier": "medium",
+      "default": false
+    }
+  ]
+}
