@@ -40,6 +40,7 @@ from api.capabilities import DEFAULT_STRATEGY, capabilities as capabilities_body
 from api.export import FORMATS as EXPORT_FORMATS, as_json as export_json, as_markdown as export_markdown, filename as export_filename
 from api.share import ShareRegistry, link as share_link, shared_view
 from api.sources import sources_for
+from api.sql_mask import POLICIES as SQL_MASK_POLICIES, mask_event, mask_part, policy_from_env as sql_mask_policy_from_env
 from api.stream_parts import emit_parts
 from api.styles import apply_style
 from api.titles import title_from_parts
@@ -154,6 +155,8 @@ class Settings:
                                                                                          "3600")))
     #: "demo" (default) lets create_app fall back to DemoAuth; anything else requires an explicit auth backend
     auth_mode: str = field(default_factory=lambda: os.environ.get("CC_API_AUTH", "demo"))
+    #: 1.14.0: literal masking in *shown* SQL ("phi" default, "all", "off"); an unknown value means "phi" (sql_mask)
+    sql_literal_masking: str = field(default_factory=sql_mask_policy_from_env)
     analyzer_overrides: dict = field(default_factory=lambda: {
         "glossary": "basic", "data_dictionary": False, "data_profile": False, "row_limit": 5000,
         "candidates": 1, "cascade": "off"})
@@ -310,8 +313,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             customer = authed(request, new_id("r")).principal.customer if _token(request) else None
         except AuthError:
             customer = None
-        return JSONResponse(capabilities_body(CONTRACT_VERSION, demo=settings.llm == "scripted", customer=customer),
-                            headers=NO_STORE)
+        return JSONResponse(capabilities_body(CONTRACT_VERSION, demo=settings.llm == "scripted", customer=customer,
+                                              sql_literal_masking=settings.sql_literal_masking), headers=NO_STORE)
 
     @app.post("/api/auth/sign-out")
     def sign_out(request: Request):
@@ -463,11 +466,13 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         run = _Run(message_id, ctx.principal, conversation_id=conversation_id)
         runs[message_id] = run
         started = time.perf_counter()
+        sql_policy = settings.sql_literal_masking if settings.sql_literal_masking in SQL_MASK_POLICIES else "phi"
         marks: dict = {}
         persisted_steps: list = []
         reasoning: dict = {}
 
         def emit(payload: dict):
+            payload = mask_event(payload, sql_policy)  # 1.14.0: shown SQL never carries PHI-bearing literals
             seq = len(run.events)
             event = {**payload, "seq": seq}
             if "first_event" not in marks:
@@ -539,6 +544,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                         "message_id": message_id, "choices": part.get("choices", []), "scenario": scenario,
                         "expires": time.time() + settings.clarification_ttl_seconds}
 
+            parts = [mask_part(p, sql_policy) for p in parts]   # persisted, shared and exported copies too
             if not emit_parts(parts, emit, cancelled=run.cancelled, delay=settings.stream_delay_seconds,
                               on_part=remember_clarification):
                 finish = "aborted"

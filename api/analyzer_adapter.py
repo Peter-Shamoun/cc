@@ -32,6 +32,7 @@ from api.contract import CONTRACT_VERSION
 from api.live import Cancelled, LiveTap
 from api.mapping import outcome_parts
 from api.reasoning_policy import DEFAULT_POLICY, ReasoningPolicy
+from api.sql_mask import DEFAULT_POLICY as SQL_MASK_DEFAULT, mask_part, masking_emit
 from api.store import DownloadRegistry, Principal
 from api.stream_parts import emit_parts
 
@@ -154,7 +155,8 @@ class _ReplayLLM:
 def events_for_recording(recording: Recording, *, principal: Principal | None = None,
                          downloads: DownloadRegistry | None = None, message_id: str = "m_rec",
                          conversation_id: str = "c_rec", parent_id: str = "u_rec",
-                         cancel_after_call: int | None = None, reasoning: str = DEFAULT_POLICY) -> list[dict]:
+                         cancel_after_call: int | None = None, reasoning: str = DEFAULT_POLICY,
+                         sql_masking: str = SQL_MASK_DEFAULT) -> list[dict]:
     """Replay a recorded analyzer run into the contract stream that ``POST /api/chat`` would send.
 
     ``cancel_after_call`` simulates Stop after N model calls (the stream must finish "aborted").
@@ -178,14 +180,16 @@ def events_for_recording(recording: Recording, *, principal: Principal | None = 
                          downloads=downloads, message_id=message_id, conversation_id=conversation_id,
                          parent_id=parent_id, reasoning=reasoning,
                          strategy=adapter_strategy(recording.strategy, multi_candidate=recording.multi_candidate,
-                                                   escalated=recording.escalated))
+                                                   escalated=recording.escalated),
+                         sql_masking=sql_masking)
 
 
 def run_to_events(question: str, run: Callable[[LiveTap], AnalyzerAnswer], inner_llm: Any, *, model: str,
                   multi_candidate: bool = False, cancelled: threading.Event | None = None,
                   principal: Principal | None = None, downloads: DownloadRegistry | None = None,
                   message_id: str = "m_rec", conversation_id: str = "c_rec", parent_id: str = "u_rec",
-                  strategy: str | None = None, reasoning: str = DEFAULT_POLICY) -> list[dict]:
+                  strategy: str | None = None, reasoning: str = DEFAULT_POLICY,
+                  sql_masking: str = SQL_MASK_DEFAULT) -> list[dict]:
     """The shared adapter pipeline: ``run(tap)`` drives an analyzer/analyst run whose model calls go through ``tap``
     (a ``LiveTap`` around ``inner_llm``) and returns the ``AnalyzerAnswer``; this function frames it as the full
     contract stream (``message.start`` … ``message.end``, with ``seq``). Model text is filtered by ``reasoning``.
@@ -196,7 +200,7 @@ def run_to_events(question: str, run: Callable[[LiveTap], AnalyzerAnswer], inner
     def raw_emit(payload: dict):
         events.append({**payload, "seq": len(events)})
 
-    emit = ReasoningPolicy(raw_emit, reasoning)
+    emit = masking_emit(ReasoningPolicy(raw_emit, reasoning), sql_masking)
     principal = principal or Principal("acme_labs", "ana@xifin.example")
     downloads = downloads or DownloadRegistry()
     cancelled = cancelled or threading.Event()
@@ -220,6 +224,7 @@ def run_to_events(question: str, run: Callable[[LiveTap], AnalyzerAnswer], inner
                   "message": "The analysis failed. Try again.", "retryable": True}]
         finish = "error"
     emit({"type": "status", "label": "Writing answer" if finish == "stop" else None})
+    parts = [mask_part(p, sql_masking) for p in parts]
     if finish != "aborted" and not emit_parts(parts, emit, cancelled=cancelled):
         finish = "aborted"
     emit({"type": "status", "label": None})
