@@ -210,3 +210,15 @@ describe('offline banner', () => {
     onLine.mockRestore();
   });
 });
+
+describe('empty state starters', () => {
+  it('shows four starter cards named by title, and a card sends its prompt', async () => {
+    cleanup();
+    render(<App />);
+    const cards = screen.getAllByTestId('starter-card');
+    expect(cards).toHaveLength(4);
+    expect(screen.getByRole('group', { name: 'Suggestions' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Denial rate by payer' }));
+    await waitFor(() => expect(screen.getAllByTestId('msg-user')[0]).toHaveTextContent('What was our denial rate by payer last quarter?'));
+  });
+});
