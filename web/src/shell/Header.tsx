@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, Copy, Database, Download, Ellipsis, Keyboard, Moon, PanelLeft, Pencil, Settings, Share, SquarePen, Sun, Trash2 } from 'lucide-react';
 import { useTheme } from '../lib/theme';
 import { IconButton } from '../components/ui';
-import { Menu, useMenu, type MenuItem } from './primitives';
+import { Menu, modKey, useMenu, type MenuItem } from './primitives';
 
 export interface HeaderProps {
   showNav: boolean;
@@ -64,8 +64,8 @@ export function Header(p: HeaderProps) {
       <div className="flex min-w-0 items-center gap-1">
         {p.showNav && (
           <>
-            <IconButton label="Open sidebar" onClick={p.onOpenSidebar}><PanelLeft size={18} /></IconButton>
-            <IconButton label="New chat" onClick={p.onNewChat} className="max-sm:hidden"><SquarePen size={18} /></IconButton>
+            <IconButton label="Open sidebar" tip={`Open sidebar · ${modKey()} ⇧ S`} onClick={p.onOpenSidebar}><PanelLeft size={18} /></IconButton>
+            <IconButton label="New chat" tip={`New chat · ${modKey()} ⇧ O`} onClick={p.onNewChat} className="max-sm:hidden"><SquarePen size={18} /></IconButton>
           </>
         )}
         <button type="button" onClick={product.toggle} aria-haspopup="menu" aria-expanded={!!product.anchor} data-testid="product-menu" data-mode={p.adapterName}
@@ -103,7 +103,7 @@ export function Header(p: HeaderProps) {
         {p.showNav && (
           <IconButton label="New chat" onClick={p.onNewChat} className="sm:hidden"><SquarePen size={18} /></IconButton>
         )}
-        <IconButton label="More options" aria-haspopup="menu" aria-expanded={!!more.anchor} onClick={more.toggle}><Ellipsis size={18} /></IconButton>
+        <IconButton label="More options" tip tipAt="end" aria-haspopup="menu" aria-expanded={!!more.anchor} onClick={more.toggle}><Ellipsis size={18} /></IconButton>
         {share.anchor && <Menu label="Share chat" anchor={share.anchor} items={shareItems} onClose={share.close} align="end" />}
         {product.anchor && <Menu label="ClaimClarity" anchor={product.anchor} items={productItems} onClose={product.close} />}
         {more.anchor && <Menu label="More options" anchor={more.anchor} items={moreItems} onClose={more.close} align="end" />}

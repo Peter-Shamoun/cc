@@ -76,7 +76,7 @@ export function Sidebar(p: SidebarProps) {
           <span className="flex h-6 w-6 items-center justify-center rounded-md bg-accent text-[11px] font-bold text-accent-fg" aria-hidden>CC</span>
           ClaimClarity
         </div>
-        <IconButton label="Close sidebar" onClick={p.onCollapse}>{p.drawer ? <X size={20} /> : <PanelLeft size={18} />}</IconButton>
+        <IconButton label="Close sidebar" tip={p.drawer ? undefined : `Close sidebar · ${modKey()} ⇧ S`} onClick={p.onCollapse}>{p.drawer ? <X size={20} /> : <PanelLeft size={18} />}</IconButton>
       </div>
       <nav className="px-2 text-sm" aria-label="Chat actions">
         <button type="button" onClick={p.onNew} className="group/nav flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 hover:bg-hover">
@@ -160,11 +160,11 @@ function ThreadRow({ t, active, tabStop, renaming, setRenaming, onSelect, onRena
 export function SidebarRail({ onExpand, onNew, onSearch, onSettings }: { onExpand: () => void; onNew: () => void; onSearch: () => void; onSettings: () => void }) {
   return (
     <aside className="flex h-full w-[52px] shrink-0 flex-col items-center gap-1 border-r border-line/60 bg-sidebar py-2.5 font-sans max-md:hidden" aria-label="Sidebar (collapsed)" data-testid="sidebar-rail">
-      <IconButton label="Open sidebar" onClick={onExpand}><PanelLeft size={18} /></IconButton>
-      <IconButton label="New chat" onClick={onNew}><MessageSquarePlus size={18} /></IconButton>
-      <IconButton label="Search chats" onClick={onSearch}><Search size={18} /></IconButton>
+      <IconButton label="Open sidebar" tip={`Open sidebar · ${modKey()} ⇧ S`} tipAt="right" onClick={onExpand}><PanelLeft size={18} /></IconButton>
+      <IconButton label="New chat" tip={`New chat · ${modKey()} ⇧ O`} tipAt="right" onClick={onNew}><MessageSquarePlus size={18} /></IconButton>
+      <IconButton label="Search chats" tip={`Search chats · ${modKey()} K`} tipAt="right" onClick={onSearch}><Search size={18} /></IconButton>
       <div className="flex-1" />
-      <IconButton label="Settings" onClick={onSettings}><Settings size={18} /></IconButton>
+      <IconButton label="Settings" tip={`Settings · ${modKey()} ,`} tipAt="right" onClick={onSettings}><Settings size={18} /></IconButton>
     </aside>
   );
 }
