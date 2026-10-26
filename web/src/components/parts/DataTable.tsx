@@ -169,7 +169,7 @@ export const DataTable = memo(function DataTable({ part, onOpen, full }: { part:
         style={virtual ? { height: full ? 'calc(100vh - 170px)' : 400 } : undefined}
         data-virtual={virtual || undefined}
       >
-        <table className="w-max min-w-full border-collapse font-sans text-sm">
+        <table className="w-max min-w-full border-collapse font-sans text-sm tabular-nums">
           <thead ref={headRef} className="sticky top-0 z-[1] bg-elev">
             <tr>
               {part.columns.map((col, i) => {
