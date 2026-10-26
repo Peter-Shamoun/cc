@@ -11,6 +11,7 @@ export const SHORTCUTS: { label: string; keys: () => string[]; group: ShortcutGr
   { label: 'Export chat as Markdown', keys: () => [modKey(), 'Shift', 'E'], group: 'Chats' },
   { label: 'Settings', keys: () => [modKey(), ','], group: 'Navigation' },
   { label: 'Show shortcuts', keys: () => [modKey(), '/'], group: 'Navigation' },
+  { label: 'Stop generating', keys: () => ['Esc'], group: 'Composer' },
   { label: 'Slash commands', keys: () => ['/'], group: 'Composer' },
   { label: 'New line in message', keys: () => ['Shift', 'Enter'], group: 'Composer' },
   { label: 'Close panel or dialog', keys: () => ['Esc'], group: 'Navigation' },
