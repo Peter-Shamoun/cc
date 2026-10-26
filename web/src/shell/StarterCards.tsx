@@ -19,7 +19,7 @@ export function StarterCards({ onPick }: { onPick: (prompt: string) => void }) {
     <div role="group" aria-label="Suggestions" data-testid="starter-cards"
       className="mt-4 grid grid-cols-2 gap-2 max-sm:order-first max-sm:-mx-4 max-sm:mb-3 max-sm:mt-0 max-sm:flex max-sm:overflow-x-auto max-sm:px-4 max-sm:pb-1 max-sm:scrollbar-none max-sm:[mask-image:linear-gradient(to_right,transparent,#000_1rem,#000_calc(100%-2rem),transparent)]">
       {STARTERS.map((s, i) => (
-        <button key={s.prompt} type="button" onClick={() => onPick(s.prompt)} style={{ animationDelay: `${i * 40}ms` }} data-testid="starter-card"
+        <button key={s.prompt} type="button" onClick={() => onPick(s.prompt)} aria-label={s.title} style={{ animationDelay: `${i * 40}ms` }} data-testid="starter-card"
           className="group flex min-w-0 items-start gap-3 rounded-2xl border border-line bg-bg px-4 py-3 text-left transition-colors hover:bg-hover motion-safe:animate-[cc-rise_240ms_ease-out_both] max-sm:shrink-0">
           <s.icon size={16} aria-hidden className="mt-0.5 shrink-0 text-fg-subtle transition-colors group-hover:text-fg-muted" />
           <span className="min-w-0">

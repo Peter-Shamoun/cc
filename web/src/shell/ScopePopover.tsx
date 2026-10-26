@@ -31,6 +31,7 @@ export function ScopePopover({ anchor, onClose }: { anchor: HTMLElement; onClose
   }, [anchor, onClose]);
   const close = () => { onClose(); anchor.focus(); };
   return createPortal(
+    // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Escape-to-close on the dialog container (APG dialog pattern)
     <div ref={ref} role="dialog" aria-labelledby={`${id}-t`} data-testid="scope-popover" style={pos ?? { top: -9999, left: -9999 }}
       onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } }}
       className="fixed z-[60] w-[min(20rem,calc(100vw-16px))] rounded-2xl border border-line bg-elev p-1.5 font-sans text-sm text-fg shadow-[0_8px_30px_rgba(0,0,0,0.16)] motion-safe:animate-[cc-pop_120ms_ease-out]">
@@ -48,7 +49,7 @@ export function ScopePopover({ anchor, onClose }: { anchor: HTMLElement; onClose
           <span className="min-w-0 flex-1"><span className="block font-medium">Raw EDI tables</span><span className="block text-[13px]">837/835 loops, not in your session</span></span>
         </div>
       </div>
-      <div className="my-1 h-px bg-line" role="separator" />
+      <hr className="my-1 h-px border-0 bg-line" />
       <div className="px-2.5 pb-1 pt-1.5 text-xs font-medium text-fg-subtle" id={`${id}-v`}>Views in scope</div>
       <ul aria-labelledby={`${id}-v`} className="flex flex-wrap gap-1 px-2.5 pb-2">
         {SCOPE_VIEWS.map((v) => <li key={v} className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[12px] text-fg-muted">{v}</li>)}
