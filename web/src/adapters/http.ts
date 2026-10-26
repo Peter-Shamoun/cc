@@ -1,4 +1,5 @@
-import { noteServerDate, serverNow } from '../lib/serverClock';
+import { noteServerDate } from '../lib/serverClock';
+import { retryAfterOf } from '../lib/fetchGuard';
 import { getShare, loadShared, revokeShare, setShare } from '../contract/share';
 import type { ShareExpiryDays, ShareLink, SharedConversation } from '../contract/v1.gen';
 import type { ErrorPart, StreamEvent } from '../lib/contract';
@@ -53,24 +54,7 @@ export function streamGone(): Error {
   return e;
 }
 
-/**
- * An HTTP-date is server time, so it is measured against the same response's `Date` header (RFC 9110 §10.2.3); without
- * one, against the server clock estimate. The local clock alone would retry at once when it runs fast, or wait
- * (or give up) far too long when it runs slow.
- */
-export function retryAfterMs(value: string | null, now = serverNow(), serverDate?: string | null): number | null {
-  if (!value) return null;
-  const v = value.trim();
-  if (/^\d+$/.test(v)) return Number(v) * 1000;
-  if (!/[a-z]/i.test(v)) return null; // "1.5", "-3": not delay-seconds and not a date (Date.parse would guess one)
-  const at = Date.parse(v);
-  if (Number.isNaN(at)) return null;
-  const ref = serverDate ? Date.parse(serverDate) : NaN;
-  return Math.max(0, at - (Number.isNaN(ref) ? now : ref));
-}
-
-/** Retry-After of a response, measured against that response's own `Date`. */
-const retryAfterOf = (res: Response) => retryAfterMs(res.headers.get('retry-after'), serverNow(), res.headers.get('date'));
+export { retryAfterMs } from '../lib/fetchGuard';
 
 const abortError = () => new DOMException('aborted', 'AbortError');
 const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
