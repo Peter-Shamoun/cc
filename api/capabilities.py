@@ -9,6 +9,8 @@ from __future__ import annotations
 import json
 import os
 
+from api.feedback import REASONS as FEEDBACK_REASONS
+
 DEFAULT_STRATEGY = "tool_loop"
 DEFAULT_MODEL = "auto"
 
@@ -69,7 +71,7 @@ def capabilities(contract_version: str, demo: bool, customer: str | None = None)
               for m in MODELS]
     return {"contractVersion": contract_version, "demo": demo, "scope": "organization" if customer else "public",
             "defaults": {"strategy": DEFAULT_STRATEGY, "model": DEFAULT_MODEL}, "strategies": strategies,
-            "models": models}
+            "models": models, "feedbackReasons": [dict(r) for r in FEEDBACK_REASONS]}
 
 
 def check_options(options: dict, customer: str | None = None) -> str | None:

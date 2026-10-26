@@ -1,6 +1,6 @@
 # ClaimClarity chat API — stream contract
 
-**Version: 1.6.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.7.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -314,7 +314,35 @@ A picker reads what the server can run. The body is `Capabilities` (no user data
   kept equal to `api/contract/examples/capabilities.json` by a test), `modelsFor()`, `defaultStrategy()` and
   `runOptions()` (builds `options`, omitting defaults).
 
+## 13. Answer feedback (1.7.0)
+
+Thumbs up/down on an **assistant** message, with optional reason chips and a comment.
+
+* `PUT /api/conversations/{conversationId}/messages/{messageId}/feedback` with body `FeedbackRequest
+  {rating: "up"|"down", reasons?: string[], comment?: string ≤ 1000}`. It returns `Feedback {messageId, rating,
+  reasons, comment?, updatedAt}`. A later PUT replaces the earlier one, so changing your mind is just another PUT.
+* `DELETE` on the same path clears it: `{"cleared": true}`.
+* The stored value comes back on `StoredMessage.feedback` in `GET /api/conversations/{id}`, so a reloaded
+  conversation shows the thumbs state.
+* Reason chips: `Capabilities.feedbackReasons[] {id, label, rating}` (demo: up `correct`, `clear`, `fast`; down
+  `wrong_numbers`, `wrong_query`, `misunderstood`, `missing_data`, `too_slow`, `other`). Ids are stable; show the
+  label. Each reason must belong to the rating you send.
+* Errors:
+  * 422 `validation`: unknown reason, a reason of the other rating, a comment over 1000 characters, or a user
+    message id.
+  * 404 `not_found`: unknown message or conversation, or someone else's.
+  * 401 when signed out.
+  * 410 when the org's transcripts are shredded (same as §11).
+* **PHI:** the comment is user text, treated exactly like a message. It is stored (sealed) with the transcript,
+  never logged, and never in a URL. The audit event `answer_feedback` carries only the rating (`kind`) and the reason
+  ids (`reason`). Ephemeral transcript mode keeps feedback only as long as the conversation.
+* Example: `examples/feedback.json`. Client: `web/src/contract/feedback.ts` (`sendFeedback`, `feedbackUrl`) and
+  `feedbackReasonsFor(capabilities, rating)`.
+
 ## Changelog
+
+* **1.7.0** (2026-10-25) — Answer feedback (§13): the `PUT`/`DELETE …/messages/{id}/feedback` endpoints,
+  `FeedbackRequest`, `Feedback`, `StoredMessage.feedback`, `Capabilities.feedbackReasons`. Additive.
 
 * **1.6.0** (2026-10-25) — `usage.latency.stages` (`LatencyStages`: plan/sql/repair/checks/render, wall-clock ms;
   §7). §8 documents that cancelling a running SQL statement needs analyzer support, and gives the intended event
