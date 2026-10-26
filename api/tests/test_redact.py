@@ -79,3 +79,13 @@ def test_unhandled_exception_is_500_envelope_and_log_has_no_message(caplog):
     logged = "\n".join(rec.getMessage() for rec in caplog.records)
     assert "RuntimeError" in logged and "/api/_boom" in logged
     assert not any(p in logged for p in PHI)
+
+
+def test_log_filter_keeps_uvicorn_access_args_shape():
+    """uvicorn's AccessFormatter unpacks five args; the filter must redact them without dropping them (QA C6)."""
+    from uvicorn.logging import AccessFormatter
+    rec = logging.LogRecord("uvicorn.access", logging.INFO, __file__, 1, '%s - "%s %s HTTP/%s" %d',
+                            ("127.0.0.1:5000", "GET", "/api/x?email=jane.doe@example.org", "1.1", 200), None)
+    assert PhiLogFilter().filter(rec)
+    text = AccessFormatter('%(client_addr)s "%(request_line)s" %(status_code)s', use_colors=False).format(rec)
+    assert "[email]" in text and "200" in text and "jane.doe" not in text

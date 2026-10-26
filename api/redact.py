@@ -42,11 +42,16 @@ class PhiLogFilter(logging.Filter):
     text) and drops the exception message."""
 
     def filter(self, record: logging.LogRecord) -> bool:
-        try:
-            msg = record.getMessage()
-        except Exception:  # bad format args: keep the template only
-            msg = str(record.msg)
-        record.msg, record.args = redact(msg, 2000), ()
+        if isinstance(record.args, tuple) and record.args:
+            # Keep the tuple's length: formatters such as uvicorn's access log unpack record.args themselves.
+            # The template is code-authored and stays as is (the quote rule would eat its %s placeholders).
+            record.args = tuple(a if isinstance(a, (int, float)) else redact(a, 2000) for a in record.args)
+        else:
+            try:
+                msg = record.getMessage()
+            except Exception:  # bad format args: keep the template only
+                msg = str(record.msg)
+            record.msg, record.args = redact(msg, 2000), ()
         if record.exc_info and record.exc_info[0] is not None:
             etype, _exc, tb = record.exc_info
             frames = "\n".join(f"  {f.filename.rsplit('/', 1)[-1]}:{f.lineno} in {f.name}"
