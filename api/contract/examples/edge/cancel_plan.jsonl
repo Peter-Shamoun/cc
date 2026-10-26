@@ -1,4 +1,4 @@
-{"type":"message.start","messageId":"m_1","conversationId":"c_1","contractVersion":"1.22.0","model":"scripted","parentId":"u_1","strategy":"tool_loop","seq":0}
+{"type":"message.start","messageId":"m_1","conversationId":"c_1","contractVersion":"1.23.0","model":"scripted","parentId":"u_1","strategy":"tool_loop","seq":0}
 {"type":"status","label":"Thinking","seq":1}
 {"type":"status","label":null,"seq":2}
 {"type":"status","label":null,"seq":3}

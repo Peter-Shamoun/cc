@@ -40,6 +40,7 @@ from api.security import (MAX_BODY_BYTES, SESSION_COOKIE, BodyLimitMiddleware, C
                           HeadMiddleware, SecurityHeadersMiddleware)
 from api.store import DownloadRegistry, Principal
 from api.feedback import MAX_COMMENT, check as check_feedback, record as feedback_record
+from api.clarify import legacy_answers, summary as clarify_summary, validate_answers
 from api.capabilities import DEFAULT_STRATEGY, capabilities as capabilities_body, check_options
 from api.export import FORMATS as EXPORT_FORMATS, as_json as export_json, as_markdown as export_markdown, filename as export_filename
 from api.sources import sources_for
@@ -94,10 +95,19 @@ class ChatMessageIn(BaseModel):
     editOf: str | None = Field(default=None, pattern=_ID)
 
 
+class ClarifyAnswerIn(BaseModel):
+    questionId: str = Field(pattern=_ID)
+    choiceIds: list[str] = Field(default_factory=list, max_length=4)
+    otherText: str | None = Field(default=None, max_length=500)
+    skipped: bool = False
+
+
 class ResumeIn(BaseModel):
     clarificationId: str = Field(pattern=_ID)
     choiceIds: list[str] = Field(default_factory=list, max_length=8)
     text: str | None = Field(default=None, max_length=2000)
+    #: 1.23.0: answers to a multi-question clarification (§6.1)
+    answers: list[ClarifyAnswerIn] | None = Field(default=None, max_length=4)
 
 
 class RegenerateIn(BaseModel):
@@ -478,9 +488,21 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 pending = clarifications.get(body.resume.clarificationId)
                 if pending is None or pending["principal"] != ctx.principal or pending["conversation_id"] != conversation_id:
                     return error_json("clarification_expired", "That question has expired; send it as a new question.", 409)
+                questions = pending.get("questions") or []
+                if body.resume.answers is not None:
+                    answers = [a.model_dump(exclude_none=True) for a in body.resume.answers]
+                    problem = validate_answers(questions, answers) if questions else \
+                        "This question has no parts to answer; send choiceIds or text."
+                    if problem:  # the pending question stays answerable
+                        return error_json("validation", problem, 422)
+                elif questions:  # 1.23.0: a pre-1.23 client answered the first question through `choices`
+                    answers = legacy_answers(questions, body.resume.choiceIds, body.resume.text or reply)
                 del clarifications[body.resume.clarificationId]
-                labels = [c["label"] for c in pending["choices"] if c["id"] in set(body.resume.choiceIds)]
-                answer_text = "; ".join(labels) or (body.resume.text or reply)
+                if questions:
+                    answer_text = clarify_summary(questions, answers)
+                else:
+                    labels = [c["label"] for c in pending["choices"] if c["id"] in set(body.resume.choiceIds)]
+                    answer_text = "; ".join(labels) or (body.resume.text or reply)
                 question = f"{pending['question']}\nClarification: {answer_text}"
                 start_extra["resumeOf"] = {"clarificationId": body.resume.clarificationId,
                                            "messageId": pending["message_id"]}
@@ -606,6 +628,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                     clarifications[part["clarificationId"]] = {
                         "principal": ctx.principal, "conversation_id": conversation_id, "question": question,
                         "message_id": message_id, "choices": part.get("choices", []), "scenario": scenario,
+                        "questions": part.get("questions", []),
                         "expires": time.time() + settings.clarification_ttl_seconds}
 
             parts = [mask_part(p, sql_policy) for p in parts]   # persisted and exported copies too

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://claimclarity.local/api/contract/v1.schema.json",
   "title": "ClaimClarity chat stream contract",
-  "version": "1.22.0",
+  "version": "1.23.0",
   "description": "One JSON object per SSE data: line. See api/CONTRACT.md. Validate an event against #/$defs/StreamEvent.",
   "$ref": "#/$defs/StreamEvent",
   "$defs": {
@@ -1394,6 +1394,15 @@
         },
         "answered": {
           "type": "boolean"
+        },
+        "questions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/ClarifyQuestion"
+          },
+          "description": "1.23.0: 1–4 questions answered together (CONTRACT.md §6.1). `question` is then the lead-in, and `choices`/`multiSelect` mirror the first question for pre-1.23 clients."
         }
       },
       "additionalProperties": true
@@ -2393,6 +2402,14 @@
             "text": {
               "type": "string",
               "maxLength": 2000
+            },
+            "answers": {
+              "type": "array",
+              "maxItems": 4,
+              "items": {
+                "$ref": "#/$defs/ClarifyAnswer"
+              },
+              "description": "1.23.0: answers to `ClarificationPart.questions`; an empty array skips them all. Only for a part with `questions` (otherwise 422)."
             }
           },
           "additionalProperties": true
@@ -2436,7 +2453,8 @@
             "cancel_repair",
             "cancel_candidates",
             "cancel_escalation",
-            "cancel_render"
+            "cancel_render",
+            "clarify_multi"
           ]
         },
         "temporary": {
@@ -3373,6 +3391,98 @@
         "warehouse"
       ],
       "description": "1.21.0 (BACKEND-FIT): names a client can never send in `ChatRequest` or `ChatRequest.options`, because the customer, the data source and the queryable relations come only from the signed-in identity, server-side (production: the Cognito id token's `custom:customer` claim, then `ccsim.query.open_session` with that customer's manifest; demo: the demo token and `DEMO_DIRECTORY`). Sending one is 422 `validation`; nothing is run. CONTRACT.md §2.1."
+    },
+    "ClarifyOption": {
+      "description": "1.23.0: one option of a ClarifyQuestion (CONTRACT.md §6.1). Unlike `Choice`, the description is required.",
+      "type": "object",
+      "required": [
+        "id",
+        "label",
+        "description"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "additionalProperties": true
+    },
+    "ClarifyQuestion": {
+      "description": "1.23.0: one question of a multi-question clarification (CONTRACT.md §6.1), like Claude's ask-the-user form. Every question also accepts free text (\"Other\") and can be skipped; the client always offers both.",
+      "type": "object",
+      "required": [
+        "id",
+        "header",
+        "question",
+        "options"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "header": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 12,
+          "description": "Short tab/chip label, 12 characters or fewer (e.g. \"Metric\")."
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/ClarifyOption"
+          }
+        },
+        "multiSelect": {
+          "type": "boolean",
+          "description": "More than one option (and free text) may be picked."
+        }
+      },
+      "additionalProperties": true
+    },
+    "ClarifyAnswer": {
+      "description": "1.23.0: the reply to one ClarifyQuestion in `ChatRequest.resume.answers`. Exactly one of: `choiceIds` and/or `otherText` (both or several picks only when `multiSelect`), or `skipped: true`. A question with no answer counts as skipped.",
+      "type": "object",
+      "required": [
+        "questionId"
+      ],
+      "properties": {
+        "questionId": {
+          "$ref": "#/$defs/ID"
+        },
+        "choiceIds": {
+          "type": "array",
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ID"
+          }
+        },
+        "otherText": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "skipped": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
     }
   }
 }

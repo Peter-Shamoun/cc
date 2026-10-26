@@ -239,7 +239,8 @@ def _question(messages: list) -> str:
 SCENARIOS = ("table", "chart", "repair", "abstain", "clarify", "escalation", "candidates", "error", "slow", "report",
              # 1.16.0 edge cases (CONTRACT.md §9.1): what the UI must survive, each with an example stream
              "empty", "multi_table", "long_sql", "many_repairs", "clarify_nested", "escalation_abstain",
-             "cancel_plan", "cancel_sql", "cancel_repair", "cancel_candidates", "cancel_escalation", "cancel_render")
+             "cancel_plan", "cancel_sql", "cancel_repair", "cancel_candidates", "cancel_escalation", "cancel_render",
+             "clarify_multi")  # 1.23.0: Claude-style multi-question clarification (§6.1); appended like the schema enum
 #: 1.16.0 "cancel at every stage": scenario -> (scripted run it rides on, the event that presses Stop).
 #: The server presses Stop itself the moment that event is emitted, so the aborted stream is deterministic.
 CANCEL_AT = {
@@ -260,6 +261,7 @@ def scripted_scenario(scenario: str | None) -> str | None:
 
 _SCENARIO_WORDS = [
     ("error", re.compile(r"\b(simulate (an )?(error|outage)|fail on purpose)\b", re.I)),
+    ("clarify_multi", re.compile(r"\b(denial (rate )?breakdown|ask me (a few|some) questions)\b", re.I)),
     ("clarify", re.compile(r"\b(how (bad|big) (are|is)|ambiguous|clarify)\b", re.I)),
     ("abstain", re.compile(r"\b(appeals?|prior auth\w*|forecast|predict\w*|next (month|quarter|year))\b", re.I)),
     ("escalation", re.compile(r"\b(escalat\w*|net collection rate|hard question)\b", re.I)),
@@ -278,6 +280,7 @@ SCENARIO_CONFIG = {
     "empty": {"verify": False},                      # an empty result is the answer, not a reason to revise
     "many_repairs": {"max_repairs": 6, "max_turns": 10, "max_tool_calls": 14},
     "clarify_nested": {"enable_ask": True},
+    "clarify_multi": {"enable_ask": True},
     "escalation_abstain": {"cascade": "haiku_then_sonnet"},
     "cancel_candidates": {"candidates": 3, "candidate_selection": "execution_vote"},
     "cancel_escalation": {"cascade": "haiku_then_sonnet"},
@@ -298,7 +301,7 @@ def detect_scenario(question: str, forced: str | None = None) -> str:
     if _REFUSE.search(question):
         return "abstain"
     for name, pattern in _SCENARIO_WORDS:
-        if pattern.search(question) and not (name == "clarify" and "Clarification:" in question):
+        if pattern.search(question) and not (name.startswith("clarify") and "Clarification:" in question):
             return name
     return "chart" if DEMO_QUERIES[0][0].search(question) else "table"
 
@@ -516,6 +519,50 @@ def _turn_clarify_nested(model, question, step, cand):
                   + (", last 90 days." if recent else ", all time."), ["Denied means the whole claim was denied."])
 
 
+#: 1.23.0 demo (§6.1): three questions in one form, the last one multi-select.
+MULTI_CLARIFY_LEAD = "A few quick questions so the numbers match what you need:"
+MULTI_CLARIFY = [
+    {"id": "metric", "header": "Metric", "question": "How should the denial rate be measured?", "options": [
+        {"id": "count", "label": "By claim count", "description": "Share of claims that were fully denied"},
+        {"id": "dollars", "label": "By billed dollars", "description": "Share of charges on denied claims"}]},
+    {"id": "period", "header": "Period", "question": "Which time window?", "options": [
+        {"id": "last_90", "label": "Last 90 days", "description": "Service dates in the last 90 days of data"},
+        {"id": "last_12m", "label": "Last 12 months", "description": "Service dates in the last 12 months of data"},
+        {"id": "all", "label": "All time", "description": "Every service date in the data"}]},
+    {"id": "group", "header": "Group by", "question": "How should the results be broken down?", "multiSelect": True,
+     "options": [{"id": "payer", "label": "By payer", "description": "One row per payer"},
+                 {"id": "month", "label": "By service month", "description": "One row per month of service"}]},
+]
+
+
+def _turn_clarify_multi(model, question, step, cand):
+    m = re.search(r"^Clarification:\s*(.*)$", question, re.M)
+    if m is None:
+        if step == 0:
+            return _explore()
+        return {"tool_calls": [{"name": "ask", "arguments": {"question": MULTI_CLARIFY_LEAD,
+                                                             "questions": MULTI_CLARIFY}}]}
+    picked = dict(kv.split(": ", 1) for kv in m.group(1).split("; ") if ": " in kv)
+    dollars = "dollar" in picked.get("Metric", "").lower()
+    period = picked.get("Period", "")
+    days = 90 if "90 days" in period else 365 if "12 months" in period else None
+    groups = picked.get("Group by", "")
+    keys = [k for k, on in (("payer_name", "payer" in groups.lower()),
+                            ("strftime(service_date, '%Y-%m') AS service_month", "month" in groups.lower())) if on]
+    keys = keys or ["payer_name"]
+    measure = ("SUM(CASE WHEN status = 'denied' THEN charge_amount ELSE 0 END) / SUM(charge_amount) AS denied_dollar_rate"
+               if dollars else "AVG(CASE WHEN status = 'denied' THEN 1.0 ELSE 0.0 END) AS denial_rate")
+    where = (f"\nWHERE service_date >= (SELECT MAX(service_date) - INTERVAL {days} DAY FROM sem.claims)" if days else "")
+    sql = (f"SELECT {', '.join(keys)}, {measure}, COUNT(*) AS claims\nFROM sem.claims{where}\n"
+           f"GROUP BY {', '.join(str(i + 1) for i in range(len(keys)))}\nORDER BY {len(keys) + 1} DESC")
+    if step == 0:
+        return _run_sql(sql)
+    how = "weighted by billed dollars" if dollars else "by claim count"
+    when = {90: "last 90 days", 365: "last 12 months"}.get(days, "all time")
+    return _final(sql, f"Denial rate {how}, {when}.", ["Denied means the whole claim was denied.",
+                                                        "Questions you skipped use the default (claim count, all time, by payer)."])
+
+
 def _turn_escalation_abstain(model, question, step, cand):
     if "haiku" in model.lower():
         if step == 0:
@@ -529,6 +576,7 @@ def _turn_escalation_abstain(model, question, step, cand):
 
 EDGE_TURNS = {"empty": _turn_empty, "multi_table": _turn_multi_table, "long_sql": _turn_long_sql,
               "many_repairs": _turn_many_repairs, "clarify_nested": _turn_clarify_nested,
+              "clarify_multi": _turn_clarify_multi,
               "escalation_abstain": _turn_escalation_abstain}
 
 
