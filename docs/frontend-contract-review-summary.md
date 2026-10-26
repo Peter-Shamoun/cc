@@ -1,8 +1,8 @@
-# CC chat contract — review summary for Claude (v1.0 → v1.19.0)
+# CC chat contract — review summary for Claude (v1.0 → v1.20.0)
 
 One page. Sources: `api/CONTRACT.md` (spec and changelog), `api/contract/v1.schema.json` (machine truth),
 `docs/frontend-contract-migration.md` (per-version migration), `docs/frontend-analyzer-adapter.md` (real analyzer).
-State on 2026-10-25: **1.19.0**, all changes additive, demo mode only (ScriptedLLM), **no paid API calls**.
+State on 2026-10-25: **1.20.0**, all changes additive, demo mode only (ScriptedLLM), **no paid API calls**.
 
 ## What the contract is
 An SSE stream (`POST /api/chat`) of `message.start` → `step.*` / `part` / `table.*` / `artifact` → `message.end`, with
@@ -10,7 +10,7 @@ An SSE stream (`POST /api/chat`) of `message.start` → `step.*` / `part` / `tab
 plus REST for conversations, capabilities, feedback, export and share. TS types are generated from the schema
 (`gen_ts --check` is a drift gate); every example stream is conformance-checked.
 
-## v1.0 → v1.19 at a glance
+## v1.0 → v1.20 at a glance
 | Ver | Theme | Ver | Theme |
 |---|---|---|---|
 | 1.0 | versioned stream, steps, abstain/clarify/escalation | 1.8 | citations (`sources`), export |
@@ -25,6 +25,7 @@ plus REST for conversations, capabilities, feedback, export and share. TS types 
 | | | 1.17 | pin/archive persisted per user (PATCH flags, pins first, `?archived=` filter); archive drops pin, pin/new question unarchives |
 | | | 1.18 | strict closed `PlotSpec` on charts (caps, shared Python/TS cases), server drops invalid charts with a table fallback, progressive `chart.start`/`chart.points` |
 | | | 1.19 | no pattern accepts a trailing newline (shared `pattern_cases.json`); demo follow-up report revises in place (v2) |
+| | | 1.20 | temporary chat (§11.1): in memory only, never listed, titled, shared or exported; `Capabilities.temporaryChat` |
 
 ## Open decisions that need your sign-off
 1. **Shown-SQL masking default.** Proposed `phi` (mask literals compared with PHI-like columns or that look like
