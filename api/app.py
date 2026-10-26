@@ -27,6 +27,7 @@ from api.contract import CONTRACT_VERSION, schema as contract_schema
 from api.ids import new_id
 from api.live import Cancelled, LiveTap
 from api.mapping import outcome_parts
+from api.security import SecurityHeadersMiddleware
 from api.store import DownloadRegistry, Principal
 from api.transcripts import CustomerKeyDisabled, make_store
 
@@ -133,7 +134,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
     store = store or make_store(audit=audit)
     downloads = DownloadRegistry()
     runs: dict[str, _Run] = {}
-    app = FastAPI(title="ClaimClarity chat API", version="0.1.0", docs_url=None, redoc_url=None)
+    app = FastAPI(title="ClaimClarity chat API", version="0.1.0", docs_url=None, redoc_url=None, openapi_url=None)
+    app.add_middleware(SecurityHeadersMiddleware)
     app.state.audit, app.state.store, app.state.downloads, app.state.runs = audit, store, downloads, runs
     app.state.settings, app.state.auth = settings, auth
 
