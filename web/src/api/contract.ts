@@ -21,7 +21,7 @@ export type {
   Sensitivity, StatusPart, TablePart, TextPart, ToolCallPart, ArtifactPart, PartBase,
 };
 
-export const CONTRACT_VERSION = '1.9.0';
+export const CONTRACT_VERSION = '1.10.0';
 export const CONTRACT_MAJOR = 1;
 
 // ---------------------------------------------------------------- new parts (v1)
@@ -77,6 +77,9 @@ export interface Usage {
   models?: { model: string; role?: string; inputTokens: number; outputTokens: number; costUsd?: number; calls?: number }[];
 }
 
+/** 1.10.0: `regenerate.style` (CONTRACT.md §8.1). */
+export type RegenerateStyle = 'default' | 'concise' | 'detailed';
+
 export type FinishReason = 'stop' | 'abstain' | 'needs_input' | 'error' | 'aborted';
 
 // ---------------------------------------------------------------- events
@@ -88,6 +91,8 @@ export interface MessageStartEvent extends Seq {
   model?: string; strategy?: string; parentId?: ID;
   resumeOf?: { clarificationId: ID; messageId: ID };
   regenerateOf?: ID;
+  /** 1.10.0: echoes `regenerate.style` when it is not `default`. */
+  regenerateStyle?: RegenerateStyle;
   /** Set when this answer is for an edited question (ChatMessage.editOf). */
   editOf?: ID;
 }
@@ -190,8 +195,11 @@ export interface ChatRequest {
   options?: { strategy?: string; model?: string; [k: string]: unknown };
   /** Answer a ClarificationPart. `messages` carries the user's reply as a normal user turn. */
   resume?: { clarificationId: ID; choiceIds?: ID[]; text?: string };
-  /** Re-run the assistant message `messageId` (same user turn); the new message is a sibling branch. */
-  regenerate?: { messageId: ID };
+  /**
+   * Re-run the assistant message `messageId` for the same user turn. The new message is a sibling branch, i.e. a new
+   * version of the answer. 1.10.0: `style` restyles it ('More concise' / 'More detailed'; CONTRACT.md §8.1).
+   */
+  regenerate?: { messageId: ID; style?: RegenerateStyle };
   /** Demo backend only: force a scripted scenario (see CONTRACT.md §9). Ignored in sim/prod. */
   scenario?: 'table' | 'chart' | 'repair' | 'abstain' | 'clarify' | 'escalation' | 'error' | 'candidates' | 'slow';
 }

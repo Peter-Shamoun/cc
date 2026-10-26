@@ -11,7 +11,7 @@ def test_rate_beats_count():
     rows = [["A", 0.2, 10], ["B", 0.1, 20]]
     ch = chart_for(cols, rows)
     assert ch["spec"]["encoding"]["y"]["field"] == "denial_rate"
-    assert ch["title"] == "Denial rate by payer name"
+    assert ch["title"] == "Denial rate by payer"
 
 
 def test_first_measure_when_no_rate():

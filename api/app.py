@@ -38,6 +38,7 @@ from api.feedback import MAX_COMMENT, check as check_feedback, record as feedbac
 from api.capabilities import DEFAULT_STRATEGY, capabilities as capabilities_body, check_options
 from api.export import FORMATS as EXPORT_FORMATS, as_json as export_json, as_markdown as export_markdown, filename as export_filename
 from api.sources import sources_for
+from api.styles import apply_style
 from api.titles import title_from_parts
 from api.transcripts import CustomerKeyDisabled, make_store
 
@@ -88,6 +89,7 @@ class ResumeIn(BaseModel):
 
 class RegenerateIn(BaseModel):
     messageId: str = Field(pattern=_ID)
+    style: Literal["default", "concise", "detailed"] = "default"
 
 
 class ChatRequest(BaseModel):
@@ -367,6 +369,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             question = parent.get("analyzerQuestion") or parent["text"]
             user_msg = parent
             start_extra["regenerateOf"] = body.regenerate.messageId
+            if body.regenerate.style != "default":
+                start_extra["regenerateStyle"] = body.regenerate.style
             scenario_hint = scenario_hint or parent.get("scenario")
         else:
             reply = users[-1].text.strip()
@@ -481,6 +485,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                                               legacy_tools=legacy_tools)
                 if scenario == "report" and finish == "stop":
                     parts = report_artifacts(parts)
+                if finish == "stop" and start_extra.get("regenerateStyle"):
+                    parts = apply_style(parts, start_extra["regenerateStyle"])
             except Cancelled:
                 finish = "aborted"
                 if tap is not None:
@@ -545,6 +551,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 record["sources"] = sources
             if start_extra.get("regenerateOf"):
                 record["regenerateOf"] = start_extra["regenerateOf"]
+            if start_extra.get("regenerateStyle"):
+                record["regenerateStyle"] = start_extra["regenerateStyle"]
             try:
                 with purge_lock:
                     if not run.discarded.is_set():

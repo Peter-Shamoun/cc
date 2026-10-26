@@ -66,6 +66,7 @@ same<H.HeartbeatEvent, G.Heartbeat>(true);
 same<H.StreamEvent['type'], G.StreamEvent['type']>(true);
 // requests
 same<H.ChatRequest, G.ChatRequest>(true);
+same<H.RegenerateStyle, G.RegenerateStyle>(true);
 same<H.HttpError, G.HttpError>(true);
 
 // capabilities (1.4.0): re-exported from the generated file, so only check the request side and the export
