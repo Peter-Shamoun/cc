@@ -1,11 +1,11 @@
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
-import { LIVE, open, ask, lastAssistant, gap } from './helpers';
+import { LIVE, open, ask, lastAssistant } from './helpers';
 
 /**
  * Peter 12:15 AM: sharing is removed entirely. No share affordance anywhere (header, menus, keyboard, mobile,
- * settings) and the share routes are plain 404s. gap('QA-SH0') flips to "expected to fail but passed" once
- * shell + contract's removal PRs merge; QA then deletes the gap() lines.
+ * settings) and the share routes are plain 404s. Both halves verified at C10-final (shell #302, contract #305); these were gap() ratchets until
+ * those merged and are now regression guards.
  */
 const SHARE = /\bshare|shared link/i;
 const noShareVisible = async (page: Page, where: string) => {
@@ -17,7 +17,7 @@ const escape = (page: Page) => page.keyboard.press('Escape');
 
 test.describe('sharing removed @both', () => {
   test('no share affordance in the header, menus, shortcuts or settings (QA-SH0)', async ({ page, isMobile }) => {
-    gap('QA-SH0');
+    // QA-SH0 UI half verified fixed by #302 (C10-final): ratchet removed, now a regression guard.
     await open(page, LIVE);
     await ask(page, 'What was our denial rate by payer last quarter?');
     await noShareVisible(page, 'the chat view');
@@ -30,7 +30,7 @@ test.describe('sharing removed @both', () => {
     await noShareVisible(page, "the answer's More menu"); await escape(page);
     // sidebar row ⋯ menu (mobile: open the drawer first)
     if (isMobile) await page.getByRole('button', { name: 'Open sidebar' }).click();
-    await page.getByRole('button', { name: /^Chat options/ }).first().click();
+    await page.getByRole('button', { name: /^(Chat options|Options for)/ }).first().click();
     await noShareVisible(page, 'the chat row menu'); await escape(page);
     // keyboard: the shortcuts sheet lists no share binding
     if (!isMobile) {
@@ -51,7 +51,7 @@ test.describe('sharing removed @both', () => {
   });
 
   test('share routes are plain 404s (QA-SH0)', async ({ page }) => {
-    gap('QA-SH0');
+    // QA-SH0 route half verified fixed by contract #305 (1.22.0, C10-final): now a regression guard.
     await open(page, LIVE);
     await ask(page, 'Total paid by payer');
     const id = new URL(page.url()).hash.match(/\/c\/([^/?]+)/)?.[1];
@@ -59,9 +59,13 @@ test.describe('sharing removed @both', () => {
     const headers = { authorization: 'Bearer demo:acme_labs:qa', 'content-type': 'application/json' };
     const put = await page.request.put(`${LIVE}api/conversations/${id}/share`, { headers, data: { includeData: false } });
     expect(put.status(), 'PUT /api/conversations/{id}/share').toBe(404);
-    expect((await page.request.get(`${LIVE}api/shared/sh_qa_probe`, { headers })).status()).toBe(404);
-    await page.goto(`${LIVE}shared/sh_qa_probe`);
-    await expect(page.getByText(/not found|doesn.t exist|page you/i).first()).toBeVisible();
-    await expect(page.getByTestId('shared-view')).toHaveCount(0);
+    for (const path of ['api/shared/sh_qa_probe', 'api/share/sh_qa_probe']) {
+      expect((await page.request.get(`${LIVE}${path}`, { headers })).status(), `GET /${path}`).toBe(404);
+    }
+    for (const path of ['shared/sh_qa_probe', 'share/sh_qa_probe']) {
+      await page.goto(`${LIVE}${path}`);
+      await expect(page.getByText(/not found|doesn.t exist|page you/i).first(), `/${path}`).toBeVisible();
+      await expect(page.getByTestId('shared-view')).toHaveCount(0);
+    }
   });
 });
