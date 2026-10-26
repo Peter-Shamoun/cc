@@ -1,0 +1,1957 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cc.local/api/contract/v1.schema.json",
+  "title": "CC chat stream contract",
+  "version": "1.0.0",
+  "description": "One JSON object per SSE data: line. See api/CONTRACT.md. Validate an event against #/$defs/StreamEvent.",
+  "$ref": "#/$defs/StreamEvent",
+  "$defs": {
+    "ID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_:.-]+$"
+    },
+    "Sensitivity": {
+      "enum": [
+        "none",
+        "deidentified",
+        "limited",
+        "phi"
+      ]
+    },
+    "ColumnType": {
+      "enum": [
+        "string",
+        "integer",
+        "number",
+        "currency",
+        "percent",
+        "date",
+        "datetime",
+        "boolean",
+        "code"
+      ]
+    },
+    "Column": {
+      "type": "object",
+      "required": [
+        "key",
+        "label",
+        "type"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/ColumnType"
+        },
+        "format": {
+          "type": "string"
+        },
+        "phi": {
+          "type": "boolean"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "ColumnSummary": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/ColumnType"
+        }
+      },
+      "additionalProperties": true
+    },
+    "StepError": {
+      "type": "object",
+      "required": [
+        "code",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 500
+        }
+      },
+      "additionalProperties": true
+    },
+    "ModelRef": {
+      "type": "object",
+      "required": [
+        "model"
+      ],
+      "properties": {
+        "model": {
+          "type": "string"
+        },
+        "tier": {
+          "enum": [
+            "small",
+            "medium",
+            "large"
+          ]
+        },
+        "provider": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "Usage": {
+      "type": "object",
+      "required": [
+        "queries",
+        "elapsedMs"
+      ],
+      "properties": {
+        "queries": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "elapsedMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tokens": {
+          "type": "object",
+          "required": [
+            "input",
+            "output"
+          ],
+          "properties": {
+            "input": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "output": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cacheRead": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cacheWrite": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": true
+        },
+        "costUsd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "costIsEstimate": {
+          "type": "boolean"
+        },
+        "latency": {
+          "type": "object",
+          "required": [
+            "totalMs"
+          ],
+          "properties": {
+            "firstEventMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "firstStepMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "firstTokenMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "modelMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "sqlMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "queueMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "totalMs": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": true
+        },
+        "models": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "model",
+              "inputTokens",
+              "outputTokens"
+            ],
+            "properties": {
+              "model": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "inputTokens": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "outputTokens": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "costUsd": {
+                "type": "number",
+                "minimum": 0
+              },
+              "calls": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "Suggestion": {
+      "type": "object",
+      "required": [
+        "id",
+        "text"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 300
+        }
+      },
+      "additionalProperties": true
+    },
+    "Choice": {
+      "type": "object",
+      "required": [
+        "id",
+        "label"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "TextPart": {
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "text"
+      ],
+      "properties": {
+        "type": {
+          "const": "text"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "ReasoningPart": {
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "summary"
+      ],
+      "properties": {
+        "type": {
+          "const": "reasoning"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "StatusPart": {
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "label"
+      ],
+      "properties": {
+        "type": {
+          "const": "status"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "ToolCallPart": {
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "tool",
+        "label",
+        "state"
+      ],
+      "properties": {
+        "type": {
+          "const": "tool_call"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "tool": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "running",
+            "ok",
+            "error"
+          ]
+        },
+        "input": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "sql": {
+              "type": "string"
+            },
+            "args": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": true
+        },
+        "output": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "rowCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "columns": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Column"
+              }
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "agent": {
+          "type": "string"
+        },
+        "stepId": {
+          "$ref": "#/$defs/ID"
+        }
+      },
+      "additionalProperties": true
+    },
+    "TablePart": {
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "columns",
+        "rows",
+        "rowCount"
+      ],
+      "properties": {
+        "type": {
+          "const": "table"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Column"
+          }
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "array"
+          }
+        },
+        "rowCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "resultId": {
+          "$ref": "#/$defs/ID"
+        },
+        "csvFileId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sqlPartId": {
+          "$ref": "#/$defs/ID"
+        },
+        "stepId": {
+          "$ref": "#/$defs/ID"
+        },
+        "source": {
+          "type": "object",
+          "required": [
+            "views"
+          ],
+          "properties": {
+            "views": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "elapsedMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "asOf": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "FilePart": {
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "fileId",
+        "name",
+        "mime",
+        "sizeBytes"
+      ],
+      "properties": {
+        "type": {
+          "const": "file"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "fileId": {
+          "$ref": "#/$defs/ID"
+        },
+        "name": {
+          "type": "string"
+        },
+        "mime": {
+          "type": "string"
+        },
+        "sizeBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rowCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "previewable": {
+          "type": "boolean"
+        },
+        "expiresAt": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "ImagePart": {
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "blobId",
+        "mime",
+        "width",
+        "height",
+        "alt"
+      ],
+      "properties": {
+        "type": {
+          "const": "image"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "blobId": {
+          "$ref": "#/$defs/ID"
+        },
+        "mime": {
+          "enum": [
+            "image/png",
+            "image/svg+xml",
+            "image/webp"
+          ]
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "alt": {
+          "type": "string"
+        },
+        "caption": {
+          "type": "string"
+        },
+        "svgBlobId": {
+          "$ref": "#/$defs/ID"
+        }
+      },
+      "additionalProperties": true
+    },
+    "ChartPart": {
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "library",
+        "spec",
+        "alt"
+      ],
+      "properties": {
+        "type": {
+          "const": "chart"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "library": {
+          "const": "vega-lite"
+        },
+        "spec": {
+          "type": "object",
+          "not": {
+            "properties": {
+              "data": {
+                "required": [
+                  "url"
+                ]
+              }
+            },
+            "required": [
+              "data"
+            ]
+          }
+        },
+        "data": {
+          "type": "object",
+          "required": [
+            "name",
+            "values"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          },
+          "additionalProperties": true
+        },
+        "dataResultId": {
+          "$ref": "#/$defs/ID"
+        },
+        "staticImageBlobId": {
+          "$ref": "#/$defs/ID"
+        },
+        "title": {
+          "type": "string"
+        },
+        "alt": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "CodePart": {
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "language",
+        "code"
+      ],
+      "properties": {
+        "type": {
+          "const": "code"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "query",
+            "snippet",
+            "spec"
+          ]
+        },
+        "collapsed": {
+          "type": "boolean"
+        },
+        "rerunnable": {
+          "type": "boolean"
+        },
+        "stepId": {
+          "$ref": "#/$defs/ID"
+        }
+      },
+      "additionalProperties": true
+    },
+    "CalloutPart": {
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "variant",
+        "items"
+      ],
+      "properties": {
+        "type": {
+          "const": "callout"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "variant": {
+          "enum": [
+            "assumption",
+            "caveat",
+            "data_quality",
+            "phi_redaction",
+            "info"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "text"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/ID"
+              },
+              "text": {
+                "type": "string"
+              },
+              "editable": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "ArtifactPart": {
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "artifactId",
+        "version",
+        "kind",
+        "title",
+        "content"
+      ],
+      "properties": {
+        "type": {
+          "const": "artifact"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "artifactId": {
+          "$ref": "#/$defs/ID"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "kind": {
+          "enum": [
+            "table",
+            "chart",
+            "report",
+            "code",
+            "image"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "content": {
+          "type": "object"
+        },
+        "autoOpen": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    },
+    "ErrorPart": {
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "code",
+        "title",
+        "message",
+        "retryable"
+      ],
+      "properties": {
+        "type": {
+          "const": "error"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "retryAfterMs": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "AbstainPart": {
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "category",
+        "reason",
+        "suggestions"
+      ],
+      "properties": {
+        "type": {
+          "const": "abstain"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "category": {
+          "enum": [
+            "out_of_scope",
+            "phi_request",
+            "data_unavailable",
+            "ambiguous",
+            "low_confidence",
+            "unsupported",
+            "policy"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "details": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "suggestions": {
+          "type": "array",
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/Suggestion"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "ClarificationPart": {
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "clarificationId",
+        "question",
+        "allowFreeText"
+      ],
+      "properties": {
+        "type": {
+          "const": "clarification"
+        },
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "clarificationId": {
+          "$ref": "#/$defs/ID"
+        },
+        "question": {
+          "type": "string"
+        },
+        "choices": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/Choice"
+          }
+        },
+        "allowFreeText": {
+          "type": "boolean"
+        },
+        "multiSelect": {
+          "type": "boolean"
+        },
+        "expiresAt": {
+          "type": "string"
+        },
+        "answered": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    },
+    "Part": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/TextPart"
+        },
+        {
+          "$ref": "#/$defs/ReasoningPart"
+        },
+        {
+          "$ref": "#/$defs/StatusPart"
+        },
+        {
+          "$ref": "#/$defs/ToolCallPart"
+        },
+        {
+          "$ref": "#/$defs/TablePart"
+        },
+        {
+          "$ref": "#/$defs/FilePart"
+        },
+        {
+          "$ref": "#/$defs/ImagePart"
+        },
+        {
+          "$ref": "#/$defs/ChartPart"
+        },
+        {
+          "$ref": "#/$defs/CodePart"
+        },
+        {
+          "$ref": "#/$defs/CalloutPart"
+        },
+        {
+          "$ref": "#/$defs/ArtifactPart"
+        },
+        {
+          "$ref": "#/$defs/ErrorPart"
+        },
+        {
+          "$ref": "#/$defs/AbstainPart"
+        },
+        {
+          "$ref": "#/$defs/ClarificationPart"
+        }
+      ]
+    },
+    "MessageStart": {
+      "type": "object",
+      "required": [
+        "type",
+        "messageId",
+        "conversationId",
+        "contractVersion",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "message.start"
+        },
+        "messageId": {
+          "$ref": "#/$defs/ID"
+        },
+        "conversationId": {
+          "$ref": "#/$defs/ID"
+        },
+        "contractVersion": {
+          "type": "string",
+          "pattern": "^1\\.\\d+\\.\\d+$"
+        },
+        "model": {
+          "type": "string"
+        },
+        "strategy": {
+          "type": "string"
+        },
+        "parentId": {
+          "$ref": "#/$defs/ID"
+        },
+        "resumeOf": {
+          "type": "object",
+          "required": [
+            "clarificationId",
+            "messageId"
+          ],
+          "properties": {
+            "clarificationId": {
+              "$ref": "#/$defs/ID"
+            },
+            "messageId": {
+              "$ref": "#/$defs/ID"
+            }
+          },
+          "additionalProperties": true
+        },
+        "regenerateOf": {
+          "$ref": "#/$defs/ID"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "Status": {
+      "type": "object",
+      "required": [
+        "type",
+        "label",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "status"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "StepSqlRunning": {
+      "type": "object",
+      "required": [
+        "type",
+        "stepId",
+        "sql",
+        "purpose",
+        "attempt",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "step.sql_running"
+        },
+        "stepId": {
+          "$ref": "#/$defs/ID"
+        },
+        "sql": {
+          "type": "string"
+        },
+        "purpose": {
+          "enum": [
+            "explore",
+            "answer",
+            "candidate",
+            "repair",
+            "check"
+          ]
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "candidateId": {
+          "$ref": "#/$defs/ID"
+        },
+        "repairOf": {
+          "$ref": "#/$defs/ID"
+        },
+        "label": {
+          "type": "string"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "StepSqlResult": {
+      "type": "object",
+      "required": [
+        "type",
+        "stepId",
+        "ok",
+        "elapsedMs",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "step.sql_result"
+        },
+        "stepId": {
+          "$ref": "#/$defs/ID"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "elapsedMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rowCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ColumnSummary"
+          }
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "error": {
+          "$ref": "#/$defs/StepError"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "StepRepairAttempt": {
+      "type": "object",
+      "required": [
+        "type",
+        "stepId",
+        "failedStepId",
+        "attempt",
+        "error",
+        "revisedSql",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "step.repair_attempt"
+        },
+        "stepId": {
+          "$ref": "#/$defs/ID"
+        },
+        "failedStepId": {
+          "$ref": "#/$defs/ID"
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxAttempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "error": {
+          "$ref": "#/$defs/StepError"
+        },
+        "revisedSql": {
+          "type": "string"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "StepCheck": {
+      "type": "object",
+      "required": [
+        "type",
+        "stepId",
+        "check",
+        "verdict",
+        "message",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "step.check"
+        },
+        "stepId": {
+          "$ref": "#/$defs/ID"
+        },
+        "check": {
+          "type": "string"
+        },
+        "verdict": {
+          "enum": [
+            "pass",
+            "warn",
+            "fail"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "targetStepId": {
+          "$ref": "#/$defs/ID"
+        },
+        "action": {
+          "enum": [
+            "none",
+            "repair",
+            "caveat",
+            "abstain",
+            "escalate",
+            "clarify"
+          ]
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "StepExplore": {
+      "type": "object",
+      "required": [
+        "type",
+        "stepId",
+        "probe",
+        "summary",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "step.explore"
+        },
+        "stepId": {
+          "$ref": "#/$defs/ID"
+        },
+        "probe": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "elapsedMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "StepCandidates": {
+      "type": "object",
+      "required": [
+        "type",
+        "stepId",
+        "candidates",
+        "chosenId",
+        "method",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "step.candidates"
+        },
+        "stepId": {
+          "$ref": "#/$defs/ID"
+        },
+        "candidates": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "candidateId",
+              "sql",
+              "ok"
+            ],
+            "properties": {
+              "candidateId": {
+                "$ref": "#/$defs/ID"
+              },
+              "label": {
+                "type": "string"
+              },
+              "sql": {
+                "type": "string"
+              },
+              "ok": {
+                "type": "boolean"
+              },
+              "rowCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "score": {
+                "type": "number"
+              },
+              "agreesWith": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/ID"
+                }
+              },
+              "stepId": {
+                "$ref": "#/$defs/ID"
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "chosenId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ID"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "method": {
+          "type": "string"
+        },
+        "rationale": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "Escalation": {
+      "type": "object",
+      "required": [
+        "type",
+        "from",
+        "to",
+        "reason",
+        "trigger",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "escalation"
+        },
+        "from": {
+          "$ref": "#/$defs/ModelRef"
+        },
+        "to": {
+          "$ref": "#/$defs/ModelRef"
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "trigger": {
+          "enum": [
+            "verifier_fail",
+            "low_confidence",
+            "repair_exhausted",
+            "complexity",
+            "disagreement",
+            "user"
+          ]
+        },
+        "stepId": {
+          "$ref": "#/$defs/ID"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "TextStart": {
+      "type": "object",
+      "required": [
+        "type",
+        "partId",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "text.start"
+        },
+        "partId": {
+          "$ref": "#/$defs/ID"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "TextDelta": {
+      "type": "object",
+      "required": [
+        "type",
+        "partId",
+        "delta",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "text.delta"
+        },
+        "partId": {
+          "$ref": "#/$defs/ID"
+        },
+        "delta": {
+          "type": "string"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "TextEnd": {
+      "type": "object",
+      "required": [
+        "type",
+        "partId",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "text.end"
+        },
+        "partId": {
+          "$ref": "#/$defs/ID"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "ReasoningDelta": {
+      "type": "object",
+      "required": [
+        "type",
+        "partId",
+        "delta",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "reasoning.delta"
+        },
+        "partId": {
+          "$ref": "#/$defs/ID"
+        },
+        "delta": {
+          "type": "string"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "ReasoningEnd": {
+      "type": "object",
+      "required": [
+        "type",
+        "partId",
+        "durationMs",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "reasoning.end"
+        },
+        "partId": {
+          "$ref": "#/$defs/ID"
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "CodeDelta": {
+      "type": "object",
+      "required": [
+        "type",
+        "partId",
+        "delta",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "code.delta"
+        },
+        "partId": {
+          "$ref": "#/$defs/ID"
+        },
+        "delta": {
+          "type": "string"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "PartEvent": {
+      "type": "object",
+      "required": [
+        "type",
+        "part",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "part"
+        },
+        "part": {
+          "$ref": "#/$defs/Part"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "PartPatch": {
+      "type": "object",
+      "required": [
+        "type",
+        "partId",
+        "patch",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "part.patch"
+        },
+        "partId": {
+          "$ref": "#/$defs/ID"
+        },
+        "patch": {
+          "type": "object",
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "id"
+                ]
+              },
+              {
+                "required": [
+                  "type"
+                ]
+              }
+            ]
+          }
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "MessageEnd": {
+      "type": "object",
+      "required": [
+        "type",
+        "messageId",
+        "finishReason",
+        "usage",
+        "seq"
+      ],
+      "properties": {
+        "type": {
+          "const": "message.end"
+        },
+        "messageId": {
+          "$ref": "#/$defs/ID"
+        },
+        "finishReason": {
+          "enum": [
+            "stop",
+            "abstain",
+            "needs_input",
+            "error",
+            "aborted"
+          ]
+        },
+        "usage": {
+          "$ref": "#/$defs/Usage"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "Heartbeat": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "heartbeat"
+        },
+        "at": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "StreamEvent": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/MessageStart"
+        },
+        {
+          "$ref": "#/$defs/Status"
+        },
+        {
+          "$ref": "#/$defs/StepSqlRunning"
+        },
+        {
+          "$ref": "#/$defs/StepSqlResult"
+        },
+        {
+          "$ref": "#/$defs/StepRepairAttempt"
+        },
+        {
+          "$ref": "#/$defs/StepCheck"
+        },
+        {
+          "$ref": "#/$defs/StepExplore"
+        },
+        {
+          "$ref": "#/$defs/StepCandidates"
+        },
+        {
+          "$ref": "#/$defs/Escalation"
+        },
+        {
+          "$ref": "#/$defs/TextStart"
+        },
+        {
+          "$ref": "#/$defs/TextDelta"
+        },
+        {
+          "$ref": "#/$defs/TextEnd"
+        },
+        {
+          "$ref": "#/$defs/ReasoningDelta"
+        },
+        {
+          "$ref": "#/$defs/ReasoningEnd"
+        },
+        {
+          "$ref": "#/$defs/CodeDelta"
+        },
+        {
+          "$ref": "#/$defs/PartEvent"
+        },
+        {
+          "$ref": "#/$defs/PartPatch"
+        },
+        {
+          "$ref": "#/$defs/MessageEnd"
+        },
+        {
+          "$ref": "#/$defs/Heartbeat"
+        }
+      ]
+    },
+    "ChatRequest": {
+      "type": "object",
+      "required": [
+        "messages"
+      ],
+      "properties": {
+        "conversationId": {
+          "$ref": "#/$defs/ID"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "role",
+              "text"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/ID"
+              },
+              "role": {
+                "enum": [
+                  "user"
+                ]
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 8000
+              },
+              "parentId": {
+                "$ref": "#/$defs/ID"
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "options": {
+          "type": "object"
+        },
+        "resume": {
+          "type": "object",
+          "required": [
+            "clarificationId"
+          ],
+          "properties": {
+            "clarificationId": {
+              "$ref": "#/$defs/ID"
+            },
+            "choiceIds": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ID"
+              }
+            },
+            "text": {
+              "type": "string",
+              "maxLength": 2000
+            }
+          },
+          "additionalProperties": true
+        },
+        "regenerate": {
+          "type": "object",
+          "required": [
+            "messageId"
+          ],
+          "properties": {
+            "messageId": {
+              "$ref": "#/$defs/ID"
+            }
+          },
+          "additionalProperties": true
+        },
+        "scenario": {
+          "type": "string",
+          "description": "Demo mode only: force a scripted scenario."
+        }
+      },
+      "additionalProperties": true
+    },
+    "HttpError": {
+      "type": "object",
+      "required": [
+        "error"
+      ],
+      "properties": {
+        "error": {
+          "type": "object",
+          "required": [
+            "code",
+            "message"
+          ],
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}
