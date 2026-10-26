@@ -1,4 +1,5 @@
-import { memo, useRef, type CSSProperties } from 'react';
+import { memo, useRef, type CSSProperties, type MutableRefObject, type RefObject } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { AssistantTurn, UserBubble, type Artifact } from '../components/Message';
 import type { ViewMessage } from '../lib/useChat';
 import type { AnyView } from '../components/answer/normalize';
@@ -23,6 +24,8 @@ export interface ThreadActions {
  * few turns always render fully so streaming, pinning and measuring stay exact.
  */
 const LIVE_TAIL = 6;
+/** Past this length the thread window is virtualized. Shorter chats stay a plain list so tests and small threads are unchanged. */
+const VIRTUAL_AT = 30;
 const offscreen: CSSProperties = { contentVisibility: 'auto', containIntrinsicSize: 'auto 320px' } as CSSProperties;
 
 interface RowProps {
@@ -58,21 +61,71 @@ const Row = memo(function Row({ msg, index, isLast, reserve, lazy, busy, vCur, v
   );
 });
 
+function auditVisit(count: number) {
+  if (typeof window === 'undefined' || !new URLSearchParams(window.location.search).has('audit')) return;
+  const stats = (window.__ccRenderStats ??= { commits: 0, actual: 0, worst: 0, children: 0 });
+  stats.children += count;
+}
+
 /** The message list. Only rows whose message object or position flags changed re-render while a reply streams. */
-export function ThreadView({ messages, busy, actions }: { messages: ViewMessage[]; busy: boolean; actions: ThreadActions }) {
+export function ThreadView({ messages, busy, actions, scrollRef, scrollToIndexRef }: {
+  messages: ViewMessage[];
+  busy: boolean;
+  actions: ThreadActions;
+  scrollRef?: RefObject<HTMLDivElement | null>;
+  /** Virtual lists pin by index. Null while the list is short enough to scroll the real DOM node. */
+  scrollToIndexRef?: MutableRefObject<((index: number) => void) | null>;
+}) {
   const ref = useRef(actions);
   ref.current = actions;
   const n = messages.length;
+  const virtual = n > VIRTUAL_AT && !!scrollRef;
+  const virtualizer = useVirtualizer({
+    count: virtual ? n : 0,
+    getScrollElement: () => scrollRef?.current ?? null,
+    estimateSize: () => 160,
+    overscan: 6,
+    getItemKey: (index) => messages[index]?.id ?? index,
+    // Paint a window before the scrollport is measured, so the first frame is not blank.
+    initialRect: { width: 720, height: 800 },
+  });
+  if (scrollToIndexRef) {
+    scrollToIndexRef.current = virtual
+      ? (index) => { virtualizer.scrollToIndex(index, { align: 'start', behavior: 'auto' }); }
+      : null;
+  }
+  const items = virtual ? virtualizer.getVirtualItems() : [];
+  auditVisit(virtual ? items.length : n);
+
+  const row = (m: ViewMessage, i: number) => {
+    const v = m.role === 'user' ? actions.versionOf(i) : undefined;
+    const isLast = i === n - 1;
+    return (
+      <Row key={m.id} msg={m} index={i} isLast={isLast} reserve={isLast && m.role === 'assistant'} lazy={!virtual && i < n - LIVE_TAIL}
+        busy={m.role === 'user' ? busy : false} vCur={v?.current} vTotal={v?.total} actions={ref} />
+    );
+  };
+
+  if (!virtual) {
+    return (
+      <>
+        {messages.map((m, i) => row(m, i))}
+      </>
+    );
+  }
+
   return (
-    <>
-      {messages.map((m, i) => {
-        const v = m.role === 'user' ? actions.versionOf(i) : undefined;
-        const isLast = i === n - 1;
+    <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
+      {items.map((item) => {
+        const m = messages[item.index];
+        if (!m) return null;
         return (
-          <Row key={m.id} msg={m} index={i} isLast={isLast} reserve={isLast && m.role === 'assistant'} lazy={i < n - LIVE_TAIL}
-            busy={m.role === 'user' ? busy : false} vCur={v?.current} vTotal={v?.total} actions={ref} />
+          <div key={String(item.key)} data-index={item.index} ref={virtualizer.measureElement}
+            className="absolute left-0 top-0 w-full pb-6" style={{ transform: `translateY(${item.start}px)` }}>
+            {row(m, item.index)}
+          </div>
         );
       })}
-    </>
+    </div>
   );
 }
