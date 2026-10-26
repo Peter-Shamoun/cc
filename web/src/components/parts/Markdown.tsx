@@ -1,18 +1,38 @@
-import { memo, type ReactNode } from 'react';
-import { createMathPlugin } from '@streamdown/math';
+import { memo, useEffect, useState, type ReactNode } from 'react';
 import { defaultRehypePlugins, Streamdown } from 'streamdown';
 import clsx from 'clsx';
 import { CodeBlock } from './CodeBlock';
 import { safeHref } from '../../render/safeHref';
-import 'katex/dist/katex.min.css';
 // Streamdown (Apache-2.0) word fade-in keyframes for [data-sd-animate]; plain stylesheet, CSP-safe.
 import 'streamdown/styles.css';
 
 /**
  * `$…$` and `$$…$$` (spec §4.1). Currency such as `$412` is escaped before parse
- * so it stays text. KaTeX errors use the app danger color.
+ * so it stays text. KaTeX errors use the app danger color. The plugin (KaTeX, its CSS and fonts)
+ * is loaded on first use, so answers without math never download it.
  */
-const mathPlugin = createMathPlugin({ singleDollarTextMath: true, errorColor: 'var(--danger)' });
+type MathPlugin = typeof import('./mathPlugin').mathPlugin;
+let mathPlugin: MathPlugin | null = null;
+let mathLoading: Promise<MathPlugin> | null = null;
+export function loadMath(): Promise<MathPlugin> {
+  mathLoading ??= import('./mathPlugin').then((m) => (mathPlugin = m.mathPlugin));
+  return mathLoading;
+}
+/** Unescaped `$` (after protectCurrency) or `\(`/`\[` delimiters mean the text may contain math. */
+export function mayContainMath(protectedText: string): boolean {
+  return /(^|[^\\])\$|\\\(|\\\[/.test(protectedText);
+}
+function useMath(protectedText: string): MathPlugin | null {
+  const need = !mathPlugin && mayContainMath(protectedText);
+  const [plugin, setPlugin] = useState<MathPlugin | null>(mathPlugin);
+  useEffect(() => {
+    if (!need) return;
+    let alive = true;
+    loadMath().then((p) => { if (alive) setPlugin(p); }).catch(() => undefined);
+    return () => { alive = false; };
+  }, [need]);
+  return plugin ?? mathPlugin;
+}
 
 /**
  * Raw HTML is omitted on purpose (spec §4.1, §6.11). ChatGPT and Claude show
@@ -62,6 +82,8 @@ function textContent(node: ReactNode): string {
  * closed) and memoizes per block so only the tail re-renders.
  */
 export const Markdown = memo(function Markdown({ text, streaming }: { text: string; streaming?: boolean }) {
+  const source = protectCurrency(text);
+  const math = useMath(source);
   return (
     <div
       className={clsx('prose-chat', streaming && 'streaming-caret')}
@@ -75,7 +97,7 @@ export const Markdown = memo(function Markdown({ text, streaming }: { text: stri
         animated={streaming ? STREAM_ANIMATION : false}
         parseIncompleteMarkdown
         controls={false}
-        plugins={{ math: mathPlugin }}
+        plugins={math ? { math } : undefined}
         rehypePlugins={rehypePlugins}
         components={{
           // No remote images in markdown (spec §4.1, §6.11): images arrive only as image parts.
@@ -107,7 +129,7 @@ export const Markdown = memo(function Markdown({ text, streaming }: { text: stri
           ),
         }}
       >
-        {protectCurrency(text)}
+        {source}
       </Streamdown>
     </div>
   );
