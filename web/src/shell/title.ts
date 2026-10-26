@@ -18,9 +18,11 @@ const LEAD = [
 ];
 const ARTICLE = /^(the|our|my|a|an|all|me|us)\s+/i;
 const TRAIL = /\s+(for me|please|thanks|thank you|right now|today|again)$/i;
+/** Trailing time window ("last quarter", "in Q3", "this year", "2025-10..2026-09"): ChatGPT-style titles name the topic, not the window. */
+const TIME_END = /\s+(?:(?:in|for|during|over|since|from|of)\s+)?(?:(?:the\s+)?(?:last|past|this|previous|prior|current|next)\s+(?:\d+\s+)?(?:day|week|month|quarter|year|yr|qtr)s?|q[1-4](?:\s+\d{4})?|(?:fy\s*)?\d{4}(?:[-/.]\d{1,2})?(?:\s*(?:-|–|to|\.\.)\s*\d{4}(?:[-/.]\d{1,2})?)?|ytd|mtd|qtd|yesterday|today|to date|so far)$/i;
 const STOP_END = /\s+(by|for|of|in|on|at|to|and|or|with|the|a|an|from|vs|per|over)$/i;
 
-export function shortTitle(text: string, maxWords = 6, maxChars = 40): string {
+export function shortTitle(text: string, maxWords = 6, maxChars = 36): string {
   let t = text.replace(/\s+/g, ' ').trim();
   if (!t) return 'New chat';
   // first sentence / line only
@@ -31,6 +33,7 @@ export function shortTitle(text: string, maxWords = 6, maxChars = 40): string {
     t = t.replace(ARTICLE, '').replace(TRAIL, '');
     if (t === before) break;
   }
+  for (let i = 0; i < 2; i++) { const cut = t.replace(TIME_END, ''); if (cut.split(' ').length >= 2) t = cut; }
   const words = t.split(' ').filter(Boolean);
   let out = '';
   for (const w of words.slice(0, maxWords)) {
