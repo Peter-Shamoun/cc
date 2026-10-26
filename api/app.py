@@ -9,6 +9,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import threading
 import time
 from dataclasses import dataclass, field
@@ -26,13 +27,28 @@ from api.contract import CONTRACT_VERSION, schema as contract_schema
 from api.ids import new_id
 from api.live import Cancelled, LiveTap
 from api.mapping import outcome_parts
-from api.store import DownloadRegistry, InMemoryTranscriptStore, Principal
+from api.store import DownloadRegistry, Principal
+from api.transcripts import CustomerKeyDisabled, make_store
 
 log = logging.getLogger("cc.api")
 NO_STORE = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
 
 
 _ID = r"^[A-Za-z0-9_:.-]{1,128}$"
+_SAFE_ID = re.compile(_ID)
+
+
+class RenameIn(BaseModel):
+    title: str = Field(max_length=500)
+
+
+class SearchIn(BaseModel):
+    q: str = Field(default="", max_length=200)
+    cursor: str | None = Field(default=None, max_length=16)
+
+
+class RetentionIn(BaseModel):
+    days: int = Field(ge=0, le=3650)
 
 
 class ChatMessageIn(BaseModel):
@@ -114,7 +130,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
     settings = settings or Settings()
     auth = auth or DemoAuth()
     audit = AuditLog()
-    store = store or InMemoryTranscriptStore(audit=audit)
+    store = store or make_store(audit=audit)
     downloads = DownloadRegistry()
     runs: dict[str, _Run] = {}
     app = FastAPI(title="CC chat API", version="0.1.0", docs_url=None, redoc_url=None)
@@ -170,14 +186,16 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         except AuthError:
             return unauthorized()
         conversation_id = body.conversationId or new_id("c_")
-        owner = getattr(store, "owner_of", lambda _cid: None)(conversation_id)
-        if owner is not None and owner != ctx.principal:
+        if not _SAFE_ID.match(conversation_id) or store.owned_by_other(ctx.principal, conversation_id):
             return error_json("access_denied", "Not found.", 404)
         demo = getattr(auth, "mode", "") == "demo"
         start_extra: dict = {}
         scenario_hint = body.scenario if demo else None
         if body.regenerate:
-            conv = store.get_conversation(ctx.principal, conversation_id) if body.conversationId else None
+            try:
+                conv = store.get_conversation(ctx.principal, conversation_id) if body.conversationId else None
+            except CustomerKeyDisabled:
+                return shredded()
             msgs = (conv or {}).get("messages", [])
             target = next((m for m in msgs if m.get("id") == body.regenerate.messageId and m.get("role") == "assistant"), None)
             parent = next((m for m in msgs if target and m.get("id") == target.get("parentId")), None)
@@ -210,7 +228,10 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 user_msg["parentId"] = users[-1].parentId
             if question != reply:
                 user_msg["analyzerQuestion"] = question
-            store.append_message(ctx.principal, conversation_id, user_msg)
+            try:
+                store.append_message(ctx.principal, conversation_id, user_msg)
+            except CustomerKeyDisabled:
+                return shredded()
         scenario = detect_scenario(question, scenario_hint) if demo else None
         if scenario and "scenario" not in user_msg and isinstance(user_msg, dict):
             user_msg["scenario"] = scenario
@@ -310,7 +331,10 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                       "steps": persisted_steps if finish != "aborted" else []}
             if start_extra.get("regenerateOf"):
                 record["regenerateOf"] = start_extra["regenerateOf"]
-            store.append_message(ctx.principal, conversation_id, record)
+            try:
+                store.append_message(ctx.principal, conversation_id, record)
+            except Exception as exc:  # noqa: BLE001 - a history write must not hang the stream
+                log.warning("transcript append failed: %s", type(exc).__name__)
             audit("chat_message", customer=ctx.principal.customer, user=ctx.principal.user,
                   conversation_id=conversation_id, message_id=message_id, parts=len(parts), queries=usage["queries"],
                   elapsed_ms=elapsed, finish=finish, scenario=scenario, steps=len(persisted_steps))
@@ -383,13 +407,67 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         return Response(data, media_type="text/csv; charset=utf-8", headers={
             **NO_STORE, "Content-Disposition": f'attachment; filename="{item.name}"'})
 
+    def not_found():
+        return JSONResponse({"error": {"code": "not_found", "message": "Not found."}}, 404, headers=NO_STORE)
+
+    def shredded():
+        return JSONResponse({"error": {"code": "transcripts_unavailable",
+                                       "message": "Chat history is unavailable for this organization."}},
+                            410, headers=NO_STORE)
+
+    @app.get("/api/transcripts")
+    def transcripts_info(request: Request):
+        try:
+            ctx = authed(request, new_id("r"))
+        except AuthError:
+            return unauthorized()
+        return JSONResponse({"mode": store.mode, "persisted": store.mode == "persisted",
+                             "retentionDays": store.retention_days(ctx.principal)}, headers=NO_STORE)
+
+    @app.put("/api/transcripts/retention")
+    def set_retention(body: RetentionIn, request: Request):
+        try:
+            ctx = authed(request, new_id("r"))
+        except AuthError:
+            return unauthorized()
+        store.set_retention(ctx.principal, body.days)
+        audit("retention_set", customer=ctx.principal.customer, user=ctx.principal.user, status=body.days)
+        return JSONResponse({"mode": store.mode, "retentionDays": store.retention_days(ctx.principal)},
+                            headers=NO_STORE)
+
     @app.get("/api/conversations")
     def conversations(request: Request, cursor: str | None = None):
         try:
             ctx = authed(request, new_id("r"))
         except AuthError:
             return unauthorized()
-        return JSONResponse(store.list_conversations(ctx.principal, cursor), headers=NO_STORE)
+        try:
+            return JSONResponse(store.list_conversations(ctx.principal, cursor), headers=NO_STORE)
+        except CustomerKeyDisabled:
+            return shredded()
+
+    @app.post("/api/conversations/search")
+    def search_conversations(body: SearchIn, request: Request):
+        """POST, not GET: the search text can be PHI and must never sit in a URL (contract section 10)."""
+        try:
+            ctx = authed(request, new_id("r"))
+        except AuthError:
+            return unauthorized()
+        query = body.q.strip()
+        if not query:
+            return JSONResponse({"items": []}, headers=NO_STORE)
+        try:
+            return JSONResponse(store.list_conversations(ctx.principal, body.cursor, query), headers=NO_STORE)
+        except CustomerKeyDisabled:
+            return shredded()
+
+    @app.delete("/api/conversations")
+    def delete_all_conversations(request: Request):
+        try:
+            ctx = authed(request, new_id("r"))
+        except AuthError:
+            return unauthorized()
+        return JSONResponse({"deleted": store.delete_all(ctx.principal)}, headers=NO_STORE)
 
     @app.get("/api/conversations/{conversation_id}")
     def conversation(conversation_id: str, request: Request):
@@ -397,10 +475,32 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             ctx = authed(request, new_id("r"))
         except AuthError:
             return unauthorized()
-        conv = store.get_conversation(ctx.principal, conversation_id)
+        try:
+            conv = store.get_conversation(ctx.principal, conversation_id)
+        except CustomerKeyDisabled:
+            return shredded()
         if conv is None:
-            return JSONResponse({"error": {"code": "access_denied", "message": "Not found."}}, 404, headers=NO_STORE)
+            return not_found()
         return JSONResponse(conv, headers=NO_STORE)
+
+    @app.patch("/api/conversations/{conversation_id}")
+    def rename_conversation(conversation_id: str, body: RenameIn, request: Request):
+        try:
+            ctx = authed(request, new_id("r"))
+        except AuthError:
+            return unauthorized()
+        try:
+            out = store.rename_conversation(ctx.principal, conversation_id, body.title)
+        except ValueError:
+            return JSONResponse({"error": {"code": "invalid_title", "message": "Use a single line of text."}}, 422,
+                                headers=NO_STORE)
+        except CustomerKeyDisabled:
+            return shredded()
+        if out is None:
+            return not_found()
+        audit("conversation_renamed", customer=ctx.principal.customer, user=ctx.principal.user,
+              conversation_id=conversation_id)
+        return JSONResponse(out, headers=NO_STORE)
 
     @app.delete("/api/conversations/{conversation_id}")
     def delete_conversation(conversation_id: str, request: Request):
