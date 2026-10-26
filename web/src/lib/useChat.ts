@@ -327,6 +327,24 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore, getOpti
     await store.replaceMessages(convId, next.map(persist));
   }, [branches, busy, convId, messages, store]);
 
+  /**
+   * QA-S41 "Branch in new chat" (ChatGPT): a new chat holding the visible thread up to and including answer `index`;
+   * the original is untouched. Copies the store's own transcript, so only stores that keep messages client-side can do
+   * it (memory). A server store needs a fork call from Contract; `canBranch` is false there.
+   */
+  const branchAt = useCallback(async (index: number): Promise<ID | null> => {
+    const target = messages[index];
+    if (busy || !convId || !target || target.role !== 'assistant' || target.streaming) return null;
+    const path = messages.slice(0, index + 1).filter((m) => !('interrupted' in m && m.interrupted));
+    const cid = uid('c');
+    const source = threads.find((t) => t.id === convId)?.title ?? 'Chat';
+    const title = `Branch · ${source}`.slice(0, 120);
+    for (const m of path) await store.appendMessage(cid, persist(m), title);
+    await open(cid);
+    await refresh();
+    return cid;
+  }, [busy, convId, messages, open, refresh, store, threads]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const rename = useCallback(async (id: ID, title: string) => {
     await store.renameConversation(id, title);
     refresh();
@@ -427,5 +445,5 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore, getOpti
     return () => { delete window.__ccAudit; };
   }, []);
 
-  return { threads, convId, messages, busy, send, stop, open, newChat, regenerate, remove, editAt, switchVersion, versionOf, rename, pin, canPin: !!store.setPinned, archive, canArchive: !!store.setArchived, refresh };
+  return { threads, convId, messages, busy, send, stop, open, newChat, regenerate, remove, editAt, switchVersion, versionOf, rename, pin, canPin: !!store.setPinned, archive, canArchive: !!store.setArchived, refresh, branchAt, canBranch: store.mode === 'ephemeral' };
 }
