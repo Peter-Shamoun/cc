@@ -136,4 +136,4 @@ PERF_OUT=/tmp/perf-after.json node scripts/perf_audit.mjs http://127.0.0.1:4173
 node scripts/a11y_perf_audit.mjs
 ```
 
-`npm test` (181 tests), `tsc -b`, and `vite build` pass on this change.
+`npm test` (199 tests), `tsc -b`, and `vite build` pass on this change.
