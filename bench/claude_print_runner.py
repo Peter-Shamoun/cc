@@ -7,7 +7,7 @@ because analyzer.orchestration treats an issued role that wrote nothing as finis
 <run>/runner_state.json, so a killed runner, an interrupted session or a restarted machine picks up the unfinished
 indices of the current round. When a run has no more work it is scored (bench.eval_subagents score).
 
-A worker is locked to the analyzer CLI: its only allowed tool is Bash(python3 -m analyzer.cli ...), in dontAsk mode,
+A worker is locked to the analyzer CLI: its only allowed tools are Bash(python3 -m analyzer.cli ...) and cd, in dontAsk mode,
 started outside the repository so it reads no project instructions. Each worker's JSON result (cost, usage, turns)
 is kept next to the session as claude_print.json.
 """
@@ -39,14 +39,20 @@ def worker_command(session: str, model: str, effort: str) -> list[str]:
     prompt = ("Run this command with the Bash tool and follow the instructions it prints exactly:\n"
               f"python3 -m analyzer.cli --session {session} briefing")
     command = ["claude", "-p", prompt, "--model", model, "--permission-mode", "dontAsk",
-               "--allowedTools", "Bash(python3 -m analyzer.cli:*)", "--disallowedTools", *DISALLOWED_TOOLS,
+               "--allowedTools", "Bash(python3 -m analyzer.cli:*)", "Bash(cd:*)", "--disallowedTools", *DISALLOWED_TOOLS,
                "--output-format", "json"]
     if effort and effort != "default":
         command += ["--effort", effort]
     return command
 
 
+SESSION_OUTPUT_FILES = ("audit.jsonl", "calls.jsonl", "final.json", "claude_print.json")
+
+
 def run_worker(action: dict) -> dict:
+    # an unfinished run (killed, interrupted) may have left calls behind; every run starts from the prepared session
+    for name in SESSION_OUTPUT_FILES:
+        Path(action["session"], name).unlink(missing_ok=True)
     WORKER_DIRECTORY.mkdir(exist_ok=True)
     environment = {**os.environ, "PYTHONPATH": str(ROOT)}
     started = time.time()
