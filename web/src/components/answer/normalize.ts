@@ -180,10 +180,15 @@ export function unresolvedFailures(steps: Step[]): number {
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 export function fmtMs(ms: number): string {
-  if (ms < 1000) return `${Math.round(ms)}ms`; // QA-A14: one format everywhere (7ms, 1.2s, 2m 5s)
+  // Edge cases: a bad or skewed clock (NaN, negative) reads 0ms; rounding never yields "60s" or "1m 60s".
+  if (!Number.isFinite(ms) || ms < 0) ms = 0;
+  if (ms < 999.5) return `${Math.round(ms)}ms`; // QA-A14: one format everywhere (7ms, 1.2s, 2m 5s)
   const s = ms / 1000;
-  if (s < 60) return `${s < 10 ? s.toFixed(1).replace(/\.0$/, '') : Math.round(s)}s`;
-  return `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
+  if (s < 9.95) return `${s.toFixed(1).replace(/\.0$/, '')}s`;
+  const whole = Math.round(s);
+  if (whole < 60) return `${whole}s`;
+  if (whole < 3600) return `${Math.floor(whole / 60)}m ${whole % 60}s`;
+  return `${Math.floor(whole / 3600)}h ${Math.floor((whole % 3600) / 60)}m`;
 }
 
 /** "Ran 3 queries, 1 repair, 2 checks · 12s" (Claude-style one-line summary). */
@@ -210,18 +215,21 @@ export function summarize(steps: Step[], elapsedMs?: number): string {
 
 /** Footer cost: cents, like a receipt ("<$0.01" under a cent). The popover keeps the exact figure (fmtUsd). */
 export function fmtUsdShort(x: number): string {
-  if (x === 0) return '$0';
+  if (!Number.isFinite(x) || x <= 0) return '$0';
   if (x < 0.01) return '<$0.01';
   return `$${x.toFixed(2)}`;
 }
 
 export function fmtUsd(x: number): string {
-  if (x === 0) return '$0';
+  if (!Number.isFinite(x) || x <= 0) return '$0';
   if (x < 0.01) return `$${x.toFixed(4)}`;
   return `$${x.toFixed(2)}`;
 }
 
 export function fmtTokens(n: number): string {
+  if (!Number.isFinite(n) || n < 0) return '0';
+  n = Math.round(n);
+  if (n >= 999_500) return `${(n / 1e6).toFixed(n >= 9_950_000 ? 0 : 1).replace(/\.0$/, '')}M`;
   return n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n);
 }
 
