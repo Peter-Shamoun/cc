@@ -15,6 +15,7 @@
     "check:csp": "node scripts/csp_check.mjs",
     "lint": "oxlint -c .oxlintrc.json",
     "check:headers": "node scripts/header_check.mjs",
+    "check:perf": "node scripts/lighthouse_budget.mjs",
     "audit": "npm audit --audit-level=low"
   },
   "dependencies": {
