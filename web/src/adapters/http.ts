@@ -236,6 +236,25 @@ export class HttpAnalystAdapter implements AnalystAdapter {
         }
         if (!res.ok || !res.body) {
           if (messageId !== null && res.status >= 500 && retries < this.opts.maxRetries) { onConnection?.('reconnecting'); dropped = true; await this.backoff(++retries, signal); continue; }
+          // Session expired while re-attaching to a running answer: keep what already streamed, end it with the
+          // sign-in card (not "Connection lost"), and tell the session layer so the app can prompt for sign-in.
+          if (messageId !== null && res.status === 401) {
+            this.auth.onExpired();
+            yield { type: 'part', part: await httpError(res) };
+            yield { type: 'message.end', messageId, finishReason: 'error' };
+            return;
+          }
+          // Rate-limited while re-attaching: wait out Retry-After (capped) like a 5xx, instead of dropping the answer.
+          if (messageId !== null && res.status === 429 && retries < this.opts.maxRetries) {
+            const wait = retryAfterMs(res.headers.get('retry-after'));
+            if (wait === null || wait <= this.opts.maxRateWaitMs) {
+              onConnection?.('reconnecting');
+              dropped = true;
+              retries++;
+              if (wait === null) await this.backoff(retries, signal); else await this.sleep(wait, signal);
+              continue;
+            }
+          }
           if (messageId !== null && res.status === 404) throw streamGone(); // §8 stream_gone: useChat reloads the stored answer
           if (messageId !== null) throw new Error(`replay ${res.status}`); // the run is gone: useChat shows "Connection lost"
           if (res.status === 401) this.auth.onExpired();
