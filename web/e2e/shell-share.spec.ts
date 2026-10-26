@@ -44,6 +44,10 @@ test.describe('share links (live, contract 1.11.0) @desktop', () => {
     await expect(view.getByTestId('shared-no-data')).toBeVisible();
     await expect(view.getByText('Total paid by payer').first()).toBeVisible();
     await expect(view.getByTestId('msg-assistant').first()).toBeVisible();
+    // QA-S18: a data-off share keeps the SQL with the owner (queries can hold literal values).
+    await expect(view.getByTestId('table-sql')).toHaveCount(0);
+    await expect(view.getByTestId('open-sql')).toHaveCount(0);
+    expect(await view.evaluate((el) => /\bSELECT\b|\bFROM\s+sem\./.test(el.textContent ?? ''))).toBe(false);
     await expect(viewer.getByRole('textbox', { name: 'Message' })).toHaveCount(0);
     await expect(viewer.getByRole('button', { name: /Regenerate/ })).toHaveCount(0);
     await expect(viewer.getByRole('button', { name: /Edit/ })).toHaveCount(0);
@@ -56,6 +60,25 @@ test.describe('share links (live, contract 1.11.0) @desktop', () => {
     await expect(dlg.getByTestId('create-link')).toBeVisible();
     await viewer.reload();
     await expect(viewer.getByTestId('shared-unavailable')).toContainText("This link isn't available");
+    await viewer.close();
+  });
+
+  test('QA-S18: a share with result data keeps "View SQL"', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await open(page, LIVE);
+    await ask(page, 'Total paid by payer');
+    await page.getByTestId('share-button').click();
+    const dlg = page.getByRole('dialog', { name: 'Share chat' });
+    await dlg.getByRole('switch', { name: 'Include result data' }).check();
+    await dlg.getByTestId('create-link').click();
+    const url = await dlg.getByTestId('share-url').inputValue();
+    const viewer = await context.newPage();
+    await viewer.goto(url);
+    const view = viewer.getByTestId('shared-view');
+    await expect(view.getByTestId('msg-assistant').first()).toBeVisible();
+    await expect(view.getByTestId('shared-no-data')).toHaveCount(0);
+    await expect(view.getByTestId('table-sql').first()).toBeVisible();
+    await dlg.getByRole('button', { name: 'Stop sharing' }).click();
     await viewer.close();
   });
 
