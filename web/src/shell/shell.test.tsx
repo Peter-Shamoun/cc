@@ -190,3 +190,23 @@ describe('stop with Esc', () => {
     spy.mockRestore();
   });
 });
+
+describe('offline banner', () => {
+  it('shows while offline, keeps the draft and pauses sending, then clears on reconnect', async () => {
+    cleanup();
+    const onLine = vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+    render(<App />);
+    expect(screen.getByTestId('offline-banner')).toHaveTextContent(/offline/i);
+    const box = screen.getByRole('textbox', { name: 'Message' });
+    fireEvent.change(box, { target: { value: 'Total paid by payer' } });
+    expect(screen.getByRole('button', { name: 'Send message' })).toBeDisabled();
+    fireEvent.keyDown(box, { key: 'Enter' });
+    expect(screen.queryAllByTestId('msg-user')).toHaveLength(0);
+    expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('Total paid by payer');
+    onLine.mockReturnValue(true);
+    act(() => { window.dispatchEvent(new Event('online')); });
+    expect(screen.queryByTestId('offline-banner')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Send message' })).toBeEnabled();
+    onLine.mockRestore();
+  });
+});
