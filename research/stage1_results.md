@@ -34,3 +34,22 @@ Reading:
 - By the pre-registered rule (ties with the leader go to the lowest cost per correct answer) the winner is not yet
   decidable: every bundle ties B1 at this precision. A second repeat runs on B0, B1, B7 and B9 (`s1r2`) before the
   winner is named. B10 is dropped: at 35× it would have to beat B1 clearly.
+
+## Second repeat (`s1r2`): B0, B1, B7, B9 at two repeats
+
+| bundle | accuracy | pass^2 | vs B0 (pp) | 95% CI | answered and wrong | $/correct |
+|---|---|---|---|---|---|---|
+| B1 knowledge only | 85.7% | 82.2% | +5.8 | [+0.8, +10.9] | 13.6% | 0.0079 |
+| B9 planner → executor | 79.8% | 73.6% | 0.0 | [-5.0, +5.0] | 19.4% | 0.1125 |
+| B7 traps in code | 79.1% | 72.9% | -0.8 | [-5.8, +3.9] | 15.1% | 0.0074 |
+| B0 base | 79.8% | 72.9% | 0 | | 20.2% | 0.0068 |
+
+B1 − B9 = +5.8 [+1.6, +10.1]; B1 − B7 = +6.6 [+1.9, +11.2].
+
+**Stage-1 winner: B1.** It is the only bundle whose interval against B0 excludes zero, it beats the next two
+candidates with intervals excluding zero, it cuts answered-and-wrong by a third, and its cost per correct answer is
+within 16% of B0's. The one-repeat leads of B9 and B7 did not survive the second repeat.
+
+Next (compressed stage 2 + 3, one repeat, paired against B1's two repeats, run `s2`): leave-one-out arms for the
+playbook, examples, dictionary + profile, lookup and the invariants glossary; additions for repair with hints and for
+repair + domain lint + reconciliation.
