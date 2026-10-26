@@ -15,6 +15,7 @@ import { ThreadView, type ThreadActions } from './ThreadView';
 import { ArtifactPanel } from '../components/ArtifactPanel';
 import { SUGGESTIONS } from '../fixtures';
 import { Header } from './Header';
+import { useStrategy } from './useStrategy';
 import { OfflineBanner } from './OfflineBanner';
 import { useOnline } from '../lib/useOnline';
 import { SearchDialog } from './SearchDialog';
@@ -76,7 +77,9 @@ function ShellInner() {
   if (auditOn) renderStart.current = performance.now();
   const adapter = useMemo(makeAdapter, []);
   const store = useMemo(() => makeStore(adapter), [adapter]);
-  const chat = useChat(adapter, store);
+  const loadCaps = useMemo(() => (adapter instanceof HttpAnalystAdapter ? () => adapter.capabilities() : undefined), [adapter]);
+  const strategy = useStrategy(loadCaps);
+  const chat = useChat(adapter, store, strategy.options);
   // Opening a stored chat can take a round trip (server history): after a short grace period show a
   // thread skeleton instead of the empty state or the previous chat (ChatGPT/Claude behaviour).
   const [opening, setOpening] = useState<string | null>(() => (store instanceof HttpTranscriptStore ? routeId() : null));
@@ -424,7 +427,7 @@ function ShellInner() {
         {sidebarVisible && (mobile ? <div ref={drawerRef}><Sidebar {...sidebarProps} drawer /></div> : <Sidebar {...sidebarProps} />)}
         {!sidebarVisible && !mobile && <SidebarRail onExpand={() => setSidebar(true)} onNew={sidebarProps.onNew} onSearch={() => setDialog('search')} onSettings={() => setDialog('settings')} />}
         <main className="relative flex min-w-0 flex-1 flex-col font-sans md:min-w-[400px]" aria-label="Chat">
-          <Header showNav={mobile} onOpenSidebar={() => setSidebar(true)} onNewChat={sidebarProps.onNew} adapterName={adapter.name}
+          <Header strategy={strategy} showNav={mobile} onOpenSidebar={() => setSidebar(true)} onNewChat={sidebarProps.onNew} adapterName={adapter.name}
             hasChat={!empty} onCopyMarkdown={copyCurrent} onDownloadMarkdown={exportCurrent} onSettings={() => setDialog('settings')} onShortcuts={() => setDialog('shortcuts')}
             title={chat.convId ? threads.find((t) => t.id === chat.convId)?.title : undefined}
             onRename={(t) => { if (chat.convId) chat.rename(chat.convId, t); }} onDelete={() => { if (chat.convId) requestDelete(chat.convId); }} />
