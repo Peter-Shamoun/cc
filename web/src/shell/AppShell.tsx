@@ -9,7 +9,8 @@ import { AdapterCtx } from '../adapters/context';
 import type { AnalystAdapter } from '../adapters/types';
 import { Sidebar, SidebarRail } from '../components/Sidebar';
 import { Composer } from '../components/Composer';
-import { AssistantTurn, UserBubble, messageMarkdown, type Artifact } from '../components/Message';
+import { messageMarkdown, type Artifact } from '../components/Message';
+import { ThreadView, type ThreadActions } from './ThreadView';
 import { ArtifactPanel } from '../components/ArtifactPanel';
 import { SUGGESTIONS } from '../fixtures';
 import { Header } from './Header';
@@ -186,7 +187,7 @@ function ShellInner() {
   useEffect(() => { if (artifact && window.innerWidth < 1400 && !mobile) setSidebar(false); }, [artifact]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => setArtifact(null), [chat.convId]);
 
-  // ---- scrolling: stick to bottom while streaming, pin a follow-up question to the top ----
+  // ---- scrolling: pin each new question (the first one too, QA-S3) to the top while its answer streams ----
   const [draft, setDraftPush] = useState<{ text: string; n: number } | undefined>();
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
@@ -202,7 +203,7 @@ function ShellInner() {
     lastLen.current = messages.length;
     const last = messages[messages.length - 1];
     const prev = messages[messages.length - 2];
-    if (grew && messages.length > 2 && last?.role === 'assistant' && prev?.role === 'user') {
+    if (grew && last?.role === 'assistant' && prev?.role === 'user') {
       const users = el.querySelectorAll<HTMLElement>('[data-testid="msg-user"]');
       const u = users[users.length - 1];
       if (u) {
@@ -234,13 +235,49 @@ function ShellInner() {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' });
   };
 
+  // ---- screen readers: the log is aria-busy while streaming (one announcement, not per token), then "Answer complete" (QA-S1) ----
+  const [announce, setAnnounce] = useState('');
+  const wasBusy = useRef(false);
+  useEffect(() => {
+    if (chat.busy && !wasBusy.current) setAnnounce('ClaimClarity is answering');
+    if (!chat.busy && wasBusy.current) {
+      const last = messages[messages.length - 1];
+      setAnnounce(last?.role === 'assistant' && last.parts.some((p) => p.type === 'error') ? 'Answer failed' : 'Answer complete');
+    }
+    wasBusy.current = chat.busy;
+  }, [chat.busy]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => setAnnounce(''), [chat.convId]);
+
   const edit = (t: string) => setDraftPush((d) => ({ text: t, n: (d?.n ?? 0) + 1 }));
   const empty = messages.length === 0;
   const draftKey = chat.convId ?? NEW_CHAT_KEY;
   const send = (t: string, resume?: ChatRequest['resume']) => { atBottomRef.current = true; setAtBottom(true); chat.send(t, resume ? { resume } : undefined); };
+  /** Up-arrow in an empty composer edits the last question in place (ChatGPT behaviour, QA-S8). */
+  const editLast = () => {
+    const users = scroller.current?.querySelectorAll<HTMLElement>('[data-testid="msg-user"]');
+    const btn = users?.[users.length - 1]?.querySelector<HTMLButtonElement>('button[aria-label="Edit message"]:not([disabled])');
+    if (!btn) return false;
+    btn.click();
+    requestAnimationFrame(() => {
+      const ta = scroller.current?.querySelector<HTMLTextAreaElement>('[data-testid="msg-user-editing"] textarea');
+      if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); ta.scrollIntoView?.({ block: 'nearest' }); }
+    });
+    return true;
+  };
   const composer = (autoFocus: boolean, placeholder?: string) => (
-    <Composer onSend={send} onStop={chat.stop} busy={chat.busy} autoFocus={autoFocus} initial={draft} placeholder={placeholder} draftKey={draftKey} enterToSend={enterToSend} onCommand={onCommand} />
+    <Composer onEditLast={editLast} onSend={send} onStop={chat.stop} busy={chat.busy} autoFocus={autoFocus} initial={draft} placeholder={placeholder} draftKey={draftKey} enterToSend={enterToSend} onCommand={onCommand} />
   );
+  const threadActions: ThreadActions = {
+    editAt: (i, t) => { atBottomRef.current = true; setAtBottom(true); chat.editAt(i, t); },
+    switchVersion: chat.switchVersion,
+    versionOf: chat.versionOf,
+    openArtifact: setArtifact,
+    regenerate: chat.regenerate,
+    editIntoComposer: edit,
+    send,
+    // Clarification chips / free text resume the paused run (ChatRequest.resume); abstain rephrasings send plainly.
+    reply: (t, resume) => send(t, resume),
+  };
   const searchStore = useCallback((q: string) => store.search(q), [store]);
   const openFromSearch = async (id: string, messageId?: string) => {
     await chat.open(id);
@@ -287,19 +324,9 @@ function ShellInner() {
           ) : (
             <>
               <div ref={scroller} onScroll={(e) => onScroll(e.currentTarget)} className="flex-1 overflow-y-auto [overflow-anchor:none]" data-testid="thread-scroller">
-                <div ref={content} className="mx-auto flex max-w-[48rem] flex-col gap-6 px-4 pb-10 pt-4 md:px-6" role="log" aria-live="off" aria-label="Messages">
-                  {messages.map((m, i) =>
-                    m.role === 'user' ? (
-                      <div key={m.id} data-message-id={m.id}>
-                        <UserBubble msg={m} disabled={chat.busy} onEdit={(t) => { atBottomRef.current = true; setAtBottom(true); chat.editAt(i, t); }} version={chat.versionOf(i)} onVersion={(k) => chat.switchVersion(i, k)} />
-                      </div>
-                    ) : (
-                      // The newest answer reserves most of a viewport so the pinned question can sit at the top.
-                      <div key={m.id} data-message-id={m.id} style={i === messages.length - 1 && messages.length > 2 ? { minHeight: 'calc(100dvh - 330px)' } : undefined}>
-                        <AssistantTurn msg={m} isLast={i === messages.length - 1} onOpen={setArtifact} onRegenerate={chat.regenerate} onEdit={edit} onReply={send} />
-                      </div>
-                    ),
-                  )}
+                <div ref={content} className="mx-auto flex max-w-[48rem] flex-col gap-6 px-4 pb-10 pt-4 md:px-6" role="log" aria-live="polite" aria-relevant="additions" aria-busy={chat.busy} aria-label="Messages">
+                  <h1 className="sr-only" data-testid="thread-title">{currentTitle}</h1>
+                  <ThreadView messages={messages} busy={chat.busy} actions={threadActions} />
                 </div>
               </div>
               <div className="relative mx-auto w-full max-w-[48rem] px-4 md:px-6" id="composer">
@@ -313,7 +340,7 @@ function ShellInner() {
               </div>
             </>
           )}
-          <div className="sr-only" aria-live="polite" data-testid="status-live">{chat.busy ? 'ClaimClarity is answering' : ''}</div>
+          <div className="sr-only" role="status" aria-live="polite" aria-atomic="true" data-testid="status-live">{announce}</div>
         </main>
         {artifact && <ArtifactPanel artifact={artifact} onClose={() => setArtifact(null)} />}
       </div>

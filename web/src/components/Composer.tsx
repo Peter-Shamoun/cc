@@ -16,13 +16,15 @@ export interface ComposerProps {
   draftKey?: string;
   enterToSend?: boolean;
   onCommand?: (c: SlashCommand) => void;
+  /** Up-arrow in an empty composer: edit the last question. Return false if there is none. */
+  onEditLast?: () => boolean;
 }
 
 /**
  * ChatGPT/Claude-style composer: auto-growing textarea, send button that morphs into stop while a
  * reply streams, Enter vs Shift+Enter (configurable), IME-safe, per-chat drafts and a "/" command menu.
  */
-export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder = 'Ask about your claims', draftKey, enterToSend = true, onCommand }: ComposerProps) {
+export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder = 'Ask about your claims', draftKey, enterToSend = true, onCommand, onEditLast }: ComposerProps) {
   const [value, setValueState] = useState(() => (draftKey ? getDraft(draftKey) : ''));
   const ref = useRef<HTMLTextAreaElement>(null);
   const [slashIdx, setSlashIdx] = useState(0);
@@ -88,6 +90,7 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
             if (e.key === 'Tab') { e.preventDefault(); runCommand(slash[slashIdx]); return; }
             if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setSlashDismissed(true); return; }
           }
+          if (e.key === 'ArrowUp' && !value && !busy && !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey && onEditLast?.()) { e.preventDefault(); return; }
           if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
           const mod = e.metaKey || e.ctrlKey;
           if (enterToSend ? !e.shiftKey : mod) { e.preventDefault(); submit(); }

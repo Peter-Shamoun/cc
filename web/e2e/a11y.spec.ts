@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { MOCK, open, ask, gap } from './helpers';
+import { MOCK, open, ask } from './helpers';
 
 const scan = async (page: import('@playwright/test').Page) => {
   const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
@@ -38,11 +38,10 @@ test('keyboard: composer focused on load, Enter sends, Shift+Enter newline, Tab 
 test('keyboard: Ctrl+K opens chat search', async ({ page }) => {
   await open(page, MOCK);
   await page.keyboard.press('Control+k');
-  await expect(page.getByRole('textbox', { name: /search/i }).or(page.getByRole('searchbox')).first()).toBeFocused();
+  await expect(page.getByRole('textbox', { name: /search/i }).or(page.getByRole('searchbox')).or(page.getByRole('combobox', { name: /search/i })).first()).toBeFocused();
 });
 
 test('streaming answer is announced to screen readers (aria-live)', async ({ page }) => {
-  gap('QA-A11Y-2: no aria-live/role=log region for streamed answers (shell)');
   await open(page, MOCK);
   await ask(page, 'What was our denial rate by payer last quarter?');
   expect(await page.locator('[aria-live], [role="log"], [role="status"]').count()).toBeGreaterThan(0);

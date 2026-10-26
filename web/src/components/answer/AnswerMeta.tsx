@@ -39,7 +39,7 @@ export function AnswerMeta({ usage, queries, repairs = 0, onSql, sqlOpen }: { us
         </button>
       )}
       {open && usage && (
-        <div id={id} role="dialog" aria-label="Answer details" className="absolute bottom-full left-0 z-20 mb-2 w-72 rounded-xl border border-line bg-elev p-3 text-fg-muted shadow-lg step-enter" data-testid="meta-popover">
+        <div id={id} role="dialog" aria-label="Answer details" className="absolute bottom-full left-0 z-20 mb-2 w-72 max-sm:fixed max-sm:inset-x-3 max-sm:bottom-24 max-sm:left-3 max-sm:w-auto rounded-xl border border-line bg-elev p-3 text-fg-muted shadow-lg step-enter" data-testid="meta-popover">
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
             {usage.model && !(usage.models && usage.models.length > 1) && <><dt>Model</dt><dd className="text-right text-fg">{usage.model}</dd></>}
             {usage.inputTokens !== undefined && <><dt>Tokens</dt><dd className="text-right tabular-nums text-fg">{fmtTokens(usage.inputTokens)} in · {fmtTokens(usage.outputTokens ?? 0)} out{usage.cacheRead ? ` · ${fmtTokens(usage.cacheRead)} cached` : ''}</dd></>}

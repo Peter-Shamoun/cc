@@ -107,7 +107,7 @@ export function Sidebar(p: SidebarProps) {
           <span>{p.storeMode === 'ephemeral' ? <><b className="font-medium text-fg-muted">History off</b> · chats live in memory only.</> : 'History on'} Synthetic demo data.</span>
         </div>
         <button type="button" onClick={account.toggle} aria-haspopup="menu" aria-expanded={!!account.anchor} className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm hover:bg-hover" data-testid="account-button">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#5b6cf0] text-[11px] font-semibold text-white" aria-hidden>DU</span>
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#4352d6] text-[11px] font-semibold text-white" aria-hidden>DU</span>
           <span className="min-w-0 flex-1">
             <span className="block truncate font-medium">Demo user</span>
             <span className="block truncate text-xs text-fg-subtle">acme_labs · analyst</span>
