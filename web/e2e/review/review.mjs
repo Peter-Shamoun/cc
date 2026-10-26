@@ -93,7 +93,7 @@ await safe('live', async () => {
   await shot(pg, 'live_table_answer');
   report.metrics.live_answer = await measure(pg);
   await axe(pg, 'live_answer_light');
-  await safe('sql', async () => { await pg.getByTestId('sql-disclosure').first().getByRole('button').first().click(); await pg.waitForTimeout(300); await shot(pg, 'live_sql_expanded'); });
+  await safe('sql', async () => { await pg.getByTestId('open-sql').first().click(); await pg.waitForTimeout(400); await shot(pg, 'live_sql_inspector'); await pg.keyboard.press('Escape'); });
   await safe('hover actions', async () => { await pg.getByTestId('msg-assistant').last().hover(); await shot(pg, 'live_hover_actions'); });
   await safe('table hover', async () => { await pg.getByTestId('data-table').first().hover(); await shot(pg, 'live_table_hover'); });
   await safe('artifact', async () => { const c = pg.getByTestId('artifact-card').first(); if (await c.count()) { await c.click(); await pg.waitForTimeout(500); await shot(pg, 'live_artifact_panel'); await pg.keyboard.press('Escape'); await pg.waitForTimeout(300); await shot(pg, 'live_artifact_after_esc'); } });
