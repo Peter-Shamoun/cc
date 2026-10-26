@@ -59,6 +59,28 @@ describe('HttpTranscriptStore', () => {
   });
 });
 
+describe('HttpTranscriptStore titles after reload', () => {
+  it('rebuilds short titles in memory from the first question; renamed chats keep their server title', async () => {
+    const s = server({
+      'GET /api/transcripts': () => [200, { mode: 'persisted', persisted: true, retentionDays: 90 }],
+      'GET /api/conversations': () => [200, { items: [
+        { id: 'c_1', title: 'New analysis', updatedAt: '2026-10-25T00:00:00Z', messageCount: 2 },
+        { id: 'c_2', title: 'My payer review', updatedAt: '2026-10-24T00:00:00Z', messageCount: 2 },
+      ] }],
+      'GET /api/conversations/c_1': () => [200, { id: 'c_1', title: 'New analysis', updatedAt: '', messages: [{ id: 'u1', role: 'user', text: 'Can you show me the denial rate by payer last quarter?', createdAt: '' }] }],
+    });
+    const store = new HttpTranscriptStore('', 'demo:acme_labs:u', s.impl); // a fresh tab = after reload
+    await store.ready;
+    const items = (await store.listConversations()).items;
+    expect(items.map((i) => i.title)).toEqual(['Denial rate by payer', 'My payer review']);
+    expect(s.calls.filter((c) => c.url === '/api/conversations/c_2')).toHaveLength(0); // renamed: no fetch
+    await store.listConversations();
+    expect(s.calls.filter((c) => c.url === '/api/conversations/c_1')).toHaveLength(1); // cached
+    // nothing about the question goes into a URL or a write
+    expect(s.calls.every((c) => !/denial/i.test(c.url) && c.method === 'GET')).toBe(true);
+  });
+});
+
 describe('hydrate', () => {
   it('groups flat persisted step events into step views', async () => {
     const { hydrate } = await import('./httpStore');
