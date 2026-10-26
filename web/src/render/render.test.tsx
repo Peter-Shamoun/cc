@@ -174,6 +174,8 @@ describe('table fixtures', () => {
       expect(cells[1].className).toContain('text-right');
       expect(cells[2].className).toContain('text-right');
       expect(cells[2].className).toContain('tabular-nums');
+      // QA-A20: digits line up in every column (also text columns with codes like CO-97).
+      expect(cells[0].closest('table')!.className).toContain('tabular-nums');
       expect(cells[3].className).toContain('text-right');
       expect(container.textContent).toContain('$1,234.50');
       expect(container.textContent).toContain('12.5%');
