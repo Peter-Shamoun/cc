@@ -71,3 +71,13 @@ describe('CSP-compatible sources', () => {
     expect(chart).toMatch(/disableDefaultStyle: true/);
   });
 });
+
+describe('no WebAssembly', () => {
+  it('script-src has no wasm-unsafe-eval and CodeBlock uses the Shiki JS engine, not the full bundle', async () => {
+    const { contentSecurityPolicy } = await import('./headers');
+    expect(contentSecurityPolicy('n')).not.toMatch(/wasm-unsafe-eval/);
+    const src = (await import('../components/parts/CodeBlock.tsx?raw')).default;
+    expect(src).toMatch(/shiki\/engine\/javascript/);
+    expect(src).not.toMatch(/import\('shiki'\)/);
+  });
+});

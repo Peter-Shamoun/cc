@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { Download, Maximize2, FileJson } from 'lucide-react';
-import { loader as createVegaLoader } from 'vega';
 import type { ChartPart } from '../../lib/contract';
 import { IconButton } from '../ui';
 import { CHART_COLORS, useTheme } from '../../lib/theme';
@@ -11,8 +10,11 @@ export { buildSpec };
 
 type View = { finalize: () => void; toImageURL: (t: 'png' | 'svg', scale?: number) => Promise<string> };
 
-/** Refuse http(s) and file loads. Inline `values` never need the loader (spec §4.5, §6.11). */
-function remoteBlockedLoader() {
+/**
+ * Refuse http(s) and file loads. Inline `values` never need the loader (spec §4.5, §6.11).
+ * `vega` is passed in from the lazy import so it stays out of the initial bundle.
+ */
+function remoteBlockedLoader(createVegaLoader: typeof import('vega').loader) {
   const loader = createVegaLoader();
   const reject = () => Promise.reject(new Error('Remote chart data is blocked'));
   loader.http = reject;
@@ -35,8 +37,8 @@ export function ChartView({ part, onOpen, full, onShowSpec }: { part: ChartPart;
     const root = document.documentElement;
     root.classList.toggle('dark', mode === 'dark');
     root.dataset.palette = palette;
-    import('vega-embed')
-      .then(({ default: embed }) => {
+    Promise.all([import('vega-embed'), import('vega')])
+      .then(([{ default: embed }, { loader: createVegaLoader }]) => {
         if (!alive || !ref.current) return;
         const dark = mode === 'dark';
         const css = getComputedStyle(root);
@@ -49,7 +51,7 @@ export function ChartView({ part, onOpen, full, onShowSpec }: { part: ChartPart;
           renderer: chartRenderer(part),
           // vega-interpreter: no Function/eval on model-authored expressions (spec §6.9) and no 'unsafe-eval' in the CSP.
           ast: true,
-          loader: remoteBlockedLoader(),
+          loader: remoteBlockedLoader(createVegaLoader),
           // Strict CSP (no inline <style>): no injected stylesheets; the tooltip is themed in index.css (#vg-tooltip-element).
           defaultStyle: false,
           tooltip: { theme: dark ? 'dark' : 'light', disableDefaultStyle: true },

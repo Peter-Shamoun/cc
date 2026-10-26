@@ -5,10 +5,25 @@ import { CopyButton, IconButton } from '../ui';
 import { downloadText } from '../../lib/csv';
 import { useTheme } from '../../lib/theme';
 
-let hl: Promise<import('shiki').Highlighter> | null = null;
+/**
+ * Fine-grained Shiki: only the five languages and four themes we render, and the JavaScript regex engine
+ * instead of the oniguruma wasm. This keeps ~300 grammar chunks and a 225 KB (gz) wasm out of dist, and the
+ * CSP no longer needs 'wasm-unsafe-eval'.
+ */
+type Highlighter = { codeToHtml: (code: string, opts: { lang: string; themes: Record<string, string>; defaultColor: string }) => string };
+let hl: Promise<Highlighter> | null = null;
 function highlighter() {
-  hl ??= import('shiki').then((m) =>
-    m.createHighlighter({ themes: ['github-light', 'github-dark', 'vitesse-light', 'vitesse-dark'], langs: ['sql', 'python', 'json', 'typescript', 'bash'] }),
+  hl ??= Promise.all([
+    import('shiki/core'),
+    import('shiki/engine/javascript'),
+    Promise.all([import('shiki/langs/sql.mjs'), import('shiki/langs/python.mjs'), import('shiki/langs/json.mjs'), import('shiki/langs/typescript.mjs'), import('shiki/langs/bash.mjs')]),
+    Promise.all([import('shiki/themes/github-light.mjs'), import('shiki/themes/github-dark.mjs'), import('shiki/themes/vitesse-light.mjs'), import('shiki/themes/vitesse-dark.mjs')]),
+  ]).then(([core, engine, langs, themes]) =>
+    core.createHighlighterCore({
+      engine: engine.createJavaScriptRegexEngine(),
+      langs: langs.map((m) => m.default),
+      themes: themes.map((m) => m.default),
+    }) as Promise<Highlighter>,
   );
   return hl;
 }
