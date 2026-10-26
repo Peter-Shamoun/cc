@@ -24,6 +24,7 @@ import { useTheme } from '../lib/theme';
 import { copyText, downloadText } from '../lib/csv';
 import { getPref, setPref } from '../lib/prefs';
 import type { AssistantView } from '../lib/contract';
+import type { AssistantViewV1, ChatRequest } from '../api/contract';
 
 function makeAdapter(): AnalystAdapter {
   const base = import.meta.env.VITE_ANALYST_BASE as string | undefined;
@@ -139,8 +140,8 @@ function ShellInner() {
     downloadMd('claimclarity-chats', parts.join('\n---\n\n'));
   };
   const copyLast = async () => {
-    const last = [...chat.messages].reverse().find((m): m is AssistantView => m.role === 'assistant');
-    if (last && (await copyText(messageMarkdown(last)))) toast({ text: 'Copied last response' });
+    const last = [...chat.messages].reverse().find((m): m is AssistantViewV1 => m.role === 'assistant');
+    if (last && (await copyText(messageMarkdown(last as unknown as AssistantView)))) toast({ text: 'Copied last response' });
   };
   const focusComposer = () => document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message"]')?.focus();
 
@@ -252,7 +253,7 @@ function ShellInner() {
   const edit = (t: string) => setDraftPush((d) => ({ text: t, n: (d?.n ?? 0) + 1 }));
   const empty = messages.length === 0;
   const draftKey = chat.convId ?? NEW_CHAT_KEY;
-  const send = (t: string) => { atBottomRef.current = true; setAtBottom(true); chat.send(t); };
+  const send = (t: string, resume?: ChatRequest['resume']) => { atBottomRef.current = true; setAtBottom(true); chat.send(t, resume ? { resume } : undefined); };
   /** Up-arrow in an empty composer edits the last question in place (ChatGPT behaviour, QA-S8). */
   const editLast = () => {
     const users = scroller.current?.querySelectorAll<HTMLElement>('[data-testid="msg-user"]');
@@ -276,6 +277,8 @@ function ShellInner() {
     regenerate: chat.regenerate,
     editIntoComposer: edit,
     send,
+    // Clarification chips / free text resume the paused run (ChatRequest.resume); abstain rephrasings send plainly.
+    reply: (t, resume) => send(t, resume),
   };
   const searchStore = useCallback((q: string) => store.search(q), [store]);
   const openFromSearch = async (id: string, messageId?: string) => {
