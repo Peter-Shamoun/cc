@@ -6,6 +6,7 @@ passed to ``create_app(auth=SimAuth(world.aws, world.dep))``.
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 import json
 import logging
 import os
@@ -127,6 +128,9 @@ class Settings:
     #: unfinished /api/chat runs allowed per user at once (429 rate_limited beyond it)
     max_concurrent_runs: int = int(os.environ.get("CC_API_MAX_CONCURRENT_RUNS", "3"))
     clarification_ttl_seconds: float = 1800.0
+    #: background retention sweep (store.purge_expired) interval while the app is running; 0 = off
+    transcript_sweep_seconds: float = field(default_factory=lambda: float(os.environ.get("CC_TRANSCRIPT_SWEEP_SECONDS",
+                                                                                         "3600")))
     analyzer_overrides: dict = field(default_factory=lambda: {
         "glossary": "basic", "data_dictionary": False, "data_profile": False, "row_limit": 5000,
         "candidates": 1, "cascade": "off"})
@@ -160,6 +164,9 @@ class _Run:
     subscribers: set = field(default_factory=set)  # (event loop, asyncio.Event) per attached client
     attached: int = 0
     grace: threading.Timer | None = None
+    conversation_id: str | None = None
+    #: set when the conversation is deleted mid-run: the worker must not write it back (no resurrection)
+    discarded: threading.Event = field(default_factory=threading.Event)
 
     def notify(self):
         """Wake every attached client, each on its own event loop. Thread-safe; never raises."""
@@ -185,7 +192,32 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
     store = store or make_store(audit=audit)
     downloads = DownloadRegistry()
     runs: dict[str, _Run] = {}
-    app = FastAPI(title="ClaimClarity chat API", version="0.1.0", docs_url=None, redoc_url=None, openapi_url=None)
+    purge_lock = threading.Lock()  # a delete and a run's final transcript write never interleave
+
+    @asynccontextmanager
+    async def lifespan(_app):
+        async def sweep():
+            while True:
+                await asyncio.sleep(settings.transcript_sweep_seconds)
+                try:
+                    removed = await asyncio.to_thread(store.purge_expired)
+                    if removed:
+                        log.info("retention sweep removed %d conversations", removed)
+                except Exception as exc:  # noqa: BLE001 - keep sweeping
+                    log.warning("retention sweep failed: %s", type(exc).__name__)
+
+        task = None
+        if settings.transcript_sweep_seconds > 0 and hasattr(store, "purge_expired"):
+            await asyncio.to_thread(store.purge_expired)  # once at startup: catch up on what expired while down
+            task = asyncio.create_task(sweep())
+        try:
+            yield
+        finally:
+            if task:
+                task.cancel()
+
+    app = FastAPI(title="ClaimClarity chat API", version="0.1.0", docs_url=None, redoc_url=None, openapi_url=None,
+                  lifespan=lifespan)
     install_log_redaction()
     app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_body_bytes)
     app.add_middleware(ErrorShieldMiddleware)  # inside SecurityHeaders: 500s get the headers too
@@ -205,12 +237,27 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         msg = "Invalid request" + (f": {', '.join(f for f in fields if f)}." if any(fields) else ".")
         return error_json("validation", msg, 422)
 
+    def forget(principal, conversation_id: str | None) -> None:
+        """Everything outside the store that still holds this conversation (None = all of the principal's): stop
+        and discard in-flight runs, so their final write can't resurrect it, and their resume buffers are dropped at
+        the next gc. Also drops pending clarifications (they hold the question text) and revokes CSV downloads."""
+        for run in list(runs.values()):
+            if run.principal == principal and (conversation_id is None or run.conversation_id == conversation_id):
+                run.discarded.set()
+                run.cancelled.set()
+        for key, pending in list(clarifications.items()):
+            if pending["principal"] == principal and (conversation_id is None
+                                                      or pending["conversation_id"] == conversation_id):
+                clarifications.pop(key, None)
+        downloads.revoke(principal, conversation_id)
+
     def unauthorized():
         return JSONResponse({"error": {"code": "auth_expired", "message": "Sign in again."}}, 401, headers=NO_STORE)
 
     def gc_runs():
         now = time.time()
-        for key in [k for k, r in runs.items() if r.finished_at and now - r.finished_at > settings.resume_seconds]:
+        for key in [k for k, r in runs.items() if r.finished_at and (
+                r.discarded.is_set() or now - r.finished_at > settings.resume_seconds)]:
             del runs[key]
 
     @app.get("/api/health")
@@ -346,7 +393,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         if scenario and "scenario" not in user_msg and isinstance(user_msg, dict):
             user_msg["scenario"] = scenario
         legacy_tools = bool(body.options.get("legacyToolParts"))
-        run = _Run(message_id, ctx.principal)
+        run = _Run(message_id, ctx.principal, conversation_id=conversation_id)
         runs[message_id] = run
         started = time.perf_counter()
         marks: dict = {}
@@ -393,7 +440,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 answer = analyzer.answer(question)
                 tap.finish(answer)
                 elapsed = int((time.perf_counter() - started) * 1000)
-                parts, finish = outcome_parts(answer, ctx.principal, downloads, elapsed_ms=elapsed, question=question,
+                parts, finish = outcome_parts(answer, ctx.principal, downloads.scoped(conversation_id), elapsed_ms=elapsed, question=question,
                                               ask_args=tap.ask_args, refuse_args=tap.refuse_args,
                                               legacy_tools=legacy_tools)
             except Cancelled:
@@ -429,7 +476,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                     emit({"type": "text.end", "partId": part["id"]})
                 else:
                     emit({"type": "part", "part": part})
-                    if part["type"] == "clarification":
+                    if part["type"] == "clarification" and not run.discarded.is_set():
                         clarifications[part["clarificationId"]] = {
                             "principal": ctx.principal, "conversation_id": conversation_id, "question": question,
                             "message_id": message_id, "choices": part.get("choices", []), "scenario": scenario,
@@ -454,7 +501,9 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             if start_extra.get("regenerateOf"):
                 record["regenerateOf"] = start_extra["regenerateOf"]
             try:
-                store.append_message(ctx.principal, conversation_id, record)
+                with purge_lock:
+                    if not run.discarded.is_set():
+                        store.append_message(ctx.principal, conversation_id, record)
             except Exception as exc:  # noqa: BLE001 - a history write must not hang the stream
                 log.warning("transcript append failed: %s", type(exc).__name__)
             audit("chat_message", customer=ctx.principal.customer, user=ctx.principal.user,
@@ -625,7 +674,10 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             ctx = authed(request, new_id("r"))
         except AuthError:
             return unauthorized()
-        return JSONResponse({"deleted": store.delete_all(ctx.principal)}, headers=NO_STORE)
+        with purge_lock:
+            count = store.delete_all(ctx.principal)
+            forget(ctx.principal, None)
+        return JSONResponse({"deleted": count}, headers=NO_STORE)
 
     @app.get("/api/conversations/{conversation_id}")
     def conversation(conversation_id: str, request: Request):
@@ -666,7 +718,10 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             ctx = authed(request, new_id("r"))
         except AuthError:
             return unauthorized()
-        ok = store.delete_conversation(ctx.principal, conversation_id)
+        with purge_lock:
+            ok = store.delete_conversation(ctx.principal, conversation_id)
+            if ok:
+                forget(ctx.principal, conversation_id)
         return JSONResponse({"deleted": ok}, 200 if ok else 404, headers=NO_STORE)
 
     return app
