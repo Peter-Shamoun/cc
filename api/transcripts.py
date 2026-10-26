@@ -266,16 +266,25 @@ class Keyring:
             if customer in self._disabled or (self._file(customer) and self._file(customer).with_suffix(".disabled").exists()):
                 raise CustomerKeyDisabled(customer)
             if customer not in self._keys:
-                path = self._file(customer)
-                if path and path.exists():
-                    self._keys[customer] = path.read_bytes()
-                else:
-                    self._keys[customer] = AESGCM.generate_key(256)
-                    if path:
-                        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-                        with os.fdopen(fd, "wb") as fh:
-                            fh.write(self._keys[customer])
+                self._keys[customer] = self._load_or_create(customer)
             return self._keys[customer]
+
+    def _load_or_create(self, customer: str) -> bytes:
+        """The key file wins: a new key is cached only once it is the one on disk (another process may have
+        created the file first, and caching a key that lost that race would seal data nobody else can open)."""
+        path = self._file(customer)
+        if path is None:
+            return AESGCM.generate_key(256)
+        if path.exists():
+            return path.read_bytes()
+        new_key = AESGCM.generate_key(256)
+        try:
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError:
+            return path.read_bytes()
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(new_key)
+        return new_key
 
     def disable(self, customer: str) -> None:
         with self._lock:
@@ -514,7 +523,10 @@ class SealedTranscriptStore:
         if not create:
             return None
         dek = AESGCM.generate_key(256)
-        self.blobs.put(key, _seal(kek, dek, self._aad(principal, "transcript-dek")))
+        try:
+            self.blobs.put(key, _seal(kek, dek, self._aad(principal, "transcript-dek")), if_none_match=True)
+        except PreconditionFailed:  # another task created it first: use that one, never overwrite it
+            return _open(kek, self.blobs.get(key), self._aad(principal, "transcript-dek"))
         return dek
 
     def _save(self, principal, conv: dict, etag: str | None) -> None:
