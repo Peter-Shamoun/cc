@@ -142,3 +142,17 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -
 .dark .cc-tip::after { background: #000; box-shadow: 0 0 0 1px rgba(255,255,255,.12); }
 @media (hover: hover) { .cc-tip:hover::after { opacity: 1; transform: translate(-50%, 0); transition-delay: 150ms; } }
 .cc-tip:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+
+/* Vega tooltip. The library's injected <style> is disabled for the strict CSP; this is our own theme. */
+#vg-tooltip-element {
+  visibility: hidden; position: fixed; z-index: 1000; padding: 6px 8px; max-width: 320px;
+  font: 12px/1.4 var(--font-sans, sans-serif); white-space: pre-line; pointer-events: none;
+  background: var(--bg-elev); color: var(--fg); border: 1px solid var(--border-strong, rgba(0,0,0,0.15));
+  border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+#vg-tooltip-element.visible { visibility: visible; }
+#vg-tooltip-element h2 { margin: 0 0 6px; font-size: 13px; font-weight: 600; }
+#vg-tooltip-element table { border-spacing: 0; }
+#vg-tooltip-element td { padding: 1px 0; vertical-align: top; overflow: hidden; text-overflow: ellipsis; }
+#vg-tooltip-element td.key { color: var(--fg-muted); padding-right: 8px; text-align: right; max-width: 150px; }
+#vg-tooltip-element td.value { max-width: 240px; text-align: left; font-variant-numeric: tabular-nums; }
