@@ -14,7 +14,8 @@
     "e2e:update": "playwright test -c e2e/playwright.config.ts --project=desktop --project=mobile --update-snapshots -g visual",
     "check:csp": "node scripts/csp_check.mjs",
     "lint": "oxlint -c .oxlintrc.json",
-    "check:headers": "node scripts/header_check.mjs"
+    "check:headers": "node scripts/header_check.mjs",
+    "audit": "npm audit --audit-level=low"
   },
   "dependencies": {
     "@streamdown/math": "^1.0.3",
@@ -51,5 +52,9 @@
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
     "vitest": "^4.1.12"
+  },
+  "overrides": {
+    "katex": "$katex",
+    "postcss-selector-parser": "^7.1.6"
   }
 }
