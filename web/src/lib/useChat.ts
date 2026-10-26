@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AssistantMessage, ID, UserMessage } from './contract';
-import { newAssistantViewV1, reduceV1, type AssistantViewV1, type ChatRequest } from '../api/contract';
+import { newAssistantViewV1, reduceV1, type AssistantViewV1, type ChatRequest, type Usage } from '../api/contract';
 import type { AnalystAdapter, ThreadSummary, TranscriptStore } from '../adapters/types';
 import { shortTitle } from '../shell/title';
 
@@ -11,6 +11,29 @@ function toView(m: UserMessage | AssistantMessage): ViewMessage {
   if (m.role === 'user') return m;
   const v = m as AssistantMessage & Partial<AssistantViewV1>;
   return { ...v, parts: v.parts as AssistantViewV1['parts'], streaming: false, status: null, openText: [], steps: v.steps ?? [], escalations: v.escalations ?? [], lastSeq: -1 };
+}
+
+/**
+ * A clarification that has a later turn after it was replied to (CONTRACT.md §6), so after a reload
+ * it renders as answered instead of offering choices again. The server sets `answered` on its own
+ * transcript; the memory store does not, so we derive it here too.
+ */
+export function markAnswered(msgs: ViewMessage[]): ViewMessage[] {
+  return msgs.map((m, i) => {
+    if (m.role !== 'assistant' || i === msgs.length - 1) return m;
+    if (!m.parts.some((p) => p.type === 'clarification' && !p.answered)) return m;
+    return { ...m, parts: m.parts.map((p) => (p.type === 'clarification' && !p.answered ? { ...p, answered: true } : p)) };
+  });
+}
+
+/**
+ * Usage for a run that ended without the server's `message.end` (Stop before it arrived, or a lost
+ * connection): count the SQL that finished and the wall time, so the answer keeps its figures.
+ */
+export function partialUsage(view: AssistantViewV1, startedAt: number): Usage {
+  if (view.usage) return view.usage;
+  const queries = view.steps.filter((s) => s.kind === 'sql' && s.events.some((e) => e.type === 'step.sql_result')).length;
+  return { queries, elapsedMs: Math.max(0, Date.now() - startedAt) };
 }
 
 /** Short client-side title (shell/title.ts) until the server returns a PHI-scrubbed one (spec §6.5). */
@@ -47,7 +70,7 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     const c = await store.getConversation(id);
     setConvId(c ? id : null);
     setBranches({});
-    setMessages(c ? c.messages.map(toView) : []);
+    setMessages(c ? markAnswered(c.messages.map(toView)) : []);
   }, [store]);
 
   const newChat = useCallback(() => {
@@ -61,6 +84,8 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     let view = newAssistantViewV1(uid('a'));
+    const startedAt = Date.now();
+    history = markAnswered(history);
     const set = () => setMessages([...history, view]);
     set();
     setBusy(true);
@@ -72,11 +97,13 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
         if (ev.type === 'message.end') break;
       }
     } catch (e) {
-      if ((e as Error).name !== 'AbortError') {
+      if ((e as Error).name !== 'AbortError' && !ctrl.signal.aborted) {
         view = reduceV1(view, { type: 'part', part: { type: 'error', id: uid('err'), code: 'internal', title: 'Connection lost', message: 'Response interrupted.', retryable: true } });
+        if (view.streaming) view = reduceV1(view, { type: 'message.end', messageId: view.id, finishReason: 'error', usage: partialUsage(view, startedAt) } as never);
       }
     }
-    if (ctrl.signal.aborted && view.streaming) view = reduceV1(view, { type: 'message.end', messageId: view.id, finishReason: 'aborted', usage: view.usage ?? { queries: 0, elapsedMs: 0 } } as never);
+    // Stopped before the server's aborted message.end arrived: keep what ran (queries, time) on the answer.
+    if (ctrl.signal.aborted && view.streaming) view = reduceV1(view, { type: 'message.end', messageId: view.id, finishReason: 'aborted', usage: partialUsage(view, startedAt) } as never);
     view = { ...view, streaming: false, status: null, openText: [] };
     set();
     setBusy(false);
