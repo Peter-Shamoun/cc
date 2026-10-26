@@ -4,7 +4,9 @@ import './index.css';
 import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { installGlobalErrorHandlers } from './lib/errorReporting';
-import { preloadMarkdown } from './components/parts/Markdown';
+import { loadMath, preloadMarkdown } from './components/parts/Markdown';
+import { preloadCharts } from './components/parts/ChartView';
+import { scheduleIdlePrefetch } from './lib/idlePrefetch';
 import { adoptBootDraft, restoreBootFocus } from './lib/bootShell';
 import { installTrustedTypes } from './security/trustedTypes';
 
@@ -23,6 +25,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 );
 requestAnimationFrame(() => requestAnimationFrame(() => restoreBootFocus()));
 
-// The answer renderer is its own chunk; fetch it once the shell has painted so the first answer never waits.
-const idle = (cb: () => void) => ('requestIdleCallback' in window ? window.requestIdleCallback(cb, { timeout: 3000 }) : setTimeout(cb, 1500));
-idle(() => { preloadMarkdown().catch(() => undefined); });
+// The answer renderer, KaTeX and Vega are lazy chunks; warm them at idle once the shell has painted, so the first
+// answer never waits on them or compiles them mid-stream (lib/idlePrefetch.ts).
+scheduleIdlePrefetch([preloadMarkdown, loadMath, preloadCharts], { conn: (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection });
