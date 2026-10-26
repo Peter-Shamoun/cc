@@ -123,6 +123,22 @@ def feedback_example() -> dict:
             "response": response, "clear": {"method": "DELETE", "response": {"cleared": True}}}
 
 
+def share_example() -> dict:
+    """PUT .../share then GET /api/shared/{id} by a colleague in the same org (1.11.0); ids and times normalised."""
+    client = _client()
+    _post(client, {"messages": [{"id": "u_1", "role": "user", "text": "Paid amount by service month"}],
+                   "conversationId": "c_1", "scenario": "chart"})
+    link = client.put("/api/conversations/c_1/share", json={}, headers=_HEADERS).json()
+    colleague = {**_HEADERS, "Authorization": _HEADERS["Authorization"].rsplit(":", 1)[0] + ":colleague"}
+    view = client.get(f"/api/shared/{link['shareId']}", headers=colleague).json()
+    raw = json.dumps({"link": link, "view": view}).replace(link["shareId"], "sh_1")
+    raw = re.sub(r'"\d{4}-\d\d-\d\dT[0-9:.]+Z"', '"2026-10-25T20:00:00Z"', raw)
+    out = json.loads(json.dumps(normalise([json.loads(raw)])[0]))
+    return {"share": {"method": "PUT", "path": "/api/conversations/c_1/share", "request": {}, "response": out["link"]},
+            "view": {"method": "GET", "path": "/api/shared/sh_1", "response": out["view"]},
+            "revoke": {"method": "DELETE", "path": "/api/conversations/c_1/share", "response": {"revoked": True}}}
+
+
 def export_example() -> str:
     """GET /api/conversations/{id}/export?format=markdown for a demo answer (1.8.0); the timestamp is normalised."""
     client = _client()
@@ -161,6 +177,8 @@ def main(argv: list[str]) -> int:
     print("wrote examples/capabilities.json")
     (EXAMPLES / "feedback.json").write_text(json.dumps(feedback_example(), indent=2) + "\n")
     print("wrote examples/feedback.json")
+    (EXAMPLES / "share.json").write_text(json.dumps(share_example(), indent=2, ensure_ascii=False) + "\n")
+    print("wrote examples/share.json")
     (EXAMPLES / "export.md").write_text(export_example())
     print("wrote examples/export.md")
     for k, v in captured.items():
