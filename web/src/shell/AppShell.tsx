@@ -365,6 +365,8 @@ function ShellInner() {
                 </div>
               </div>
               <div className="relative mx-auto w-full max-w-[48rem] px-4 md:px-6" id="composer">
+                {/* Content scrolls under a soft fade instead of a hard edge above the composer. */}
+                <div className="pointer-events-none absolute inset-x-0 -top-6 h-6 bg-linear-to-b from-transparent to-bg" aria-hidden />
                 <button type="button" aria-label="Jump to latest" tabIndex={atBottom ? -1 : 0} aria-hidden={atBottom} onClick={jumpToLatest} data-testid="jump-latest"
                   className={clsx('absolute -top-12 left-1/2 z-10 flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full border border-line bg-bg text-fg shadow-md transition-[opacity,transform] duration-200',
                     atBottom ? 'pointer-events-none translate-y-2 opacity-0' : 'opacity-100')}>
