@@ -145,8 +145,8 @@ def test_stop_kills_the_worker_promptly(driver_factory):
     started = time.monotonic()
     with pytest.raises(Cancelled):
         driver.answer("Claims?", tap, cancelled)
-    assert time.monotonic() - started < 5
-    assert driver_factory.started_processes[-1].poll() is not None
+    assert time.monotonic() - started < 1
+    driver_factory.started_processes[-1].wait(timeout=5)   # SIGTERM was sent; the worker is gone
     assert [event["type"] for event in emitted if event["type"].startswith("step.")] == ["step.explore"]
 
 

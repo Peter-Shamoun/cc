@@ -59,18 +59,26 @@ def start_worker_process(command: list[str], working_directory: Path, environmen
 
 
 def stop_worker_process(process: subprocess.Popen) -> None:
+    """SIGTERM to the worker's group now (Stop must not wait on it), SIGKILL from a thread if it lingers."""
     if process.poll() is not None:
         return
-    for stop_signal in (signal.SIGTERM, signal.SIGKILL):
-        try:
-            os.killpg(process.pid, stop_signal)
-        except ProcessLookupError:
-            return
+    _signal_group(process, signal.SIGTERM)
+
+    def kill_if_still_running():
         try:
             process.wait(timeout=WORKER_STOP_GRACE_SECONDS)
-            return
         except subprocess.TimeoutExpired:
-            continue
+            _signal_group(process, signal.SIGKILL)
+            process.wait()
+
+    threading.Thread(target=kill_if_still_running, name=f"stop-worker-{process.pid}", daemon=True).start()
+
+
+def _signal_group(process: subprocess.Popen, stop_signal: int) -> None:
+    try:
+        os.killpg(process.pid, stop_signal)
+    except ProcessLookupError:
+        pass
 
 
 class CallsFileTail:

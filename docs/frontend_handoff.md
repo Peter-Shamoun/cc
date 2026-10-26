@@ -234,6 +234,27 @@ A non-`auto` model adds `model`. An org-disabled or unknown strategy/model raise
    SQL or row values.
 5. Shadow runs: replay recorded questions and gate on `check() == []` and on the PHI scan before turning it on for users.
 
+**5.9 Dev and mock runs with the shipped analyzer (claude -p, no API key)**
+`CC_API_ANALYZER_INTERACTION` picks how the analyzer reaches its model: `model_api` (default: the in-process loop
+above, client from `CC_API_LLM`) or `claude_code_cli` (`api/claude_code_cli_driver.py`): bundle B1 (Haiku, effort low,
+playbook v1, invariants glossary, dictionary with derivations, enum profile, value lookup, 3 BM25 TRAIN examples, free
+SQL over `sem.*`, one candidate, no repair) run by local headless Claude Code exactly as the benchmark runs it, on the
+signed-in user's subscription. Steps stream from the session's calls.jsonl, Stop kills the worker, the final SQL is
+re-executed in the sandbox. It refuses any auth but `DemoAuth` (its data is the bench snapshot, not the customer's
+lake), any strategy/model option but the defaults, and the `escalate` command. No live clarification: B1 has `ask`
+off, and multi-question clarify still needs the analyzer `ask` spec change (5.7).
+
+```bash
+CC_API_ANALYZER_INTERACTION=claude_code_cli CC_API_ANALYZER_SNAPSHOT=.ccsim/bench/<snapshot id> \
+CC_TRANSCRIPT_MODE=persisted CC_TRANSCRIPT_DIR=/tmp/cc-chat/blobs CC_TRANSCRIPT_KEYS_DIR=/tmp/cc-chat/keys \
+CC_API_DEMO_PACE=0 python -m api --port 8787
+```
+
+Persistence (no DynamoDB): in persisted mode each conversation is one sealed object updated by read, change and
+`If-Match` write (retried when another task wrote first), and each run's events go in numbered write-once chunk
+objects, so `Last-Event-ID` replays a run on any API task or after a restart. `CC_TRANSCRIPT_S3_BUCKET` puts both on
+S3 (`S3Blobs`, tested on ccsim's S3); `CC_TRANSCRIPT_DIR` is the same on disk.
+
 <!-- /SECTION: contract -->
 
 ## 6. Production checklist
