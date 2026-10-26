@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://cc.local/api/contract/v1.schema.json",
   "title": "CC chat stream contract",
-  "version": "1.4.0",
+  "version": "1.8.0",
   "description": "One JSON object per SSE data: line. See api/CONTRACT.md. Validate an event against #/$defs/StreamEvent.",
   "$ref": "#/$defs/StreamEvent",
   "$defs": {
@@ -197,6 +197,9 @@
             "totalMs": {
               "type": "integer",
               "minimum": 0
+            },
+            "stages": {
+              "$ref": "#/$defs/LatencyStages"
             }
           },
           "additionalProperties": true
@@ -1800,6 +1803,13 @@
         "seq": {
           "type": "integer",
           "minimum": 0
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Source"
+          },
+          "description": "1.8.0: citations, answer sources first. Omitted when there are none (aborted runs never have any). An abstain or clarify can list explored sources only."
         }
       },
       "additionalProperties": true
@@ -2001,10 +2011,19 @@
           ],
           "properties": {
             "code": {
-              "type": "string"
+              "type": "string",
+              "description": "Branch on this. Known: auth_expired, access_denied, not_found, stream_gone, validation, clarification_expired, invalid_title, transcripts_unavailable, payload_too_large (1.5), rate_limited. Unknown codes: treat by HTTP status."
             },
             "message": {
               "type": "string"
+            },
+            "legacyCode": {
+              "type": "string",
+              "description": "1.5.0: the code this error had before it got a dedicated one (payload_too_large was 'validation'). Clients that predate the new code may branch on it."
+            },
+            "maxBytes": {
+              "type": "integer",
+              "description": "payload_too_large: the body limit in bytes."
             }
           },
           "additionalProperties": true
@@ -2132,6 +2151,17 @@
         },
         "usage": {
           "$ref": "#/$defs/Usage"
+        },
+        "feedback": {
+          "$ref": "#/$defs/Feedback",
+          "description": "Assistant messages: the user's thumbs up/down (1.7.0)."
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Source"
+          },
+          "description": "Assistant messages: same as message.end.sources (1.8.0)."
         }
       },
       "additionalProperties": true
@@ -2295,7 +2325,11 @@
         },
         "available": {
           "type": "boolean",
-          "description": "False: show it disabled (e.g. not enabled for this organization)."
+          "description": "False: show it disabled (not enabled for this organization; see unavailableReason). Sending it anyway is a 422 validation."
+        },
+        "unavailableReason": {
+          "type": "string",
+          "description": "Why it is unavailable for this organization (show as a tooltip). Present iff available is false."
         }
       },
       "additionalProperties": true
@@ -2306,7 +2340,8 @@
         "id",
         "label",
         "default",
-        "costTier"
+        "costTier",
+        "available"
       ],
       "properties": {
         "id": {
@@ -2334,6 +2369,14 @@
         },
         "costTier": {
           "$ref": "#/$defs/CostTier"
+        },
+        "available": {
+          "type": "boolean",
+          "description": "False: show it disabled for this organization."
+        },
+        "unavailableReason": {
+          "type": "string",
+          "description": "Why it is unavailable for this organization (show as a tooltip). Present iff available is false."
         }
       },
       "additionalProperties": true
@@ -2346,7 +2389,8 @@
         "demo",
         "defaults",
         "strategies",
-        "models"
+        "models",
+        "scope"
       ],
       "properties": {
         "contractVersion": {
@@ -2383,6 +2427,220 @@
           "items": {
             "$ref": "#/$defs/ModelOption"
           }
+        },
+        "scope": {
+          "enum": [
+            "organization",
+            "public"
+          ],
+          "description": "'organization' when the request was signed in, so `available` reflects the caller's organization; 'public' otherwise (everything shows available; the chat request is still checked)."
+        },
+        "feedbackReasons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FeedbackReason"
+          },
+          "description": "1.7.0: reason chips for answer feedback, grouped by rating."
+        }
+      },
+      "additionalProperties": true
+    },
+    "LatencyStages": {
+      "type": "object",
+      "description": "Wall-clock milliseconds per pipeline stage (1.6.0). Every instant of the run is attributed to exactly one stage, so the stages sum to about latency.totalMs (minus queueMs and time before the analyzer starts). plan: model turns and schema exploration; sql: running queries; repair: from a failed query or failed verification until the repaired query returns (model + SQL); checks: result checks after the final query; render: writing the answer parts. With parallel candidates the attribution follows the latest stage change, so treat it as approximate.",
+      "required": [
+        "plan",
+        "sql",
+        "repair",
+        "checks",
+        "render"
+      ],
+      "properties": {
+        "plan": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sql": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "repair": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "checks": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "render": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "FeedbackRating": {
+      "enum": [
+        "up",
+        "down"
+      ]
+    },
+    "FeedbackReason": {
+      "type": "object",
+      "description": "A reason chip for one rating (1.7.0). Listed in Capabilities.feedbackReasons; ids are stable.",
+      "required": [
+        "id",
+        "label",
+        "rating"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "rating": {
+          "$ref": "#/$defs/FeedbackRating"
+        }
+      },
+      "additionalProperties": true
+    },
+    "FeedbackRequest": {
+      "type": "object",
+      "description": "PUT /api/conversations/{conversationId}/messages/{messageId}/feedback (1.7.0). Assistant messages only. Replaces earlier feedback; DELETE on the same path clears it ({cleared: true}). 422 validation for an unknown reason, a reason of the other rating, or a user message; 404 for an unknown or someone else's message.",
+      "required": [
+        "rating"
+      ],
+      "properties": {
+        "rating": {
+          "$ref": "#/$defs/FeedbackRating"
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 9,
+          "description": "FeedbackReason ids matching the rating."
+        },
+        "comment": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Optional free text. Treated like message text: stored with the transcript, never logged."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Feedback": {
+      "type": "object",
+      "description": "Stored feedback on an answer: the PUT response (with messageId) and StoredMessage.feedback.",
+      "required": [
+        "rating",
+        "reasons",
+        "updatedAt"
+      ],
+      "properties": {
+        "messageId": {
+          "$ref": "#/$defs/ID"
+        },
+        "rating": {
+          "$ref": "#/$defs/FeedbackRating"
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "comment": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO-8601 UTC"
+        }
+      },
+      "additionalProperties": true
+    },
+    "Source": {
+      "type": "object",
+      "description": "A data source the answer used or explored (1.8.0, CONTRACT.md §14). Schema identifiers only, never row values.",
+      "required": [
+        "id",
+        "kind",
+        "name",
+        "label",
+        "role"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable within the message: src_1, src_2, …"
+        },
+        "kind": {
+          "type": "string",
+          "description": "Open enum: 'view' today; 'definition' (metric definition) and 'document' are reserved. Unknown kinds render as a plain chip."
+        },
+        "name": {
+          "type": "string",
+          "description": "Fully qualified, e.g. sem.claims."
+        },
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "answer",
+            "explored"
+          ],
+          "description": "'answer': the final SQL/table read it; 'explored': looked at while planning only."
+        },
+        "stepIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ID"
+          },
+          "description": "step.* events that touched it (sql_running, explore)."
+        },
+        "partIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ID"
+          },
+          "description": "Parts built from it (code, table, chart)."
+        }
+      },
+      "additionalProperties": true
+    },
+    "ConversationExport": {
+      "type": "object",
+      "description": "GET /api/conversations/{id}/export?format=json (1.8.0, §15). format=markdown returns text/markdown instead. Both are attachments (Content-Disposition), Cache-Control: no-store.",
+      "required": [
+        "format",
+        "contractVersion",
+        "exportedAt",
+        "conversation"
+      ],
+      "properties": {
+        "format": {
+          "const": "cc.conversation"
+        },
+        "contractVersion": {
+          "type": "string"
+        },
+        "exportedAt": {
+          "type": "string",
+          "description": "ISO-8601 UTC"
+        },
+        "conversation": {
+          "$ref": "#/$defs/Conversation"
         }
       },
       "additionalProperties": true

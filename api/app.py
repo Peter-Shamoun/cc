@@ -6,6 +6,7 @@ passed to ``create_app(auth=SimAuth(world.aws, world.dep))``.
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 import json
 import logging
 import os
@@ -13,9 +14,11 @@ import re
 import threading
 import time
 from dataclasses import dataclass, field
+from typing import Literal
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field
 
 from analyzer.config import AnalyzerConfig
@@ -27,13 +30,18 @@ from api.contract import CONTRACT_VERSION, schema as contract_schema
 from api.ids import new_id
 from api.live import Cancelled, LiveTap
 from api.mapping import outcome_parts
-from api.security import MAX_BODY_BYTES, BodyLimitMiddleware, SecurityHeadersMiddleware
+from api.redact import install_log_redaction
+from api.security import MAX_BODY_BYTES, BodyLimitMiddleware, ErrorShieldMiddleware, SecurityHeadersMiddleware
 from api.store import DownloadRegistry, Principal
+from api.feedback import MAX_COMMENT, check as check_feedback, record as feedback_record
 from api.capabilities import DEFAULT_STRATEGY, capabilities as capabilities_body, check_options
+from api.export import FORMATS as EXPORT_FORMATS, as_json as export_json, as_markdown as export_markdown, filename as export_filename
+from api.sources import sources_for
 from api.titles import title_from_parts
 from api.transcripts import CustomerKeyDisabled, make_store
 
 log = logging.getLogger("cc.api")
+_SAFE_KEY = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,40}")
 NO_STORE = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
 
 
@@ -43,6 +51,12 @@ _SAFE_ID = re.compile(_ID)
 
 class RenameIn(BaseModel):
     title: str = Field(max_length=500)
+
+
+class FeedbackIn(BaseModel):
+    rating: Literal["up", "down"]
+    reasons: list[str] = Field(default_factory=list, max_length=9)
+    comment: str | None = Field(default=None, max_length=MAX_COMMENT)
 
 
 class SearchIn(BaseModel):
@@ -124,6 +138,9 @@ class Settings:
     #: unfinished /api/chat runs allowed per user at once (429 rate_limited beyond it)
     max_concurrent_runs: int = int(os.environ.get("CC_API_MAX_CONCURRENT_RUNS", "3"))
     clarification_ttl_seconds: float = 1800.0
+    #: background retention sweep (store.purge_expired) interval while the app is running; 0 = off
+    transcript_sweep_seconds: float = field(default_factory=lambda: float(os.environ.get("CC_TRANSCRIPT_SWEEP_SECONDS",
+                                                                                         "3600")))
     analyzer_overrides: dict = field(default_factory=lambda: {
         "glossary": "basic", "data_dictionary": False, "data_profile": False, "row_limit": 5000,
         "candidates": 1, "cascade": "off"})
@@ -157,6 +174,9 @@ class _Run:
     subscribers: set = field(default_factory=set)  # (event loop, asyncio.Event) per attached client
     attached: int = 0
     grace: threading.Timer | None = None
+    conversation_id: str | None = None
+    #: set when the conversation is deleted mid-run: the worker must not write it back (no resurrection)
+    discarded: threading.Event = field(default_factory=threading.Event)
 
     def notify(self):
         """Wake every attached client, each on its own event loop. Thread-safe; never raises."""
@@ -182,8 +202,35 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
     store = store or make_store(audit=audit)
     downloads = DownloadRegistry()
     runs: dict[str, _Run] = {}
-    app = FastAPI(title="CC chat API", version="0.1.0", docs_url=None, redoc_url=None, openapi_url=None)
+    purge_lock = threading.Lock()  # a delete and a run's final transcript write never interleave
+
+    @asynccontextmanager
+    async def lifespan(_app):
+        async def sweep():
+            while True:
+                await asyncio.sleep(settings.transcript_sweep_seconds)
+                try:
+                    removed = await asyncio.to_thread(store.purge_expired)
+                    if removed:
+                        log.info("retention sweep removed %d conversations", removed)
+                except Exception as exc:  # noqa: BLE001 - keep sweeping
+                    log.warning("retention sweep failed: %s", type(exc).__name__)
+
+        task = None
+        if settings.transcript_sweep_seconds > 0 and hasattr(store, "purge_expired"):
+            await asyncio.to_thread(store.purge_expired)  # once at startup: catch up on what expired while down
+            task = asyncio.create_task(sweep())
+        try:
+            yield
+        finally:
+            if task:
+                task.cancel()
+
+    app = FastAPI(title="CC chat API", version="0.1.0", docs_url=None, redoc_url=None, openapi_url=None,
+                  lifespan=lifespan)
+    install_log_redaction()
     app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_body_bytes)
+    app.add_middleware(ErrorShieldMiddleware)  # inside SecurityHeaders: 500s get the headers too
     app.add_middleware(SecurityHeadersMiddleware)  # outermost, so the 413 carries the security headers too
     app.state.audit, app.state.store, app.state.downloads, app.state.runs = audit, store, downloads, runs
     app.state.settings, app.state.auth = settings, auth
@@ -191,12 +238,36 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
     def authed(request: Request, request_id: str):
         return auth.authenticate(_token(request), request_id)
 
+    @app.exception_handler(RequestValidationError)
+    async def validation_error(_request: Request, exc: RequestValidationError):
+        # FastAPI's default 422 echoes the offending ``input`` (it can be PHI) and isn't the contract envelope.
+        # Report field paths only, with user-controlled dict keys masked.
+        fields = sorted({".".join(str(p) if isinstance(p, int) or _SAFE_KEY.fullmatch(str(p)) else "*"
+                                  for p in e.get("loc", ())[1:]) for e in exc.errors()})[:10]
+        msg = "Invalid request" + (f": {', '.join(f for f in fields if f)}." if any(fields) else ".")
+        return error_json("validation", msg, 422)
+
+    def forget(principal, conversation_id: str | None) -> None:
+        """Everything outside the store that still holds this conversation (None = all of the principal's): stop
+        and discard in-flight runs, so their final write can't resurrect it, and their resume buffers are dropped at
+        the next gc. Also drops pending clarifications (they hold the question text) and revokes CSV downloads."""
+        for run in list(runs.values()):
+            if run.principal == principal and (conversation_id is None or run.conversation_id == conversation_id):
+                run.discarded.set()
+                run.cancelled.set()
+        for key, pending in list(clarifications.items()):
+            if pending["principal"] == principal and (conversation_id is None
+                                                      or pending["conversation_id"] == conversation_id):
+                clarifications.pop(key, None)
+        downloads.revoke(principal, conversation_id)
+
     def unauthorized():
         return JSONResponse({"error": {"code": "auth_expired", "message": "Sign in again."}}, 401, headers=NO_STORE)
 
     def gc_runs():
         now = time.time()
-        for key in [k for k, r in runs.items() if r.finished_at and now - r.finished_at > settings.resume_seconds]:
+        for key in [k for k, r in runs.items() if r.finished_at and (
+                r.discarded.is_set() or now - r.finished_at > settings.resume_seconds)]:
             del runs[key]
 
     @app.get("/api/health")
@@ -205,9 +276,15 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                              "paidApis": False}, headers=NO_STORE)
 
     @app.get("/api/capabilities")
-    def capabilities():
-        """Strategies and models for a picker (contract 1.4.0). Public like /api/contract: no user data."""
-        return JSONResponse(capabilities_body(CONTRACT_VERSION, demo=settings.llm == "scripted"), headers=NO_STORE)
+    def capabilities(request: Request):
+        """Strategies and models for a picker (contract 1.4.0). Signed in (1.5.0): per-organization ``available``.
+        Signed out it still answers (no user data), without org-specific flags."""
+        try:
+            customer = authed(request, new_id("r")).principal.customer if _token(request) else None
+        except AuthError:
+            customer = None
+        return JSONResponse(capabilities_body(CONTRACT_VERSION, demo=settings.llm == "scripted", customer=customer),
+                            headers=NO_STORE)
 
     @app.get("/api/contract")
     def contract():
@@ -241,7 +318,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             ctx = authed(request, message_id[-8:])
         except AuthError:
             return unauthorized()
-        bad_option = check_options(body.options)
+        bad_option = check_options(body.options, ctx.principal.customer)
         if bad_option:
             return error_json("validation", bad_option, 422)
         conversation_id = body.conversationId or new_id("c_")
@@ -326,7 +403,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         if scenario and "scenario" not in user_msg and isinstance(user_msg, dict):
             user_msg["scenario"] = scenario
         legacy_tools = bool(body.options.get("legacyToolParts"))
-        run = _Run(message_id, ctx.principal)
+        run = _Run(message_id, ctx.principal, conversation_id=conversation_id)
         runs[message_id] = run
         started = time.perf_counter()
         marks: dict = {}
@@ -373,7 +450,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 answer = analyzer.answer(question)
                 tap.finish(answer)
                 elapsed = int((time.perf_counter() - started) * 1000)
-                parts, finish = outcome_parts(answer, ctx.principal, downloads, elapsed_ms=elapsed, question=question,
+                parts, finish = outcome_parts(answer, ctx.principal, downloads.scoped(conversation_id), elapsed_ms=elapsed, question=question,
                                               ask_args=tap.ask_args, refuse_args=tap.refuse_args,
                                               legacy_tools=legacy_tools)
             except Cancelled:
@@ -391,6 +468,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 finish = "error"
             if run.cancelled.is_set():
                 finish = "aborted"
+            if tap is not None:
+                tap.enter("render")
             emit({"type": "status", "label": "Writing answer" if finish == "stop" else None})
             for part in parts:
                 if run.cancelled.is_set():
@@ -407,7 +486,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                     emit({"type": "text.end", "partId": part["id"]})
                 else:
                     emit({"type": "part", "part": part})
-                    if part["type"] == "clarification":
+                    if part["type"] == "clarification" and not run.discarded.is_set():
                         clarifications[part["clarificationId"]] = {
                             "principal": ctx.principal, "conversation_id": conversation_id, "question": question,
                             "message_id": message_id, "choices": part.get("choices", []), "scenario": scenario,
@@ -417,6 +496,9 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             usage = (tap.usage(elapsed, marks.get("first_event"), marks.get("first_token")) if tap is not None
                      else {"queries": 0, "elapsedMs": elapsed})
             end = {"type": "message.end", "messageId": message_id, "finishReason": finish, "usage": usage}
+            sources = sources_for(parts, persisted_steps) if finish != "aborted" else []
+            if sources:
+                end["sources"] = sources
             title = title_from_parts(parts) if finish == "stop" else None
             if title and conversation_id:
                 try:
@@ -429,10 +511,14 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             record = {"id": message_id, "role": "assistant", "parts": kept, "createdAt": _iso(time.time()),
                       "parentId": user_msg["id"], "finishReason": finish, "usage": usage,
                       "steps": persisted_steps if finish != "aborted" else []}
+            if sources:
+                record["sources"] = sources
             if start_extra.get("regenerateOf"):
                 record["regenerateOf"] = start_extra["regenerateOf"]
             try:
-                store.append_message(ctx.principal, conversation_id, record)
+                with purge_lock:
+                    if not run.discarded.is_set():
+                        store.append_message(ctx.principal, conversation_id, record)
             except Exception as exc:  # noqa: BLE001 - a history write must not hang the stream
                 log.warning("transcript append failed: %s", type(exc).__name__)
             audit("chat_message", customer=ctx.principal.customer, user=ctx.principal.user,
@@ -603,7 +689,10 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             ctx = authed(request, new_id("r"))
         except AuthError:
             return unauthorized()
-        return JSONResponse({"deleted": store.delete_all(ctx.principal)}, headers=NO_STORE)
+        with purge_lock:
+            count = store.delete_all(ctx.principal)
+            forget(ctx.principal, None)
+        return JSONResponse({"deleted": count}, headers=NO_STORE)
 
     @app.get("/api/conversations/{conversation_id}")
     def conversation(conversation_id: str, request: Request):
@@ -638,13 +727,80 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
               conversation_id=conversation_id)
         return JSONResponse(out, headers=NO_STORE)
 
+    @app.get("/api/conversations/{conversation_id}/export")
+    def export_conversation(conversation_id: str, request: Request, format: str = "markdown"):
+        """Download the conversation as Markdown or JSON (contract 1.8.0, §15). Your own transcript only."""
+        try:
+            ctx = authed(request, new_id("r"))
+        except AuthError:
+            return unauthorized()
+        if format not in EXPORT_FORMATS:
+            return error_json("validation", "Use format=markdown or format=json.", 422)
+        try:
+            conv = store.get_conversation(ctx.principal, conversation_id) if _SAFE_ID.match(conversation_id) else None
+        except CustomerKeyDisabled:
+            return shredded()
+        if conv is None:
+            return not_found()
+        now = _iso(time.time())
+        if format == "json":
+            body = json.dumps(export_json(conv, CONTRACT_VERSION, now), ensure_ascii=False, default=str)
+        else:
+            body = export_markdown(conv, now)
+        audit("conversation_exported", customer=ctx.principal.customer, user=ctx.principal.user,
+              conversation_id=conversation_id, kind=format)
+        mime = EXPORT_FORMATS[format][0]
+        return Response(body.encode(), media_type=mime, headers={
+            **NO_STORE, "Content-Disposition": f'attachment; filename="{export_filename(format)}"'})
+
+    @app.put("/api/conversations/{conversation_id}/messages/{message_id}/feedback")
+    def put_feedback(conversation_id: str, message_id: str, body: FeedbackIn, request: Request):
+        """Thumbs up/down on an assistant answer (contract 1.7.0, §13). Replaces any earlier feedback."""
+        return _feedback(conversation_id, message_id, body, request)
+
+    @app.delete("/api/conversations/{conversation_id}/messages/{message_id}/feedback")
+    def delete_feedback(conversation_id: str, message_id: str, request: Request):
+        return _feedback(conversation_id, message_id, None, request)
+
+    def _feedback(conversation_id: str, message_id: str, body: FeedbackIn | None, request: Request):
+        try:
+            ctx = authed(request, new_id("r"))
+        except AuthError:
+            return unauthorized()
+        if not (_SAFE_ID.match(conversation_id) and _SAFE_ID.match(message_id)):
+            return not_found()
+        record = None
+        if body is not None:
+            problem = check_feedback(body.rating, body.reasons)
+            if problem:
+                return error_json("validation", problem, 422)
+            record = feedback_record(body.rating, body.reasons, body.comment)
+        try:
+            result = store.set_feedback(ctx.principal, conversation_id, message_id, record)
+        except CustomerKeyDisabled:
+            return shredded()
+        if result == "missing":
+            return not_found()
+        if result == "not_assistant":
+            return error_json("validation", "Feedback is for answers, not questions.", 422)
+        # rating + reason ids only: the comment is user text, like a message, and never leaves the transcript
+        audit("answer_feedback", customer=ctx.principal.customer, user=ctx.principal.user,
+              conversation_id=conversation_id, message_id=message_id,
+              kind=record["rating"] if record else "cleared", reason=",".join(record["reasons"]) if record else "")
+        if record is None:
+            return JSONResponse({"cleared": True}, headers=NO_STORE)
+        return JSONResponse({"messageId": message_id, **record}, headers=NO_STORE)
+
     @app.delete("/api/conversations/{conversation_id}")
     def delete_conversation(conversation_id: str, request: Request):
         try:
             ctx = authed(request, new_id("r"))
         except AuthError:
             return unauthorized()
-        ok = store.delete_conversation(ctx.principal, conversation_id)
+        with purge_lock:
+            ok = store.delete_conversation(ctx.principal, conversation_id)
+            if ok:
+                forget(ctx.principal, conversation_id)
         return JSONResponse({"deleted": ok}, 200 if ok else 404, headers=NO_STORE)
 
     return app

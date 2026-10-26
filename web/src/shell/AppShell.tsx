@@ -13,8 +13,9 @@ import { Composer } from '../components/Composer';
 import { messageMarkdown, type Artifact } from '../components/Message';
 import { ThreadView, type ThreadActions } from './ThreadView';
 import { ArtifactPanel } from '../components/ArtifactPanel';
-import { SUGGESTIONS } from '../fixtures';
+import { StarterCards } from './StarterCards';
 import { Header } from './Header';
+import { useStrategy } from './useStrategy';
 import { OfflineBanner } from './OfflineBanner';
 import { useOnline } from '../lib/useOnline';
 import { SearchDialog } from './SearchDialog';
@@ -76,7 +77,9 @@ function ShellInner() {
   if (auditOn) renderStart.current = performance.now();
   const adapter = useMemo(makeAdapter, []);
   const store = useMemo(() => makeStore(adapter), [adapter]);
-  const chat = useChat(adapter, store);
+  const loadCaps = useMemo(() => (adapter instanceof HttpAnalystAdapter ? () => adapter.capabilities() : undefined), [adapter]);
+  const strategy = useStrategy(loadCaps);
+  const chat = useChat(adapter, store, strategy.options);
   // Opening a stored chat can take a round trip (server history): after a short grace period show a
   // thread skeleton instead of the empty state or the previous chat (ChatGPT/Claude behaviour).
   const [opening, setOpening] = useState<string | null>(() => (store instanceof HttpTranscriptStore ? routeId() : null));
@@ -301,10 +304,18 @@ function ShellInner() {
   // Only a scroll the reader made can release the pin (QA-S12). While pinned, the reserved space under the
   // question leaves the view "at the bottom", so a programmatic scroll or a layout clamp must not count.
   const userScrollAt = useRef(0);
-  const markUserScroll = () => { userScrollAt.current = Date.now(); };
+  // Direction of the reader's last wheel: an upward wheel always means "stop following", even when it lands
+  // during the pin's smooth scroll and moves nothing (which used to read as "at bottom" and release the pin
+  // into follow mode, yanking the view down once the answer outgrew the reserve).
+  const wheelDir = useRef(0);
+  const jumping = useRef(false);
+  const markUserScroll = (e?: { deltaY?: number }) => { userScrollAt.current = Date.now(); wheelDir.current = Math.sign(e?.deltaY ?? 0); };
   const onScroll = (el: HTMLDivElement) => {
     const b = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     const byUser = Date.now() - userScrollAt.current < 800;
+    if (byUser && wheelDir.current < 0) { jumping.current = false; atBottomRef.current = false; setAtBottom(b); return; }
+    // "Jump to latest" smooth-scrolls; its intermediate positions must not read as the reader leaving the bottom.
+    if (jumping.current) { if (b) jumping.current = false; else { atBottomRef.current = true; return; } }
     if (pinned.current && !byUser) { setAtBottom(b); return; }
     atBottomRef.current = b;
     if (b) pinned.current = false;
@@ -313,6 +324,8 @@ function ShellInner() {
   const jumpToLatest = () => {
     pinned.current = false;
     atBottomRef.current = true;
+    jumping.current = true;
+    setTimeout(() => { jumping.current = false; }, 1000);
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: scrollBehavior() });
   };
 
@@ -424,7 +437,7 @@ function ShellInner() {
         {sidebarVisible && (mobile ? <div ref={drawerRef}><Sidebar {...sidebarProps} drawer /></div> : <Sidebar {...sidebarProps} />)}
         {!sidebarVisible && !mobile && <SidebarRail onExpand={() => setSidebar(true)} onNew={sidebarProps.onNew} onSearch={() => setDialog('search')} onSettings={() => setDialog('settings')} />}
         <main className="relative flex min-w-0 flex-1 flex-col font-sans md:min-w-[400px]" aria-label="Chat">
-          <Header showNav={mobile} onOpenSidebar={() => setSidebar(true)} onNewChat={sidebarProps.onNew} adapterName={adapter.name}
+          <Header strategy={strategy} showNav={mobile} onOpenSidebar={() => setSidebar(true)} onNewChat={sidebarProps.onNew} adapterName={adapter.name}
             hasChat={!empty} onCopyMarkdown={copyCurrent} onDownloadMarkdown={exportCurrent} onSettings={() => setDialog('settings')} onShortcuts={() => setDialog('shortcuts')}
             title={chat.convId ? threads.find((t) => t.id === chat.convId)?.title : undefined}
             onRename={(t) => { if (chat.convId) chat.rename(chat.convId, t); }} onDelete={() => { if (chat.convId) requestDelete(chat.convId); }} />
@@ -434,19 +447,13 @@ function ShellInner() {
               <h1 className="mb-7 text-center tracking-tight max-sm:mb-auto max-sm:mt-auto" style={{ fontFamily: 'var(--heading-font)', fontSize: 'var(--empty-size)', fontWeight: 'var(--empty-weight)' as never }}>What should we look into?</h1>
               <div className="flex w-full max-w-[48rem] flex-col" id="composer">
                 {composer(true)}
-                {/* Phones: one swipeable row above the composer with an edge fade (ChatGPT/Claude mobile), not a cut-off row at the screen edge. */}
-                <div className="mt-4 flex flex-wrap justify-center gap-2 max-sm:order-first max-sm:-mx-4 max-sm:mb-3 max-sm:mt-0 max-sm:flex-nowrap max-sm:justify-start max-sm:overflow-x-auto max-sm:px-4 max-sm:pb-1 max-sm:scrollbar-none max-sm:[mask-image:linear-gradient(to_right,transparent,#000_1rem,#000_calc(100%-2rem),transparent)]" role="group" aria-label="Suggestions">
-                  {SUGGESTIONS.map((s, i) => (
-                    <button key={s.prompt} type="button" onClick={() => send(s.prompt)} style={{ animationDelay: `${i * 40}ms` }}
-                      className="shrink-0 rounded-full border border-line bg-bg px-3.5 py-2 text-sm font-medium text-fg-muted transition-colors hover:bg-hover hover:text-fg motion-safe:animate-[cc-rise_240ms_ease-out_both]">{s.title}</button>
-                  ))}
-                </div>
+                <StarterCards onPick={(p) => send(p)} />
               </div>
             </div>
           ) : (
             <>
               {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- scroll-intent tracking on a focusable scroll region */}
-              <div ref={scroller} tabIndex={0} role="region" aria-label="Conversation" onScroll={(e) => onScroll(e.currentTarget)} onWheel={markUserScroll} onTouchMove={markUserScroll} onPointerDown={markUserScroll} onKeyDown={markUserScroll} className="flex-1 overflow-y-auto [overflow-anchor:none] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--focus)]" data-testid="thread-scroller">
+              <div ref={scroller} tabIndex={0} role="region" aria-label="Conversation" onScroll={(e) => onScroll(e.currentTarget)} onWheel={(e) => markUserScroll(e)} onTouchMove={() => markUserScroll()} onPointerDown={() => markUserScroll()} onKeyDown={() => markUserScroll()} className="flex-1 overflow-y-auto [overflow-anchor:none] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--focus)]" data-testid="thread-scroller">
                 <div ref={content} className="mx-auto flex max-w-[48rem] flex-col gap-6 px-4 pb-10 pt-4 md:px-6" role={virtualList ? undefined : 'log'} aria-live={virtualList ? undefined : 'polite'} aria-relevant={virtualList ? undefined : 'additions'} aria-busy={virtualList ? undefined : chat.busy} aria-label={virtualList ? undefined : 'Messages'}>
                   <h1 className="sr-only" data-testid="thread-title">{currentTitle}</h1>
                   {opening ? <ThreadSkeleton /> : <ThreadView messages={messages} busy={chat.busy} actions={threadActions} scrollRef={scroller} scrollToIndexRef={scrollToIndexRef} />}

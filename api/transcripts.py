@@ -16,7 +16,8 @@ simulator agree):
   to open. Deleting all of a user's chats destroys their wrapped data key; ``crypto_shred_customer``
   destroys the customer key, after which every copy of that customer's content is unreadable.
 
-  Retention: ``TRANSCRIPT_RETENTION_DAYS`` (90) unless the user sets a shorter one; enforced on access.
+  Retention: ``TRANSCRIPT_RETENTION_DAYS`` (90) unless the user sets a shorter one (persisted as
+  ``retention.json``); enforced on access and by ``purge_expired`` (the app's background sweep).
   ``CC_TRANSCRIPT_DIR`` keeps blobs on disk (files 0600); unset keeps them in memory (tests, demo).
 
 Nothing here logs text. Audit events carry ids and counts only (``AuditLog`` allowlist).
@@ -33,10 +34,12 @@ from pathlib import Path
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from api.feedback import apply as apply_feedback
 from api.store import DEFAULT_TITLE, InMemoryTranscriptStore, Principal, _iso, clean_title, page
 
 TRANSCRIPT_RETENTION_DAYS = 90
 _SAFE = re.compile(r"^[A-Za-z0-9_:.-]{1,128}$")
+_USER_PREFIX = re.compile(r"^[A-Za-z0-9_:.-]{1,128}/transcripts/users/[0-9a-f]{32}/")
 
 
 def resolve_mode(mode: str | None = None) -> str:
@@ -237,6 +240,17 @@ class SealedTranscriptStore:
             self._save(principal, conv)
             return True
 
+    def set_feedback(self, principal, conversation_id, message_id, feedback):
+        """Same as the in-memory store; the feedback (and its comment) is sealed with the transcript."""
+        with self._lock:
+            conv = self._load(principal, conversation_id)
+            if conv is None:
+                return "missing"
+            result = apply_feedback(conv, message_id, feedback)
+            if result == "ok":
+                self._save(principal, conv)
+            return result
+
     def delete_conversation(self, principal, conversation_id):
         if not _SAFE.match(conversation_id or ""):
             return False
@@ -253,22 +267,43 @@ class SealedTranscriptStore:
     def delete_all(self, principal):
         """``delete_my_chats``: every object under the user's prefix, including the wrapped data key."""
         with self._lock:
-            keys = self.blobs.list(self._prefix(principal))
+            prefix = self._prefix(principal)
+            keys = self.blobs.list(prefix)
             count = sum(1 for k in keys if "/meta/" in k)
             for key in keys:
-                self.blobs.delete(key)
+                if key != f"{prefix}retention.json":  # the user's setting, not chat data: keep it
+                    self.blobs.delete(key)
         self._audit("conversations_deleted", customer=principal.customer, user=principal.user, row_count=count)
         return count
 
     def set_retention(self, principal, days):
         if days < 0:
             raise ValueError("days must be >= 0")
+        days = min(days, self.default_retention_days)
         with self._lock:
-            self._retention[principal] = min(days, self.default_retention_days)
+            self._retention[principal] = days
+            # Persisted beside the user's objects so it survives restarts and the sweep can read it. Days only.
+            self.blobs.put(f"{self._prefix(principal)}retention.json", json.dumps({"days": days}).encode())
         self._expire(principal)
 
     def retention_days(self, principal):
-        return self._retention.get(principal, self.default_retention_days)
+        if principal not in self._retention:
+            self._retention[principal] = self._stored_days(self._prefix(principal))
+        return self._retention[principal]
+
+    def purge_expired(self, now: float | None = None) -> int:
+        """Sweep every user under every customer, not just the ones who come back. Deletes expired meta and
+        content. When a user has nothing left it also deletes the wrapped data key (a per-user crypto-shred; the
+        next save makes a new one). Returns the number of conversations removed. The app runs this from its
+        lifespan loop (CC_TRANSCRIPT_SWEEP_SECONDS)."""
+        now = time.time() if now is None else now
+        prefixes = sorted({m.group(0) for k in self.blobs.list("") if (m := _USER_PREFIX.match(k))})
+        removed = 0
+        for prefix in prefixes:
+            removed += self._sweep(prefix, now - self._stored_days(prefix) * 86400, now)
+        if removed:
+            self._audit("transcripts_expired", row_count=removed)
+        return removed
 
     def owner_of(self, conversation_id):  # kept for callers of the older interface
         return None
@@ -340,13 +375,33 @@ class SealedTranscriptStore:
                 "createdAt": meta.get("createdAt"), "updatedAt": meta["updatedAt"]}
 
     def _expire(self, principal) -> None:
-        cutoff = time.time() - self.retention_days(principal) * 86400
-        prefix = self._prefix(principal)
-        for cid in self._ids(principal):
-            raw = self.blobs.get(f"{prefix}meta/{cid}.json")
-            if raw and json.loads(raw)["updatedAt"] < cutoff:
-                self.blobs.delete(f"{prefix}content/{cid}.bin")
-                self.blobs.delete(f"{prefix}meta/{cid}.json")
+        now = time.time()
+        self._sweep(self._prefix(principal), now - self.retention_days(principal) * 86400, now, shred_empty=False)
+
+    def _stored_days(self, prefix: str) -> int:
+        raw = self.blobs.get(f"{prefix}retention.json")
+        try:
+            return min(int(json.loads(raw)["days"]), self.default_retention_days) if raw else self.default_retention_days
+        except (ValueError, KeyError, TypeError):
+            return self.default_retention_days
+
+    def _sweep(self, prefix: str, cutoff: float, now: float, shred_empty: bool = True) -> int:
+        removed = 0
+        with self._lock:
+            metas = [k for k in self.blobs.list(f"{prefix}meta/") if k.endswith(".json")]
+            for key in metas:
+                raw = self.blobs.get(key)
+                if raw and json.loads(raw)["updatedAt"] < cutoff:
+                    cid = key[len(f"{prefix}meta/"):-5]
+                    self.blobs.delete(f"{prefix}content/{cid}.bin")
+                    self.blobs.delete(key)
+                    removed += 1
+            if shred_empty and removed == len(metas) and self.blobs.get(f"{prefix}dek.bin") is not None:
+                # Stray content without meta can't be listed or read anyway; drop it with the key.
+                for key in self.blobs.list(f"{prefix}content/"):
+                    self.blobs.delete(key)
+                self.blobs.delete(f"{prefix}dek.bin")
+        return removed
 
 
 def _check_id(value: str) -> None:

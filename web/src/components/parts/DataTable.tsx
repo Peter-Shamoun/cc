@@ -12,6 +12,12 @@ const ROW_H = 37;
 
 type Sort = { index: number; dir: 'asc' | 'desc' } | null;
 
+/** Column resize bounds (px). Keyboard steps 16 px, 48 px with Shift. */
+export const MIN_COL = 56;
+export const MAX_COL = 640;
+export const clampCol = (w: number) => Math.round(Math.min(MAX_COL, Math.max(MIN_COL, w)));
+const fixed = (w: number | undefined) => (w === undefined ? undefined : { width: w, minWidth: w, maxWidth: w });
+
 /** Null, blank, and non-finite values sort after every real number (Excel-style blanks). */
 function compareNumeric(a: unknown, b: unknown): number {
   const to = (v: unknown) => {
@@ -40,6 +46,27 @@ export const DataTable = memo(function DataTable({ part, onOpen, full }: { part:
   const adapter = useAdapter();
   const [sort, setSort] = useState<Sort>(null);
   const [filter, setFilter] = useState('');
+  // Column widths the reader dragged (index → px); unset columns size to content.
+  const [widths, setWidths] = useState<Record<number, number>>({});
+  const setWidth = (i: number, w: number | null) => setWidths((cur) => { const next = { ...cur }; if (w === null) delete next[i]; else next[i] = clampCol(w); return next; });
+  const startResize = (i: number) => (e: React.PointerEvent<HTMLElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const th = e.currentTarget.parentElement as HTMLElement;
+    const x0 = e.clientX, w0 = th.getBoundingClientRect().width;
+    const move = (ev: PointerEvent) => setWidth(i, w0 + ev.clientX - x0);
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); document.body.classList.remove('cursor-col-resize', 'select-none'); };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    document.body.classList.add('cursor-col-resize', 'select-none');
+  };
+  const keyResize = (i: number) => (e: React.KeyboardEvent<HTMLElement>) => {
+    const step = e.shiftKey ? 48 : 16;
+    const cur = widths[i] ?? (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect().width;
+    if (e.key === 'ArrowRight') { e.preventDefault(); setWidth(i, cur + step); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); setWidth(i, cur - step); }
+    else if (e.key === 'Home' || e.key === 'Escape') { e.preventDefault(); setWidth(i, null); }
+  };
   const rows = useMemo(() => {
     const q = filter.trim().toLowerCase();
     let next = part.rows;
@@ -142,13 +169,19 @@ export const DataTable = memo(function DataTable({ part, onOpen, full }: { part:
                 const numeric = isNumeric(col);
                 const dir = sort?.index === i ? sort.dir : null;
                 return (
-                  <th key={`${i}:${col.key}`} scope="col" aria-sort={dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : 'none'} title={col.description}
-                    className={clsx('border-b border-line px-3 py-2 font-semibold whitespace-nowrap', numeric ? 'text-right' : 'text-left')}>
+                  <th key={`${i}:${col.key}`} scope="col" aria-sort={dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : 'none'} title={col.description} style={fixed(widths[i])}
+                    className={clsx('group/th relative border-b border-line px-3 py-2 font-semibold whitespace-nowrap', numeric ? 'text-right' : 'text-left', widths[i] !== undefined && 'overflow-hidden text-ellipsis')}>
                     <button type="button" disabled={!!col.phi} onClick={() => cycle(i)} className={clsx('inline-flex items-center gap-1', numeric && 'flex-row-reverse')}>
                       {col.label}
                       {col.phi && <ShieldAlert size={12} className="text-fg-subtle" aria-label="PHI, masked" />}
                       {dir === 'asc' ? <ArrowUp size={13} /> : dir === 'desc' ? <ArrowDown size={13} /> : null}
                     </button>
+                    {/* Drag (or ←/→, Shift for bigger steps; Home/double-click resets) to resize, like Sheets/ChatGPT tables. */}
+                    <span role="separator" aria-orientation="vertical" aria-label={`Resize column ${col.label}`} tabIndex={0}
+                      aria-valuenow={widths[i]} aria-valuemin={MIN_COL} aria-valuemax={MAX_COL}
+                      onPointerDown={startResize(i)} onKeyDown={keyResize(i)} onDoubleClick={() => setWidth(i, null)} onClick={(e) => e.stopPropagation()}
+                      className="absolute inset-y-0 right-0 z-[2] w-2 cursor-col-resize touch-none select-none opacity-0 transition-opacity after:absolute after:inset-y-2 after:right-0 after:w-px after:bg-fg-subtle group-hover/th:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:after:w-0.5 focus-visible:after:bg-[var(--focus)]"
+                      data-testid="col-resize" />
                   </th>
                 );
               })}
@@ -159,7 +192,8 @@ export const DataTable = memo(function DataTable({ part, onOpen, full }: { part:
             {shown.map(({ key, row }) => (
               <tr key={key} className="hover:bg-hover" style={virtual ? { height: ROW_H } : undefined}>
                 {part.columns.map((col, i) => (
-                  <td key={`${i}:${col.key}`} className={clsx('border-b border-line px-3 py-2 whitespace-nowrap', isNumeric(col) && 'text-right tabular-nums', col.phi && 'font-mono text-fg-subtle')}>
+                  <td key={`${i}:${col.key}`} style={fixed(widths[i])} title={widths[i] !== undefined && !col.phi ? String(row[i] ?? '') : undefined}
+                    className={clsx('border-b border-line px-3 py-2 whitespace-nowrap', isNumeric(col) && 'text-right tabular-nums', col.phi && 'font-mono text-fg-subtle', widths[i] !== undefined && 'overflow-hidden text-ellipsis')}>
                     {formatCell(row[i], col)}
                   </td>
                 ))}
