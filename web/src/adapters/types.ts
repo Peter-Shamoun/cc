@@ -1,4 +1,8 @@
-import type { AssistantMessage, ID, ISODate, Message, StreamEvent, UserMessage } from '../lib/contract';
+import type { AssistantMessage, ID, ISODate, Message, StreamEvent as LegacyStreamEvent, UserMessage } from '../lib/contract';
+import type { ChatRequest, StreamEvent as V1StreamEvent } from '../api/contract';
+
+/** Adapters may yield pre-v1 or contract-v1 events; the client reducer (reduceV1) accepts both. */
+export type AnyStreamEvent = LegacyStreamEvent | V1StreamEvent;
 
 /**
  * Thin adapter to the analyst backend. MockAnalystAdapter replays fixtures;
@@ -7,7 +11,7 @@ import type { AssistantMessage, ID, ISODate, Message, StreamEvent, UserMessage }
  */
 export interface AnalystAdapter {
   readonly name: string;
-  streamTurn(input: { conversationId: ID; messages: { id: ID; role: 'user' | 'assistant'; text: string }[]; signal: AbortSignal }): AsyncIterable<StreamEvent>;
+  streamTurn(input: { conversationId: ID; messages: { id: ID; role: 'user' | 'assistant'; text: string }[]; signal: AbortSignal; resume?: ChatRequest['resume'] }): AsyncIterable<AnyStreamEvent>;
   /** Fetch an image/file blob by opaque id (auth header, never a PHI-bearing URL). */
   fetchBlob(id: ID): Promise<Blob>;
 }

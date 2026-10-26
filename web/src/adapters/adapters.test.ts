@@ -4,10 +4,13 @@ import { MemoryTranscriptStore } from './memoryStore';
 import { parseSse } from './http';
 import { FIXTURES } from '../fixtures';
 import { KNOWN_PART_TYPES, newAssistantView, reduce, type StreamEvent } from '../lib/contract';
+import { newAssistantViewV1, reduceV1 } from '../api/contract';
+import { V1_FIXTURES } from '../fixtures/v1';
+import type { AnyStreamEvent } from './types';
 
-async function collect(it: AsyncIterable<StreamEvent>) {
+async function collect(it: AsyncIterable<AnyStreamEvent>) {
   const out: StreamEvent[] = [];
-  for await (const e of it) out.push(e);
+  for await (const e of it) out.push(e as StreamEvent);
   return out;
 }
 
@@ -30,10 +33,23 @@ describe('MockAnalystAdapter', () => {
     }
   });
 
+  it('replays answer fixtures as contract-v1 streams (seq, steps, finishReason)', async () => {
+    const a = new MockAnalystAdapter(0);
+    for (const f of V1_FIXTURES) {
+      const evs = await collect(a.streamTurn({ conversationId: 'c', messages: [{ id: 'u', role: 'user', text: f.prompt }], signal: new AbortController().signal }));
+      const seqs = evs.map((e) => (e as { seq?: number }).seq);
+      expect(seqs).toEqual(seqs.map((_, i) => i));
+      const m = (evs as AnyStreamEvent[]).reduce(reduceV1, newAssistantViewV1('x'));
+      expect(m.finishReason).toBe(f.finishReason ?? 'stop');
+      expect(m.steps.every((s) => s.state !== 'running')).toBe(true);
+      expect(m.steps.length).toBe(new Set(f.steps.flatMap((s) => ('event' in s ? [(s.event as { stepId?: string }).stepId] : []))).size);
+    }
+  });
+
   it('stops on abort', async () => {
     const a = new MockAnalystAdapter(5);
     const ctrl = new AbortController();
-    const evs: StreamEvent[] = [];
+    const evs: AnyStreamEvent[] = [];
     for await (const e of a.streamTurn({ conversationId: 'c', messages: [{ id: 'u', role: 'user', text: FIXTURES[0].prompt }], signal: ctrl.signal })) {
       evs.push(e);
       if (evs.length === 3) ctrl.abort();

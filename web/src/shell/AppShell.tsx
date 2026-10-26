@@ -23,6 +23,7 @@ import { useTheme } from '../lib/theme';
 import { copyText, downloadText } from '../lib/csv';
 import { getPref, setPref } from '../lib/prefs';
 import type { AssistantView } from '../lib/contract';
+import type { AssistantViewV1, ChatRequest } from '../api/contract';
 
 function makeAdapter(): AnalystAdapter {
   const base = import.meta.env.VITE_ANALYST_BASE as string | undefined;
@@ -138,8 +139,8 @@ function ShellInner() {
     downloadMd('cc-chats', parts.join('\n---\n\n'));
   };
   const copyLast = async () => {
-    const last = [...chat.messages].reverse().find((m): m is AssistantView => m.role === 'assistant');
-    if (last && (await copyText(messageMarkdown(last)))) toast({ text: 'Copied last response' });
+    const last = [...chat.messages].reverse().find((m): m is AssistantViewV1 => m.role === 'assistant');
+    if (last && (await copyText(messageMarkdown(last as unknown as AssistantView)))) toast({ text: 'Copied last response' });
   };
   const focusComposer = () => document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message"]')?.focus();
 
@@ -236,7 +237,7 @@ function ShellInner() {
   const edit = (t: string) => setDraftPush((d) => ({ text: t, n: (d?.n ?? 0) + 1 }));
   const empty = messages.length === 0;
   const draftKey = chat.convId ?? NEW_CHAT_KEY;
-  const send = (t: string) => { atBottomRef.current = true; setAtBottom(true); chat.send(t); };
+  const send = (t: string, resume?: ChatRequest['resume']) => { atBottomRef.current = true; setAtBottom(true); chat.send(t, resume ? { resume } : undefined); };
   const composer = (autoFocus: boolean, placeholder?: string) => (
     <Composer onSend={send} onStop={chat.stop} busy={chat.busy} autoFocus={autoFocus} initial={draft} placeholder={placeholder} draftKey={draftKey} enterToSend={enterToSend} onCommand={onCommand} />
   );
@@ -295,7 +296,7 @@ function ShellInner() {
                     ) : (
                       // The newest answer reserves most of a viewport so the pinned question can sit at the top.
                       <div key={m.id} data-message-id={m.id} style={i === messages.length - 1 && messages.length > 2 ? { minHeight: 'calc(100dvh - 330px)' } : undefined}>
-                        <AssistantTurn msg={m} isLast={i === messages.length - 1} onOpen={setArtifact} onRegenerate={chat.regenerate} onEdit={edit} onSend={send} />
+                        <AssistantTurn msg={m} isLast={i === messages.length - 1} onOpen={setArtifact} onRegenerate={chat.regenerate} onEdit={edit} onReply={send} />
                       </div>
                     ),
                   )}
