@@ -93,7 +93,7 @@ main() {
   if [ "${CI_ONLY:-}" != api ]; then
       cd "$WEB"
       step "web: licences + static safety checks" node scripts/license_audit.mjs
-      step "web: oxlint (warning ratchet)" npm run -s lint
+      step "web: oxlint (0 warnings)" npm run -s lint
       step "web: npm audit" npm run -s audit
       step "web: typecheck (tsc -b)" npx tsc -b
       mem_gate
