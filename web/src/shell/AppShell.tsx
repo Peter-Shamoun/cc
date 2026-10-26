@@ -39,6 +39,7 @@ import { signedOutUrl } from './routes';
 import { trackInputModality } from '../lib/inputModality';
 import type { AssistantView } from '../lib/contract';
 import type { AssistantViewV1, ChatRequest } from '../api/contract';
+import { composerResume, useOpenClarification } from '../lib/openClarification';
 
 /** One auth session for both adapters (src/auth/session.ts): demo token, real-backend cookie, or none. */
 const session = sessionFromEnv();
@@ -560,10 +561,13 @@ function ShellInner() {
   const online = useOnline(); // gates Send at once
   const bannerOnline = useSettledOnline(); // the banner waits out sub-second flaps
   const printing = usePrinting();
+  // QA-A30: while a clarifying question is open, the composer is the reply (Claude/ChatGPT); the card stays in the thread.
+  const clarify = useOpenClarification(messages, chat.busy);
+  const sendOrReply = (t: string) => send(t, clarify ? composerResume(clarify, t) : undefined);
   const composer = (autoFocus: boolean, placeholder?: string) => (
     <>
       {!bannerOnline && <OfflineBanner />}
-      <Composer onEditLast={editLast} onSend={send} onStop={chat.stop} busy={chat.busy} autoFocus={autoFocus} initial={draft} placeholder={placeholder} draftKey={draftKey} enterToSend={enterToSend} onCommand={onCommand} offline={!online} />
+      <Composer onEditLast={editLast} onSend={sendOrReply} onStop={chat.stop} busy={chat.busy} autoFocus={autoFocus} initial={draft} placeholder={clarify ? 'Reply…' : placeholder} draftKey={draftKey} enterToSend={enterToSend} onCommand={onCommand} offline={!online} />
     </>
   );
   const threadActions: ThreadActions = {
