@@ -37,9 +37,14 @@ export default defineConfig({
     launchOptions: { executablePath: chrome },
   },
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 }, channel: undefined }, grepInvert: /@mobile|@perf/ },
+    { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 }, channel: undefined }, grepInvert: /@mobile|@perf|@chaos/ },
     { name: 'mobile', use: { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true }, grep: /@mobile|@both/ },
+    { name: 'chaos', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 }, channel: undefined }, grep: /@chaos/ },
     { name: 'perf', use: { viewport: { width: 1440, height: 900 } }, grep: /@perf/ },
+    // Cross-browser (QA): core flows only, never pixel baselines. Opt-in: `npm run e2e:xb` (one worker, run sequentially).
+    { name: 'firefox', use: { ...devices['Desktop Firefox'], viewport: { width: 1440, height: 900 }, launchOptions: {} }, grepInvert: /@mobile|@perf|@chaos/, testIgnore: /visual/ },
+    { name: 'webkit', use: { ...devices['Desktop Safari'], viewport: { width: 1440, height: 900 }, launchOptions: {} }, grepInvert: /@mobile|@perf|@chaos/, testIgnore: /visual/ },
+    { name: 'mobile-webkit', use: { ...devices['iPhone 13'], viewport: { width: 390, height: 844 }, launchOptions: {} }, grep: /@mobile|@both/, testIgnore: /visual/ },
   ],
   // Only ONE server (BRIEF resource rules): the demo API. The built app is served to the browser by
   // Playwright routing (e2e/static.mjs); global-setup builds e2e/.dist/{live,mock}.
