@@ -1,6 +1,6 @@
 # ClaimClarity chat API — stream contract
 
-**Version: 1.15.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.16.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -322,6 +322,32 @@ Canonical example streams for every outcome (answer, tool steps/repair, abstain,
 chart, candidates, error) live in [`api/contract/examples/`](contract/examples/README.md), one event per line, regenerated
 from the demo backend by `python -m api.contract.gen_examples` and checked by `api/tests/test_contract_examples.py`.
 
+### 9.1 Edge-case scenarios (1.16.0)
+
+Request-only (`ChatRequest.scenario`; no keywords), so e2e tests can pin them. Every one runs through the real
+`Analyzer` + `LiveTap` with `ScriptedLLM`, passes `stream_rules.json` (§2.1), and has a recorded stream in
+`api/contract/examples/edge/<name>.jsonl` checked by `api/tests/test_edge_scenarios.py` and
+`web/src/contract/edgeCases.test.ts` (`EDGE_SCENARIOS` in `web/src/contract/edgeCases.ts`).
+
+| `scenario` | finish | What it exercises |
+|---|---|---|
+| `empty` | stop | Query returns **0 rows** (`sql_result.rowCount: 0`): table part with columns and `rows: []`, an explanation, no chart. The verifier's "no rows" bounce is off here so the empty answer stands. |
+| `multi_table` | stop | **Two tables** in one answer ("By payer", "By claim status"), each with its own SQL `code` part via `sqlPartId`, and a chart per table (`tablePartId`). The second query also streams as steps. |
+| `long_sql` | stop | A ~4.4 KB, 100+ line query (7 CTEs) in `step.sql_running.sql` and the `code` part. Test wrap/scroll/copy/collapse. |
+| `many_repairs` | stop | Four failing queries, each followed by `step.repair_attempt` and a rerun (attempts 2–5), then the answer. |
+| `clarify_nested` | needs_input → needs_input → stop | Asks (count vs dollars); after the resume it asks **again** (time window); after the second resume it answers. `resumeOf` chains each message to the one before (`edge/clarify_nested{,_2,_3}.jsonl`). |
+| `escalation_abstain` | abstain | The small model gives up → `escalation` → the larger model also abstains (`abstain` part with suggestions; two models in usage). A refusal itself never escalates. |
+| `cancel_plan` | aborted | Stop while planning, before any SQL. |
+| `cancel_sql` | aborted | Stop while a query runs: its `step.sql_result` arrives `ok: false`, `error.code: "cancelled"`. |
+| `cancel_repair` | aborted | Stop right after a `step.repair_attempt`. |
+| `cancel_candidates` | aborted | Stop while candidate `k2` runs; every open candidate query closes as cancelled. |
+| `cancel_escalation` | aborted | Stop right after the `escalation` event. |
+| `cancel_render` | aborted | Stop as the answer text starts rendering: open text/reasoning blocks close, no table part. |
+
+In the `cancel_*` scenarios the **server presses Stop itself** when the stage's first event is emitted (same path as
+`POST /api/chat/{messageId}/stop`, §8), so the cut point is deterministic. Clients must render each as a normal
+`aborted` message: no step left spinning, no error part.
+
 ## 10. PHI and security rules
 
 * Step events never carry row values: `step.sql_result` has counts and column names/types only.
@@ -562,6 +588,11 @@ must be signed in to the same organization (customer). A conversation has at mos
 
 ## Changelog
 
+* **1.16.0** (2026-10-25) — Edge-case demo scenarios (§9.1), additive. `ChatRequest.scenario` gains `empty`,
+  `multi_table`, `long_sql`, `many_repairs`, `clarify_nested`, `escalation_abstain` and `cancel_plan|sql|repair|
+  candidates|escalation|render`; the enum now also lists `report` (1.9.0, previously missing from the schema and
+  `contract.ts`). Recorded streams in `examples/edge/`, conformance-tested in Python and TS. No event or part shape
+  changed. `web/src/api/contract.ts` exports `DemoScenario`.
 * **1.15.0** (2026-10-25) — Share security (#241), additive. **S1:** turning `includeData` on issues a new share id
   and revokes the old one (`ShareLink.rotated`); narrowing keeps it. **S4:** shares expire, `expiresInDays` 7 / 30
   (default) / 90 (`ShareRequest.expiresInDays`, `ShareExpiryDays`, `ShareLink.expiresAt`/`expiresInDays`,

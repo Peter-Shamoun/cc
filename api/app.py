@@ -25,12 +25,14 @@ from pydantic import BaseModel, Field
 from analyzer.config import AnalyzerConfig
 from analyzer.llm import PaidAPIDisabled
 from analyzer.loop import Analyzer
+from analyzer.tools import ToolLayer
 
-from api.backends import SCENARIO_CONFIG, AuthError, DemoAuth, detect_scenario, make_llm
+from api.backends import (CANCEL_AT, MULTI_TABLE_SQL, MULTI_TABLE_TITLES, SCENARIO_CONFIG, AuthError, DemoAuth,
+                          detect_scenario, make_llm)
 from api.contract import CONTRACT_VERSION, schema as contract_schema
 from api.ids import new_id
 from api.live import Cancelled, LiveTap
-from api.mapping import outcome_parts, report_artifacts
+from api.mapping import multi_table_parts, outcome_parts, report_artifacts
 from api.redact import install_access_log_redaction, install_log_redaction, install_outbound_url_redaction
 from api.security import (MAX_BODY_BYTES, SESSION_COOKIE, BodyLimitMiddleware, CsrfMiddleware, ErrorShieldMiddleware,
                           HeadMiddleware, SecurityHeadersMiddleware)
@@ -476,6 +478,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         persisted_steps: list = []
         reasoning: dict = {}
 
+        press_stop_on = CANCEL_AT[scenario][1] if scenario in CANCEL_AT else None
+
         def emit(payload: dict):
             payload = mask_event(payload, sql_policy)  # 1.14.0: shown SQL never carries PHI-bearing literals
             seq = len(run.events)
@@ -493,6 +497,8 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             elif t == "text.delta" and "first_token" not in marks:
                 marks["first_token"] = int((time.perf_counter() - started) * 1000)
             run.events.append((seq, event))
+            if press_stop_on is not None and not run.cancelled.is_set() and press_stop_on(event):
+                run.cancelled.set()  # 1.16.0 demo cancel_* scenarios: Stop pressed at a known stage
             run.notify()
 
         def work():
@@ -522,6 +528,13 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                                               legacy_tools=legacy_tools)
                 if scenario == "report" and finish == "stop":
                     parts = report_artifacts(parts)
+                if scenario == "multi_table" and finish == "stop":
+                    # 1.16.0 demo: the second query already ran live (its steps streamed); show its rows too
+                    tools = ToolLayer(ctx.opener, config)
+                    digest = tools.run_sql(MULTI_TABLE_SQL[1], charge=False, include_all_rows=True)
+                    parts = [{**p, "title": MULTI_TABLE_TITLES[0]} if p.get("type") == "table" else p for p in parts]
+                    parts = multi_table_parts(parts, answer, [(MULTI_TABLE_TITLES[1], MULTI_TABLE_SQL[1], digest)],
+                                              ctx.principal, downloads.scoped(conversation_id), elapsed_ms=elapsed)
                 if finish == "stop" and start_extra.get("regenerateStyle"):
                     parts = apply_style(parts, start_extra["regenerateStyle"])
             except Cancelled:
