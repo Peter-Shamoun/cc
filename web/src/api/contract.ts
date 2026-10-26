@@ -15,13 +15,14 @@ import type {
 } from '../lib/contract';
 import { reduce as legacyReduce } from '../lib/contract';
 import type { Source } from '../contract/v1.gen';
+import { EVENT_SHAPES } from '../contract/v1.gen';
 
 export type {
   CalloutPart, ChartPart, CodePart, Column, ColumnType, ErrorPart, FilePart, ID, ImagePart, ISODate, ReasoningPart,
   Sensitivity, StatusPart, TablePart, TextPart, ToolCallPart, ArtifactPart, PartBase,
 };
 
-export const CONTRACT_VERSION = '1.11.0';
+export const CONTRACT_VERSION = '1.12.0';
 export const CONTRACT_MAJOR = 1;
 
 // ---------------------------------------------------------------- new parts (v1)
@@ -272,6 +273,59 @@ function upsertStep(steps: StepView[], stepId: ID, ev: StepEvent | EscalationEve
  * Unknown event types are ignored (forward compatibility, CONTRACT.md §3).
  */
 export function reduceV1(m: AssistantViewV1, ev: StreamEvent | { type: string; seq?: number }): AssistantViewV1 {
+  // 1.12.0 fail-safe: a malformed event is dropped, and a reducer fault keeps the last good view. Never throw
+  // into the render loop (CONTRACT.md §3).
+  if (!wellFormed(ev)) return m;
+  try {
+    return reduceWellFormed(m, ev);
+  } catch {
+    return m;
+  }
+}
+
+const KIND_OK: Record<string, (x: unknown) => boolean> = {
+  string: (x) => typeof x === 'string',
+  boolean: (x) => typeof x === 'boolean',
+  integer: (x) => Number.isInteger(x),
+  number: (x) => typeof x === 'number' && Number.isFinite(x),
+  object: (x) => x !== null && typeof x === 'object' && !Array.isArray(x),
+  array: (x) => Array.isArray(x),
+  null: (x) => x === null,
+};
+const isObj = KIND_OK.object;
+
+/**
+ * 1.12.0: structural check of one event against the schema's required fields (`EVENT_SHAPES`, generated): a field of
+ * the wrong JSON kind fails; a missing one fails if it is an id, object or array (missing scalars are tolerated). Unknown
+ * types pass, because §3 says to ignore them and the reducer does. Also checks what the reducer dereferences:
+ * `part.part.{id,type}`, `table.rows.rows[]`, and a non-negative integer `seq`.
+ */
+export function wellFormed(ev: unknown): boolean {
+  if (!isObj(ev) || typeof (ev as { type?: unknown }).type !== 'string') return false;
+  const e = ev as Record<string, unknown> & { type: string };
+  if (e.seq !== undefined && !(Number.isInteger(e.seq) && (e.seq as number) >= 0)) return false;
+  const shape = EVENT_SHAPES[e.type];
+  if (!shape) return true;
+  for (const [field, kinds] of Object.entries(shape)) {
+    const x = e[field];
+    // Missing: drop only when the reducer needs it (ids, objects, arrays); a missing scalar (e.g. `ok`, `attempt` in
+    // older persisted steps) is tolerated. Present with the wrong kind: always drop.
+    if (x === undefined) {
+      if (/([iI]d|delta)$/.test(field) || kinds.length === 0 || kinds.includes('object') || kinds.includes('array')) return false;
+      continue;
+    }
+    if (kinds.length && !kinds.some((k) => KIND_OK[k]?.(x) ?? true)) return false;
+  }
+  if (e.type === 'part' && !(isObj(e.part) && typeof (e.part as Part).id === 'string' && typeof (e.part as Part).type === 'string')) return false;
+  if (e.type === 'table.rows' && !((e.rows as unknown[]).every(Array.isArray) && (e.offset as number) >= 0)) return false;
+  return true;
+}
+
+/** Test-only: the reducer without the fail-safe wrapper, so fuzz tests can see faults. Use `reduceV1` in the app. */
+export const reduceV1Strict = (m: AssistantViewV1, ev: StreamEvent | { type: string; seq?: number }): AssistantViewV1 =>
+  reduceWellFormed(m, ev);
+
+function reduceWellFormed(m: AssistantViewV1, ev: StreamEvent | { type: string; seq?: number }): AssistantViewV1 {
   const e = ev as StreamEvent;
   if (e.type === 'heartbeat') return m;
   const seq = (ev as { seq?: number }).seq;

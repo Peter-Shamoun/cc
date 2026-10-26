@@ -19,6 +19,7 @@ from typing import Literal
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel, Field
 
 from analyzer.config import AnalyzerConfig
@@ -256,6 +257,14 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
     def authed(request: Request, request_id: str):
         return auth.authenticate(_token(request), request_id)
 
+    @app.exception_handler(StarletteHTTPException)
+    async def http_error(_request: Request, exc: StarletteHTTPException):
+        # 1.12.0: unmatched routes (404) and wrong methods (405) use the standard envelope too, not {"detail"}.
+        code = {404: "not_found", 405: "method_not_allowed"}.get(exc.status_code, f"http_{exc.status_code}")
+        message = {404: "Not found.", 405: "Method not allowed."}.get(exc.status_code, "Request failed.")
+        return JSONResponse({"error": {"code": code, "message": message}}, exc.status_code,
+                            headers={**NO_STORE, **(exc.headers or {})})
+
     @app.exception_handler(RequestValidationError)
     async def validation_error(_request: Request, exc: RequestValidationError):
         # FastAPI's default 422 echoes the offending ``input`` (it can be PHI) and isn't the contract envelope.
@@ -327,7 +336,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 return unauthorized()
             if run is None or run.principal != ctx.principal:
                 return error_json("stream_gone", "Nothing to resume.", 404)
-            return _stream(run, int(seq) if seq.isdigit() else -1, request)
+            return _stream(run, int(seq) if seq.isascii() and seq.isdigit() else -1, request)
         users = [m for m in body.messages if m.role == "user" and m.text.strip()]
         if not users and not body.regenerate:
             return error_json("validation", "Send a question.", 422)
@@ -641,7 +650,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             return error_json("stream_gone", "Nothing to resume.", 404)
         last_event = request.headers.get("last-event-id") or ""
         mid, _, seq = last_event.rpartition(":")
-        after = int(seq) if mid == message_id and seq.isdigit() else -1
+        after = int(seq) if mid == message_id and seq.isascii() and seq.isdigit() else -1
         return _stream(run, after, request)
 
     @app.post("/api/chat/{message_id}/stop")

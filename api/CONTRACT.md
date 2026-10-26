@@ -1,6 +1,6 @@
 # CC chat API — stream contract
 
-**Version: 1.11.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
+**Version: 1.12.0** (semver) · machine-readable schema: [`api/contract/v1.schema.json`](contract/v1.schema.json) ·
 TypeScript: generated [`web/src/contract/v1.gen.ts`](../web/src/contract/v1.gen.ts) (`python -m api.contract.gen_ts`) +
 client mirror [`web/src/api/contract.ts`](../web/src/api/contract.ts) (pinned to the generated types at compile time)
 
@@ -35,6 +35,10 @@ The frontend builds against this document only; the analyzer adapts to it.
 * Each SSE frame is `id: <messageId>:<seq>` + `data: <one JSON StreamEvent>`. Heartbeats have no `id:`.
 * Auth: httpOnly `cc_session` cookie (prod) or `Authorization: Bearer demo:<customer>:<user>` (demo mode).
   Credentials are never accepted in query parameters, because URLs end up in logs.
+* **Errors (1.12.0):** every 4xx/5xx JSON body is `{"error":{"code","message"}}`, including unmatched routes (404
+  `not_found`) and wrong methods (405 `method_not_allowed`), which used to be FastAPI's `{"detail":…}`. One documented
+  exception remains: `DELETE /api/conversations/{id}` answers 404 `{deleted:false}` (§11). A non-ASCII-digit
+  `Last-Event-ID` seq (e.g. `²`) is treated as "replay from the start", never as a 500.
 * **CSRF (1.10 docs, #198):** a cookie-authenticated (`cc_session`, no `Authorization` header) `POST`/`PUT`/`PATCH`/
   `DELETE` to `/api/*` must send the header **`x-cc-csrf: 1`**. Without it the API answers 403
   `{"error":{"code":"access_denied","message":"Missing CSRF header."}}`, before auth or body parsing. Bearer/demo
@@ -82,11 +86,33 @@ The frontend builds against this document only; the analyzer adapts to it.
   `step.check` on the answer itself.
 * `escalation` may appear anywhere between `message.start` and the first answer part.
 
+### 2.1 Machine-checkable rules (1.12.0)
+
+The ordering guarantees above are also data: [`api/contract/stream_rules.json`](contract/stream_rules.json) is the
+**single source**, with one id per rule (`seq.gapless`, `text.span`, `table.span`, `answer.after_steps`, …). Two
+small runners interpret it:
+
+* Python: `from api.contract.conformance import check`, then `check(events)` returns `[Violation(rule, index,
+  message)]`.
+* TypeScript: `import { checkStream } from 'src/contract/conformance'`. The rules are embedded by `gen_ts` in
+  `streamRules.gen.ts`, and CI fails on drift.
+
+Both runners are pinned to the same cases in `api/contract/conformance_cases/cases.json` (each lists the exact rule
+ids it must violate) and to every golden example. Both are total: malformed input becomes `event.shape` /
+`stream.list` violations, never an exception. **Any backend, including the real analyzer adapter, must produce
+streams with `check(events) == []`.** To add a rule, give it an existing `kind` in the JSON, add a case to
+`make_cases.py`, then regenerate. A new `kind` needs both runners.
+
 ## 3. Forward compatibility (client obligations)
 
 * Ignore unknown event types and unknown fields.
 * Render unknown part types as an "Unsupported content" chip; never crash.
 * Enum fields marked *open* may gain values in a minor release: fall back to a generic rendering.
+* **Fail safe (1.12.0).** A malformed SSE frame (data that isn't a JSON object with a string `type`) is skipped and
+  counted, not thrown: see `web/src/contract/sse.ts` (`SseDecoder`, `readSse`). An event missing a required field, or
+  with the wrong JSON kind (`EVENT_SHAPES`, generated from the schema), is dropped by `wellFormed()` in `reduceV1`.
+  A late or duplicate `seq` is dropped. Any reducer fault keeps the last good view. Seeded fuzz/property tests
+  pin this: `web/src/contract/fuzz.test.ts` and `api/tests/test_fuzz_requests.py`.
 
 ## 4. Events
 
@@ -491,6 +517,10 @@ must be signed in to the same organization (customer). A conversation has at mos
   Example: `examples/share.json`.
 
 ## Changelog
+
+* **1.12.0** (2026-10-25) — The §2 ordering rules as data (`stream_rules.json`, §2.1), with Python and TS runners
+  and shared cases. Fail-safe client decoding (§3): `sse.ts`, `wellFormed`/`EVENT_SHAPES`, and a guarded
+  `reduceV1`. 404/405 now use the error envelope (§1). Request/reducer/SSE fuzz tests. No event or part shape change.
 
 * **1.11.0** (2026-10-25) — Org-scoped share links (§17): `ShareRequest`, `ShareLink`, `SharedConversation`,
   `TablePart.dataWithheld`, and GET/PUT/DELETE `/api/conversations/{id}/share` plus `GET /api/shared/{shareId}`.
