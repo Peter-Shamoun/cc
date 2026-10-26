@@ -28,19 +28,19 @@ export function AbstainCard({ part, onReply }: { part: AbstainPart; onReply?: On
   return (
     <div className="my-4 rounded-2xl border border-line bg-elev px-4 py-3.5 font-sans text-sm" role="note" aria-label="Cannot answer" data-testid="abstain" data-category={part.category}>
       <div className="flex items-center gap-2 font-medium text-fg"><Icon size={16} className="shrink-0 text-fg-muted" aria-hidden /> {ABSTAIN_TITLE[part.category] ?? "I can't answer this from the data I have"}</div>
-      <div className="abstain-reason mt-1 text-fg-muted [&_p]:my-1"><Markdown text={part.reason} /></div>
+      <div className="abstain-reason mt-1 text-fg-muted [&_.prose-chat]:text-sm [&_.prose-chat]:leading-relaxed [&_p]:my-1"><Markdown text={part.reason} /></div>
       {part.details && (
         <details className="group/needed mt-1 text-[13px]" data-testid="abstain-details">
           {/* Same chevron disclosure as the timeline and "View SQL", not the browser's ▶ marker. */}
           <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-fg-subtle hover:text-fg [&::-webkit-details-marker]:hidden">
             What would be needed<ChevronRight size={13} className="transition-transform group-open/needed:rotate-90" aria-hidden />
           </summary>
-          <div className="mt-1 text-fg-muted [&_p]:my-1"><Markdown text={part.details} /></div>
+          <div className="mt-1 text-fg-muted [&_.prose-chat]:text-[13px] [&_.prose-chat]:leading-relaxed [&_p]:my-1"><Markdown text={part.details} /></div>
         </details>
       )}
       {part.suggestions.length > 0 && (
         <div className="mt-3">
-          <div className="text-xs font-medium uppercase tracking-wide text-fg-subtle">Try asking</div>
+          <div className="text-xs font-medium text-fg-subtle">Try asking</div>
           <div className="mt-1.5 flex flex-wrap gap-2">
             {part.suggestions.map((s) => (
               <button key={s.id} type="button" onClick={() => onReply?.(s.text)} disabled={!onReply} className="rounded-full border border-line bg-bg px-3 py-1.5 text-left text-[13px] text-fg hover:bg-hover disabled:opacity-50" data-testid="rephrase-chip">{s.text}</button>

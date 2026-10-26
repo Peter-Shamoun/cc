@@ -1,5 +1,5 @@
 import { memo, useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, Code2, FileText, Minimize2, MoreHorizontal, Pencil, Plus, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Code2, FileText, Minimize2, MoreHorizontal, Pencil, Plus, Printer, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react';
 import clsx from 'clsx';
 import type { AssistantView, ChartPart, CodePart, ImagePart, Part, TablePart, UserMessage } from '../lib/contract';
 import { KNOWN_PART_TYPES } from '../lib/contract';
@@ -101,6 +101,21 @@ export const UserBubble = memo(function UserBubble({ msg, onEdit, version, onVer
   );
 });
 
+/** Print (or save as PDF) one question + answer, not the whole chat: the rest of the thread is hidden
+ *  by `body[data-print-one]` rules in index.css until the print dialog closes. */
+export function printOne(answer: HTMLElement | null) {
+  const row = answer?.closest<HTMLElement>('[data-message-id]');
+  if (!row) return window.print();
+  const keep = [row, row.previousElementSibling].filter((e): e is HTMLElement => e instanceof HTMLElement && e.hasAttribute('data-message-id'));
+  keep.forEach((e) => e.setAttribute('data-print-keep', ''));
+  document.body.setAttribute('data-print-one', '');
+  const done = () => { document.body.removeAttribute('data-print-one'); keep.forEach((e) => e.removeAttribute('data-print-keep')); window.removeEventListener('afterprint', done); };
+  window.addEventListener('afterprint', done);
+  window.print();
+  // Some engines (and headless tests) never fire afterprint; print() blocks until the dialog closes, so tidy up now.
+  setTimeout(done, 0);
+}
+
 /** "‹ 2/3 ›": under an edited question, or under a regenerated answer (QA-A18). `onVersion(k)` takes a 0-based index. */
 function VersionNav({ version, onVersion, disabled }: { version: { current: number; total: number }; onVersion: (k: number) => void; disabled?: boolean }) {
   return (
@@ -180,10 +195,11 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
   placeTimeline();
   if (sqlRunning) blocks.push(<TableSkeleton key="skeleton" />);
 
+  const rootRef = useRef<HTMLDivElement>(null);
   const empty = parts.length === 0 && steps.length === 0;
   const nQueries = usage?.queries ?? queries.length;
   return (
-    <div className="group" data-testid="msg-assistant">
+    <div className="group" data-testid="msg-assistant" ref={rootRef}>
       {blocks}
       {/* QA-A7: while the timeline is live it already says what is happening; only transport states (offline, reconnecting, 429) add a line. */}
       {msg.streaming && (msg.status || empty) && !(timeline && timelineLive && !isTransportStatus(msg.status)) && (
@@ -218,6 +234,7 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
       )}
       {more.anchor && (
         <Menu anchor={more.anchor} onClose={more.close} label="More actions" items={[
+          { label: 'Print this answer', icon: <Printer size={15} />, onSelect: () => printOne(rootRef.current) },
           { label: 'Copy as Markdown', icon: <FileText size={15} />, onSelect: () => { void copyText(messageMarkdown(view)).then((ok) => ok && toast({ text: 'Copied as Markdown' })); } },
           ...(okQueries ? [{ label: okQueries > 1 ? `Copy SQL (${okQueries} queries)` : 'Copy SQL', icon: <Code2 size={15} />, onSelect: () => { void copyText(sqlForClipboard(queries)).then((ok) => ok && toast({ text: 'SQL copied' })); } } as MenuItem] : []),
         ]} />

@@ -185,12 +185,18 @@ export function ToolGroup({ parts }: { parts: ToolCallPart[] }) {
 export function ErrorView({ part, onRetry }: { part: ErrorPart; onRetry?: () => void }) {
   const [details, setDetails] = useState(false);
   return (
-    <div className="my-4 rounded-xl border border-line border-l-[3px] bg-elev px-4 py-3 font-sans text-sm" style={{ borderLeftColor: 'var(--danger)' }} role="alert" data-testid="error">
-      <div className="flex items-center gap-2 font-semibold text-danger"><AlertTriangle size={16} /> {part.title}</div>
-      <p className="mt-1 text-fg">{part.message}</p>
-      <div className="mt-2 flex items-center gap-3 text-xs">
+    // Comparison pass: ChatGPT/Claude errors are a quiet tinted note with one clear Retry, not a red-barred alarm.
+    <div className="my-3 rounded-xl border px-3.5 py-2.5 font-sans text-sm" style={{ borderColor: 'color-mix(in srgb, var(--danger) 22%, transparent)', background: 'color-mix(in srgb, var(--danger) 5%, transparent)' }} role="alert" data-testid="error">
+      <div className="flex items-start gap-2">
+        <AlertTriangle size={15} className="mt-0.5 shrink-0 text-danger" aria-hidden />
+        <div className="min-w-0 flex-1">
+          <div className="font-medium text-fg">{part.title}</div>
+          <p className="mt-0.5 text-fg-muted">{part.message}</p>
+        </div>
+      </div>
+      <div className={clsx('flex items-center gap-3 pl-[23px] text-xs', ((part.retryable && onRetry) || part.details) && 'mt-2')}>
         {part.retryable && onRetry && (
-          <button type="button" onClick={onRetry} className="inline-flex items-center gap-1 rounded-full border border-line px-3 py-1 hover:bg-hover"><RotateCcw size={12} /> Retry</button>
+          <button type="button" onClick={onRetry} className="inline-flex items-center gap-1 rounded-full bg-fg px-3 py-1 font-medium text-bg hover:opacity-90"><RotateCcw size={12} aria-hidden /> Retry</button>
         )}
         {part.details && <button type="button" onClick={() => setDetails((d) => !d)} className="text-fg-muted underline underline-offset-2">{details ? 'Hide details' : 'Details'}</button>}
       </div>
