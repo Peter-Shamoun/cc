@@ -262,7 +262,7 @@ export const AssistantTurn = memo(function AssistantTurn({ msg: view, isLast, on
     if (isFollowUps(p as { type: string })) continue; // rendered once, under the action row
     if (p.type === 'abstain') { blocks.push(<AbstainCard key={p.id} part={p} onReply={readOnly ? undefined : reply} />); continue; }
     if (p.type === 'clarification') { const C = isMultiClarification(p) ? ClarifyForm : ClarifyCard; blocks.push(<C key={p.id} part={p as never} onReply={readOnly ? undefined : reply} active={!readOnly && isLast && !msg.streaming} />); continue; }
-    blocks.push(<PartView key={p.id} part={p as Part} msg={msg} liveTurn={liveTurn} open={open} openArtifact={onOpen} onRetry={readOnly ? undefined : onRegenerate} onEdit={readOnly ? undefined : onEdit} />);
+    blocks.push(<PartView key={p.id} part={p as Part} msg={msg} liveTurn={liveTurn} open={open} openArtifact={onOpen} onRetry={readOnly ? undefined : onRegenerate} onEdit={readOnly ? undefined : onEdit} onAsk={readOnly || msg.streaming ? undefined : onSend} />);
     if (p.type === 'table') {
       const q = queryForTable(view, p);
       if (q) blocks.push(<TableSql key={`sql-${p.id}`} query={q} />);
@@ -389,13 +389,13 @@ function FeedbackPanel({ onClose, onSubmit }: { onClose: () => void; onSubmit: (
   );
 }
 
-function PartView({ part, msg, liveTurn, open, openArtifact, onRetry, onEdit }: { part: Part; msg: AssistantView; liveTurn?: boolean; open: (p: Artifact['part'], title?: string, v?: number) => void; openArtifact: (a: Artifact) => void; onRetry?: () => void; onEdit?: (t: string) => void }) {
+function PartView({ part, msg, liveTurn, open, openArtifact, onRetry, onEdit, onAsk }: { part: Part; msg: AssistantView; liveTurn?: boolean; open: (p: Artifact['part'], title?: string, v?: number) => void; openArtifact: (a: Artifact) => void; onRetry?: () => void; onEdit?: (t: string) => void; onAsk?: (t: string) => void }) {
   switch (part.type) {
     case 'text': return <Markdown text={part.text} streaming={msg.openText.includes(part.id)} paced liveTurn={liveTurn} />;
     case 'reasoning': return <ReasoningView part={part} running={msg.streaming && part.durationMs === undefined} />;
     case 'status': return null;
     case 'table': return <DataTable part={part} onOpen={() => open(part)} />;
-    case 'chart': return <ChartView part={part} onOpen={() => open(part)} />;
+    case 'chart': return <ChartView part={part} onOpen={() => open(part)} onAsk={onAsk} />;
     case 'code': return <CodePartView part={part} onOpen={() => open(part)} />;
     case 'image': return <ImageView part={part} onOpen={() => open(part)} />;
     case 'file': {
