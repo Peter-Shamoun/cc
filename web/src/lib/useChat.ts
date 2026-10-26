@@ -131,7 +131,7 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     });
     set();
     setBusy(true);
-    const wire = history.map((m) => ({ id: m.id, role: m.role, text: m.role === 'user' ? m.text : m.parts.map((p) => (p.type === 'text' ? p.text : '')).join('\n'), ...(m.role === 'user' && m.parentId ? { parentId: m.parentId } : {}) }));
+    const wire = history.map((m) => ({ id: m.id, role: m.role, text: m.role === 'user' ? m.text : m.parts.map((p) => (p.type === 'text' ? p.text : '')).join('\n'), ...(m.role === 'user' && m.parentId ? { parentId: m.parentId } : {}), ...(m.role === 'user' && m.editOf ? { editOf: m.editOf } : {}) }));
     // Transport hiccups show in the status line (client view state, not a contract event); the
     // server's own status comes back once the replay resumes.
     let serverStatus: string | null = null;
@@ -158,6 +158,7 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
       view = { ...view, status: CONNECTION_LABEL[state] };
       set();
     };
+    let reloaded = false;
     try {
       for await (const ev of adapter.streamTurn({ conversationId: cid, messages: wire, signal: ctrl.signal, ...(opts.resume ? { resume: opts.resume } : {}), ...(opts.regenerate ? { regenerate: opts.regenerate } : {}), onConnection })) {
         view = reduceV1(view, ev);
@@ -168,7 +169,14 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
         if (ev.type === 'message.end') break;
       }
     } catch (e) {
-      if ((e as Error).name !== 'AbortError' && !ctrl.signal.aborted) {
+      // CONTRACT.md §8: the run finished (or expired) while we were away and the server can't replay it
+      // (`stream_gone`). Reload the conversation and show the stored answer instead of "Connection lost".
+      if ((e as Error).name === 'StreamGoneError' && !ctrl.signal.aborted) {
+        const saved = await store.getConversation(cid).catch(() => undefined);
+        const done = saved?.messages.find((m) => m.role === 'assistant' && m.id === view.id);
+        if (done) { view = toView(done) as typeof view; reloaded = true; }
+      }
+      if ((e as Error).name !== 'AbortError' && !ctrl.signal.aborted && !reloaded) {
         view = reduceV1(view, { type: 'part', part: { type: 'error', id: uid('err'), code: 'internal', title: 'Connection lost', message: 'Response interrupted.', retryable: true } });
         if (view.streaming) view = reduceV1(view, { type: 'message.end', messageId: view.id, finishReason: 'error', usage: partialUsage(view, startedAt) } as never);
       }
@@ -230,8 +238,9 @@ export function useChat(adapter: AnalystAdapter, store: TranscriptStore) {
     const b = branches[i] ?? { versions: [tail], idx: 0 };
     const versions = [...b.versions];
     versions[b.idx] = tail;
-    // parentId = the message before the edited one: the server stores the edit as a sibling branch (§8).
-    const user: UserMessage = { id: uid('u'), role: 'user', text: t, createdAt: new Date().toISOString(), ...(i > 0 ? { parentId: messages[i - 1].id } : {}) };
+    // parentId = the message before the edited one, editOf = the edited question (contract 1.2): the server
+    // stores the edit as a sibling branch, and an edited first question as a new root (§8).
+    const user: UserMessage = { id: uid('u'), role: 'user', text: t, createdAt: new Date().toISOString(), editOf: old.id, ...(i > 0 ? { parentId: messages[i - 1].id } : {}) };
     versions.push([user]);
     setBranches((all) => ({ ...Object.fromEntries(Object.entries(all).filter(([k]) => Number(k) < i)), [i]: { versions, idx: versions.length - 1 } }));
     const prefix = messages.slice(0, i);

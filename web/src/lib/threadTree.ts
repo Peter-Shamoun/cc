@@ -1,11 +1,12 @@
 import type { ID } from './contract';
 
-type Node = { id: ID; role: 'user' | 'assistant'; parentId?: ID };
+type Node = { id: ID; role: 'user' | 'assistant'; parentId?: ID; editOf?: ID };
 
 /**
  * The server records a transcript as an append-only list (CONTRACT.md §8): a regenerated answer is
  * appended with `parentId` = its user turn (and `regenerateOf`), an edited question with `parentId` =
- * the message before it. Messages without `parentId` follow the message before them.
+ * the message before it, and `editOf` = the question it replaces (contract 1.2: an edited first question
+ * has `editOf` and no `parentId`, so it is a new root). Messages with neither follow the message before them.
  *
  * `foldThread` turns that list back into what a chat UI shows: the path to the newest message, plus,
  * for every user turn on it that was edited, the sibling versions (each one's newest continuation),
@@ -18,7 +19,10 @@ export function foldThread<M extends Node>(msgs: M[]): { visible: M[]; branches:
   const order = new Map(msgs.map((m, i) => [m.id, i]));
   const parent = new Map<ID, ID | null>();
   msgs.forEach((m, i) => {
-    const p = m.parentId && byId.has(m.parentId) && order.get(m.parentId)! < i ? m.parentId : i > 0 ? msgs[i - 1].id : null;
+    const earlier = (id?: ID) => !!id && byId.has(id) && order.get(id)! < i;
+    const p = earlier(m.parentId) ? m.parentId!
+      : earlier(m.editOf) ? parent.get(m.editOf!) ?? null // a sibling of the edited question (root if that was the first)
+      : i > 0 ? msgs[i - 1].id : null;
     parent.set(m.id, p);
   });
   const children = new Map<ID | null, M[]>();
