@@ -37,6 +37,7 @@ from api.store import DownloadRegistry, Principal
 from api.feedback import MAX_COMMENT, check as check_feedback, record as feedback_record
 from api.capabilities import DEFAULT_STRATEGY, capabilities as capabilities_body, check_options
 from api.export import FORMATS as EXPORT_FORMATS, as_json as export_json, as_markdown as export_markdown, filename as export_filename
+from api.share import ShareRegistry, link as share_link, shared_view
 from api.sources import sources_for
 from api.styles import apply_style
 from api.titles import title_from_parts
@@ -61,6 +62,10 @@ class FeedbackIn(BaseModel):
     rating: Literal["up", "down"]
     reasons: list[str] = Field(default_factory=list, max_length=9)
     comment: str | None = Field(default=None, max_length=MAX_COMMENT)
+
+
+class ShareIn(BaseModel):
+    includeData: bool = False
 
 
 class SearchIn(BaseModel):
@@ -212,6 +217,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
     audit = AuditLog()
     store = store or make_store(audit=audit)
     downloads = DownloadRegistry()
+    shares = ShareRegistry()
     runs: dict[str, _Run] = {}
     purge_lock = threading.Lock()  # a delete and a run's final transcript write never interleave
 
@@ -839,7 +845,73 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             ok = store.delete_conversation(ctx.principal, conversation_id)
             if ok:
                 forget(ctx.principal, conversation_id)
+                shares.revoke(ctx.principal.customer, ctx.principal.user, conversation_id)
         return JSONResponse({"deleted": ok}, 200 if ok else 404, headers=NO_STORE)
+
+    # ---------------------------------------------------------------- share (contract 1.11.0, §17)
+
+    def _own_conversation(request: Request, conversation_id: str):
+        """(ctx, None) when the caller owns the conversation, else (None, error response)."""
+        try:
+            ctx = authed(request, new_id("r"))
+        except AuthError:
+            return None, unauthorized()
+        try:
+            conv = store.get_conversation(ctx.principal, conversation_id) if _SAFE_ID.match(conversation_id) else None
+        except CustomerKeyDisabled:
+            return None, shredded()
+        return (ctx, None) if conv is not None else (None, not_found())
+
+    @app.get("/api/conversations/{conversation_id}/share")
+    def get_share(conversation_id: str, request: Request):
+        ctx, err = _own_conversation(request, conversation_id)
+        if err is not None:
+            return err
+        share = shares.for_conversation(ctx.principal.customer, ctx.principal.user, conversation_id)
+        return JSONResponse(share_link(share), headers=NO_STORE) if share else not_found()
+
+    @app.put("/api/conversations/{conversation_id}/share")
+    def put_share(conversation_id: str, body: ShareIn, request: Request):
+        """Create (or update) the org-scoped read-only link. ``includeData`` defaults to false."""
+        ctx, err = _own_conversation(request, conversation_id)
+        if err is not None:
+            return err
+        share = shares.put(ctx.principal.customer, ctx.principal.user, conversation_id, body.includeData, _iso(time.time()))
+        audit("conversation_shared", customer=ctx.principal.customer, user=ctx.principal.user,
+              conversation_id=conversation_id, kind="with_data" if body.includeData else "no_data")
+        return JSONResponse(share_link(share), headers=NO_STORE)
+
+    @app.delete("/api/conversations/{conversation_id}/share")
+    def delete_share(conversation_id: str, request: Request):
+        ctx, err = _own_conversation(request, conversation_id)
+        if err is not None:
+            return err
+        if not shares.revoke(ctx.principal.customer, ctx.principal.user, conversation_id):
+            return not_found()
+        audit("conversation_share_revoked", customer=ctx.principal.customer, user=ctx.principal.user,
+              conversation_id=conversation_id)
+        return JSONResponse({"revoked": True}, headers=NO_STORE)
+
+    @app.get("/api/shared/{share_id}")
+    def get_shared(share_id: str, request: Request):
+        """Read-only view for any signed-in user of the same organization. 404 for unknown, revoked, deleted or
+        other-organization shares alike, so a link reveals nothing outside the org."""
+        try:
+            ctx = authed(request, new_id("r"))
+        except AuthError:
+            return unauthorized()
+        share = shares.get(share_id, ctx.principal.customer) if _SAFE_ID.match(share_id) else None
+        if share is None:
+            return not_found()
+        try:
+            conv = store.get_conversation(Principal(share.customer, share.user), share.conversation_id)
+        except CustomerKeyDisabled:
+            return shredded()
+        if conv is None:
+            return not_found()
+        audit("shared_conversation_viewed", customer=ctx.principal.customer, user=ctx.principal.user,
+              conversation_id=share.conversation_id, kind="with_data" if share.include_data else "no_data")
+        return JSONResponse(shared_view(share, conv), headers={**NO_STORE, "Referrer-Policy": "no-referrer"})
 
     return app
 
