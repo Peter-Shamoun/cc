@@ -57,6 +57,8 @@ class ChatMessageIn(BaseModel):
     role: str = "user"
     text: str = Field(default="", max_length=8000)
     parentId: str | None = Field(default=None, pattern=_ID)
+    #: id of an earlier user message this one replaces (an edit); the new message becomes its sibling (1.2.0)
+    editOf: str | None = Field(default=None, pattern=_ID)
 
 
 class ResumeIn(BaseModel):
@@ -253,6 +255,14 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         else:
             reply = users[-1].text.strip()
             question = reply
+            edited = None
+            if users[-1].editOf:
+                conv = store.get_conversation(ctx.principal, conversation_id) if body.conversationId else None
+                edited = next((m for m in (conv or {}).get("messages", [])
+                               if m.get("id") == users[-1].editOf and m.get("role") == "user"), None)
+                if edited is None:
+                    return error_json("validation", "Nothing to edit.", 404)
+                start_extra["editOf"] = edited["id"]
             if body.resume:
                 now = time.time()
                 for key in [k for k, v in clarifications.items() if v["expires"] < now]:
@@ -271,6 +281,12 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                         "createdAt": _iso(time.time())}
             if users[-1].parentId:
                 user_msg["parentId"] = users[-1].parentId
+            if edited is not None:
+                # an edit is a sibling of the message it replaces: same parent (none = a new root), CONTRACT.md §8
+                user_msg["editOf"] = edited["id"]
+                user_msg.pop("parentId", None)
+                if edited.get("parentId"):
+                    user_msg["parentId"] = edited["parentId"]
             if question != reply:
                 user_msg["analyzerQuestion"] = question
             try:

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://cc.local/api/contract/v1.schema.json",
   "title": "CC chat stream contract",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "One JSON object per SSE data: line. See api/CONTRACT.md. Validate an event against #/$defs/StreamEvent.",
   "$ref": "#/$defs/StreamEvent",
   "$defs": {
@@ -1167,6 +1167,9 @@
         "regenerateOf": {
           "$ref": "#/$defs/ID"
         },
+        "editOf": {
+          "$ref": "#/$defs/ID"
+        },
         "seq": {
           "type": "integer",
           "minimum": 0
@@ -1904,6 +1907,10 @@
               },
               "parentId": {
                 "$ref": "#/$defs/ID"
+              },
+              "editOf": {
+                "$ref": "#/$defs/ID",
+                "description": "Id of an earlier user message this one replaces (edit). The new message becomes its sibling: same parent, or a new root when editing the first question."
               }
             },
             "additionalProperties": true
