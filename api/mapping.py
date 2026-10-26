@@ -247,10 +247,15 @@ def outcome_parts(answer: AnalyzerAnswer, principal: Principal, downloads: Downl
         choices = [{"id": str(c.get("id") or f"c{i}")[:64], "label": str(c.get("label") or "")[:200],
                     **({"description": str(c["description"])} if c.get("description") else {})}
                    for i, c in enumerate(args.get("choices") or []) if isinstance(c, dict) and c.get("label")]
-        questions = normalize_questions(args.get("questions"))  # 1.23.0 (§6.1); demo args only until the analyzer's ask spec has it
+        # 1.23.0 (§6.1): the analyzer's ask (analyzer.tools.clarification_request) and the demo send `questions`
+        raw_questions = args.get("questions") or getattr(answer, "questions", None) or []
+        questions = normalize_questions(raw_questions)
+        lead_in = answer.text or str(args.get("question") or "") or "A few quick questions first:"
+        if raw_questions and not questions:  # nothing showable as a form: keep the questions readable as text
+            asked = [str(q.get("question") or "").strip() for q in raw_questions if isinstance(q, dict)]
+            lead_in = " ".join([lead_in] + [q for q in asked if q and q != lead_in])[:500]
         part = {"type": "clarification", "id": new_id("p_"), "clarificationId": new_id("q_"),
-                "question": answer.text or str(args.get("question") or "") or "A few quick questions first:",
-                "allowFreeText": True}
+                "question": lead_in, "allowFreeText": True}
         if questions:
             part["questions"] = questions
             choices = choices or [dict(o) for o in questions[0]["options"]]  # pre-1.23 clients answer question 1

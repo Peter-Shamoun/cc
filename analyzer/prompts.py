@@ -63,6 +63,9 @@ def system_prompt(config: AnalyzerConfig, *, dictionary_text: str = "", profile_
         parts.append("Data dictionary:\n" + dictionary_text)
     if profile_text:
         parts.append("Data profile:\n" + profile_text)
+    if config.enable_ask:
+        from analyzer.protocols import clarify_block
+        parts.append(clarify_block().strip())
     parts.append(
         "When you submit final_answer, the sql field is re-executed and scored. "
         "A hardcoded number with no table read does not count. "

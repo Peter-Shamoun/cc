@@ -1,0 +1,8 @@
+{
+ "B1": {"effort": "low", "self_correct": "none", "max_repairs": 0, "glossary": "invariants", "playbook": true,
+        "data_dictionary": true, "dictionary_detail": "derivations", "data_profile": true, "profile_detail": "enums",
+        "enable_lookup": true, "enable_examples": true, "examples_k": 3},
+ "B1_ask": {"effort": "low", "self_correct": "none", "max_repairs": 0, "glossary": "invariants", "playbook": true,
+        "data_dictionary": true, "dictionary_detail": "derivations", "data_profile": true, "profile_detail": "enums",
+        "enable_lookup": true, "enable_examples": true, "examples_k": 3, "enable_ask": true}
+}

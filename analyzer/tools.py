@@ -63,8 +63,89 @@ REWRITTEN_TOOL_DESCRIPTIONS = {
     "lookup_examples": "Solved questions from the training split with their SQL, for the shape of a query.",
     "final_answer": "Submit the SQL that computes the answer, once. Every number in the paragraph must come from it.",
     "refuse": "Decline patient identifiers, another customer's data, or any change to the data.",
-    "ask": "Ask one clarifying question when the request cannot be answered as stated.",
+    "ask": "Only when two readings of the question give different numbers, or a required scope is missing: ask "
+           "every clarifying question at once (up to 4), each with 2-4 options.",
 }
+
+# ``ask`` (contract 1.23.0 clarify, api/CONTRACT.md §6.1). One plain ``question`` stays valid; ``questions`` holds 1-4
+# form questions, each with a chip ``header`` and 2-4 ``options``, and ``question`` is then the form's lead-in. The
+# limits mirror api/clarify.py so the form the user sees is exactly what the model asked.
+ASK_MAX_QUESTIONS = 4
+ASK_MIN_OPTIONS, ASK_MAX_OPTIONS = 2, 4
+ASK_HEADER_MAX, ASK_QUESTION_MAX, ASK_LABEL_MAX, ASK_DESCRIPTION_MAX = 12, 500, 60, 200
+ASK_DEFAULT_LEAD_IN = "A few quick questions first:"
+ASK_DESCRIPTION = ("Ask the user before answering, when the request cannot be answered as stated. Either one plain "
+                   "question, or up to 4 questions at once, each with a short header and 2-4 options.")
+ASK_INPUT_SCHEMA = {"type": "object", "properties": {
+    "question": {"type": "string", "maxLength": ASK_QUESTION_MAX,
+                 "description": "One clarifying question; with questions, an optional lead-in sentence."},
+    "questions": {"type": "array", "minItems": 1, "maxItems": ASK_MAX_QUESTIONS, "items": {
+        "type": "object", "properties": {
+            "header": {"type": "string", "maxLength": ASK_HEADER_MAX, "description": "Chip label, e.g. Time basis"},
+            "question": {"type": "string", "maxLength": ASK_QUESTION_MAX},
+            "options": {"type": "array", "minItems": ASK_MIN_OPTIONS, "maxItems": ASK_MAX_OPTIONS, "items": {
+                "type": "object", "properties": {
+                    "label": {"type": "string", "maxLength": ASK_LABEL_MAX},
+                    "description": {"type": "string", "maxLength": ASK_DESCRIPTION_MAX}},
+                "required": ["label", "description"]}},
+            "multiSelect": {"type": "boolean"}},
+        "required": ["header", "question"]}}}}
+
+
+def _one_line(value) -> str:
+    return " ".join(str(value if value is not None else "").split())
+
+
+def clarification_request(arguments: dict) -> dict:
+    """``ask`` arguments -> ``{"text", "questions"}`` or ToolError (the model repairs and asks again).
+
+    A plain question gives ``questions == []`` and ``text`` = the question. With ``questions``, every question needs a
+    header, a question and 2-4 options with a label and a description; options may be left out only when a single
+    question is asked, which is then a plain question. Ids are q1.. and o1.. so the result is contract-ready.
+    ``text`` is the lead-in: the given ``question``, else the only question's text, else ASK_DEFAULT_LEAD_IN."""
+    lead_in = _one_line(arguments.get("question"))
+    raw_questions = arguments.get("questions")
+    if raw_questions in (None, "", []):
+        if not lead_in:
+            raise ToolError("ask needs a question, or questions")
+        if len(lead_in) > ASK_QUESTION_MAX:
+            raise ToolError(f"the question is longer than {ASK_QUESTION_MAX} characters")
+        return {"text": lead_in, "questions": []}
+    if not isinstance(raw_questions, list) or not all(isinstance(item, dict) for item in raw_questions):
+        raise ToolError("questions must be a list of objects with header, question and options")
+    if len(raw_questions) > ASK_MAX_QUESTIONS:
+        raise ToolError(f"ask at most {ASK_MAX_QUESTIONS} questions at once")
+    if len(raw_questions) == 1 and not raw_questions[0].get("options"):
+        text = _one_line(raw_questions[0].get("question"))
+        return clarification_request({"question": " ".join(part for part in (lead_in, text) if part)})
+    questions = []
+    for question_number, raw in enumerate(raw_questions, start=1):
+        header, text = _one_line(raw.get("header")), _one_line(raw.get("question"))
+        where = f"question {question_number}"
+        if not header or len(header) > ASK_HEADER_MAX:
+            raise ToolError(f"{where}: header must be 1-{ASK_HEADER_MAX} characters (a chip label such as 'Time basis')")
+        if not text or len(text) > ASK_QUESTION_MAX:
+            raise ToolError(f"{where}: question must be 1-{ASK_QUESTION_MAX} characters")
+        raw_options = raw.get("options") or []
+        if not isinstance(raw_options, list) or not ASK_MIN_OPTIONS <= len(raw_options) <= ASK_MAX_OPTIONS:
+            raise ToolError(f"{where}: give {ASK_MIN_OPTIONS}-{ASK_MAX_OPTIONS} options (the user can also type "
+                            "their own answer or skip)")
+        options = []
+        for option_number, option in enumerate(raw_options, start=1):
+            label = _one_line(option.get("label")) if isinstance(option, dict) else ""
+            description = _one_line(option.get("description")) if isinstance(option, dict) else ""
+            if not label or len(label) > ASK_LABEL_MAX or not description or len(description) > ASK_DESCRIPTION_MAX:
+                raise ToolError(f"{where}, option {option_number}: needs a label (at most {ASK_LABEL_MAX} characters) "
+                                f"and a description (at most {ASK_DESCRIPTION_MAX})")
+            options.append({"id": f"o{option_number}", "label": label, "description": description})
+        if len({option["label"].lower() for option in options}) != len(options):
+            raise ToolError(f"{where}: option labels must differ")
+        questions.append({"id": f"q{question_number}", "header": header, "question": text, "options": options,
+                          **({"multiSelect": True} if raw.get("multiSelect") is True else {})})
+    if len(lead_in) > ASK_QUESTION_MAX:
+        raise ToolError(f"the lead-in is longer than {ASK_QUESTION_MAX} characters")
+    text = lead_in or (questions[0]["question"] if len(questions) == 1 else ASK_DEFAULT_LEAD_IN)
+    return {"text": text, "questions": questions}
 
 
 class ToolError(ValueError):
@@ -185,10 +266,7 @@ def tool_spec(config: AnalyzerConfig) -> list[dict]:
                  "description": "Decline a request for patient identifiers, another customer, or a change to the data.",
                  "input_schema": {"type": "object", "properties": {"reason": {"type": "string"}}, "required": ["reason"]}})
     if config.enable_ask:
-        spec.append({"name": "ask",
-                     "description": "Ask one clarifying question when the request cannot be answered as stated.",
-                     "input_schema": {"type": "object", "properties": {"question": {"type": "string"}},
-                                      "required": ["question"]}})
+        spec.append({"name": "ask", "description": ASK_DESCRIPTION, "input_schema": ASK_INPUT_SCHEMA})
     if not config.enable_sql:
         spec = [tool for tool in spec if tool["name"] != "run_sql"]
     if config.rewritten_tool_descriptions:

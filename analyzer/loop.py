@@ -16,7 +16,7 @@ from analyzer.answer import AnalyzerAnswer
 from analyzer.checks import blocking_warnings
 from analyzer.config import AnalyzerConfig
 from analyzer.prompts import system_prompt, user_message
-from analyzer.tools import ToolError, ToolLayer, jsonable, tool_spec
+from analyzer.tools import ToolError, ToolLayer, clarification_request, jsonable, tool_spec
 
 _LOSSLESS = re.compile(r"\blossless\.", re.IGNORECASE)
 _TERMINAL = {"final_answer", "refuse", "ask"}
@@ -144,11 +144,14 @@ class Analyzer:
         if call.name == "ask":
             if not config.enable_ask:
                 return "repair", None, "ask is not enabled in this session"
-            question = str(call.arguments.get("question") or "").strip()
-            if not question:
-                return "repair", None, "ask requires a question"
-            return "done", _finish(kind="clarification", text=question, model=model, candidate_index=candidate_index,
-                                   usage=usage, trace=trace, audit=tools.audit, warnings=[]), None
+            try:
+                request = clarification_request(call.arguments or {})
+            except ToolError as exc:
+                return "repair", None, str(exc)
+            answer = _finish(kind="clarification", text=request["text"], model=model, candidate_index=candidate_index,
+                             usage=usage, trace=trace, audit=tools.audit, warnings=[])
+            answer.questions = request["questions"]
+            return "done", answer, None
         sql = str(call.arguments.get("sql") or "")
         prose = str(call.arguments.get("answer") or "")
         assumptions = list(call.arguments.get("assumptions") or [])

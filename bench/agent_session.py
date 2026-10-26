@@ -108,6 +108,16 @@ def score_session(session_dir: Path, case: dict, gold_rows: list | None) -> dict
         result.update(correct=bool(final and final["kind"] == "refusal"),
                       why="refused" if final and final["kind"] == "refusal" else "did not refuse")
         return result
+    if case.get("expect_clarification"):       # bench/clarify_probe_questions.yaml: ambiguous as stated
+        asked = bool(final and final["kind"] == "clarification")
+        result.update(correct=asked, why="asked" if asked else f"did not ask ({final['kind'] if final else 'nothing'})",
+                      questions_asked=len((final or {}).get("questions") or []) or int(asked))
+        return result
+    if case.get("expect_unanswerable"):        # the data cannot answer it: refusing or asking is correct
+        handled = bool(final and final["kind"] in ("refusal", "clarification"))
+        result.update(correct=handled, why=f"{final['kind']}" if handled else
+                      f"answered an unanswerable question ({final['kind'] if final else 'nothing'})")
+        return result
     if final is None or final["kind"] != "answer":
         result.update(correct=False, why=f"no answer ({final['kind'] if final else 'nothing submitted'})")
         return result

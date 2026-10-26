@@ -1,7 +1,9 @@
 """Batch evaluation of technique configurations with real Haiku / Sonnet subagents.
 
     python -m bench.eval_subagents prepare RUN --configs configs.json --models haiku,sonnet --repeats 3 [--only cat]
-        [--agent cli|analyzer] [--split train|validation|test] [--unseal-test]
+        [--agent cli|analyzer] [--split train|validation|test] [--unseal-test] [--cases FILE.yaml]
+        --cases runs a separate question file instead of the bench set (bench/clarify_probe_questions.yaml); it is
+        not in the frozen splits, so it cannot be combined with --split.
         -> .ccsim/agent_sessions/RUN/manifest.json  (one entry per session: path, model, prompt)
         --agent analyzer writes the analyzer's briefing plus its tool spec (analyzer.harness). Default stays the CLI.
         --split test is refused unless --unseal-test is set (the test split is sealed).
@@ -35,7 +37,7 @@ from bench.eval import load_cases  # noqa: E402
 
 def prepare(run_label: str, configs: dict, models: list[str], repeats: int, only: str | None = None,
             snapshot_path: Path | None = None, agent: str = "cli", question_split: str | None = None,
-            unseal_test: bool = False) -> Path:
+            unseal_test: bool = False, cases_file: Path | None = None) -> Path:
     if agent not in {"cli", "analyzer"}:
         raise ValueError(f"unknown agent {agent!r}; expected cli or analyzer")
     snap = Path(snapshot_path) if snapshot_path else snapshot()
@@ -43,7 +45,9 @@ def prepare(run_label: str, configs: dict, models: list[str], repeats: int, only
     if run_dir.exists():
         raise FileExistsError(f"{run_dir} exists; choose a new run label")
     entries = []
-    cases = load_cases(snapshot_path=snap)
+    if cases_file and question_split:
+        raise ValueError("--cases files are not in the frozen splits; drop --split")
+    cases = _load_cases_file(cases_file) if cases_file else load_cases(snapshot_path=snap)
     if question_split:
         from bench.splits import select_cases
         cases = select_cases(cases, question_split, unseal_test=unseal_test)
@@ -62,7 +66,8 @@ def prepare(run_label: str, configs: dict, models: list[str], repeats: int, only
                                if technique_config.get("enable_examples") and agent == "cli" else None)
                     s = create_session(snap, case, technique_config, model, run_label, library)
                     meta = json.loads((s / "session.json").read_text())
-                    meta.update(config_name=config_name, repeat=repeat)
+                    meta.update(config_name=config_name, repeat=repeat,
+                                **({"outside_splits": True} if cases_file else {}))
                     (s / "session.json").write_text(json.dumps(meta, indent=1))
                     if agent == "analyzer":
                         from analyzer.harness import manifest_fields, stamp_session
@@ -76,19 +81,31 @@ def prepare(run_label: str, configs: dict, models: list[str], repeats: int, only
                                         repeat=repeat, effort=technique_config.get("effort", "default"),
                                         agent=agent, prompt=prompt, **fields))
     (run_dir / "manifest.json").write_text(json.dumps(dict(run=run_label, snapshot=str(snap), configs=configs,
-                                                           entries=entries), indent=1))
+                                                           entries=entries,
+                                                           **({"cases_file": str(cases_file)} if cases_file else {})),
+                                                      indent=1))
     return run_dir / "manifest.json"
+
+
+def _load_cases_file(path) -> list[dict]:
+    import yaml
+    cases = yaml.safe_load(Path(path).read_text())
+    ids = [c["id"] for c in cases]
+    if len(ids) != len(set(ids)):
+        raise ValueError(f"duplicate question ids in {path}")
+    return cases
 
 
 def score(run_label: str) -> dict:
     run_dir = SESSIONS_ROOT / run_label
     manifest = json.loads((run_dir / "manifest.json").read_text())
-    cases = {c["id"]: c for c in load_cases(snapshot_path=Path(manifest["snapshot"]))}
+    cases = {c["id"]: c for c in (_load_cases_file(manifest["cases_file"]) if manifest.get("cases_file")
+                                  else load_cases(snapshot_path=Path(manifest["snapshot"])))}
     gold_cache = {}
     rows = []
     for e in manifest["entries"]:
         case = cases[e["question_id"]]
-        if not case.get("expect_refusal") and case["id"] not in gold_cache:
+        if case.get("gold_sql") and case["id"] not in gold_cache:
             gold_cache[case["id"]] = open_snapshot(Path(manifest["snapshot"]), escalate=case.get("escalate", False)) \
                 .execute(case["gold_sql"]).fetchall()
         r = score_session(Path(e["session"]), case, gold_cache.get(case["id"]))
@@ -184,10 +201,11 @@ def main():
                     help="cli: bench.agent_cli briefing. analyzer: analyzer prompt and tool spec")
     ap.add_argument("--split", help="train, validation, or test; test is sealed without --unseal-test")
     ap.add_argument("--unseal-test", action="store_true")
+    ap.add_argument("--cases", help="a separate question file (YAML list) instead of the bench set")
     a = ap.parse_args()
     if a.cmd == "prepare":
         print(prepare(a.run, json.loads(Path(a.configs).read_text()), a.models.split(","), a.repeats, a.only,
-                      a.snapshot, a.agent, a.split, a.unseal_test))
+                      a.snapshot, a.agent, a.split, a.unseal_test, a.cases))
     elif a.cmd == "contrast":
         print(json.dumps(contrast(a.run, a.baseline), indent=1))
     elif a.cmd == "effects":

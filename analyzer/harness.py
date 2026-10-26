@@ -100,7 +100,9 @@ def _final_commands(config: AnalyzerConfig, cli: str) -> list[tuple[str, str]]:
         finals.append(("answer", f"{cli} answer --spec '<json>' --text \"<one-paragraph answer>\"{confidence}"))
     finals.append(("refuse", f'{cli} refuse "<reason>"'))
     if config.enable_ask:
-        finals.append(("ask", f'{cli} ask "<clarifying question>"'))
+        finals.append(("ask", f"{cli} ask --questions '[{{\"header\": \"<short>\", \"question\": \"...?\", "
+                              f"\"options\": [{{\"label\": \"...\", \"description\": \"...\"}}, "
+                              f"{{\"label\": \"...\", \"description\": \"...\"}}]}}]'"))
     return finals
 
 
@@ -128,6 +130,8 @@ def _method_blocks(config: AnalyzerConfig, meta: dict, cli: str) -> str:
         blocks.append(protocols.decompose_block(cli))
     if config.report_confidence:
         blocks.append(protocols.confidence_block())
+    if config.enable_ask:
+        blocks.append(protocols.clarify_block())
     return "".join(block + "\n" for block in blocks)
 
 
@@ -135,7 +139,7 @@ def _examples(config: AnalyzerConfig, meta: dict) -> str:
     if not config.enable_examples:
         return ""
     from analyzer.examples import LIVE_QUESTION_ID, train_examples_for, train_examples_for_live_question
-    if meta["question_id"] == LIVE_QUESTION_ID:
+    if meta["question_id"] == LIVE_QUESTION_ID or meta.get("outside_splits"):   # a live or probe question: no split
         examples = train_examples_for_live_question(meta["snapshot_path"], meta["question"], config.examples_k)
     else:
         examples = train_examples_for(meta["snapshot_path"], meta["question_id"], config.examples_k)
