@@ -3,15 +3,19 @@ import clsx from 'clsx';
 import { Check, Copy } from 'lucide-react';
 import { copyText } from '../lib/csv';
 
-/** `tip`: quick styled tooltip under the button (ChatGPT/Claude message actions) instead of the slow native title. */
-export function IconButton({ label, className, children, tip, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; children: ReactNode; tip?: boolean }) {
+/**
+ * `tip`: quick styled tooltip under the button (ChatGPT/Claude) instead of the slow native title. Pass a string to
+ * show extra text such as a shortcut ("New chat · Ctrl ⇧ O"); `tipAt` moves it right of the button (rail) or
+ * right-aligns it (buttons at the window's right edge).
+ */
+export function IconButton({ label, className, children, tip, tipAt, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; children: ReactNode; tip?: boolean | string; tipAt?: 'right' | 'end' }) {
   return (
     <button
       type="button"
       aria-label={label}
       title={tip ? undefined : label}
-      data-tip={tip ? label : undefined}
-      className={clsx('inline-flex h-8 w-8 items-center justify-center rounded-lg text-fg-muted hover:bg-hover hover:text-fg transition-colors disabled:opacity-40', tip && 'cc-tip', className)}
+      data-tip={tip ? (typeof tip === 'string' ? tip : label) : undefined}
+      className={clsx('inline-flex h-8 w-8 items-center justify-center rounded-lg text-fg-muted hover:bg-hover hover:text-fg transition-colors disabled:opacity-40', tip && 'cc-tip', tip && tipAt && `cc-tip-${tipAt}`, className)}
       {...rest}
     >
       {children}
