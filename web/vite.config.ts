@@ -5,6 +5,15 @@ import tailwindcss from '@tailwindcss/vite';
 import fs from 'node:fs';
 import path from 'node:path';
 import { NONCE_PLACEHOLDER, newNonce, securityHeaders } from './src/security/headers.ts';
+import { bootShellHtml } from './scripts/boot_shell.mjs';
+
+/** Boot shell (QA-P8): see scripts/boot_shell.mjs. Applied to built and dev HTML alike. */
+function bootShellPlugin(root: string): Plugin {
+  return {
+    name: 'cc-boot-shell',
+    transformIndexHtml: { order: 'post', handler: (html) => bootShellHtml(html, fs.readFileSync(path.join(root, 'public/theme-init.js'), 'utf8')) },
+  };
+}
 
 const env = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {};
 
@@ -65,7 +74,7 @@ export default defineConfig(({ command }) => {
   const devNonce = newNonce();
   const api = env.CC_API_URL ?? 'http://127.0.0.1:8787';
   return {
-    plugins: [react(), tailwindcss(), securityHeadersPlugin(devNonce)],
+    plugins: [react(), tailwindcss(), securityHeadersPlugin(devNonce), bootShellPlugin(path.dirname(new URL(import.meta.url).pathname))],
     html: { cspNonce: command === 'serve' && !env.CC_PREVIEW ? devNonce : NONCE_PLACEHOLDER },
     server: { port: 5173, host: '127.0.0.1', proxy: { '/api': { target: api, changeOrigin: true } } },
     preview: { host: '127.0.0.1', proxy: { '/api': { target: api, changeOrigin: true } } },
