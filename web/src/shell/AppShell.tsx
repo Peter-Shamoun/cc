@@ -15,6 +15,8 @@ import { ThreadView, type ThreadActions } from './ThreadView';
 import { ArtifactPanel } from '../components/ArtifactPanel';
 import { SUGGESTIONS } from '../fixtures';
 import { Header } from './Header';
+import { OfflineBanner } from './OfflineBanner';
+import { useOnline } from '../lib/useOnline';
 import { SearchDialog } from './SearchDialog';
 import { SettingsDialog, ShortcutsDialog } from './SettingsDialog';
 import { ToastProvider, useFocusTrap, useToast } from './primitives';
@@ -364,8 +366,12 @@ function ShellInner() {
     });
     return true;
   };
+  const online = useOnline();
   const composer = (autoFocus: boolean, placeholder?: string) => (
-    <Composer onEditLast={editLast} onSend={send} onStop={chat.stop} busy={chat.busy} autoFocus={autoFocus} initial={draft} placeholder={placeholder} draftKey={draftKey} enterToSend={enterToSend} onCommand={onCommand} />
+    <>
+      {!online && <OfflineBanner />}
+      <Composer onEditLast={editLast} onSend={send} onStop={chat.stop} busy={chat.busy} autoFocus={autoFocus} initial={draft} placeholder={placeholder} draftKey={draftKey} enterToSend={enterToSend} onCommand={onCommand} offline={!online} />
+    </>
   );
   const threadActions: ThreadActions = {
     editAt: (i, t) => { atBottomRef.current = true; setAtBottom(true); chat.editAt(i, t); },

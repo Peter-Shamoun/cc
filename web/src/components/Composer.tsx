@@ -28,13 +28,15 @@ export interface ComposerProps {
   onCommand?: (c: SlashCommand) => void;
   /** Up-arrow in an empty composer: edit the last question. Return false if there is none. */
   onEditLast?: () => boolean;
+  /** Offline: the draft stays editable, sending waits until the browser reconnects. */
+  offline?: boolean;
 }
 
 /**
  * ChatGPT/Claude-style composer: auto-growing textarea, send button that morphs into stop while a
  * reply streams, Enter vs Shift+Enter (configurable), IME-safe, per-chat drafts and a "/" command menu.
  */
-export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder = 'Ask about your claims', draftKey, enterToSend = true, onCommand, onEditLast }: ComposerProps) {
+export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder = 'Ask about your claims', draftKey, enterToSend = true, onCommand, onEditLast, offline }: ComposerProps) {
   const [value, setValueState] = useState(() => (draftKey ? getDraft(draftKey) : ''));
   const ref = useRef<HTMLTextAreaElement>(null);
   const [slashIdx, setSlashIdx] = useState(0);
@@ -81,13 +83,13 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
   };
   const submit = () => {
     if (slash?.length) { runCommand(slash[slashIdx]); return; }
-    if ((!value.trim() && !pastes.length) || busy) return;
+    if ((!value.trim() && !pastes.length) || busy || offline) return;
     onSend([value.trim(), ...pastes.map((x) => (x.name ? `${x.name}:\n${x.text}` : x.text))].filter(Boolean).join('\n\n'));
     setNotice('');
     setValue('');
     setPastes([]);
   };
-  const canSend = !!value.trim() || pastes.length > 0;
+  const canSend = (!!value.trim() || pastes.length > 0) && !offline;
   const removePaste = (id: number) => { setPastes((ps) => ps.filter((x) => x.id !== id)); ref.current?.focus(); };
   return (
     <form
@@ -181,7 +183,7 @@ export function Composer({ onSend, onStop, busy, autoFocus, initial, placeholder
               <Square size={12} fill="currentColor" />
             </button>
           ) : (
-            <button key="send" type="submit" aria-label="Send message" disabled={!canSend}
+            <button key="send" type="submit" aria-label="Send message" disabled={!canSend} title={offline ? "You're offline" : undefined}
               className={clsx('absolute inset-0 flex items-center justify-center rounded-full bg-accent text-accent-fg transition-[opacity,transform] duration-150 motion-safe:animate-[cc-pop_150ms_ease-out]', canSend ? 'opacity-100 active:scale-95' : 'opacity-30')}>
               <ArrowUp size={18} strokeWidth={2.5} />
             </button>
