@@ -130,6 +130,10 @@ protocol need a small shim to `Completion`: see §6 (R7) and `api/analyst_shim.p
   `strategy="candidates"` with `candidates3=0` is a contradiction and raises. `strict=True` rejects unsupported
   factors; otherwise they are reported in `fidelity`, so a caller never silently runs a different cell. `api.app` still
   only echoes the strategy.
+  `message.start.strategy` from the adapter is always a `GET /api/capabilities` id (`adapter_strategy`): the request's
+  `options.strategy` when given (an unknown id raises), else inferred from the run: several candidates →
+  `candidates`, a model change mid-run → `cascade`, otherwise the default `tool_loop`. Recordings may carry
+  `"strategy"`. (Before this, the stub sent `"analyst"`, which is not a capability id.)
 * **R5 Usage.** Use `Completion.usage` tokens. `LiveTap` falls back to an approximation when they are missing.
   `costIsEstimate` stays true.
 * **R6 Cancel during SQL.** This needs an analyzer cancel hook (CONTRACT §8). Until then, Stop takes effect between

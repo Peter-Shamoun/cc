@@ -12,6 +12,7 @@ from api.contract import validate_event
 from api.live import LiveTap, _Pending
 from api.tests.conftest import DX, LABS, events
 from api.tests.test_contract import check_invariants
+from api.tests.timing import budget
 
 
 def _ids(text):
@@ -136,7 +137,7 @@ def test_stop_is_idempotent_and_owner_scoped():
                 t0 = time.perf_counter()
                 threading.Timer(0.05, lambda: [client.post(f"/api/chat/{mid}/stop", headers=LABS) for _ in range(2)]).start()
     assert got[-1]["finishReason"] == "aborted"
-    assert time.perf_counter() - t0 < 3.0
+    assert time.perf_counter() - t0 < budget(3.0)
     check_invariants(got)
 
 
