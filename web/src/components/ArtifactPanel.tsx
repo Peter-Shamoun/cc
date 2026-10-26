@@ -12,6 +12,7 @@ import { useAdapter, useBlobUrl } from '../adapters/context';
 import { slug, type Artifact } from './artifacts';
 import { getPref, setPref } from '../lib/prefs';
 import { useFocusTrap } from '../shell/primitives';
+import { ErrorBoundary } from './ErrorBoundary';
 
 const MIN_W = 360;
 const PHONE = '(max-width: 767px)';
@@ -53,8 +54,21 @@ function sqlFor(a: Artifact): CodePart | undefined {
   return a.related.find((p): p is CodePart => p.type === 'code' && p.id === (a.part as { sqlPartId?: string }).sqlPartId);
 }
 
+/**
+ * The artifact panel inside its own error boundary: a render crash there shows a panel-shaped card (Try again, Close
+ * panel) and leaves the chat usable. It retries by itself when another artifact or version is opened.
+ */
+export function ArtifactPanel(props: Parameters<typeof ArtifactPanelView>[0]) {
+  return (
+    <ErrorBoundary scope="section" name="ArtifactPanel" resetKey={props.artifact.part} onDismiss={props.onClose} dismissLabel="Close panel"
+      fallbackClassName="flex h-full w-[min(22rem,100%)] shrink-0 flex-col items-start justify-center gap-0 border-l border-line bg-sidebar p-6 text-sm text-fg-muted">
+      <ArtifactPanelView {...props} />
+    </ErrorBoundary>
+  );
+}
+
 /** Claude-style artifact panel (spec §4.10): resizable, segmented tabs, copy/download/full screen/close. */
-export function ArtifactPanel({ artifact, onClose, versions, onVersion }: { artifact: Artifact; onClose: () => void; versions?: Artifact[]; onVersion?: (v: number) => void }) {
+function ArtifactPanelView({ artifact, onClose, versions, onVersion }: { artifact: Artifact; onClose: () => void; versions?: Artifact[]; onVersion?: (v: number) => void }) {
   const adapter = useAdapter();
   const [width, setWidthRaw] = useState(initialWidth);
   const phone = usePhone();
