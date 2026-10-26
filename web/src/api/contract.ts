@@ -14,7 +14,7 @@ import type {
   TextPart, ToolCallPart, ArtifactPart, PartBase, StreamEvent as LegacyStreamEvent,
 } from '../lib/contract';
 import { reduce as legacyReduce } from '../lib/contract';
-import type { Source } from '../contract/v1.gen';
+import type { ErrorCode, Source } from '../contract/v1.gen';
 import { EVENT_SHAPES } from '../contract/v1.gen';
 
 export type {
@@ -22,7 +22,7 @@ export type {
   Sensitivity, StatusPart, TablePart, TextPart, ToolCallPart, ArtifactPart, PartBase,
 };
 
-export const CONTRACT_VERSION = '1.12.0';
+export const CONTRACT_VERSION = '1.13.0';
 export const CONTRACT_MAJOR = 1;
 
 // ---------------------------------------------------------------- new parts (v1)
@@ -207,8 +207,13 @@ export interface ChatRequest {
   scenario?: 'table' | 'chart' | 'repair' | 'abstain' | 'clarify' | 'escalation' | 'error' | 'candidates' | 'slow';
 }
 
-/** `code` known values: see the schema. 1.5.0: `payload_too_large` (413) with `legacyCode: 'validation'` and `maxBytes`. */
-export interface HttpError { error: { code: string; message: string; legacyCode?: string; maxBytes?: number } }
+/**
+ * Every non-stream 4xx/5xx body (CONTRACT.md §1). `code` is the open `ErrorCode` registry (1.13.0): branch on known
+ * values, then `legacyCode`, then the HTTP status. 1.5.0: `payload_too_large` (413) with `legacyCode: 'validation'` and
+ * `maxBytes`. 1.13.0: regenerate/edit 404s are `not_found` (`legacyCode: 'validation'`); stop/delete 404s keep
+ * `stopped: false` / `deleted: false` next to `error`.
+ */
+export interface HttpError { error: { code: ErrorCode; message: string; legacyCode?: string; maxBytes?: number } }
 
 // ---------------------------------------------------------------- client view + reducer
 

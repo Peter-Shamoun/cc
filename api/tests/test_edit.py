@@ -41,7 +41,8 @@ def test_edit_of_unknown_or_foreign_message_is_404(client):
     first = events(_send(client, "How many claims?", id="u_1"))
     cid = first[0]["conversationId"]
     r = _send(client, "x", cid, editOf="u_nope")
-    assert r.status_code == 404 and r.json()["error"]["code"] == "validation"
+    assert r.status_code == 404 and r.json()["error"] == {"code": "not_found", "message": "Nothing to edit.",
+                                                           "legacyCode": "validation"}   # 1.13.0
     # editOf must point at a user message
     r = _send(client, "x", cid, editOf=first[-1]["messageId"])
     assert r.status_code == 404

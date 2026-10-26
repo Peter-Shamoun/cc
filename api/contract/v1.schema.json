@@ -2,17 +2,24 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://claimclarity.local/api/contract/v1.schema.json",
   "title": "ClaimClarity chat stream contract",
-  "version": "1.12.0",
+  "version": "1.13.0",
   "description": "One JSON object per SSE data: line. See api/CONTRACT.md. Validate an event against #/$defs/StreamEvent.",
   "$ref": "#/$defs/StreamEvent",
   "$defs": {
     "ID": {
+      "description": "Opaque, non-PHI id: `^[A-Za-z0-9_:.-]+$`, 1–128 chars. Never derived from data values.",
       "type": "string",
       "minLength": 1,
       "maxLength": 128,
       "pattern": "^[A-Za-z0-9_:.-]+$"
     },
+    "Timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "1.13.0: ISO-8601 UTC timestamp, e.g. 2026-10-25T19:00:00Z. Clients must also accept fractional seconds and a numeric offset."
+    },
     "Sensitivity": {
+      "description": "Closed. Data classification of a part; `phi` content is never persisted in a share or export.",
       "enum": [
         "none",
         "deidentified",
@@ -31,9 +38,13 @@
         "datetime",
         "boolean",
         "code"
-      ]
+      ],
+      "x-open": true,
+      "x-fallback": "string",
+      "description": "Open (1.13.0): a newer server may add values; render an unknown value as `string`."
     },
     "Column": {
+      "description": "A display column of a table part. `key` indexes the row arrays; `label` is display copy.",
       "type": "object",
       "required": [
         "key",
@@ -63,6 +74,7 @@
       "additionalProperties": true
     },
     "ColumnSummary": {
+      "description": "A database column name (and optional type) reported by a SQL step. Steps report raw `name`s; table parts carry display `Column`s (`key`/`label`).",
       "type": "object",
       "required": [
         "name"
@@ -78,6 +90,7 @@
       "additionalProperties": true
     },
     "StepError": {
+      "description": "Why a SQL step failed. `message` is scrubbed: no literals, dates or ids from the data.",
       "type": "object",
       "required": [
         "code",
@@ -85,7 +98,17 @@
       ],
       "properties": {
         "code": {
-          "type": "string"
+          "type": "string",
+          "x-open": true,
+          "x-known": [
+            "binder_error",
+            "syntax_error",
+            "timeout",
+            "guard_blocked",
+            "query_failed",
+            "cancelled"
+          ],
+          "description": "Open. Database-side failure class; `cancelled` closes a step the user stopped. Unknown codes render as a generic query failure."
         },
         "message": {
           "type": "string",
@@ -95,6 +118,7 @@
       "additionalProperties": true
     },
     "ModelRef": {
+      "description": "A model named in an escalation.",
       "type": "object",
       "required": [
         "model"
@@ -108,7 +132,10 @@
             "small",
             "medium",
             "large"
-          ]
+          ],
+          "x-open": true,
+          "x-fallback": "medium",
+          "description": "Open (1.13.0): a newer server may add values; render an unknown value as `medium`."
         },
         "provider": {
           "type": "string"
@@ -117,6 +144,7 @@
       "additionalProperties": true
     },
     "Usage": {
+      "description": "Run totals on `message.end` (CONTRACT.md §7). `costUsd` is an estimate when `costIsEstimate` is true.",
       "type": "object",
       "required": [
         "queries",
@@ -218,7 +246,15 @@
                 "type": "string"
               },
               "role": {
-                "type": "string"
+                "type": "string",
+                "x-open": true,
+                "x-known": [
+                  "analyst",
+                  "escalation",
+                  "judge",
+                  "verifier"
+                ],
+                "description": "Open. What this model did in the run."
               },
               "inputTokens": {
                 "type": "integer",
@@ -244,6 +280,7 @@
       "additionalProperties": true
     },
     "Suggestion": {
+      "description": "A rephrasing offered by an abstain part; clicking it sends `text` as a new question.",
       "type": "object",
       "required": [
         "id",
@@ -261,6 +298,7 @@
       "additionalProperties": true
     },
     "Choice": {
+      "description": "One option of a clarification part.",
       "type": "object",
       "required": [
         "id",
@@ -281,6 +319,7 @@
       "additionalProperties": true
     },
     "TextPart": {
+      "description": "Markdown answer text.",
       "type": "object",
       "required": [
         "type",
@@ -301,7 +340,7 @@
           "$ref": "#/$defs/Sensitivity"
         },
         "createdAt": {
-          "type": "string"
+          "$ref": "#/$defs/Timestamp"
         },
         "text": {
           "type": "string"
@@ -310,6 +349,7 @@
       "additionalProperties": true
     },
     "ReasoningPart": {
+      "description": "Optional thinking summary. Real backends send counts and labels only (never raw model text).",
       "type": "object",
       "required": [
         "type",
@@ -330,7 +370,7 @@
           "$ref": "#/$defs/Sensitivity"
         },
         "createdAt": {
-          "type": "string"
+          "$ref": "#/$defs/Timestamp"
         },
         "summary": {
           "type": "string"
@@ -343,6 +383,7 @@
       "additionalProperties": true
     },
     "StatusPart": {
+      "description": "Legacy (pre-v1) status line. v1 streams `status` events instead.",
       "type": "object",
       "required": [
         "type",
@@ -363,7 +404,7 @@
           "$ref": "#/$defs/Sensitivity"
         },
         "createdAt": {
-          "type": "string"
+          "$ref": "#/$defs/Timestamp"
         },
         "label": {
           "type": "string"
@@ -372,6 +413,7 @@
       "additionalProperties": true
     },
     "ToolCallPart": {
+      "description": "Legacy (pre-v1) tool call. Still valid; v1 backends prefer `step.*` events.",
       "type": "object",
       "required": [
         "type",
@@ -394,10 +436,11 @@
           "$ref": "#/$defs/Sensitivity"
         },
         "createdAt": {
-          "type": "string"
+          "$ref": "#/$defs/Timestamp"
         },
         "tool": {
-          "type": "string"
+          "type": "string",
+          "description": "Legacy (pre-v1) tool name. v1 backends emit `step.*` events instead."
         },
         "label": {
           "type": "string"
@@ -456,6 +499,7 @@
       "additionalProperties": true
     },
     "TablePart": {
+      "description": "A result table: preview rows (≤50) plus `rowCount`; the full result is the CSV.",
       "type": "object",
       "required": [
         "type",
@@ -478,7 +522,7 @@
           "$ref": "#/$defs/Sensitivity"
         },
         "createdAt": {
-          "type": "string"
+          "$ref": "#/$defs/Timestamp"
         },
         "title": {
           "type": "string"
@@ -503,10 +547,12 @@
           "type": "boolean"
         },
         "resultId": {
-          "$ref": "#/$defs/ID"
+          "$ref": "#/$defs/ID",
+          "description": "Id of the full result set this preview came from (`ChartPart.dataResultId` points here). Equal to `csvFileId` today; prefer `csvFileId` for downloads."
         },
         "csvFileId": {
-          "$ref": "#/$defs/ID"
+          "$ref": "#/$defs/ID",
+          "description": "Download id: `GET /api/download/{csvFileId}` (auth, short-lived). Absent when the result is not downloadable (e.g. `dataWithheld`)."
         },
         "sqlPartId": {
           "$ref": "#/$defs/ID"
@@ -544,6 +590,7 @@
       "additionalProperties": true
     },
     "FilePart": {
+      "description": "A downloadable file chip.",
       "type": "object",
       "required": [
         "type",
@@ -567,7 +614,7 @@
           "$ref": "#/$defs/Sensitivity"
         },
         "createdAt": {
-          "type": "string"
+          "$ref": "#/$defs/Timestamp"
         },
         "fileId": {
           "$ref": "#/$defs/ID"
@@ -590,12 +637,13 @@
           "type": "boolean"
         },
         "expiresAt": {
-          "type": "string"
+          "$ref": "#/$defs/Timestamp"
         }
       },
       "additionalProperties": true
     },
     "ImagePart": {
+      "description": "A static image (e.g. a rendered chart). Blobs are fetched with auth.",
       "type": "object",
       "required": [
         "type",
@@ -620,7 +668,7 @@
           "$ref": "#/$defs/Sensitivity"
         },
         "createdAt": {
-          "type": "string"
+          "$ref": "#/$defs/Timestamp"
         },
         "blobId": {
           "$ref": "#/$defs/ID"
@@ -653,6 +701,7 @@
       "additionalProperties": true
     },
     "ChartPart": {
+      "description": "A Vega-Lite chart with inline `data.values` (never `data.url`).",
       "type": "object",
       "required": [
         "type",
@@ -675,7 +724,7 @@
           "$ref": "#/$defs/Sensitivity"
         },
         "createdAt": {
-          "type": "string"
+          "$ref": "#/$defs/Timestamp"
         },
         "library": {
           "const": "vega-lite"
@@ -715,7 +764,8 @@
           "additionalProperties": true
         },
         "dataResultId": {
-          "$ref": "#/$defs/ID"
+          "$ref": "#/$defs/ID",
+          "description": "The `TablePart.resultId` whose rows the chart plots when `data` is absent."
         },
         "staticImageBlobId": {
           "$ref": "#/$defs/ID"
@@ -734,6 +784,7 @@
       "additionalProperties": true
     },
     "CodePart": {
+      "description": "A code block; `role: query` is the SQL behind the answer.",
       "type": "object",
       "required": [
         "type",
@@ -755,10 +806,11 @@
           "$ref": "#/$defs/Sensitivity"
         },
         "createdAt": {
-          "type": "string"
+          "$ref": "#/$defs/Timestamp"
         },
         "language": {
-          "type": "string"
+          "type": "string",
+          "description": "Highlighter language, e.g. `sql`, `json`, `python`. Unknown languages render as plain text."
         },
         "code": {
           "type": "string"
@@ -771,7 +823,10 @@
             "query",
             "snippet",
             "spec"
-          ]
+          ],
+          "x-open": true,
+          "x-fallback": "snippet",
+          "description": "Open (1.13.0): a newer server may add values; render an unknown value as `snippet`."
         },
         "collapsed": {
           "type": "boolean"
@@ -786,6 +841,7 @@
       "additionalProperties": true
     },
     "CalloutPart": {
+      "description": "Assumptions, caveats, data-quality and PHI-redaction notes.",
       "type": "object",
       "required": [
         "type",
@@ -807,7 +863,7 @@
           "$ref": "#/$defs/Sensitivity"
         },
         "createdAt": {
-          "type": "string"
+          "$ref": "#/$defs/Timestamp"
         },
         "variant": {
           "enum": [
@@ -816,7 +872,10 @@
             "data_quality",
             "phi_redaction",
             "info"
-          ]
+          ],
+          "x-open": true,
+          "x-fallback": "info",
+          "description": "Open (1.13.0): a newer server may add values; render an unknown value as `info`."
         },
         "title": {
           "type": "string"
@@ -847,6 +906,7 @@
       "additionalProperties": true
     },
     "ArtifactPart": {
+      "description": "A versioned side-panel artifact (CONTRACT.md §16).",
       "type": "object",
       "required": [
         "type",
@@ -871,7 +931,7 @@
           "$ref": "#/$defs/Sensitivity"
         },
         "createdAt": {
-          "type": "string"
+          "$ref": "#/$defs/Timestamp"
         },
         "artifactId": {
           "$ref": "#/$defs/ID"
@@ -927,6 +987,7 @@
       "additionalProperties": true
     },
     "ErrorPart": {
+      "description": "The run failed (`finishReason: error`). Exactly one per failed message.",
       "type": "object",
       "required": [
         "type",
@@ -950,10 +1011,22 @@
           "$ref": "#/$defs/Sensitivity"
         },
         "createdAt": {
-          "type": "string"
+          "$ref": "#/$defs/Timestamp"
         },
         "code": {
-          "type": "string"
+          "type": "string",
+          "x-open": true,
+          "x-known": [
+            "internal",
+            "query_failed",
+            "access_denied",
+            "timeout",
+            "rate_limited",
+            "auth_expired",
+            "validation",
+            "offline"
+          ],
+          "description": "Open. `internal` is the server's catch-all (e.g. the analysis failed, paid model APIs disabled); `offline` is client-made. Unknown codes: render `title`/`message` and honour `retryable`."
         },
         "title": {
           "type": "string"
@@ -976,6 +1049,7 @@
       "additionalProperties": true
     },
     "AbstainPart": {
+      "description": "A deliberate non-answer (`finishReason: abstain`): an outcome, not an error.",
       "type": "object",
       "required": [
         "type",
@@ -998,7 +1072,7 @@
           "$ref": "#/$defs/Sensitivity"
         },
         "createdAt": {
-          "type": "string"
+          "$ref": "#/$defs/Timestamp"
         },
         "category": {
           "enum": [
@@ -1009,7 +1083,10 @@
             "low_confidence",
             "unsupported",
             "policy"
-          ]
+          ],
+          "x-open": true,
+          "x-fallback": "unsupported",
+          "description": "Open (1.13.0): a newer server may add values; render an unknown value as `unsupported`."
         },
         "reason": {
           "type": "string"
@@ -1029,6 +1106,7 @@
       "additionalProperties": true
     },
     "ClarificationPart": {
+      "description": "A question back to the user (`finishReason: needs_input`).",
       "type": "object",
       "required": [
         "type",
@@ -1051,7 +1129,7 @@
           "$ref": "#/$defs/Sensitivity"
         },
         "createdAt": {
-          "type": "string"
+          "$ref": "#/$defs/Timestamp"
         },
         "clarificationId": {
           "$ref": "#/$defs/ID"
@@ -1073,7 +1151,7 @@
           "type": "boolean"
         },
         "expiresAt": {
-          "type": "string"
+          "$ref": "#/$defs/Timestamp"
         },
         "answered": {
           "type": "boolean"
@@ -1082,6 +1160,7 @@
       "additionalProperties": true
     },
     "Part": {
+      "description": "Any persisted message part. Unknown `type`s render as an \"Unsupported content\" chip.",
       "oneOf": [
         {
           "$ref": "#/$defs/TextPart"
@@ -1128,6 +1207,7 @@
       ]
     },
     "MessageStart": {
+      "description": "First event of every stream (seq 0).",
       "type": "object",
       "required": [
         "type",
@@ -1151,10 +1231,12 @@
           "pattern": "^1\\.\\d+\\.\\d+$"
         },
         "model": {
-          "type": "string"
+          "type": "string",
+          "description": "The model that starts the run (a ModelOption id other than `auto`, or the server's own id when it was `auto`). Escalations announce later models."
         },
         "strategy": {
-          "type": "string"
+          "type": "string",
+          "description": "The StrategyOption id the run uses (GET /api/capabilities); the default when the request named none. Adapters for research agents may send another id: treat unknown ids as a plain label."
         },
         "parentId": {
           "$ref": "#/$defs/ID"
@@ -1193,6 +1275,7 @@
       "additionalProperties": true
     },
     "Status": {
+      "description": "Transient progress label; `null` clears it.",
       "type": "object",
       "required": [
         "type",
@@ -1221,6 +1304,7 @@
       "additionalProperties": true
     },
     "StepSqlRunning": {
+      "description": "A SQL query started. Followed by `step.sql_result` with the same `stepId`.",
       "type": "object",
       "required": [
         "type",
@@ -1247,7 +1331,10 @@
             "candidate",
             "repair",
             "check"
-          ]
+          ],
+          "x-open": true,
+          "x-fallback": "answer",
+          "description": "Open (1.13.0): a newer server may add values; render an unknown value as `answer`."
         },
         "attempt": {
           "type": "integer",
@@ -1270,6 +1357,7 @@
       "additionalProperties": true
     },
     "StepSqlResult": {
+      "description": "A SQL query finished (or failed, or was cancelled).",
       "type": "object",
       "required": [
         "type",
@@ -1316,6 +1404,7 @@
       "additionalProperties": true
     },
     "StepRepairAttempt": {
+      "description": "A failed query is being revised; the revision runs as a new `step.sql_running` with `repairOf`.",
       "type": "object",
       "required": [
         "type",
@@ -1361,6 +1450,7 @@
       "additionalProperties": true
     },
     "StepCheck": {
+      "description": "A verifier or sanity check fired.",
       "type": "object",
       "required": [
         "type",
@@ -1378,7 +1468,17 @@
           "$ref": "#/$defs/ID"
         },
         "check": {
-          "type": "string"
+          "type": "string",
+          "x-open": true,
+          "x-known": [
+            "verifier",
+            "row_count",
+            "null_share",
+            "join_fanout",
+            "date_range",
+            "definition"
+          ],
+          "description": "Open. Unknown checks render by `verdict` with the `message`."
         },
         "verdict": {
           "enum": [
@@ -1402,7 +1502,10 @@
             "abstain",
             "escalate",
             "clarify"
-          ]
+          ],
+          "x-open": true,
+          "x-fallback": "none",
+          "description": "Open (1.13.0): a newer server may add values; render an unknown value as `none`."
         },
         "seq": {
           "type": "integer",
@@ -1412,6 +1515,7 @@
       "additionalProperties": true
     },
     "StepExplore": {
+      "description": "A schema or data probe finished.",
       "type": "object",
       "required": [
         "type",
@@ -1428,7 +1532,19 @@
           "$ref": "#/$defs/ID"
         },
         "probe": {
-          "type": "string"
+          "type": "string",
+          "x-open": true,
+          "x-known": [
+            "list_views",
+            "describe_view",
+            "sample_values",
+            "lookup_glossary",
+            "lookup_dictionary",
+            "search_examples",
+            "profile",
+            "request_escalation"
+          ],
+          "description": "Open. Unknown probes render with a generic icon and the `summary`."
         },
         "target": {
           "type": "string"
@@ -1449,6 +1565,7 @@
       "additionalProperties": true
     },
     "StepCandidates": {
+      "description": "Multi-candidate comparison finished.",
       "type": "object",
       "required": [
         "type",
@@ -1519,7 +1636,15 @@
           ]
         },
         "method": {
-          "type": "string"
+          "type": "string",
+          "x-open": true,
+          "x-known": [
+            "vote",
+            "execution_agreement",
+            "verifier",
+            "judge"
+          ],
+          "description": "Open. How the candidate was chosen."
         },
         "rationale": {
           "type": "string",
@@ -1533,6 +1658,7 @@
       "additionalProperties": true
     },
     "Escalation": {
+      "description": "The run moved to a bigger model.",
       "type": "object",
       "required": [
         "type",
@@ -1564,7 +1690,10 @@
             "complexity",
             "disagreement",
             "user"
-          ]
+          ],
+          "x-open": true,
+          "x-fallback": "complexity",
+          "description": "Why the run moved to a bigger model. Open (1.13.0): a newer server may add values; render an unknown value as `complexity`."
         },
         "stepId": {
           "$ref": "#/$defs/ID"
@@ -1577,6 +1706,7 @@
       "additionalProperties": true
     },
     "TextStart": {
+      "description": "A text part starts streaming.",
       "type": "object",
       "required": [
         "type",
@@ -1598,6 +1728,7 @@
       "additionalProperties": true
     },
     "TextDelta": {
+      "description": "Markdown appended to a streaming text part.",
       "type": "object",
       "required": [
         "type",
@@ -1623,6 +1754,7 @@
       "additionalProperties": true
     },
     "TextEnd": {
+      "description": "A text part finished streaming.",
       "type": "object",
       "required": [
         "type",
@@ -1644,6 +1776,7 @@
       "additionalProperties": true
     },
     "ReasoningDelta": {
+      "description": "Text appended to the reasoning part. Real backends send label/count summaries only.",
       "type": "object",
       "required": [
         "type",
@@ -1669,6 +1802,7 @@
       "additionalProperties": true
     },
     "ReasoningEnd": {
+      "description": "The reasoning part is complete.",
       "type": "object",
       "required": [
         "type",
@@ -1695,6 +1829,7 @@
       "additionalProperties": true
     },
     "CodeDelta": {
+      "description": "Text appended to a streaming code part.",
       "type": "object",
       "required": [
         "type",
@@ -1720,6 +1855,7 @@
       "additionalProperties": true
     },
     "PartEvent": {
+      "description": "A complete part. Replaces any earlier part with the same `id`.",
       "type": "object",
       "required": [
         "type",
@@ -1741,6 +1877,7 @@
       "additionalProperties": true
     },
     "PartPatch": {
+      "description": "Shallow-merges `patch` into an existing part (never `id` or `type`).",
       "type": "object",
       "required": [
         "type",
@@ -1780,6 +1917,7 @@
       "additionalProperties": true
     },
     "MessageEnd": {
+      "description": "Last event of every stream.",
       "type": "object",
       "required": [
         "type",
@@ -1827,6 +1965,7 @@
       "additionalProperties": true
     },
     "Heartbeat": {
+      "description": "Keep-alive after ≤15 s of silence. No `seq`, no SSE `id`.",
       "type": "object",
       "required": [
         "type"
@@ -1836,12 +1975,13 @@
           "const": "heartbeat"
         },
         "at": {
-          "type": "string"
+          "$ref": "#/$defs/Timestamp"
         }
       },
       "additionalProperties": true
     },
     "StreamEvent": {
+      "description": "Any stream event. Clients ignore unknown `type`s and unknown fields (CONTRACT.md §3).",
       "oneOf": [
         {
           "$ref": "#/$defs/MessageStart"
@@ -1909,6 +2049,7 @@
       ]
     },
     "ChatRequest": {
+      "description": "Body of `POST /api/chat`.",
       "type": "object",
       "required": [
         "messages"
@@ -2032,11 +2173,11 @@
           ],
           "properties": {
             "code": {
-              "type": "string",
-              "description": "Branch on this. Known: auth_expired, access_denied, not_found, stream_gone, validation, clarification_expired, invalid_title, transcripts_unavailable, payload_too_large (1.5), rate_limited. Unknown codes: treat by HTTP status."
+              "$ref": "#/$defs/ErrorCode"
             },
             "message": {
-              "type": "string"
+              "type": "string",
+              "description": "Short, fixed, PHI-free copy. Safe to show; never contains request values."
             },
             "legacyCode": {
               "type": "string",
@@ -2050,7 +2191,8 @@
           "additionalProperties": true
         }
       },
-      "additionalProperties": true
+      "additionalProperties": true,
+      "description": "Every non-stream 4xx/5xx JSON body (CONTRACT.md §1). Two success-shaped bodies also carry it since 1.13.0: 404 `{stopped:false, error}` and `{deleted:false, error}`."
     },
     "ConversationSummary": {
       "type": "object",
@@ -2070,8 +2212,7 @@
           "description": "'New analysis' until the user renames it or the server sets message.end.conversationTitle."
         },
         "updatedAt": {
-          "type": "string",
-          "description": "ISO-8601 UTC, e.g. 2026-10-25T19:00:00Z"
+          "$ref": "#/$defs/Timestamp"
         },
         "messageCount": {
           "type": "integer",
@@ -2085,6 +2226,7 @@
       "additionalProperties": true
     },
     "ConversationPage": {
+      "description": "One page of conversation summaries, newest first.",
       "type": "object",
       "required": [
         "items"
@@ -2098,7 +2240,7 @@
         },
         "next": {
           "type": "string",
-          "description": "Opaque cursor for the next page; absent on the last page."
+          "description": "Opaque cursor for the next page; absent on the last page. Send it back as `?cursor=` (GET) or `SearchRequest.cursor`."
         }
       },
       "additionalProperties": true
@@ -2122,8 +2264,7 @@
           ]
         },
         "createdAt": {
-          "type": "string",
-          "description": "ISO-8601 UTC, e.g. 2026-10-25T19:00:00Z"
+          "$ref": "#/$defs/Timestamp"
         },
         "parentId": {
           "$ref": "#/$defs/ID"
@@ -2208,8 +2349,7 @@
           "type": "string"
         },
         "updatedAt": {
-          "type": "string",
-          "description": "ISO-8601 UTC, e.g. 2026-10-25T19:00:00Z"
+          "$ref": "#/$defs/Timestamp"
         },
         "messages": {
           "type": "array",
@@ -2262,6 +2402,7 @@
       "additionalProperties": false
     },
     "RenameResponse": {
+      "description": "Body of a successful rename.",
       "type": "object",
       "required": [
         "id",
@@ -2276,8 +2417,7 @@
           "type": "string"
         },
         "updatedAt": {
-          "type": "string",
-          "description": "ISO-8601 UTC, e.g. 2026-10-25T19:00:00Z"
+          "$ref": "#/$defs/Timestamp"
         }
       },
       "additionalProperties": true
@@ -2360,6 +2500,7 @@
       "additionalProperties": true
     },
     "ModelOption": {
+      "description": "One model a picker can offer.",
       "type": "object",
       "required": [
         "id",
@@ -2508,6 +2649,7 @@
       }
     },
     "FeedbackRating": {
+      "description": "Closed. Thumbs up or down.",
       "enum": [
         "up",
         "down"
@@ -2585,8 +2727,7 @@
           "type": "string"
         },
         "updatedAt": {
-          "type": "string",
-          "description": "ISO-8601 UTC"
+          "$ref": "#/$defs/Timestamp"
         }
       },
       "additionalProperties": true
@@ -2608,7 +2749,13 @@
         },
         "kind": {
           "type": "string",
-          "description": "Open enum: 'view' today; 'definition' (metric definition) and 'document' are reserved. Unknown kinds render as a plain chip."
+          "description": "Open enum: 'view' today; 'definition' (metric definition) and 'document' are reserved. Unknown kinds render as a plain chip.",
+          "x-open": true,
+          "x-known": [
+            "view",
+            "definition",
+            "document"
+          ]
         },
         "name": {
           "type": "string",
@@ -2661,8 +2808,7 @@
           "type": "string"
         },
         "exportedAt": {
-          "type": "string",
-          "description": "ISO-8601 UTC"
+          "$ref": "#/$defs/Timestamp"
         },
         "conversation": {
           "$ref": "#/$defs/Conversation"
@@ -2795,8 +2941,7 @@
           "type": "boolean"
         },
         "createdAt": {
-          "type": "string",
-          "format": "date-time"
+          "$ref": "#/$defs/Timestamp"
         }
       },
       "additionalProperties": true
@@ -2821,17 +2966,21 @@
           ]
         },
         "updatedAt": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Null when the conversation has not changed since it was shared."
         },
         "includeData": {
           "type": "boolean"
         },
         "createdAt": {
-          "type": "string",
-          "format": "date-time"
+          "$ref": "#/$defs/Timestamp"
         },
         "messages": {
           "type": "array",
@@ -2841,6 +2990,25 @@
         }
       },
       "additionalProperties": true
+    },
+    "ErrorCode": {
+      "type": "string",
+      "x-open": true,
+      "x-known": [
+        "auth_expired",
+        "access_denied",
+        "not_found",
+        "method_not_allowed",
+        "stream_gone",
+        "validation",
+        "invalid_title",
+        "clarification_expired",
+        "transcripts_unavailable",
+        "payload_too_large",
+        "rate_limited",
+        "internal"
+      ],
+      "description": "1.13.0: `HttpError.error.code`. Open: branch on the known values, and on the HTTP status for anything else. A server may send `http_<status>` for a status with no dedicated code. When a code gets more specific the old one stays in `legacyCode` for at least one minor version."
     }
   }
 }
