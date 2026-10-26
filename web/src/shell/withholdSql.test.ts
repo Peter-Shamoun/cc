@@ -23,7 +23,9 @@ const synthetic = {
 
 describe('withholdSql (QA-S18)', () => {
   it('a data-off share loses every SQL string; prose, tables and other code stay', () => {
-    for (const shared of [example, synthetic]) {
+    // 1.15.0: the server already withholds SQL in the example (sqlWithheld), so this stays a no-op safety net there
+    expect(JSON.stringify(withholdSql(example))).not.toMatch(/SELECT/);
+    for (const shared of [synthetic]) {
       expect(JSON.stringify(shared)).toMatch(/SELECT/);
       const out = withholdSql(shared);
       expect(JSON.stringify(out)).not.toMatch(/SELECT/);

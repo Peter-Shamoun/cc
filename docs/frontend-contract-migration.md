@@ -1,4 +1,4 @@
-# CC chat contract: changelog and migration guide (v1.0 → 1.14.0)
+# CC chat contract: changelog and migration guide (v1.0 → 1.15.0)
 
 **For review by Claude.** This is a reading guide to `api/CONTRACT.md`, which stays the normative text, and
 `api/contract/v1.schema.json`. It covers three things:
@@ -10,7 +10,7 @@
 The adapter that produces these events from analyzer and analyst outputs is specified in
 [`frontend-analyzer-adapter.md`](frontend-analyzer-adapter.md).
 
-Every version from 1.0 to 1.14 is **additive**. A 1.0 client keeps working against a 1.14 server, because it ignores
+Every version from 1.0 to 1.15 is **additive**. A 1.0 client keeps working against a 1.15 server, because it ignores
 unknown events, fields and part types (§3). No field was removed or renamed. The one wire-visible tightening is
 1.12's error envelope on 404 and 405, and 1.13's `not_found` for regenerate/edit 404s (below).
 
@@ -33,8 +33,12 @@ unknown events, fields and part types (§3). No field was removed or renamed. Th
 | 1.12 | ordering rules as data (`stream_rules.json`) with py/ts runners; fail-safe SSE decode and reducer; 404/405 envelope | every stream must pass `check()`; unknown routes return `{"error":{code:"not_found"}}` | use `readSse`/`SseDecoder`; `reduceV1` drops malformed events |
 | 1.13 | review audit: error envelope on every 4xx (stop/delete 404s too), `ErrorCode` registry, `x-open`/`x-fallback`/`x-known`, `Timestamp`, descriptions on every def | regenerate/edit 404s are `not_found` + `legacyCode:"validation"`; send ISO-8601 UTC | read `error.code` (then `legacyCode`, then status); render unknown open-enum values with `OPEN_ENUM_FALLBACKS` |
 | 1.14 | shown-SQL literal masking (`maskedLiterals`, `Capabilities.sqlLiteralMasking`), `ArtifactPart.kind` open, exact latency stages | mask literals in every shown SQL (`api/sql_mask.py`); stages sum to `totalMs` | show "Patient values hidden" when `maskedLiterals` is set; never run shown SQL; unknown artifact kinds render as a generic document |
+| 1.15 | share expiry (`expiresInDays` 7/30/90, `expiresAt`), rotate id on widening (`rotated`), SQL withheld on data-off shares (`sqlWithheld`), sign-out documented | rotate on false→true; expire shares (same 404); strip SQL from data-off views | show expiry in the share dialog; on `rotated` show the new link; "SQL not shared" when `sqlWithheld` |
 
 **Migration notes**
+* **1.15 shares.** A link handed out data-free stops working when the owner turns data on (new id, `rotated: true`),
+  and every link now expires (30 days unless chosen). A data-off shared view no longer contains SQL; clients that
+  rendered `code`/`sql` from it get nothing to render (`sqlWithheld: true`).
 * **1.13 errors.** If you branched on `error.code === "validation"` for a 404 from regenerate/edit, switch to
   `not_found` (or read `legacyCode`; it stays for at least one minor). `{stopped:false}` and `{deleted:false}` now
   also have `error`, so a generic `body.error.code` check works for every 4xx.
