@@ -50,3 +50,11 @@ so there is exactly one `Cache-Control`.
   asks the live demo questions (or every fixture with `CSP_MODE=mock`), and fails on any CSP violation,
   console error, missing header, or a rendered row value found in localStorage/sessionStorage/URL/console.
   Verified clean on 2026-10-25 against `vite preview` (live demo API and mock) and `vite` dev.
+
+## CSV / TSV formula injection
+
+Every spreadsheet export path, server and client, defuses formula-looking text: the API download (`api/store.py
+defuse_cell`), and Download CSV, Copy table (TSV) and chart "Download data" (`web/src/lib/csv.ts defuse`). A text cell
+or header that starts with `= + - @`, TAB or CR gets a leading `'`, so Excel or Sheets shows it as text instead of running
+it (e.g. `=HYPERLINK(...)` exfiltration). Numbers, negatives included, stay numeric. Tests: `api/tests/test_csv_injection.py`,
+`web/src/security/csvInjection.test.ts`.
