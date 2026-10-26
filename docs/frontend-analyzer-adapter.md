@@ -1,6 +1,6 @@
 # Real analyzer adapter: spec (contract 1.12.0)
 
-**Status:** a stub, for review by Claude. `api/analyzer_adapter.py` plus fixture-only tests in
+**Status:** a stub, for review by Claude. `api/analyzer_adapter.py`, `api/reasoning_policy.py` (R2), `api/strategy_config.py` (R4) and `api/analyst_shim.py` (R7), plus fixture-only tests in
 `api/tests/test_analyzer_adapter.py`. The server is **not** wired to it. No paid API is called, and nothing under
 `analyzer/`, `analyst/`, `bench/` or `ccsim/` was changed (they were read only).
 
@@ -76,42 +76,116 @@ The analyst variants (e.g. `analyst/variants/multi_candidate.MultiCandidateAgent
 `bench.Answer` has **no column names**, so the caller must pass them from the executor's cursor description.
 Otherwise they are `col_1…n`. Steps from analyst agents only appear if their LLM is wrapped in `LiveTap` the same
 way, through the same `complete(model=…, messages=…, candidate_index=…)` interface. Agents with their own LLM
-protocol (e.g. `analyst/variants/multi_candidate/llm.py: LLMResponse`) need a small shim to `Completion`. That is
-future work, and it is not in the stub.
+protocol need a small shim to `Completion`: see §6 (R7) and `api/analyst_shim.py`.
 
 ## 3. Requirements for a real backend
 
 * **R1 Conformance.** Every stream passes `api.contract.conformance.check(events) == []` and every event validates
-  against `StreamEvent` in the schema. The adapter tests enforce this for 8 recorded run shapes and for Stop
+  against `StreamEvent` in the schema. The adapter tests enforce this for 9 recorded run shapes and for Stop
   mid-run.
-* **R2 PHI in reasoning (open; must close before wiring).** `reasoning.delta` is the model's raw `Completion.text`.
-  ScriptedLLM text is canned, but a real model can quote row values. Before wiring, either drop reasoning text for
-  real models or pass it through `scrub()` plus a PHI-column filter. Steps and errors are already value-free (tested).
+* **R2 PHI in reasoning (closed in the adapter path).** `reasoning.delta` is the model's raw `Completion.text`, and a
+  real model can quote row values. The adapter never forwards it: `run_to_events`/`events_for_recording` wrap `emit`
+  in `api.reasoning_policy.ReasoningPolicy(policy)`:
+  * `"drop"` (**default**): every `reasoning.delta`/`reasoning.end` is withheld. Reasoning parts are optional in the
+    contract, so the stream stays conformant and the UI simply shows no "Thinking" disclosure.
+  * `"summary"`: model text is still withheld. When the tap closes the reasoning part, one `reasoning.delta` is built
+    **only from labels and counts** of step events already sent (known probe labels, queries / failed / repaired,
+    candidate count, last row count, check verdict counts, escalation count), e.g. *"Explored the data: sampled values.
+    Ran 3 queries (1 failed, 1 repaired). The last successful query returned one row."* No model text, SQL, error text
+    or table name is copied. The summary then passes `phi_findings()` (names, MRNs, DOBs, member IDs, NPIs, SSNs,
+    phones, e-mails, long digit runs) or is dropped (fail closed).
+  * There is no "raw" mode. Showing model text needs a PHI review and a contract change.
+  * `scrub()` (error text in `step.sql_result.error` / explore summaries) now also masks dates, e-mail addresses and
+    IDs that mix letters and digits, as well as quoted literals and runs of 4+ digits.
+  * Tests (`api/tests/test_adapter_r2_r4_r7.py`) use the synthetic `phi_reasoning` recording, whose model text, sampled
+    rows and DB error quote an invented patient name, MRN, DOB, member ID and NPI. None of them may appear anywhere in
+    the stream under either policy, including Stop mid-run. The demo path (`api.app` + ScriptedLLM) is unchanged.
+  * Residual risk (not R2): `step.sql_running.sql` and the `code` part show the model's SQL verbatim. A literal in a
+    `WHERE` clause is visible. `sem.*` exposes no direct identifiers, and the analyzer refuses identifier requests, but a
+    reviewer should know.
 * **R3 Paid-API switch.** `build_real_llm(kind, enable=True)` returns `AnthropicLLM`/`BedrockLLM(allow_paid_api=True)`
   only when `CC_API_ALLOW_PAID_API` equals the exact phrase `i-understand-this-calls-a-paid-model-api` **and** the
   caller passes `enable=True`. Anything else raises the analyzer's `PaidAPIDisabled`, which `api.app` already maps to
   an `error` part ("Paid model APIs are disabled on this server"). It is off by default. A test asserts that `api/app.py`
   does not reference the adapter, the switch or `allow_paid_api=True`.
-* **R4 Strategy.** Apply `options.strategy` → `capabilities.STRATEGIES[*].config` as `AnalyzerConfig` overrides.
-  Today demo mode only echoes it.
+* **R4 Strategy (mapping done; not wired).** `api.strategy_config.strategy_config(strategy, model, *, grid=None,
+  customer=None, strict=False)` is a pure function that returns `StrategyConfig{overrides, fidelity, notes}`. The
+  `overrides` are valid `AnalyzerConfig(**overrides)` / `AnalyzerConfig.from_technique(overrides)`. The strategy gives
+  `capabilities.STRATEGIES[*].config`, and a non-`auto` model adds `model`. Unknown, incompatible or org-disabled
+  options raise `ValueError`, using the same rule as the API's 422. An optional 384-grid cell (factor names from
+  `research/grid/GRID_PROTOCOL.md`, read-only) refines it:
+
+  | grid factor | level → `AnalyzerConfig` | fidelity |
+  |---|---|---|
+  | `generation` | `direct_sql` → (none); `metric_spec` → `enable_metrics`; `decompose_cte` → (none) | exact / approximate / **unsupported** |
+  | `fewshot` | 1 → `enable_examples: true` (lookup tool, not pasted examples); 0 → `false` | approximate / exact |
+  | `explore` | 1 → `data_profile`, `enable_lookup` true; 0 → both false | exact |
+  | `candidates3` | 1 → `candidates: 3, candidate_selection: execution_vote`; 0 → `candidates: 1` | exact |
+  | `verifier` | 1 → `verify`, `result_checks` true (deterministic bounce, not a critic model); 0 → `verify: false` | approximate / exact |
+  | `repair` | 1 → `self_correct: errors+result_signals, max_repairs: 2`; 0 → `none`, `0` | exact |
+  | `assumptions` | no switch; `final_answer.assumptions` is always offered | approximate |
+  | `multiagent` | 1 → no planner/writer split exists | **unsupported** (0: exact) |
+
+  `verifier=1` with `repair=0` is flagged in `notes`: the analyzer's bounce needs `self_correct=errors+result_signals`.
+  `strategy="candidates"` with `candidates3=0` is a contradiction and raises. `strict=True` rejects unsupported
+  factors; otherwise they are reported in `fidelity`, so a caller never silently runs a different cell. `api.app` still
+  only echoes the strategy.
 * **R5 Usage.** Use `Completion.usage` tokens. `LiveTap` falls back to an approximation when they are missing.
   `costIsEstimate` stays true.
 * **R6 Cancel during SQL.** This needs an analyzer cancel hook (CONTRACT §8). Until then, Stop takes effect between
   model turns.
+* **R7 Analyst model shims (stub).** See §6.
 
 ## 4. Recordings (fixtures)
 
 `api/tests/fixtures/analyzer_runs/*.json` hold `{question, multiCandidate?, calls:[{model, candidate, tool_results:
 [{tool_use_id, content}], completion:{text, tool_calls:[{name, arguments, id}], usage?}}], answer:{AnalyzerAnswer
 fields}}`. All data is synthetic ("Synthetic Payer A"). Shapes: `answer`, `repair`, `escalation`, `candidates`,
-`abstain`, `clarify`, `refusal`, `no_answer`. To record a real run later, wrap the LLM so each `complete()` call
+`abstain`, `clarify`, `refusal`, `no_answer`, and `phi_reasoning` (synthetic PHI in model text, sampled rows and a DB
+error, for R2). To record a real run later, wrap the LLM so each `complete()` call
 appends `{model, candidate_index, tool_results of messages[-1], completion}`, and store `asdict(answer)`. Then
 **scrub row values out of tool results** before committing it as a fixture.
 
 ## 5. Rollout (not done here; each step is its own reviewed PR)
 
-1. Close R2.
+1. R2 is closed in the adapter path. Wiring must call `run_to_events(..., reasoning="drop")` (or `"summary"`).
 2. Add `Settings.llm in ("anthropic","bedrock")` → `build_real_llm(settings.llm, enable=settings.allow_paid_api)`
    in `api.app`. Keep the demo default `scripted`. The test that forbids wiring then changes in the same PR.
-3. Apply R4.
+3. Apply R4: `AnalyzerConfig(**{**settings.analyzer_overrides, **strategy_config(strategy, model,
+   customer=principal.customer).overrides})`.
 4. Shadow runs with recordings, and gate on `check()` == [] in CI.
+
+## 6. Analyst-agent model shims (R7, stub)
+
+`api/analyst_shim.py` implements each analyst agent's *own* model interface on top of a `LiveTap`, or anything with
+the analyzer's `complete(**kw) -> Completion`. An analyst run then streams the same events as an analyzer run.
+Frame it with `run_to_events(question, run, inner_llm, ...)`, where `run(tap)` builds the agent with a shim around
+`tap` and returns `answer_from_bench(result, columns=…)`. The shims only translate. The backend behind the tap is
+chosen elsewhere: `ScriptedLLM`/fixtures today, and `build_real_llm` behind the off switch later.
+
+| agent | its interface | shim | candidate index |
+|---|---|---|---|
+| `analyst/variants/multi_candidate` | `complete(*, system, messages, tools, model, strategy) -> LLMResponse(text, tool_calls[ToolCall(name, arguments, call_id)], usage, stop_reason)` | `ToolLoopShim(tap, strategies)` | position in `strategies`; `__selector__`/`__verifier__` get `n`, `n+1` |
+| `analyst/approaches/a05_verifier` | `complete(*, role, system, user, phase) -> ModelCompletion(text)` | `TextRoleShim(tap, {"analyst": m1, "critic": m2})` | analyst 0, critic 1 |
+| `analyst/variants/context_retrieval` | `complete(LLMRequest) -> LLMResponse(sql, text, refused, usage)` | `SingleShotShim(tap, model)` | 0 |
+
+Rules:
+
+* **Separate indices per role.** `LiveTap` reads a model change *within one index* as an escalation, and it streams
+  only index 0's text as reasoning. Judges and critics therefore never cause a false `escalation`, and their text
+  never becomes the analyst's reasoning.
+* **Final SQL runs inside the agent** (multi_candidate executes `final_answer` itself). `ToolLoopShim` records each
+  candidate's final SQL, and `candidate_for_sql(answer.sql)` gives the `candidate_index` for the `AnalyzerAnswer`.
+  `LiveTap.finish` then attaches the row count and columns to the chosen candidate's final step.
+* **Tool results** keep the agent's own `{"type": "tool_result", "tool_use_id": call_id}` blocks. These are what
+  `LiveTap` consumes, so `ToolCall.id` ↔ `call_id` round-trips.
+* **a05** runs SQL through its own executor, not through model tool calls. Its shim yields reasoning (subject to R2)
+  and usage only. Steps for a05 need an executor tap (open).
+* **context_retrieval**: `final_answer{sql, answer}` → `LLMResponse(sql, text)`; `refuse{reason}` → `refused=True`;
+  anything else → text only.
+* Response classes are imported lazily from `analyst` (read-only) and can be injected. Nothing under analyst/ changes.
+
+Tests (fixtures only): a real `MultiCandidateAgent(n_candidates=3)` runs through `ToolLoopShim` with a scripted
+analyzer-protocol fake and fake tools. It must be schema-valid and conformant, with `k1..k3` candidate steps, rows on
+the chosen candidate, and no PHI from the model text under either policy. There are also round-trip tests for each
+shim, and a test that the shims reference no real backend and that `api.app` does not import them.
