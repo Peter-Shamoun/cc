@@ -94,7 +94,14 @@ export function contractExample(outcome: string): Ev[] | null {
 
 /** Deterministic visuals: no motion, no caret, hide the live-timer style counters. */
 export async function freeze(page: Page) {
-  await page.addStyleTag({ content: '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}' });
+  // The app ships a strict CSP (no inline <style>), so page.addStyleTag is refused. A constructed
+  // stylesheet (CSSOM) is not subject to style-src, and reduced motion covers anything it misses.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.evaluate(() => {
+    const sheet = new CSSStyleSheet();
+    sheet.replaceSync('*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}');
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+  });
 }
 
 /**
