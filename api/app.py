@@ -29,6 +29,7 @@ from api.live import Cancelled, LiveTap
 from api.mapping import outcome_parts
 from api.security import MAX_BODY_BYTES, BodyLimitMiddleware, SecurityHeadersMiddleware
 from api.store import DownloadRegistry, Principal
+from api.capabilities import DEFAULT_STRATEGY, capabilities as capabilities_body, check_options
 from api.titles import title_from_parts
 from api.transcripts import CustomerKeyDisabled, make_store
 
@@ -197,6 +198,11 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
         return JSONResponse({"status": "ok", "mode": getattr(auth, "mode", "custom"), "llm": settings.llm,
                              "paidApis": False}, headers=NO_STORE)
 
+    @app.get("/api/capabilities")
+    def capabilities():
+        """Strategies and models for a picker (contract 1.4.0). Public like /api/contract: no user data."""
+        return JSONResponse(capabilities_body(CONTRACT_VERSION, demo=settings.llm == "scripted"), headers=NO_STORE)
+
     @app.get("/api/contract")
     def contract():
         return JSONResponse({"version": CONTRACT_VERSION, "schema": contract_schema()}, headers=NO_STORE)
@@ -229,6 +235,9 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
             ctx = authed(request, message_id[-8:])
         except AuthError:
             return unauthorized()
+        bad_option = check_options(body.options)
+        if bad_option:
+            return error_json("validation", bad_option, 422)
         conversation_id = body.conversationId or new_id("c_")
         if not _SAFE_ID.match(conversation_id) or store.owned_by_other(ctx.principal, conversation_id):
             return error_json("access_denied", "Not found.", 404)
@@ -345,7 +354,7 @@ def create_app(auth=None, settings: Settings | None = None, store=None, llm_fact
                 delay = max(delay, SLOW_FLOOR_SECONDS)
             emit({"type": "message.start", "messageId": message_id, "conversationId": conversation_id,
                   "contractVersion": CONTRACT_VERSION, "model": settings.llm, "parentId": user_msg["id"],
-                  "strategy": body.options.get("strategy", "tool_loop"), **start_extra})
+                  "strategy": body.options.get("strategy", DEFAULT_STRATEGY), **start_extra})
             emit({"type": "status", "label": "Thinking"})
             tap = None
             answer = None
