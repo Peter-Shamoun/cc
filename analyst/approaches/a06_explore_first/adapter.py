@@ -45,9 +45,11 @@ TECHNIQUE_CONFIG = {
 
 
 def technique_config() -> dict:
-    if TECHNIQUE_CONFIG != DEFAULT_TECHNIQUE_CONFIG:
-        raise RuntimeError("technique config drifted from the held-out base flags in bench.agent_cli")
-    return dict(TECHNIQUE_CONFIG)
+    # The base flags A06 pins must still be the defaults; settings added to the defaults later are not drift.
+    drifted = {k for k, v in TECHNIQUE_CONFIG.items() if DEFAULT_TECHNIQUE_CONFIG.get(k) != v}
+    if drifted:
+        raise RuntimeError(f"technique config drifted from the held-out base flags in bench.agent_cli: {sorted(drifted)}")
+    return dict(DEFAULT_TECHNIQUE_CONFIG)
 
 
 def configs_document() -> dict:
