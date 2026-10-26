@@ -12,7 +12,10 @@ let refocus = false;
 export function adoptBootDraft(doc: Document = document): void {
   const el = doc.getElementById(BOOT_INPUT_ID);
   if (!(el instanceof HTMLTextAreaElement)) return;
-  refocus = doc.activeElement === el;
+  // The boot textarea has `autofocus`, so focus alone is not intent. On touch, carry focus over only if the
+  // reader actually typed (no surprise keyboard on load: shell-focus.spec, ace3f4b).
+  const coarse = doc.defaultView?.matchMedia?.('(pointer: coarse)').matches ?? false;
+  refocus = doc.activeElement === el && (!coarse || el.value.length > 0);
   if (el.value && !getDraft(NEW_CHAT_KEY)) setDraft(NEW_CHAT_KEY, el.value);
   el.value = '';
 }
