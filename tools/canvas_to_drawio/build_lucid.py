@@ -12,7 +12,8 @@ The same layout as build.py, restricted to what Lucidchart's draw.io importer ha
 
 Usage: python3 build_lucid.py extract.json out.drawio [--drawio /path/to/drawio]
 With --drawio, the file is re-saved through the draw.io CLI (a genuine draw.io export, which Lucid's
-importer expects), then given back its XML declaration and ASCII-only encoding.
+importer expects). Numeric character references (draw.io writes &#39; for apostrophes) are then written as plain
+UTF-8 characters, because Lucid shows them literally.
 """
 import json, os, re, subprocess, sys, tempfile, urllib.parse
 from xml.sax.saxutils import quoteattr
@@ -144,6 +145,7 @@ def convert_board_items(board):
     ox, oy = board["left"], board["top"]
     add_vertex(ox, oy, board["w"], board["h"], {"rounded": "1", "absoluteArcSize": "1", "arcSize": "12", "html": "0",
                                                 "fillColor": "#FFFFFF", "strokeColor": "none"})
+    layout.update(board_layout(board))
     skip_lid = False
     for it in board["items"]:
         t, s = it["t"], it.get("s")
@@ -161,7 +163,10 @@ def convert_board_items(board):
             if rx:
                 st.update(rounded="1", absoluteArcSize="1", arcSize=fmt(rx * 2))
             st.update(integer_stroke(s))
-            add_vertex(num(a.get("x")) + dx, num(a.get("y")) + dy, num(a["width"]), num(a["height"]), st)
+            x, y, w, h = num(a.get("x")) + dx, num(a.get("y")) + dy, num(a["width"]), num(a["height"])
+            add_vertex(x, y, w, h, st)
+            if is_label_chip(st, h):
+                layout["chips"].append({"index": len(cells) - 1, "x": x, "y": y, "w": w, "h": h})
         elif t == "circle":
             a = it["a"]
             r = num(a["r"])
@@ -222,6 +227,80 @@ def convert_path(it, dx, dy):
     return False
 
 
+layout = {"chips": [], "boxes": [], "runs": []}
+
+
+def is_label_chip(style, height):
+    """A white, borderless strip that hides a line or frame border behind a label."""
+    return style.get("fillColor") == "#FFFFFF" and style.get("strokeColor") == "none" and height <= 40
+
+
+def board_layout(board):
+    """Original geometry the Lucid text must keep clear of: other text runs, and every vertical line
+    (shape borders and connector segments) that sits clear of the text in the original."""
+    ox, oy = board["left"], board["top"]
+    verticals, runs = [], []  # verticals: (x, top, bottom)
+    for it in board["items"]:
+        s = it.get("s")
+        if it["t"] == "rect" and not it["a"].get("width", "").endswith("%") and color(s["stroke"]) != "none":
+            a = it["a"]
+            x, y, w, h = num(a.get("x")) + ox, num(a.get("y")) + oy, num(a["width"]), num(a["height"])
+            verticals += [(x, y, y + h), (x + w, y, y + h)]
+        elif it["t"] == "line":
+            a = it["a"]
+            if num(a["x1"]) == num(a["x2"]):
+                ys = sorted([num(a["y1"]) + oy, num(a["y2"]) + oy])
+                verticals.append((num(a["x1"]) + ox, *ys))
+        elif it["t"] == "path" and color(s["stroke"]) != "none":
+            segs = svg_shapes.parse_path(it["a"]["d"])
+            pts = [(x + ox, y + oy) for x, y in svg_shapes.seg_points(segs)]
+            if any(t[0] == "Z" for t in segs):
+                xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+                verticals += [(min(xs), min(ys), max(ys)), (max(xs), min(ys), max(ys))]
+            else:
+                verticals += [(a[0], min(a[1], b[1]), max(a[1], b[1])) for a, b in zip(pts, pts[1:]) if abs(a[0] - b[0]) < 0.01]
+        elif it["t"] == "text":
+            _, by, _, bh = it["bb"]
+            for run in it["spans"]:
+                if run["text"].strip():
+                    runs.append((id(run), run["x0"] + ox, run["x0"] + run["w"] + ox, by + oy, by + bh + oy))
+    return {"chips": [], "verticals": verticals, "runs": runs}
+
+
+def text_limits(run_key, left, right, top, bottom):
+    """How far a run's text may extend: up to its neighbours on the same line and the nearest vertical line
+    on either side that the original text does not touch."""
+    limit_left, limit_right = float("-inf"), float("inf")
+    for key, l2, r2, t2, b2 in layout["runs"]:
+        if key == run_key or min(bottom, b2) - max(top, t2) < 0.3 * min(bottom - top, b2 - t2):
+            continue
+        if l2 >= right - 1:
+            limit_right = min(limit_right, l2 - 6)
+        elif r2 <= left + 1:
+            limit_left = max(limit_left, r2 + 6)
+    middle = (top + bottom) / 2
+    for x, y1, y2 in layout["verticals"]:
+        if y1 <= middle <= y2:
+            if x >= right:
+                limit_right = min(limit_right, x - 4)
+            elif x <= left:
+                limit_left = max(limit_left, x + 4)
+    return limit_left, limit_right
+
+
+def widen_chip(left, right, middle_x, middle_y):
+    """Keep the white chip behind a label at least as wide as the label's text."""
+    for chip in layout["chips"]:
+        if chip["x"] <= middle_x <= chip["x"] + chip["w"] and chip["y"] <= middle_y <= chip["y"] + chip["h"]:
+            new_left, new_right = min(chip["x"], left - 4), max(chip["x"] + chip["w"], right + 4)
+            if (new_left, new_right) != (chip["x"], chip["x"] + chip["w"]):
+                cells[chip["index"]] = re.sub(r'<mxGeometry x="[^"]+" y="([^"]+)" width="[^"]+"',
+                                              lambda m: f'<mxGeometry x="{fmt(new_left)}" y="{m.group(1)}" width="{fmt(new_right - new_left)}"',
+                                              cells[chip["index"]], count=1)
+                chip["x"], chip["w"] = new_left, new_right - new_left
+            return
+
+
 def convert_text(it, ox, oy):
     s = it["s"]
     bx, by, bw, bh = it["bb"]
@@ -234,48 +313,44 @@ def convert_text(it, ox, oy):
         leading = len(text) - len(text.lstrip(" "))
         kind = "mono" if "mono" in rs["font-family"].lower() else "sans"
         bold = num(rs["font-weight"], 400) >= 600
-        size = round(num(rs["font-size"]))
         # Lucid's importer may treat <word> as a tag; the look-alike angle quotes keep CLI placeholders visible
         visible = re.sub(r"<([a-zA-Z_/][^<>]*)>", "\u2039\\1\u203a", text.strip(" "))
         # width the original run gives this text, minus the leading spaces it skips over
         run_width = run["w"] * len(visible) / max(1, len(text)) if kind == "mono" else run["w"]
-        x0 = run["x0"] + (run["w"] * leading / len(text) if leading else 0)
-        original_size = size
-        while size > round(original_size * MIN_FONT_SCALE) and font(kind, bold, size).getlength(visible) > run_width:
+        x0 = run["x0"] + (run["w"] * leading / len(text) if leading else 0) + ox
+        align = "center" if single and anchor == "middle" else "right" if single and anchor == "end" else "left"
+
+        def extent(size):
+            need = font(kind, bold, size).getlength(visible)
+            left = {"left": x0, "center": x0 + (run_width - need) / 2, "right": x0 + run_width - need}[align]
+            return need, left, left + need
+
+        original_size = size = round(num(rs["font-size"]))
+        while size > round(original_size * MIN_FONT_SCALE) and extent(size)[0] > run_width:
             size -= 1
-        need = font(kind, bold, size).getlength(visible)
+        limit_left, limit_right = text_limits(id(run), x0, x0 + run_width, by + oy, by + bh + oy)
+        while size > 6 and (extent(size)[1] < limit_left or extent(size)[2] > limit_right):
+            size -= 1
+        need, text_left, text_right = extent(size)
         height = max(bh, size * 1.2)
         st = {"text": None, "html": "0", "whiteSpace": "nowrap", "spacing": "0", "spacingTop": "0", "spacingBottom": "0",
-              "spacingLeft": "0", "spacingRight": "0", "verticalAlign": "middle",
+              "spacingLeft": "0", "spacingRight": "0", "verticalAlign": "middle", "align": align,
               "fontFamily": MONO if kind == "mono" else SANS, "fontSize": str(size),
               "fontColor": blend(color(rs["fill"]), num(s["opacity"], 1)), "strokeColor": "none", "fillColor": "none",
               "fontStyle": str((1 if bold else 0) + (2 if rs["font-style"] == "italic" else 0))}
-        cell_w = need + 6
-        if single and anchor == "middle":
-            st["align"], x = "center", x0 + run_width / 2 - cell_w / 2
-        elif single and anchor == "end":
-            st["align"], x = "right", x0 + run_width - cell_w
-        else:
-            st["align"], x = "left", x0
-        add_vertex(x + ox, by + bh / 2 - height / 2 + oy, cell_w, height, st, visible, bindable=False)
-        widen_title_chip(x + ox, x + ox + cell_w)
+        add_vertex(text_left - 3, by + oy + bh / 2 - height / 2, need + 6, height, st, visible, bindable=False)
+        widen_chip(text_left, text_right, x0 + run_width / 2, by + oy + bh / 2)
 
 
-def widen_title_chip(text_left, text_right):
-    """Frame titles sit on a white chip that hides the frame border; keep the chip as wide as the text."""
-    for index in range(len(cells) - 2, max(-1, len(cells) - 4), -1):
-        cell = cells[index]
-        if not cell or "fillColor=#FFFFFF;" not in cell or "strokeColor=none;" not in cell:
-            continue
-        geometry = re.search(r'<mxGeometry x="([\d.]+)" y="[\d.]+" width="([\d.]+)"', cell)
-        chip_left, chip_width = float(geometry.group(1)), float(geometry.group(2))
-        if chip_left <= text_left <= chip_left + chip_width and text_right + 4 > chip_left + chip_width:
-            cells[index] = cell.replace(f'width="{geometry.group(2)}"', f'width="{fmt(text_right + 4 - chip_left)}"', 1)
-        return
+def utf8_text(text):
+    """Write characters as UTF-8, the way draw.io itself does: Lucid shows numeric entities such as &#183; literally."""
+    named = {"&": "&amp;", "<": "&lt;", '"': "&quot;"}
 
-
-def ascii_only(text):
-    return "".join(ch if ord(ch) < 128 else f"&#{ord(ch)};" for ch in text)
+    def decode(match):
+        code = match.group(1)
+        ch = chr(int(code[1:], 16) if code[0] in "xX" else int(code))
+        return named.get(ch, ch)
+    return re.sub(r"&#([xX][0-9a-fA-F]+|[0-9]+);", decode, text)
 
 
 def main():
@@ -323,15 +398,14 @@ def main():
            f'<mxGraphModel dx="0" dy="0" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" '
            f'page="1" pageScale="1" pageWidth="{W}" pageHeight="{H}" math="0" shadow="0">'
            f'<root><mxCell id="0"/><mxCell id="1" parent="0"/>{body}</root></mxGraphModel></diagram></mxfile>\n')
-    open(output_path, "w").write(ascii_only(xml))
+    open(output_path, "w", encoding="utf-8").write(utf8_text(xml))
     if "--drawio" in sys.argv:
         drawio = sys.argv[sys.argv.index("--drawio") + 1]
         subprocess.run(["xvfb-run", "-a", drawio, "-x", "-f", "xml", "--uncompressed", "-o", output_path, output_path,
                         "--no-sandbox", "--disable-gpu"], check=True, capture_output=True, env={**os.environ, "HOME": "/tmp"})
-        exported = open(output_path, encoding="utf-8").read()
-        if not exported.startswith("<?xml"):
-            exported = '<?xml version="1.0" encoding="UTF-8"?>\n' + exported
-        open(output_path, "w").write(ascii_only(exported))
+        # draw.io writes apostrophes as &#39;, which Lucid would also show literally
+        exported = utf8_text(open(output_path, encoding="utf-8").read())
+        open(output_path, "w", encoding="utf-8").write(exported)
     print(f"{len(cells)} cells, {len(png_jobs)} PNGs -> {output_path}")
 
 

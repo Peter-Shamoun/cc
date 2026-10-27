@@ -30,10 +30,14 @@ and SVG icons are all things it mishandles). `build_lucid.py` writes the same la
 ```bash
 python3 tools/canvas_to_drawio/build_lucid.py extract.json diagrams/ClaimClarity_Architecture_Canvas_Lucid.drawio --drawio /path/to/drawio
 python3 tools/lucid/check_drawio_for_lucid.py diagrams/ClaimClarity_Architecture_Canvas_Lucid.drawio   # must be 0 errors
+python3 tools/canvas_to_drawio/check_lucid_text.py diagrams/ClaimClarity_Architecture_Canvas_Lucid.drawio extract.json   # must be 0 findings
 ```
 
+`check_lucid_text.py` places every label in Lucid's font metrics. It reports labels that overlap each other, spill out of their box, run into an image, or are newly crossed by a connector or border.
+
 What changes in the Lucid file:
-- Text is plain Helvetica or Courier New, one cell per styled run. Runs that don't fit shrink to at most 85% of their size, so condensed titles run a little wider; the white chip behind each title widens to match.
+- Text is plain Helvetica or Courier New, one cell per styled run. Runs that don't fit shrink to at most 85% of their size, so condensed labels run a little wider, and the white chip behind a label widens to match. Labels shrink further where they would otherwise reach a neighbouring label, a border or a connector line.
+- Text is UTF-8, with no numeric character references: Lucid shows `&#183;` and `&#39;` literally.
 - Icons and the folder and note outlines are PNG images. Cylinders are built from ellipses and rects.
 - Stroke widths are rounded to whole pixels, and fill opacity is blended into solid colours.
 - There is one flat layer. Edges are bound to the shapes they touch, at exact exit and entry points.

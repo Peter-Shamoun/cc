@@ -1,445 +1,180 @@
 # ClaimClarity · Data backend architecture
 
-| Field | Value |
-|---|---|
-| Owner | _TODO: name / team_ |
-| Status | _TODO: Draft / In review / Approved_ |
-| Last reviewed | _TODO: YYYY-MM-DD_ |
-| Reviewers | _TODO: security, data platform, app team_ |
-| Diagram source | _TODO: link to canvas / draw.io source_ |
-| Related pages | _TODO: link to "ClaimClarity · Frontend & UI states" page_ · _TODO: ADRs_ · _TODO: runbooks_ |
+How customer claim data moves through the ClaimClarity backend, and how each customer's data is kept separate.
 
-> **Note:** Diagram images in this page are exports of the architecture canvas. Filenames are stable (`images/<slug>.png`); replace the files in place when the diagrams change.
-
-## Contents
-
-_TODO: insert Confluence Table of Contents macro here (levels 2–3)._
-
----
-
-## 1. Purpose and audience
-
-This page explains how customer claim data moves through the ClaimClarity backend and how each customer's data is kept isolated.
-
-- **Purpose:** _TODO: what decisions / reviews this page supports (security review, onboarding, audit evidence)._
-- **Audience:** _TODO: engineers, security reviewers, data platform, support._
-- **In scope:** _TODO: SFTP intake, S3 storage layout, parser, sign-in and customer mapping, query path, analyzer, IAM / KMS gates, audit._
-- **Out of scope:** _TODO: frontend / UI states (see the frontend page), cost, ops runbooks._
-
-## 2. Overview
-
-The whole data backend on one board, shown for Customer B, with the six AWS gates and links to drill-downs 00–04.
+## Overview
 
 ![ClaimClarity data backend overview: SFTP intake, customer prefixes in the data bucket, Fargate parser, Entra ID and Cognito sign-in, Claim Query Agent and DuckDB query service, with gates 1–6](images/main.png)
 
-_TODO: caption — "Overview board, shown for Customer B."_
+**Summary:** The whole data backend on one board, shown for Customer B. Customers send daily files over SFTP. A Fargate parser turns them into tables in the customer's folder. A Xifin user signs in, asks a question, and the Claim Query Agent answers it through the DuckDB query service. Six numbered gates (1–6) keep every step inside one customer's data.
 
-### 2.1 How to read the diagrams
+**Key components:**
 
-_TODO: explain the legend — lanes (Compute · Write, Access, Compute · Read), numbered gate badges 1–6, write vs read arrows, "shown for Customer B" convention, drill-down numbers 00–05._
+- **AWS Transfer Family (SFTP)**: each customer logs in and drops daily 837, 835 and 277 files.
+- **Data bucket `xifin-dl-curated-prod/claimclarity`**: one folder per customer (`customer_a/`, `customer_b/`), each with its own KMS key and roles.
+- **EventBridge**: fires when a `_SUCCESS` file lands in `raw/`.
+- **Launcher (ECS RunTask)**: starts the parser task as Role B. It can't read data itself.
+- **Fargate parser task**: lives for one batch. Reads `raw/`, writes `parquet/`, rebuilds `semantic_layer/` once per batch, then exits.
+- **View SQL (GitHub, `semantic/views/`)**: code only. The parser runs it each batch to build the `sem.*` views.
+- **Microsoft Entra ID**: company login for the Xifin user.
+- **Cognito**: maps the user's group to a customer and issues a signed token naming that customer.
+- **API server (Chat API + run workers, ECS on Fargate)**: verifies the token and queues the run.
+- **Claim Query Agent**: runs in the run worker on Claude Haiku. Has no access to the data itself.
+- **DuckDB query service (Quack server, Fargate)**: the only part that holds the customer's credentials and reads data.
+- **STS**: gives the query service temporary credentials for one customer.
+- **`audit/`**: one JSON line per SQL statement.
 
-### 2.2 Main components at a glance
+**Notes / TODO:**
 
-| Component | Runs on | Role in the system |
-|---|---|---|
-| AWS Transfer Family (SFTP) | _TODO_ | _TODO_ |
-| Data bucket `xifin-dl-curated-prod/claimclarity` | S3 | _TODO_ |
-| EventBridge rule + launcher (ECS RunTask) | _TODO_ | _TODO_ |
-| Fargate parser task | ECS on Fargate | _TODO_ |
-| View SQL (`semantic/views/`, GitHub) | _TODO_ | _TODO_ |
-| Microsoft Entra ID | _TODO_ | _TODO_ |
-| Amazon Cognito | _TODO_ | _TODO_ |
-| Chat API + run workers | ECS on Fargate | _TODO_ |
-| Claim Query Agent (Claude Haiku) | Run worker | _TODO_ |
-| DuckDB query service (Quack server) | Fargate | _TODO_ |
-| AWS STS | _TODO_ | _TODO_ |
-| KMS keys (one per customer) | KMS | _TODO_ |
+- The board has drill-down badges for 00–04 only. There is no link to 05 (Access matrix).
+- The board says the parser "rebuilds" `semantic_layer/`. Board 05 says it writes "a new version" and the reader sees "current version only". Agree on one wording.
+- Lane labels are Compute · Write, Access, Compute · Read. Add a short legend if readers find the gate badges and arrows unclear.
 
-### 2.3 End-to-end story
-
-1. _TODO: customer drops daily 837 / 835 / 277 files over SFTP into `raw/` (→ section 3)._
-2. _TODO: data at rest per customer prefix, layers and keys (→ section 4)._
-3. _TODO: Xifin user signs in; token names one customer (→ section 5)._
-4. _TODO: question goes to the analyzer / Claim Query Agent (→ section 7)._
-5. _TODO: SQL runs in the DuckDB query service with one customer's temp creds (→ section 6)._
-6. _TODO: every SQL is written to the customer's `audit/` (→ section 10)._
-
-> **Note:** Sections follow the data story (intake → storage → login → query → analyzer → access matrix), not the diagram numbering.
-
----
-
-## 3. Ingestion & parse (01)
-
-One ingestion cycle for Customer B: files arrive over SFTP into `raw/`, the `_SUCCESS` marker triggers one Fargate parser task that writes silver and publishes a new gold version.
+## 01 · Ingestion & parse
 
 ![Ingestion and parse: Customer B SFTP files land in raw/, EventBridge on _SUCCESS triggers the ECS RunTask launcher, a Fargate parser task reads raw/ and writes parquet/ and semantic_layer/, gates 1–3](images/01-ingestion.png)
 
-_TODO: caption — "01 · Ingestion & parse, one cycle for Customer B."_
+**Summary:** One ingestion cycle for Customer B. Cycles run on a schedule. Files arrive over SFTP into `raw/`. The `_SUCCESS` file triggers one Fargate parser task, which writes the silver and gold layers and then exits.
 
-### 3.1 What it shows
+**Key components:**
 
-_TODO: describe the scope of one ingestion cycle and the schedule it runs on._
+- **Customer B**: sends daily 837, 835 and 277 files.
+- **Transfer Family SFTP endpoint**: writes the files into `raw/` with the Customer B copy role.
+- **`raw/`**: holds the 837, 835 and 277 files plus the `_SUCCESS` trigger.
+- **EventBridge**: sees `_SUCCESS` and calls the launcher (gate 1: rule matches customer B).
+- **ECS RunTask launcher**: starts the parser task with parser role B (gate 2: PassRole allowed).
+- **Fargate parser task (one per batch)**: steps are Start, Parse, Silver, Gold, Exit. Every read and write passes gate 3 (IAM + KMS for parser role B).
+- **`parquet/` (silver)**: parsed tables.
+- **`semantic_layer/` (gold)**: rebuilt from the view SQL each batch.
 
-### 3.2 Components
+**Notes / TODO:**
 
-- **Customer B (daily files):** _TODO: file types 837 / 835 / 277, cadence, SFTP login._
-- **Transfer Family SFTP endpoint:** _TODO: per-customer login, SFTP copy role, write-once into `raw/`._
-- **`raw/` (bronze):** _TODO: `received_date=YYYY-MM-DD/` partitioning, `837/ 835/ 277/` subfolders, `_SUCCESS` marker._
-- **EventBridge rule:** _TODO: one rule per customer, matches `_SUCCESS`._
-- **Launcher (ECS RunTask):** _TODO: starts the task as parser role B; cannot read data itself._
-- **Fargate parser task:** _TODO: one task per batch, lifetime, image, sizing._
-- **`parquet/` (silver) and `semantic_layer/` (gold):** _TODO: outputs; see section 4._
+- The board doesn't name its schedule. Confirm how often cycles run and whether `_SUCCESS` or a schedule starts them (or both).
+- Failed files go to `quarantine/` (from board 00). Confirm retries and alerting.
+- What happens with a missing `_SUCCESS` or a partial batch?
+- Board title has no "01 ·" prefix, unlike 03–05.
 
-### 3.3 Flow / steps
-
-1. **Start:** _TODO: ECS hands the task parser role B temp creds._
-2. **Parse:** _TODO: read each file in `raw/`, parse EDI._
-3. **Silver:** _TODO: write lossless parquet tables to `parquet/`; failed files to `quarantine/`._
-4. **Gold:** _TODO: run the `sem.*` view SQL from `semantic/views/` and publish a new `semantic_layer/` version once per batch._
-5. **Exit:** _TODO: creds expire, container destroyed._
-
-### 3.4 Security gates
-
-| Gate | Check | Where it applies |
-|---|---|---|
-| 1 | Rule matches customer B? | _TODO: EventBridge rule_ |
-| 2 | PassRole allowed for parser role B? | _TODO: launcher IAM policy_ |
-| 3 | IAM + KMS allow parser role B? | _TODO: each read of `raw/` and write to `parquet/` / `semantic_layer/`_ |
-
-### 3.5 Failure handling
-
-_TODO: what happens on parse failure (`quarantine/`), missing `_SUCCESS`, partial batches, retries, alerting._
-
-### 3.6 Open questions
-
-- _TODO_
-
----
-
-## 4. Storage & isolation (00)
-
-Customer B's prefixes in the single ClaimClarity data bucket, the roles and KMS keys that guard them, and Customer A's roles being denied.
+## 00 · Storage & isolation
 
 ![Storage and isolation: Customer B prefixes raw/, parquet/, semantic_layer/, quarantine/, audit/ in xifin-dl-curated-prod/claimclarity, with the copy, parser and reader roles, KMS key B, and Customer A roles denied at gates 3 and 6](images/00-storage.png)
 
-_TODO: caption — "00 · Storage & isolation, Customer B's folder."_
+**Summary:** Each customer has their own folder in the one data bucket. This board shows Customer B's folder, the roles that use it and its KMS key. Customer A's roles are denied by IAM + KMS.
 
-### 4.1 What it shows
+**Key components:**
 
-_TODO: one bucket, one folder per customer, one KMS key per customer._
+- **`raw/`**: bronze layer, under Object Lock. Written by the Customer B copy role (Transfer Family).
+- **`parquet/`**: silver layer. Written by parser role B.
+- **`semantic_layer/`**: gold layer. Built from views by parser role B. Read by the DuckDB query service.
+- **`quarantine/`**: failed parses.
+- **`audit/`**: one JSON Lines record per SQL, hash-chained, with a 6-year retention rule.
+- **Data encryption key (KMS)**: each customer's folder has its own key.
+- **Gate 3**: IAM + KMS for parser role B.
+- **Gate 6**: IAM + KMS for reader role B (DuckDB query service, Customer B read access).
+- **Customer A roles**: denied on `customer_b/` by IAM + KMS.
 
-### 4.2 Bucket and prefix layout
+Example audit record (one line per SQL):
 
-| Prefix | Layer | Contents | Written by | Read by | Retention / protection |
-|---|---|---|---|---|---|
-| `customer_b/raw/` | Bronze | _TODO: raw EDI_ | _TODO_ | _TODO_ | _TODO: Object Lock_ |
-| `customer_b/quarantine/` | — | _TODO: failed parses_ | _TODO_ | _TODO_ | _TODO_ |
-| `customer_b/parquet/` | Silver | _TODO: lossless parquet tables_ | _TODO_ | _TODO: only after escalation_ | _TODO_ |
-| `customer_b/semantic_layer/` | Gold | _TODO: all `sem.*` views as Parquet, versioned_ | _TODO_ | _TODO_ | _TODO_ |
-| `customer_b/audit/` | — | _TODO: one JSON line per SQL, hash-chained_ | _TODO_ | _TODO_ | _TODO: 6-year retention rule_ |
+```json
+{"ts": "2026-10-27T14:03:11Z", "customer": "customer_b", "user": "ana@xifin.example",
+ "run_id": "r_7f3c", "seq": 3, "sql": "SELECT payer_name, … (first 500 chars)",
+ "tables": ["sem.remit_claims"], "rows": 12, "ms": 184,
+ "escalation_reason": null, "prev_hash": "9c1e…", "hash": "4b7a…"}
+```
 
-### 4.3 Encryption keys
+**Notes / TODO:**
 
-_TODO: one KMS key per customer; key policy; who can encrypt vs decrypt; rotation._
+- The board doesn't show who writes `audit/`. Board 05 says the audit role (in the DuckDB query service) appends.
+- Verify against the real bucket and key policies: Object Lock mode on `raw/`, the 6-year rule, key rotation.
+- How is the hash chain checked, and who can read audit logs?
+- Board title has no "00 ·" prefix.
 
-### 4.4 Roles per customer
-
-- **Customer B copy role (Transfer Family):** _TODO_
-- **Parser role B:** _TODO_
-- **Reader role B (DuckDB query service):** _TODO_
-- **Audit role:** _TODO_
-
-### 4.5 Isolation between customers
-
-_TODO: why Customer A's roles are denied on `customer_b/` (IAM + KMS), and what an accidental cross-customer request looks like._
-
-### 4.6 Security gates
-
-| Gate | Check | Role |
-|---|---|---|
-| 3 | IAM + KMS allow? | Parser role B |
-| 6 | IAM + KMS allow? | Reader role B |
-
-### 4.7 Open questions
-
-- _TODO_
-
----
-
-## 5. Login & customer mapping (02)
-
-Each user signs in with their company account at Microsoft Entra ID; Cognito maps their one ClaimClarity group to exactly one customer and issues a token naming that customer.
+## 02 · Login & customer mapping
 
 ![Login and customer mapping: user signs in at Microsoft Entra ID with MFA, is a member of one ClaimClarity group, Cognito user pool maps group to customer and issues an ID token with customer = B, Chat API checks it at gate 4](images/02-login.png)
 
-_TODO: caption — "02 · Login & customer mapping."_
+**Summary:** Each user signs in with their company account at Microsoft Entra ID. Cognito maps their one ClaimClarity group to one customer. It issues an ID token that names that customer, and the Chat API trusts only that.
 
-### 5.1 What it shows
+**Key components:**
 
-_TODO: describe sign-in from the user's company account to a token the Chat API trusts._
+- **User**: signs in with a company account.
+- **Microsoft Entra ID**: company sign-in with MFA. The user is a member of one assigned group (e.g. Customer B).
+- **Cognito user pool**: single sign-on with Entra ID. Reads the group claim and looks it up in the group → customer table.
+- **Group → customer table**: "ClaimClarity · customer A" → `customer_a`, "ClaimClarity · customer B" → `customer_b`.
+- **ID token**: carries `customer = B`.
+- **Chat API**: takes the customer only from the token (gate 4: token valid).
 
-### 5.2 Components
+**Notes / TODO:**
 
-- **User (company account):** _TODO_
-- **Microsoft Entra ID tenant:** _TODO: company sign-in, MFA, assigned groups._
-- **Amazon Cognito user pool:** _TODO: SSO with Entra ID, group → customer lookup table._
-- **Chat API:** _TODO: takes the customer only from the token._
+- Who owns the group → customer table, and how is a new customer added?
+- What happens if a user has zero groups or more than one?
+- Board title has no "02 ·" prefix.
 
-### 5.3 Flow / steps
-
-1. **Sign in:** _TODO_
-2. **Member of:** _TODO: user's one assigned ClaimClarity group._
-3. **Single sign-on:** _TODO: Entra ID → Cognito._
-4. **Group claim:** _TODO_
-5. **Look up:** _TODO: group → customer mapping._
-6. **Issue:** _TODO: ID token with `customer = B`._
-
-### 5.4 Group → customer mapping
-
-| Entra ID group | Customer |
-|---|---|
-| ClaimClarity · customer A | `customer_a` |
-| ClaimClarity · customer B | `customer_b` |
-
-_TODO: who owns this mapping, how a new customer is added, what happens with zero or multiple groups._
-
-### 5.5 Security gates
-
-| Gate | Check | Defined in |
-|---|---|---|
-| 4 | Token valid and names the customer? | _TODO: Chat API, Cognito signature check on every request_ |
-
-### 5.6 Open questions
-
-- _TODO_
-
----
-
-## 6. Query path (03)
-
-The run worker sends SQL over Quack to the DuckDB query service, which alone exchanges the token at STS for customer B's 15-minute credentials and reads only customer B's data.
+## 03 · Query path
 
 ![Query path: Claim Query Agent in the run worker sends SQL through cli.py and the SQL guard to the Quack server in the DuckDB query service, which exchanges the token at AWS STS for reader role B credentials and reads customer_b semantic_layer/ (and lossless parquet after escalation); customer_a/ denied by IAM + KMS; gates 5 and 6](images/03-query-path.png)
 
-_TODO: caption — "03 · Query path, Customer B."_
+**Summary:** Only the DuckDB query service touches the data, with temporary credentials for one customer. The run worker sends SQL to the Quack server. The query service swaps the user's token at STS for reader role B credentials. It reads Customer B's data and sends rows back. `customer_a/` is denied by IAM + KMS.
 
-### 6.1 What it shows
+**Key components:**
 
-_TODO: only the DuckDB query service touches data, with temp credentials for one customer._
+- **Run worker (Fargate)**: holds the Claim Query Agent (Claude Haiku), `cli.py` and the read-only SQL guard.
+- **Quack server (DuckDB query service, Fargate)**: receives SQL, returns rows.
+- **AWS STS**: exchanges the token for temp credentials for reader role B (gate 5: trust policy allows this token).
+- **`semantic_layer/`**: gold layer views, read-only (gate 6: IAM + KMS for reader role B).
+- **`lossless.*`**: silver layer parquet, read only after escalation (gate 6).
+- **`customer_a/`**: denied by IAM + KMS.
 
-### 6.2 Components
+**Notes / TODO:**
 
-- **Run worker (Fargate):** _TODO: hosts the Claim Query Agent, cli.py, SQL guard; holds no data credentials._
-- **DuckDB query service (Fargate):** _TODO: Quack server, holds the customer's temp creds._
-- **AWS STS:** _TODO: token exchange for reader role B._
-- **`customer_b/semantic_layer/` (gold) and `lossless.*` (silver parquet):** _TODO_
+- The old page said the STS credentials last 15 minutes. No board shows that number. Confirm it against the real role config.
+- Verify the reader role trust policy actually checks the token's customer.
 
-### 6.3 Flow / steps
-
-1. **SQL:** _TODO: run worker → Quack server._
-2. **Token:** _TODO: query service presents the user's token to STS._
-3. **Temp credentials:** _TODO: 15-minute creds for reader role B._
-4. **Read-only:** _TODO: read gold views; silver `lossless.*` only after escalation._
-5. **Rows:** _TODO: results streamed back to the run worker._
-
-### 6.4 Security gates
-
-| Gate | Check | Defined in |
-|---|---|---|
-| 5 | Trust policy allows this token's customer? | _TODO: reader role trust policy (STS)_ |
-| 6 | IAM + KMS allow reader role B? | _TODO: reader role IAM policy, customer key policy_ |
-
-### 6.5 Cross-customer denial
-
-_TODO: describe how a request for `customer_a/` is denied by IAM + KMS even if SQL asked for it._
-
-### 6.6 Open questions
-
-- _TODO_
-
----
-
-## 7. Analyzer (04)
-
-The KPI gate answers with a preset query or hands the question to the Claim Query Agent, which writes SQL through cli.py and the SQL guard; the query then continues on the query path (section 6).
+## 04 · Analyzer
 
 ![Analyzer: user prompt hits the KPI gate; yes runs a preset KPI query, no goes to the Claim Query Agent (Claude Haiku via Strands on Amazon Bedrock) with prompt-cached references, which issues cli.py calls checked by the SQL guard before the DuckDB query service](images/04-analyzer.png)
 
-_TODO: caption — "04 · Analyzer."_
+**Summary:** A user question first hits the KPI gate. If a preset query answers it, that runs. If not, the Claim Query Agent writes CLI calls with SQL, which must pass the SQL guard before going to the DuckDB query service. The agent queries step by step, and the server re-runs the final query and answer.
 
-### 7.1 What it shows
+**Key components:**
 
-_TODO: how a user question becomes validated SQL and an answer._
+- **KPI gate**: "does a preset answer it?" Yes runs a preset KPI query. No hands the question to the agent.
+- **Claim Query Agent**: one agent, Claude Haiku, Strands on Amazon Bedrock. Runs as the run worker on Fargate. Gets the system prompt and conversation history (prompt cached) plus the newest user prompt.
+- **References (prompt cached)**: preset KPI queries, solved examples / question bank (K = 3 most similar question + SQL + answer), tool & CLI reference, rules from past mistakes, EDI business glossary, semantic layer schema + allowed values.
+- **Full lossless EDI schema**: given only after the agent escalates with a reason, which is logged.
+- **`cli.py` (ClaimClarity CLI)**: the agent's one tool. Commands: `sql "SELECT …"`, `lookup <dimension> <text>`, `describe <relation>`, `list`, `escalate "<reason>"`, `answer --sql … --text …`, `ask`, `refuse`.
+- **SQL guard**: checks read-only SELECT (one statement), allowed tables and functions (`sem.*`, `lossless.*` after escalate), valid against the schema, and join cost (no keyless joins over 100 M row pairs). A failed check sends an error back to the agent.
+- **DuckDB query service**: holds the credentials. Continues on 03 · Query path.
 
-### 7.2 KPI gate
+**Notes / TODO:**
 
-_TODO: "does a preset answer it?" — yes: preset fixed SQL with parameters filled in by the agent; no: hand to the agent._
+- The board doesn't say what `ask` and `refuse` do. Document them.
+- Is there a limit on how many query steps the agent can take?
 
-### 7.3 Claim Query Agent
-
-_TODO: one agent, Claude Haiku, Strands on Amazon Bedrock; runs as the run worker on Fargate; inputs = system prompt + conversation history (prompt cached) + newest user prompt._
-
-### 7.4 References (prompt cached)
-
-- **Preset KPI queries:** _TODO_
-- **Solved examples / question bank:** _TODO: K = 3 most similar question + SQL + answer._
-- **Tool & CLI reference:** _TODO_
-- **Rules from past mistakes:** _TODO_
-- **EDI business glossary:** _TODO_
-- **Semantic layer schema + allowed values:** _TODO_
-- **Full lossless EDI schema:** _TODO: only after the agent escalates with a logged reason._
-
-### 7.5 cli.py · ClaimClarity CLI
-
-| Command | Purpose |
-|---|---|
-| `sql "SELECT …"` | _TODO_ |
-| `lookup <dimension> <text>` | _TODO_ |
-| `describe <relation>` | _TODO_ |
-| `list` | _TODO_ |
-| `escalate "<reason>"` | _TODO_ |
-| `answer --sql … --text …` | _TODO: final query re-run by the server_ |
-| `ask` · `refuse` | _TODO_ |
-
-### 7.6 SQL guard checks
-
-1. **Read-only SELECT, one statement:** _TODO_
-2. **Allowed tables + functions:** _TODO: `sem.*`; `lossless.*` only after escalate._
-3. **Valid against the schema:** _TODO: would it fail? stop it here._
-4. **Join cost:** _TODO: no keyless joins over 100 M row pairs._
-
-_TODO: on failure, the error goes back to the agent; on pass, continue to section 6._
-
-### 7.7 Iterative querying and answer
-
-_TODO: iterative querying and result streaming; final query + answer re-run by the server._
-
-### 7.8 Open questions
-
-- _TODO_
-
----
-
-## 8. Access matrix (05)
-
-What each role can do in each customer prefix, the key it uses and the gates that guard it, plus where each of the six gates is defined.
+## 05 · Access matrix
 
 ![Access matrix: roles (SFTP copy, launcher, parser, reader, audit, chat API / run worker) against prefixes raw/, quarantine/, parquet/, semantic_layer/, audit/, KMS key and gates; plus a table of gates 1–6 and where each is defined](images/05-access-matrix.png)
 
-_TODO: caption — "05 · Access matrix."_
+**Summary:** What each role can do in each customer folder, which key it uses and which gates guard it. A second table lists the six gates and where each check is defined.
 
-### 8.1 Roles × prefixes
+**Key components:**
 
-| Role | Used by | raw/ | quarantine/ | parquet/ | semantic_layer/ | audit/ | KMS key | Gates |
-|---|---|---|---|---|---|---|---|---|
-| SFTP copy role | Transfer Family | _TODO_ | | | | | _TODO_ | |
-| Launcher | EventBridge → ECS RunTask | | | | | | | _TODO_ |
-| Parser role | Fargate parser task | _TODO_ | _TODO_ | _TODO_ | _TODO_ | | _TODO_ | _TODO_ |
-| Reader role | DuckDB query service | | | _TODO_ | _TODO_ | | _TODO_ | _TODO_ |
-| Audit role | DuckDB query service | | | | | _TODO_ | _TODO_ | |
-| Chat API · run worker | Claim Query Agent | | | | | | _TODO: none_ | _TODO_ |
+- **SFTP copy role (Transfer Family)**: write once to `raw/`. Customer key: encrypt.
+- **Launcher (EventBridge → ECS RunTask)**: no data access. Gates 1 and 2.
+- **Parser role (Fargate parser task)**: read `raw/`, write `quarantine/` and `parquet/`, write a new version of `semantic_layer/`. Customer key. Gate 3.
+- **Reader role (DuckDB query service)**: read `parquet/` only after escalation, read `semantic_layer/` current version only. Customer key: decrypt only. Gates 5 and 6.
+- **Audit role (DuckDB query service)**: append, write once to `audit/`. Customer key.
+- **Chat API · run worker (Claim Query Agent)**: no data credentials. Gate 4.
 
-_TODO: fill from the diagram; keep in sync with the PNG._
+The six gates:
 
-### 8.2 Gates · where each check is defined
+- **Gate 1**: the `_SUCCESS` file is in this customer's `raw/` folder. Defined in the EventBridge rule, one per customer.
+- **Gate 2**: the launcher passes only this customer's parser role, only to ECS. Defined in the launcher role's IAM policy (`iam:PassRole`).
+- **Gate 3**: the parser role and the customer's key allow the read or write. Defined in the parser role's IAM policy and the key policy.
+- **Gate 4**: the token is valid and names the customer. The Chat API checks Cognito's signature on every request.
+- **Gate 5**: the reader role trusts this token's customer. Defined in the reader role's trust policy (STS).
+- **Gate 6**: the reader role and the customer's key allow the read. Defined in the reader role's IAM policy and the key policy.
 
-See section 9 for the consolidated gate table.
+**Notes / TODO:**
 
-### 8.3 Open questions
-
-- _TODO_
-
----
-
-## 9. Security & isolation model
-
-Customer isolation rests on six gates; each must pass for a request to touch one customer's data.
-
-| # | What has to be true | Defined in | Diagram(s) |
-|---|---|---|---|
-| 1 | _TODO: `_SUCCESS` is in this customer's `raw/`_ | _TODO: EventBridge rule, one per customer_ | 01, main |
-| 2 | _TODO: launcher passes only this customer's parser role, only to ECS_ | _TODO: launcher IAM policy (`iam:PassRole`)_ | 01, main |
-| 3 | _TODO: parser role + customer key allow the read/write_ | _TODO: parser role IAM policy, key policy_ | 00, 01, main |
-| 4 | _TODO: token is valid and names the customer_ | _TODO: Chat API Cognito signature check_ | 02, main |
-| 5 | _TODO: reader role trusts this token's customer_ | _TODO: reader role trust policy (STS)_ | 03, main |
-| 6 | _TODO: reader role + customer key allow the read_ | _TODO: reader role IAM policy, key policy_ | 00, 03, main |
-
-### 9.1 Write side (gates 1–3)
-
-_TODO: summarise how ingestion is confined to one customer._
-
-### 9.2 Read side (gates 4–6)
-
-_TODO: summarise how queries are confined to one customer; the agent holds no data credentials._
-
-### 9.3 Defence in depth beyond the gates
-
-_TODO: SQL guard, escalation logging, Object Lock on `raw/`, short-lived credentials, per-customer KMS keys._
-
-### 9.4 Threats considered
-
-_TODO: link or list threat-model items (prompt injection, cross-customer SQL, stolen token, misrouted file)._
-
-## 10. Audit
-
-Every SQL statement is recorded as one hash-chained JSON line in the customer's `audit/` prefix.
-
-### 10.1 Audit record format
-
-```json
-{
-  "ts": "2026-10-27T14:03:11Z",
-  "customer": "customer_b",
-  "user": "ana@xifin.example",
-  "run_id": "r_7f3c", "seq": 3,
-  "sql": "SELECT payer_name, … (first 500 chars)",
-  "tables": ["sem.remit_claims"], "rows": 12, "ms": 184,
-  "escalation_reason": null,
-  "prev_hash": "9c1e…", "hash": "4b7a…"
-}
-```
-
-_TODO: field definitions, hash-chain verification._
-
-### 10.2 Writer, retention and access
-
-_TODO: audit role (append, write once), 6-year retention rule, who can read audit logs._
-
-### 10.3 Open questions
-
-- _TODO_
-
-## 11. Glossary
-
-| Term | Meaning |
-|---|---|
-| 837 / 835 / 277 | _TODO: EDI claim / remittance / claim status transactions_ |
-| Bronze / silver / gold | _TODO: `raw/` / `parquet/` / `semantic_layer/`_ |
-| `sem.*` | _TODO_ |
-| `lossless.*` | _TODO_ |
-| `_SUCCESS` | _TODO_ |
-| Escalation | _TODO_ |
-| KPI gate | _TODO_ |
-| Quack | _TODO_ |
-| Run worker | _TODO_ |
-| _TODO: more_ | |
-
-## 12. Decision log / ADRs
-
-| Decision | Status | Link |
-|---|---|---|
-| _TODO: one bucket with per-customer prefixes and KMS keys_ | _TODO_ | _TODO_ |
-| _TODO: only the DuckDB query service holds data credentials_ | _TODO_ | _TODO_ |
-| _TODO: one Fargate parser task per batch_ | _TODO_ | _TODO_ |
-| _TODO: Entra ID → Cognito group-to-customer mapping_ | _TODO_ | _TODO_ |
-| _TODO: single agent on Claude Haiku with one CLI tool_ | _TODO_ | _TODO_ |
-
-## 13. Open questions
-
-| # | Question | Owner | Status |
-|---|---|---|---|
-| 1 | _TODO_ | _TODO_ | _TODO_ |
-
-## 14. Change history
-
-_TODO: version, date, author, summary of change; note when diagram PNGs are replaced._
+- The audit role's KMS column says only "Customer key" (no encrypt/decrypt). Confirm what it needs.
+- Verify every cell against the real IAM, KMS and EventBridge config, and keep this list in sync with the PNG.

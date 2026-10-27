@@ -1,7 +1,7 @@
 """Check a draw.io file for features Lucidchart's draw.io importer is known to mishandle.
 
 Rules (each one is something that renders wrong or fails in Lucid):
-  file      XML declaration, ASCII-only, parses, one diagram, compressed payload decodes
+  file      no numeric character references (Lucid shows "&#183;" literally), parses, one diagram
   labels    no HTML labels (html=1 / tags in value) - Lucid shows the markup or drops styling
   fonts     only web-safe families (Helvetica, Arial, Courier New, ...); no fontSource web fonts
   shapes    only rect / text / rhombus / ellipse / hexagon / image(data URI PNG); no stencils
@@ -52,12 +52,10 @@ def shape_of(st):
 def check(path):
     errs, warns = [], []
     raw = open(path, "rb").read()
-    if not raw.startswith(b"<?xml"):
-        warns.append("file: no <?xml ...?> declaration (unverified rule)")
-    try:
-        raw.decode("ascii")
-    except UnicodeDecodeError:
-        warns.append("file: non-ASCII bytes (unverified rule)")
+    numeric_refs = re.findall(rb"&#[xX]?[0-9a-fA-F]+;", raw)
+    if numeric_refs:
+        errs.append(f"file: {len(numeric_refs)} numeric character references such as {numeric_refs[0].decode()} "
+                    "(Lucid shows them literally; write the characters as UTF-8)")
     root = ET.fromstring(raw)
     diagrams = root.findall("diagram")
     if len(diagrams) != 1:
