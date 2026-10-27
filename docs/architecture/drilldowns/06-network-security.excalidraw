@@ -861,7 +861,7 @@
    "type": "arrow",
    "x": 1710,
    "y": 465,
-   "width": 60,
+   "width": 55,
    "height": 0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
@@ -888,7 +888,7 @@
      0
     ],
     [
-     60,
+     55,
      0
     ]
    ],
@@ -902,9 +902,9 @@
   {
    "id": "arrow_1175",
    "type": "arrow",
-   "x": 1960,
+   "x": 1965,
    "y": 465,
-   "width": 100,
+   "width": 95,
    "height": 0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
@@ -931,7 +931,7 @@
      0
     ],
     [
-     100,
+     95,
      0
     ]
    ],
@@ -2127,9 +2127,9 @@
   {
    "id": "rectangle_1420",
    "type": "rectangle",
-   "x": 1770,
+   "x": 1765,
    "y": 415,
-   "width": 190,
+   "width": 200,
    "height": 100,
    "angle": 0,
    "strokeColor": "#1e1e1e",
@@ -2156,7 +2156,7 @@
   {
    "id": "image_1427",
    "type": "image",
-   "x": 1778,
+   "x": 1773,
    "y": 423,
    "width": 26,
    "height": 26,

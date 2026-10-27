@@ -15,6 +15,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 from ddlib import DENY, GR as GR_, Diagram, check, to_excalidraw, to_html  # noqa: E402
 
 OUT = Path(__file__).resolve().parent.parent / "drilldowns"
+AUDIT = ['{', '  "ts": "2026-10-27T14:03:11Z",', '  "customer": "customer_b",', '  "user": "ana@xifin.example",',
+         '  "run_id": "r_7f3c",  "seq": 3,', '  "sql": "SELECT payer_name, avg(is_denied::INT) …',
+         '          (first 500 chars)",', '  "tables": ["sem.remit_claims"],  "rows": 12,  "ms": 184,',
+         '  "escalation_reason": null,', '  "prev_hash": "9c1e…",  "hash": "4b7a…"', '}']
 G1, G2, G3, G4, G5, G6 = ("Rule matches\ncustomer B", "PassRole\nparser role B", "IAM + KMS\nparser role B",
                           "Token valid", "Trust policy\nallows this token", "IAM + KMS\nreader role B")
 
@@ -22,7 +26,7 @@ G1, G2, G3, G4, G5, G6 = ("Rule matches\ncustomer B", "PassRole\nparser role B",
 def d00():
     d = Diagram("00-storage", "00 · Storage & isolation",
                 "Customer B's prefixes in the one ClaimClarity data bucket, the roles and keys that guard them, and Customer A denied.",
-                2060, 970)
+                2300, 970)
     d.text(40, 56, "00 · Storage & isolation", "title")
     d.text(40, 86, "One bucket, one prefix per customer. Shown for customer B; every customer gets the same.", "subtitle")
     d.zone(360, 130, 1160, 720, "ClaimClarity data bucket", "bucket", "s3")
@@ -42,7 +46,10 @@ def d00():
     d.gate(6, 1620, cy, G6, "below", "iam")
     y2, h2 = 500, 110
     d.node("quar", 440, y2, 230, h2, "quarantine/", "bad files · 1 yr", shape="folder")
-    d.node("audit", 1210, y2, 240, h2, "audit/", "write-once · audit role", shape="folder")
+    d.node("audit", 1210, y2, 240, h2, "audit/", "write-once · 6 yr", shape="folder")
+    c = d.node("rec", 1560, 450, 700, 320, "Audit record", "JSON Lines · one per SQL · hash-chained", shape="code")
+    c["inner"] = AUDIT
+    d.edge([(1450, 555), (1560, 555)], style="dashed", end=False)
     d.edge([(555, y1 + h1), (555, y2)], "bad files", (567, (y1 + h1 + y2) // 2 + 6), lpos="right", style="dashed")
     y3 = 700
     d.text(440, y3 - 18, "KMS keys", "eyebrow")
@@ -56,7 +63,7 @@ def d00():
 def d01():
     d = Diagram("01-ingestion", "01 · Ingestion & parse",
                 "Lab files arrive over SFTP straight into raw, and the _SUCCESS marker triggers one Fargate parser task that writes silver and publishes a new gold version.",
-                2200, 980)
+                2200, 840)
     d.text(40, 56, "01 · Ingestion & parse", "title")
     d.text(40, 86, "One batch for customer B, from the lab's upload to a new CURRENT gold version.", "subtitle")
     X = -260                      # everything right of the SFTP endpoint
@@ -76,7 +83,7 @@ def d01():
     y2, h2 = 570, 100
     c2 = y2 + h2 // 2
     pe, pr = 1000 + X, 1150 + X   # raw bottom ports: event, read
-    d.node("eb", pe - 110, y2, 220, h2, "EventBridge rule", "customer B", "eventbridge")
+    d.node("eb", pe - 110, y2, 220, h2, "EventBridge rule", "3 launch retries", "eventbridge")
     d.node("run", 1200 + X, y2, 200, h2, "ECS RunTask", "launcher", "ecs")
     t = d.node("task", 1580 + X, 530, 680, 180, "Fargate parser task · one per batch", icon="fargate", shape="steps",
                inner=["Start", "Parse", "Silver", "Gold", "Exit"])
@@ -92,8 +99,6 @@ def d01():
     d.gate(3, 1800 + X, 425, G3, "right", "iam")
     d.edge([(2095 + X, 530), (2095 + X, y1 + h1)], "write", (2107 + X, 506), lpos="right")
     d.gate(3, 2095 + X, 425, G3, "right", "iam")
-    d.node("alarm", pe - 130, 790, 260, 90, "CloudWatch alarm", "re-run from same _SUCCESS", "cloudwatch")
-    d.edge([(pe, y2 + h2), (pe, 790)], "3 failed retries", (pe + 12, 736), lpos="right", style="dashed")
     return d
 
 
@@ -127,13 +132,13 @@ def d02():
 def d03():
     d = Diagram("03-query-path", "03 · Query path",
                 "The run worker sends SQL over Quack to the DuckDB query service, which alone holds customer B's 15-minute STS credentials and reads only customer B's gold; Customer A is denied by the API and by IAM.",
-                2400, 1000)
+                2400, 1040)
     d.text(40, 56, "03 · Query path", "title")
     d.text(40, 86, "The agent never holds AWS credentials. Only the query service does, for 15 minutes.", "subtitle")
     cy = 330
     d.zone(330, 190, 820, 280, "Run worker · Fargate · no AWS credentials", "worker", "fargate")
     d.zone(1330, 190, 360, 280, "DuckDB query service · Fargate", "worker", "fargate")
-    d.zone(1900, 130, 460, 760, "ClaimClarity data bucket", "bucket", "s3")
+    d.zone(1900, 140, 460, 800, "ClaimClarity data bucket", "bucket", "s3")
     d.node("api", 40, cy - 45, 210, 90, "Chat API", "customer from token", "fargate")
     d.node("agent", 370, cy - 50, 250, 100, "Claim Query Agent", "run worker")
     d.nodes[-1]["shape"] = "agent"
@@ -148,15 +153,19 @@ def d03():
     d.node("sts", 1400, 680, 230, 100, "AWS STS", "reader role B · 15 min", "sts")
     d.edge([(1515, cy + 60), (1515, 680)], "token", (1503, 510), lpos="left", start=True)
     d.gate(5, 1515, 590, G5, "right", "sts")
-    # reads
-    d.node("gold", 1950, 260, 370, 140, "customer_b/\nsemantic_layer/", "current gold · read-only", shape="db", style="white")
-    d.node("lossless", 1950, 480, 370, 120, "lossless.*", "after a reasoned escalation", shape="db", style="optional")
-    d.node("custa", 1950, 680, 370, 120, "customer_a/", shape="db", style="denied")
-    d.edge([(1660, cy), (1950, cy)], "read", (1910 - 40, cy - 12))
-    d.gate(6, 1790, cy, G6, "above", "iam")
-    d.edge([(1660, 360), (1880, 360), (1880, 540), (1950, 540)], style="dashed")
-    d.edge([(1660, 380), (1840, 380), (1840, 740), (1950, 740)], "denied\niam + kms", (1828, 742), lpos="left", style="deny")
-    d.edges[-1]["xat"] = (1895, 740)
+    # reads and the audit write
+    d.node("gold", 1950, 230, 370, 130, "customer_b/\nsemantic_layer/", "current gold · read-only", shape="db", style="white")
+    d.node("lossless", 1950, 450, 370, 110, "lossless.*", "after a reasoned escalation", shape="db", style="optional")
+    d.node("audit", 1950, 620, 370, 100, "customer_b/audit/", "write-once · audit key · 6 yr", shape="folder")
+    d.node("custa", 1950, 790, 370, 110, "customer_a/", shape="db", style="denied")
+    d.edge([(1660, 295), (1950, 295)], "read", (1910 - 40, 283))
+    d.gate(6, 1790, 295, G6, "above", "iam")
+    d.edge([(1660, 320), (1890, 320), (1890, 505), (1950, 505)], style="dashed")
+    d.edge([(1660, 350), (1860, 350), (1860, 670), (1950, 670)], "record", (1872, 600), lpos="right")
+    d.edge([(1660, 380), (1830, 380), (1830, 845), (1950, 845)], "denied\niam + kms", (1818, 830), lpos="left", style="deny")
+    d.edges[-1]["xat"] = (1895, 845)
+    c = d.node("rec", 330, 600, 760, 320, "Audit record · customer_b/audit/", "one per SQL · hash-chained", shape="code")
+    c["inner"] = AUDIT
     # Customer A at the API
     d.node("reqa", 40, 560, 210, 90, "Request for A", "token names B", style="denied")
     d.edge([(145, 560), (145, cy + 45)], "denied by api", (157, 470), lpos="right", style="deny")
@@ -256,13 +265,13 @@ def d06():
     d.gate(4, 1080, 345, G4, "below", "cognito")
     d.edge([(1360, 345), (1440, 345)])
     d.edge([(1560, 395), (1560, 535)], "quack", (1572, 470), lpos="right")
-    d.node("endpoints", 1770, 415, 190, 100, "VPC endpoints", "private", "endpoint")
-    d.edge([(1710, 465), (1770, 465)])
+    d.node("endpoints", 1765, 415, 200, 100, "VPC endpoints", "private", "endpoint")
+    d.edge([(1710, 465), (1765, 465)])
     d.node("aws", 2060, 240, 280, 440, "AWS services", shape="grid", style="white")
     d.nodes[-1]["inner"] = [("s3", "Amazon S3"), ("sts", "AWS STS"), ("kms", "AWS KMS"), ("bedrock", "Bedrock"),
                             ("ecr", "Amazon ECR"), ("cloudwatch", "CloudWatch Logs"), ("sqs", "Amazon SQS"), ("secrets", "Secrets Manager")]
     d.nodes[-1]["cols"] = 1
-    d.edge([(1960, 465), (2060, 465)])
+    d.edge([(1965, 465), (2060, 465)])
     d.node("nat", 1160, 810, 240, 100, "NAT gateway", icon="nat")
     d.node("fw", 1460, 810, 230, 100, "Network Firewall", "Cognito hosts only", "firewall")
     d.node("cognito", 2040, 810, 220, 100, "Amazon Cognito", "token keys", "cognito")
@@ -304,19 +313,17 @@ def d07():
     c2 = 590
     d.node("svc", 80, c2 - 45, 420, 90, "ECS services", "chat API · run workers · parser · query service", "ecs")
     d.node("alarms", 600, c2 - 45, 300, 90, "CloudWatch alarms", "queue · errors · latency · cost", "cloudwatch")
-    d.node("rerun", 1060, c2 - 45, 330, 90, "Re-run the batch", "from the same _SUCCESS", style="white")
     d.edge([(500, c2), (600, c2)], "metrics", (550, c2 - 12))
-    d.edge([(900, c2), (1060, c2)], "parser failed", (980, c2 - 12))
     c3 = 820
     d.node("fb", 80, c3 - 45, 320, 90, "Feedback", "thumbs-down · sampled chats", "thumb", style="white")
     d.node("reg", 480, c3 - 55, 280, 110, "Regression set", "answer keys · rewordings", shape="db")
-    d.node("holds", 860, c3 - 80, 220, 160, "Accuracy holds?", shape="decision")
+    d.node("holds", 850, c3 - 85, 250, 170, "Accuracy\nholds?", shape="decision")
     d.node("ship", 1180, c3 - 45, 240, 90, "Ship the change", "through the ship lane", style="white")
     d.node("block", 1180, 915, 240, 70, "Don't ship", style="denied")
     d.edge([(400, c3), (480, c3)])
-    d.edge([(760, c3), (860, c3)], "run", (810, c3 - 12))
-    d.edge([(1080, c3), (1180, c3)], "yes", (1130, c3 - 12))
-    d.edge([(970, c3 + 80), (970, 950), (1180, 950)], "no", (1075, 938))
+    d.edge([(760, c3), (850, c3)], "run", (805, c3 - 12))
+    d.edge([(1100, c3), (1180, c3)], "yes", (1140, c3 - 12))
+    d.edge([(975, c3 + 85), (975, 950), (1180, 950)], "no", (1077, 938))
     return d
 
 

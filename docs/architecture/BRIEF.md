@@ -69,8 +69,20 @@ Middle-ground length: about 15–20 PDF pages. No 100-page sets.
 8. **Compute is ECS on Fargate.** No EC2. Don't mention AgentCore.
 9. No build-status words ("simulated", "mock", "planned", "not built"), no regions or account ids, no model ids,
    no internal names ("B1", "claude -p").
-10. Diagrams read left to right, with no crossing arrows and no arrows through text. Leave white space. Verify by
-    looking at every render.
+10. **Not a single horizontal chain (user correction).** Drill-downs 02–05 came back as one left-to-right line,
+    which the user rejected. Lay each board out the way the user's excalidraw does:
+    - a few large zone containers side by side: "Frontend", "Claim Query Agent", the tools, and "Core principle"
+      with the customer's S3 prefix nested inside;
+    - inside each zone, a two-dimensional composition: a tall input column on the left (the example bank), a row of
+      inputs above (the references) feeding DOWN into a central node, a side column (the prompts), and dashed
+      optional parts below (the lossless schema);
+    - nested trust boundaries: account ⊃ service ⊃ customer prefix, with gates on the arrows that cross them;
+    - parallel labelled arrows for a two-way exchange ("writes CLI calls with SQL" →, ← "iterative querying and
+      result streaming", and a red "final query + answer");
+    - short annotations beside the arrows they explain (for example "SQL over a per-run channel; the agent never
+      holds credentials").
+    The overall flow can still run left to right between zones. No crossing arrows, no arrows through text, white
+    space. Verify by looking at every render.
 11. Keep the main board. Enhance it, don't replace it. The user said: "you abandoned the original drawio instead of
     enhancing".
 
