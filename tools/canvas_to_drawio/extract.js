@@ -26,7 +26,11 @@ const out=await p.evaluate(()=>{
    for(const a of c.attributes)it.a[a.name]=a.value;
    if(t==='text'){const bb=c.getBBox();it.bb=[bb.x,bb.y,bb.width,bb.height];
      it.spans=[];const nodes=c.childNodes;
-     for(const n of nodes){if(n.nodeType===3)it.spans.push({text:n.textContent,s:it.s});else it.spans.push({text:n.textContent,s:cs(n),a:Object.fromEntries([...n.attributes].map(a=>[a.name,a.value]))});}
+     let charIndex=0;
+     for(const n of nodes){const span=n.nodeType===3?{text:n.textContent,s:it.s}:{text:n.textContent,s:cs(n),a:Object.fromEntries([...n.attributes].map(a=>[a.name,a.value]))};
+       const len=n.textContent.length;
+       if(len){span.x0=c.getStartPositionOfChar(charIndex).x;span.w=c.getSubStringLength(charIndex,len);}
+       charIndex+=len;it.spans.push(span);}
    }
    items.push(it);}};
   walk(root);

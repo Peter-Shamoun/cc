@@ -2,8 +2,6 @@
 import base64, json, re, sys, urllib.parse, zlib
 from xml.sax.saxutils import escape, quoteattr
 
-extract_path, output_path = sys.argv[1], sys.argv[2]
-data = json.load(open(extract_path))
 
 GOOGLE_FONTS = {
     "Barlow": "https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap",
@@ -207,8 +205,8 @@ def stencil(segs, bx, by, w, h):
     return base64.b64encode(packed).decode()
 
 
-MARKERS = {  # marker id suffix -> (arrow, size)
-    "arr": ("block", 10), "arrb": ("block", 10), "arrn": ("block", 12), "arrs": ("block", 9),
+MARKERS = {  # marker id suffix -> (arrow, size); sizes measured against the SVG markers (draw.io adds the stroke)
+    "arr": ("blockThin", 8), "arrb": ("blockThin", 8), "arrn": ("blockThin", 9), "arrs": ("blockThin", 7),
 }
 
 
@@ -353,56 +351,65 @@ def convert_icon(parent, it):
     add_vertex(parent, x, y, w, h, st)
 
 
-canvas = data["canvas"]
-BX, BY = canvas["bounds"][0], canvas["bounds"][1]
+def main():
+    global ONLY_BOARD
+    extract_path, output_path = sys.argv[1], sys.argv[2]
+    ONLY_BOARD = sys.argv[3] if len(sys.argv) > 3 else None
+    data = json.load(open(extract_path))
+    canvas = data["canvas"]
+    BX, BY = canvas["bounds"][0], canvas["bounds"][1]
 
-# dashed connectors from the main board's zoom badges to each drill-down (drawn under the boards)
-ONLY_BOARD = sys.argv[3] if len(sys.argv) > 3 else None
-for link in ([] if ONLY_BOARD else canvas["links"]):
-    (x1, y1), (x2, y2) = link["start"], link["end"]
-    p1, p2 = (x1 - BX, y1 - BY), (x2 - BX, y2 - BY)
-    add_edge("1", [p1, p2], {"html": "1", "endArrow": "none", "startArrow": "none", "strokeColor": "#4A6BB0",
-                             "strokeWidth": "7", "dashed": "1", "dashPattern": f"{fmt(26 / 7)} {fmt(16 / 7)}", "opacity": "75"})
-    add_vertex("1", p2[0] - 34, p2[1] - 34, 68, 68, {"ellipse": None, "html": "1", "fillColor": "#4A6BB0",
-                                                     "strokeColor": "#FFFFFF", "strokeWidth": "5"})
-    add_vertex("1", p2[0] - 34, p2[1] - 34, 68, 68,
-               {"text": None, "html": "1", "align": "center", "verticalAlign": "middle", "spacing": "0",
-                "fontFamily": "Barlow Condensed", "fontSource": urllib.parse.quote(GOOGLE_FONTS["Barlow Condensed"], safe=""),
-                "fontSize": "34", "fontStyle": "1", "fontColor": "#FFFFFF", "strokeColor": "none", "fillColor": "none"},
-               link["number"])
+    # dashed connectors from the main board's zoom badges to each drill-down (drawn under the boards)
+    for link in ([] if ONLY_BOARD else canvas["links"]):
+        (x1, y1), (x2, y2) = link["start"], link["end"]
+        p1, p2 = (x1 - BX, y1 - BY), (x2 - BX, y2 - BY)
+        add_edge("1", [p1, p2], {"html": "1", "endArrow": "none", "startArrow": "none", "strokeColor": "#4A6BB0",
+                                 "strokeWidth": "7", "dashed": "1", "dashPattern": f"{fmt(26 / 7)} {fmt(16 / 7)}", "opacity": "75"})
+        add_vertex("1", p2[0] - 34, p2[1] - 34, 68, 68, {"ellipse": None, "html": "1", "fillColor": "#4A6BB0",
+                                                         "strokeColor": "#FFFFFF", "strokeWidth": "5"})
+        add_vertex("1", p2[0] - 34, p2[1] - 34, 68, 68,
+                   {"text": None, "html": "1", "align": "center", "verticalAlign": "middle", "spacing": "0",
+                    "fontFamily": "Barlow Condensed", "fontSource": urllib.parse.quote(GOOGLE_FONTS["Barlow Condensed"], safe=""),
+                    "fontSize": "34", "fontStyle": "1", "fontColor": "#FFFFFF", "strokeColor": "none", "fillColor": "none"},
+                   link["number"])
 
-for board in data["boards"]:
-    if ONLY_BOARD:
-        if board["slug"] != ONLY_BOARD:
-            continue
-        board = dict(board, left=0, top=0)
-    board_id = add_vertex("1", board["left"], board["top"], board["w"], board["h"], {
-        "rounded": "1", "absoluteArcSize": "1", "arcSize": "12", "html": "1", "fillColor": "#FFFFFF",
-        "strokeColor": "none", "container": "1", "collapsible": "0", "pointerEvents": "0", "recursiveResize": "0",
-        "shadow": "1", "shadowColor": "#1C2B57", "shadowOpacity": "16", "shadowBlur": "24", "shadowOffsetX": "0",
-        "shadowOffsetY": "18", **({"shadow": "0"} if ONLY_BOARD else {})})
-    skip_lid = False
-    for it in board["items"]:
-        t = it["t"]
-        if t == "rect":
-            convert_rect(board_id, it)
-        elif t == "circle":
-            convert_circle(board_id, it)
-        elif t == "line":
-            convert_line(board_id, it)
-        elif t == "text":
-            convert_text(board_id, it)
-        elif t == "icon":
-            convert_icon(board_id, it)
-        elif t == "path":
-            skip_lid = convert_path(board_id, it, skip_lid)
-            continue
+    for board in data["boards"]:
+        if ONLY_BOARD:
+            if board["slug"] != ONLY_BOARD:
+                continue
+            board = dict(board, left=0, top=0)
+        board_id = add_vertex("1", board["left"], board["top"], board["w"], board["h"], {
+            "rounded": "1", "absoluteArcSize": "1", "arcSize": "12", "html": "1", "fillColor": "#FFFFFF",
+            "strokeColor": "none", "container": "1", "collapsible": "0", "pointerEvents": "0", "recursiveResize": "0",
+            "shadow": "1", "shadowColor": "#1C2B57", "shadowOpacity": "16", "shadowBlur": "24", "shadowOffsetX": "0",
+            "shadowOffsetY": "18", **({"shadow": "0"} if ONLY_BOARD else {})})
         skip_lid = False
+        for it in board["items"]:
+            t = it["t"]
+            if t == "rect":
+                convert_rect(board_id, it)
+            elif t == "circle":
+                convert_circle(board_id, it)
+            elif t == "line":
+                convert_line(board_id, it)
+            elif t == "text":
+                convert_text(board_id, it)
+            elif t == "icon":
+                convert_icon(board_id, it)
+            elif t == "path":
+                skip_lid = convert_path(board_id, it, skip_lid)
+                continue
+            skip_lid = False
 
-W, H = canvas["bounds"][2], canvas["bounds"][3]
-xml = (f'<mxfile host="Electron" type="device"><diagram id="claimclarity-canvas" name="ClaimClarity architecture">'
-       f'<mxGraphModel dx="0" dy="0" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" '
-       f'page="0" pageScale="1" pageWidth="{W}" pageHeight="{H}" background="#DCE2EC" math="0" shadow="0">'
-       f'<root><mxCell id="0"/><mxCell id="1" parent="0"/>{"".join(cells)}</root></mxGraphModel></diagram></mxfile>')
-open(output_path, "w").write(xml)
-print(f"{len(cells)} cells -> {output_path}")
+    W, H = canvas["bounds"][2], canvas["bounds"][3]
+    xml = (f'<mxfile host="Electron" type="device"><diagram id="claimclarity-canvas" name="ClaimClarity architecture">'
+           f'<mxGraphModel dx="0" dy="0" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" '
+           f'page="0" pageScale="1" pageWidth="{W}" pageHeight="{H}" background="#DCE2EC" math="0" shadow="0">'
+           f'<root><mxCell id="0"/><mxCell id="1" parent="0"/>{"".join(cells)}</root></mxGraphModel></diagram></mxfile>')
+    open(output_path, "w").write(xml)
+    print(f"{len(cells)} cells -> {output_path}")
+
+
+ONLY_BOARD = None
+if __name__ == "__main__":
+    main()

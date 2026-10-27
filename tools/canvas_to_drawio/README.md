@@ -21,4 +21,22 @@ python3 tools/canvas_to_drawio/build.py extract.json diagrams/ClaimClarity_Archi
 python3 tools/canvas_to_drawio/build.py extract.json one_board.drawio 00-storage   # one board at 0,0, no shadow (for pixel diffs)
 ```
 
+## Lucidchart
+
+Lucid's draw.io importer shows a blank canvas for the full-fidelity file (HTML labels, web fonts, stencils, containers
+and SVG icons are all things it mishandles). `build_lucid.py` writes the same layout in the subset
+`tools/lucid/check_drawio_for_lucid.py` accepts, and re-saves it through the draw.io CLI:
+
+```bash
+python3 tools/canvas_to_drawio/build_lucid.py extract.json diagrams/ClaimClarity_Architecture_Canvas_Lucid.drawio --drawio /path/to/drawio
+python3 tools/lucid/check_drawio_for_lucid.py diagrams/ClaimClarity_Architecture_Canvas_Lucid.drawio   # must be 0 errors
+```
+
+What changes in the Lucid file:
+- Text is plain Helvetica or Courier New, one cell per styled run. Runs that don't fit shrink to at most 85% of their size, so condensed titles run a little wider; the white chip behind each title widens to match.
+- Icons and the folder and note outlines are PNG images. Cylinders are built from ellipses and rects.
+- Stroke widths are rounded to whole pixels, and fill opacity is blended into solid colours.
+- There is one flat layer. Edges are bound to the shapes they touch, at exact exit and entry points.
+- `<word>` placeholders in CLI text use the look-alike angle quotes ‹word›.
+
 When exporting with the draw.io desktop app, Barlow, Barlow Condensed and IBM Plex Mono must be installed where the app can find them (`$HOME/.fonts`), or the text falls back to Arial. In the browser, draw.io loads them from Google Fonts through each cell's `fontSource`.
