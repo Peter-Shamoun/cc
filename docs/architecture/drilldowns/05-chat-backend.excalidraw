@@ -6,9 +6,9 @@
   {
    "id": "rectangle_1007",
    "type": "rectangle",
-   "x": 350,
+   "x": 386,
    "y": 170,
-   "width": 340,
+   "width": 304,
    "height": 290,
    "angle": 0,
    "strokeColor": "#1e1e1e",
@@ -35,7 +35,7 @@
   {
    "id": "text_1014",
    "type": "text",
-   "x": 364,
+   "x": 400,
    "y": 180,
    "width": 49.28,
    "height": 27.5,

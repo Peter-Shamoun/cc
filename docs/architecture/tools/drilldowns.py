@@ -357,7 +357,7 @@ def d05():
     u = d.node("user", 20, 362, 250, 136, "ClaimClarity", shape="image")
     u["href"], u["fit"] = UI_LIGHT, "meet"
     d.text(20, 345, "User · browser", "heading")
-    d.zone(350, 290, 340, 290, "Edge", "plain")
+    d.zone(386, 290, 304, 290, "Edge", "plain")
     d.node("cf", 400, 355, 260, 140, "CloudFront + WAF", "public entry", "cloudfront")
     d.edge([(270, 405), (400, 405)], "question", (335, 393))
     d.edge([(400, 455), (270, 455)], "answer · sse", (335, 487), style="dashed")
