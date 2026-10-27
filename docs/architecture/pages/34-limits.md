@@ -52,7 +52,7 @@ live in one S3 limits object per customer, written with If-Match like a conversa
 | SQL time per question | 60 s in total | Reader session | The analyzer is told the time is used up, and answers or abstains |
 | Rows per query | 1,000 (the guard adds the LIMIT). The model sees 20. The user sees a 50-row preview plus a CSV. | Reader session | The table shows "Showing n of N rows" |
 | Reader credentials | 15 minutes | STS | Queries after expiry are refused |
-| Run deadline | 4 minutes from the start of the run | Run worker | The run ends as `error`. The lease expires at the same time. |
+| Run deadline | 110 s from the start of the run, inside the 120 s ECS stop timeout, so a deploy never cuts a run | Run worker | The run ends as `error`. The lease expires at the same time. |
 | Time in the queue | 2 minutes | Run worker | A run that waited longer ends as `error` without running. `usage.latency.queueMs` records the wait. |
 | Clarification reply | 30 minutes | Chat API | 409 `clarification_expired`: "Ask again" |
 | Stream replay | 60 s after the run ends | Chat API | 404 `stream_gone`. The client reloads the saved answer. |

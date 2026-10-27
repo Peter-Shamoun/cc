@@ -1,0 +1,12 @@
+### AWS IAM
+| | |
+|---|---|
+| Purpose in ClaimClarity | Defines every role and what it may do. Each customer has its own lake roles (parser, reader, SFTP copy), transcript roles (user, customer admin, eval) and audit roles (writer, reader), each tagged `customer = <customer>` and `kms_key_arn = <that role's key>`. Platform roles: chat API, run workers, deploy (Terraform), key admin, support and support break-glass, eval team, and the EventBridge launcher. |
+| Talks to | STS (role trust policies), S3 (identity policies plus the ABAC bucket policy), KMS (key policies name the roles), ECS (task roles, `iam:PassRole` for the launcher, gate 2) |
+| Permissions | Reader: `ListBucket` (prefix `<customer>/semantic_layer/*`) and `GetObject` on `<customer>/semantic_layer/*` only, with no `GetObjectVersion`. Parser: reads raw and the derived layers, writes staging, silver, gold and quarantine of its customer. SFTP copy: `PutObject` and `PutObjectRetention` on `<customer>/raw/*`. Audit writer: `PutObject` only on `<customer>/audit/queries/*`. Chat API role: assumes the audit writer roles only, and cannot read PHI. Launcher: `ecs:RunTask` for the parser task definitions on the ClaimClarity cluster, and `iam:PassRole` for the parser roles to `ecs-tasks` only. Only the deploy role changes IAM. |
+| Encryption | n/a. Roles carry the `kms_key_arn` tag that the bucket policy compares against every PUT |
+| Data held / PHI | None |
+| Scaling and limits | Roles grow linearly with customers (about 8 per customer). The bucket policy is the same size for any number of customers (ABAC on the `customer` tag). The query-audit key policy grows by 2 statements per customer, within the 32 KB key policy limit for several hundred customers |
+| Failure behaviour | Any missing permission is an explicit `AccessDenied`, never a silent fallback. Policies that name roles that do not exist are rejected when written |
+| Logging and audit | Every IAM change is a CloudTrail management event. Role changes outside the deploy pipeline raise an alarm |
+| Used on pages | [Identity & access](20-identity.md) · [Token to credentials](22-token-to-credentials.md) · [Customer isolation](23-customer-isolation.md) · [Encryption & keys](52-encryption-keys.md) |
