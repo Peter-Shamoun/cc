@@ -5,7 +5,7 @@
 A Confluence-ready architecture set that the company's IT and security teams can build, secure and operate from.
 The set has three parts:
 - one main board, the overview;
-- six drill-downs (00–05), one per app area;
+- five drill-downs (00–04), one per app area;
 - a short document with one section per board (image plus a 3–8 row spec table).
 
 Formats:
@@ -34,10 +34,9 @@ Middle-ground length: about 15–20 PDF pages. No 100-page sets.
 |---|---|---|
 | 00 | Storage & isolation | One bucket, the `customer_b/` prefixes (raw, parquet/silver, semantic_layer/gold, quarantine, audit), the customer's roles, keys and bucket policy, and Customer A denied |
 | 01 | Ingestion & parse | Lab → SFTP intake → raw → `_SUCCESS` → EventBridge rule → ECS RunTask → Fargate parser task (start, parse, silver, gold, exit) → gold publish (new CURRENT version). Gates 1, 2 and 3. |
-| 02 | Login & customer mapping | User → Microsoft Entra ID → assigned group → Cognito (group → one customer) → ID token to the chat API (server to server) → encrypted session cookie (key in Secrets Manager) → gate 4 (token valid) → chat API |
+| 02 | Login & customer mapping | User → Microsoft Entra ID → assigned group → Cognito (group → one customer) → token naming the customer → gate 4 → chat API. No session details. |
 | 03 | Query path | Run worker: Claim Query Agent → ClaimClarity CLI (`cli.py`) → SQL guard → over Quack → DuckDB query service. The query service exchanges the token at STS (gate 5) and reads `customer_b/semantic_layer/` (gate 6); `lossless.*` only after a reasoned escalation. Customer A is blocked by the API and by IAM. |
 | 04 | Analyzer | The user's excalidraw: frontend ⇄ Claim Query Agent. The agent's inputs: the solved example bank (K = 3), references (prompt cached: rules, EDI glossary, semantic schema + allowed values), the tool and CLI reference (prompt cached), the system prompt + history (cached) and the newest prompt. It runs Claude Haiku, first decides to answer, clarify or escalate, then calls `cli.py` → SQL guard. The full lossless schema is reachable only after escalation. **Add the KPI gate** in front: a preset fits → preset KPI queries (the gate fills the parameters); otherwise → the agent. |
-| 05 | Chat backend | User → CloudFront + WAF → internal load balancer → gate 4 → chat API (Fargate) → SQS run queue → run worker (Fargate, the Claim Query Agent) → Bedrock. The run worker talks to the DuckDB query service over Quack. The answer streams back live (SSE). Limits. No chat storage (out of scope). |
 
 ## Hard rules: the user's feedback, in their words where it matters
 
@@ -88,7 +87,7 @@ Middle-ground length: about 15–20 PDF pages. No 100-page sets.
 
 - **Scope (user decision): we own the app, not the platform.** Network & security (VPC, endpoints, NAT, firewall) and
   operations (deploy, monitoring, alarms, log retention) are owned by IT: no boards 06/07. The set is the main board
-  plus drill-downs 00–05.
+  plus drill-downs 00–04. Board 05 (chat backend) was dropped (user decision 2026-10-27).
 
 - **Query audit (user decision: keep it, and show it with its record structure).** The DuckDB query service writes one
   JSON Lines record per SQL statement to `customer_b/audit/` (write-once, platform audit key, kept 6 years, each
@@ -119,10 +118,9 @@ Middle-ground length: about 15–20 PDF pages. No 100-page sets.
 - **KPI gate:** one Haiku call with structured output. 16 preset queries with fixed SQL. The parameters (payer,
   payer class, month, CPT, CARC) are checked against the data. A preset that doesn't fit, or anything else wrong,
   goes to the agent.
-- **Login cookie (decided 2026-10-27; no DynamoDB):** the browser never sees a readable token. The chat API gets the ID
-  token from Cognito server to server and puts it in the session cookie encrypted (key in Secrets Manager; HttpOnly,
-  Secure, SameSite=Strict). The cookie lives 60 minutes, then single sign-on again. No session store. Say "single
-  sign-on", not "federate".
+- **Login scope (user decision 2026-10-27):** propose only Entra ID → group → Cognito lookup → token naming the customer.
+  Session handling (cookie, lifetime, sign-out) is IT's design: don't draw it. Say "single sign-on", not "federate".
+  No DynamoDB.
 - **Chat:** the API checks the token on every request. 3 unfinished runs per user, 110 s run deadline. The answer
   streams live over SSE. The server re-runs the final SQL, so the numbers come from
   the database.

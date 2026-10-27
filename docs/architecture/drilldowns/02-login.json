@@ -4,17 +4,17 @@
  "board": {
   "slug": "02-login",
   "title": "Login & customer mapping",
-  "desc": "The user signs in at Microsoft Entra ID; Cognito maps the user's one assigned group to a customer and gives the ID token to the chat API, which puts it in the session cookie encrypted, so the browser can't read or reuse it; gate 4 checks it on every request.",
-  "w": 3000,
-  "h": 1360,
+  "desc": "The user signs in at Microsoft Entra ID; Cognito maps the user's one assigned ClaimClarity group to exactly one customer and issues a token naming that customer, which gate 4 checks before the chat API.",
+  "w": 2500,
+  "h": 1000,
   "zones": [
    {
     "id": "z_browser",
     "x": 40,
     "y": 160,
     "w": 380,
-    "h": 960,
-    "label": "Browser",
+    "h": 220,
+    "label": "User",
     "kind": "plain",
     "icon": null
    },
@@ -37,16 +37,6 @@
     "label": "Amazon Cognito",
     "kind": "dashed",
     "icon": "cognito"
-   },
-   {
-    "id": "z_api",
-    "x": 2060,
-    "y": 680,
-    "w": 460,
-    "h": 460,
-    "label": "Chat API · Fargate",
-    "kind": "worker",
-    "icon": "fargate"
    }
   ],
   "nodes": [
@@ -61,19 +51,6 @@
     "icon": "users",
     "shape": "box",
     "style": "service",
-    "inner": null
-   },
-   {
-    "id": "cookie",
-    "x": 80,
-    "y": 900,
-    "w": 300,
-    "h": 180,
-    "name": "Session cookie",
-    "sub": "encrypted ID token\nHttpOnly · Secure · SameSite",
-    "icon": null,
-    "shape": "file",
-    "style": "white",
     "inner": null
    },
    {
@@ -149,60 +126,21 @@
     "w": 380,
     "h": 130,
     "name": "ID token",
-    "sub": "customer = B · 60 min",
+    "sub": "customer = B",
     "icon": null,
     "shape": "token",
     "style": "service",
     "inner": null
    },
    {
-    "id": "signin",
-    "x": 2100,
-    "y": 745,
-    "w": 380,
-    "h": 120,
-    "name": "Sign-in",
-    "sub": "one group, else refused",
-    "icon": "fargate",
-    "shape": "box",
-    "style": "service",
-    "inner": null
-   },
-   {
     "id": "api",
-    "x": 2100,
-    "y": 985,
-    "w": 380,
-    "h": 110,
+    "x": 2120,
+    "y": 740,
+    "w": 320,
+    "h": 130,
     "name": "Chat API",
-    "sub": "decrypts + verifies the token",
+    "sub": "takes the customer\nonly from the token",
     "icon": "fargate",
-    "shape": "box",
-    "style": "service",
-    "inner": null
-   },
-   {
-    "id": "reject",
-    "x": 1850,
-    "y": 1170,
-    "w": 220,
-    "h": 80,
-    "name": "Rejected",
-    "sub": "sign in again",
-    "icon": null,
-    "shape": "box",
-    "style": "denied",
-    "inner": null
-   },
-   {
-    "id": "key",
-    "x": 2620,
-    "y": 760,
-    "w": 300,
-    "h": 90,
-    "name": "Cookie key",
-    "sub": "Secrets Manager",
-    "icon": "secrets",
     "shape": "box",
     "style": "service",
     "inner": null
@@ -342,160 +280,31 @@
     "lpos": "right"
    },
    {
-    "id": "e_exchange",
+    "id": "e_token",
     "pts": [
      [
       1740,
       805
      ],
      [
-      2100,
+      2120,
       805
      ]
     ],
-    "label": "server to server",
-    "at": [
-     1960,
-     793
-    ],
+    "label": null,
+    "at": null,
     "style": "solid",
     "end": true,
     "start": false,
     "lpos": "above"
-   },
-   {
-    "id": "e_store",
-    "pts": [
-     [
-      2620,
-      805
-     ],
-     [
-      2480,
-      805
-     ]
-    ],
-    "label": "key",
-    "at": [
-     2550,
-     793
-    ],
-    "style": "solid",
-    "end": true,
-    "start": false,
-    "lpos": "above"
-   },
-   {
-    "id": "e_setcookie",
-    "pts": [
-     [
-      2100,
-      845
-     ],
-     [
-      2000,
-      845
-     ],
-     [
-      2000,
-      925
-     ],
-     [
-      380,
-      925
-     ]
-    ],
-    "label": "set cookie · encrypted token",
-    "at": [
-     1190,
-     913
-    ],
-    "style": "dashed",
-    "end": true,
-    "start": false,
-    "lpos": "above"
-   },
-   {
-    "id": "e_request",
-    "pts": [
-     [
-      380,
-      1040
-     ],
-     [
-      2100,
-      1040
-     ]
-    ],
-    "label": "every request",
-    "at": [
-     1190,
-     1028
-    ],
-    "style": "solid",
-    "end": true,
-    "start": false,
-    "lpos": "above"
-   },
-   {
-    "id": "e_check",
-    "pts": [
-     [
-      2700,
-      850
-     ],
-     [
-      2700,
-      1040
-     ],
-     [
-      2480,
-      1040
-     ]
-    ],
-    "label": "key",
-    "at": [
-     2712,
-     950
-    ],
-    "style": "solid",
-    "end": true,
-    "start": false,
-    "lpos": "right"
-   },
-   {
-    "id": "e_deny",
-    "pts": [
-     [
-      1960,
-      1076
-     ],
-     [
-      1960,
-      1170
-     ]
-    ],
-    "label": "invalid or expired",
-    "at": [
-     1946,
-     1146
-    ],
-    "style": "deny",
-    "end": true,
-    "start": false,
-    "lpos": "left",
-    "xat": [
-     1960,
-     1104
-    ]
    }
   ],
   "gates": [
    {
     "id": "g4",
     "n": 4,
-    "x": 1960,
-    "y": 1040,
+    "x": 2000,
+    "y": 805,
     "label": "Token valid",
     "side": "above",
     "icon": "cognito"
@@ -515,17 +324,8 @@
     "id": "t_sub",
     "x": 40,
     "y": 86,
-    "s": "Sign-in happens at Entra ID. The browser gets the token only encrypted, so it can't read or reuse it.",
+    "s": "Each user signs in with their company account. Cognito maps their one ClaimClarity group to one customer.",
     "role": "subtitle",
-    "anchor": "start",
-    "color": null
-   },
-   {
-    "id": "t_note",
-    "x": 2580,
-    "y": 1110,
-    "s": "A copied cookie works only until\nthe token expires (60 min). Then\nthe user signs in again (SSO).",
-    "role": "note",
     "anchor": "start",
     "color": null
    }

@@ -7,7 +7,7 @@ The main board ("ov") is kept as drawn, with these edits:
 - the API backend is ECS on Fargate, and the Claim Query Agent sits inside it as the run worker;
 - DuckDB moves out into its own query service (DuckDB Quack server), which now does the STS exchange.
 
-The original zoom boards 00–03 are replaced by tools/boards.py (00–07), and zoom badges 04–07 are added.
+The original zoom boards 00–03 are replaced by tools/boards.py (00–07), and zoom badge 04 is added.
 """
 import re
 import sys
@@ -60,9 +60,8 @@ for cid in ("ov_l_bkt", "ov_l_s3r"):
     swap(cid, ("cc/", "claimclarity/"))
 swap("ov_l_ec2", ("API backend · EC2", "Chat API + run workers · ECS on Fargate"))
 swap("ov_api", ("Verifies token, gets creds", "Verifies token, queues the run"))
-# sign-in: the browser holds the ID token only encrypted, in the session cookie
+# sign-in: Cognito maps the Entra ID group to one customer (session handling is IT's design)
 swap("ov_cog", ("Issues token", "Maps group → customer"))
-swap("ov_tok", ("Signed token", "Session cookie"), ("Names the customer", "Encrypted ID token"))
 value("ov_agent", caps("Claim Query Agent", 17, "#FFFFFF") + '<br><span style="font-size:12px;color:#FFFFFF">run worker · Claude Haiku</span>')
 value("ov_duck", caps("DuckDB query service") + '<br><span style="font-size:13px">Quack server · own Fargate task · holds B\'s creds</span>')
 value("ov_sts", caps("STS") + '<br><span style="font-size:14px">15-min B creds for the query service</span>')
@@ -102,12 +101,11 @@ for res, color in COLORS.items():   # official AWS icon colours
     text = text.replace(f"resIcon=mxgraph.aws4.{res};fillColor=#1C2B57;", f"resIcon=mxgraph.aws4.{res};fillColor={color};")
 text = text.replace("resIcon=mxgraph.aws4.ec2;fillColor=#1C2B57;", f"resIcon=mxgraph.aws4.fargate;fillColor={COLORS['fargate']};")
 
-# 3. new boards, zoom badges 04-07 and zoom links to every board
+# 3. new boards, zoom badge 04 and zoom links to every board
 extra = boards()
 zoom(extra, "ov_z04", "04", 1592, 1312, "ov")   # Claim Query Agent
-zoom(extra, "ov_z05", "05", 1500, 1225, "ov")   # chat API + run workers
 link_style = re.search(r'<mxCell id="zl_00"[^>]*style="([^"]*)"', text).group(1)
-for n in range(4, 6):
+for n in range(4, 5):
     extra.append(f'<mxCell id="zl_0{n}" value="" style="{link_style}" edge="1" parent="1" source="ov_z0{n}" target="s{n}">'
                  f'<mxGeometry relative="1" as="geometry"/></mxCell>')
 text = text.replace("</root>", "".join(extra) + "</root>", 1)

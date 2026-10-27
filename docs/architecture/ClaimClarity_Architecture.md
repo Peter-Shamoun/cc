@@ -2,7 +2,7 @@
 
 ClaimClarity answers questions about a clinical lab's claims (837P) and remittances (835). Each customer's data
 sits in its own S3 prefix, under its own KMS key and IAM roles. Six AWS checks, the numbered diamonds, enforce that
-on every write and read. The main board shows the whole system, and drill-downs 00–05 zoom into each part.
+on every write and read. The main board shows the whole system, and drill-downs 00–04 zoom into each part.
 
 | Gate | What AWS checks |
 |---|---|
@@ -22,7 +22,7 @@ on every write and read. The main board shows the whole system, and drill-downs 
 | SFTP | Each lab sends daily 837 · 835 · 277 files | AWS Transfer Family, lab IP addresses only, straight into `raw/` |
 | ClaimClarity data bucket | One prefix per customer: raw → silver → gold, plus quarantine and audit | One bucket for all customer data |
 | Compute · write | EventBridge → ECS RunTask → one Fargate parser task per batch | Runs as the customer's parser role. Gates 1–3. |
-| Access | Entra ID → Cognito → ID token naming the customer, kept in an encrypted cookie | The token is the only source of the customer. The browser can't read it. Gate 4. |
+| Access | Entra ID → Cognito → token naming the customer | The token is the only source of the customer. Gate 4. |
 | Compute · read | Chat API → run worker (the Claim Query Agent) → DuckDB query service → STS → gold | 15-minute credentials, this customer's gold only. Gates 5–6. |
 
 ## 00 · Storage & isolation
@@ -61,11 +61,8 @@ on every write and read. The main board shows the whole system, and drill-downs 
 |---|---|
 | Microsoft Entra ID | Company sign-in. The ClaimClarity app is assigned to groups. |
 | Assigned group | One group per customer |
-| Amazon Cognito | Single sign-on with Entra ID (OIDC). Maps the group to a customer and issues an ID token naming that customer, valid 60 minutes. |
-| Sign-in (chat API) | Gets the tokens from Cognito server to server, with the code from the sign-in redirect. Refuses a user in no ClaimClarity group or in more than one. |
-| Session cookie | The ID token, encrypted by the chat API (AES-GCM, key in Secrets Manager): `HttpOnly`, `Secure`, `SameSite=Strict`. The browser can't read or reuse the token, and other sites can't send the cookie. No server-side session store. |
-| Gate 4 | The chat API decrypts the cookie and checks the token's signature, audience, expiry and customer on every request. An invalid or expired token is rejected. |
-| Expiry and sign-out | The cookie lives as long as the token (60 minutes); then the user signs in again, usually without a prompt (single sign-on). Sign-out clears the cookie; a copy made before then keeps working until the token expires. A WAF rule limiting the app to company networks narrows that further. |
+| Amazon Cognito | Single sign-on with Entra ID. Maps the user's group to exactly one customer and issues a token naming that customer. A user in no ClaimClarity group, or in more than one, is refused. |
+| Gate 4 | The chat API accepts a request only with a valid token, and takes the customer only from it |
 
 ## 03 · Query path
 
@@ -95,20 +92,7 @@ on every write and read. The main board shows the whole system, and drill-downs 
 | `cli.py` · SQL guard | The agent's one tool: `sql`, `lookup`, `describe`, `list`, `escalate`, then `answer`, `ask` or `refuse`. Every query passes the guard's checks (limits in 03). A failed check goes back to the agent as an error. |
 | Answer | Streams back with live steps. The server re-runs the final SQL, so the numbers come from the database. |
 
-## 05 · Chat backend
-
-![Chat backend](drilldowns/05-chat-backend.png)
-
-| Part | Key facts |
-|---|---|
-| CloudFront + WAF | The only public web entry |
-| Load balancer | Internal. Accepts traffic from CloudFront only. |
-| Chat API (Fargate) | Gate 4 on every request. Queues one run per question and streams the answer over SSE. 3 unfinished runs per user. |
-| Run queue (SQS) | One message per run |
-| Run worker (Fargate) | The Claim Query Agent. Calls Bedrock and the DuckDB query service. 110 s run deadline. |
-| Chat storage | Out of scope: answers stream live, and conversations are not stored |
-
-Network, operations and log retention are owned by IT.
+Network, operations, log retention and session handling are owned by IT.
 
 ## Open decisions
 

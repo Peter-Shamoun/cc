@@ -15,7 +15,6 @@ LAYOUT = {
     "s2": ("02", "Login & customer mapping", -900, 1700, 2700, 760),
     "s3": ("03", "Query path", 4500, 1550, 2600, 1150),
     "s4": ("04", "Analyzer", -900, 2800, 3000, 1050),
-    "s5": ("05", "Chat backend", 2300, 2800, 2600, 900),
 }
 
 
@@ -181,30 +180,6 @@ def analyzer(cells):
     b.edge("s4_e4", "s4_guard", "s4_out", "", exit_=(.5, 1), entry=(.5, 0))
 
 
-def chat_backend(cells):
-    b = board(cells, "s5")
-    b.box("s5_u", "XiFin user", "browser", 40, 180, 240, 90, res="users")
-    b.box("s5_cf", "CloudFront + WAF", "the only public entry", 340, 180, 280, 90, res="cloudfront")
-    b.box("s5_alb", "Load balancer", "internal", 680, 180, 260, 90, res="elastic_load_balancing")
-    big_gate(b, "s5_g4", 4, "Token valid?", "every request", 1080, 193)
-    b.box("s5_api", "Chat API", "ECS on Fargate · queues the run", 1300, 180, 320, 90, res="fargate")
-    b.box("s5_sqs", "Run queue", "SQS · one run per question", 1700, 180, 320, 90, res="sqs")
-    for e, (s, t) in enumerate([("s5_u", "s5_cf"), ("s5_cf", "s5_alb"), ("s5_alb", "s5_g4"), ("s5_g4", "s5_api"), ("s5_api", "s5_sqs")]):
-        b.edge(f"s5_e{e}", s, t)
-    b.box("s5_rw", "Run worker", "ECS on Fargate · the Claim Query Agent", 1700, 420, 320, 100, res="fargate")
-    b.box("s5_bed", "Amazon Bedrock", "Claude Haiku", 2140, 420, 300, 100, res="bedrock")
-    b.box("s5_q", "DuckDB query service", "Quack server · own Fargate service", 1700, 650, 320, 100, res="fargate")
-    b.edge("s5_e5", "s5_sqs", "s5_rw", "", exit_=(.5, 1), entry=(.5, 0))
-    b.edge("s5_e6", "s5_rw", "s5_bed")
-    b.edge("s5_e7", "s5_rw", "s5_q", "Quack", exit_=(.5, 1), entry=(.5, 0))
-    b.group("s5_pfx", "customer_b/ · chat state · transcript key", 300, 420, 1100, 330, res="s3", phi=True)
-    b.mono("s5_conv", "conversations/ · one object each, If-Match writes", 340, 500, 1020, 70)
-    b.mono("s5_ev", "run-events/ · numbered chunks · replayed on reconnect", 340, 610, 1020, 70)
-    b.edge("s5_e8", "s5_api", "s5_conv", "save", exit_=(.5, 1), entry=(.85, 0))
-    b.edge("s5_e9", "s5_rw", "s5_ev", "append", exit_=(0, .5), entry=(1, .5))
-    b.note("s5_lim", "<b>Limits</b> · 3 unfinished runs per user · 110 s per run · per-customer concurrency and token budgets · answer streams back over SSE", 40, 790, 2400, 70)
-
-
 def network(cells):
     b = board(cells, "s6", tag="")
     b.box("s6_u", "XiFin users", "HTTPS", 40, 330, 240, 90, res="users")
@@ -261,6 +236,6 @@ def operations(cells):
 
 def boards():
     cells = []
-    for build in (storage, ingestion, login, query_path, analyzer, chat_backend):
+    for build in (storage, ingestion, login, query_path, analyzer):
         build(cells)
     return cells
