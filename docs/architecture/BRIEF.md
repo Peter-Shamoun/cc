@@ -24,19 +24,19 @@ Middle-ground length: about 15–20 PDF pages. No 100-page sets.
 - **The user's reference for every drill-down.** `/root/.claude/uploads/0e6bb8ac-ae6e-51d1-adaa-a5d39fba27c7/a72a3212-agent_analyzer.excalidraw`,
   the analyzer excalidraw. Read its JSON and render it. Copy its look and structure, then add detail.
 - **Code facts.** `/home/user/cc-strands` is the core branch: `ccsim/` holds the AWS design (`infra.py` covers IAM,
-  KMS and bucket policy), `api/`, `analyzer/` and `web/`. The KPI gate and preset queries exist only on the user's
+  KMS), `api/`, `analyzer/` and `web/`. The KPI gate and preset queries exist only on the user's
   other machine. Their facts are below.
 
 ## The drill-downs (numbers match the zoom badges on the main board)
 
 | # | Board | Must show |
 |---|---|---|
-| 00 | Storage & isolation | One bucket, the `customer_b/` prefixes (raw, parquet/silver, semantic_layer/gold, quarantine, audit), the customer's roles, keys and bucket policy, and Customer A denied |
+| 00 | Storage & isolation | One bucket, the `customer_b/` prefixes (raw, parquet/silver, semantic_layer/gold, quarantine, audit), the customer's roles and data encryption key, and Customer A denied |
 | 01 | Ingestion & parse | Customer → SFTP intake → raw → `_SUCCESS` → EventBridge rule → ECS RunTask → Fargate parser task (start, parse, silver, gold, exit) → gold publish (new CURRENT version). Gates 1, 2 and 3. |
 | 02 | Login & customer mapping | User → Microsoft Entra ID → assigned group → Cognito (group → one customer) → token naming the customer → gate 4 → chat API. No session details. |
 | 03 | Query path | Run worker: Claim Query Agent → ClaimClarity CLI (`cli.py`) → SQL guard → over Quack → DuckDB query service. The query service exchanges the token at STS (gate 5) and reads `customer_b/semantic_layer/` (gate 6); `lossless.*` only after a reasoned escalation. Customer A is blocked by the API and by IAM. |
 | 04 | Analyzer | The user's excalidraw: frontend ⇄ Claim Query Agent. The agent's inputs: the solved example bank (K = 3), references (prompt cached: rules, EDI glossary, semantic schema + allowed values), the tool and CLI reference (prompt cached), the system prompt + history (cached) and the newest prompt. It runs Claude Haiku, first decides to answer, clarify or escalate, then calls `cli.py` → SQL guard. The full lossless schema is reachable only after escalation. **Add the KPI gate** in front: a preset fits → preset KPI queries (the gate fills the parameters); otherwise → the agent. |
-| 05 | Access matrix | Not a zoom-in: a separate board (user decision 2026-10-27). Roles × `customer_b/` folders + key + gates, and a gates key: what each gate checks and where it is defined. |
+| 05 | Access matrix | Not a zoom-in: a separate board (user decision 2026-10-27). Roles × a customer's folders + key + gates (no customer A vs B comparison, no notes), and a gates key: what each gate checks and where it is defined. |
 
 ## Hard rules: the user's feedback, in their words where it matters
 
@@ -85,12 +85,15 @@ Middle-ground length: about 15–20 PDF pages. No 100-page sets.
 
 ## Settled facts
 
+- **No bucket policies (user rule, 2026-10-27): we have no authority over bucket policies.** Never mention, draw or rely on
+  a bucket policy. Isolation comes from IAM role policies and each customer's KMS key policy only.
+
 - **Scope (user decision): we own the app, not the platform.** Network & security (VPC, endpoints, NAT, firewall) and
   operations (deploy, monitoring, alarms, log retention) are owned by IT: no boards 06/07. The set is the main board
   plus drill-downs 00–04. Board 05 (chat backend) was dropped (user decision 2026-10-27).
 
 - **Query audit (user decision: keep it, and show it with its record structure).** The DuckDB query service writes one
-  JSON Lines record per SQL statement to `customer_b/audit/` (write-once, platform audit key, kept 6 years, each
+  JSON Lines record per SQL statement to `customer_b/audit/` (write-once, the customer's key, kept 6 years, each
   record chained by hash). Show this record as an evidence artifact on 00, 03 and the main board:
   `{"ts":"2026-10-27T14:03:11Z","customer":"customer_b","user":"ana@xifin.example","run_id":"r_7f3c","seq":3,`
   `"sql":"SELECT payer_name, avg(is_denied::INT) … (first 500 chars)","tables":["sem.remit_claims"],"rows":12,`
@@ -99,8 +102,9 @@ Middle-ground length: about 15–20 PDF pages. No 100-page sets.
 - **Out of scope (user decision): chat transcripts and conversation storage.** No `conversations/` or `run-events/`
   prefix, no transcript role and no transcript key. They would need their own ids and database, which is a later
   design. The chat streams answers live over SSE.
-- **Two KMS keys (user decision):** one **customer key** per customer (raw, silver, gold, quarantine) and one
-  **platform audit key** (`audit/`, one key-policy statement per customer). IAM prefix policies keep roles apart.
+- **One data encryption key per customer (user decision, replaces the earlier two-key design):** each customer's folder
+  is encrypted with that customer's own KMS key, `audit/` included. There is no platform audit key: never draw or write one.
+  IAM prefix policies keep roles apart.
 - **No landing zone and no staging zone (user decision).** SFTP intake writes straight into `raw/`. The batch lease
   is a lock object owned by the parser, drawn as a small lock on the parser and not as a prefix or zone. Prefixes per
   customer: `raw/`, `parquet/` (silver), `semantic_layer/` (gold), `quarantine/` and `audit/`.

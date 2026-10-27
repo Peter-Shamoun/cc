@@ -11,10 +11,10 @@ board, and sits on the arrow it guards. Board 05 shows where each one is defined
 |---|---|---|
 | 1 | The `_SUCCESS` file is in this customer's `raw/` folder | EventBridge rule, one per customer |
 | 2 | The launcher passes only this customer's parser role, only to ECS | Launcher role's IAM policy (`iam:PassRole`) |
-| 3 | The parser role and the customer's key allow the read or write | Parser role's IAM policy, bucket policy, customer key's key policy |
+| 3 | The parser role and the customer's key allow the read or write | Parser role's IAM policy, customer key's key policy |
 | 4 | The token is valid and names the customer | Chat API: checks Cognito's signature on every request |
 | 5 | The reader role trusts this token's customer | Reader role's trust policy (STS) |
-| 6 | The reader role and the customer's key allow the read | Reader role's IAM policy, bucket policy, customer key's key policy |
+| 6 | The reader role and the customer's key allow the read | Reader role's IAM policy, customer key's key policy |
 
 ## Data backend
 
@@ -37,8 +37,8 @@ board, and sits on the arrow it guards. Board 05 shows where each one is defined
 | Bucket | One bucket for all customer data, one prefix per customer. The web app and the access logs have their own buckets. |
 | Prefixes | `raw/` (write-once, Object Lock 7 years, `_SUCCESS` written last), `parquet/` (silver), `semantic_layer/` (gold), `quarantine/` (bad files, kept 1 year), `audit/` |
 | IAM roles | Per customer: SFTP copy, parser, reader, audit. IAM prefix policies keep the roles apart. |
-| KMS keys | The customer key, one per customer, covers raw, silver, gold and quarantine. The platform audit key covers `audit/`, with one key-policy statement per customer. |
-| Bucket policy | Only customer B's roles reach `customer_b/`. Customer A's roles are denied by the bucket policy and the key policy. |
+| Data encryption key | Each customer's folder is encrypted with that customer's own KMS key, which covers every folder in the prefix, `audit/` included |
+| Isolation | Each customer's roles reach only that customer's prefix (IAM). Customer A's roles are denied by IAM and by customer B's key policy. |
 | Query audit | The DuckDB query service writes one JSON Lines record per SQL statement: write-once, kept 6 years, each record chained by hash to the one before |
 | Gates | 3 on the parser's reads and writes, 6 on the reader's reads |
 
@@ -103,11 +103,8 @@ Network, operations, log retention and session handling are owned by IT.
 
 | Part | Key facts |
 |---|---|
-| Roles | Four per customer (SFTP copy, parser, reader, audit), plus the launcher. Each is limited to its own prefix `customer_b/` and its own key. |
-| Write-once | `raw/` and `audit/` (Object Lock): no role can change or delete them, including the roles that write them |
-| Escalation | The reader may read `parquet/` only after an escalation. The SQL guard enforces this; IAM allows the read. |
+| Roles | Four per customer (SFTP copy, parser, reader, audit), plus the launcher |
 | No data credentials | The chat API and the run worker (the Claim Query Agent) hold no AWS data credentials |
-| Customer A | Every customer A role is denied everywhere under `customer_b/`, by the bucket policy and customer key B's key policy |
 
 ## Open decisions
 

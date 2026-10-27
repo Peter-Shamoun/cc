@@ -166,7 +166,7 @@
     "w": 230,
     "h": 90,
     "name": "Customer A roles",
-    "sub": "bucket policy + KMS",
+    "sub": "IAM + KMS",
     "icon": "role",
     "shape": "box",
     "style": "denied",
