@@ -5,7 +5,7 @@
 A Confluence-ready architecture set that the company's IT and security teams can build, secure and operate from.
 The set has three parts:
 - one main board, the overview;
-- five drill-downs (00–04), one per app area;
+- five drill-downs (00–04), one per app area, and the access matrix (05);
 - a short document with one section per board (image plus a 3–8 row spec table).
 
 Formats:
@@ -36,6 +36,7 @@ Middle-ground length: about 15–20 PDF pages. No 100-page sets.
 | 02 | Login & customer mapping | User → Microsoft Entra ID → assigned group → Cognito (group → one customer) → token naming the customer → gate 4 → chat API. No session details. |
 | 03 | Query path | Run worker: Claim Query Agent → ClaimClarity CLI (`cli.py`) → SQL guard → over Quack → DuckDB query service. The query service exchanges the token at STS (gate 5) and reads `customer_b/semantic_layer/` (gate 6); `lossless.*` only after a reasoned escalation. Customer A is blocked by the API and by IAM. |
 | 04 | Analyzer | The user's excalidraw: frontend ⇄ Claim Query Agent. The agent's inputs: the solved example bank (K = 3), references (prompt cached: rules, EDI glossary, semantic schema + allowed values), the tool and CLI reference (prompt cached), the system prompt + history (cached) and the newest prompt. It runs Claude Haiku, first decides to answer, clarify or escalate, then calls `cli.py` → SQL guard. The full lossless schema is reachable only after escalation. **Add the KPI gate** in front: a preset fits → preset KPI queries (the gate fills the parameters); otherwise → the agent. |
+| 05 | Access matrix | Not a zoom-in: a separate board (user decision 2026-10-27). Roles × `customer_b/` folders + key + gates, and a gates key: what each gate checks and where it is defined. |
 
 ## Hard rules: the user's feedback, in their words where it matters
 

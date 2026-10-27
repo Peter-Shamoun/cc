@@ -779,6 +779,8 @@ def to_excalidraw(d):
         X.diamond(g["x"] - 30, g["y"] - 30, 60, 60, backgroundColor="#ffc9c9", strokeColor="#1e1e1e")
         X.text(g["x"], g["y"] - 14, str(g["n"]), 24, "center")
         lines = g["label"]
+        if not lines:
+            continue
         nl = lines.count("\n") + 1
         wmax = max(len(s) for s in lines.split("\n")) * 18 * 0.56
         side = g["side"]

@@ -2,38 +2,19 @@
 
 ClaimClarity answers questions about a customer's claims (837P) and remittances (835). Each customer's data
 sits in its own S3 prefix, under its own KMS key and IAM roles. Six AWS checks, the numbered diamonds, enforce that
-on every write and read. The main board shows the whole system, and drill-downs 00–04 zoom into each part.
+on every write and read. The main board shows the whole system, and drill-downs 00–04 zoom into each part, and 05 is the access matrix.
 
 The numbered diamonds on every board are the six permission checks. Each number means the same check on every
-board, and sits on the arrow it guards. The matrix below shows what each role can do in one customer's prefix.
+board, and sits on the arrow it guards. Board 05 shows where each one is defined and what every role can do.
 
-## Gates and access
-
-| Gate | Checked by | What has to be true | If not | Boards |
-|---|---|---|---|---|
-| 1 | EventBridge rule | The `_SUCCESS` file is under this customer's `raw/` | No parser task starts | main, 01 |
-| 2 | IAM (`iam:PassRole`) | The launcher passes this customer's parser role, and only to an ECS task | The task can't start | main, 01 |
-| 3 | IAM + KMS | The parser role and the customer's key allow the read or write | The read or write fails | main, 00, 01 |
-| 4 | Chat API | The token is valid and names the customer | The request is refused | main, 02 |
-| 5 | STS (role trust policy) | The reader role trusts this token's customer | No credentials are issued | main, 03 |
-| 6 | IAM + KMS | The reader role and the customer's key allow the read | The read fails | main, 00, 03, 04 |
-
-**Access matrix**, shown for customer B. Every customer has the same set of roles, each limited to its own prefix
-`customer_b/` and its own key.
-
-| Role (used by) | `raw/` | `quarantine/` | `parquet/` | `semantic_layer/` | `audit/` | Key | Gate |
-|---|---|---|---|---|---|---|---|
-| SFTP copy role B (Transfer Family) | Write once | – | – | – | – | Customer key B | – |
-| Launcher (EventBridge → ECS RunTask) | – | – | – | – | – | – | 1, 2 (may pass parser role B only) |
-| Parser role B (Fargate parser task) | Read | Write | Write | Write a new version | – | Customer key B | 3 |
-| Reader role B (DuckDB query service) | – | – | Read, only after escalation | Read the current version | – | Customer key B, decrypt only | 5, 6 |
-| Audit role B (DuckDB query service) | – | – | – | – | Append, write once | Platform audit key | – |
-| Chat API, run worker (Claim Query Agent) | – | – | – | – | – | – | 4 |
-| Any customer A role | Denied | Denied | Denied | Denied | Denied | Denied | 3, 6 |
-
-`raw/` and `audit/` are write-once (Object Lock): nobody can change or delete them, including the roles that write
-them. "Only after escalation" is enforced by the SQL guard; IAM allows the read. The chat API and the run worker
-hold no AWS data credentials at all.
+| Gate | What has to be true | Defined in |
+|---|---|---|
+| 1 | The `_SUCCESS` file is in this customer's `raw/` folder | EventBridge rule, one per customer |
+| 2 | The launcher passes only this customer's parser role, only to ECS | Launcher role's IAM policy (`iam:PassRole`) |
+| 3 | The parser role and the customer's key allow the read or write | Parser role's IAM policy, bucket policy, customer key's key policy |
+| 4 | The token is valid and names the customer | Chat API: checks Cognito's signature on every request |
+| 5 | The reader role trusts this token's customer | Reader role's trust policy (STS) |
+| 6 | The reader role and the customer's key allow the read | Reader role's IAM policy, bucket policy, customer key's key policy |
 
 ## Data backend
 
@@ -115,6 +96,18 @@ hold no AWS data credentials at all.
 | Answer | Streams back with live steps. The server re-runs the final SQL, so the numbers come from the database. |
 
 Network, operations, log retention and session handling are owned by IT.
+
+## 05 · Access matrix
+
+![Access matrix](drilldowns/05-access-matrix.png)
+
+| Part | Key facts |
+|---|---|
+| Roles | Four per customer (SFTP copy, parser, reader, audit), plus the launcher. Each is limited to its own prefix `customer_b/` and its own key. |
+| Write-once | `raw/` and `audit/` (Object Lock): no role can change or delete them, including the roles that write them |
+| Escalation | The reader may read `parquet/` only after an escalation. The SQL guard enforces this; IAM allows the read. |
+| No data credentials | The chat API and the run worker (the Claim Query Agent) hold no AWS data credentials |
+| Customer A | Every customer A role is denied everywhere under `customer_b/`, by the bucket policy and customer key B's key policy |
 
 ## Open decisions
 
