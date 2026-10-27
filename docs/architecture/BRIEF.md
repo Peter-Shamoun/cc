@@ -17,13 +17,12 @@ Middle-ground length: about 15–20 PDF pages. No 100-page sets.
 
 ## What exists
 
-- **Main board, keep it.** `docs/architecture/ClaimClarity_Architecture.drawio`, page 1, cell `ov`. Its render is
-  `docs/architecture/00-overview.png`. It is the original icon drawio (`diagrams/CC_Data_Backend_uncompressed.drawio`)
-  with fixes. The user said "the general diagram is fine". Don't redesign it.
+- **Main board, keep it.** `docs/architecture/drilldowns/main.json`, rendered to `drilldowns/main.png` and `.svg`. It
+  was converted on 2026-10-27 from the enhanced original icon drawio (`diagrams/CC_Data_Backend_uncompressed.drawio`)
+  so the user can edit it in the diagram editor like the drill-downs. The user said "the general diagram is fine".
+  Don't redesign it.
 - **The user's reference for every drill-down.** `/root/.claude/uploads/0e6bb8ac-ae6e-51d1-adaa-a5d39fba27c7/a72a3212-agent_analyzer.excalidraw`,
   the analyzer excalidraw. Read its JSON and render it. Copy its look and structure, then add detail.
-- **Current drill-downs, all rejected.** `docs/architecture/0[1-8]-*.png` and `tools/boards.py`. The user says they
-  "need to be redone".
 - **Code facts.** `/home/user/cc-strands` is the core branch: `ccsim/` holds the AWS design (`infra.py` covers IAM,
   KMS and bucket policy), `api/`, `analyzer/` and `web/`. The KPI gate and preset queries exist only on the user's
   other machine. Their facts are below.
@@ -131,12 +130,10 @@ Middle-ground length: about 15–20 PDF pages. No 100-page sets.
 
 ## Tooling in this container
 
-- **drawio CLI:** `/tmp/claude-0/-home-user-cc/0e6bb8ac-ae6e-51d1-adaa-a5d39fba27c7/scratchpad/squashfs-root/drawio`.
-  Run it with `HOME=/tmp/drawio-home-<x> xvfb-run -a … -x -f png …`, adding `--no-sandbox --disable-gpu` after the
-  file.
 - **Playwright and Chromium** are preinstalled (`require('playwright')`). Don't install another copy.
 - **Python 3.13, PIL, pandoc.**
-- **Drill-down sources:** `docs/architecture/drilldowns/<nn>-<name>.json`, the files `diagram-editor.html` opens and saves.
-  `tools/drilldowns.py` renders them (set `PYTHON` to a Python with Playwright); `tools/build_editor.py` rebuilds the editor.
-- **The current build:** `python3 docs/architecture/tools/build.py`. It renders the drawio, crops the boards and
-  builds the HTML and PDF from `ClaimClarity_Architecture.md`.
+- **Board sources:** `docs/architecture/drilldowns/main.json` and `<nn>-<name>.json`, the files `diagram-editor.html`
+  opens and saves. `tools/build.py` renders them (set `PYTHON` to a Python with Playwright), rebuilds the editor, and
+  builds the HTML and PDF.
+- **The current build:** `python3 docs/architecture/tools/build.py`. It builds the HTML and PDF from
+  `ClaimClarity_Architecture.md`.

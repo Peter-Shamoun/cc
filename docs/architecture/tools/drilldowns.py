@@ -1,6 +1,6 @@
-"""python3 docs/architecture/tools/drilldowns.py [nn ...]: render the six drill-downs from their board files.
+"""python3 docs/architecture/tools/drilldowns.py [main|nn ...]: render the main board and the drill-downs.
 
-The source of each drill-down is docs/architecture/drilldowns/<nn>-<name>.json, the file the diagram editor
+The source of each board is docs/architecture/drilldowns/main.json or <nn>-<name>.json, the file the diagram editor
 (docs/architecture/diagram-editor.html) opens and saves. Per board this writes the production figure (ClaimClarity
 skin) as <nn>-<name>.svg and .png via diagram-design's exporters, and the prototype <nn>-<name>.excalidraw in the
 user's excalidraw style (except 04, whose .excalidraw is the user's own board, edited by analyzer04.py).
@@ -24,7 +24,10 @@ MAX_PNG = 4000                # longest side of a drill-down PNG; the SVG keeps 
 
 
 def board_files():
-    return {path.stem[:2]: path for path in sorted(OUT.glob("[0-9][0-9]-*.json"))}
+    """main (the main board) first, then the drill-downs 00-04."""
+    files = {"main": OUT / "main.json"}
+    files.update({path.stem[:2]: path for path in sorted(OUT.glob("[0-9][0-9]-*.json"))})
+    return files
 
 
 def load(path):

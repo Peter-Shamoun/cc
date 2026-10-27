@@ -210,6 +210,8 @@ def node_layout(n):
     y0 = y + top_pad + (h - top_pad - lh) / 2 + 16
     if n.get("valign") == "bottom":
         y0 = y + h - lh - 10 + 16
+    elif n.get("valign") == "top":
+        y0 = y + top_pad + 14 + 16
     return dict(names=names, subs=subs, ic=ic, isz=isz, left=left, tx=tx, anchor=anchor, need=need, y0=y0, top_pad=top_pad)
 
 
@@ -440,7 +442,7 @@ def check(d):
             need = max(_tw(l, 13.5, "mono") for l in n["inner"]) + 36
             if need > n["w"]:
                 probs.append(f"code overflow in {n['id']}: needs {need:.0f}, has {n['w']}")
-        elif L["need"] > n["w"] + 1 and n["shape"] not in ("steps", "grid", "table", "image"):
+        elif L["need"] > n["w"] + 1 and n["shape"] not in ("steps", "grid", "table", "image", "badge"):
             probs.append(f"text overflow in {n['id']}: needs {L['need']:.0f}, has {n['w']}")
     for g in d.gates:
         gb = gate_box(g); dia = (g["x"] - GR, g["y"] - GR, 2 * GR, 2 * GR)
@@ -579,6 +581,8 @@ def svg_legend(d, items):
             out.append(f'<rect x="{x}" y="{y - 9}" width="34" height="18" fill="{TINT}" stroke="{BLUE}" stroke-width="1.2"/>'); off = 46
         elif k == "store":
             c, _ = _cyl(x + 4, y - 12, 24, 24, TINT, BLUE, 1.2); out.append(c); off = 38
+        elif k == "badge":
+            out.append(f'<circle cx="{x + 10}" cy="{y}" r="10" fill="{BLUE}"/>'); off = 30
         elif k == "external":
             out.append(f'<rect x="{x}" y="{y - 9}" width="34" height="18" fill="{PAPER}" stroke="#7A7F88" stroke-width="1.2" stroke-dasharray="5 4"/>'); off = 46
         out.append(_t(x + off, y + 5, lab, 14, SANS, INK, 500))

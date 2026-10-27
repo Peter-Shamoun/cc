@@ -15,7 +15,7 @@ on every write and read. The main board shows the whole system, and drill-downs 
 
 ## Data backend
 
-![Data backend](00-overview.png)
+![Data backend](drilldowns/main.png)
 
 | Part | What it does | Key facts |
 |---|---|---|

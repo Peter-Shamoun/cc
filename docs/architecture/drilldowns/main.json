@@ -1,0 +1,1150 @@
+{
+ "format": "claimclarity-diagram",
+ "version": 1,
+ "board": {
+  "slug": "main",
+  "title": "ClaimClarity · Data backend",
+  "desc": "The whole ClaimClarity data backend: SFTP intake, the customer prefixes in the data bucket, the parser that writes them, sign-in, and the read path through the Claim Query Agent and the DuckDB query service, with the six AWS gates.",
+  "w": 3075,
+  "h": 2254,
+  "zones": [
+   {
+    "id": "z_sftp",
+    "kind": "bucket",
+    "label": "SFTP",
+    "icon": null,
+    "x": 50,
+    "y": 125,
+    "w": 1475,
+    "h": 200
+   },
+   {
+    "id": "z_bucket",
+    "kind": "bucket",
+    "label": "Prod S3 bucket · claimclarity/",
+    "icon": "s3",
+    "x": 50,
+    "y": 400,
+    "w": 1475,
+    "h": 1000
+   },
+   {
+    "id": "z_custA",
+    "kind": "phi",
+    "label": "Customer A",
+    "icon": null,
+    "x": 100,
+    "y": 488,
+    "w": 650,
+    "h": 875
+   },
+   {
+    "id": "z_custB",
+    "kind": "phi",
+    "label": "Customer B",
+    "icon": null,
+    "x": 834,
+    "y": 488,
+    "w": 650,
+    "h": 875
+   },
+   {
+    "id": "z_write",
+    "kind": "bucket",
+    "label": "Compute · write",
+    "icon": null,
+    "x": 1600,
+    "y": 400,
+    "w": 800,
+    "h": 1000
+   },
+   {
+    "id": "z_parser",
+    "kind": "worker",
+    "label": "Fargate task · lives for one batch",
+    "icon": "fargate",
+    "x": 1650,
+    "y": 875,
+    "w": 700,
+    "h": 438
+   },
+   {
+    "id": "z_access",
+    "kind": "bucket",
+    "label": "Access",
+    "icon": null,
+    "x": 50,
+    "y": 1475,
+    "w": 1250,
+    "h": 375
+   },
+   {
+    "id": "z_read",
+    "kind": "bucket",
+    "label": "Compute · read",
+    "icon": null,
+    "x": 1375,
+    "y": 1475,
+    "w": 1050,
+    "h": 525
+   },
+   {
+    "id": "z_chat",
+    "kind": "worker",
+    "label": "Chat API + run workers · ECS on Fargate",
+    "icon": "fargate",
+    "x": 1412,
+    "y": 1550,
+    "w": 625,
+    "h": 275
+   },
+   {
+    "id": "z_bucket2",
+    "kind": "bucket",
+    "label": "Prod S3 bucket · claimclarity/",
+    "icon": "s3",
+    "x": 2500,
+    "y": 1475,
+    "w": 500,
+    "h": 683
+   }
+  ],
+  "nodes": [
+   {
+    "id": "sftpA",
+    "x": 100,
+    "y": 188,
+    "w": 650,
+    "h": 105,
+    "name": "Customer A",
+    "sub": "Daily 837 · 835 · 277",
+    "icon": null,
+    "shape": "box",
+    "style": "external",
+    "inner": null
+   },
+   {
+    "id": "sftpB",
+    "x": 825,
+    "y": 188,
+    "w": 650,
+    "h": 105,
+    "name": "Customer B",
+    "sub": "Daily 837 · 835 · 277",
+    "icon": null,
+    "shape": "box",
+    "style": "external",
+    "inner": null
+   },
+   {
+    "id": "user",
+    "x": 88,
+    "y": 1662,
+    "w": 250,
+    "h": 112,
+    "name": "Xifin user",
+    "sub": null,
+    "icon": "users",
+    "shape": "box",
+    "style": "external",
+    "inner": null
+   },
+   {
+    "id": "entra",
+    "x": 388,
+    "y": 1662,
+    "w": 275,
+    "h": 112,
+    "name": "Microsoft Entra ID",
+    "sub": "Company login",
+    "icon": "entra",
+    "shape": "box",
+    "style": "external",
+    "inner": null
+   },
+   {
+    "id": "eb",
+    "x": 1650,
+    "y": 525,
+    "w": 700,
+    "h": 100,
+    "name": "EventBridge",
+    "sub": "On _SUCCESS",
+    "icon": "eventbridge",
+    "shape": "box",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "launch",
+    "x": 1650,
+    "y": 700,
+    "w": 700,
+    "h": 88,
+    "name": "Launcher · ECS RunTask",
+    "sub": "Starts the task as Role B · can't read data itself",
+    "icon": "role",
+    "shape": "box",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "cog",
+    "x": 712,
+    "y": 1662,
+    "w": 250,
+    "h": 112,
+    "name": "Cognito",
+    "sub": "Maps group →\ncustomer",
+    "icon": "cognito",
+    "shape": "box",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "tok",
+    "x": 1012,
+    "y": 1662,
+    "w": 250,
+    "h": 112,
+    "name": "Signed token",
+    "sub": "Names the customer",
+    "icon": null,
+    "shape": "box",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "api",
+    "x": 1450,
+    "y": 1662,
+    "w": 300,
+    "h": 112,
+    "name": "API server",
+    "sub": "Verifies token, queues the run",
+    "icon": "fargate",
+    "shape": "box",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "duck",
+    "x": 2075,
+    "y": 1650,
+    "w": 288,
+    "h": 138,
+    "name": "DuckDB query service",
+    "sub": "Quack server · own Fargate task\nholds B's creds",
+    "icon": "duck",
+    "shape": "box",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "sts",
+    "x": 2056,
+    "y": 1900,
+    "w": 325,
+    "h": 88,
+    "name": "STS",
+    "sub": "15-min B creds for\nthe query service",
+    "icon": "sts",
+    "shape": "box",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "aud",
+    "x": 2525,
+    "y": 1790,
+    "w": 450,
+    "h": 55,
+    "name": "customer_b/audit/ · one JSON line per SQL",
+    "sub": null,
+    "icon": null,
+    "shape": "box",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "gh",
+    "x": 2475,
+    "y": 1075,
+    "w": 500,
+    "h": 125,
+    "name": "View SQL · GitHub",
+    "sub": "semantic/views/ · code only · run by the parser each batch",
+    "icon": "git",
+    "shape": "box",
+    "style": "white",
+    "inner": null
+   },
+   {
+    "id": "agent",
+    "x": 1800,
+    "y": 1656,
+    "w": 225,
+    "h": 125,
+    "name": "Claim Query Agent",
+    "sub": "run worker · Claude Haiku",
+    "icon": null,
+    "shape": "agent",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "s3a",
+    "x": 2525,
+    "y": 1550,
+    "w": 450,
+    "h": 75,
+    "name": "customer_a/",
+    "sub": null,
+    "icon": null,
+    "shape": "box",
+    "style": "external",
+    "inner": null
+   },
+   {
+    "id": "s3b",
+    "x": 2525,
+    "y": 1662,
+    "w": 450,
+    "h": 112,
+    "name": "customer_b/\nparquet + semantic_layer",
+    "sub": null,
+    "icon": null,
+    "shape": "box",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "rawA",
+    "x": 125,
+    "y": 562,
+    "w": 600,
+    "h": 250,
+    "name": "raw/",
+    "sub": "received_date=YYYY-MM-DD/ · raw EDI · bronze layer",
+    "icon": null,
+    "shape": "box",
+    "style": "service",
+    "inner": null,
+    "valign": "top"
+   },
+   {
+    "id": "aftA",
+    "x": 125,
+    "y": 950,
+    "w": 600,
+    "h": 288,
+    "name": "After parsing",
+    "sub": "parquet/ lossless parquet tables · silver layer\nsemantic_layer/ all sem.* views as Parquet · gold layer\nstaging/ · in-progress load\nquarantine/ · failed files",
+    "icon": null,
+    "shape": "box",
+    "style": "service",
+    "inner": null,
+    "valign": "top"
+   },
+   {
+    "id": "rawA_t0",
+    "x": 180,
+    "y": 662,
+    "w": 72,
+    "h": 25,
+    "name": "837/",
+    "sub": null,
+    "icon": null,
+    "shape": "box",
+    "style": "white",
+    "inner": null
+   },
+   {
+    "id": "rawA_t1",
+    "x": 260,
+    "y": 662,
+    "w": 72,
+    "h": 25,
+    "name": "835/",
+    "sub": null,
+    "icon": null,
+    "shape": "box",
+    "style": "white",
+    "inner": null
+   },
+   {
+    "id": "rawA_t2",
+    "x": 340,
+    "y": 662,
+    "w": 72,
+    "h": 25,
+    "name": "277/",
+    "sub": null,
+    "icon": null,
+    "shape": "box",
+    "style": "white",
+    "inner": null
+   },
+   {
+    "id": "rawA_ts",
+    "x": 420,
+    "y": 662,
+    "w": 112,
+    "h": 25,
+    "name": "_SUCCESS",
+    "sub": null,
+    "icon": null,
+    "shape": "box",
+    "style": "focal",
+    "inner": null
+   },
+   {
+    "id": "rawB",
+    "x": 850,
+    "y": 562,
+    "w": 600,
+    "h": 250,
+    "name": "raw/",
+    "sub": "received_date=YYYY-MM-DD/ · raw EDI · bronze layer",
+    "icon": null,
+    "shape": "box",
+    "style": "service",
+    "inner": null,
+    "valign": "top"
+   },
+   {
+    "id": "aftB",
+    "x": 850,
+    "y": 950,
+    "w": 600,
+    "h": 288,
+    "name": "After parsing",
+    "sub": "parquet/ lossless parquet tables · silver layer\nsemantic_layer/ all sem.* views as Parquet · gold layer\nstaging/ · in-progress load\nquarantine/ · failed files",
+    "icon": null,
+    "shape": "box",
+    "style": "service",
+    "inner": null,
+    "valign": "top"
+   },
+   {
+    "id": "rawB_t0",
+    "x": 905,
+    "y": 662,
+    "w": 72,
+    "h": 25,
+    "name": "837/",
+    "sub": null,
+    "icon": null,
+    "shape": "box",
+    "style": "white",
+    "inner": null
+   },
+   {
+    "id": "rawB_t1",
+    "x": 985,
+    "y": 662,
+    "w": 72,
+    "h": 25,
+    "name": "835/",
+    "sub": null,
+    "icon": null,
+    "shape": "box",
+    "style": "white",
+    "inner": null
+   },
+   {
+    "id": "rawB_t2",
+    "x": 1065,
+    "y": 662,
+    "w": 72,
+    "h": 25,
+    "name": "277/",
+    "sub": null,
+    "icon": null,
+    "shape": "box",
+    "style": "white",
+    "inner": null
+   },
+   {
+    "id": "rawB_ts",
+    "x": 1145,
+    "y": 662,
+    "w": 112,
+    "h": 25,
+    "name": "_SUCCESS",
+    "sub": null,
+    "icon": null,
+    "shape": "box",
+    "style": "focal",
+    "inner": null
+   },
+   {
+    "id": "st1",
+    "x": 1675,
+    "y": 938,
+    "w": 650,
+    "h": 88,
+    "name": "1 · Start",
+    "sub": "ECS hands it Role B temp creds",
+    "icon": null,
+    "shape": "box",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "st2",
+    "x": 1675,
+    "y": 1025,
+    "w": 650,
+    "h": 88,
+    "name": "2 · Read raw/",
+    "sub": "parse each file",
+    "icon": null,
+    "shape": "box",
+    "style": "white",
+    "inner": null
+   },
+   {
+    "id": "st3",
+    "x": 1675,
+    "y": 1112,
+    "w": 650,
+    "h": 88,
+    "name": "3 · Write parquet/",
+    "sub": "rebuild semantic_layer/ once per batch",
+    "icon": null,
+    "shape": "box",
+    "style": "white",
+    "inner": null
+   },
+   {
+    "id": "st4",
+    "x": 1675,
+    "y": 1200,
+    "w": 650,
+    "h": 88,
+    "name": "4 · Exit",
+    "sub": "creds expire, container destroyed",
+    "icon": null,
+    "shape": "box",
+    "style": "focal",
+    "inner": null
+   },
+   {
+    "id": "s3a_t",
+    "x": 2851,
+    "y": 1575,
+    "w": 112,
+    "h": 25,
+    "name": "No access",
+    "sub": null,
+    "icon": null,
+    "shape": "box",
+    "style": "white",
+    "inner": null
+   },
+   {
+    "id": "s3b_t",
+    "x": 2891,
+    "y": 1706,
+    "w": 72,
+    "h": 25,
+    "name": "Read",
+    "sub": null,
+    "icon": null,
+    "shape": "box",
+    "style": "focal",
+    "inner": null
+   },
+   {
+    "id": "aud_json",
+    "x": 2525,
+    "y": 1858,
+    "w": 450,
+    "h": 276,
+    "name": "Audit record",
+    "sub": "one JSON line per SQL",
+    "icon": null,
+    "shape": "code",
+    "style": "service",
+    "inner": [
+     "{\"ts\":\"2026-10-27T14:03:11Z\",",
+     "\"customer\":\"customer_b\",",
+     " \"user\":\"ana@xifin.example\",",
+     "\"run_id\":\"r_7f3c\",\"seq\":3,",
+     "\"sql\":\"SELECT payer_name,",
+     " … (first 500 chars)\",",
+     "\"tables\":[\"sem.remit_claims\"],\"rows\":12,",
+     " \"ms\":184,",
+     "\"escalation_reason\":null,",
+     " \"prev_hash\":\"9c1e…\",\"hash\":\"4b7a…\"}"
+    ]
+   },
+   {
+    "id": "z00",
+    "x": 1510,
+    "y": 385,
+    "w": 30,
+    "h": 30,
+    "name": "00",
+    "sub": null,
+    "icon": null,
+    "shape": "badge",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "z01",
+    "x": 2385,
+    "y": 385,
+    "w": 30,
+    "h": 30,
+    "name": "01",
+    "sub": null,
+    "icon": null,
+    "shape": "badge",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "z02",
+    "x": 1285,
+    "y": 1460,
+    "w": 30,
+    "h": 30,
+    "name": "02",
+    "sub": null,
+    "icon": null,
+    "shape": "badge",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "z03",
+    "x": 2410,
+    "y": 1460,
+    "w": 30,
+    "h": 30,
+    "name": "03",
+    "sub": null,
+    "icon": null,
+    "shape": "badge",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "z04",
+    "x": 1991,
+    "y": 1641,
+    "w": 30,
+    "h": 30,
+    "name": "04",
+    "sub": null,
+    "icon": null,
+    "shape": "badge",
+    "style": "service",
+    "inner": null
+   }
+  ],
+  "edges": [
+   {
+    "id": "e1",
+    "pts": [
+     [
+      600,
+      292
+     ],
+     [
+      600,
+      428
+     ],
+     [
+      600,
+      562
+     ]
+    ],
+    "label": "Copy script",
+    "at": [
+     600,
+     434
+    ],
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above"
+   },
+   {
+    "id": "e2",
+    "pts": [
+     [
+      1325,
+      292
+     ],
+     [
+      1325,
+      428
+     ],
+     [
+      1325,
+      562
+     ]
+    ],
+    "label": "Copy script",
+    "at": [
+     1325,
+     434
+    ],
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above"
+   },
+   {
+    "id": "e3",
+    "pts": [
+     [
+      1450,
+      575
+     ],
+     [
+      1650,
+      575
+     ]
+    ],
+    "label": null,
+    "at": null,
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above"
+   },
+   {
+    "id": "e4",
+    "pts": [
+     [
+      2000,
+      625
+     ],
+     [
+      2000,
+      700
+     ]
+    ],
+    "label": null,
+    "at": null,
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above"
+   },
+   {
+    "id": "e5",
+    "pts": [
+     [
+      2000,
+      788
+     ],
+     [
+      2000,
+      875
+     ]
+    ],
+    "label": null,
+    "at": null,
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above"
+   },
+   {
+    "id": "e6",
+    "pts": [
+     [
+      1450,
+      750
+     ],
+     [
+      1525,
+      750
+     ],
+     [
+      1525,
+      1069
+     ],
+     [
+      1675,
+      1069
+     ]
+    ],
+    "label": "Read",
+    "at": [
+     1525,
+     980
+    ],
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above"
+   },
+   {
+    "id": "e7",
+    "pts": [
+     [
+      1675,
+      1156
+     ],
+     [
+      1562,
+      1156
+     ],
+     [
+      1450,
+      1156
+     ]
+    ],
+    "label": "Write",
+    "at": [
+     1481,
+     1162
+    ],
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above"
+   },
+   {
+    "id": "e8",
+    "pts": [
+     [
+      2475,
+      1156
+     ],
+     [
+      2325,
+      1156
+     ]
+    ],
+    "label": "Materialize\nsem.* views",
+    "at": [
+     2400,
+     1119
+    ],
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above"
+   },
+   {
+    "id": "e_user",
+    "pts": [
+     [
+      338,
+      1719
+     ],
+     [
+      388,
+      1719
+     ]
+    ],
+    "label": null,
+    "at": null,
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above"
+   },
+   {
+    "id": "e_entra",
+    "pts": [
+     [
+      662,
+      1719
+     ],
+     [
+      712,
+      1719
+     ]
+    ],
+    "label": null,
+    "at": null,
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above"
+   },
+   {
+    "id": "e_cog",
+    "pts": [
+     [
+      962,
+      1719
+     ],
+     [
+      1012,
+      1719
+     ]
+    ],
+    "label": null,
+    "at": null,
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above"
+   },
+   {
+    "id": "e_tok",
+    "pts": [
+     [
+      1262,
+      1719
+     ],
+     [
+      1450,
+      1719
+     ]
+    ],
+    "label": null,
+    "at": null,
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above"
+   },
+   {
+    "id": "e_api",
+    "pts": [
+     [
+      1750,
+      1719
+     ],
+     [
+      1800,
+      1719
+     ]
+    ],
+    "label": null,
+    "at": null,
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above"
+   },
+   {
+    "id": "e_agent",
+    "pts": [
+     [
+      2025,
+      1719
+     ],
+     [
+      2075,
+      1719
+     ]
+    ],
+    "label": null,
+    "at": null,
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above"
+   },
+   {
+    "id": "e_duck",
+    "pts": [
+     [
+      2362,
+      1719
+     ],
+     [
+      2525,
+      1719
+     ]
+    ],
+    "label": null,
+    "at": null,
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above"
+   },
+   {
+    "id": "e_sts1",
+    "pts": [
+     [
+      2219,
+      1788
+     ],
+     [
+      2219,
+      1900
+     ]
+    ],
+    "label": null,
+    "at": null,
+    "style": "solid",
+    "end": true,
+    "start": true,
+    "lpos": "above"
+   },
+   {
+    "id": "e_aud",
+    "pts": [
+     [
+      2362,
+      1774
+     ],
+     [
+      2444,
+      1774
+     ],
+     [
+      2444,
+      1818
+     ],
+     [
+      2525,
+      1818
+     ]
+    ],
+    "label": null,
+    "at": null,
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above"
+   }
+  ],
+  "gates": [
+   {
+    "id": "g1",
+    "n": 1,
+    "x": 1550,
+    "y": 575,
+    "label": "Rule matches B?",
+    "side": "above",
+    "icon": "eventbridge"
+   },
+   {
+    "id": "g2",
+    "n": 2,
+    "x": 2000,
+    "y": 831,
+    "label": "PassRole allowed?",
+    "side": "right",
+    "icon": "iam"
+   },
+   {
+    "id": "g3a",
+    "n": 3,
+    "x": 1525,
+    "y": 912,
+    "label": "IAM + KMS allow?",
+    "side": "left",
+    "icon": "kms"
+   },
+   {
+    "id": "g3b",
+    "n": 3,
+    "x": 1562,
+    "y": 1156,
+    "label": "IAM + KMS allow?",
+    "side": "below",
+    "icon": "kms"
+   },
+   {
+    "id": "g4",
+    "n": 4,
+    "x": 1356,
+    "y": 1719,
+    "label": "Token valid?",
+    "side": "above",
+    "icon": "cognito"
+   },
+   {
+    "id": "g5",
+    "n": 5,
+    "x": 2219,
+    "y": 1846,
+    "label": "Trust policy allows B?",
+    "side": "right",
+    "icon": "sts"
+   },
+   {
+    "id": "g6",
+    "n": 6,
+    "x": 2425,
+    "y": 1719,
+    "label": "IAM + KMS allow?",
+    "side": "above",
+    "icon": "kms"
+   }
+  ],
+  "texts": [
+   {
+    "id": "t_title",
+    "x": 40,
+    "y": 56,
+    "s": "ClaimClarity · Data backend",
+    "role": "title",
+    "anchor": "start",
+    "color": null
+   },
+   {
+    "id": "t_cw2",
+    "x": 2375,
+    "y": 436,
+    "s": "Shown for Customer B · same per customer",
+    "role": "note",
+    "anchor": "end",
+    "color": null
+   },
+   {
+    "id": "t_keyA",
+    "x": 552,
+    "y": 524,
+    "s": "Key A · Role A",
+    "role": "heading",
+    "anchor": "start",
+    "color": null,
+    "icon": "kms"
+   },
+   {
+    "id": "t_keyB",
+    "x": 1278,
+    "y": 524,
+    "s": "Key B · Role B",
+    "role": "heading",
+    "anchor": "start",
+    "color": null,
+    "icon": "kms"
+   }
+  ],
+  "legend_items": [
+   [
+    "agent",
+    "Agent"
+   ],
+   [
+    "service",
+    "Service"
+   ],
+   [
+    "external",
+    "External"
+   ],
+   [
+    "phi",
+    "PHI boundary"
+   ],
+   [
+    "gate",
+    "AWS gate"
+   ],
+   [
+    "badge",
+    "Zoom-in"
+   ]
+  ],
+  "show_legend": true
+ }
+}

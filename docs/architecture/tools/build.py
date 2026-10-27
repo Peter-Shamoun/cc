@@ -1,20 +1,16 @@
-"""python3 docs/architecture/tools/build.py: render the enhanced canvas, cut the main board (00-overview.png), and build
-ClaimClarity_Architecture.html and .pdf from ClaimClarity_Architecture.md.
+"""python3 docs/architecture/tools/build.py: render every board and build ClaimClarity_Architecture.html and .pdf
+from ClaimClarity_Architecture.md.
 
-The drill-down PNGs are not cut from the canvas: they come from drilldowns/ (made by drilldowns.py and analyzer04.py)
-and are embedded as they are.
+The boards' sources are drilldowns/main.json (the main board) and drilldowns/<nn>-<name>.json, the files the diagram
+editor (diagram-editor.html) opens and saves. drilldowns.py renders them to PNG and SVG; set PYTHON to a Python with
+Playwright. The editor is rebuilt too, so it opens the same boards.
 """
-import base64, io, os, re, subprocess
+import base64, io, os, re, subprocess, sys
 from pathlib import Path
 from PIL import Image
 
 V2 = Path(__file__).resolve().parent.parent
-DRAWIO = os.environ.get("DRAWIO", "/tmp/claude-0/-home-user-cc/0e6bb8ac-ae6e-51d1-adaa-a5d39fba27c7/scratchpad/squashfs-root/drawio")
-import sys
-sys.path.insert(0, str(Path(__file__).parent))
-from boards import LAYOUT  # noqa: E402  (the canvas still holds these boards; they fix where the export starts)
-OVERVIEW = (1900, 160, 2460, 1700)
-ORIGIN = (min([OVERVIEW[0]] + [v[2] for v in LAYOUT.values()]) - 2, 48)   # canvas position of the exported image's top-left
+TOOLS = V2 / "tools"
 WIDE = 3.0   # a figure wider than 3:1 is split into two stacked halves in the document, so its text stays readable in print
 
 
@@ -35,17 +31,8 @@ def image(m):
 
 
 def main():
-    subprocess.run(["python3", str(V2 / "tools" / "enhance_original.py")], check=True)
-    full = V2 / "full.png"
-    env = dict(os.environ, HOME="/tmp/drawio-home-build"); Path(env["HOME"]).mkdir(exist_ok=True)
-    subprocess.run(["xvfb-run", "-a", DRAWIO, "-x", "-f", "png", "-p", "1", "-s", "1", "-b", "0", "-o", str(full),
-                    str(V2 / "ClaimClarity_Architecture.drawio"), "--no-sandbox", "--disable-gpu"], env=env, check=True, capture_output=True)
-    im = Image.open(full)
-    x, y, w, h = OVERVIEW
-    im.crop((max(0, x - ORIGIN[0] - 16), max(0, y - ORIGIN[1] - 16), min(im.width, x - ORIGIN[0] + w + 16),
-             min(im.height, y - ORIGIN[1] + h + 16))).save(V2 / "00-overview.png")
-    im.save(V2 / "ClaimClarity_Architecture.png")
-    full.unlink()
+    subprocess.run([sys.executable, str(TOOLS / "drilldowns.py")], check=True)
+    subprocess.run([sys.executable, str(TOOLS / "build_editor.py")], check=True)
     md = (V2 / "ClaimClarity_Architecture.md").read_text()
     md = re.sub(r"!\[([^\]]*)\]\(([^)]+\.png)\)", image, md)
     body = subprocess.run(["pandoc", "-f", "gfm", "-t", "html"], input=md, capture_output=True, text=True, check=True).stdout

@@ -244,6 +244,7 @@ function nodeLayout(n) {
   const lh = names.length * 22 + subs.length * 18;
   let y0 = y + topPad + (h - topPad - lh) / 2 + 16;
   if (n.valign === "bottom") y0 = y + h - lh - 10 + 16;
+  else if (n.valign === "top") y0 = y + topPad + 14 + 16;
   return { names, subs, ic, isz, left, tx, anchor, y0, topPad };
 }
 
@@ -479,6 +480,7 @@ function svgLegend(b, uid) {
     else if (k === "decision") { out.push(`<path d="M${x + 12},${y - 12} L${x + 24},${y} L${x + 12},${y + 12} L${x},${y} Z" fill="${PAPER}" stroke="${NAVY}" stroke-width="1.6"/>`); off = 34; }
     else if (k === "service") out.push(`<rect x="${x}" y="${y - 9}" width="34" height="18" fill="${TINT}" stroke="${BLUE}" stroke-width="1.2"/>`);
     else if (k === "store") { out.push(cylinder(x + 4, y - 12, 24, 24, TINT, BLUE, 1.2)); off = 38; }
+    else if (k === "badge") { out.push(`<circle cx="${x + 10}" cy="${y}" r="10" fill="${BLUE}"/>`); off = 30; }
     else if (k === "external") out.push(`<rect x="${x}" y="${y - 9}" width="34" height="18" fill="${PAPER}" stroke="#7A7F88" stroke-width="1.2" stroke-dasharray="5 4"/>`);
     out.push(T(x + off, y + 5, lab, 14, SANS, INK, 500));
     x += off + tw(lab, 14, "sans") + 40;

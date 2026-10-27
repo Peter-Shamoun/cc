@@ -58,12 +58,8 @@ The newest working version of CC is NOT in this repo. It is on Peter's other mac
 
 ## Architecture docs for Confluence
 
-- `docs/architecture/ClaimClarity_Architecture.drawio` is the original icon canvas
-  (`diagrams/CC_Data_Backend_uncompressed.drawio`), enhanced:
-  - fixed labels: Fargate, analyzer, ClaimClarity;
-  - official AWS icon colours;
-  - new zoom boards 04 Analyzer, 05 Chat backend, 06 Network & security, 07 Operations.
+- The main board and drill-downs 00-04 are editor board files: `docs/architecture/drilldowns/main.json` and
+  `<nn>-<name>.json`. Edit them in `docs/architecture/diagram-editor.html`.
 - `ClaimClarity_Architecture.md` holds one section per board, with an image and a spec table. It builds to the
-  HTML and the 18-page PDF.
-- Rebuild with `python3 docs/architecture/tools/build.py`. The new boards are in `tools/boards.py`, in the original
-  style from `tools/olib.py`.
+  HTML and the PDF.
+- Rebuild everything with `PYTHON=<python with playwright> python3 docs/architecture/tools/build.py`.
