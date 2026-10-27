@@ -237,10 +237,11 @@ function nodeLayout(n) {
   const { x, y, w, h, shape } = n;
   const names = splitLines(n.name), subs = splitLines(n.sub);
   const topPad = { db: 12, folder: 8, ui: 18 }[shape] || 0;
-  const ic = ["decision", "steps", "grid", "code", "table", "image", "badge"].includes(shape) ? null : n.icon;
+  const ic = ["decision", "steps", "grid", "code", "table", "image", "badge", "list"].includes(shape) ? null : n.icon;
   const isz = h >= 76 ? 40 : 32;
   const left = x + (shape === "agent" ? 30 : 16);
-  const tx = ic ? left + isz + 12 : x + w / 2, anchor = ic ? "start" : "middle";
+  const leftText = ic || n.align === "left";
+  const tx = ic ? left + isz + 12 : (leftText ? left : x + w / 2), anchor = leftText ? "start" : "middle";
   const lh = names.length * 22 + subs.length * 18;
   let y0 = y + topPad + (h - topPad - lh) / 2 + 16;
   if (n.valign === "bottom") y0 = y + h - lh - 10 + 16;
@@ -270,7 +271,7 @@ function svgNode(n) {
     out.push(T(cx, cy + r * 0.32, n.name || "", r0(r * 0.9), COND, PAPER, 700, "middle"));
     return out.join("");
   }
-  if (["box", "steps", "ui", "grid", "table"].includes(shape)) {
+  if (["box", "steps", "ui", "grid", "table", "list"].includes(shape)) {
     out.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${dash}/>`);
   } else if (shape === "db") {
     out.push(cylinder(x, y, w, h, fill, stroke));
@@ -321,6 +322,14 @@ function svgNode(n) {
       const parts = m[2].split(/("[^"]*"\s*:)/);
       const tspans = parts.filter(Boolean).map(p => `<tspan fill="${p.endsWith(":") ? "#AFC2E6" : "#FFFFFF"}">${esc(p)}</tspan>`).join("");
       out.push(`<text x="${x + 18 + m[1].length * 8}" y="${ly}" font-family="${MONO}" font-size="13.5" xml:space="preserve">${tspans}</text>`);
+    });
+  } else if (shape === "list") {
+    out.push(T(x + 16, y + 30, (L.names[0] || "").toUpperCase(), 14, COND, LINK, 700, "start", "0.06em"));
+    const rows = n.inner || [], step = Math.min(46, (h - 64) / Math.max(1, rows.length));
+    rows.forEach(([path, desc], i) => {
+      const ry = y + 70 + i * step;
+      out.push(T(x + 28, ry, path || "", 16, MONO, INK, 500));
+      if (desc) out.push(T(x + 28 + tw(path || "", 16, "mono") + 10, ry, desc, 14, SANS, SOFT, 400));
     });
   } else if (shape === "grid") {
     out.push(T(x + 18, y + 34, L.names[0] || "", NAME, SANS, txt, 600));
@@ -528,7 +537,7 @@ const ALL_ICONS = [...Object.keys(AWS_ICONS).filter(k => !GLYPHS[k]), ...Object.
 
 const SHAPES = {
   box: "Box", db: "Database / prefix", folder: "Folder", file: "File", token: "Token", agent: "Agent", decision: "Decision",
-  ui: "App window", code: "Code / CLI panel", table: "Table", steps: "Steps", grid: "Icon grid", image: "Image", badge: "Zoom badge",
+  ui: "App window", code: "Code / CLI panel", table: "Table", steps: "Steps", grid: "Icon grid", list: "Folder list", image: "Image", badge: "Zoom badge",
 };
 const NODE_STYLES = { service: "Service (tint)", white: "White", external: "External (dashed grey)", optional: "Optional (dashed)",
                       focal: "Focal (navy)", denied: "Denied (red dashed)" };
@@ -559,6 +568,8 @@ function shapeDefaults(shape) {
     case "table": return { w: 420, h: 200, name: "sem.remit_claims", colw: 190,
                            inner: [["column", "type"], ["payer_name", "VARCHAR"], ["is_denied", "BOOLEAN"]] };
     case "steps": return { w: 620, h: 150, name: "Fargate parser task", icon: "fargate", inner: ["Start", "Parse", "Silver", "Gold", "Exit"] };
+    case "list": return { w: 600, h: 260, name: "After parsing",
+                          inner: [["parquet/", "silver layer"], ["semantic_layer/", "gold layer"], ["quarantine/", "failed parses"], ["audit/", "one JSON line per SQL"]] };
     case "grid": return { w: 360, h: 160, name: "Customer B roles", cols: 2,
                           inner: [["role", "SFTP copy"], ["role", "Parser"], ["role", "Reader"], ["role", "Audit"]] };
     case "image": return { w: 360, h: 240, name: "", href: "" };
@@ -1323,17 +1334,18 @@ const orderButtons = `<div class="btns"><button data-act="front">Bring to front<
 function innerAsText(n) {
   if (!n.inner) return "";
   if (n.shape === "table") return n.inner.map(r => r.join(" | ")).join("\n");
-  if (n.shape === "grid") return n.inner.map(([i, l]) => `${i} | ${l}`).join("\n");
+  if (n.shape === "grid" || n.shape === "list") return n.inner.map(([i, l]) => `${i} | ${l}`).join("\n");
   return n.inner.join("\n");
 }
 function innerFromText(shape, s) {
   const rows = s.split("\n");
   if (shape === "table") return rows.filter(r => r.trim()).map(r => r.split("|").map(c => c.trim()));
-  if (shape === "grid") return rows.filter(r => r.trim()).map(r => { const [i, ...l] = r.split("|"); return [i.trim(), l.join("|").trim()]; });
+  if (shape === "grid" || shape === "list") return rows.filter(r => r.trim()).map(r => { const [i, ...l] = r.split("|"); return [i.trim(), l.join("|").trim()]; });
   if (shape === "steps") return rows.filter(r => r.trim());
   return rows;
 }
 const INNER_HELP = { code: "One line per row of code.", steps: "One step per line.", table: "One row per line, cells split by |. The first row is the header.",
+                     list: "One row per line: folder | description.",
                      grid: "One item per line: icon | label (icon names as in the picker's tooltips, e.g. role, kms, s3)." };
 
 function renderInspector() {
@@ -1350,6 +1362,8 @@ function renderInspector() {
     if (!["image", "badge", "table", "grid"].includes(el.shape)) html += field("Qualifier (short)", area("sub", el.sub, 1));
     html += `<div class="row"><div>${field("Shape", `<select data-field="shape">${opt(SHAPES, el.shape)}</select>`)}</div>` +
             `<div>${field("Style", `<select data-field="style">${opt(NODE_STYLES, el.style)}</select>`)}</div></div>`;
+    if (["box", "db", "folder", "file", "token"].includes(el.shape) && !el.icon)
+      html += field("Text", `<select data-field="align">${opt({ center: "Centred", left: "Left-aligned" }, el.align || "center")}</select>`);
     if (INNER_HELP[el.shape]) html += field("Contents", area("inner", innerAsText(el), 5)) + `<p class="help">${INNER_HELP[el.shape]}</p>`;
     if (el.shape === "grid") html += field("Columns", numInput("cols", el.cols || 2));
     if (el.shape === "steps") html += field("Badge (icon | label, optional)", textInput("badge", el.badge ? el.badge.join(" | ") : ""));
@@ -1450,7 +1464,7 @@ function applyField(it, key, value) {
   const touched = new Set([el.id]);
   if (it.kind === "node" && key === "shape") {
     const d = shapeDefaults(value);
-    if (["code", "table", "steps", "grid"].includes(value) && !Array.isArray(el.inner)) el.inner = d.inner;
+    if (["code", "table", "steps", "grid", "list"].includes(value) && !Array.isArray(el.inner)) el.inner = d.inner;
     if (value === "table" && !el.colw) el.colw = d.colw;
     renderInspector();
   }

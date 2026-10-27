@@ -36,7 +36,7 @@ class Diagram:
         self.zones.append(dict(x=x, y=y, w=w, h=h, label=label, kind=kind, icon=icon))
 
     def node(self, id, x, y, w, h, name, sub=None, icon=None, shape="box", style="service", inner=None):
-        """shape: box, db, folder, file, token, agent, decision, ui, code, table, steps, grid, image, badge.
+        """shape: box, db, folder, file, token, agent, decision, ui, code, table, steps, grid, list, image, badge.
         style: service (tint fill), white, external (dashed grey), focal (navy fill), optional (dashed)."""
         n = dict(id=id, x=x, y=y, w=w, h=h, name=name, sub=sub, icon=icon, shape=shape, style=style, inner=inner)
         self.nodes.append(n)
@@ -193,13 +193,15 @@ def node_layout(n):
     x, y, w, h, shape = n["x"], n["y"], n["w"], n["h"], n["shape"]
     names, subs = _lines(n["name"]), _lines(n["sub"])
     top_pad = {"db": 12, "folder": 8, "ui": 18}.get(shape, 0)
-    ic = n["icon"] if shape not in ("decision", "steps", "grid", "code", "table", "image") else None
+    ic = n["icon"] if shape not in ("decision", "steps", "grid", "code", "table", "image", "list") else None
     isz = 40 if h >= 76 else 32
     left = x + (30 if shape == "agent" else 16)
     widths = [_tw(s, NAME - 1, "mono") if _is_mono(s) else _tw(s, NAME, "sans") for s in names] + [_tw(s, SUB, "sans4") for s in subs]
     content = max(widths) if widths else 0
     if ic:
         tx, anchor, need = left + isz + 12, "start", (left - x) + isz + 12 + content + 14
+    elif n.get("align") == "left":
+        tx, anchor, need = left, "start", content + 32
     else:
         tx, anchor, need = x + w / 2, "middle", content + 28
     if shape == "decision":
@@ -239,7 +241,7 @@ def svg_node(n):
         out.append(f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="{NAVY if style == "focal" else BLUE}" stroke="{PAPER}" stroke-width="2"/>'
                    + _t(cx, cy + r * 0.32, n["name"] or "", round(r * 0.9), COND, PAPER, 700, "middle") + "</g>")
         return "".join(out)
-    if shape in ("box", "steps", "ui", "grid", "table"):
+    if shape in ("box", "steps", "ui", "grid", "table", "list"):
         out.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="4" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"{dash}/>')
     elif shape == "db":
         c, ry = _cyl(x, y, w, h, fill, stroke); out.append(c)
@@ -290,6 +292,15 @@ def svg_node(n):
             parts = re.split(r'("[^"]*"\s*:)', m.group(2))
             tsp = "".join(f'<tspan fill="{"#AFC2E6" if p2.endswith(":") else "#FFFFFF"}">{escape(p2)}</tspan>' for p2 in parts if p2)
             out.append(f'<text x="{x + 18 + len(m.group(1)) * 8}" y="{ly}" font-family="{MONO}" font-size="13.5" xml:space="preserve">{tsp}</text>')
+    elif shape == "list":       # a heading and left-aligned rows of folder + description
+        out.append(_t(x + 16, y + 30, (L["names"][0] if L["names"] else "").upper(), 14, COND, LINK, 700, ls="0.06em"))
+        rows = n["inner"] or []
+        step = min(46, (h - 64) / max(1, len(rows)))
+        for i, (path, desc) in enumerate(rows):
+            ry = y + 70 + i * step
+            out.append(_t(x + 28, ry, path, 16, MONO, INK, 500))
+            if desc:
+                out.append(_t(x + 28 + _tw(path, 16, "mono") + 10, ry, desc, 14, SANS, SOFT, 400))
     elif shape == "grid":
         out.append(_t(x + 18, y + 34, L["names"][0], NAME, SANS, txt, 600))
         items, cols = n["inner"], n.get("cols", 2)
@@ -442,7 +453,7 @@ def check(d):
             need = max(_tw(l, 13.5, "mono") for l in n["inner"]) + 36
             if need > n["w"]:
                 probs.append(f"code overflow in {n['id']}: needs {need:.0f}, has {n['w']}")
-        elif L["need"] > n["w"] + 1 and n["shape"] not in ("steps", "grid", "table", "image", "badge"):
+        elif L["need"] > n["w"] + 1 and n["shape"] not in ("steps", "grid", "table", "image", "badge", "list"):
             probs.append(f"text overflow in {n['id']}: needs {L['need']:.0f}, has {n['w']}")
     for g in d.gates:
         gb = gate_box(g); dia = (g["x"] - GR, g["y"] - GR, 2 * GR, 2 * GR)

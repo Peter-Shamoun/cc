@@ -36,7 +36,7 @@
     "x": 100,
     "y": 488,
     "w": 650,
-    "h": 780
+    "h": 875
    },
    {
     "id": "z_custB",
@@ -46,7 +46,7 @@
     "x": 834,
     "y": 488,
     "w": 650,
-    "h": 780
+    "h": 875
    },
    {
     "id": "z_write",
@@ -325,12 +325,13 @@
     "w": 600,
     "h": 200,
     "name": "raw/",
-    "sub": "received_date=YYYY-MM-DD/ · bronze · Object Lock",
+    "sub": "received_date=YYYY-MM-DD/ · raw EDI · bronze layer",
     "icon": null,
-    "shape": "folder",
+    "shape": "box",
     "style": "service",
     "inner": null,
-    "valign": "top"
+    "valign": "top",
+    "align": "left"
    },
    {
     "id": "rawA_t0",
@@ -391,12 +392,13 @@
     "w": 600,
     "h": 200,
     "name": "raw/",
-    "sub": "received_date=YYYY-MM-DD/ · bronze · Object Lock",
+    "sub": "received_date=YYYY-MM-DD/ · raw EDI · bronze layer",
     "icon": null,
-    "shape": "folder",
+    "shape": "box",
     "style": "service",
     "inner": null,
-    "valign": "top"
+    "valign": "top",
+    "align": "left"
    },
    {
     "id": "rawB_t0",
@@ -618,108 +620,64 @@
     "inner": null
    },
    {
-    "id": "quarA",
+    "id": "aftA",
     "x": 125,
-    "y": 840,
-    "w": 290,
-    "h": 110,
-    "name": "quarantine/",
-    "sub": "failed parses",
+    "y": 950,
+    "w": 600,
+    "h": 288,
+    "name": "After parsing",
+    "sub": null,
     "icon": null,
-    "shape": "folder",
+    "shape": "list",
     "style": "service",
-    "inner": null
+    "inner": [
+     [
+      "parquet/",
+      "lossless parquet tables · silver layer"
+     ],
+     [
+      "semantic_layer/",
+      "all sem.* views as Parquet · gold layer"
+     ],
+     [
+      "quarantine/",
+      "failed files"
+     ],
+     [
+      "audit/",
+      "one JSON line per SQL · 6 yr"
+     ]
+    ]
    },
    {
-    "id": "auditA",
-    "x": 435,
-    "y": 840,
-    "w": 290,
-    "h": 110,
-    "name": "audit/",
-    "sub": "one JSON line per SQL · 6 yr",
-    "icon": null,
-    "shape": "folder",
-    "style": "service",
-    "inner": null
-   },
-   {
-    "id": "silverA",
-    "x": 125,
-    "y": 1090,
-    "w": 290,
-    "h": 130,
-    "name": "parquet/",
-    "sub": "silver layer",
-    "icon": null,
-    "shape": "db",
-    "style": "service",
-    "inner": null
-   },
-   {
-    "id": "goldA",
-    "x": 435,
-    "y": 1090,
-    "w": 290,
-    "h": 130,
-    "name": "semantic_layer/",
-    "sub": "gold layer",
-    "icon": null,
-    "shape": "db",
-    "style": "service",
-    "inner": null
-   },
-   {
-    "id": "quarB",
+    "id": "aftB",
     "x": 859,
-    "y": 840,
-    "w": 290,
-    "h": 110,
-    "name": "quarantine/",
-    "sub": "failed parses",
+    "y": 950,
+    "w": 600,
+    "h": 288,
+    "name": "After parsing",
+    "sub": null,
     "icon": null,
-    "shape": "folder",
+    "shape": "list",
     "style": "service",
-    "inner": null
-   },
-   {
-    "id": "auditB",
-    "x": 1169,
-    "y": 840,
-    "w": 290,
-    "h": 110,
-    "name": "audit/",
-    "sub": "one JSON line per SQL · 6 yr",
-    "icon": null,
-    "shape": "folder",
-    "style": "service",
-    "inner": null
-   },
-   {
-    "id": "silverB",
-    "x": 859,
-    "y": 1090,
-    "w": 290,
-    "h": 130,
-    "name": "parquet/",
-    "sub": "silver layer",
-    "icon": null,
-    "shape": "db",
-    "style": "service",
-    "inner": null
-   },
-   {
-    "id": "goldB",
-    "x": 1169,
-    "y": 1090,
-    "w": 290,
-    "h": 130,
-    "name": "semantic_layer/",
-    "sub": "gold layer",
-    "icon": null,
-    "shape": "db",
-    "style": "service",
-    "inner": null
+    "inner": [
+     [
+      "parquet/",
+      "lossless parquet tables · silver layer"
+     ],
+     [
+      "semantic_layer/",
+      "all sem.* views as Parquet · gold layer"
+     ],
+     [
+      "quarantine/",
+      "failed files"
+     ],
+     [
+      "audit/",
+      "one JSON line per SQL · 6 yr"
+     ]
+    ]
    }
   ],
   "edges": [
@@ -937,9 +895,9 @@
      "fy": 0.5
     },
     "dst": {
-     "id": "goldB",
+     "id": "aftB",
      "fx": 1,
-     "fy": 0.5076923076923077
+     "fy": 0.7152777777777778
     }
    },
    {
@@ -1242,50 +1200,6 @@
      "fx": 0,
      "fy": 0.509090909090909
     }
-   },
-   {
-    "id": "e_badA",
-    "pts": [
-     [
-      270,
-      762
-     ],
-     [
-      270,
-      840
-     ]
-    ],
-    "label": "bad files",
-    "at": [
-     282,
-     806
-    ],
-    "style": "dashed",
-    "end": true,
-    "start": false,
-    "lpos": "right"
-   },
-   {
-    "id": "e_badB",
-    "pts": [
-     [
-      1004,
-      762
-     ],
-     [
-      1004,
-      840
-     ]
-    ],
-    "label": "bad files",
-    "at": [
-     1016,
-     806
-    ],
-    "style": "dashed",
-    "end": true,
-    "start": false,
-    "lpos": "right"
    }
   ],
   "gates": [
@@ -1311,7 +1225,7 @@
     "id": "g3a",
     "n": 3,
     "x": 1525,
-    "y": 1010,
+    "y": 880,
     "label": "IAM + KMS allow?",
     "side": "left",
     "icon": "kms"
