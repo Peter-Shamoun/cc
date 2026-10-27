@@ -296,7 +296,7 @@ _TODO: one paragraph: what the sidebar is for, where history lives (server `Http
 
 | # | Element | Behaviour |
 |---|---|---|
-| 1 | Toast | "Deleted "<title>"" + Undo for 5 s (`UNDO_MS`). Archive shows the same pattern; a server refusal shows "Couldn't archive that chat. Try again." |
+| 1 | Toast | "Deleted "\<title>"" + Undo for 5 s (`UNDO_MS`). Archive shows the same pattern; a server refusal shows "Couldn't archive that chat. Try again." |
 
 _TODO: confirm whether delete is optimistic on the live API and what happens if the DELETE fails after Undo expires._
 
@@ -608,12 +608,12 @@ Unknown events and fields are ignored; unknown part types render as "Unsupported
 
 | Step kind | Icon | Live label → done label | Source |
 |---|---|---|---|
-| explore | Telescope | "Probing the data" → "Looked at <relation>" / "Read schema" / "Sampled values" / "Looked up glossary" / "Used the full EDI data" | `answer/normalize.ts` `PROBE` |
+| explore | Telescope | "Probing the data" → "Looked at \<relation>" / "Read schema" / "Sampled values" / "Looked up glossary" / "Used the full EDI data" | `answer/normalize.ts` `PROBE` |
 | sql | Database | "Running query" → "Ran query"; check purpose → "Ran check query"; final → "Final query" | `PURPOSE` / `PRESENT` |
 | repair | Wrench | "Repairing the query" → "Repaired the query" ("Re-ran repaired query · attempt 2") | `normalize.ts` |
 | check | ListChecks | "Verified the result" / "Checked row count" / "Ran N checks" | `CHECK` |
-| candidates | GitCompare | "Compared N candidates · <method>" | |
-| escalation | MoveUpRight | "Handed off to <model>" | |
+| candidates | GitCompare | "Compared N candidates · \<method>" | |
+| escalation | MoveUpRight | "Handed off to \<model>" | |
 | chart / schema / search / other | BarChart3 / List / Search / Wrench | legacy `tool_call` parts | |
 
 ### 9.5 Outcomes the user can get
@@ -733,7 +733,7 @@ _TODO: intro: the answer is a list of typed parts (`Part` union in `contract/v1.
 | `abstain` | `AbstainCard` | category (open, fallback `unsupported`), suggestions |
 | `clarification` | `ClarifyCard` / `ClarifyForm` | single or 1–4 questions |
 | `status` | — | not rendered as a part |
-| unknown | `Unsupported` | "Unsupported content (<type>)" |
+| unknown | `Unsupported` | "Unsupported content (\<type>)" |
 
 ### 10.1 Answer chrome: action row, sources, usage
 
