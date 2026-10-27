@@ -319,19 +319,6 @@
     "inner": null
    },
    {
-    "id": "check4",
-    "x": 3340,
-    "y": 800,
-    "w": 280,
-    "h": 64,
-    "name": "Time + row limits",
-    "sub": "25 s · 60 s per question · 1,000 rows",
-    "icon": null,
-    "shape": "box",
-    "style": "white",
-    "inner": null
-   },
-   {
     "id": "node1",
     "shape": "box",
     "style": "service",
@@ -659,41 +646,12 @@
    {
     "pts": [
      [
-      3480,
-      784
-     ],
-     [
-      3480,
-      800
-     ]
-    ],
-    "label": null,
-    "at": null,
-    "style": "solid",
-    "end": true,
-    "start": false,
-    "lpos": "above",
-    "id": "edge11",
-    "src": {
-     "id": "check3",
-     "fx": 0.5,
-     "fy": 1
-    },
-    "dst": {
-     "id": "check4",
-     "fx": 0.5,
-     "fy": 0
-    }
-   },
-   {
-    "pts": [
-     [
       3620,
-      832
+      752
      ],
      [
       3660,
-      832
+      752
      ],
      [
       3660,
@@ -715,7 +673,7 @@
     "lpos": "right",
     "id": "edge12",
     "src": {
-     "id": "check4",
+     "id": "check3",
      "fx": 1,
      "fy": 0.5
     },
@@ -765,7 +723,11 @@
    {
     "pts": [
      [
-      3340,
+      3480,
+      784
+     ],
+     [
+      3480,
       840
      ],
      [
@@ -788,9 +750,9 @@
     "lpos": "above",
     "id": "edge14",
     "src": {
-     "id": "check4",
-     "fx": 0,
-     "fy": 0.625
+     "id": "check3",
+     "fx": 0.5,
+     "fy": 1
     },
     "dst": {
      "id": "agent",

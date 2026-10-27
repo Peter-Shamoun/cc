@@ -74,7 +74,7 @@ board, and sits on the arrow it guards. Board 05 shows where each one is defined
 | Part | Key facts |
 |---|---|
 | Run worker | The Claim Query Agent sends SQL through `cli.py` and the SQL guard. It holds no AWS credentials. |
-| SQL guard | Read-only SELECT. Blocks queries that would fail against the schema. 25 s per query, 60 s per question, 1,000 rows. Refuses keyless joins over 100 million row pairs. |
+| SQL guard | Read-only SELECT. Blocks queries that would fail against the schema. Refuses keyless joins over 100 million row pairs. |
 | Quack | SQL goes to the DuckDB query service over Quack with a per-run token, and rows come back the same way |
 | Gate 5 | The reader role's trust policy accepts only this token's customer. STS returns read-only credentials for 15 minutes, renewed with the same token when fewer than 3 minutes remain. |
 | Gate 6 | IAM + KMS allow reader role B only the current gold version in `customer_b/semantic_layer/`, and `customer_b/parquet/` after an escalation |
@@ -92,7 +92,7 @@ board, and sits on the arrow it guards. Board 05 shows where each one is defined
 | Claim Query Agent | The run worker itself (Fargate): Claude Haiku, Strands on Amazon Bedrock |
 | Prompt | Cached: rules, EDI glossary, semantic schema with allowed values, tool and CLI reference, system prompt and history. Per question: the 3 most similar solved examples and the newest prompt. |
 | First decision | Answer, ask a clarifying question, or escalate to the lossless tables with a reason, which is logged |
-| `cli.py` · SQL guard | The agent's one tool: `sql`, `lookup`, `describe`, `list`, `escalate`, then `answer`, `ask` or `refuse`. Every query passes the guard's checks (limits in 03). A failed check goes back to the agent as an error. |
+| `cli.py` · SQL guard | The agent's one tool: `sql`, `lookup`, `describe`, `list`, `escalate`, then `answer`, `ask` or `refuse`. Every query passes the guard's checks. A failed check goes back to the agent as an error. |
 | Answer | Streams back with live steps. The server re-runs the final SQL, so the numbers come from the database. |
 
 Network, operations, log retention and session handling are owned by IT.

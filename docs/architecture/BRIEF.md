@@ -117,8 +117,9 @@ Middle-ground length: about 15–20 PDF pages. No 100-page sets.
   new version, and `CURRENT` moves by compare-and-set; old versions stay readable for sessions already open.
 - **Reader:** STS credentials last 15 minutes, renewed with the same token when fewer than 3 minutes remain. Read-only.
   Only the current gold version. `lossless.*` holds PHI-stripped tables published next to gold.
-- **SQL guard:** read-only SELECT; blocks queries that would fail against the schema; 25 s per query, 60 s per
-  question, 1,000 rows; refuses keyless joins over 100 million row pairs.
+- **SQL guard:** read-only SELECT; blocks queries that would fail against the schema; refuses keyless joins over 100
+  million row pairs. The time and row limits (25 s per query, 60 s per question, 1,000 rows) apply only to the agent's
+  exploratory queries, not the final answer, so they are not drawn (user decision 2026-10-27).
 - **KPI gate:** one Haiku call with structured output. 16 preset queries with fixed SQL. The parameters (payer,
   payer class, month, CPT, CARC) are checked against the data. A preset that doesn't fit, or anything else wrong,
   goes to the agent.
