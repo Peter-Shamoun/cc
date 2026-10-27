@@ -12,7 +12,7 @@ from AWS services drive alarms that notify on-call.
 | Item | What it does | Details |
 |---|---|---|
 | ECS tasks | Chat API, run workers and parser. They write redacted logs, plus one metric record per answer and per batch. | |
-| CloudWatch Logs | One encrypted log group per service | [CloudWatch](../cards/cloudwatch.md) |
+| CloudWatch Logs | One encrypted log group per service | [Service catalog](90-service-catalog.md) |
 | CloudWatch metrics | Metrics from metric filters, embedded metric records and AWS services | |
 | Run queue · Load balancer · Amazon Bedrock | Publish their own metrics | |
 | CloudWatch alarms | Compare the metrics with the thresholds below | |

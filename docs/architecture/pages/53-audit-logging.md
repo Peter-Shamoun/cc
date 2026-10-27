@@ -12,9 +12,9 @@ the application logs are redacted so they carry no PHI.
 
 | Item | What it does | Details |
 |---|---|---|
-| Every role | Any task role, pipeline, IT's SFTP copy or person making an AWS call. | [IAM and KMS matrix](91-iam-kms-matrix.md) |
+| Every role | Any task role, pipeline, copy step or person making an AWS call. | [IAM and KMS matrix](91-iam-kms-matrix.md) |
 | CloudTrail | Records management events and S3 data events, allowed or denied. | [CloudTrail card](90-service-catalog.md) |
-| S3 · trail logs | The log bucket: Object Lock, its own KMS key, 6 years. | |
+| S3 · trail logs | The log bucket's CloudTrail prefix: Object Lock COMPLIANCE, the trail key, 6 years. | [Encryption keys](52-encryption-keys.md) |
 | Run worker | Runs every analyzer SQL call through one entry point. | [SQL guard & escalation](44-sql-guard-escalation.md) |
 | Agent audit | One hash-chained record per SQL call and per session opening. | |
 | S3 · B's query audit | `B/audit/queries/<date>/<request id>.json`, write-once for 6 years. | [Encryption keys](52-encryption-keys.md) |
@@ -28,7 +28,7 @@ the application logs are redacted so they carry no PHI.
    ClaimClarity bucket, including denials. It delivers to the log bucket with log file validation on.
 2. Each analyzer SQL call writes one agent-audit record, whatever the outcome. Each record carries a sequence
    number, the previous record's hash and its own SHA-256 hash, so an edit, reorder or insert breaks the chain.
-3. At the end of the request the chat API assumes Customer B's audit writer role and writes the request's records
+3. At the end of the run the run worker assumes Customer B's audit writer role and writes the run's records
    as one object. The writer can only add objects, and the bucket policy requires create-only writes, Object Lock
    COMPLIANCE and 6 years of retention.
 4. Application logs pass the PHI filter: quoted text, emails, SSNs, phone numbers, dates and ids are masked,
@@ -67,7 +67,7 @@ prefix with the query-audit key.
 |---|---|---|
 | Raw EDI files | 7 years | Object Lock COMPLIANCE; deletes denied |
 | Query audit | 6 years | Object Lock COMPLIANCE; deletes denied |
-| CloudTrail | 6 years | Object Lock on the log bucket |
+| CloudTrail | 6 years | Object Lock COMPLIANCE on the log bucket's CloudTrail prefix |
 | Network and application logs | 1 year | CloudWatch Logs retention |
 | Transcripts | 90 days | S3 lifecycle; users can delete sooner |
 

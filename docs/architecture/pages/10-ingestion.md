@@ -34,7 +34,7 @@ a new version of the semantic tables (gold) that the chat reads, all inside the 
 
 | Item | Value |
 |---|---|
-| Isolation | Each customer has its own prefix, roles (SFTP copy, parser, reader, transcripts, audit) and KMS keys (lake, transcripts), plus its own EventBridge rule and parser task definition |
+| Isolation | Each customer has its own prefix, roles (Transfer Family, SFTP copy, parser, reader, transcripts, audit) and KMS keys (lake, transcripts), plus its own EventBridge rule and parser task definition |
 | Data held / PHI | Raw, silver and quarantine: full PHI. Gold: no direct patient identifiers. |
 | Encryption | SSE-KMS with the customer's lake key on every lake object |
 | Raw retention | Object Lock COMPLIANCE, 2,555 days; never deleted |

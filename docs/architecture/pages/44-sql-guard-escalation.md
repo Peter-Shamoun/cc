@@ -49,7 +49,7 @@ reason is masked, logged and shown to the user.
 | Reader session | One DuckDB session per run with the customer's reader role for 15 minutes; it holds only the mounted tables, cannot read other files or the network, and its settings are locked |
 | Escalation | Only the agent can escalate, and only with a reason. The reason is put on one line, masked (quotes, dates, e-mails, ids, SSN- and phone-like values) and cut to 300 characters. Same customer only. |
 | Keys | The customer's lake key for the tables; reads are allowed by the customer's reader role (gate 6) |
-| Audit | Each query: customer, user, gold version, ok or failed, rows, seconds, error and the first 500 characters of the SQL, stored under the audit key. Escalations: requested, granted or failed. Server logs hold no SQL or rows. |
+| Audit | Each query: customer, user, gold version, ok or failed, rows, seconds, error and the first 500 characters of the SQL, stored under the query audit key. Escalations: requested, granted or failed. Server logs hold no SQL or rows. |
 
 ## Related
 

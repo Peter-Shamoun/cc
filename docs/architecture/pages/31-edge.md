@@ -12,13 +12,13 @@ The web app comes from its own S3 bucket, and API calls go through a load balanc
 | Item | What it does | Details |
 |---|---|---|
 | XiFin user | Opens the app and calls `/api/*` on the same origin | |
-| CloudFront + WAF | TLS, WAF rules and rate limit, routing by path | [CloudFront](../cards/cloudfront.md), [WAF](../cards/waf.md) |
+| CloudFront + WAF | TLS, WAF rules and rate limit, routing by path | [Service catalog](90-service-catalog.md) |
 | Nonce function | Lambda@Edge. Returns `index.html` with a fresh CSP nonce on every response. | |
 | S3 · web app | The web app bucket: hashed assets and the HTML template. No PHI. | [Deploy](61-deploy.md) |
-| Load balancer | Application Load Balancer. Accepts traffic from CloudFront only. | [ALB](../cards/alb.md) |
+| Load balancer | Application Load Balancer. Accepts traffic from CloudFront only. | [Service catalog](90-service-catalog.md) |
 | Chat API | Checks the token on every call | [Chat turn](32-chat-turn.md) |
 | Amazon Cognito | Publishes the keys that sign ID tokens | [Token to credentials](22-token-to-credentials.md) |
-| S3 · access logs | The log bucket for CloudFront and load balancer access logs | [Audit & logging](53-audit-logging.md) |
+| S3 · access logs | The log bucket: CloudFront and load balancer access logs | [Audit & logging](53-audit-logging.md) |
 
 ## How it works
 

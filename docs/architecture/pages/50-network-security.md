@@ -2,9 +2,9 @@
 
 [Overview](00-overview.md) › Network & security
 
-ClaimClarity has one public entry point, CloudFront with AWS WAF, and every ECS task runs in private subnets that
-reach AWS only through VPC endpoints. Every object is encrypted with the customer's keys, and every AWS call and
-every analyzer SQL call is recorded.
+Users enter only through CloudFront with AWS WAF and labs only through the SFTP endpoint, and every ECS task runs in
+private subnets that reach AWS only through VPC endpoints. Every customer object is encrypted with the customer's
+keys, and every AWS call and every analyzer SQL call is recorded.
 
 ![Network & security](../png/50-network-security.png)
 
@@ -36,13 +36,13 @@ every analyzer SQL call is recorded.
 
 | Control | Design |
 |---|---|
-| Public entry | CloudFront + WAF only. No public load balancer, no public IPs on tasks |
+| Public entry | Users: CloudFront + WAF only. Labs: the Transfer Family SFTP endpoint (TCP 22, lab source addresses only). No public load balancer, no public IPs on tasks |
 | Placement | All ECS tasks on Fargate in private subnets in two Availability Zones |
 | AWS access | S3 gateway endpoint; interface endpoints for STS, KMS, Bedrock runtime, ECR api and dkr, CloudWatch Logs, SQS, Secrets Manager |
 | Internet egress | Chat API only, through NAT + Network Firewall, to the Cognito hosts only |
 | Buckets | One bucket holds all customer data. The web app and the access logs have their own buckets |
 | In transit | TLS 1.2 or later on every hop. The bucket denies non-TLS requests |
-| At rest | SSE-KMS on every object with the customer's keys; KMS on logs, queues and secrets |
+| At rest | SSE-KMS on every customer object with the customer's keys; platform KMS keys on logs, the trail, queues and secrets; SSE-S3 on the web app bucket (no PHI) |
 | Audit | CloudTrail management and S3 data events; one agent-audit record per SQL call; redacted application logs |
 | Retention | Raw 7 years · query audit 6 years · CloudTrail 6 years · network and app logs 1 year · transcripts 90 days |
 

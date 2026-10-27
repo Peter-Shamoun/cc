@@ -22,8 +22,8 @@ read the customer's gold tables only through the cc CLI and SQL guard, on a read
 | Full lossless EDI schema | Described to the agent only after it escalates with a reason, which is logged and shown to the user. | [cc CLI + SQL guard](44-sql-guard-escalation.md) |
 | cc CLI + SQL guard | The only way to the data: it checks every query from both paths, and the server re-runs the agent's final query. | [cc CLI + SQL guard](44-sql-guard-escalation.md) |
 | DuckDB reader session | One read-only session per run, with row, time and cost caps, using the customer's 15-minute credentials. | [Token to credentials](22-token-to-credentials.md) |
-| Customer's S3 prefix | Holds `sem.*` (gold, read by default) and `lossless.*` (PHI-stripped EDI tables, only after escalation). | [S3 layout](12-s3-layout.md) |
 | IAM + KMS gate | AWS allows the reader to read this customer's data only (gate 6). | [Customer isolation](23-customer-isolation.md) |
+| Customer's S3 prefix | Holds `sem.*` (gold, read by default) and `lossless.*` (PHI-stripped EDI tables, only after escalation). | [S3 layout](12-s3-layout.md) |
 
 ## How it works
 
@@ -49,7 +49,7 @@ read the customer's gold tables only through the cc CLI and SQL guard, on a read
 | Guard limits | 25 s per query, 60 s total query time per question, 1,000 rows per query, keyless joins over 100 million row pairs refused |
 | PHI | Query results are treated as PHI. Identifier columns are redacted by the cc CLI before results go anywhere. |
 | Failure | If the gate or a preset fails, the question goes to the Claim Query Agent. If the agent ends without an answer, the user gets a retryable error. |
-| Logging | Every query, escalation and refusal is audited under the customer's audit key. Model token usage is recorded per run. |
+| Logging | Every query, escalation and refusal is audited under the query audit key. Model token usage is recorded per run. |
 
 ## Pages in this area
 

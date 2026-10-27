@@ -19,7 +19,7 @@ objects or rewrite the policies that protect them.
 | Customer B's transcript roles | Transcript user, customer admin and eval roles. | [State](33-state.md) |
 | S3 · B's transcripts | `B/transcripts/`: chats, metadata and de-identified exports. | [State](33-state.md) |
 | Customer B's transcript key | A second key for B, for transcripts only. Lake roles cannot use it. | |
-| Customer B's audit roles | Audit writer (assumed by the chat API) and audit reader (customer admins). | [Audit logging](53-audit-logging.md) |
+| Customer B's audit roles | Audit writer (assumed by the run worker) and audit reader (customer admins). | [Audit logging](53-audit-logging.md) |
 | S3 · B's query audit | `B/audit/queries/`: write-once records, kept 6 years. | [Audit logging](53-audit-logging.md) |
 | Query-audit key | One platform key with one statement per customer. | |
 
@@ -45,12 +45,16 @@ objects or rewrite the policies that protect them.
 | Transcript key | Per customer | `transcripts/` objects and per-user data keys | Automatic yearly |
 | Query-audit key | Platform, one statement per customer | `<customer>/audit/queries/` | Automatic yearly |
 | Platform default key | Platform | Bucket default only, never valid for customer objects | Automatic yearly |
+| Logs key | Platform | CloudWatch log groups and the log bucket (access logs) | Automatic yearly |
+| Trail key | Platform | CloudTrail log files | Automatic yearly |
+| Queue and secrets keys | Platform | The run queue and its dead-letter queue; Secrets Manager secrets | Automatic yearly |
 
 ### Who may use each key
 
 | Role | Key | Operations | Condition |
 |---|---|---|---|
 | Parser, reader, SFTP copy | Their customer's lake key | Decrypt, GenerateDataKey | Through S3, objects under `<customer>/` |
+| Transfer Family role | Their customer's lake key | GenerateDataKey | Through S3, `landing/` only |
 | Transcript user | Their customer's transcript key | Decrypt, GenerateDataKey | Own folder through S3; own data key only |
 | Customer admin | Their customer's transcript key | Decrypt, GenerateDataKey | All users' folders, exports and admin objects; any user data key of the customer |
 | Eval | Their customer's transcript key | Decrypt | Through S3, `transcripts/exports/` only |

@@ -40,7 +40,7 @@ lake key, and writes `_SUCCESS` last to start the parser.
 
 | Who | May | May not |
 |---|---|---|
-| Customer B's Transfer Family user | Upload to Customer B's `landing/` | See any other folder |
+| Customer B's Transfer Family user | Upload to Customer B's `landing/`, through B's Transfer Family role (put only, B's lake key) | See any other folder; read, overwrite or delete |
 | Customer B's SFTP copy role | Read and delete `landing/`; `s3:PutObject` and `s3:PutObjectRetention` on `raw/` | Overwrite or delete `raw/`; touch any other customer |
 | Customer B's lake key | Encrypt and decrypt for Customer B's lake roles, through S3 only | Be used by any other principal |
 
@@ -58,6 +58,8 @@ lake key, and writes `_SUCCESS` last to start the parser.
 
 | Item | Value |
 |---|---|
+| Endpoint | Internet-facing SFTP endpoint, TCP 22; its security group admits each lab's listed source addresses only; one SSH key per lab user |
+| Copy step | A Lambda function per upload day, started by the lab's `_SUCCESS` in `landing/`, as the customer's SFTP copy role |
 | Data held / PHI | Full PHI in `landing/` and `raw/` |
 | A file name that already exists in raw | Refused; the lab sends a corrected file under a new name, and both are kept |
 | A day without the lab's `_SUCCESS` | Nothing is copied or parsed |

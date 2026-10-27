@@ -51,7 +51,7 @@ is open only to the role that needs it.
 
 | Zone | SFTP copy role | Parser role | Reader role |
 |---|---|---|---|
-| `landing/` | Get, Delete | – | – |
+| `landing/` | Get, Delete (Transfer Family role: Put) | – | – |
 | `raw/` | Put, PutObjectRetention | Get, GetObjectVersion | – |
 | `staging/` | – | Get, Put, Delete | – |
 | `quarantine/` | – | Put, Delete | – |
@@ -65,7 +65,7 @@ is open only to the role that needs it.
 | `landing/` | Yes | Deleted after the copy |
 | `raw/` | Yes | Object Lock COMPLIANCE 2,555 days; no deletes; no lifecycle rule |
 | `staging/` | No | Old versions expire after 1 day |
-| `quarantine/` | Yes | Kept for review |
+| `quarantine/` | Yes | Deleted 1 year after the batch (lifecycle rule) |
 | `parquet/` | Yes | Old versions expire after 7 days |
 | `semantic_layer/` | No direct patient identifiers | Retired files deleted after 20 minutes; old versions expire after 1 day |
 

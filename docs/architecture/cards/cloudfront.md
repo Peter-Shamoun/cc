@@ -9,4 +9,4 @@
 | Scaling and limits | Managed. Origin read timeout 60 s, which is above the 15 s SSE heartbeat. `/assets/*` cached for one year (immutable). Edge features that rewrite JS, CSS or HTML stay off, because Subresource Integrity would reject the files. |
 | Failure behaviour | An unreachable origin returns 5xx. The web app retries API calls and reconnects SSE streams. A Lambda@Edge failure stops the app from loading, but does not affect the API. |
 | Logging and audit | Standard access logs go to the access log bucket (separate from the ClaimClarity bucket). Paths carry opaque ids, so the logs are treated as PHI-bearing: encrypted, security team only, kept 1 year. Configuration changes are recorded in CloudTrail. |
-| Used on pages | [Edge](../pages/31-edge.md), [Deploy](../pages/61-deploy.md), [Chat backend](../pages/30-chat-backend.md) |
+| Used on pages | [Edge](31-edge.md), [Deploy](61-deploy.md), [Chat backend](30-chat-backend.md) |

@@ -42,7 +42,7 @@ those credentials can read only that customer's gold data.
 | Session cookie | `cc_session` · HttpOnly · Secure · SameSite=Strict · Path=/api · Max-Age 3600 |
 | Reader credentials | AssumeRoleWithWebIdentity, 900 s, renewed when fewer than 3 minutes remain |
 | Reader scope | List and read `<customer>/semantic_layer/`, current object versions only |
-| The customer's roles and keys | Parser, reader, SFTP copy, transcript and audit roles; a lake key and a transcript key. See [IAM and KMS matrix](91-iam-kms-matrix.md) |
+| The customer's roles and keys | Transfer Family, SFTP copy, parser, reader, transcript and audit roles; a lake key and a transcript key. See [IAM and KMS matrix](91-iam-kms-matrix.md) |
 | Logging | Entra sign-in log; CloudTrail for every STS, S3 and KMS call. Tokens are never logged |
 
 ## Pages in this area

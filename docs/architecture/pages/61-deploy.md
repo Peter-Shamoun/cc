@@ -13,8 +13,8 @@ CI from a reviewed pull request and is deployed by a pipeline role, not by a per
 |---|---|---|
 | Git | The protected main branch | |
 | CI | Lint, type checks, unit, contract and security tests, and the eval gate for analyzer changes | [Eval regression](63-eval-regression.md) |
-| Amazon ECR | One repository per image: chat API, run worker, parser | [ECR](../cards/ecr.md) |
-| ECS services | Rolling deploy of the chat API and run workers | [ECS](../cards/ecs-fargate.md) |
+| Amazon ECR | One repository per image: chat API, run worker, parser | [Service catalog](90-service-catalog.md) |
+| ECS services | Rolling deploy of the chat API and run workers | [Service catalog](90-service-catalog.md) |
 | Healthy? | New tasks must pass their health checks | |
 | New tasks live / Roll back | Old tasks stop, or the circuit breaker rolls back | |
 | S3 · web app | The web app bucket. New assets go in first, then the HTML template. | [Edge](31-edge.md) |
@@ -41,7 +41,7 @@ CI from a reviewed pull request and is deployed by a pipeline role, not by a per
 | Deploy role cannot | Read the ClaimClarity bucket, use the customer's keys, or change bucket and key policies (the infrastructure pipeline does that) |
 | Images | Immutable tags. Scanned on push. The last 50 are kept for rollback. |
 | Rollback | ECS circuit breaker, or redeploy the previous revision. Web app: restore the previous HTML template. |
-| Production settings | Cookie auth, SQL literal masking `phi` or `all`, the paid-model switch on in production only |
+| Production settings | Cookie sign-in; SQL literal masking `phi` or `all`; Bedrock model calls switched on in production only |
 
 ## Related
 

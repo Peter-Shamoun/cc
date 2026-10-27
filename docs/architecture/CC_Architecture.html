@@ -28,11 +28,11 @@ pre { background:#F1F3F7; padding:10px; overflow:auto; }
 <nav><b>CC ARCHITECTURE</b><a class="d0" href="#00-overview">ClaimClarity architecture overview</a><a class="d0" href="#10-ingestion">Ingestion &amp; lake</a><a class="d1" href="#11-sftp-intake">SFTP intake</a><a class="d1" href="#12-s3-layout">S3 layout</a><a class="d1" href="#13-parse-trigger">Parse trigger</a><a class="d1" href="#14-parser-task">Parser task</a><a class="d1" href="#15-gold-publish">Gold publish</a><a class="d0" href="#20-identity">Identity &amp; access</a><a class="d1" href="#21-sign-in">Sign-in</a><a class="d1" href="#22-token-to-credentials">Token to credentials</a><a class="d1" href="#23-customer-isolation">Customer isolation</a><a class="d0" href="#30-chat-backend">Chat backend</a><a class="d1" href="#31-edge">Edge</a><a class="d1" href="#32-chat-turn">Chat turn</a><a class="d1" href="#33-state">State</a><a class="d1" href="#34-limits">Limits</a><a class="d0" href="#40-analyzer">Analyzer</a><a class="d1" href="#41-kpi-gate">KPI gate</a><a class="d1" href="#42-standard-kpi-path">Preset KPI queries</a><a class="d1" href="#43-custom-analysis-agent">Claim Query Agent</a><a class="d1" href="#44-sql-guard-escalation">cc CLI + SQL guard</a><a class="d1" href="#45-model-calls">Model calls</a><a class="d0" href="#50-network-security">Network &amp; security</a><a class="d1" href="#51-network">Network</a><a class="d1" href="#52-encryption-keys">Encryption keys</a><a class="d1" href="#53-audit-logging">Audit logging</a><a class="d0" href="#60-operations">Operations</a><a class="d1" href="#61-deploy">Deploy</a><a class="d1" href="#62-monitoring">Monitoring</a><a class="d1" href="#63-eval-regression">Eval regression</a><a class="d0" href="#90-service-catalog">AWS service catalog</a><a class="d1" href="#91-iam-kms-matrix">IAM and KMS matrix</a><a class="d1" href="#92-glossary">Glossary</a><a class="d1" href="#93-open-decisions">Open decisions</a></nav>
 <main><section id="00-overview"><h1 id="claimclarity-architecture-overview">ClaimClarity architecture
 overview</h1>
-<p>ClaimClarity is a chat assistant for XiFin staff. It answers
-questions about a clinical lab customer's claims (837P) and remittances
-(835), and shows the SQL and data behind every answer. Each customer's
-data stays inside that customer's own S3 prefix, KMS keys and IAM roles.
-A signed-in user reaches only the customer their token names.</p>
+<p>ClaimClarity is a chat assistant that answers XiFin staff's questions
+about a clinical lab customer's claims (837P) and remittances (835), and
+shows the SQL and data behind every answer. Each customer's data stays
+inside that customer's own S3 prefix, roles and keys, and a signed-in
+user reaches only the customer their token names.</p>
 <div class="diagram">
 
 <p><svg xmlns="http://www.w3.org/2000/svg" style="background: transparent; background-color: transparent; color-scheme: light dark;" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="1522px" height="726px" viewBox="0 0 1522 726"><defs/><g><g data-cell-id="0"><g data-cell-id="1"><g data-cell-id="title"><g transform="translate(0.5,0.5)"><rect x="0" y="0" width="1520" height="36" fill="none" stroke="none" pointer-events="all"/></g><g><g><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe flex-start; width: 1px; height: 1px; padding-top: 18px; margin-left: 2px;"><div style="box-sizing: border-box; font-size: 0; text-align: left; color: #1C2B57; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: light-dark(#1C2B57, #bbc8ee); line-height: 1.2; pointer-events: all; white-space: nowrap; "><b style="font-size:20px">CLAIMCLARITY
@@ -123,13 +123,23 @@ lossless and gold tables.</td>
 <td><a href="#20-identity">Identity &amp; access</a></td>
 </tr>
 <tr class="odd">
+<td>XiFin user</td>
+<td>Opens the web app and signs in</td>
+<td><a href="#21-sign-in">Sign-in</a></td>
+</tr>
+<tr class="even">
 <td>Microsoft Entra ID</td>
 <td>Company sign-in</td>
 <td><a href="#21-sign-in">Sign-in</a></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Amazon Cognito</td>
 <td>Issues the ID token that names one customer</td>
+<td><a href="#21-sign-in">Sign-in</a></td>
+</tr>
+<tr class="even">
+<td>ID token</td>
+<td>Names one customer; kept in an httpOnly session cookie</td>
 <td><a href="#21-sign-in">Sign-in</a></td>
 </tr>
 <tr class="odd">
@@ -138,24 +148,34 @@ lossless and gold tables.</td>
 <td><a href="#30-chat-backend">Chat backend</a></td>
 </tr>
 <tr class="even">
+<td>XiFin user</td>
+<td>Asks a question and reads the streamed answer</td>
+<td><a href="#32-chat-turn">Chat turn</a></td>
+</tr>
+<tr class="odd">
 <td>CloudFront + WAF</td>
 <td>The only public entry: serves the app and passes API calls on</td>
 <td><a href="#31-edge">Edge</a></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Chat API</td>
 <td>Checks the token and queues one run per question</td>
 <td><a href="#32-chat-turn">One chat turn</a></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Run queue</td>
 <td>SQS queue between the chat API and the run workers</td>
 <td><a href="#34-limits">Limits</a></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Run worker</td>
 <td>Fargate task that runs the analyzer for one run</td>
 <td><a href="#40-analyzer">Analyzer</a></td>
+</tr>
+<tr class="odd">
+<td>S3 · gold</td>
+<td>The customer's current gold version, read-only</td>
+<td><a href="#15-gold-publish">Gold publish</a></td>
 </tr>
 <tr class="even">
 <td>STS</td>
@@ -175,8 +195,8 @@ reader role</td>
 <h2 id="how-it-works">How it works</h2>
 <ol type="1">
 <li><strong>Data in.</strong> A lab's files land in its raw prefix. When
-the batch is complete, a parser task, running as that customer's role,
-writes the lossless tables and publishes a new gold version.</li>
+the batch is complete, a parser task, running as that customer's parser
+role, writes the lossless tables and publishes a new gold version.</li>
 <li><strong>Sign-in.</strong> The user signs in with Entra ID. Cognito
 issues an ID token naming the customer, which the browser keeps in an
 httpOnly session cookie.</li>
@@ -301,9 +321,9 @@ moves <code>CURRENT</code> to it.</li>
 <tbody>
 <tr class="odd">
 <td>Isolation</td>
-<td>Each customer has its own prefix, roles (SFTP copy, parser, reader,
-transcripts, audit) and KMS keys (lake, transcripts), plus its own
-EventBridge rule and parser task definition</td>
+<td>Each customer has its own prefix, roles (Transfer Family, SFTP copy,
+parser, reader, transcripts, audit) and KMS keys (lake, transcripts),
+plus its own EventBridge rule and parser task definition</td>
 </tr>
 <tr class="even">
 <td>Data held / PHI</td>
@@ -482,8 +502,9 @@ EventBridge, which starts the parser.</li>
 <tbody>
 <tr class="odd">
 <td>Customer B's Transfer Family user</td>
-<td>Upload to Customer B's <code>landing/</code></td>
-<td>See any other folder</td>
+<td>Upload to Customer B's <code>landing/</code>, through B's Transfer
+Family role (put only, B's lake key)</td>
+<td>See any other folder; read, overwrite or delete</td>
 </tr>
 <tr class="even">
 <td>Customer B's SFTP copy role</td>
@@ -541,6 +562,17 @@ tag</td>
 </tr>
 </thead>
 <tbody>
+<tr class="odd">
+<td>Endpoint</td>
+<td>Internet-facing SFTP endpoint, TCP 22; its security group admits
+each lab's listed source addresses only; one SSH key per lab user</td>
+</tr>
+<tr class="even">
+<td>Copy step</td>
+<td>A Lambda function per upload day, started by the lab's
+<code>_SUCCESS</code> in <code>landing/</code>, as the customer's SFTP
+copy role</td>
+</tr>
 <tr class="odd">
 <td>Data held / PHI</td>
 <td>Full PHI in <code>landing/</code> and <code>raw/</code></td>
@@ -717,7 +749,7 @@ else.</li>
 <tbody>
 <tr class="odd">
 <td><code>landing/</code></td>
-<td>Get, Delete</td>
+<td>Get, Delete (Transfer Family role: Put)</td>
 <td>–</td>
 <td>–</td>
 </tr>
@@ -782,7 +814,7 @@ rule</td>
 <tr class="even">
 <td><code>quarantine/</code></td>
 <td>Yes</td>
-<td>Kept for review</td>
+<td>Deleted 1 year after the batch (lifecycle rule)</td>
 </tr>
 <tr class="odd">
 <td><code>parquet/</code></td>
@@ -1698,9 +1730,9 @@ object versions only</td>
 </tr>
 <tr class="even">
 <td>The customer's roles and keys</td>
-<td>Parser, reader, SFTP copy, transcript and audit roles; a lake key
-and a transcript key. See <a href="#91-iam-kms-matrix">IAM and KMS
-matrix</a></td>
+<td>Transfer Family, SFTP copy, parser, reader, transcript and audit
+roles; a lake key and a transcript key. See <a
+href="#91-iam-kms-matrix">IAM and KMS matrix</a></td>
 </tr>
 <tr class="odd">
 <td>Logging</td>
@@ -2434,8 +2466,9 @@ href="#91-iam-kms-matrix">IAM and KMS matrix</a></p>
 </section><section id="30-chat-backend"><h1 id="chat-backend">Chat backend</h1>
 <p><a href="#00-overview">Overview</a> › Chat backend</p>
 <p>The chat API takes a question, queues a run and streams the answer
-back. A run worker on Fargate does the work. All chat state is kept in
-S3 objects under the customer's prefix, and there is no database.</p>
+back, while a run worker on Fargate does the work. All chat state is
+kept in S3 objects under the customer's prefix, and there is no
+database.</p>
 <div class="diagram">
 
 <p><svg xmlns="http://www.w3.org/2000/svg" style="background: transparent; background-color: transparent; color-scheme: light dark;" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="1522px" height="451px" viewBox="0 0 1522 451"><defs/><g><g data-cell-id="0"><g data-cell-id="1"><g data-cell-id="title"><g transform="translate(0.5,0.5)"><rect x="0" y="0" width="1520" height="36" fill="none" stroke="none" pointer-events="all"/></g><g><g><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe flex-start; width: 1px; height: 1px; padding-top: 18px; margin-left: 2px;"><div style="box-sizing: border-box; font-size: 0; text-align: left; color: #1C2B57; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: light-dark(#1C2B57, #bbc8ee); line-height: 1.2; pointer-events: all; white-space: nowrap; "><b style="font-size:20px">CLAIMCLARITY
@@ -2561,7 +2594,8 @@ Path=/api). Cookie writes need <code>x-cc-csrf: 1</code>.</td>
 <tr class="even">
 <td>Access</td>
 <td>The customer's roles and keys: the transcript role and key for chat
-state, the reader role and lake key for gold</td>
+state, the reader role and lake key for gold, the audit writer role and
+the query audit key for the agent audit</td>
 </tr>
 <tr class="odd">
 <td>PHI</td>
@@ -2638,8 +2672,7 @@ is not SVG - cannot display</text></a></switch></svg></div></p>
 <tr class="even">
 <td>CloudFront + WAF</td>
 <td>TLS, WAF rules and rate limit, routing by path</td>
-<td><a href="../cards/cloudfront.md">CloudFront</a>, <a
-href="../cards/waf.md">WAF</a></td>
+<td><a href="#90-service-catalog">Service catalog</a></td>
 </tr>
 <tr class="odd">
 <td>Nonce function</td>
@@ -2657,7 +2690,7 @@ PHI.</td>
 <td>Load balancer</td>
 <td>Application Load Balancer. Accepts traffic from CloudFront
 only.</td>
-<td><a href="../cards/alb.md">ALB</a></td>
+<td><a href="#90-service-catalog">Service catalog</a></td>
 </tr>
 <tr class="even">
 <td>Chat API</td>
@@ -2671,7 +2704,7 @@ only.</td>
 </tr>
 <tr class="even">
 <td>S3 · access logs</td>
-<td>The log bucket for CloudFront and load balancer access logs</td>
+<td>The log bucket: CloudFront and load balancer access logs</td>
 <td><a href="#53-audit-logging">Audit &amp; logging</a></td>
 </tr>
 </tbody>
@@ -2926,9 +2959,9 @@ href="#33-state">State</a>, <a href="#34-limits">Limits</a></p>
 <p><a href="#00-overview">Overview</a> › <a href="#30-chat-backend">Chat
 backend</a> › State</p>
 <p>All chat state is kept in S3 objects under the customer's prefix in
-the ClaimClarity bucket. There is no database. A conversation is one
-object, changed with an If-Match write, and its text is sealed with a
-per-user data key.</p>
+the ClaimClarity bucket, with no database. A conversation is one object,
+changed with an If-Match write, and its text is sealed with a per-user
+data key.</p>
 <div class="diagram">
 
 <p><svg xmlns="http://www.w3.org/2000/svg" style="background: transparent; background-color: transparent; color-scheme: light dark;" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="1522px" height="776px" viewBox="0 0 1522 776"><defs/><g><g data-cell-id="0"><g data-cell-id="1"><g data-cell-id="title"><g transform="translate(0.5,0.5)"><rect x="0" y="0" width="1520" height="36" fill="none" stroke="none" pointer-events="all"/></g><g><g><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe flex-start; width: 1px; height: 1px; padding-top: 18px; margin-left: 2px;"><div style="box-sizing: border-box; font-size: 0; text-align: left; color: #1C2B57; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: light-dark(#1C2B57, #bbc8ee); line-height: 1.2; pointer-events: all; white-space: nowrap; "><b style="font-size:20px">CLAIMCLARITY
@@ -3013,7 +3046,7 @@ and is stored only in wrapped form.</td>
 </tr>
 <tr class="odd">
 <td>Agent audit record</td>
-<td>One write-once record per SQL statement</td>
+<td>One record per SQL statement, written once per request</td>
 <td><a href="#53-audit-logging">Audit &amp; logging</a></td>
 </tr>
 <tr class="even">
@@ -3036,8 +3069,9 @@ retries, up to 8 times with jittered backoff.</li>
 If-Match loop.</li>
 <li>Every seal binds customer, user and object name, so a copied blob
 does not open elsewhere.</li>
-<li>The run worker writes one agent audit record per SQL statement,
-through Customer B's audit writer role.</li>
+<li>At the end of the run, the run worker writes the run's agent audit
+records (one per SQL statement) as one write-once object, through
+Customer B's audit writer role.</li>
 </ol>
 <h2 id="specification">Specification</h2>
 <h3 id="objects-under-btranscriptsusersuser-unless-noted">Objects (under
@@ -3082,14 +3116,21 @@ through Customer B's audit writer role.</li>
 <td>Yes</td>
 </tr>
 <tr class="odd">
+<td>Limits object</td>
+<td><code>B/transcripts/limits.json</code>: runs in flight, tokens used
+today, kill switch; If-Match writes</td>
+<td>No</td>
+</tr>
+<tr class="even">
 <td>Conversation owner</td>
 <td><code>B/transcripts/conversation-owners/{conversation}.json</code></td>
 <td>No</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Agent audit</td>
-<td><code>B/audit/queries/{date}/{request}.json</code>: ids, outcome,
-row count and the first 500 characters of the SQL</td>
+<td><code>B/audit/queries/{date}/{request}.json</code>: one object per
+request; ids, outcome, row count and the first 500 characters of the
+SQL</td>
 <td>Yes</td>
 </tr>
 </tbody>
@@ -3108,7 +3149,7 @@ ids.</p>
 <tr class="odd">
 <td>Chat API and run worker</td>
 <td>Customer B's transcript role, session-tagged with the user: only
-that user's prefix</td>
+that user's prefix, plus Get and Put on the limits object</td>
 </tr>
 <tr class="even">
 <td>Audit</td>
@@ -3519,17 +3560,17 @@ the customer's 15-minute credentials.</td>
 <td><a href="#22-token-to-credentials">Token to credentials</a></td>
 </tr>
 <tr class="odd">
+<td>IAM + KMS gate</td>
+<td>AWS allows the reader to read this customer's data only (gate
+6).</td>
+<td><a href="#23-customer-isolation">Customer isolation</a></td>
+</tr>
+<tr class="even">
 <td>Customer's S3 prefix</td>
 <td>Holds <code>sem.*</code> (gold, read by default) and
 <code>lossless.*</code> (PHI-stripped EDI tables, only after
 escalation).</td>
 <td><a href="#12-s3-layout">S3 layout</a></td>
-</tr>
-<tr class="even">
-<td>IAM + KMS gate</td>
-<td>AWS allows the reader to read this customer's data only (gate
-6).</td>
-<td><a href="#23-customer-isolation">Customer isolation</a></td>
 </tr>
 </tbody>
 </table>
@@ -3603,8 +3644,8 @@ error.</td>
 </tr>
 <tr class="odd">
 <td>Logging</td>
-<td>Every query, escalation and refusal is audited under the customer's
-audit key. Model token usage is recorded per run.</td>
+<td>Every query, escalation and refusal is audited under the query audit
+key. Model token usage is recorded per run.</td>
 </tr>
 </tbody>
 </table>
@@ -3867,17 +3908,23 @@ or saved.</td>
 <td><a href="#44-sql-guard-escalation">cc CLI + SQL guard</a></td>
 </tr>
 <tr class="odd">
+<td>IAM + KMS gate</td>
+<td>AWS allows the reader to read this customer's data only (gate
+6).</td>
+<td><a href="#23-customer-isolation">Customer isolation</a></td>
+</tr>
+<tr class="even">
 <td>Customer's S3 prefix · <code>sem.*</code></td>
 <td>The gold tables the presets read.</td>
 <td><a href="#12-s3-layout">S3 layout</a></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Number formatting</td>
 <td>Formats rates as 12.3%, money as $1,234.56 and counts as 1,649, in
 code.</td>
 <td></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Claude Haiku · reply writer</td>
 <td>Writes 1–3 sentences from the formatted rows, copying the values
 exactly.</td>
@@ -4337,8 +4384,8 @@ customer's reader role (gate 6)</td>
 <td>Audit</td>
 <td>Each query: customer, user, gold version, ok or failed, rows,
 seconds, error and the first 500 characters of the SQL, stored under the
-audit key. Escalations: requested, granted or failed. Server logs hold
-no SQL or rows.</td>
+query audit key. Escalations: requested, granted or failed. Server logs
+hold no SQL or rows.</td>
 </tr>
 </tbody>
 </table>
@@ -4401,30 +4448,30 @@ is not SVG - cannot display</text></a></switch></svg></div></p>
 <td><a href="#41-kpi-gate">KPI gate</a></td>
 </tr>
 <tr class="even">
+<td>Claude Haiku on Amazon Bedrock</td>
+<td>Runs every call, in all three strips.</td>
+<td><a href="#90-service-catalog">Service catalog</a></td>
+</tr>
+<tr class="odd">
 <td>Cached: 16 presets · allowed values</td>
 <td>The gate's fixed prompt, cached per customer and gold version.</td>
 <td></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Claude Haiku · reply writer</td>
 <td>One call for a preset answer, no tools.</td>
 <td><a href="#42-standard-kpi-path">Preset KPI queries</a></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Claude Haiku · Strands agent</td>
 <td>One call per agent step, until its final command.</td>
 <td><a href="#43-custom-analysis-agent">Claim Query Agent</a></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Cached: playbook · glossary · gold schema</td>
 <td>The agent's fixed prompt and tool, cached per customer and gold
 version.</td>
 <td></td>
-</tr>
-<tr class="even">
-<td>Claude Haiku on Amazon Bedrock</td>
-<td>Runs every call.</td>
-<td><a href="#90-service-catalog">Service catalog</a></td>
 </tr>
 </tbody>
 </table>
@@ -4458,33 +4505,29 @@ chat API and the parser cannot call Bedrock.</td>
 steps.</td>
 </tr>
 <tr class="odd">
-<td>Typical time</td>
-<td>Preset answer about 4 s; agent answer about 18 s</td>
-</tr>
-<tr class="even">
 <td>Output</td>
 <td>At most 4,096 tokens per call</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Prompt cache</td>
 <td>Kept by Bedrock for 5 minutes after last use</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Data sent</td>
 <td>The question, the conversation history and query results (up to 20
 rows per query, identifiers redacted). Treated as PHI.</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Data kept by Bedrock</td>
 <td>None; model invocation logging is off</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Failure</td>
 <td>A failed gate or reply call sends the question to the Claim Query
 Agent. A failed agent call gives a retryable error. Stop cancels the
 call.</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Logging</td>
 <td>Per run and model: input, output, cache-read and cache-write tokens,
 model time, calls. CloudTrail records the API calls without prompt
@@ -4498,10 +4541,11 @@ href="#90-service-catalog">Amazon Bedrock card</a> · <a
 href="#62-monitoring">Monitoring</a></p>
 </section><section id="50-network-security"><h1 id="network--security">Network &amp; security</h1>
 <p><a href="#00-overview">Overview</a> › Network &amp; security</p>
-<p>ClaimClarity has one public entry point, CloudFront with AWS WAF, and
-every ECS task runs in private subnets that reach AWS only through VPC
-endpoints. Every object is encrypted with the customer's keys, and every
-AWS call and every analyzer SQL call is recorded.</p>
+<p>Users enter only through CloudFront with AWS WAF and labs only
+through the SFTP endpoint, and every ECS task runs in private subnets
+that reach AWS only through VPC endpoints. Every customer object is
+encrypted with the customer's keys, and every AWS call and every
+analyzer SQL call is recorded.</p>
 <div class="diagram">
 
 <p><svg xmlns="http://www.w3.org/2000/svg" style="background: transparent; background-color: transparent; color-scheme: light dark;" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="1521px" height="521px" viewBox="0 0 1521 521"><defs/><g><g data-cell-id="0"><g data-cell-id="1"><g data-cell-id="title"><g transform="translate(0.5,0.5)"><rect x="0" y="0" width="1520" height="36" fill="none" stroke="none" pointer-events="all"/></g><g><g><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe flex-start; width: 1px; height: 1px; padding-top: 18px; margin-left: 2px;"><div style="box-sizing: border-box; font-size: 0; text-align: left; color: #1C2B57; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: light-dark(#1C2B57, #bbc8ee); line-height: 1.2; pointer-events: all; white-space: nowrap; "><b style="font-size:20px">CLAIMCLARITY
@@ -4607,8 +4651,9 @@ what happened.</li>
 <tbody>
 <tr class="odd">
 <td>Public entry</td>
-<td>CloudFront + WAF only. No public load balancer, no public IPs on
-tasks</td>
+<td>Users: CloudFront + WAF only. Labs: the Transfer Family SFTP
+endpoint (TCP 22, lab source addresses only). No public load balancer,
+no public IPs on tasks</td>
 </tr>
 <tr class="even">
 <td>Placement</td>
@@ -4637,8 +4682,9 @@ requests</td>
 </tr>
 <tr class="odd">
 <td>At rest</td>
-<td>SSE-KMS on every object with the customer's keys; KMS on logs,
-queues and secrets</td>
+<td>SSE-KMS on every customer object with the customer's keys; platform
+KMS keys on logs, the trail, queues and secrets; SSE-S3 on the web app
+bucket (no PHI)</td>
 </tr>
 <tr class="even">
 <td>Audit</td>
@@ -4669,10 +4715,9 @@ matrix</a></p>
 </section><section id="51-network"><h1 id="network">Network</h1>
 <p><a href="#00-overview">Overview</a> › <a
 href="#50-network-security">Network &amp; security</a> › Network</p>
-<p>The ClaimClarity VPC has no internet-facing resources: users enter
-through CloudFront and WAF, and tasks reach AWS through VPC endpoints.
-One filtered egress path lets the chat API reach Amazon Cognito and
-nothing else.</p>
+<p>Users enter only through CloudFront and WAF, labs only through the
+SFTP endpoint, and tasks reach AWS through VPC endpoints. One filtered
+egress path lets the chat API reach Amazon Cognito and nothing else.</p>
 <div class="diagram">
 
 <p><svg xmlns="http://www.w3.org/2000/svg" style="background: transparent; background-color: transparent; color-scheme: light dark;" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="1521px" height="741px" viewBox="0 0 1521 741"><defs/><g><g data-cell-id="0"><g data-cell-id="1"><g data-cell-id="title"><g transform="translate(0.5,0.5)"><rect x="0" y="0" width="1520" height="36" fill="none" stroke="none" pointer-events="all"/></g><g><g><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe flex-start; width: 1px; height: 1px; padding-top: 18px; margin-left: 2px;"><div style="box-sizing: border-box; font-size: 0; text-align: left; color: #1C2B57; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: light-dark(#1C2B57, #bbc8ee); line-height: 1.2; pointer-events: all; white-space: nowrap; "><b style="font-size:20px">CLAIMCLARITY
@@ -4799,7 +4844,8 @@ endpoint</td>
 </tr>
 <tr class="even">
 <td>Egress (one per AZ)</td>
-<td>NAT gateway, Network Firewall endpoint</td>
+<td>NAT gateway, Network Firewall endpoint, the SFTP endpoint's Elastic
+IP</td>
 <td>Internet gateway</td>
 </tr>
 </tbody>
@@ -4819,11 +4865,11 @@ task definition sets <code>assignPublicIp = DISABLED</code>.</p>
 <tr class="odd">
 <td>Load balancer</td>
 <td>443 from the CloudFront origin-facing prefix list</td>
-<td>App port to the chat API group</td>
+<td>443 to the chat API group</td>
 </tr>
 <tr class="even">
 <td>Chat API</td>
-<td>App port from the load balancer group</td>
+<td>443 from the load balancer group</td>
 <td>443 to the endpoint group and the S3 prefix list; 443 to the
 internet, filtered to the Cognito hosts</td>
 </tr>
@@ -4841,6 +4887,11 @@ internet, filtered to the Cognito hosts</td>
 <td>Endpoints</td>
 <td>443 from the chat API, run worker and parser groups</td>
 <td>none</td>
+</tr>
+<tr class="even">
+<td>SFTP endpoint</td>
+<td>22 from each lab's listed source addresses</td>
+<td>none (Transfer Family writes to S3 itself)</td>
 </tr>
 </tbody>
 </table>
@@ -5009,7 +5060,7 @@ it.</td>
 </tr>
 <tr class="odd">
 <td>Customer B's audit roles</td>
-<td>Audit writer (assumed by the chat API) and audit reader (customer
+<td>Audit writer (assumed by the run worker) and audit reader (customer
 admins).</td>
 <td><a href="#53-audit-logging">Audit logging</a></td>
 </tr>
@@ -5078,6 +5129,25 @@ and leaves the lake and the query audit.</li>
 <td>Bucket default only, never valid for customer objects</td>
 <td>Automatic yearly</td>
 </tr>
+<tr class="odd">
+<td>Logs key</td>
+<td>Platform</td>
+<td>CloudWatch log groups and the log bucket (access logs)</td>
+<td>Automatic yearly</td>
+</tr>
+<tr class="even">
+<td>Trail key</td>
+<td>Platform</td>
+<td>CloudTrail log files</td>
+<td>Automatic yearly</td>
+</tr>
+<tr class="odd">
+<td>Queue and secrets keys</td>
+<td>Platform</td>
+<td>The run queue and its dead-letter queue; Secrets Manager
+secrets</td>
+<td>Automatic yearly</td>
+</tr>
 </tbody>
 </table>
 <h3 id="who-may-use-each-key">Who may use each key</h3>
@@ -5098,49 +5168,55 @@ and leaves the lake and the query audit.</li>
 <td>Through S3, objects under <code>&lt;customer&gt;/</code></td>
 </tr>
 <tr class="even">
+<td>Transfer Family role</td>
+<td>Their customer's lake key</td>
+<td>GenerateDataKey</td>
+<td>Through S3, <code>landing/</code> only</td>
+</tr>
+<tr class="odd">
 <td>Transcript user</td>
 <td>Their customer's transcript key</td>
 <td>Decrypt, GenerateDataKey</td>
 <td>Own folder through S3; own data key only</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Customer admin</td>
 <td>Their customer's transcript key</td>
 <td>Decrypt, GenerateDataKey</td>
 <td>All users' folders, exports and admin objects; any user data key of
 the customer</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Eval</td>
 <td>Their customer's transcript key</td>
 <td>Decrypt</td>
 <td>Through S3, <code>transcripts/exports/</code> only</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Support break-glass</td>
 <td>The ticket's customer transcript key</td>
 <td>Decrypt</td>
 <td>Users' folders and data keys, read only</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Audit writer</td>
 <td>Query-audit key</td>
 <td>Decrypt, GenerateDataKey</td>
 <td>Through S3, own customer's <code>audit/queries/</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Audit reader</td>
 <td>Query-audit key</td>
 <td>Decrypt</td>
 <td>Through S3, own customer's <code>audit/queries/</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Deploy role (Terraform)</td>
 <td>All</td>
 <td>Key policy and lifecycle</td>
 <td>No data use</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Key admin</td>
 <td>All</td>
 <td>Enable, disable, rotate, schedule deletion</td>
@@ -5232,7 +5308,7 @@ is not SVG - cannot display</text></a></switch></svg></div></p>
 <tbody>
 <tr class="odd">
 <td>Every role</td>
-<td>Any task role, pipeline, IT's SFTP copy or person making an AWS
+<td>Any task role, pipeline, copy step or person making an AWS
 call.</td>
 <td><a href="#91-iam-kms-matrix">IAM and KMS matrix</a></td>
 </tr>
@@ -5244,8 +5320,9 @@ denied.</td>
 </tr>
 <tr class="odd">
 <td>S3 · trail logs</td>
-<td>The log bucket: Object Lock, its own KMS key, 6 years.</td>
-<td></td>
+<td>The log bucket's CloudTrail prefix: Object Lock COMPLIANCE, the
+trail key, 6 years.</td>
+<td><a href="#52-encryption-keys">Encryption keys</a></td>
 </tr>
 <tr class="even">
 <td>Run worker</td>
@@ -5290,9 +5367,9 @@ denials. It delivers to the log bucket with log file validation on.</li>
 outcome. Each record carries a sequence number, the previous record's
 hash and its own SHA-256 hash, so an edit, reorder or insert breaks the
 chain.</li>
-<li>At the end of the request the chat API assumes Customer B's audit
-writer role and writes the request's records as one object. The writer
-can only add objects, and the bucket policy requires create-only writes,
+<li>At the end of the run the run worker assumes Customer B's audit
+writer role and writes the run's records as one object. The writer can
+only add objects, and the bucket policy requires create-only writes,
 Object Lock COMPLIANCE and 6 years of retention.</li>
 <li>Application logs pass the PHI filter: quoted text, emails, SSNs,
 phone numbers, dates and ids are masked, tracebacks lose their messages,
@@ -5400,7 +5477,7 @@ changes</td>
 <tr class="odd">
 <td>CloudTrail</td>
 <td>6 years</td>
-<td>Object Lock on the log bucket</td>
+<td>Object Lock COMPLIANCE on the log bucket's CloudTrail prefix</td>
 </tr>
 <tr class="even">
 <td>Network and application logs</td>
@@ -5639,12 +5716,12 @@ gate for analyzer changes</td>
 <tr class="odd">
 <td>Amazon ECR</td>
 <td>One repository per image: chat API, run worker, parser</td>
-<td><a href="../cards/ecr.md">ECR</a></td>
+<td><a href="#90-service-catalog">Service catalog</a></td>
 </tr>
 <tr class="even">
 <td>ECS services</td>
 <td>Rolling deploy of the chat API and run workers</td>
-<td><a href="../cards/ecs-fargate.md">ECS</a></td>
+<td><a href="#90-service-catalog">Service catalog</a></td>
 </tr>
 <tr class="odd">
 <td>Healthy?</td>
@@ -5728,8 +5805,9 @@ restore the previous HTML template.</td>
 </tr>
 <tr class="odd">
 <td>Production settings</td>
-<td>Cookie auth, SQL literal masking <code>phi</code> or
-<code>all</code>, the paid-model switch on in production only</td>
+<td>Cookie sign-in; SQL literal masking <code>phi</code> or
+<code>all</code>; Bedrock model calls switched on in production
+only</td>
 </tr>
 </tbody>
 </table>
@@ -5779,7 +5857,7 @@ metric record per answer and per batch.</td>
 <tr class="even">
 <td>CloudWatch Logs</td>
 <td>One encrypted log group per service</td>
-<td><a href="../cards/cloudwatch.md">CloudWatch</a></td>
+<td><a href="#90-service-catalog">Service catalog</a></td>
 </tr>
 <tr class="odd">
 <td>CloudWatch metrics</td>
@@ -6093,10 +6171,11 @@ and 277 files</td>
 <tr class="odd">
 <td>Permissions</td>
 <td>One user per customer, signed in with the customer's SSH key. The
-user's home folder maps to <code>&lt;customer&gt;/landing/</code> only.
-A copy step, as the customer's SFTP copy role, then writes each file
-into <code>raw/</code> create-only, with Object Lock and the customer's
-lake key, and writes <code>_SUCCESS</code> last.</td>
+user's home folder maps to <code>&lt;customer&gt;/landing/</code> only,
+written through the customer's Transfer Family role (put only). A copy
+step, as the customer's SFTP copy role, then writes each file into
+<code>raw/</code> create-only, with Object Lock and the customer's lake
+key, and writes <code>_SUCCESS</code> last.</td>
 </tr>
 <tr class="even">
 <td>Encryption</td>
@@ -6110,8 +6189,8 @@ Lock COMPLIANCE retention of at least 2,555 days.</td>
 </tr>
 <tr class="even">
 <td>Scaling and limits</td>
-<td>Managed service; one server for all customers, one user per
-customer</td>
+<td>Managed service; one internet-facing server for all customers (TCP
+22, lab source addresses only), one user per customer</td>
 </tr>
 <tr class="odd">
 <td>Failure behaviour</td>
@@ -6143,10 +6222,10 @@ buckets.</td>
 </tr>
 <tr class="even">
 <td>Talks to</td>
-<td>AWS Transfer Family (writes landing), the copy step (writes raw),
-EventBridge (Object Created events), the parser task (reads raw, writes
-the derived zones), the run workers (read gold), KMS (SSE-KMS on every
-object)</td>
+<td>AWS Transfer Family (writes landing as the customer's Transfer
+Family role), the copy step (writes raw), EventBridge (Object Created
+events), the parser task (reads raw, writes the derived zones), the run
+workers (read gold), KMS (SSE-KMS on every object)</td>
 </tr>
 <tr class="odd">
 <td>Permissions</td>
@@ -6179,8 +6258,9 @@ identifiers.</td>
 <td>Scaling and limits</td>
 <td>Versioning and Object Lock on. Lifecycle: noncurrent versions expire
 after 1 day (<code>semantic_layer/</code>, <code>staging/</code>) or 7
-days (<code>parquet/</code>); none for <code>raw/</code>. The bucket
-policy stays the same size for any number of customers.</td>
+days (<code>parquet/</code>); <code>quarantine/</code> objects after 1
+year; none for <code>raw/</code>. The bucket policy stays the same size
+for any number of customers.</td>
 </tr>
 <tr class="odd">
 <td>Failure behaviour</td>
@@ -6278,9 +6358,8 @@ user's token), the ClaimClarity bucket (gold reads, chunks, answers,
 agent audit), KMS, Amazon Bedrock. Its egress to Bedrock goes through a
 VPC endpoint. <strong>Parser task:</strong> started by the launcher for
 one batch. It reads raw, writes lossless and gold under one customer's
-prefix, and publishes the views (<a
-href="../pages/14-parser-task.md">Parser task</a>). All three use VPC
-endpoints for AWS APIs.</td>
+prefix, and publishes the views (<a href="#14-parser-task">Parser
+task</a>). All three use VPC endpoints for AWS APIs.</td>
 </tr>
 <tr class="odd">
 <td>Permissions</td>
@@ -6290,14 +6369,13 @@ send to the run queue. It holds no customer data permissions of its own:
 S3 and KMS calls use the signed-in user's session credentials: Customer
 B's transcript role, tagged with the user. <strong>Run worker task
 role:</strong> receive and delete on the run queue,
-sts:AssumeRoleWithWebIdentity, Bedrock InvokeModel for Claude Haiku
-only. Data access uses the customer's roles and keys from the token:
-Customer B's reader role for gold (<a
-href="../pages/22-token-to-credentials.md">gates 5 and 6</a>), the
+sts:AssumeRoleWithWebIdentity, sts:AssumeRole on the audit writer roles,
+Bedrock InvokeModel for Claude Haiku only. Data access uses the
+customer's roles and keys from the token: Customer B's reader role for
+gold (<a href="#22-token-to-credentials">gates 5 and 6</a>), the
 transcript role for chat state, and the audit writer role for audit
 records. <strong>Parser task role:</strong> Customer B's parser role,
-passed by the launcher (<a href="../pages/13-parse-trigger.md">gate
-2</a>).</td>
+passed by the launcher (<a href="#13-parse-trigger">gate 2</a>).</td>
 </tr>
 <tr class="even">
 <td>Encryption</td>
@@ -6331,24 +6409,24 @@ one task per batch, sized per batch type. Rolling deploys keep at least
 group, and clients reconnect to another task and replay from S3.
 <strong>Run worker:</strong> a run is not retried (the queue's maximum
 receive count is 1, then the dead-letter queue). Its stream stops, the
-client reloads, and the user retries. <strong>Parser:</strong> a failed
-batch is quarantined and alarmed.</td>
+client reloads, and the user retries. <strong>Parser:</strong> a bad
+file is quarantined; a failed batch commits nothing, raises the parser
+alarm and is re-run.</td>
 </tr>
 <tr class="even">
 <td>Logging and audit</td>
 <td>Each service logs to its own CloudWatch log group through the
 redaction filter, with no PHI. Audit events carry ids, counts and
 timings. The run worker writes one agent-audit record per SQL call under
-the customer's prefix. ECS API calls are recorded in CloudTrail.</td>
+the customer's prefix, through the customer's audit writer role. ECS API
+calls are recorded in CloudTrail.</td>
 </tr>
 <tr class="odd">
 <td>Used on pages</td>
-<td><a href="../pages/30-chat-backend.md">Chat backend</a>, <a
-href="../pages/31-edge.md">Edge</a>, <a
-href="../pages/32-chat-turn.md">Chat turn</a>, <a
-href="../pages/34-limits.md">Limits</a>, <a
-href="../pages/61-deploy.md">Deploy</a>, <a
-href="../pages/62-monitoring.md">Monitoring</a></td>
+<td><a href="#30-chat-backend">Chat backend</a>, <a
+href="#31-edge">Edge</a>, <a href="#32-chat-turn">Chat turn</a>, <a
+href="#34-limits">Limits</a>, <a href="#61-deploy">Deploy</a>, <a
+href="#62-monitoring">Monitoring</a></td>
 </tr>
 </tbody>
 </table>
@@ -6400,8 +6478,8 @@ the security team.</td>
 </tr>
 <tr class="odd">
 <td>Used on pages</td>
-<td><a href="../pages/60-operations.md">Operations</a>, <a
-href="../pages/61-deploy.md">Deploy</a></td>
+<td><a href="#60-operations">Operations</a>, <a
+href="#61-deploy">Deploy</a></td>
 </tr>
 </tbody>
 </table>
@@ -6461,10 +6539,9 @@ configuration changes are recorded in CloudTrail.</td>
 </tr>
 <tr class="odd">
 <td>Used on pages</td>
-<td><a href="../pages/30-chat-backend.md">Chat backend</a>, <a
-href="../pages/32-chat-turn.md">Chat turn</a>, <a
-href="../pages/34-limits.md">Limits</a>, <a
-href="../pages/62-monitoring.md">Monitoring</a></td>
+<td><a href="#30-chat-backend">Chat backend</a>, <a
+href="#32-chat-turn">Chat turn</a>, <a href="#34-limits">Limits</a>, <a
+href="#62-monitoring">Monitoring</a></td>
 </tr>
 </tbody>
 </table>
@@ -6525,9 +6602,8 @@ changes are recorded in CloudTrail.</td>
 </tr>
 <tr class="odd">
 <td>Used on pages</td>
-<td><a href="../pages/31-edge.md">Edge</a>, <a
-href="../pages/61-deploy.md">Deploy</a>, <a
-href="../pages/30-chat-backend.md">Chat backend</a></td>
+<td><a href="#31-edge">Edge</a>, <a href="#61-deploy">Deploy</a>, <a
+href="#30-chat-backend">Chat backend</a></td>
 </tr>
 </tbody>
 </table>
@@ -6583,8 +6659,7 @@ metrics per rule. Web ACL changes are recorded in CloudTrail.</td>
 </tr>
 <tr class="odd">
 <td>Used on pages</td>
-<td><a href="../pages/31-edge.md">Edge</a>, <a
-href="../pages/34-limits.md">Limits</a></td>
+<td><a href="#31-edge">Edge</a>, <a href="#34-limits">Limits</a></td>
 </tr>
 </tbody>
 </table>
@@ -6644,8 +6719,8 @@ healthy hosts.</td>
 </tr>
 <tr class="odd">
 <td>Used on pages</td>
-<td><a href="../pages/31-edge.md">Edge</a>, <a
-href="../pages/62-monitoring.md">Monitoring</a></td>
+<td><a href="#31-edge">Edge</a>, <a
+href="#62-monitoring">Monitoring</a></td>
 </tr>
 </tbody>
 </table>
@@ -6781,7 +6856,7 @@ policies), the run workers through the STS interface endpoint</td>
 <code>sts:TagSession</code> only for the ClaimClarity Cognito OIDC
 provider, only when <code>aud</code> is the ClaimClarity app client and
 <code>aws:RequestTag/customer</code> equals that role's customer. The
-audit writer trusts only the chat API role, with matching
+audit writer trusts only the run worker task role, with matching
 <code>customer</code> and a <code>user</code> tag. Break-glass trusts
 only the support role, with an external id, a <code>TICKET-*</code>
 reason tag, a customer tag and an operator tag</td>
@@ -6829,9 +6904,9 @@ href="#51-network">Network</a></td>
 <tr class="odd">
 <td>Purpose in ClaimClarity</td>
 <td>Defines every role and what it may do. Each customer has its own
-lake roles (parser, reader, SFTP copy), transcript roles (user, customer
-admin, eval) and audit roles (writer, reader), each tagged
-<code>customer = &lt;customer&gt;</code> and
+lake roles (Transfer Family, SFTP copy, parser, reader), transcript
+roles (user, customer admin, eval) and audit roles (writer, reader),
+each tagged <code>customer = &lt;customer&gt;</code> and
 <code>kms_key_arn = &lt;that role's key&gt;</code>. Platform roles: chat
 API, run workers, deploy (Terraform), key admin, support and support
 break-glass, eval team, and the EventBridge launcher.</td>
@@ -6849,14 +6924,19 @@ bucket policy), KMS (key policies name the roles), ECS (task roles,
 <code>GetObject</code> on <code>&lt;customer&gt;/semantic_layer/*</code>
 only, with no <code>GetObjectVersion</code>. Parser: reads raw and the
 derived layers, writes staging, silver, gold and quarantine of its
-customer. SFTP copy: <code>PutObject</code> and
+customer. Transfer Family: <code>PutObject</code> on
+<code>&lt;customer&gt;/landing/*</code>. SFTP copy:
+<code>GetObject</code> and <code>DeleteObject</code> on
+<code>&lt;customer&gt;/landing/*</code>, <code>PutObject</code> and
 <code>PutObjectRetention</code> on <code>&lt;customer&gt;/raw/*</code>.
 Audit writer: <code>PutObject</code> only on
-<code>&lt;customer&gt;/audit/queries/*</code>. Chat API role: assumes
-the audit writer roles only, and cannot read PHI. Launcher:
-<code>ecs:RunTask</code> for the parser task definitions on the
-ClaimClarity cluster, and <code>iam:PassRole</code> for the parser roles
-to <code>ecs-tasks</code> only. Only the deploy role changes IAM.</td>
+<code>&lt;customer&gt;/audit/queries/*</code>. Run worker task role:
+assumes the audit writer roles; it reads data only through the
+customer's roles. Chat API role: no customer data permissions of its
+own. Launcher: <code>ecs:RunTask</code> for the parser task definitions
+on the ClaimClarity cluster, and <code>iam:PassRole</code> for the
+parser roles to <code>ecs-tasks</code> only. Only the deploy role
+changes IAM.</td>
 </tr>
 <tr class="even">
 <td>Encryption</td>
@@ -6869,8 +6949,8 @@ policy compares against every PUT</td>
 </tr>
 <tr class="even">
 <td>Scaling and limits</td>
-<td>Roles grow linearly with customers (about 8 per customer). The
-bucket policy is the same size for any number of customers (ABAC on the
+<td>Roles grow linearly with customers (9 per customer). The bucket
+policy is the same size for any number of customers (ABAC on the
 <code>customer</code> tag). The query-audit key policy grows by 2
 statements per customer, within the 32 KB key policy limit for several
 hundred customers</td>
@@ -6901,22 +6981,24 @@ href="#52-encryption-keys">Encryption &amp; keys</a></td>
 <tr class="odd">
 <td>Purpose in ClaimClarity</td>
 <td>Customer managed keys: one lake key per customer, one transcript key
-per customer, one query-audit key for the platform, and a platform
-default key that is never valid for customer objects. Disabling a
-customer's key makes all of its objects unreadable at once</td>
+per customer, one query-audit key for the platform, platform keys for
+logs, the trail, the queues and secrets, and a platform default key that
+is never valid for customer objects. Disabling a customer's keys makes
+all of its objects unreadable at once</td>
 </tr>
 <tr class="even">
 <td>Talks to</td>
-<td>S3 (SSE-KMS through <code>kms:ViaService</code>), the chat API
-(per-user transcript data keys), SQS, CloudWatch Logs and Secrets
-Manager (their own encryption)</td>
+<td>S3 (SSE-KMS through <code>kms:ViaService</code>), the chat API and
+run workers (per-user transcript data keys), SQS, CloudWatch Logs and
+Secrets Manager (their own encryption)</td>
 </tr>
 <tr class="odd">
 <td>Permissions</td>
 <td>Key policies are authoritative and do not delegate to the account,
 so IAM policies cannot widen them. Lake key: <code>Decrypt</code> and
 <code>GenerateDataKey</code> for the customer's parser, reader and SFTP
-copy roles only, via S3 only, for objects under
+copy roles (and GenerateDataKey for its Transfer Family role on
+<code>landing/</code>) only, via S3 only, for objects under
 <code>&lt;customer&gt;/</code> only. Transcript key: user, customer
 admin, eval and break-glass statements, each limited by prefix or
 encryption context. Query-audit key: one writer and one reader statement
@@ -6966,8 +7048,8 @@ href="#53-audit-logging">Audit &amp; logging</a></td>
 <tr class="odd">
 <td>Purpose in ClaimClarity</td>
 <td>The only model service. Runs Claude Haiku for the analyzer: the KPI
-gate, the reply writer on the standard KPI path, and every step of the
-custom analysis agent.</td>
+gate, the reply writer for preset KPI queries, and every step of the
+Claim Query Agent.</td>
 </tr>
 <tr class="even">
 <td>Talks to</td>
@@ -7002,14 +7084,14 @@ HIPAA-eligible service under the AWS BAA.</td>
 <tr class="even">
 <td>Scaling and limits</td>
 <td>On-demand, within the account's Bedrock quotas (requests and tokens
-per minute for the model). Per call: 4,096 output tokens, effort low (no
-extended thinking). Per turn: 2 calls on the standard KPI path; 1 + one
-per step on the custom analysis path, at most 30 agent steps.</td>
+per minute for the model). Per call: 4,096 output tokens. Per turn: 2
+calls for a preset answer; 1 + one per step for an agent answer, at most
+30 agent steps.</td>
 </tr>
 <tr class="odd">
 <td>Failure behaviour</td>
-<td>A failed or timed-out KPI gate call sends the turn to the custom
-analysis path. A failed reply-writer call does the same. A failed agent
+<td>A failed or timed-out KPI gate call sends the turn to the Claim
+Query Agent. A failed reply-writer call does the same. A failed agent
 call ends the turn with a retryable error. The user's Stop aborts the
 in-flight stream.</td>
 </tr>
@@ -7021,10 +7103,9 @@ output, cache read, cache write), model time and stop reason.</td>
 </tr>
 <tr class="odd">
 <td>Used on pages</td>
-<td><a href="#40-analyzer">Agent analyzer</a> · <a
-href="#41-kpi-gate">KPI gate</a> · <a
-href="#42-standard-kpi-path">Standard KPI path</a> · <a
-href="#43-custom-analysis-agent">Custom analysis agent</a> · <a
+<td><a href="#40-analyzer">Analyzer</a> · <a href="#41-kpi-gate">KPI
+gate</a> · <a href="#42-standard-kpi-path">Preset KPI queries</a> · <a
+href="#43-custom-analysis-agent">Claim Query Agent</a> · <a
 href="#45-model-calls">Model calls</a></td>
 </tr>
 </tbody>
@@ -7183,13 +7264,13 @@ healthy-host alarms.</td>
 <tr class="even">
 <td>Logging and audit</td>
 <td>Alarm and dashboard changes are in CloudTrail. Alarm thresholds are
-listed on <a href="../pages/62-monitoring.md">Monitoring</a>.</td>
+listed on <a href="#62-monitoring">Monitoring</a>.</td>
 </tr>
 <tr class="odd">
 <td>Used on pages</td>
-<td><a href="../pages/60-operations.md">Operations</a>, <a
-href="../pages/62-monitoring.md">Monitoring</a>, <a
-href="../pages/34-limits.md">Limits</a></td>
+<td><a href="#60-operations">Operations</a>, <a
+href="#62-monitoring">Monitoring</a>, <a
+href="#34-limits">Limits</a></td>
 </tr>
 </tbody>
 </table>
@@ -7204,17 +7285,17 @@ audit; the agent audit is the SQL half</td>
 </tr>
 <tr class="even">
 <td>Talks to</td>
-<td>The trail log bucket, CloudWatch Logs (alarms)</td>
+<td>The log bucket (CloudTrail prefix), CloudWatch Logs (alarms)</td>
 </tr>
 <tr class="odd">
 <td>Permissions</td>
 <td>Only the deploy role changes the trail. Only the security team's
-audit role reads the trail log bucket</td>
+audit role reads the CloudTrail prefix</td>
 </tr>
 <tr class="even">
 <td>Encryption</td>
-<td>Trail logs encrypted with a dedicated KMS key. Log file validation
-on</td>
+<td>Trail logs encrypted with the trail key, a dedicated platform KMS
+key. Log file validation on</td>
 </tr>
 <tr class="odd">
 <td>Data held / PHI</td>
@@ -7233,8 +7314,8 @@ raises an alarm</td>
 </tr>
 <tr class="even">
 <td>Logging and audit</td>
-<td>Trail log bucket with Object Lock COMPLIANCE, 6 years. Digest files
-allow integrity checks</td>
+<td>CloudTrail prefix of the log bucket with Object Lock COMPLIANCE, 6
+years. Digest files allow integrity checks</td>
 </tr>
 <tr class="odd">
 <td>Used on pages</td>
@@ -7298,22 +7379,31 @@ read gold)</td>
 <code>customer = &lt;c&gt;</code> (AssumeRoleWithWebIdentity)</td>
 </tr>
 <tr class="even">
-<td>SFTP copy</td>
+<td>Transfer Family</td>
 <td>nothing</td>
-<td><code>raw/</code> (create only, with retention)</td>
-<td><code>&lt;c&gt;</code>'s lake key: Decrypt, GenerateDataKey (used to
-write raw)</td>
-<td>The SFTP intake copy step</td>
+<td><code>landing/</code> (put only)</td>
+<td><code>&lt;c&gt;</code>'s lake key: GenerateDataKey</td>
+<td>AWS Transfer Family, for <code>&lt;c&gt;</code>'s SFTP user</td>
 </tr>
 <tr class="odd">
+<td>SFTP copy</td>
+<td><code>landing/</code> (get)</td>
+<td><code>landing/</code> (delete); <code>raw/</code> (create only, with
+retention)</td>
+<td><code>&lt;c&gt;</code>'s lake key: Decrypt, GenerateDataKey</td>
+<td>The copy step's Lambda function</td>
+</tr>
+<tr class="even">
 <td>Transcript user</td>
-<td>Own folder <code>transcripts/users/&lt;sub&gt;/</code></td>
-<td>Own folder (put and delete)</td>
+<td>Own folder <code>transcripts/users/&lt;sub&gt;/</code>;
+<code>transcripts/limits.json</code></td>
+<td>Own folder (put and delete); <code>transcripts/limits.json</code>
+(put, If-Match)</td>
 <td><code>&lt;c&gt;</code>'s transcript key: own folder and own data
 key</td>
 <td>Cognito ID token with <code>customer = &lt;c&gt;</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Transcript admin</td>
 <td>All of <code>transcripts/</code></td>
 <td>Delete in <code>transcripts/users/</code>; put and delete in
@@ -7324,22 +7414,22 @@ user data key of <code>&lt;c&gt;</code></td>
 <td>Cognito ID token with <code>customer = &lt;c&gt;</code> and
 <code>transcript_admin = true</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Eval</td>
 <td>List and get <code>transcripts/exports/</code></td>
 <td>nothing</td>
 <td><code>&lt;c&gt;</code>'s transcript key: Decrypt, exports only</td>
 <td>The eval team role</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Audit writer</td>
 <td>nothing</td>
 <td><code>audit/queries/</code> (create only, with retention)</td>
 <td>Query-audit key: <code>&lt;c&gt;</code>'s statement</td>
-<td>The chat API role, with session tags
+<td>The run worker task role, with session tags
 <code>customer = &lt;c&gt;</code> and <code>user</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Audit reader</td>
 <td>List and get <code>audit/queries/</code></td>
 <td>nothing</td>
@@ -7347,30 +7437,32 @@ user data key of <code>&lt;c&gt;</code></td>
 <td>Cognito ID token with <code>customer = &lt;c&gt;</code> and
 <code>transcript_admin = true</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><strong>Platform</strong></td>
 <td></td>
 <td></td>
 <td></td>
 <td></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Chat API</td>
 <td>nothing</td>
 <td>nothing</td>
 <td>none</td>
-<td>ECS tasks (chat API service). It may assume only the audit writer
-roles</td>
+<td>ECS tasks (chat API service). Sends to the run queue; reads the
+Cognito app client secret. Data access only through the user's
+transcript role</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Run worker task role</td>
 <td>nothing in the bucket</td>
 <td>nothing</td>
 <td>none</td>
-<td>ECS tasks (run worker service). It reads data only through a
-customer's reader role</td>
+<td>ECS tasks (run worker service). Receives from the run queue; invokes
+Claude Haiku. Data access only through the customer's reader, transcript
+and audit writer roles</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Launcher (EventBridge target)</td>
 <td>nothing</td>
 <td>nothing</td>
@@ -7378,7 +7470,7 @@ customer's reader role</td>
 <td>EventBridge in the ClaimClarity account. May run the parser task
 definitions and pass the parser roles to ECS tasks</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Support</td>
 <td>nothing</td>
 <td>nothing</td>
@@ -7386,7 +7478,7 @@ definitions and pass the parser roles to ECS tasks</td>
 <td>Support staff through company SSO. May assume only the break-glass
 role</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Support break-glass</td>
 <td><code>&lt;c&gt;/transcripts/users/</code> for the customer named in
 its session tag</td>
@@ -7395,7 +7487,7 @@ its session tag</td>
 <td>The support role, with the external id, a <code>TICKET-*</code>
 reason tag and customer and operator tags</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Eval team</td>
 <td>nothing</td>
 <td>nothing</td>
@@ -7403,7 +7495,7 @@ reason tag and customer and operator tags</td>
 <td>Eval staff through company SSO. May assume the per-customer eval
 roles</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Key admin</td>
 <td>nothing</td>
 <td>nothing</td>
@@ -7411,7 +7503,7 @@ roles</td>
 grants, no policy changes</td>
 <td>Key administrators through company SSO</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Deploy (Terraform)</td>
 <td>nothing</td>
 <td>Bucket configuration only (policy, lifecycle, versioning, Object
@@ -7492,8 +7584,9 @@ adjustments). The chat reads these.</td>
 </tr>
 <tr class="odd">
 <td>Escalation</td>
-<td>The analyzer reading the lossless tables. Allowed only with a stated
-reason, which is recorded.</td>
+<td>The analyzer reading the PHI-stripped <code>lossless.*</code> tables
+published next to gold (never silver objects). Allowed only with a
+stated reason, which is recorded.</td>
 </tr>
 <tr class="even">
 <td>Version, CURRENT pointer</td>
@@ -7508,18 +7601,18 @@ two tasks never write the same customer's lake</td>
 </tr>
 <tr class="even">
 <td>KPI gate</td>
-<td>The first model call of a turn. It decides whether a standard KPI
+<td>The first model call of a turn. It decides whether a preset KPI
 query answers the question exactly.</td>
 </tr>
 <tr class="odd">
-<td>Standard KPI query</td>
-<td>One of the fixed, reviewed SQL templates. The gate fills in its
+<td>Preset KPI query (standard KPI path)</td>
+<td>One of the 16 fixed, reviewed SQL queries. The gate fills in its
 values (payer, month, CPT, CARC, payer class).</td>
 </tr>
 <tr class="even">
-<td>Custom analysis</td>
-<td>The analyzer path that writes its own read-only SQL over gold,
-behind the SQL guard</td>
+<td>Claim Query Agent (custom analysis path)</td>
+<td>The Strands agent in the analyzer that writes its own read-only SQL
+over gold, through the cc CLI and SQL guard</td>
 </tr>
 <tr class="odd">
 <td>SQL guard</td>
@@ -7528,9 +7621,8 @@ join-cost limit, 60 s total query time per question</td>
 </tr>
 <tr class="even">
 <td>Reader session</td>
-<td>The per-request DuckDB connection opened with the customer's
-temporary role credentials. It can read only that customer's current
-gold version.</td>
+<td>The per-run DuckDB session opened with the customer's temporary role
+credentials. It can read only that customer's current gold version.</td>
 </tr>
 <tr class="odd">
 <td>Run</td>
@@ -7597,8 +7689,9 @@ Transfer Family uploads don't set.</td>
 <tr class="odd">
 <td>3</td>
 <td>Does the agent audit record hold the SQL text?</td>
-<td>Yes, the first 500 characters, stored with the customer's run data
-under the customer's audit key. Server logs never hold SQL.</td>
+<td>Yes, the first 500 characters, stored under the customer's prefix
+with the query audit key (one platform key, one statement per customer).
+Server logs never hold SQL.</td>
 <td>The API contract says ids, counts and timings only; the code records
 SQL.</td>
 </tr>
@@ -7620,7 +7713,7 @@ lifetime.</td>
 <td>6</td>
 <td>Reader credentials in long chats</td>
 <td>Renewed with the same ID token when fewer than 3 minutes remain</td>
-<td>Not yet in the code.</td>
+<td>The code does not renew.</td>
 </tr>
 <tr class="odd">
 <td>7</td>
@@ -7641,7 +7734,7 @@ lifetime.</td>
 <td>Run limits</td>
 <td>Run deadline 110 s. Per-customer concurrency and token budgets are
 settings, with values to be chosen.</td>
-<td>Not in the code.</td>
+<td>The code has no such limits.</td>
 </tr>
 <tr class="even">
 <td>10</td>
@@ -7670,8 +7763,49 @@ redaction with them</td>
 <td>Runs on SQS and run workers</td>
 <td>These pages describe the SQS queue and Fargate run workers. They
 also describe the cancel flag, limits object, CSV objects and event
-chunks that design needs.</td>
-<td>Today the chat API runs each question in its own process.</td>
+chunks that design needs. The run worker task role, not the chat API
+role, assumes the audit writer roles.</td>
+<td>The code runs each question in a chat API process, and the chat API
+role writes the audit.</td>
+</tr>
+<tr class="even">
+<td>14</td>
+<td>SFTP endpoint exposure</td>
+<td>Internet-facing Transfer Family endpoint with an Elastic IP in the
+egress subnets; its security group admits TCP 22 only from each lab's
+listed source addresses</td>
+<td>No page or code names the endpoint type or a source-address
+list.</td>
+</tr>
+<tr class="odd">
+<td>15</td>
+<td>Role Transfer Family writes <code>landing/</code> with</td>
+<td>A per-customer Transfer Family role: put only on
+<code>&lt;customer&gt;/landing/</code>, GenerateDataKey on the
+customer's lake key, tagged like the other per-customer roles</td>
+<td>In the code, IT's SFTP host writes <code>raw/</code> directly as the
+SFTP copy role, with no landing prefix.</td>
+</tr>
+<tr class="even">
+<td>16</td>
+<td>Quarantine retention</td>
+<td><code>quarantine/</code> objects deleted by a lifecycle rule 1 year
+after the batch</td>
+<td>No retention is set; quarantined files hold full PHI.</td>
+</tr>
+<tr class="odd">
+<td>17</td>
+<td>Where the per-customer limits object lives</td>
+<td><code>&lt;customer&gt;/transcripts/limits.json</code>, no PHI, under
+the transcript key; read and written with If-Match through the
+transcript user role</td>
+<td>No page or code names its key or the role that writes it.</td>
+</tr>
+<tr class="even">
+<td>18</td>
+<td>Chat API container port</td>
+<td>443, HTTPS from the load balancer</td>
+<td>Security groups need a port; none is named.</td>
 </tr>
 </tbody>
 </table>

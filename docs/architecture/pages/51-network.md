@@ -2,8 +2,8 @@
 
 [Overview](00-overview.md) › [Network & security](50-network-security.md) › Network
 
-The ClaimClarity VPC has no internet-facing resources: users enter through CloudFront and WAF, and tasks reach AWS
-through VPC endpoints. One filtered egress path lets the chat API reach Amazon Cognito and nothing else.
+Users enter only through CloudFront and WAF, labs only through the SFTP endpoint, and tasks reach AWS through VPC
+endpoints. One filtered egress path lets the chat API reach Amazon Cognito and nothing else.
 
 ![Network](../png/51-network.png)
 
@@ -40,7 +40,7 @@ through VPC endpoints. One filtered egress path lets the chat API reach Amazon C
 | Subnet | Holds | Routes |
 |---|---|---|
 | Private (one per AZ, two AZs) | Load balancer, chat API, run workers, parser, interface endpoints | Default route to the NAT; S3 prefix list to the gateway endpoint |
-| Egress (one per AZ) | NAT gateway, Network Firewall endpoint | Internet gateway |
+| Egress (one per AZ) | NAT gateway, Network Firewall endpoint, the SFTP endpoint's Elastic IP | Internet gateway |
 
 No task subnet routes to the internet gateway. Every ECS service and task definition sets `assignPublicIp = DISABLED`.
 
@@ -48,11 +48,12 @@ No task subnet routes to the internet gateway. Every ECS service and task defini
 
 | Group | Inbound | Outbound |
 |---|---|---|
-| Load balancer | 443 from the CloudFront origin-facing prefix list | App port to the chat API group |
-| Chat API | App port from the load balancer group | 443 to the endpoint group and the S3 prefix list; 443 to the internet, filtered to the Cognito hosts |
+| Load balancer | 443 from the CloudFront origin-facing prefix list | 443 to the chat API group |
+| Chat API | 443 from the load balancer group | 443 to the endpoint group and the S3 prefix list; 443 to the internet, filtered to the Cognito hosts |
 | Run workers | none | 443 to the endpoint group and the S3 prefix list |
 | Parser | none | 443 to the endpoint group and the S3 prefix list |
 | Endpoints | 443 from the chat API, run worker and parser groups | none |
+| SFTP endpoint | 22 from each lab's listed source addresses | none (Transfer Family writes to S3 itself) |
 
 ### VPC endpoints
 

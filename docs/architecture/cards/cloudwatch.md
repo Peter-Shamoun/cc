@@ -8,5 +8,5 @@
 | Data held / PHI | No PHI. Application logs pass a redaction filter. The audit log is an allowlist of ids, counts and timings. Access logs record route shapes and truncated client addresses. Question text, answer text, SQL and row values are never logged. |
 | Scaling and limits | Log retention: 1 year for service logs, 90 days for the edge function. Metrics carry a `customer` dimension (an id, never a name), so per-customer alarms and cost views are possible. |
 | Failure behaviour | Logging is asynchronous. A logging outage never blocks an answer. Alarms treat missing data as breaching for the queue age and healthy-host alarms. |
-| Logging and audit | Alarm and dashboard changes are in CloudTrail. Alarm thresholds are listed on [Monitoring](../pages/62-monitoring.md). |
-| Used on pages | [Operations](../pages/60-operations.md), [Monitoring](../pages/62-monitoring.md), [Limits](../pages/34-limits.md) |
+| Logging and audit | Alarm and dashboard changes are in CloudTrail. Alarm thresholds are listed on [Monitoring](62-monitoring.md). |
+| Used on pages | [Operations](60-operations.md), [Monitoring](62-monitoring.md), [Limits](34-limits.md) |

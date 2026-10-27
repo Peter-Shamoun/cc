@@ -9,4 +9,4 @@
 | Scaling and limits | AWS managed rule groups (common rule set, known bad inputs, IP reputation). A body size rule that allows at least the API's 1 MiB limit. A rate-based rule per client address over 5 minutes, answered with a 429 custom response (`{"error":{"code":"rate_limited"}}` and `Retry-After`). |
 | Failure behaviour | A blocked request never reaches an origin. A rate-limit block returns 429, which the web app waits out and retries twice before it shows "Too many requests". |
 | Logging and audit | Sampled requests and full logs (with headers redacted) in CloudWatch Logs. `BlockedRequests` and `CountedRequests` metrics per rule. Web ACL changes are recorded in CloudTrail. |
-| Used on pages | [Edge](../pages/31-edge.md), [Limits](../pages/34-limits.md) |
+| Used on pages | [Edge](31-edge.md), [Limits](34-limits.md) |

@@ -2,8 +2,8 @@
 
 [Overview](00-overview.md) › Chat backend
 
-The chat API takes a question, queues a run and streams the answer back. A run worker on Fargate does the work.
-All chat state is kept in S3 objects under the customer's prefix, and there is no database.
+The chat API takes a question, queues a run and streams the answer back, while a run worker on Fargate does the
+work. All chat state is kept in S3 objects under the customer's prefix, and there is no database.
 
 ![Chat backend](../png/30-chat-backend.png)
 
@@ -37,7 +37,7 @@ All chat state is kept in S3 objects under the customer's prefix, and there is n
 | Compute | Two ECS services on Fargate in private subnets: chat API and run workers |
 | API contract | Version 1.24.0. `GET /api/contract` returns the version and the schema. |
 | Auth | `cc_session` cookie (HttpOnly, Secure, SameSite=Strict, Path=/api). Cookie writes need `x-cc-csrf: 1`. |
-| Access | The customer's roles and keys: the transcript role and key for chat state, the reader role and lake key for gold |
+| Access | The customer's roles and keys: the transcript role and key for chat state, the reader role and lake key for gold, the audit writer role and the query audit key for the agent audit |
 | PHI | Questions, answers, table previews and CSV files. They are kept only under the customer's prefix, never in logs or URLs. |
 | Buckets | Customer data in the ClaimClarity bucket. The web app and the access logs have their own buckets. |
 

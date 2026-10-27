@@ -13,11 +13,11 @@ the prompts that are the same for every question are cached by Bedrock.
 | Item | What it does (one sentence) | Details |
 |---|---|---|
 | KPI gate | One call per question. | [KPI gate](41-kpi-gate.md) |
+| Claude Haiku on Amazon Bedrock | Runs every call, in all three strips. | [Service catalog](90-service-catalog.md) |
 | Cached: 16 presets · allowed values | The gate's fixed prompt, cached per customer and gold version. | |
 | Claude Haiku · reply writer | One call for a preset answer, no tools. | [Preset KPI queries](42-standard-kpi-path.md) |
 | Claude Haiku · Strands agent | One call per agent step, until its final command. | [Claim Query Agent](43-custom-analysis-agent.md) |
 | Cached: playbook · glossary · gold schema | The agent's fixed prompt and tool, cached per customer and gold version. | |
-| Claude Haiku on Amazon Bedrock | Runs every call. | [Service catalog](90-service-catalog.md) |
 
 ## How it works
 
@@ -33,7 +33,6 @@ the prompts that are the same for every question are cached by Bedrock.
 |---|---|
 | Caller | The run worker's task role; it may invoke only Claude Haiku. The chat API and the parser cannot call Bedrock. |
 | Calls per question | Preset answer: 2. Agent answer: 1 + one per step, at most 30 steps. |
-| Typical time | Preset answer about 4 s; agent answer about 18 s |
 | Output | At most 4,096 tokens per call |
 | Prompt cache | Kept by Bedrock for 5 minutes after last use |
 | Data sent | The question, the conversation history and query results (up to 20 rows per query, identifiers redacted). Treated as PHI. |

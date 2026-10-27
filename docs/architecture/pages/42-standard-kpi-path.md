@@ -18,6 +18,7 @@ from them.
 | Display SQL | The same SQL with the values written in, used wherever SQL is shown or saved. | |
 | cc CLI + SQL guard | Checks and runs the query, exactly as for the agent. | [cc CLI + SQL guard](44-sql-guard-escalation.md) |
 | DuckDB reader session | Runs the query read-only on the customer's gold. | [cc CLI + SQL guard](44-sql-guard-escalation.md) |
+| IAM + KMS gate | AWS allows the reader to read this customer's data only (gate 6). | [Customer isolation](23-customer-isolation.md) |
 | Customer's S3 prefix · `sem.*` | The gold tables the presets read. | [S3 layout](12-s3-layout.md) |
 | Number formatting | Formats rates as 12.3%, money as $1,234.56 and counts as 1,649, in code. | |
 | Claude Haiku · reply writer | Writes 1–3 sentences from the formatted rows, copying the values exactly. | [Model calls](45-model-calls.md) |

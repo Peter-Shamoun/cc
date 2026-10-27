@@ -9,4 +9,4 @@
 | Scaling and limits | Immutable tags (the commit SHA). Task definitions pin the image digest. Scan on push, and a critical finding stops the deploy. The lifecycle policy keeps the last 50 images per repository, enough to roll back. |
 | Failure behaviour | If ECR cannot be reached, new tasks cannot start, but running tasks keep running. The ECS circuit breaker rolls back a deploy whose tasks cannot pull. |
 | Logging and audit | Push and pull calls are in CloudTrail. Scan findings are reported to the security team. |
-| Used on pages | [Operations](../pages/60-operations.md), [Deploy](../pages/61-deploy.md) |
+| Used on pages | [Operations](60-operations.md), [Deploy](61-deploy.md) |
