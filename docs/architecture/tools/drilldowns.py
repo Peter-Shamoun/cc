@@ -29,7 +29,7 @@ def d00():
     d.zone(390, 180, 1100, 640, "customer_b/   ·   bucket policy: customer B roles only", "phi")
     y1, h1 = 250, 120
     cy = y1 + h1 // 2
-    d.node("sftp", 40, cy - 45, 230, 90, "Transfer Family", "SFTP role B", "transfer")
+    d.node("sftp", 40, cy - 45, 230, 90, "Transfer Family", "SFTP copy role B", "transfer")
     d.node("raw", 440, y1, 230, h1, "raw/", "bronze · Object Lock", shape="db")
     d.node("silver", 920, y1, 200, h1, "parquet/", "silver · parser role", shape="db")
     d.node("gold", 1230, y1, 220, h1, "semantic_layer/", "gold · CURRENT", shape="db", style="white")
@@ -42,14 +42,12 @@ def d00():
     d.gate(6, 1620, cy, G6, "below", "iam")
     y2, h2 = 500, 110
     d.node("quar", 440, y2, 230, h2, "quarantine/", "bad files · 1 yr", shape="folder")
-    d.node("audit", 920, y2, 200, h2, "audit/", "write-once · audit role", shape="folder")
-    d.node("chat", 1230, y2, 220, h2, "conversations/\nrun-events/", "transcripts role", shape="folder")
+    d.node("audit", 1230, y2, 220, h2, "audit/", "write-once · audit role", shape="folder")
     d.edge([(555, y1 + h1), (555, y2)], "bad files", (567, (y1 + h1 + y2) // 2 + 6), lpos="right", style="dashed")
     y3 = 700
     d.text(440, y3 - 18, "KMS keys", "eyebrow")
-    d.node("k_lake", 440, y3, 300, 80, "Lake key", "customer B · data prefixes", "kms", style="white")
-    d.node("k_audit", 820, y3, 300, 80, "Query audit key", "platform · B statement", "kms", style="white")
-    d.node("k_tr", 1200, y3, 250, 80, "Transcript key", "customer B · chat", "kms", style="white")
+    d.node("k_cust", 440, y3, 680, 80, "Customer key B", "raw · parquet · semantic_layer · quarantine", "kms", style="white")
+    d.node("k_audit", 1230, y3, 220, 80, "Platform audit key", "B statement", "kms", style="white")
     d.node("custA", 40, 595, 230, 90, "Customer A roles", "bucket policy + KMS", "role", style="denied")
     d.edge([(270, 640), (390, 640)], "denied", (330, 616), style="deny")
     return d
@@ -94,8 +92,8 @@ def d01():
     d.gate(3, 1800 + X, 425, G3, "right", "iam")
     d.edge([(2095 + X, 530), (2095 + X, y1 + h1)], "write", (2107 + X, 506), lpos="right")
     d.gate(3, 2095 + X, 425, G3, "right", "iam")
-    d.node("dlq", pe - 115, 790, 230, 80, "Dead-letter queue", icon="sqs")
-    d.edge([(pe, y2 + h2), (pe, 790)], "after 3 retries", (pe + 12, 736), lpos="right", style="dashed")
+    d.node("alarm", pe - 130, 790, 260, 90, "CloudWatch alarm", "re-run from same _SUCCESS", "cloudwatch")
+    d.edge([(pe, y2 + h2), (pe, 790)], "3 failed retries", (pe + 12, 736), lpos="right", style="dashed")
     return d
 
 

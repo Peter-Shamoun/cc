@@ -1,4 +1,4 @@
-%% 05 Chat backend
+%% 05 Chat backend. Chat storage (conversations, run-events) is out of scope: the answer streams back live.
 flowchart LR
   user["User (browser)"] --> cf["Amazon CloudFront + AWS WAF"]
   cf --> alb["Internal load balancer"]
@@ -7,7 +7,4 @@ flowchart LR
   sqs --> worker["Run worker (Fargate)<br/>Claim Query Agent · 110 s deadline"]
   worker --> bedrock["Amazon Bedrock<br/>Claude Haiku"]
   worker <-->|Quack| qs["DuckDB query service"]
-  api -->|If-Match| conv[/"conversations/"/]
-  worker -->|append| events[/"run-events/"/]
-  events -.->|replay on reconnect| api
-  api -.->|SSE stream| user
+  worker -.->|answer · SSE, live, back through the chat API| user

@@ -1,7 +1,8 @@
 %% 00 Storage & isolation. Source of truth for the drill-down. Gates are nodes on the edges they guard.
+%% Chat transcripts / conversation storage are out of scope (no conversations/, run-events/, transcript role or key).
 %% No landing or staging prefix: SFTP writes straight to raw/; the batch lease is a lock owned by the parser (see 01).
 flowchart LR
-  sftp["AWS Transfer Family (SFTP intake)<br/>SFTP role B"]
+  sftp["AWS Transfer Family (SFTP intake)<br/>SFTP copy role B"]
   custA["Customer A roles"]
   subgraph bucket["S3 · ClaimClarity data bucket (one bucket, one prefix per customer)"]
     subgraph prefB["customer_b/ · bucket policy: customer B roles only"]
@@ -9,13 +10,13 @@ flowchart LR
       silver[("parquet/ · silver")]
       gold[("semantic_layer/ · gold<br/>CURRENT version")]
       quarantine[/"quarantine/ · 1 yr"/]
-      chat[/"conversations/ + run-events/"/]
       audit[/"audit/ · write-once"/]
     end
   end
   qs["DuckDB query service<br/>reader role B"]
-  keys{{"Keys B: lake key · transcript key<br/>platform query audit key (statement per customer)"}}
-  roles{{"Roles B: SFTP · parser · reader · transcripts · audit"}}
+  keyB{{"KMS customer key B<br/>raw · silver · gold · quarantine"}}
+  keyAudit{{"KMS platform audit key<br/>audit/ · one key-policy statement per customer"}}
+  roles{{"Roles B: SFTP copy · parser · reader · audit (IAM prefix policies keep them apart)"}}
 
   sftp -->|write| raw
   raw --> g3{{"Gate 3 · IAM + KMS (parser)"}} -->|parse| silver
@@ -23,5 +24,9 @@ flowchart LR
   raw -.->|bad files| quarantine
   gold --> g6{{"Gate 6 · IAM + KMS (reader)"}} -->|read| qs
   custA -->|DENIED by bucket policy + KMS| prefB
-  keys -.- prefB
+  keyB -.- raw
+  keyB -.- silver
+  keyB -.- gold
+  keyB -.- quarantine
+  keyAudit -.- audit
   roles -.- prefB

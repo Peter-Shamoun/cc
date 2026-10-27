@@ -187,7 +187,7 @@ def node_layout(n):
     x, y, w, h, shape = n["x"], n["y"], n["w"], n["h"], n["shape"]
     names, subs = _lines(n["name"]), _lines(n["sub"])
     top_pad = {"db": 12, "folder": 8, "ui": 18}.get(shape, 0)
-    ic = n["icon"] if shape not in ("decision", "steps") else None
+    ic = n["icon"] if shape not in ("decision", "steps", "grid") else None
     isz = 40 if h >= 76 else 32
     left = x + (30 if shape == "agent" else 16)
     widths = [_tw(s, NAME - 1, "mono") if _is_mono(s) else _tw(s, NAME, "sans") for s in names] + [_tw(s, SUB, "sans4") for s in subs]
@@ -219,7 +219,7 @@ def svg_node(n):
     elif style == "denied":
         fill, stroke, dash = "#FDF1F0", DENY, ' stroke-dasharray="6 4"'
     out = [f'<g data-node="{n["id"]}">']
-    if shape in ("box", "steps", "ui"):
+    if shape in ("box", "steps", "ui", "grid"):
         out.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="4" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"{dash}/>')
     elif shape == "db":
         c, ry = _cyl(x, y, w, h, fill, stroke); out.append(c)
@@ -242,7 +242,14 @@ def svg_node(n):
                    f'<circle cx="{x + 12}" cy="{y + 9}" r="3" fill="{PAPER}"/><circle cx="{x + 22}" cy="{y + 9}" r="3" fill="{PAPER}"/>'
                    f'<rect x="{x + 16}" y="{y + h - 36}" width="{w - 32}" height="22" rx="11" fill="{PAPER}" stroke="{LINE}"/>')
     L = node_layout(n)
-    if shape == "steps":
+    if shape == "grid":
+        out.append(_t(x + 18, y + 34, L["names"][0], NAME, SANS, txt, 600))
+        items, cols = n["inner"], n.get("cols", 2)
+        cw = (w - 36) / cols
+        for i, (ic2, lab) in enumerate(items):
+            cx0, cy0 = x + 18 + (i % cols) * cw, y + 58 + (i // cols) * 46
+            out.append(place_icon(ic2, cx0, cy0, 32) + _t(cx0 + 42, cy0 + 22, lab, 15, SANS, INK, 500))
+    elif shape == "steps":
         hx = x + 18
         if n["icon"]:
             out.append(place_icon(n["icon"], x + 16, y + 14, 34)); hx = x + 62
@@ -378,7 +385,7 @@ def check(d):
     boxes = {n["id"]: (n["x"], n["y"], n["w"], n["h"]) for n in d.nodes}
     for n in d.nodes:
         L = node_layout(n)
-        if L["need"] > n["w"] + 1 and n["shape"] != "steps":
+        if L["need"] > n["w"] + 1 and n["shape"] not in ("steps", "grid"):
             probs.append(f"text overflow in {n['id']}: needs {L['need']:.0f}, has {n['w']}")
     for g in d.gates:
         gb = gate_box(g); dia = (g["x"] - GR, g["y"] - GR, 2 * GR, 2 * GR)
@@ -572,6 +579,10 @@ def to_excalidraw(d):
         a = X.line(e["pts"], "arrow", strokeColor=col, strokeStyle="dashed" if e["style"] in ("dashed", "deny") else "solid",
                    startArrowhead="arrow" if e["start"] else None, endArrowhead=("bar" if e["style"] == "deny" else "arrow") if e["end"] else None,
                    elbowed=False, roundness=None, roughness=0)
+        if e["style"] == "deny":
+            (xa, ya), (xb, yb) = e["pts"][-2], e["pts"][-1]
+            mx, my = e.get("xat") or ((xa + xb) / 2, (ya + yb) / 2)
+            X.text(mx, my - 14, "X", 24, "center", "#e03131")
         if e["label"]:
             x, y = e["at"]
             al = {"above": "center", "left": "right", "right": "left", "below": "center"}[e["lpos"]]
@@ -594,7 +605,15 @@ def to_excalidraw(d):
         if n["icon"] and n["icon"] not in GLYPHS and sh not in ("decision", "steps"):
             X.image(x + 8, y + (14 if sh == "db" else 8), 26, n["icon"])
         label = n["name"] + (("\n" + n["sub"]) if n["sub"] else "")
-        if sh == "steps":
+        if sh == "grid":
+            X.text(x + 16, y + 12, n["name"], 20)
+            cols = n.get("cols", 2); cw = (w - 36) / cols
+            for i, (ic2, lab) in enumerate(n["inner"]):
+                cx0, cy0 = x + 18 + (i % cols) * cw, y + 58 + (i // cols) * 46
+                if ic2 not in GLYPHS:
+                    X.image(cx0, cy0, 28, ic2)
+                X.text(cx0 + 38, cy0 + 4, lab, 16)
+        elif sh == "steps":
             X.text(x + 16, y + 12, n["name"], 20)
             steps = n["inner"]; ly = y + h - 44; x0, x1 = x + 40, x + w - 40
             X.line([(x0, ly), (x1, ly)], roughness=0)

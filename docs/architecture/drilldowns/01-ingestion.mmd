@@ -14,4 +14,4 @@ flowchart LR
   task --> g3s{{"Gate 3 · IAM + KMS (parser)"}} -->|write| silver[("parquet/ · silver")]
   task --> g3g{{"Gate 3 · IAM + KMS (parser)"}} -->|write| gold[("semantic_layer/ · gold")]
   gold -->|publish · compare-and-set| current[/"CURRENT → new version"/]
-  rule -.->|3 retries, then| dlq["Dead-letter queue"]
+  rule -.->|3 failed retries| alarm["CloudWatch alarm<br/>re-run from the same _SUCCESS"]
