@@ -5,10 +5,13 @@ from PIL import Image
 
 V2 = Path(__file__).resolve().parent.parent
 DRAWIO = os.environ.get("DRAWIO", "/tmp/claude-0/-home-user-cc/0e6bb8ac-ae6e-51d1-adaa-a5d39fba27c7/scratchpad/squashfs-root/drawio")
-BOARDS = {"00-overview": (1900, 160, 2460, 1700), "01-storage": (160, 160, 1600, 880), "02-ingestion": (4500, 160, 1900, 1030),
-          "03-login": (40, 1260, 1720, 600), "03b-query-path": (4500, 1330, 1900, 800), "04-analyzer": (40, 2250, 2520, 900),
-          "05-chat-backend": (2680, 2250, 2400, 900), "06-network-security": (40, 3250, 2520, 1050), "07-operations": (2680, 3250, 2400, 720)}
-ORIGIN = (38, 48)   # canvas position of the exported image's top-left corner
+import sys
+sys.path.insert(0, str(Path(__file__).parent))
+from boards import LAYOUT  # noqa: E402
+FILES = {"s0": "01-storage", "s1": "02-ingestion", "s2": "03-login", "s3": "04-query-path", "s4": "05-analyzer",
+         "s5": "06-chat-backend", "s6": "07-network-security", "s7": "08-operations"}
+BOARDS = {"00-overview": (1900, 160, 2460, 1700), **{FILES[k]: v[2:] for k, v in LAYOUT.items()}}
+ORIGIN = (min(x for x, _, _, _ in BOARDS.values()) - 2, 48)   # canvas position of the exported image's top-left corner
 
 
 def main():

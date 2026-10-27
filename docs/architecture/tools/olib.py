@@ -97,3 +97,19 @@ class Board:
 def zoom(cells, cid, num, x, y, parent):
     cells.append(f'<mxCell id="{cid}" value="{num}" style="{ZOOM}" vertex="1" parent="{parent}"><mxGeometry x="{x}" y="{y}" '
                  f'width="26" height="26" as="geometry"/></mxCell>')
+
+
+BIGGATE = BASE + "rhombus;fillColor=#1C2B57;strokeColor=#FFFFFF;strokeWidth=3;fontColor=#FFFFFF;fontFamily=Barlow Condensed;" + CONDSRC + "fontStyle=1;fontSize=22;"
+DENYGATE = BIGGATE.replace("#1C2B57", "#C0392B")
+GATECAP = BASE + "text;fillColor=#FFF4F4;strokeColor=#C0392B;rounded=1;arcSize=20;align=center;verticalAlign=middle;fontSize=13;spacing=4;"
+
+
+def big_gate(board, cid, number, question, detail, x, y, deny=False, label_below=False):
+    """A gate drawn ON the arrow: a 64 px diamond the arrow passes through, with a boxed caption beside it.
+    (x, y) is the diamond's top-left corner. Connect with board.edge(src, cid) and board.edge(cid, dst)."""
+    board._raw(cid, "✕" if deny else str(number), DENYGATE if deny else BIGGATE, x, y, 64, 64)
+    caption = (f'<b style="color:#1C2B57">GATE {number}</b> · {question}' if not deny else f'<b style="color:#C0392B">DENIED</b> · {question}')
+    if detail:
+        caption += f'<br><span style="font-size:12px">{detail}</span>'
+    board._raw(f"{cid}_c", caption, GATECAP, x - 98, y + (74 if label_below else -58), 260, 48)
+    return cid
