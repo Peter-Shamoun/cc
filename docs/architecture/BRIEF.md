@@ -86,7 +86,7 @@ Middle-ground length: about 15–20 PDF pages. No 100-page sets.
 - **Roles and keys:** per customer, roles for SFTP copy, parser, reader, transcripts and audit. Per customer, a lake
   key and a transcript key. The query audit key is one platform key, with one statement per customer.
 - **Raw:** write-once (Object Lock, 7 years). `_SUCCESS` is written last. Bad files go to `quarantine/` (kept 1 year).
-- **Parser:** EventBridge retries 3 times, then a dead-letter queue. The task needs 4–8 GB of memory. Gold publishes a
+- **Parser:** EventBridge retries 3 times, then raises an alarm (no dead-letter queue, user decision). The batch is re-run from the same `_SUCCESS`. The task needs 4–8 GB of memory. Gold publishes a
   new version, and `CURRENT` moves by compare-and-set; old versions stay readable for sessions already open.
 - **Reader:** STS credentials last 15 minutes, renewed with the same token when fewer than 3 minutes remain. Read-only.
   Only the current gold version. `lossless.*` holds PHI-stripped tables published next to gold.
