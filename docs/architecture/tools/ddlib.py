@@ -218,7 +218,7 @@ def svg_node(n):
         fill, stroke, txt = NAVY, NAVY, PAPER
     elif style == "denied":
         fill, stroke, dash = "#FDF1F0", DENY, ' stroke-dasharray="6 4"'
-    out = [f'<g data-node="{n["id"]}">']
+    out = [f'<g data-node="{escape(n["id"])}">']
     if shape in ("box", "steps", "ui", "grid"):
         out.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="4" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"{dash}/>')
     elif shape == "db":

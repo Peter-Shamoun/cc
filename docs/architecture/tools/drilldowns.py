@@ -42,12 +42,12 @@ def d00():
     d.gate(6, 1620, cy, G6, "below", "iam")
     y2, h2 = 500, 110
     d.node("quar", 440, y2, 230, h2, "quarantine/", "bad files · 1 yr", shape="folder")
-    d.node("audit", 1230, y2, 220, h2, "audit/", "write-once · audit role", shape="folder")
+    d.node("audit", 1210, y2, 240, h2, "audit/", "write-once · audit role", shape="folder")
     d.edge([(555, y1 + h1), (555, y2)], "bad files", (567, (y1 + h1 + y2) // 2 + 6), lpos="right", style="dashed")
     y3 = 700
     d.text(440, y3 - 18, "KMS keys", "eyebrow")
     d.node("k_cust", 440, y3, 680, 80, "Customer key B", "raw · parquet · semantic_layer · quarantine", "kms", style="white")
-    d.node("k_audit", 1230, y3, 220, 80, "Platform audit key", "B statement", "kms", style="white")
+    d.node("k_audit", 1210, y3, 240, 80, "Platform audit key", "statement for B", "kms", style="white")
     d.node("custA", 40, 595, 230, 90, "Customer A roles", "bucket policy + KMS", "role", style="denied")
     d.edge([(270, 640), (390, 640)], "denied", (330, 616), style="deny")
     return d
@@ -97,7 +97,137 @@ def d01():
     return d
 
 
-DIAGRAMS = {"00": d00, "01": d01}
+def d02():
+    d = Diagram("02-login", "02 · Login & customer mapping",
+                "Sign-in goes from the user to Microsoft Entra ID to Amazon Cognito, which maps the user's group to one customer and issues the token that gate 4 checks.",
+                2320, 760)
+    d.text(40, 56, "02 · Login & customer mapping", "title")
+    d.text(40, 86, "The token is the only place the customer comes from.", "subtitle")
+    cy = 300
+    d.node("user", 40, cy - 45, 180, 90, "User", "browser", "users")
+    d.node("entra", 310, cy - 50, 270, 100, "Microsoft Entra ID", "company sign-in", "entra", style="external")
+    d.node("group", 670, cy - 50, 260, 100, "Assigned group", "ClaimClarity · customer B", "users", style="external")
+    d.node("cognito", 1030, cy - 50, 260, 100, "Amazon Cognito", "group → one customer", "cognito")
+    d.node("token", 1390, cy - 55, 230, 110, "ID token", "customer = B · 60 min", shape="token")
+    d.node("cookie", 1710, cy - 45, 190, 90, "Cookie", "httpOnly · Secure", shape="file", style="white")
+    d.node("api", 2100, cy - 45, 190, 90, "Chat API", "Fargate", "fargate")
+    d.edge([(220, cy), (310, cy)], "sign in", (265, cy - 12))
+    d.edge([(580, cy), (670, cy)], "member", (625, cy - 12))
+    d.edge([(930, cy), (1030, cy)], "federate", (980, cy - 12))
+    d.edge([(1290, cy), (1390, cy)], "issue", (1340, cy - 12))
+    d.edge([(1620, cy), (1710, cy)], "store", (1665, cy - 12))
+    d.edge([(1900, cy), (2100, cy)], "every request", (2000, cy - GR_ - 16))
+    d.gate(4, 2000, cy, G4, "below", "cognito")
+    d.node("noacc", 330, 520, 230, 90, "No access", "not in an assigned group", style="denied")
+    d.edge([(445, cy + 50), (445, 520)], "denied", (457, 420), lpos="right", style="deny")
+    d.zone(300, 220, 650, 160, "Microsoft Entra ID tenant", "plain")
+    return d
+
+
+def d03():
+    d = Diagram("03-query-path", "03 · Query path",
+                "The run worker sends SQL over Quack to the DuckDB query service, which alone holds customer B's 15-minute STS credentials and reads only customer B's gold; Customer A is denied by the API and by IAM.",
+                2400, 1000)
+    d.text(40, 56, "03 · Query path", "title")
+    d.text(40, 86, "The agent never holds AWS credentials. Only the query service does, for 15 minutes.", "subtitle")
+    cy = 330
+    d.zone(330, 190, 820, 280, "Run worker · Fargate · no AWS credentials", "worker", "fargate")
+    d.zone(1330, 190, 360, 280, "DuckDB query service · Fargate", "worker", "fargate")
+    d.zone(1900, 130, 460, 760, "ClaimClarity data bucket", "bucket", "s3")
+    d.node("api", 40, cy - 45, 210, 90, "Chat API", "customer from token", "fargate")
+    d.node("agent", 370, cy - 50, 250, 100, "Claim Query Agent", "run worker")
+    d.nodes[-1]["shape"] = "agent"
+    d.node("cli", 690, cy - 45, 220, 90, "ClaimClarity CLI", "cli.py", "terminal")
+    d.node("guard", 980, cy - 45, 140, 90, "SQL guard", shape="box")
+    d.node("qs", 1370, cy - 60, 290, 120, "Quack server", "customer B · 15-min credentials", "duck")
+    d.edge([(250, cy), (370, cy)], "run", (310, cy - 12))
+    d.edge([(620, cy), (690, cy)])
+    d.edge([(910, cy), (980, cy)])
+    d.edge([(1120, cy), (1370, cy)], "sql over quack\nper-run token", (1245, cy - 30))
+    # STS (gate 5)
+    d.node("sts", 1400, 680, 230, 100, "AWS STS", "reader role B · 15 min", "sts")
+    d.edge([(1515, cy + 60), (1515, 680)], "token", (1503, 510), lpos="left", start=True)
+    d.gate(5, 1515, 590, G5, "right", "sts")
+    # reads
+    d.node("gold", 1950, 260, 370, 140, "customer_b/\nsemantic_layer/", "current gold · read-only", shape="db", style="white")
+    d.node("lossless", 1950, 480, 370, 120, "lossless.*", "after a reasoned escalation", shape="db", style="optional")
+    d.node("custa", 1950, 680, 370, 120, "customer_a/", shape="db", style="denied")
+    d.edge([(1660, cy), (1950, cy)], "read", (1910 - 40, cy - 12))
+    d.gate(6, 1790, cy, G6, "above", "iam")
+    d.edge([(1660, 360), (1880, 360), (1880, 540), (1950, 540)], style="dashed")
+    d.edge([(1660, 380), (1840, 380), (1840, 740), (1950, 740)], "iam + kms", (1828, 760), lpos="left", style="deny")
+    d.edges[-1]["xat"] = (1895, 740)
+    # Customer A at the API
+    d.node("reqa", 40, 560, 210, 90, "Request for A", "token names B", style="denied")
+    d.edge([(145, 560), (145, cy + 45)], "denied by api", (157, 470), lpos="right", style="deny")
+    return d
+
+
+def d04():
+    d = Diagram("04-analyzer", "04 · Analyzer",
+                "Inside the run worker, the KPI gate answers with a preset query when one fits; otherwise the Claim Query Agent, given its cached references and examples, decides to answer, clarify or escalate and sends SQL through cli.py and the SQL guard.",
+                2440, 1160)
+    d.text(40, 56, "04 · Analyzer", "title")
+    d.text(40, 86, "The Claim Query Agent is the run worker: one Fargate task per run, Claude Haiku on Amazon Bedrock.", "subtitle")
+    d.zone(400, 130, 1700, 950, "Run worker · Fargate  =  Claim Query Agent", "worker", "fargate")
+    d.node("ui", 40, 330, 240, 240, "ClaimClarity", "chat in the browser", shape="ui", style="white")
+    d.node("kpi", 440, 330, 200, 160, "KPI gate", "preset fits?", shape="decision")
+    d.edge([(280, 410), (440, 410)], "question", (340, 398))
+    d.edge([(400, 500), (280, 500)], "answer · sse", (340, 488), style="dashed")
+    xs = [(740, 230), (1000, 330), (1360, 230), (1620, 250), (1900, 180)]
+    names = [("Example bank", "K = 3 similar", "db"), ("References", "cached · rules · glossary · schema", "file"),
+             ("Tool & CLI reference", "cached", "file"), ("System prompt + history", "cached", "file"),
+             ("Newest prompt", "this turn", "file")]
+    for (x, w), (nm, sb, sh) in zip(xs, names):
+        d.node(nm, x, 170, w, 110, nm, sb, shape=sh, style="white")
+        d.edge([(x + w // 2, 280), (x + w // 2, 360)])
+    a = d.node("agent", 720, 360, 1380, 100, "Claim Query Agent", "Claude Haiku · Amazon Bedrock · Strands", "bedrock")
+    a["shape"] = "agent"
+    d.edge([(640, 410), (720, 410)], "no", (680, 398))
+    d.node("preset", 430, 600, 220, 100, "Preset KPI queries", "16 · fixed SQL", shape="file")
+    d.edge([(540, 490), (540, 600)], "yes", (552, 556), lpos="right")
+    d.node("decide", 780, 560, 260, 200, "Answer · Clarify", "or escalate", shape="decision")
+    d.edge([(910, 460), (910, 560)], "first", (922, 516), lpos="right")
+    d.node("cli", 1130, 615, 220, 90, "ClaimClarity CLI", "cli.py", "terminal")
+    d.node("guard", 1440, 615, 200, 90, "SQL guard", "read-only SELECT", "shieldcheck")
+    d.node("qs", 2160, 615, 260, 90, "DuckDB query service", "Quack", "fargate")
+    d.edge([(1040, 660), (1130, 660)], "answer", (1085, 648))
+    d.edge([(1350, 660), (1440, 660)])
+    d.edge([(1640, 660), (2160, 660)], "sql over quack", (1900, 648))
+    d.node("lossless", 800, 840, 220, 100, "Full lossless schema", "after escalation only", shape="db", style="optional")
+    d.edge([(910, 760), (910, 840)], "escalate", (922, 806), lpos="right", style="dashed")
+    d.edge([(540, 700), (540, 1010), (1540, 1010), (1540, 705)], "preset sql", (1290, 998))
+    return d
+
+
+def d05():
+    d = Diagram("05-chat-backend", "05 · Chat backend",
+                "A question enters through CloudFront and WAF, passes gate 4 at the chat API, waits in the SQS run queue, and is answered by a run worker that calls Bedrock and the DuckDB query service; the answer streams back live over SSE.",
+                2400, 880)
+    d.text(40, 56, "05 · Chat backend", "title")
+    d.text(40, 86, "One run per question. The answer streams back live.", "subtitle")
+    cy = 380
+    d.node("user", 40, cy - 45, 180, 90, "User", "browser", "users")
+    d.node("cf", 300, cy - 50, 270, 100, "CloudFront + WAF", "public entry", "cloudfront")
+    d.node("alb", 650, cy - 50, 250, 100, "Load balancer", "internal", "elb")
+    d.node("api", 1120, cy - 50, 240, 100, "Chat API", "3 open runs per user", "fargate")
+    d.node("sqs", 1440, cy - 50, 220, 100, "Run queue", "Amazon SQS", "sqs")
+    d.node("worker", 1740, cy - 50, 280, 100, "Run worker", "Claim Query Agent · 110 s", "fargate")
+    d.node("bedrock", 2120, cy - 50, 240, 100, "Amazon Bedrock", "Claude Haiku", "bedrock")
+    d.node("qs", 1740, 620, 280, 100, "DuckDB query service", "Quack server", "fargate")
+    d.edge([(220, cy), (300, cy)], "https", (260, cy - 12))
+    d.edge([(570, cy), (650, cy)])
+    d.edge([(900, cy), (1120, cy)])
+    d.gate(4, 1010, cy, G4, "below", "cognito")
+    d.edge([(1360, cy), (1440, cy)], "enqueue", (1400, cy - 12))
+    d.edge([(1660, cy), (1740, cy)])
+    d.edge([(2020, cy), (2120, cy)])
+    d.edge([(1880, cy + 50), (1880, 620)], "sql over quack", (1892, 540), lpos="right", start=True)
+    d.edge([(1880, cy - 50), (1880, 220), (130, 220), (130, cy - 45)], "answer · sse · live", (1000, 208), style="dashed")
+    return d
+
+
+DIAGRAMS = {"00": d00, "01": d01, "02": d02, "03": d03, "04": d04, "05": d05}
 
 
 SKILL = Path(os.environ.get("DIAGRAM_DESIGN", Path.home() / ".claude/skills/diagram-design")) / "scripts"
