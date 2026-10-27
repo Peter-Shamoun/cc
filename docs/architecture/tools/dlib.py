@@ -68,7 +68,44 @@ class Diagram:
                  LANE + "fontStyle=0;", 20, 14, self.width - 40, 36)
 
     def xml(self):
-        return (f'<mxfile host="drawio"><diagram id="{self.id}" name="{self.name}"><mxGraphModel dx="{self.width}" dy="{self.height}" grid="0" '
+        return (f'<mxfile host="drawio"><diagram id="{self.id}" name="{escape(self.name)}"><mxGraphModel dx="{self.width}" dy="{self.height}" grid="0" '
                 f'gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="{self.width}" '
                 f'pageHeight="{self.height}" math="0" shadow="0"><root><mxCell id="0"/><mxCell id="1" parent="0"/>'
                 + "".join(self.cells) + "</root></mxGraphModel></diagram></mxfile>\n")
+
+
+STRIP = "rounded=1;arcSize=3;html=1;fillColor=#F6F8FC;strokeColor=#D5DCE8;"
+BADGE = "ellipse;html=1;fillColor=#1C2B57;strokeColor=#FFFFFF;strokeWidth=2;fontColor=#FFFFFF;fontStyle=1;fontSize=10;fontFamily=Helvetica;aspect=fixed;"
+DECISION = "rhombus;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1C2B57;strokeWidth=1.5;fontSize=11;fontFamily=Helvetica;fontColor=#1A1D23;"
+STEPBOX = "rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontSize=11;fontFamily=Helvetica;fontColor=#1A1D23;"
+
+
+def strip(d, key, y, h, title, width=None):
+    d.add(f"{key}", "", STRIP, 20, y, (width or d.width) - 40, h)
+    d.add(f"{key}-t", title, LANE, 36, y + 6, 1000, 24)
+
+
+def badge(d, cid, page, cx, cy):
+    """Small navy circle with the drill-down page number, at an item's top right."""
+    d.add(cid, page, BADGE, cx, cy, 22, 22)
+
+
+def chain(d, prefix, items, y, x0=120, step=200):
+    """items: (res, title, page or None, tile) in a row, joined by arrows. Returns the ids."""
+    ids = []
+    for i, item in enumerate(items):
+        res, title, page, tile = item[:4]
+        label = item[4] if len(item) > 4 else "below"
+        cid, cx = f"{prefix}{i}", x0 + i * step
+        d.icon(cid, res, title, "", cx, y, tile=tile, label=label)
+        if page:
+            badge(d, f"{cid}-b", page, *((cx + 20, y - 42) if label != "above" else (cx + 30, y - 58)))
+        if ids:
+            d.edge(f"e-{ids[-1]}-{cid}", ids[-1], cid)
+        ids.append(cid)
+    return ids
+
+
+def legend_drilldown(d, x, y):
+    badge(d, "leg-b", "11", x, y)
+    d.add("leg-b-t", "page with the detail", TEXT + "fontColor=#3A5A9E;", x + 28, y - 2, 200, 26)
