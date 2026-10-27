@@ -100,7 +100,7 @@ A pending clarification is the assistant message's clarification part. It can be
 | Run-event chunks | Deleted with their conversation |
 | CSV downloads | 15 minutes, bound to the user, revoked when the conversation is deleted |
 | Agent audit | 6 years (2,190 days), write-once, never deleted |
-| Temporary chats | Never written to S3. Held in the chat API task's memory for 1 hour idle, at most 20 per user. |
+| Temporary chats | Never written to S3. Held in the memory of one chat API task (the load balancer keeps the user on it) for 1 hour idle, at most 20 per user. They are lost if that task stops. Their run events still pass through chunk objects, because that is how a worker reaches the API. The chunks are deleted 60 s after the run ends, with a 1-day lifecycle rule as a backstop. |
 
 ### Failure behaviour
 
