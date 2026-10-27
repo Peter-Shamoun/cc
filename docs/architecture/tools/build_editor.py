@@ -2,7 +2,7 @@
 
 The editor is one self-contained HTML page (open it straight from disk). This script fills its template
 (tools/diagram_editor_template.html) with the AWS icons and glyphs ddlib.py renders and the board files in
-drilldowns/*.json, so the editor opens the same boards 00-05 that drilldowns.py publishes.
+drilldowns/*.json, so the editor opens the same boards 00-04 that drilldowns.py publishes.
 """
 import json
 import sys

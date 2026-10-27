@@ -10,7 +10,7 @@
   "zones": [
    {
     "x": 360,
-    "y": 130,
+    "y": 60,
     "w": 1160,
     "h": 720,
     "label": "xifin-dl-curated-prod/ClaimClarity",
@@ -20,7 +20,7 @@
    },
    {
     "x": 390,
-    "y": 180,
+    "y": 110,
     "w": 1100,
     "h": 640,
     "label": "customer_b/",
@@ -33,7 +33,7 @@
    {
     "id": "sftp",
     "x": 40,
-    "y": 265,
+    "y": 195,
     "w": 230,
     "h": 90,
     "name": "Transfer Family",
@@ -46,7 +46,7 @@
    {
     "id": "raw",
     "x": 440,
-    "y": 250,
+    "y": 180,
     "w": 230,
     "h": 120,
     "name": "raw/",
@@ -59,7 +59,7 @@
    {
     "id": "silver",
     "x": 920,
-    "y": 250,
+    "y": 180,
     "w": 200,
     "h": 120,
     "name": "parquet/",
@@ -72,7 +72,7 @@
    {
     "id": "gold",
     "x": 1230,
-    "y": 250,
+    "y": 180,
     "w": 220,
     "h": 120,
     "name": "semantic_layer/",
@@ -85,7 +85,7 @@
    {
     "id": "qs",
     "x": 1750,
-    "y": 265,
+    "y": 195,
     "w": 290,
     "h": 90,
     "name": "DuckDB query service",
@@ -98,7 +98,7 @@
    {
     "id": "quar",
     "x": 440,
-    "y": 500,
+    "y": 430,
     "w": 230,
     "h": 110,
     "name": "quarantine/",
@@ -111,7 +111,7 @@
    {
     "id": "audit",
     "x": 1210,
-    "y": 500,
+    "y": 430,
     "w": 240,
     "h": 110,
     "name": "audit/",
@@ -124,7 +124,7 @@
    {
     "id": "rec",
     "x": 1560,
-    "y": 450,
+    "y": 380,
     "w": 510,
     "h": 290,
     "name": "Audit record",
@@ -149,7 +149,7 @@
    {
     "id": "k_cust",
     "x": 650,
-    "y": 700,
+    "y": 630,
     "w": 680,
     "h": 80,
     "name": "Data encryption key",
@@ -162,7 +162,7 @@
    {
     "id": "custA",
     "x": 40,
-    "y": 595,
+    "y": 525,
     "w": 230,
     "h": 90,
     "name": "Customer A roles",
@@ -178,17 +178,17 @@
     "pts": [
      [
       270,
-      310
+      240
      ],
      [
       440,
-      310
+      240
      ]
     ],
     "label": "write",
     "at": [
      350,
-     298
+     228
     ],
     "style": "solid",
     "end": true,
@@ -210,17 +210,17 @@
     "pts": [
      [
       670,
-      310
+      240
      ],
      [
       920,
-      310
+      240
      ]
     ],
     "label": "parse",
     "at": [
      795,
-     260
+     190
     ],
     "style": "solid",
     "end": true,
@@ -242,17 +242,17 @@
     "pts": [
      [
       1120,
-      310
+      240
      ],
      [
       1230,
-      310
+      240
      ]
     ],
     "label": "Build View",
     "at": [
      1175,
-     298
+     228
     ],
     "style": "solid",
     "end": true,
@@ -274,17 +274,17 @@
     "pts": [
      [
       1450,
-      310
+      240
      ],
      [
       1750,
-      310
+      240
      ]
     ],
     "label": "read",
     "at": [
      1710,
-     298
+     228
     ],
     "style": "solid",
     "end": true,
@@ -306,11 +306,11 @@
     "pts": [
      [
       1450,
-      555
+      485
      ],
      [
       1560,
-      555
+      485
      ]
     ],
     "label": null,
@@ -335,17 +335,17 @@
     "pts": [
      [
       555,
-      370
+      300
      ],
      [
       555,
-      500
+      430
      ]
     ],
     "label": "bad files",
     "at": [
      567,
-     441
+     371
     ],
     "style": "dashed",
     "end": true,
@@ -367,17 +367,17 @@
     "pts": [
      [
       270,
-      640
+      570
      ],
      [
       390,
-      640
+      570
      ]
     ],
     "label": "denied",
     "at": [
      330,
-     616
+     546
     ],
     "style": "deny",
     "end": true,
@@ -396,7 +396,7 @@
    {
     "n": 3,
     "x": 795,
-    "y": 310,
+    "y": 240,
     "label": "IAM + KMS\nparser role B",
     "side": "below",
     "icon": "iam",
@@ -405,7 +405,7 @@
    {
     "n": 6,
     "x": 1620,
-    "y": 310,
+    "y": 240,
     "label": "IAM + KMS\nreader role B",
     "side": "below",
     "icon": "iam",
@@ -415,7 +415,7 @@
   "texts": [
    {
     "x": 40,
-    "y": 56,
+    "y": 36,
     "s": "Storage & isolation",
     "role": "title",
     "anchor": "start",
@@ -423,8 +423,8 @@
     "id": "text1"
    },
    {
-    "x": 40,
-    "y": 86,
+    "x": 310,
+    "y": 36,
     "s": "Each customer has their own folder, shown here is Customer B",
     "role": "subtitle",
     "anchor": "start",
@@ -433,7 +433,7 @@
    },
    {
     "x": 670,
-    "y": 682,
+    "y": 612,
     "s": "KMS keys",
     "role": "eyebrow",
     "anchor": "start",

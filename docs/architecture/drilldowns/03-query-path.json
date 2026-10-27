@@ -106,7 +106,7 @@
     "w": 400,
     "h": 200,
     "name": "Quack server",
-    "sub": "customer B · 15-min credentials",
+    "sub": null,
     "icon": "duck",
     "shape": "box",
     "style": "service",
@@ -235,7 +235,7 @@
       630
      ]
     ],
-    "label": "sql · per-run token",
+    "label": "sql",
     "at": [
      780,
      618
@@ -331,7 +331,7 @@
       480
      ]
     ],
-    "label": "15-min credentials",
+    "label": "Temp credentials",
     "at": [
      1272,
      420
@@ -507,7 +507,7 @@
    {
     "x": 40,
     "y": 86,
-    "s": "Only the DuckDB query service touches the data, with 15-minute credentials for one customer.",
+    "s": "Only the DuckDB query service touches the data, with temp credentials for one customer.",
     "role": "subtitle",
     "anchor": "start",
     "color": null,

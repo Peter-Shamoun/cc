@@ -73,7 +73,7 @@
     "w": 500,
     "h": 120,
     "name": "Assigned group",
-    "sub": "ClaimClarity · customer B",
+    "sub": "Customer B",
     "icon": "users",
     "shape": "box",
     "style": "external",
@@ -167,7 +167,17 @@
     "style": "solid",
     "end": true,
     "start": false,
-    "lpos": "above"
+    "lpos": "above",
+    "src": {
+     "id": "user",
+     "fx": 1,
+     "fy": 0.5
+    },
+    "dst": {
+     "id": "entra",
+     "fx": 0,
+     "fy": 0.5
+    }
    },
    {
     "id": "e_member",
@@ -189,7 +199,17 @@
     "style": "solid",
     "end": true,
     "start": false,
-    "lpos": "right"
+    "lpos": "right",
+    "src": {
+     "id": "entra",
+     "fx": 0.5,
+     "fy": 1
+    },
+    "dst": {
+     "id": "group",
+     "fx": 0.5,
+     "fy": 0
+    }
    },
    {
     "id": "e_sso",
@@ -211,7 +231,17 @@
     "style": "solid",
     "end": true,
     "start": false,
-    "lpos": "above"
+    "lpos": "above",
+    "src": {
+     "id": "entra",
+     "fx": 1,
+     "fy": 0.5
+    },
+    "dst": {
+     "id": "pool",
+     "fx": 0,
+     "fy": 0.5
+    }
    },
    {
     "id": "e_claim",
@@ -233,7 +263,17 @@
     "style": "solid",
     "end": true,
     "start": false,
-    "lpos": "above"
+    "lpos": "above",
+    "src": {
+     "id": "group",
+     "fx": 1,
+     "fy": 0.5
+    },
+    "dst": {
+     "id": "map",
+     "fx": 0,
+     "fy": 0.5
+    }
    },
    {
     "id": "e_lookup",
@@ -255,7 +295,17 @@
     "style": "solid",
     "end": true,
     "start": false,
-    "lpos": "right"
+    "lpos": "right",
+    "src": {
+     "id": "pool",
+     "fx": 0.5,
+     "fy": 1
+    },
+    "dst": {
+     "id": "map",
+     "fx": 0.5,
+     "fy": 0
+    }
    },
    {
     "id": "e_issue",
@@ -277,7 +327,17 @@
     "style": "solid",
     "end": true,
     "start": false,
-    "lpos": "right"
+    "lpos": "right",
+    "src": {
+     "id": "map",
+     "fx": 0.5,
+     "fy": 1
+    },
+    "dst": {
+     "id": "token",
+     "fx": 0.5,
+     "fy": 0
+    }
    },
    {
     "id": "e_token",
@@ -296,7 +356,17 @@
     "style": "solid",
     "end": true,
     "start": false,
-    "lpos": "above"
+    "lpos": "above",
+    "src": {
+     "id": "token",
+     "fx": 1,
+     "fy": 0.5
+    },
+    "dst": {
+     "id": "api",
+     "fx": 0,
+     "fy": 0.5
+    }
    }
   ],
   "gates": [
@@ -331,6 +401,6 @@
    }
   ],
   "legend_items": null,
-  "show_legend": true
+  "show_legend": false
  }
 }
