@@ -17,3 +17,5 @@ The pages are written with the default shown here. Each can be changed in one pl
 | 9 | Run limits | Run deadline 110 s. Per-customer concurrency and token budgets are settings, with values to be chosen. | Not in the code. |
 | 10 | Edge | A Lambda@Edge function sets a fresh security-policy nonce on every page | Static hosting alone can't do it. |
 | 11 | Where the landing → raw copy step runs | A Lambda function triggered by the lab's `_SUCCESS` in `landing/`, running as the customer's SFTP copy role | Neither the code nor the design names its compute. |
+| 12 | Cookie and header names (`cc_session`, `x-cc-csrf`) | Kept as they are in the code, because IT configures WAF and log redaction with them | They still carry the old "CC" name. |
+| 13 | Runs on SQS and run workers | These pages describe the SQS queue and Fargate run workers. They also describe the cancel flag, limits object, CSV objects and event chunks that design needs. | Today the chat API runs each question in its own process. |
