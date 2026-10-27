@@ -112,6 +112,19 @@ def main(src):
     call = by["DQGZJ5UYd0"]                            # the callout arrow ends on the lower diamond's bottom tip
     call["points"][-1] = [low["x"] + 52 - call["x"], low["y"] + 96 - call["y"]]
 
+    # 4. the frontend panel shows the light-mode chat UI, fitted to the frame with its aspect ratio kept
+    shot = Path(__file__).resolve().parent.parent / "assets" / "chat-ui-light.png"
+    img, frame = by["IIx3z_anQB"], by["KyHx9De5HC"]
+    doc["files"][img["fileId"]]["dataURL"] = "data:image/png;base64," + __import__("base64").b64encode(shot.read_bytes()).decode()
+    doc["files"][img["fileId"]]["mimeType"] = "image/png"
+    from PIL import Image
+    w, h = Image.open(shot).size
+    img["width"] = frame["width"] - 8
+    img["height"] = img["width"] * h / w
+    img["x"] = frame["x"] + 4
+    img["y"] = frame["y"] + (frame["height"] - img["height"]) / 2
+    img["scale"] = [1, 1]
+    frame["strokeWidth"] = 1
     doc["elements"] = els
     OUT.write_text(json.dumps(doc, indent=1))
     print(OUT)

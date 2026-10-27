@@ -229,7 +229,7 @@ def svg_node(n):
     out = [f'<g data-node="{escape(n["id"])}">']
     if shape == "image":
         out.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="4" fill="{PAPER}" stroke="{BLUE}" stroke-width="1.4"/>'
-                   f'<image x="{x + 1}" y="{y + 1}" width="{w - 2}" height="{h - 2}" preserveAspectRatio="xMidYMid slice" href="{n["href"]}"/>')
+                   f'<image x="{x + 1}" y="{y + 1}" width="{w - 2}" height="{h - 2}" preserveAspectRatio="xMidYMid {n.get('fit', 'slice')}" href="{n["href"]}"/>')
         out.append("</g>")
         return "".join(out)
     if shape in ("box", "steps", "ui", "grid", "table"):

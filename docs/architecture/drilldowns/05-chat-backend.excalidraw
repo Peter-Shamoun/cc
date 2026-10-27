@@ -6,9 +6,9 @@
   {
    "id": "rectangle_1007",
    "type": "rectangle",
-   "x": 320,
+   "x": 350,
    "y": 170,
-   "width": 330,
+   "width": 340,
    "height": 290,
    "angle": 0,
    "strokeColor": "#1e1e1e",
@@ -35,7 +35,7 @@
   {
    "id": "text_1014",
    "type": "text",
-   "x": 334,
+   "x": 364,
    "y": 180,
    "width": 49.28,
    "height": 27.5,
@@ -204,9 +204,9 @@
   {
    "id": "arrow_1049",
    "type": "arrow",
-   "x": 240,
+   "x": 270,
    "y": 285,
-   "width": 110,
+   "width": 130,
    "height": 0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
@@ -233,7 +233,7 @@
      0
     ],
     [
-     110,
+     130,
      0
     ]
    ],
@@ -247,7 +247,7 @@
   {
    "id": "text_1056",
    "type": "text",
-   "x": 254.68,
+   "x": 294.68,
    "y": 255,
    "width": 80.64000000000001,
    "height": 22.5,
@@ -284,9 +284,9 @@
   {
    "id": "arrow_1063",
    "type": "arrow",
-   "x": 350,
+   "x": 400,
    "y": 335,
-   "width": 110,
+   "width": 130,
    "height": 0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
@@ -313,7 +313,7 @@
      0
     ],
     [
-     -110,
+     -130,
      0
     ]
    ],
@@ -327,7 +327,7 @@
   {
    "id": "text_1070",
    "type": "text",
-   "x": 234.51999999999998,
+   "x": 274.52,
    "y": 349,
    "width": 120.96000000000001,
    "height": 22.5,
@@ -364,9 +364,9 @@
   {
    "id": "arrow_1077",
    "type": "arrow",
-   "x": 620,
+   "x": 660,
    "y": 285,
-   "width": 160,
+   "width": 120,
    "height": 0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
@@ -393,7 +393,7 @@
      0
     ],
     [
-     160,
+     120,
      0
     ]
    ],
@@ -409,7 +409,7 @@
    "type": "arrow",
    "x": 780,
    "y": 335,
-   "width": 160,
+   "width": 120,
    "height": 0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
@@ -436,7 +436,7 @@
      0
     ],
     [
-     -160,
+     -120,
      0
     ]
    ],
@@ -1100,10 +1100,10 @@
   {
    "id": "rectangle_1203",
    "type": "rectangle",
-   "x": 40,
-   "y": 255,
-   "width": 200,
-   "height": 100,
+   "x": 20,
+   "y": 242,
+   "width": 250,
+   "height": 136,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1129,10 +1129,10 @@
   {
    "id": "text_1210",
    "type": "text",
-   "x": 108.64,
-   "y": 291.0,
-   "width": 62.720000000000006,
-   "height": 40.0,
+   "x": 91.24,
+   "y": 300.0,
+   "width": 107.52000000000001,
+   "height": 20.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1152,8 +1152,8 @@
    "updated": 1,
    "link": null,
    "locked": false,
-   "text": "User\nbrowser",
-   "originalText": "User\nbrowser",
+   "text": "ClaimClarity",
+   "originalText": "ClaimClarity",
    "fontSize": 16,
    "fontFamily": 5,
    "textAlign": "center",
@@ -1166,9 +1166,9 @@
   {
    "id": "rectangle_1217",
    "type": "rectangle",
-   "x": 350,
+   "x": 400,
    "y": 235,
-   "width": 270,
+   "width": 260,
    "height": 140,
    "angle": 0,
    "strokeColor": "#1e1e1e",
@@ -1195,7 +1195,7 @@
   {
    "id": "image_1224",
    "type": "image",
-   "x": 358,
+   "x": 408,
    "y": 243,
    "width": 26,
    "height": 26,
@@ -1228,7 +1228,7 @@
   {
    "id": "text_1231",
    "type": "text",
-   "x": 413.32,
+   "x": 458.32,
    "y": 291.0,
    "width": 143.36,
    "height": 40.0,
@@ -1997,6 +1997,43 @@
    "lineHeight": 1.25,
    "autoResize": true,
    "baseline": 20
+  },
+  {
+   "id": "text_1392",
+   "type": "text",
+   "x": 20,
+   "y": 207,
+   "width": 141.12,
+   "height": 22.5,
+   "angle": 0,
+   "strokeColor": "#1e1e1e",
+   "backgroundColor": "transparent",
+   "fillStyle": "solid",
+   "strokeWidth": 2,
+   "strokeStyle": "solid",
+   "roughness": 1,
+   "opacity": 100,
+   "groupIds": [],
+   "frameId": null,
+   "roundness": null,
+   "seed": 1392,
+   "version": 1,
+   "versionNonce": 4176,
+   "isDeleted": false,
+   "boundElements": null,
+   "updated": 1,
+   "link": null,
+   "locked": false,
+   "text": "User \u00b7 browser",
+   "originalText": "User \u00b7 browser",
+   "fontSize": 18,
+   "fontFamily": 5,
+   "textAlign": "left",
+   "verticalAlign": "top",
+   "containerId": null,
+   "lineHeight": 1.25,
+   "autoResize": true,
+   "baseline": 18
   }
  ],
  "appState": {
