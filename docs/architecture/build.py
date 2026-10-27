@@ -99,7 +99,9 @@ pre {{ background:#F1F3F7; padding:10px; overflow:auto; }}
 .diagram svg {{ width:100%; height:auto; max-width:100%; }}
 @media (max-width: 800px) {{ nav {{ position:static; width:auto; height:auto; }} main {{ margin-left:0; padding:16px; }} }}
 @media print {{ nav {{ display:none; }} main {{ margin:0; padding:0; max-width:none; }}
-  section {{ break-before:page; border:0; }} .diagram {{ border:0; }} }}
+  section {{ break-before:page; border:0; padding:0; }} .diagram {{ border:0; padding:0; break-inside:avoid; }}
+  .diagram svg {{ width:100%; height:auto; max-height:160mm; display:block; margin:0 auto; }}
+  h1, h2 {{ break-after:avoid; }} tr {{ break-inside:avoid; }} body {{ font-size:12px; }} }}
 </style></head><body>
 <nav><b>CC ARCHITECTURE</b>{''.join(nav)}</nav>
 <main>{''.join(sections)}</main></body></html>""")
