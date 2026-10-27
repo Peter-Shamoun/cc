@@ -3,7 +3,7 @@ from ClaimClarity_Architecture.md.
 
 The boards' sources are drilldowns/main.json (the main board) and drilldowns/<nn>-<name>.json, the files the diagram
 editor (diagram-editor.html) opens and saves. drilldowns.py renders them to PNG and SVG; set PYTHON to a Python with
-Playwright. The editor is rebuilt too, so it opens the same boards.
+Playwright. The editor and the one-canvas view (ClaimClarity_Canvas.html) are rebuilt too, from the same boards.
 """
 import base64, io, os, re, subprocess, sys
 from pathlib import Path
@@ -33,6 +33,7 @@ def image(m):
 def main():
     subprocess.run([sys.executable, str(TOOLS / "drilldowns.py")], check=True)
     subprocess.run([sys.executable, str(TOOLS / "build_editor.py")], check=True)
+    subprocess.run([sys.executable, str(TOOLS / "build_canvas.py")], check=True)
     md = (V2 / "ClaimClarity_Architecture.md").read_text()
     md = re.sub(r"!\[([^\]]*)\]\(([^)]+\.png)\)", image, md)
     body = subprocess.run(["pandoc", "-f", "gfm", "-t", "html"], input=md, capture_output=True, text=True, check=True).stdout
