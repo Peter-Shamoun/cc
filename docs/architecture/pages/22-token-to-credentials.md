@@ -2,145 +2,91 @@
 
 [Overview](00-overview.md) › [Identity & access](20-identity.md) › Token to credentials
 
-Every question goes through three AWS checks before a single byte of customer data is read. The chat API verifies the
-id token (gate 4). STS checks the customer role's trust policy (gate 5). IAM and KMS check every read (gate 6). The
-worker holds no standing AWS access to customer data: it gets 15-minute credentials for one customer's reader role,
-for one run.
+Every question passes three AWS checks before any customer data is read: the token (gate 4), the role's trust
+policy (gate 5) and IAM plus KMS on every read (gate 6). The run worker has no standing access to customer data: it
+gets 15-minute credentials for one customer's reader role, for one run.
 
 ![Token to credentials](../png/22-token-to-credentials.png)
 
 ## In this diagram
 
-| # | Box | What it does | Details |
-|---|---|---|---|
-| 1 | Browser | Sends the `cc_session` cookie with each API call | [Sign-in](21-sign-in.md) |
-| 2 | Chat API | Verifies the id token (gate 4). Takes the customer from the token only, then queues the run | [Chat turn](32-chat-turn.md) |
-| 3 | Run worker | Holds the verified id token for this run and calls STS | [Chat backend](30-chat-backend.md) |
-| 4 | AWS STS | AssumeRoleWithWebIdentity into Customer B's reader role (gate 5) | [STS card](90-service-catalog.md) |
-| 5 | Reader session | A DuckDB session opened with the 15-minute credentials, limited to B's gold relations | [SQL guard & escalation](44-sql-guard-escalation.md) |
-| 6 | B's gold prefix | `B/semantic_layer/` in the ClaimClarity bucket. The session reads the version that `CURRENT` names | [Gold publish](15-gold-publish.md) |
-| 7 | Cognito signing keys | The user pool's public keys (JWKS). The API caches them | [Network](51-network.md) |
-| 8 | Trust policy | Customer B's reader role trusts only Cognito tokens for the ClaimClarity app that carry `customer = B` | |
-| 9 | Customer B's key | KMS key that decrypts B's objects, only for B's roles, only through S3 | [Encryption & keys](52-encryption-keys.md) |
+| Item | What it does | Details |
+|---|---|---|
+| ID token | Arrives in the `cc_session` cookie with each API call. | [Sign-in](21-sign-in.md) |
+| Gate 4 · Token valid? | Checks the token against the Cognito signing keys. | |
+| Chat API | Takes the customer from the verified token only, then queues the run. | [Chat turn](32-chat-turn.md) |
+| Run worker | Holds the verified token for the run and calls STS. | [Analyzer](40-analyzer.md) |
+| Gate 5 · Trust policy allows? | Customer B's role accepts only ClaimClarity tokens tagged `customer = B`. | |
+| STS | Returns 15-minute credentials for Customer B's reader role. | [STS card](90-service-catalog.md) |
+| Reader session | DuckDB session opened with those credentials, limited to B's gold relations. | [SQL guard & escalation](44-sql-guard-escalation.md) |
+| Gate 6 · IAM + KMS allow? | Each S3 read must pass B's role policy, the bucket policy and B's key policy. | |
+| S3 · B's gold only | The version of `B/semantic_layer/` that `CURRENT` names. | [Gold publish](15-gold-publish.md) |
+| Cognito signing keys | Public keys the chat API verifies the token with. Cached. | [Network](51-network.md) |
+| Customer B's role | The reader role and its trust policy. | [IAM and KMS matrix](91-iam-kms-matrix.md) |
+| Customer B's key | Decrypts B's objects, only for B's roles, only through S3. | [Encryption keys](52-encryption-keys.md) |
 
 ## How it works
 
-1. The browser (1) calls the API with the `cc_session` cookie.
-2. **Gate 4 · Is the token valid?** The chat API (2) verifies the id token against the Cognito signing keys (7):
-   - the algorithm is RS256 and the key id is one of the pool's keys (no `alg=none`, no HS256);
-   - the signature is valid;
-   - `iss` is the user pool and `aud` is the ClaimClarity app client;
-   - `exp` has not passed and `token_use` is `id`;
-   - `custom:customer` is present.
-   Any failure answers 401 `auth_expired`. The API then uses `custom:customer` and `sub` from the token as the
-   customer and user. Nothing in the request body, query string or other headers can change them.
-3. The API queues the run. A run worker (3) picks it up with the verified token.
-4. **Gate 5 · Does B's role trust this token?** The worker calls STS (4) with AssumeRoleWithWebIdentity:
-   - role: Customer B's reader role, chosen from the token's customer claim;
-   - session name: `u-<first 8 characters of sub>-<request id>`, so CloudTrail shows who and which request;
-   - duration: 900 seconds.
-   STS verifies the token again, against the OIDC provider registered for the Cognito user pool, and evaluates the
-   role's trust policy (8). The token's session tags become the session's `customer` and `user` tags.
-5. STS returns credentials that expire after 15 minutes. The worker opens the reader session (5):
-   - it reads `B/semantic_layer/CURRENT`, then that version's manifest;
-   - it creates one view per `sem.*` table over exactly the files the manifest lists;
-   - each relation's prefix gets its own scoped DuckDB secret and allowed directory;
-   - external file access is off, there is no temp directory, memory is capped at 2 GB, and the configuration is
-     locked.
-6. **Gate 6 · Do IAM and KMS allow this read?** Each S3 read (6) must pass B's reader role policy, the bucket policy
-   and B's key policy (9). The key decrypts only through S3, only for objects under `B/`.
-7. Long chats renew the credentials. Before each SQL call the worker checks the credentials' expiry. With fewer than
-   3 minutes left, it calls AssumeRoleWithWebIdentity again with the same id token and reopens the reader session
-   on the same gold version. A SQL call is never run on expired credentials: it is refused and audited as
-   `expired`. Once the id token itself expires (60 minutes after sign-in), STS refuses the renewal, the run ends,
-   and the user signs in again.
+1. **Gate 4.** The chat API checks the token: RS256 with a key from the Cognito signing keys, issuer, audience
+   (the ClaimClarity app client), expiry, `token_use = id` and a `custom:customer` claim. Any failure is a 401.
+2. The API takes the customer and user from the token. Nothing in the body, query string or headers can change
+   them. It queues the run.
+3. **Gate 5.** The run worker calls AssumeRoleWithWebIdentity for Customer B's reader role, with session name
+   `u-<sub prefix>-<request id>` and a duration of 900 s. STS verifies the token again and evaluates the trust policy.
+4. The worker opens the reader session: it reads `CURRENT` and that version's manifest, then mounts one view per
+   gold table, each with its own scoped secret and allowed directory. External access is off and the
+   configuration is locked.
+5. **Gate 6.** Every S3 read needs B's role policy, the bucket policy and B's key policy to allow it.
+6. In long chats, the worker renews the credentials with the same token when fewer than 3 minutes remain, on the
+   same gold version. SQL is never run on expired credentials.
 
 ## Specification
 
 ### Trust policy of Customer B's reader role (gate 5)
 
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": { "Federated": "<OIDC provider for the ClaimClarity Cognito user pool>" },
-    "Action": ["sts:AssumeRoleWithWebIdentity", "sts:TagSession"],
-    "Condition": {
-      "StringEquals": {
-        "<user pool issuer>:aud": "<ClaimClarity app client id>",
-        "aws:RequestTag/customer": "B"
-      }
-    }
-  }]
-}
-```
-
-| Condition | Effect |
+| Element | Value |
 |---|---|
-| Principal is the Cognito OIDC provider | Only tokens from the ClaimClarity user pool. An Entra token or another pool's token is refused |
-| `aud` = the ClaimClarity app client | A token issued to another app client in the pool is refused |
-| `aws:RequestTag/customer` = B | The customer session tag that Cognito put in the token must be B. A token for Customer A is refused |
-| `sts:TagSession` allowed | Required, because the token carries session tags |
+| Principal | The IAM OIDC provider for the ClaimClarity Cognito user pool |
+| Actions | `sts:AssumeRoleWithWebIdentity`, `sts:TagSession` |
+| Condition | `<pool>:aud` = the ClaimClarity app client, and `aws:RequestTag/customer` = B |
+| Session length | 900 s requested; the role's maximum is 3600 s |
 
-The role's maximum session duration is the AWS minimum, 1 hour. ClaimClarity always requests 900 seconds.
+### Customer B's reader role policy (gate 6, IAM part)
 
-### Reader role policy (gate 6, IAM part)
+| Allowed | On |
+|---|---|
+| `s3:ListBucket` | The ClaimClarity bucket, prefix `B/semantic_layer/*` only |
+| `s3:GetObject` | `B/semantic_layer/*` |
 
-| Action | Resource | Condition |
-|---|---|---|
-| `s3:ListBucket` | the ClaimClarity bucket | `s3:prefix` like `B/semantic_layer/*` |
-| `s3:GetObject` | `B/semantic_layer/*` | |
+No `GetObjectVersion`, no raw or silver, no transcripts, no writes. `lossless.*` tables are PHI-stripped copies
+published next to gold, so even an escalated session never reads a silver object.
 
-Nothing else. In particular:
-
-- no `s3:GetObjectVersion`: only the current S3 object version can be read;
-- no raw, silver (`parquet/`), staging, quarantine or transcript prefixes;
-- no write or delete.
-
-The escalation tables (`lossless.*`) are PHI-stripped copies kept under the gold prefix, so even an escalated
-session never reads a silver object. See [SQL guard & escalation](44-sql-guard-escalation.md).
-
-### Bucket policy and key policy (gate 6, the other two parts)
-
-The bucket policy is the same for every customer. It denies:
-
-- any request without TLS;
-- any principal with no `customer` tag;
-- object access outside `${aws:PrincipalTag/customer}/`;
-- listing outside that prefix.
-
-Customer B's key policy allows `kms:Decrypt` only to B's lake roles, only with `kms:ViaService` = S3, and only
-when the encryption context `aws:s3:arn` is under `B/`. See [Encryption & keys](52-encryption-keys.md).
-
-### Limits and timeouts
+### Limits
 
 | Item | Value |
 |---|---|
-| Credential lifetime | 900 s (15 minutes) |
-| Renewal | When fewer than 180 s remain, before the next SQL call. Same id token, same gold version |
-| Id token lifetime | 3600 s. No renewal after it expires |
-| Signing-key cache | 24 hours. On an unknown key id, refetch once (at most every 5 minutes), then refuse |
+| Credentials | 900 s, renewed when fewer than 180 s remain |
+| ID token | 3600 s. No renewal after it expires: the run ends and the user signs in again |
+| Signing keys | Cached 24 h; refetched on an unknown key id, at most every 5 minutes |
 | Reader session | 2 GB memory, no temp directory, configuration locked |
 
 ### Failure behaviour
 
 | Failure | Result |
 |---|---|
-| Gate 4 fails | 401 `auth_expired`. No run is queued |
-| Gate 5 fails (`AccessDenied`, `InvalidIdentityToken`, `ExpiredTokenException`) | The run ends with a sign-in-again message. The denied call is in CloudTrail |
-| Gate 6 fails (`AccessDenied` from S3 or KMS) | The SQL call errors. The agent audit records `outcome=error` |
-| Credentials expired at a SQL call | The call is refused and audited as `expired`. Renewal normally prevents this |
-| STS throttled or unreachable | Retried 3 times with backoff over about 5 s, then the run fails cleanly |
+| Gate 4 | 401 `auth_expired`. No run is queued |
+| Gate 5 | The run ends with a sign-in-again message. CloudTrail has the denied call |
+| Gate 6 | The SQL call fails and the agent audit records `outcome=error` |
+| Credentials expired at a SQL call | Refused and audited as `expired` |
+| STS throttled | 3 retries with backoff, then the run fails |
 
 ### Logging
 
-CloudTrail records each AssumeRoleWithWebIdentity call, allowed or denied, with the role and session name. It also
-records each S3 GetObject (data events) and each KMS Decrypt. The agent audit records the session opening
-(customer, user, gold version, escalation flag, a hash of the token, never the token) and every SQL call. See
-[Audit & logging](53-audit-logging.md).
+CloudTrail records every AssumeRoleWithWebIdentity, S3 GetObject and KMS Decrypt, allowed or denied. The agent
+audit records the session opening (customer, user, gold version, escalation flag, a hash of the token) and every SQL
+call. See [Audit logging](53-audit-logging.md).
 
 ## Related
 
 Up: [Identity & access](20-identity.md) · Previous: [Sign-in](21-sign-in.md) · Next:
-[Customer isolation](23-customer-isolation.md) · See also: [IAM and KMS matrix](91-iam-kms-matrix.md)
+[Customer isolation](23-customer-isolation.md)

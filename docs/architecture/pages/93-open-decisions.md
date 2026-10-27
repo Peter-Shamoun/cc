@@ -16,3 +16,4 @@ The pages are written with the default shown here. Each can be changed in one pl
 | 8 | Log retention | Network and app logs 1 year, CloudTrail 6 years. From the code: raw 7 years, audit 6 years, transcripts 90 days. | The 1-year and 6-year values are proposals. |
 | 9 | Run limits | Run deadline 110 s. Per-customer concurrency and token budgets are settings, with values to be chosen. | Not in the code. |
 | 10 | Edge | A Lambda@Edge function sets a fresh security-policy nonce on every page | Static hosting alone can't do it. |
+| 11 | Where the landing → raw copy step runs | A Lambda function triggered by the lab's `_SUCCESS` in `landing/`, running as the customer's SFTP copy role | Neither the code nor the design names its compute. |

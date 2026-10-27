@@ -2,60 +2,56 @@
 
 [Overview](00-overview.md) › Identity & access
 
-A XiFin user signs in with their company account (Microsoft Entra ID). Amazon Cognito turns that sign-in into an id
-token that names exactly one customer. On every question, AWS STS exchanges the token for 15-minute credentials of
-that customer's reader role, and those credentials can read only that customer's gold prefix. The customer is never
-taken from the request itself, so no request can choose another customer's data.
+A XiFin user signs in with Microsoft Entra ID, and Amazon Cognito issues an ID token that names exactly one
+customer. On every question, STS exchanges that token for 15-minute credentials of the customer's reader role, and
+those credentials can read only that customer's gold data.
 
 ![Identity & access](../png/20-identity.png)
 
 ## In this diagram
 
-| # | Box | What it does | Details |
-|---|---|---|---|
-| 1 | XiFin user | Opens the ClaimClarity web app in the browser. The browser holds the session cookie, which page scripts cannot read. | [Sign-in](21-sign-in.md) |
-| 2 | Microsoft Entra ID | Company login and MFA. Only members of the groups assigned to the ClaimClarity app get a token. | [Sign-in](21-sign-in.md) |
-| 3 | Amazon Cognito | User pool with Entra ID as its only identity provider. Issues the id token that names the customer. | [Sign-in](21-sign-in.md) |
-| 4 | Chat API + run workers | Verify the id token on every request (gate 4) and hold it for the run. | [Token to credentials](22-token-to-credentials.md) |
-| 5 | AWS STS | AssumeRoleWithWebIdentity: checks the token against the role's trust policy (gate 5), returns 15-minute credentials. | [Token to credentials](22-token-to-credentials.md) |
-| 6 | Customer B's reader role | The one role the credentials belong to. Its policy reads Customer B's gold prefix and nothing else. | [Token to credentials](22-token-to-credentials.md) |
-| 7 | B's gold prefix | `B/semantic_layer/` in the ClaimClarity bucket. Only the current version is readable (gate 6). | [S3 layout](12-s3-layout.md) |
-| 8 | Customer B's key | KMS key that decrypts B's objects, only for B's roles and only through S3 (gate 6). | [Encryption & keys](52-encryption-keys.md) |
+| Item | What it does | Details |
+|---|---|---|
+| XiFin user | Opens the ClaimClarity web app and signs in. | [Sign-in](21-sign-in.md) |
+| Microsoft Entra ID | Company login. Issues a token only to members of the groups assigned to the ClaimClarity app. | [Sign-in](21-sign-in.md) |
+| Amazon Cognito | Federates Entra ID, maps the user to one customer and issues the ID token. | [Sign-in](21-sign-in.md) |
+| ID token | Names the customer. Kept in an httpOnly session cookie for 60 minutes. | [Sign-in](21-sign-in.md) |
+| Chat API checks it | Verifies the token on every request (gate 4). | [Token to credentials](22-token-to-credentials.md) |
+| STS | Exchanges the token for 15-minute credentials if the role's trust policy allows it (gate 5). | [Token to credentials](22-token-to-credentials.md) |
+| Customer B's role | The reader role the credentials belong to. It reads Customer B's gold prefix and nothing else. | [Customer isolation](23-customer-isolation.md) |
+| Customer B's key | Decrypts Customer B's objects, only for Customer B's roles, only through S3 (gate 6). | [Encryption keys](52-encryption-keys.md) |
+| S3 · B's gold only | The current version of Customer B's gold tables. | [Customer isolation](23-customer-isolation.md) |
 
 ## How it works
 
-1. The user (1) opens the app. With no valid session the app sends the browser to sign in.
-2. Entra ID (2) signs the user in. A user outside the assigned groups is refused here.
-3. Cognito (3) receives the Entra sign-in, finds the customer an administrator mapped to this user, and issues an id
-   token (60 minutes) that carries the customer. A user with no customer mapping is refused here.
-4. The chat API (4) puts the id token into the `cc_session` cookie: httpOnly, Secure, SameSite=Strict, path `/api`.
-   Every API call carries it, and the API verifies it every time (gate 4).
-5. For each run, a run worker sends the id token to STS (5). STS checks that Customer B's reader role (6) trusts
-   this token (gate 5) and returns credentials for that role that last 15 minutes.
-6. With those credentials the worker opens a read-only session on Customer B's gold prefix (7). IAM, the bucket
-   policy and Customer B's key (8) must all allow each read (gate 6).
+1. The user signs in at Entra ID. Users outside the assigned groups are refused.
+2. Cognito refuses users with no customer mapping, and issues a 60-minute ID token for the others.
+3. The chat API stores the token in the `cc_session` cookie and verifies it on every request (gate 4).
+4. A run worker exchanges the token at STS for Customer B's reader role (gate 5). The credentials last 15 minutes
+   and are renewed with the same token in long chats.
+5. Each read of Customer B's gold prefix needs IAM, the bucket policy and Customer B's key to allow it (gate 6).
 
 ## Specification
 
 | Item | Value |
 |---|---|
-| Identity provider | Microsoft Entra ID, one enterprise app for ClaimClarity with "Assignment required" on |
-| Federation | Cognito user pool, Entra ID as its only OIDC identity provider |
-| Customer claim | `custom:customer` in the id token, set by an administrator, not by the user |
-| Id token lifetime | 60 minutes. No refresh in the browser: after 60 minutes the user signs in again |
-| Session cookie | `cc_session` · httpOnly · Secure · SameSite=Strict · Path=/api · Max-Age 3600 s |
-| Token check (gate 4) | Signature (RS256, Cognito signing keys), issuer, audience (app client), expiry, `token_use=id`, customer claim present |
-| Credentials | STS AssumeRoleWithWebIdentity into the customer's reader role, 900 s (15 minutes), renewed during long chats |
-| Read scope (gate 6) | `GetObject` and a prefix-limited `ListBucket` on the customer's gold prefix only. No older object versions, no raw, no silver, no transcripts |
-| Roles per customer | Parser, reader and SFTP copy roles for the lake; separate roles for transcripts and the query audit ([Encryption & keys](52-encryption-keys.md)) |
+| Identity provider | Microsoft Entra ID, one enterprise app with "Assignment required" on |
+| Federation | Cognito user pool with Entra ID as its only identity provider |
+| Customer claim | `custom:customer`, set by an administrator, not writable by the user |
+| ID token | 60 minutes. The user signs in again when it expires |
+| Session cookie | `cc_session` · HttpOnly · Secure · SameSite=Strict · Path=/api · Max-Age 3600 |
+| Reader credentials | AssumeRoleWithWebIdentity, 900 s, renewed when fewer than 3 minutes remain |
+| Reader scope | List and read `<customer>/semantic_layer/`, current object versions only |
+| The customer's roles and keys | Parser, reader, SFTP copy, transcript and audit roles; a lake key and a transcript key. See [IAM and KMS matrix](91-iam-kms-matrix.md) |
+| Logging | Entra sign-in log; CloudTrail for every STS, S3 and KMS call. Tokens are never logged |
 
 ## Pages in this area
 
-- [Sign-in](21-sign-in.md): Entra ID, Cognito and the session cookie, step by step.
-- [Token to credentials](22-token-to-credentials.md): gates 4, 5 and 6, the trust policy and the 15-minute credentials.
-- [Customer isolation](23-customer-isolation.md): why Customer A's session cannot reach Customer B's data, layer by layer.
+- [Sign-in](21-sign-in.md): Entra ID, Cognito and the session cookie
+- [Token to credentials](22-token-to-credentials.md): gates 4, 5 and 6
+- [Customer isolation](23-customer-isolation.md): why Customer A's session cannot reach Customer B's data
 
 ## Related
 
 Up: [Overview](00-overview.md) · See also: [Network & security](50-network-security.md) ·
-[Chat backend](30-chat-backend.md) · [IAM and KMS matrix](91-iam-kms-matrix.md)
+[IAM and KMS matrix](91-iam-kms-matrix.md)

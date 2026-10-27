@@ -37,7 +37,7 @@ save(d)
 d = Diagram("10-ingestion", "Ingestion & lake", 1560, 420)
 d.title("CLAIMCLARITY · INGESTION &amp; LAKE")
 strip(d, "s1", 70, 220, "A LAB'S DAILY FILES BECOME QUERYABLE TABLES")
-d.add("phi", "Customer B only: own prefix, KMS key and role", PHI, 460, 108, 1060, 168)
+d.add("phi", "Customer B only: own prefix, keys and roles", PHI, 460, 108, 1060, 168)
 chain(d, "a", [("corporate_data_center", "Customer lab", None, F), ("transfer_family", "SFTP intake", "11", T), ("s3", "S3 · raw", "12", T),
                ("eventbridge", "EventBridge", "13", T), ("fargate", "Parser task", "14", T), ("s3", "S3 · silver", "12", T),
                ("s3", "S3 · gold", "15", T)], 200, step=210)

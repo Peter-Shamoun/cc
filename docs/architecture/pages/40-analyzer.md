@@ -1,97 +1,64 @@
-# Agent analyzer
+# Analyzer
 
-[Overview](00-overview.md) › Agent analyzer
+[Overview](00-overview.md) › Analyzer
 
-The analyzer turns one question into one answer. It runs inside the run workers (Amazon ECS on AWS Fargate) and
-calls Claude Haiku on Amazon Bedrock (every hexagon in the diagram is a model step). Every turn passes a KPI gate first. When one standard KPI query computes
-exactly what was asked, fixed SQL answers it. Otherwise the custom analysis agent writes its own read-only SQL over
-gold. Both paths use the same SQL guard and reader session, and in both the numbers come from the database, never
-from the model.
+The analyzer is code inside the run worker (ECS on Fargate) that turns one question into one answer, using Claude
+Haiku on Amazon Bedrock. A KPI gate sends each question to a preset KPI query or to the Claim Query Agent, and both
+read the customer's gold tables only through the cc CLI and SQL guard, on a read-only reader session.
 
-![Agent analyzer](../png/40-analyzer.png)
+![Analyzer](../png/40-analyzer.png)
 
 ## In this diagram
 
-| # | Box | What it does | Details |
-|---|---|---|---|
-| 1 | Chat API | Verifies the user's token and queues the turn for a run worker | [One chat turn](32-chat-turn.md) |
-| 2 | KPI gate | One model call to Claude Haiku on Amazon Bedrock. It decides whether one standard KPI template fits the question and fills in its values. | [KPI gate](41-kpi-gate.md) |
-| 3 | Standard KPI query | A fixed SQL template from the reviewed catalog, run with the values bound as parameters | [Standard KPI path](42-standard-kpi-path.md) |
-| 4 | Reply writer | One model call. It writes 1–3 sentences from the formatted rows. | [Standard KPI path](42-standard-kpi-path.md) |
-| 5 | Guarded reader | The SQL guard plus a read-only DuckDB session for one customer. Every query of both paths runs here. | [SQL guard and escalation](44-sql-guard-escalation.md) |
-| 6 | Custom analysis agent | A Strands agent that explores gold, writes SQL and submits a final query | [Custom analysis agent](43-custom-analysis-agent.md) |
-| 7 | Customer B's gold | The `sem.*` views of the current gold version. The lossless tables open only after an audited escalation. | [S3 layout](12-s3-layout.md) |
-| 8 | Answer | The same parts on both paths: text, SQL, result table, optional chart, assumptions and caveats | [Custom analysis agent](43-custom-analysis-agent.md) |
+| Item | What it does (one sentence) | Details |
+|---|---|---|
+| Chat app | The frontend, shared between apps, where the user asks and sees answers, live steps and clarifying questions. | [Chat turn](32-chat-turn.md) |
+| KPI gate | Decides whether one preset KPI query answers the question exactly. | [KPI gate](41-kpi-gate.md) |
+| Preset KPI queries | 16 reviewed, fixed SQL queries; the gate fills their parameters (payer, payer class, month, CPT, CARC). | [Preset KPI queries](42-standard-kpi-path.md) |
+| Claim Query Agent | The Strands agent that answers every other question; also part of the backend for Agentic Next Best Actions. | [Claim Query Agent](43-custom-analysis-agent.md) |
+| Each turn: solved example question bank | Gives the agent the 3 most similar solved questions, with today's date, the data coverage and the conversation history. | [Claim Query Agent](43-custom-analysis-agent.md) |
+| Cached: Playbook, EDI business glossary, Gold schema | The parts of the agent's prompt that are the same for every question, cached by Bedrock. | [Model calls](45-model-calls.md) |
+| Claude Haiku | The model behind the gate and the agent, on Amazon Bedrock. | [Model calls](45-model-calls.md) |
+| Full lossless EDI schema | Described to the agent only after it escalates with a reason, which is logged and shown to the user. | [cc CLI + SQL guard](44-sql-guard-escalation.md) |
+| cc CLI + SQL guard | The only way to the data: it checks every query from both paths, and the server re-runs the agent's final query. | [cc CLI + SQL guard](44-sql-guard-escalation.md) |
+| DuckDB reader session | One read-only session per run, with row, time and cost caps, using the customer's 15-minute credentials. | [Token to credentials](22-token-to-credentials.md) |
+| Customer's S3 prefix | Holds `sem.*` (gold, read by default) and `lossless.*` (PHI-stripped EDI tables, only after escalation). | [S3 layout](12-s3-layout.md) |
+| IAM + KMS gate | AWS allows the reader to read this customer's data only (gate 6). | [Customer isolation](23-customer-isolation.md) |
 
 ## How it works
 
-1. The chat API (1) verifies the token and queues a run. A run worker picks it up, exchanges the token for
-   short-lived credentials of the customer's role and opens a read-only reader session.
-2. The KPI gate (2) reads the question, the conversation's earlier questions with how each was answered, today's
-   date and the data coverage. It returns a structured decision. The server checks it.
-3. **Standard KPI path.** If the decision is valid, the template's fixed SQL (3) runs through the guard (5) on gold
-   (7). Code formats the numbers, and the reply writer (4) writes a short reply from them.
-4. **Custom analysis path.** Anything else goes to the custom analysis agent (6). It runs commands through the same
-   guard (5), and may escalate to the lossless tables with a stated reason. It finishes with an answer, a refusal or
-   a clarifying question.
-5. The answer (8) is built by the server. On the custom path the server runs the agent's final SQL again, so the
-   rows in the answer come from the database. The user sees one step that names the path taken:
-   "Standard KPI · &lt;template id&gt; · &lt;values&gt;" or "Custom analysis · &lt;gate reason&gt;".
+1. The user asks a question in the chat app. The KPI gate checks whether a preset answers it exactly.
+2. **Yes:** the preset's fixed SQL runs with the gate's values, and a short reply is written from the result.
+3. **No:** the Claim Query Agent gets the question with 3 similar solved examples and its cached references. It
+   answers, asks a clarifying question, or escalates to the lossless schema with a stated reason.
+4. The agent writes cc CLI calls with SQL. Each one passes the SQL guard and runs on the DuckDB reader session, and
+   the results stream back to the agent.
+5. The agent submits its final query and answer. The server re-runs that query, so the numbers come from the
+   database.
+6. The answer streams back to the chat app with its formatting, SQL and live steps, or as clarifying questions.
 
 ## Specification
 
-**Model and runtime**
-
 | Item | Value |
 |---|---|
-| Model | Claude Haiku on Amazon Bedrock, effort low (no extended thinking) |
-| Agent framework | Strands Agents, `BedrockModel` with Bedrock prompt caching |
-| Where it runs | Inside the run worker process (ECS on Fargate). No separate service. |
-| Model calls per turn | Standard KPI path: 2 (gate, reply writer). Custom analysis path: 1 + one per agent step. See [Model calls](45-model-calls.md). |
-| Typical latency | Standard KPI turn about 4 s. Custom analysis turn about 18 s. |
-| Typical cost | Standard KPI turn about $0.004. KPI gate about $0.0004 per call. |
-
-**Data access**
-
-| Item | Value |
-|---|---|
-| Who reads data | Only the reader session in the run worker, with the customer's temporary role credentials (gate 6: IAM + KMS allow the reader) |
-| Default scope | Gold (`sem.*`) of the current version, for the one customer the token names |
-| Lossless | Only after the agent's `escalate` command with a stated reason. The reason is masked, audited and shown to the user. |
-| Writes | None. Every query is a single read-only SELECT. |
-| PHI | Query results are customer data and are treated as PHI. Identifier columns are redacted before any result leaves the tool layer. Up to 20 result rows per query go to Bedrock. |
-
-**Limits** (per question; details on [SQL guard and escalation](44-sql-guard-escalation.md))
-
-| Limit | Value |
-|---|---|
-| Query time | 25 s per query, 60 s in total per question |
-| Rows | 1,000 rows per query; 20 rows shown to the model; 50-row preview in the answer, the rest as a CSV download |
-| Agent commands | 12 commands besides the final one (failed commands do not count); hard stop at 30 model turns |
-| Output tokens | 4,096 per model call |
-
-**Failure behaviour**
-
-| Event | Result |
-|---|---|
-| Gate fails in any way (invalid values, exception, timeout, no structured output) | The turn goes to the custom analysis path and the failure is logged. The user never sees a gate error. |
-| Standard KPI SQL error or failed reply | Same: the custom analysis path answers |
-| Agent ends without a final command | The turn ends with an error part ("I couldn't answer that"), retryable |
-| User presses Stop | The in-flight Bedrock stream is cancelled and no further command runs |
-
-**Logging and audit:** every query, escalation and refusal produces an audit record (customer, user, gold
-version, ok or failed, row count, seconds). Model usage per turn (input, output, cache read and cache write tokens,
-model time) is recorded with the run. See [Audit and logging](53-audit-logging.md).
+| Where it runs | Inside the run worker (ECS on Fargate). The analyzer is not a separate service. |
+| Model | Claude Haiku on Amazon Bedrock, called with the run worker's task role |
+| Data read | The signed-in customer's `sem.*`. `lossless.*` only after a reasoned escalation. Never another customer, never silver objects. |
+| Credentials | The customer's reader role, for 15 minutes. The agent never holds credentials; SQL goes to the reader over a per-run channel. |
+| Writes | None. Every query is one read-only SELECT. |
+| Guard limits | 25 s per query, 60 s total query time per question, 1,000 rows per query, keyless joins over 100 million row pairs refused |
+| PHI | Query results are treated as PHI. Identifier columns are redacted before results leave the reader. |
+| Failure | If the gate or a preset fails, the question goes to the Claim Query Agent. If the agent ends without an answer, the user gets a retryable error. |
+| Logging | Every query, escalation and refusal is audited under the customer's audit key. Model token usage is recorded per run. |
 
 ## Pages in this area
 
-- [KPI gate](41-kpi-gate.md): how the gate decides, what it sees, the server check
-- [Standard KPI path](42-standard-kpi-path.md): fixed SQL, display SQL, number formatting, reply writer
-- [Custom analysis agent](43-custom-analysis-agent.md): the prompt, the commands, the final answer
-- [SQL guard and escalation](44-sql-guard-escalation.md): what every query must pass, and how lossless is opened
-- [Model calls](45-model-calls.md): every model call in a turn, caching, latency and cost
+- [KPI gate](41-kpi-gate.md)
+- [Preset KPI queries](42-standard-kpi-path.md)
+- [Claim Query Agent](43-custom-analysis-agent.md)
+- [cc CLI + SQL guard](44-sql-guard-escalation.md)
+- [Model calls](45-model-calls.md)
 
 ## Related
 
-Up: [Overview](00-overview.md) · See also: [One chat turn](32-chat-turn.md) ·
-[Customer isolation](23-customer-isolation.md) · [Amazon Bedrock card](90-service-catalog.md)
+Up: [Overview](00-overview.md) · See also: [Chat turn](32-chat-turn.md) · [Customer isolation](23-customer-isolation.md)
