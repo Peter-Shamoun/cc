@@ -47,7 +47,7 @@ read the customer's gold tables only through the cc CLI and SQL guard, on a read
 | Credentials | The customer's reader role, for 15 minutes. The agent never holds credentials; SQL goes to the reader over a per-run channel. |
 | Writes | None. Every query is one read-only SELECT. |
 | Guard limits | 25 s per query, 60 s total query time per question, 1,000 rows per query, keyless joins over 100 million row pairs refused |
-| PHI | Query results are treated as PHI. Identifier columns are redacted before results leave the reader. |
+| PHI | Query results are treated as PHI. Identifier columns are redacted by the cc CLI before results go anywhere. |
 | Failure | If the gate or a preset fails, the question goes to the Claim Query Agent. If the agent ends without an answer, the user gets a retryable error. |
 | Logging | Every query, escalation and refusal is audited under the customer's audit key. Model token usage is recorded per run. |
 

@@ -1,66 +1,49 @@
-# Standard KPI path
+# Preset KPI queries
 
-[Overview](00-overview.md) › [Agent analyzer](40-analyzer.md) › Standard KPI path
+[Overview](00-overview.md) › [Analyzer](40-analyzer.md) › Preset KPI queries
 
-When the KPI gate finds that one template fits, the answer comes from reviewed, fixed SQL instead of SQL the model
-writes. The values are bound as parameters, so the model cannot change the query. Code formats the numbers, and one
-short model call turns them into a sentence. The same KPI asked twice is computed the same way every time.
+When the KPI gate finds a fitting preset, the answer comes from reviewed, fixed SQL with the values bound as
+parameters, so the model cannot change the query. Code formats the numbers, and Claude Haiku writes a short reply
+from them.
 
-![Standard KPI path](../png/42-standard-kpi-path.png)
+![Preset KPI queries](../png/42-standard-kpi-path.png)
 
 ## In this diagram
 
-| # | Box | What it does | Details |
-|---|---|---|---|
-| 1 | Gate decision | A template id and values that passed the server check | [KPI gate](41-kpi-gate.md) |
-| 2 | Template SQL | The template's fixed SQL from the catalog, with DuckDB named parameters | [KPI gate](41-kpi-gate.md) |
-| 3 | Guarded reader | The same SQL guard, time limit and read-only reader session as the custom analysis path | [SQL guard and escalation](44-sql-guard-escalation.md) |
-| 4 | Customer B's gold | The `sem.*` views of the current gold version | [Gold publish](15-gold-publish.md) |
-| 5 | Number formatter | Formats rates, money and counts in code | |
-| 6 | Reply writer | One model call with no tools. It writes 1–3 sentences from the formatted rows. | [Model calls](45-model-calls.md) |
-| 7 | Amazon Bedrock | Claude Haiku | [Amazon Bedrock card](90-service-catalog.md) |
-| 8 | Answer | The same shape as a custom analysis answer, marked `via="template:<id>@v1"` | [Custom analysis agent](43-custom-analysis-agent.md) |
-| 9 | Display copy | The same SQL with the values written in as literals, for people to read | |
+| Item | What it does (one sentence) | Details |
+|---|---|---|
+| Chat app | Sends the question and shows the answer and its SQL. | [Chat turn](32-chat-turn.md) |
+| KPI gate | Picks the preset and its values. | [KPI gate](41-kpi-gate.md) |
+| Preset KPI queries | 16 fixed SQL queries with named parameters for payer, payer class, month, CPT and CARC. | |
+| Display SQL | The same SQL with the values written in, used wherever SQL is shown or saved. | |
+| cc CLI + SQL guard | Checks and runs the query, exactly as for the agent. | [cc CLI + SQL guard](44-sql-guard-escalation.md) |
+| DuckDB reader session | Runs the query read-only on the customer's gold. | [cc CLI + SQL guard](44-sql-guard-escalation.md) |
+| Customer's S3 prefix · `sem.*` | The gold tables the presets read. | [S3 layout](12-s3-layout.md) |
+| Number formatting | Formats rates as 12.3%, money as $1,234.56 and counts as 1,649, in code. | |
+| Claude Haiku · reply writer | Writes 1–3 sentences from the formatted rows, copying the values exactly. | [Model calls](45-model-calls.md) |
 
 ## How it works
 
-1. The checked gate decision (1) selects one template (2). Its values become bound parameters (`$payer`,
-   `$payer_class`, `$month`, `$cpt`, `$carc`). No value is ever pasted into the SQL that runs.
-2. The SQL runs through the guarded reader (3) on the customer's gold (4): the same guard, the same 25 s per query
-   and 60 s per question, the same read-only session and the same tool layer as the custom analysis path.
-3. The number formatter (5) formats the result in code:
-   - rates and shares as a percentage with one decimal (12.3%);
-   - money as $1,234.56;
-   - counts with thousands separators (1,649).
-4. The reply writer (6) makes one call to Claude Haiku on Bedrock (7). It gets the question, the formatted rows
-   and the gate's assumptions. It copies the values exactly, states the assumptions and writes no table.
-5. The answer (8) has the text, the result table, the SQL and the assumptions, in the same parts as a custom
-   analysis answer. It is marked `via="template:<id>@v1"`.
-6. The display copy (9) is used everywhere SQL leaves the executor: the SQL panel in the answer, the conversation
-   history, the run events and exports. It runs as-is to the same rows, so a reader can copy and check it.
+1. The gate's preset and values become bound parameters. No value is pasted into the SQL that runs.
+2. The query passes the SQL guard and runs on the reader session against `sem.*`.
+3. Code formats the numbers in the result.
+4. Claude Haiku writes a short reply with the gate's assumptions. It has no tools and writes no table.
+5. The answer has the same parts as an agent answer (text, table, SQL, assumptions) and is marked
+   `via="template:<id>@v1"`.
+6. The display SQL is what the SQL panel, history, run events and exports show. It runs as-is to the same rows.
 
 ## Specification
 
 | Item | Value |
 |---|---|
-| SQL that runs | The template's fixed SQL with bound parameters. Never model-written. |
-| SQL that is shown | The display copy, with values inlined as SQL literals. The standard literal-masking policy for shown SQL still applies. |
-| Data read | Gold (`sem.*`) only. The standard KPI path never escalates to lossless. |
-| Permissions | The run worker's reader session, with the customer's temporary role credentials (gate 6: IAM + KMS allow the reader) |
-| Limits | 25 s per query, 60 s total query time per question, 1,000 rows, as on [SQL guard and escalation](44-sql-guard-escalation.md) |
-| Model calls | One reply-writer call (the gate call comes before). No tools. |
-| Latency | Reply writer 1–2 s. A whole standard KPI turn, gate included, about 4 s. |
-| Cost | About $0.004 per standard KPI turn |
-| Numbers in the reply | Copied from the formatted rows. The table in the answer comes from the query, not from the model. |
-| PHI | Result rows are customer data. Identifier columns are redacted by the tool layer, as on every query. |
-
-**Failure behaviour.** A SQL error, a timeout or a failed reply on this path is logged and the turn moves to the
-custom analysis path. The user sees one answer, never a standard-path error.
-
-**Logging.** Each run records the template id, the template version and the bound values (payer names, months and
-codes; no patient data), plus the query's audit record: ok or failed, row count and seconds.
+| SQL that runs | The preset's fixed SQL with bound parameters. Never written by the model. |
+| Data read | `sem.*` of the current gold version only. Presets never escalate. |
+| Credentials | The customer's reader role, as for every query |
+| Limits | The SQL guard's: 25 s per query, 60 s per question, 1,000 rows |
+| PHI | Result rows are treated as PHI; identifier columns are redacted |
+| Failure | A SQL error, timeout or failed reply sends the question to the Claim Query Agent and is logged |
+| Logging | Preset id, version and values, plus the query's audit record |
 
 ## Related
 
-Up: [Agent analyzer](40-analyzer.md) · See also: [KPI gate](41-kpi-gate.md) ·
-[SQL guard and escalation](44-sql-guard-escalation.md) · [Model calls](45-model-calls.md)
+Up: [Analyzer](40-analyzer.md) · See also: [KPI gate](41-kpi-gate.md) · [cc CLI + SQL guard](44-sql-guard-escalation.md)
