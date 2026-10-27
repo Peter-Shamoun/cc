@@ -528,6 +528,8 @@ def svg_text(t):
                        + _t(t["x"], yy, line.upper(), ALAB, COND, t["color"] or LINK, 600, t["anchor"], ls="0.04em"))
         return "".join(out)
     if role == "heading":
+        if t.get("icon"):
+            return place_icon(t["icon"], t["x"], t["y"] - 21, 28) + svg_text(dict(t, icon=None, x=t["x"] + 36))
         return "".join(_t(t["x"], t["y"] + i * 22, line, 17, SANS, t["color"] or INK, 600, t["anchor"])
                        for i, line in enumerate(t["s"].split("\n")))
     if role == "gatenote":

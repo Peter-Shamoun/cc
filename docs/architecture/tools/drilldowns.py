@@ -217,7 +217,7 @@ def d04():
     d.text(40, 56, "04 · Analyzer", "title")
     d.text(40, 86, "The Claim Query Agent is the run worker. The DuckDB query service holds the credentials.", "subtitle")
     # zones
-    d.zone(*box("rL8BxLtQ6X"), "Run worker · Fargate", "worker", "fargate")
+    d.zone(*box("rL8BxLtQ6X"), "", "worker")
     d.zone(*box("RY0gNU6VDh"), "References (prompt cached)", "plain")
     d.zone(*box("8DqM00NEH5"), "", "dashed")
     d.zone(*box("z9Lwryh5kO"), "", "aws")
@@ -300,14 +300,16 @@ def d04():
     def put(k, role, dy=0, anchor="start", text=None):
         e = E[k]
         d.text(X(e["x"]), Y(e["y"]) + {"label": 15, "note": 15, "heading": 17}[role] + dy, text or e["text"], role, anchor)
-    for k in ("k7SIsJ3M_h", "ZmjSuQpPF_", "Y-9ygs7teF", "h0yKh0RZM8", "Zaky5DrGkd", "YMAUWRuvhl", "X0Pit0Z_6d",
-              "EWI5qb2A46", "jDqN4Xr_II"):
+    for k in ("k7SIsJ3M_h", "ZmjSuQpPF_", "Y-9ygs7teF", "Zaky5DrGkd", "YMAUWRuvhl", "EWI5qb2A46", "jDqN4Xr_II"):
         put(k, "label")
+    put("h0yKh0RZM8", "label", dy=-40)               # above its arrow, not on it
+    put("X0Pit0Z_6d", "label", dy=31)                # under the final-query arrow, not on it
     for e in kpi:
         if e["type"] == "text" and e["text"] in ("yes", "no") or e.get("text", "").startswith("preset SQL"):
             d.text(X(e["x"]), Y(e["y"]) + 15, e["text"], "label")
     put("-A8dMCxTwW", "heading")
-    put("qHtTjH_-AM", "heading", text="Claim Query Agent: the backend for ClaimClarity, and part of the backend for Agentic Next Best Actions")
+    put("qHtTjH_-AM", "heading", text="Claim Query Agent · the run worker on Fargate: the backend for ClaimClarity, and part of the backend for Agentic Next Best Actions")
+    d.texts[-1]["icon"] = "fargate"
     put("9kVIq4ZuaA", "heading")
     put("6sE7--PXrr", "note")
     put("Hli_0rnnE0", "note")
