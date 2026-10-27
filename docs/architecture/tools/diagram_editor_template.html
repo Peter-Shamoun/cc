@@ -12,6 +12,15 @@
 :root {
   --navy: #1C2B57; --blue: #4A6BB0; --tint: #EAF0F9; --ink: #1A1D23; --line: #C9CBCE; --soft: #5B6472;
   --chrome: #F6F8FB; --panel: #FFFFFF; --canvas: #E4E8EF; --focus: #4A6BB0;
+  color-scheme: light;
+}
+/* Narrow screens: canvas on top, palette and inspector stacked below it. */
+@media (max-width: 900px) {
+  body { grid-template-rows: auto 1fr; overflow: auto; }
+  header { flex-wrap: wrap; padding-block: 6px; padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px)); }
+  main { grid-template-columns: 1fr; grid-template-rows: 60vh auto auto; overflow: visible; }
+  #palette { order: 2; border-right: 0; border-top: 1px solid var(--line); max-height: 50vh; }
+  #inspector { order: 3; border-left: 0; border-top: 1px solid var(--line); }
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
@@ -1661,13 +1670,28 @@ $("btnNew").addEventListener("click", () => {
   openBoard({ slug: "untitled-" + i, title: "Untitled board " + i, desc: "", w: 2400, h: 1200, zones: [], nodes: [], edges: [], gates: [],
               texts: [{ id: "text1", role: "title", s: "Untitled board " + i, x: 40, y: 56, anchor: "start", color: null }], show_legend: true });
 });
+let revertArmedUntil = 0;
 $("btnRevert").addEventListener("click", () => {
   const slug = state.board.slug;
-  if (!confirm("Discard your edits to this board and reload the published version?")) return;
+  if (Date.now() > revertArmedUntil) {
+    revertArmedUntil = Date.now() + 4000;
+    toast("Click Revert again within 4 seconds to discard your edits to this board.");
+    return;
+  }
+  revertArmedUntil = 0;
   delete workspace.boards[slug];
   openBoard(publishedBoard(slug));
 });
-function download(name, blob) {
+/* Inside a claude.ai artifact, files go through the viewer's download prompt; opened from disk, a plain link works. */
+let downloadsCapability = null;
+async function download(name, blob) {
+  if (!downloadsCapability) downloadsCapability = window.claude?.use ? window.claude.use("downloads").catch(() => null) : Promise.resolve(null);
+  const downloads = await downloadsCapability;
+  if (downloads) {
+    try { await downloads.save({ filename: name, data: blob }); toast(`Saved ${name}`); }
+    catch (err) { if (err && err.code !== "declined") toast(`Could not save ${name}: ${err.message || err.code}`); }
+    return;
+  }
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob); a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
@@ -1714,7 +1738,7 @@ $("btnPng").addEventListener("click", async () => {
     canvas.width = Math.round(b.w * scale); canvas.height = Math.round(b.h * scale);
     const ctx = canvas.getContext("2d");
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob(blob => { download(`${b.slug}.png`, blob); toast("PNG downloaded"); }, "image/png");
+    canvas.toBlob(blob => download(`${b.slug}.png`, blob), "image/png");
   };
   img.onerror = () => toast("PNG export failed in this browser; use SVG instead.");
   img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(boardToSvg(b, fontCss));
