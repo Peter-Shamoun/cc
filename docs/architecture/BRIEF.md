@@ -32,12 +32,12 @@ Middle-ground length: about 15–20 PDF pages. No 100-page sets.
 
 | # | Board | Must show |
 |---|---|---|
-| 00 | Storage & isolation | One bucket, the `customer_b/` prefixes (raw, parquet/silver, semantic_layer/gold, quarantine, conversations + run-events, audit), the customer's roles, keys and bucket policy, and Customer A denied |
+| 00 | Storage & isolation | One bucket, the `customer_b/` prefixes (raw, parquet/silver, semantic_layer/gold, quarantine, audit), the customer's roles, keys and bucket policy, and Customer A denied |
 | 01 | Ingestion & parse | Lab → SFTP intake → raw → `_SUCCESS` → EventBridge rule → ECS RunTask → Fargate parser task (start, parse, silver, gold, exit) → gold publish (new CURRENT version). Gates 1, 2 and 3. |
 | 02 | Login & customer mapping | User → Microsoft Entra ID → assigned group → Cognito (group → one customer) → ID token (customer = B, 60 min, httpOnly cookie) → gate 4 → chat API |
 | 03 | Query path | Run worker: Claim Query Agent → ClaimClarity CLI (`cli.py`) → SQL guard → over Quack → DuckDB query service. The query service exchanges the token at STS (gate 5) and reads `customer_b/semantic_layer/` (gate 6); `lossless.*` only after a reasoned escalation. Customer A is blocked by the API and by IAM. |
 | 04 | Analyzer | The user's excalidraw: frontend ⇄ Claim Query Agent. The agent's inputs: the solved example bank (K = 3), references (prompt cached: rules, EDI glossary, semantic schema + allowed values), the tool and CLI reference (prompt cached), the system prompt + history (cached) and the newest prompt. It runs Claude Haiku, first decides to answer, clarify or escalate, then calls `cli.py` → SQL guard. The full lossless schema is reachable only after escalation. **Add the KPI gate** in front: a preset fits → preset KPI queries (the gate fills the parameters); otherwise → the agent. |
-| 05 | Chat backend | User → CloudFront + WAF → internal load balancer → gate 4 → chat API (Fargate) → SQS run queue → run worker (Fargate, the Claim Query Agent) → Bedrock. The run worker talks to the DuckDB query service over Quack. Chat state in S3: conversations (If-Match), run-events (replay). Limits. |
+| 05 | Chat backend | User → CloudFront + WAF → internal load balancer → gate 4 → chat API (Fargate) → SQS run queue → run worker (Fargate, the Claim Query Agent) → Bedrock. The run worker talks to the DuckDB query service over Quack. The answer streams back live (SSE). Limits. No chat storage (out of scope). |
 | 06 | Network & security | AWS Cloud ⊃ VPC (2 AZs) ⊃ private subnets (load balancer, chat API, run workers, DuckDB query service, parser), VPC endpoints (S3, STS, KMS, Bedrock, ECR, Logs, SQS, Secrets Manager), and an egress subnet (NAT + Network Firewall, Cognito hosts only). CloudFront + WAF and the Transfer Family SFTP endpoint (lab IPs only, port 22) are the only public entries. Keys, roles, CloudTrail, agent audit and logs. |
 | 07 | Operations | Git → CI → ECR → ECS rolling deploy (roll back if unhealthy). CloudWatch alarms. Feedback → regression set → ship only if accuracy holds. |
 
@@ -76,15 +76,18 @@ Middle-ground length: about 15–20 PDF pages. No 100-page sets.
 
 ## Settled facts
 
+- **Out of scope (user decision): chat transcripts and conversation storage.** No `conversations/` or `run-events/`
+  prefix, no transcript role and no transcript key. They would need their own ids and database, which is a later
+  design. The chat streams answers live over SSE.
+- **Two KMS keys (user decision):** one **customer key** per customer (raw, silver, gold, quarantine) and one
+  **platform audit key** (`audit/`, one key-policy statement per customer). IAM prefix policies keep roles apart.
 - **No landing zone and no staging zone (user decision).** SFTP intake writes straight into `raw/`. The batch lease
   is a lock object owned by the parser, drawn as a small lock on the parser and not as a prefix or zone. Prefixes per
-  customer: `raw/`, `parquet/` (silver), `semantic_layer/` (gold), `quarantine/`, chat state (`conversations/`,
-  `run-events/`) and `audit/`.
+  customer: `raw/`, `parquet/` (silver), `semantic_layer/` (gold), `quarantine/` and `audit/`.
 
 - **Bucket:** one bucket holds all customer data, one prefix per customer. The web app and the access logs have their
   own buckets.
-- **Roles and keys:** per customer, roles for SFTP copy, parser, reader, transcripts and audit. Per customer, a lake
-  key and a transcript key. The query audit key is one platform key, with one statement per customer.
+- **Roles and keys:** per customer, roles for SFTP copy, parser, reader and audit. Keys: see the two-key decision above.
 - **Raw:** write-once (Object Lock, 7 years). `_SUCCESS` is written last. Bad files go to `quarantine/` (kept 1 year).
 - **Parser:** EventBridge retries 3 times, then raises an alarm (no dead-letter queue, user decision). The batch is re-run from the same `_SUCCESS`. The task needs 4–8 GB of memory. Gold publishes a
   new version, and `CURRENT` moves by compare-and-set; old versions stay readable for sessions already open.
@@ -96,7 +99,7 @@ Middle-ground length: about 15–20 PDF pages. No 100-page sets.
   payer class, month, CPT, CARC) are checked against the data. A preset that doesn't fit, or anything else wrong,
   goes to the agent.
 - **Chat:** the API checks the token on every request. 3 unfinished runs per user, 110 s run deadline. The answer
-  streams over SSE; a reconnect replays from run-events. The server re-runs the final SQL, so the numbers come from
+  streams live over SSE. The server re-runs the final SQL, so the numbers come from
   the database.
 - **Audit:** CloudTrail is kept 6 years. The agent audit is hash-chained, one record per SQL, write-once. App logs are
   PHI-redacted and kept 1 year.
