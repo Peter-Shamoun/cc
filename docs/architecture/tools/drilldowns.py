@@ -326,7 +326,7 @@ def d04():
     # lossless tables -> semantic layer, the pink dashed hint, as an elbow
     l0 = ln("QKNyGbgAu6")[0]; l1 = ln("QKNyGbgAu6")[-1]
     hl = box("YcJQqyJI9K")
-    d.edge([(l0[0], Y(E["l9RAy2prZT"]["y"])), (l0[0], l1[1]), (hl[0] + hl[2], l1[1])], style="dashed")
+    d.edge([(l0[0], Y(E["l9RAy2prZT"]["y"])), (l0[0], l1[1]), (hl[0] + hl[2], l1[1])], style="built")
     # the user's words: arrow labels, notes and headings, at their own positions
     def put(k, role, dy=0, anchor="start", text=None):
         e = E[k]
