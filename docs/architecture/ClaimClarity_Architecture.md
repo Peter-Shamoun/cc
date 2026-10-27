@@ -4,14 +4,36 @@ ClaimClarity answers questions about a customer's claims (837P) and remittances 
 sits in its own S3 prefix, under its own KMS key and IAM roles. Six AWS checks, the numbered diamonds, enforce that
 on every write and read. The main board shows the whole system, and drill-downs 00–04 zoom into each part.
 
-| Gate | What AWS checks |
-|---|---|
-| 1 | The EventBridge rule matches the customer |
-| 2 | `iam:PassRole` allows only the customer's parser role |
-| 3 | IAM + KMS for the parser |
-| 4 | The token is valid |
-| 5 | The reader role's trust policy allows this token (STS) |
-| 6 | IAM + KMS for the reader |
+The numbered diamonds on every board are the six permission checks. Each number means the same check on every
+board, and sits on the arrow it guards. The matrix below shows what each role can do in one customer's prefix.
+
+## Gates and access
+
+| Gate | Checked by | What has to be true | If not | Boards |
+|---|---|---|---|---|
+| 1 | EventBridge rule | The `_SUCCESS` file is under this customer's `raw/` | No parser task starts | main, 01 |
+| 2 | IAM (`iam:PassRole`) | The launcher passes this customer's parser role, and only to an ECS task | The task can't start | main, 01 |
+| 3 | IAM + KMS | The parser role and the customer's key allow the read or write | The read or write fails | main, 00, 01 |
+| 4 | Chat API | The token is valid and names the customer | The request is refused | main, 02 |
+| 5 | STS (role trust policy) | The reader role trusts this token's customer | No credentials are issued | main, 03 |
+| 6 | IAM + KMS | The reader role and the customer's key allow the read | The read fails | main, 00, 03, 04 |
+
+**Access matrix**, shown for customer B. Every customer has the same set of roles, each limited to its own prefix
+`customer_b/` and its own key.
+
+| Role (used by) | `raw/` | `quarantine/` | `parquet/` | `semantic_layer/` | `audit/` | Key | Gate |
+|---|---|---|---|---|---|---|---|
+| SFTP copy role B (Transfer Family) | Write once | – | – | – | – | Customer key B | – |
+| Launcher (EventBridge → ECS RunTask) | – | – | – | – | – | – | 1, 2 (may pass parser role B only) |
+| Parser role B (Fargate parser task) | Read | Write | Write | Write a new version | – | Customer key B | 3 |
+| Reader role B (DuckDB query service) | – | – | Read, only after escalation | Read the current version | – | Customer key B, decrypt only | 5, 6 |
+| Audit role B (DuckDB query service) | – | – | – | – | Append, write once | Platform audit key | – |
+| Chat API, run worker (Claim Query Agent) | – | – | – | – | – | – | 4 |
+| Any customer A role | Denied | Denied | Denied | Denied | Denied | Denied | 3, 6 |
+
+`raw/` and `audit/` are write-once (Object Lock): nobody can change or delete them, including the roles that write
+them. "Only after escalation" is enforced by the SQL guard; IAM allows the read. The chat API and the run worker
+hold no AWS data credentials at all.
 
 ## Data backend
 
@@ -74,7 +96,7 @@ on every write and read. The main board shows the whole system, and drill-downs 
 | SQL guard | Read-only SELECT. Blocks queries that would fail against the schema. 25 s per query, 60 s per question, 1,000 rows. Refuses keyless joins over 100 million row pairs. |
 | Quack | SQL goes to the DuckDB query service over Quack with a per-run token, and rows come back the same way |
 | Gate 5 | The reader role's trust policy accepts only this token's customer. STS returns read-only credentials for 15 minutes, renewed with the same token when fewer than 3 minutes remain. |
-| Gate 6 | IAM + KMS allow reader role B only `customer_b/semantic_layer/`, current gold version |
+| Gate 6 | IAM + KMS allow reader role B only the current gold version in `customer_b/semantic_layer/`, and `customer_b/parquet/` after an escalation |
 | `lossless.*` | PHI-stripped tables published next to gold, read only after the agent escalates with a reason |
 | Customer A | Denied twice: the API takes the customer only from the token, and IAM + KMS deny reader role B on `customer_a/` |
 
