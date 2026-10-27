@@ -157,13 +157,15 @@ def svg_zone(z):
            "subnet": (f'fill="{TINT}" fill-opacity="0.45" stroke="{BLUE}" stroke-width="1.2" stroke-dasharray="5 4"', LINK),
            "worker": (f'fill="{TINT}" fill-opacity="0.35" stroke="#ED7100" stroke-width="1.6"', "#B35400"),
            "plain": (f'fill="none" stroke="{LINE}" stroke-width="1.2"', SOFT),
+           "denied": (f'fill="#FDF1F0" fill-opacity="0.6" stroke="{DENY}" stroke-width="1.6" stroke-dasharray="8 5"', DENY),
+           "dashed": (f'fill="none" stroke="{BLUE}" stroke-width="1.6" stroke-dasharray="8 5"', LINK),
            "lane": (f'fill="{TINT}" fill-opacity="0.30" stroke="none"', SOFT)}[k]
     out = [f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{0 if k in ("aws","vpc","lane") else 6}" {sty[0]}/>']
     lx = x + 14
     if z["icon"]:
         out.append(place_icon(z["icon"], x + 12, y + 10, 26)); lx = x + 46
     lab = z["label"]
-    out.append(f'<rect x="{lx - 4}" y="{y + 12}" width="{_tw(lab, 15, "caps") + 12:.0f}" height="22" fill="{PAPER}" opacity="{0 if k in ("subnet","worker","lane") else 1}"/>')
+    out.append(f'<rect x="{lx - 4}" y="{y + 12}" width="{_tw(lab, 15, "caps") + 12:.0f}" height="22" fill="{PAPER}" opacity="{0 if k in ("subnet","worker","lane","denied") else 1}"/>')
     out.append(_t(lx, y + 29, lab.upper(), 15, COND, sty[1], 700, ls="0.06em"))
     return "".join(out)
 
