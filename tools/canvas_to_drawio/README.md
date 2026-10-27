@@ -31,9 +31,8 @@ and SVG icons are all things it mishandles). `build_lucid.py` writes the same la
 python3 tools/canvas_to_drawio/build_lucid.py extract.json diagrams/ClaimClarity_Architecture_Canvas_Lucid.drawio --drawio /path/to/drawio
 python3 tools/lucid/check_drawio_for_lucid.py diagrams/ClaimClarity_Architecture_Canvas_Lucid.drawio   # must be 0 errors
 python3 tools/canvas_to_drawio/check_lucid_text.py diagrams/ClaimClarity_Architecture_Canvas_Lucid.drawio extract.json   # must be 0 findings
-```
-
 python3 tools/canvas_to_drawio/check_edge_routes.py diagrams/ClaimClarity_Architecture_Canvas_Lucid.drawio /path/to/drawio   # must be 0 findings
+```
 
 `check_edge_routes.py` exports the file to SVG and checks that draw.io draws every edge along its intended corners.
 `check_lucid_text.py` places every label in Lucid's font metrics. It reports labels that overlap each other, spill out of their box, run into an image, or are newly crossed by a connector or border.
