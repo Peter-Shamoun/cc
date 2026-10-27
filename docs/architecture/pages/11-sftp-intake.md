@@ -11,27 +11,29 @@ for 7 years and can never be changed or deleted.
 
 ## In this diagram
 
-| # | Box | What it does | Details |
+| # | Item | What it does | Details |
 |---|---|---|---|
-| 1 | Customer B sender | The customer's SFTP client, signed in with the customer's SSH key | |
-| 2 | AWS Transfer Family | SFTP server. Maps the user's home folder to Customer B's `raw/`. Writes to S3 as Customer B's SFTP role. | [Transfer Family card](90-service-catalog.md) |
-| 3 | Customer B's raw/ | One folder per received day, with `837/`, `835/`, `277/` and the `_SUCCESS` marker | [S3 layout](12-s3-layout.md) |
-| 4 | EventBridge | Starts the parser when `_SUCCESS` lands | [Parse trigger](13-parse-trigger.md) |
-| 5 | Customer B's SFTP role | The only identity that writes raw files for Customer B | |
-| 6 | Customer B's key | KMS key that encrypts every object under Customer B's prefix | [Encryption keys](52-encryption-keys.md) |
-| 7 | Bucket policy | Refuses any raw write that is not create-only, under the owner's key and locked for 7 years | [Customer isolation](23-customer-isolation.md) |
-| 8 | CloudTrail | Records every write and key use, allowed or denied | [Audit logging](53-audit-logging.md) |
+| 1 | Customer B lab | The customer's SFTP client, signed in with the customer's SSH key | |
+| 2 | AWS Transfer Family | SFTP server. Maps the user's home folder to Customer B's `raw/`. Writes to S3 as Customer B's SFTP role. | [Service catalog](90-service-catalog.md) |
+| 3 | Customer B's raw/ | One folder per received day, with `837/`, `835/` and `277/` inside | [S3 layout](12-s3-layout.md) |
+| 4 | `_SUCCESS` | Empty marker object, written last. It says the day is complete. | |
+| 5 | Amazon EventBridge | Starts the parser when `_SUCCESS` lands | [Parse trigger](13-parse-trigger.md) |
+| 6 | Customer B's SFTP role | The only identity that writes raw files for Customer B | |
+| 7 | Customer B's key | KMS key that encrypts every object under Customer B's prefix | [Encryption keys](52-encryption-keys.md) |
+| 8 | Bucket policy | Refuses any raw write that is not create-only, under the owner's key and locked for 7 years | [Customer isolation](23-customer-isolation.md) |
+| 9 | AWS CloudTrail | Records every write and key use, allowed or denied | [Audit logging](53-audit-logging.md) |
 
 ## How it works
 
-1. The sender (1) opens an SFTP session (SSH, port 22) to Transfer Family (2) with Customer B's SSH key.
-2. It uploads one received day into `received_date=YYYY-MM-DD/837/`, `835/` and `277/`.
-3. Transfer Family writes each file to Customer B's `raw/` (3) as Customer B's SFTP role (5). Each object is
-   encrypted with Customer B's key (6). The bucket policy (7) checks every write.
-4. When every file of the day is uploaded, the sender writes an empty `_SUCCESS` object into the same day
-   folder. That object is the signal that the day is complete.
-5. S3 sends an Object Created event for `_SUCCESS` to EventBridge (4), which starts the parser.
-6. CloudTrail (8) records each PutObject and each KMS call.
+1. The lab (1) opens an SFTP session (SSH, port 22) to Transfer Family (2) with Customer B's SSH key.
+2. It uploads one received day into `received_date=YYYY-MM-DD/837/`, `835/` and `277/` under Customer B's
+   `raw/` (3).
+3. Transfer Family writes each file to S3 as Customer B's SFTP role (6). Each object is encrypted with
+   Customer B's key (7). The bucket policy (8) checks every write.
+4. When every file of the day is uploaded, the lab writes the empty `_SUCCESS` object (4) into the same day
+   folder.
+5. S3 sends an Object Created event for `_SUCCESS` to EventBridge (5), which starts the parser.
+6. CloudTrail (9) records each PutObject and each KMS call.
 
 ## Specification
 

@@ -3,7 +3,7 @@
 [Overview](00-overview.md) › Agent analyzer
 
 The analyzer turns one question into one answer. It runs inside the run workers (Amazon ECS on AWS Fargate) and
-calls Claude Haiku on Amazon Bedrock. Every turn passes a KPI gate first. When one standard KPI query computes
+calls Claude Haiku on Amazon Bedrock (every hexagon in the diagram is a model step). Every turn passes a KPI gate first. When one standard KPI query computes
 exactly what was asked, fixed SQL answers it. Otherwise the custom analysis agent writes its own read-only SQL over
 gold. Both paths use the same SQL guard and reader session, and in both the numbers come from the database, never
 from the model.
@@ -15,12 +15,12 @@ from the model.
 | # | Box | What it does | Details |
 |---|---|---|---|
 | 1 | Chat API | Verifies the user's token and queues the turn for a run worker | [One chat turn](32-chat-turn.md) |
-| 2 | KPI gate | One model call. It decides whether one standard KPI template fits the question and fills in its values. | [KPI gate](41-kpi-gate.md) |
-| 3 | Standard KPI query | Runs the template's fixed SQL with the values bound as parameters | [Standard KPI path](42-standard-kpi-path.md) |
+| 2 | KPI gate | One model call to Claude Haiku on Amazon Bedrock. It decides whether one standard KPI template fits the question and fills in its values. | [KPI gate](41-kpi-gate.md) |
+| 3 | Standard KPI query | A fixed SQL template from the reviewed catalog, run with the values bound as parameters | [Standard KPI path](42-standard-kpi-path.md) |
 | 4 | Reply writer | One model call. It writes 1–3 sentences from the formatted rows. | [Standard KPI path](42-standard-kpi-path.md) |
-| 5 | SQL guard · reader | Checks every query and runs it on a read-only session for one customer | [SQL guard and escalation](44-sql-guard-escalation.md) |
+| 5 | Guarded reader | The SQL guard plus a read-only DuckDB session for one customer. Every query of both paths runs here. | [SQL guard and escalation](44-sql-guard-escalation.md) |
 | 6 | Custom analysis agent | A Strands agent that explores gold, writes SQL and submits a final query | [Custom analysis agent](43-custom-analysis-agent.md) |
-| 7 | Customer B's data | Gold (`sem.*`) by default. Lossless (`lossless.*`) only after an audited escalation. | [S3 layout](12-s3-layout.md) |
+| 7 | Customer B's gold | The `sem.*` views of the current gold version. The lossless tables open only after an audited escalation. | [S3 layout](12-s3-layout.md) |
 | 8 | Answer | The same parts on both paths: text, SQL, result table, optional chart, assumptions and caveats | [Custom analysis agent](43-custom-analysis-agent.md) |
 
 ## How it works

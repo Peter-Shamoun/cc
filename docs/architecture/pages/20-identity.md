@@ -13,25 +13,27 @@ taken from the request itself, so no request can choose another customer's data.
 
 | # | Box | What it does | Details |
 |---|---|---|---|
-| 1 | User's browser | Opens the ClaimClarity web app. Holds the session cookie, which page scripts cannot read. | [Sign-in](21-sign-in.md) |
+| 1 | XiFin user | Opens the ClaimClarity web app in the browser. The browser holds the session cookie, which page scripts cannot read. | [Sign-in](21-sign-in.md) |
 | 2 | Microsoft Entra ID | Company login and MFA. Only members of the groups assigned to the ClaimClarity app get a token. | [Sign-in](21-sign-in.md) |
 | 3 | Amazon Cognito | User pool with Entra ID as its only identity provider. Issues the id token that names the customer. | [Sign-in](21-sign-in.md) |
 | 4 | Chat API + run workers | Verify the id token on every request (gate 4) and hold it for the run. | [Token to credentials](22-token-to-credentials.md) |
-| 5 | AWS STS | AssumeRoleWithWebIdentity: checks the token against the customer role's trust policy (gate 5) and returns 15-minute credentials. | [Token to credentials](22-token-to-credentials.md) |
-| 6 | Customer B's gold prefix | The only data the credentials can read: the current version of Customer B's gold tables, decrypted with Customer B's key (gate 6). | [Token to credentials](22-token-to-credentials.md) |
+| 5 | AWS STS | AssumeRoleWithWebIdentity: checks the token against the role's trust policy (gate 5), returns 15-minute credentials. | [Token to credentials](22-token-to-credentials.md) |
+| 6 | Customer B's reader role | The one role the credentials belong to. Its policy reads Customer B's gold prefix and nothing else. | [Token to credentials](22-token-to-credentials.md) |
+| 7 | B's gold prefix | `B/semantic_layer/` in the ClaimClarity bucket. Only the current version is readable (gate 6). | [S3 layout](12-s3-layout.md) |
+| 8 | Customer B's key | KMS key that decrypts B's objects, only for B's roles and only through S3 (gate 6). | [Encryption & keys](52-encryption-keys.md) |
 
 ## How it works
 
-1. The user opens the app (1). With no valid session the app sends the browser to sign in.
+1. The user (1) opens the app. With no valid session the app sends the browser to sign in.
 2. Entra ID (2) signs the user in. A user outside the assigned groups is refused here.
 3. Cognito (3) receives the Entra sign-in, finds the customer an administrator mapped to this user, and issues an id
    token (60 minutes) that carries the customer. A user with no customer mapping is refused here.
 4. The chat API (4) puts the id token into the `cc_session` cookie: httpOnly, Secure, SameSite=Strict, path `/api`.
    Every API call carries it, and the API verifies it every time (gate 4).
-5. For each run, a run worker sends the id token to STS (5). STS checks that Customer B's reader role trusts this
-   token (gate 5) and returns credentials that last 15 minutes.
-6. With those credentials the worker opens a read-only session on Customer B's gold prefix (6). IAM, the bucket
-   policy and Customer B's KMS key must all allow each read (gate 6).
+5. For each run, a run worker sends the id token to STS (5). STS checks that Customer B's reader role (6) trusts
+   this token (gate 5) and returns credentials for that role that last 15 minutes.
+6. With those credentials the worker opens a read-only session on Customer B's gold prefix (7). IAM, the bucket
+   policy and Customer B's key (8) must all allow each read (gate 6).
 
 ## Specification
 

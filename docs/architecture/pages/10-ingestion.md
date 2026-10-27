@@ -14,7 +14,7 @@ never touch another customer's data.
 
 | # | Box | What it does | Details |
 |---|---|---|---|
-| 1 | Customer B sender | The customer's SFTP client. Uploads one day's files, then an empty `_SUCCESS` marker. | [SFTP intake](11-sftp-intake.md) |
+| 1 | Customer B lab | The customer's SFTP client. Uploads one day's files, then an empty `_SUCCESS` marker. | [SFTP intake](11-sftp-intake.md) |
 | 2 | AWS Transfer Family | SFTP endpoint. One user per customer, whose home folder is that customer's `raw/`. | [SFTP intake](11-sftp-intake.md) |
 | 3 | Raw (bronze) | The files exactly as received, one folder per received day. Write-once, under Object Lock for 7 years. | [S3 layout](12-s3-layout.md) |
 | 4 | EventBridge | Customer B's rule fires when its `_SUCCESS` marker lands and starts the parser task. | [Parse trigger](13-parse-trigger.md) |
@@ -25,7 +25,7 @@ never touch another customer's data.
 
 ## How it works
 
-1. The customer uploads a day's files over SFTP (1) into `raw/received_date=YYYY-MM-DD/837/`, `835/` and
+1. The customer lab uploads a day's files over SFTP (1) into `raw/received_date=YYYY-MM-DD/837/`, `835/` and
    `277/`, and writes `_SUCCESS` last.
 2. Transfer Family (2) stores each file in Customer B's `raw/` (3), encrypted with Customer B's key and locked
    for 7 years.
