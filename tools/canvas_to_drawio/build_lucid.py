@@ -27,6 +27,7 @@ from validate_lucid import font  # noqa: E402  Liberation metrics, Lucid's defau
 SANS, MONO = "Helvetica", "Courier New"
 TABLE_COLOR = "#DCE2EC"
 PNG_SCALE = 3
+ANCHOR_SIZE = 10
 MIN_FONT_SCALE = 0.85  # below this, text keeps its size and runs wider than the original instead
 
 cells, vertex_boxes, png_jobs = [], [], []
@@ -74,7 +75,7 @@ def add_vertex(x, y, w, h, style, value="", bindable=True):
     cid = new_id("v")
     cells.append(f'<mxCell id="{cid}" value={quoteattr(value)} style={quoteattr(style_string(style))} vertex="1" parent="1">'
                  f'<mxGeometry x="{fmt(x)}" y="{fmt(y)}" width="{fmt(w)}" height="{fmt(h)}" as="geometry"/></mxCell>')
-    if bindable:
+    if bindable and not ({"ellipse", "rhombus", "shape"} & set(style)):
         vertex_boxes.append((cid, x, y, w, h))
     return cid
 
@@ -94,28 +95,46 @@ def add_edge(points, style):
     pending_edges.append((len(cells) - 1, points, style))
 
 
-def endpoint_terminal(point):
-    """Smallest bindable vertex containing the point (3px tolerance); otherwise a transparent 2x2 anchor."""
+def endpoint_terminal(point, direction, is_source):
+    """Attach an edge end the way Lucid reads it: at exitX/exitY on a rectangle's outline.
+
+    Lucid ignores draw.io's exitPerimeter=0, so an end can only sit on a shape's outline. Use the smallest rectangle
+    whose outline passes through the point, on the side the line leaves (or arrives) through; otherwise add a
+    transparent anchor placed so the point is the midpoint of that side."""
     px, py = point
+    dx, dy = direction
+    # the side of the terminal the line crosses: a line leaving rightwards leaves through the right side
+    side = ("right" if dx > 0 else "left") if dx else ("bottom" if dy > 0 else "top")
+    if not is_source:
+        side = {"right": "left", "left": "right", "bottom": "top", "top": "bottom"}[side]
     best = None
     for cid, x, y, w, h in vertex_boxes:
-        if x - 3 <= px <= x + w + 3 and y - 3 <= py <= y + h + 3 and (best is None or w * h < best[3] * best[4]):
+        on_side = {"left": abs(px - x) <= 1.5 and y <= py <= y + h, "right": abs(px - x - w) <= 1.5 and y <= py <= y + h,
+                   "top": abs(py - y) <= 1.5 and x <= px <= x + w, "bottom": abs(py - y - h) <= 1.5 and x <= px <= x + w}[side]
+        if on_side and (best is None or w * h < best[3] * best[4]):
             best = (cid, x, y, w, h)
     if best is None:
-        cid = add_vertex(px - 1, py - 1, 2, 2, {"rounded": "0", "html": "0", "fillColor": "none", "strokeColor": "none"}, bindable=False)
-        best = (cid, px - 1, py - 1, 2, 2)
+        # 10px, not smaller: draw.io's orthogonal router detours around terminals only a few pixels wide
+        half = ANCHOR_SIZE / 2
+        ax, ay = {"left": (px, py - half), "right": (px - ANCHOR_SIZE, py - half),
+                  "top": (px - half, py), "bottom": (px - half, py - ANCHOR_SIZE)}[side]
+        cid = add_vertex(ax, ay, ANCHOR_SIZE, ANCHOR_SIZE, {"rounded": "0", "html": "0", "fillColor": "none", "strokeColor": "none"},
+                         bindable=False)
+        best = (cid, ax, ay, ANCHOR_SIZE, ANCHOR_SIZE)
     cid, x, y, w, h = best
-    clamp = lambda v: min(1.0, max(0.0, v))  # noqa: E731
-    return cid, round(clamp((px - x) / w), 4), round(clamp((py - y) / h), 4)
+    fx = {"left": 0.0, "right": 1.0}.get(side, round((px - x) / w, 4))
+    fy = {"top": 0.0, "bottom": 1.0}.get(side, round((py - y) / h, 4))
+    return cid, fx, fy
 
 
 def flush_edges():
     for slot, points, style in pending_edges:
         (sx, sy), (tx, ty), mids = points[0], points[-1], points[1:-1]
-        source, exit_x, exit_y = endpoint_terminal(points[0])
-        target, entry_x, entry_y = endpoint_terminal(points[-1])
-        style = {**style, "exitX": exit_x, "exitY": exit_y, "exitDx": "0", "exitDy": "0", "exitPerimeter": "0",
-                 "entryX": entry_x, "entryY": entry_y, "entryDx": "0", "entryDy": "0", "entryPerimeter": "0"}
+        first, last = (points[1][0] - sx, points[1][1] - sy), (tx - points[-2][0], ty - points[-2][1])
+        source, exit_x, exit_y = endpoint_terminal(points[0], first, True)
+        target, entry_x, entry_y = endpoint_terminal(points[-1], last, False)
+        style = {**style, "exitX": exit_x, "exitY": exit_y, "exitDx": "0", "exitDy": "0",
+                 "entryX": entry_x, "entryY": entry_y, "entryDx": "0", "entryDy": "0"}
         mid_xml = ""
         if mids:
             mid_xml = '<Array as="points">' + "".join(f'<mxPoint x="{fmt(x)}" y="{fmt(y)}"/>' for x, y in mids) + "</Array>"
@@ -125,11 +144,18 @@ def flush_edges():
                      f'{mid_xml}</mxGeometry></mxCell>')
 
 
+LUCID_ARROWS = {"end": ("block", 6), "start": ("block", 5)}  # the arrow type and sizes of the known-good CC_Backend.drawio
+
+
 def edge_style(s, rounded):
-    st = {"edgeStyle": "none", "html": "0", "rounded": "1" if rounded else "0", "endArrow": "none", "startArrow": "none"}
+    """Orthogonal edges: Lucid imports them as elbow lines that keep their bends (straight lines lose them)."""
+    st = {"edgeStyle": "orthogonalEdgeStyle", "orthogonalLoop": "1", "jettySize": "auto", "html": "0",
+          "rounded": "1" if rounded else "0", "endArrow": "none", "startArrow": "none"}
     st.update(integer_stroke(s))
-    st.update(svg_shapes.marker_style(s["marker-end"], True))
-    st.update(svg_shapes.marker_style(s["marker-start"], False))
+    for end, marker in (("end", s["marker-end"]), ("start", s["marker-start"])):
+        if marker and marker != "none":
+            arrow, size = LUCID_ARROWS[end]
+            st.update({f"{end}Arrow": arrow, f"{end}Fill": "1", f"{end}Size": str(size)})
     return st
 
 
@@ -364,7 +390,7 @@ def main():
     for link in canvas["links"]:
         (x1, y1), (x2, y2) = link["start"], link["end"]
         p1, p2 = (x1 - BX, y1 - BY), (x2 - BX, y2 - BY)
-        add_edge([p1, p2], {"edgeStyle": "none", "html": "0", "endArrow": "none", "startArrow": "none", "strokeColor": link_color,
+        add_edge([p1, p2], {"edgeStyle": "orthogonalEdgeStyle", "orthogonalLoop": "1", "jettySize": "auto", "html": "0", "endArrow": "none", "startArrow": "none", "strokeColor": link_color,
                             "strokeWidth": "7", "dashed": "1", "dashPattern": f"{fmt(26 / 7)} {fmt(16 / 7)}"})
         add_vertex(p2[0] - 34, p2[1] - 34, 68, 68, {"ellipse": None, "html": "0", "fillColor": "#4A6BB0", "strokeColor": "#FFFFFF",
                                                     "strokeWidth": "5"})

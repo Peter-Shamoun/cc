@@ -33,6 +33,9 @@ python3 tools/lucid/check_drawio_for_lucid.py diagrams/ClaimClarity_Architecture
 python3 tools/canvas_to_drawio/check_lucid_text.py diagrams/ClaimClarity_Architecture_Canvas_Lucid.drawio extract.json   # must be 0 findings
 ```
 
+python3 tools/canvas_to_drawio/check_edge_routes.py diagrams/ClaimClarity_Architecture_Canvas_Lucid.drawio /path/to/drawio   # must be 0 findings
+
+`check_edge_routes.py` exports the file to SVG and checks that draw.io draws every edge along its intended corners.
 `check_lucid_text.py` places every label in Lucid's font metrics. It reports labels that overlap each other, spill out of their box, run into an image, or are newly crossed by a connector or border.
 
 What changes in the Lucid file:
@@ -40,7 +43,12 @@ What changes in the Lucid file:
 - Text is UTF-8, with no numeric character references: Lucid shows `&#183;` and `&#39;` literally.
 - Icons and the folder and note outlines are PNG images. Cylinders are built from ellipses and rects.
 - Stroke widths are rounded to whole pixels, and fill opacity is blended into solid colours.
-- There is one flat layer. Edges are bound to the shapes they touch, at exact exit and entry points.
+- There is one flat layer. Lucid places an edge end only from the attached shape and `exitX`/`exitY`: it ignores
+  `exitPerimeter=0` and the edge's own points. So each end attaches to the outline of a rectangle it touches, on the side
+  the line crosses, or else to a transparent 10px anchor whose side midpoint is the exact end point. Anchors smaller
+  than that make draw.io's orthogonal router detour.
+- Edges are orthogonal (`orthogonalEdgeStyle`) with their original waypoints, because Lucid draws non-orthogonal lines
+  straight and drops their bends. Arrows are `block` size 6, as in the known-good `diagrams/CC_Backend.drawio`.
 - `<word>` placeholders in CLI text use the look-alike angle quotes ‹word›.
 
 When exporting with the draw.io desktop app, Barlow, Barlow Condensed and IBM Plex Mono must be installed where the app can find them (`$HOME/.fonts`), or the text falls back to Arial. In the browser, draw.io loads them from Google Fonts through each cell's `fontSource`.

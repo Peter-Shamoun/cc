@@ -46,6 +46,8 @@ def shape_boxes(drawio_path, stroked_only=False):
         st = style_dict(cell.get("style"))
         if cell.get("vertex") != "1" or "text" in st or st.get("locked") == "1" or st.get("shape") == "image":
             continue
+        if st.get("fillColor") == "none" and st.get("strokeColor") == "none":  # invisible edge anchors
+            continue
         g = cell.find("mxGeometry")
         x, y, w, h = (float(g.get(k, 0)) for k in ("x", "y", "width", "height"))
         if w > 4 and h > 4 and not (stroked_only and st.get("strokeColor", "none") == "none"):

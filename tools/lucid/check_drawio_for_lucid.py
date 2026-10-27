@@ -7,7 +7,10 @@ Rules (each one is something that renders wrong or fails in Lucid):
   shapes    only rect / text / rhombus / ellipse / hexagon / image(data URI PNG); no stencils
   struct    no containers or nested parents; unique ids; no negative coordinates
   strokes   integer strokeWidth; no opacity / textOpacity / fillOpacity
-  edges     source + target exist, relative geometry, exit/entry inside 0..1
+  edges     source + target exist, relative geometry, exit/entry inside 0..1; Lucid places an edge end only from
+            the terminal and exitX/exitY (it ignores exitPerimeter and sourcePoint/targetPoint), so the end must sit on
+            the outline of a plain rectangle and match the intended point; edges with bends must be orthogonal
+            (straight lines lose their waypoints); arrows block or none only (what Lucid is known to import)
   images    data URIs decode to real PNGs
   text      every text cell is nowrap and wide/tall enough for its text in Lucid's font metrics
 
@@ -136,6 +139,32 @@ def check(path):
             for k in ("exitX", "exitY", "entryX", "entryY"):
                 if k in st and not 0 <= float(st[k]) <= 1:
                     errs.append(f"{where}: {k}={st[k]} outside 0..1")
+            for k in ("exitPerimeter", "entryPerimeter"):
+                if k in st:
+                    errs.append(f"{where}: {k} is ignored by Lucid")
+            for k in ("startArrow", "endArrow"):
+                if st.get(k, "none") not in ("block", "none"):
+                    errs.append(f"{where}: {k}={st[k]} may not map to a Lucid arrow")
+            waypoints = g.findall("Array/mxPoint") if g is not None else []
+            if waypoints and st.get("edgeStyle") != "orthogonalEdgeStyle":
+                errs.append(f"{where}: {len(waypoints)} waypoints on a non-orthogonal edge (Lucid draws it straight)")
+            ends = {p.get("as"): (float(p.get("x")), float(p.get("y"))) for p in (g.findall("mxPoint") if g is not None else [])}
+            for k, term, end in (("exit", "source", "sourcePoint"), ("entry", "target", "targetPoint")):
+                t = ids.get(c.get(term))
+                if t is None or t.find("mxGeometry") is None:
+                    continue
+                tst = sdict(t.get("style"))
+                if shape_of(tst) not in ("rect",):
+                    warns.append(f"{where}: {term} '{c.get(term)}' is a {shape_of(tst)}; rectangles are the safe terminal")
+                fx, fy = float(st.get(k + "X", 0.5)), float(st.get(k + "Y", 0.5))
+                if fx not in (0, 1) and fy not in (0, 1):
+                    errs.append(f"{where}: {k} point {fx},{fy} is inside {term} '{c.get(term)}', not on its outline")
+                tg = t.find("mxGeometry")
+                tx, ty = float(tg.get("x", 0)), float(tg.get("y", 0))
+                lucid_point = (tx + fx * float(tg.get("width", 0)), ty + fy * float(tg.get("height", 0)))
+                if end in ends and max(abs(a - b) for a, b in zip(lucid_point, ends[end])) > 1.5:
+                    errs.append(f"{where}: Lucid would put the {term} end at {lucid_point[0]:.0f},{lucid_point[1]:.0f}, "
+                                f"not {ends[end][0]:.0f},{ends[end][1]:.0f}")
     return errs, warns
 
 
