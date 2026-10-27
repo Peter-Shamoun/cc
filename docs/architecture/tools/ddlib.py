@@ -462,6 +462,31 @@ def check(d):
                 for p, q in zip(f["pts"], f["pts"][1:]):
                     if _seg_hits_rect(p, q, lb, 0):
                         probs.append(f"edge {j} runs through label of edge {i}")
+    texts = []
+    for z in d.zones:
+        lx = z["x"] + (46 if z["icon"] else 14)
+        texts.append((f"zone label '{z['label'][:18]}'", (lx - 4, z["y"] + 12, _tw(z["label"], 15, "caps") + 12, 22)))
+    for t in d.texts:
+        if t["role"] == "note":
+            lines = t["s"].split("\n")
+            wd = max(_tw(l, 15, "sans4") for l in lines)
+            x0 = t["x"] - (wd / 2 if t["anchor"] == "middle" else (wd if t["anchor"] == "end" else 0))
+            texts.append((f"note '{t['s'][:18]}'", (x0, t["y"] - 15, wd, len(lines) * 19)))
+    for name, tb in texts:
+        for i, e in enumerate(d.edges):
+            for p, q in zip(e["pts"], e["pts"][1:]):
+                if _seg_hits_rect(p, q, tb, 0):
+                    probs.append(f"edge {i} runs through {name}")
+            for lb in label_boxes(e):
+                if _ov(lb, tb, 2):
+                    probs.append(f"edge {i} label overlaps {name}")
+        for g in d.gates:
+            if _ov(tb, gate_box(g), 2):
+                probs.append(f"gate {g['n']} label overlaps {name}")
+        if name.startswith("note"):
+            for k, b in boxes.items():
+                if _ov(tb, b, 2):
+                    probs.append(f"{name} overlaps {k}")
     for g1 in d.gates:
         for g2 in d.gates:
             if g1 is not g2 and _ov(gate_box(g1), gate_box(g2), 4):
