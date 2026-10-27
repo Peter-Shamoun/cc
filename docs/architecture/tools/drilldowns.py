@@ -174,38 +174,53 @@ def d03():
 
 def d04():
     d = Diagram("04-analyzer", "04 · Analyzer",
-                "Inside the run worker, the KPI gate answers with a preset query when one fits; otherwise the Claim Query Agent, given its cached references and examples, decides to answer, clarify or escalate and sends SQL through cli.py and the SQL guard.",
-                2440, 1160)
+                "Inside the run worker, the KPI gate answers with a preset query when one fits; otherwise the Claim Query Agent, fed by its example bank, cached references and prompts, writes CLI calls with SQL that pass the SQL guard on the way to the DuckDB query service.",
+                2960, 1290)
     d.text(40, 56, "04 · Analyzer", "title")
     d.text(40, 86, "The Claim Query Agent is the run worker: one Fargate task per run, Claude Haiku on Amazon Bedrock.", "subtitle")
-    d.zone(400, 130, 1700, 950, "Run worker · Fargate  =  Claim Query Agent", "worker", "fargate")
-    d.node("ui", 40, 330, 240, 240, "ClaimClarity", "chat in the browser", shape="ui", style="white")
-    d.node("kpi", 440, 330, 200, 160, "KPI gate", "preset fits?", shape="decision")
-    d.edge([(280, 410), (440, 410)], "question", (340, 398))
-    d.edge([(400, 500), (280, 500)], "answer · sse", (340, 488), style="dashed")
-    xs = [(740, 230), (1000, 330), (1360, 230), (1620, 250), (1900, 180)]
-    names = [("Example bank", "K = 3 similar", "db"), ("References", "cached · rules · glossary · schema", "file"),
-             ("Tool & CLI reference", "cached", "file"), ("System prompt + history", "cached", "file"),
-             ("Newest prompt", "this turn", "file")]
-    for (x, w), (nm, sb, sh) in zip(xs, names):
-        d.node(nm, x, 170, w, 110, nm, sb, shape=sh, style="white")
-        d.edge([(x + w // 2, 280), (x + w // 2, 360)])
-    a = d.node("agent", 720, 360, 1380, 100, "Claim Query Agent", "Claude Haiku · Amazon Bedrock · Strands", "bedrock")
+    # frontend
+    d.node("ui", 40, 330, 260, 400, "ClaimClarity", "chat in the browser", shape="ui", style="white")
+    d.edge([(300, 440), (480, 440)], "question", (390, 428))
+    d.edge([(480, 620), (300, 620)], "answer · sse", (390, 608), style="dashed")
+    d.text(312, 652, "live steps, or a\nclarifying question", "note")
+    # run worker = KPI gate + Claim Query Agent
+    d.zone(480, 140, 1600, 1060, "Run worker · Fargate", "worker", "fargate")
+    d.zone(510, 200, 300, 820, "KPI gate", "plain")
+    d.node("kpi", 545, 360, 230, 160, "Preset fits?", shape="decision")
+    d.node("preset", 550, 640, 220, 110, "Preset KPI queries", "16 · fixed SQL", shape="file")
+    d.edge([(660, 520), (660, 640)], "yes · fill params", (672, 586), lpos="right")
+    d.zone(840, 200, 1210, 820, "Claim Query Agent", "phi")
+    d.node("bank", 870, 330, 190, 520, "Solved example\nbank", "questions · SQL · answers", shape="db", style="white")
+    d.zone(1180, 250, 580, 210, "References · prompt cached", "plain")
+    d.node("rules", 1200, 300, 170, 130, "Rules", "past mistakes", shape="file", style="white")
+    d.node("gloss", 1385, 300, 170, 130, "EDI glossary", shape="file", style="white")
+    d.node("schema", 1570, 300, 170, 130, "Semantic schema", "+ allowed values", shape="file", style="white")
+    d.node("sys", 1800, 250, 220, 120, "System prompt\n+ history", "cached", shape="file", style="white")
+    d.node("newest", 1800, 380, 220, 80, "Newest prompt", shape="file", style="white")
+    a = d.node("agent", 1150, 560, 870, 150, "Claim Query Agent", "Claude Haiku · first: answer, clarify or escalate", "bedrock")
     a["shape"] = "agent"
-    d.edge([(640, 410), (720, 410)], "no", (680, 398))
-    d.node("preset", 430, 600, 220, 100, "Preset KPI queries", "16 · fixed SQL", shape="file")
-    d.edge([(540, 490), (540, 600)], "yes", (552, 556), lpos="right")
-    d.node("decide", 780, 560, 260, 200, "Answer · Clarify", "or escalate", shape="decision")
-    d.edge([(910, 460), (910, 560)], "first", (922, 516), lpos="right")
-    d.node("cli", 1130, 615, 220, 90, "ClaimClarity CLI", "cli.py", "terminal")
-    d.node("guard", 1440, 615, 200, 90, "SQL guard", "read-only SELECT", "shieldcheck")
-    d.node("qs", 2160, 615, 260, 90, "DuckDB query service", "Quack", "fargate")
-    d.edge([(1040, 660), (1130, 660)], "answer", (1085, 648))
-    d.edge([(1350, 660), (1440, 660)])
-    d.edge([(1640, 660), (2160, 660)], "sql over quack", (1900, 648))
-    d.node("lossless", 800, 840, 220, 100, "Full lossless schema", "after escalation only", shape="db", style="optional")
-    d.edge([(910, 760), (910, 840)], "escalate", (922, 806), lpos="right", style="dashed")
-    d.edge([(540, 700), (540, 1010), (1540, 1010), (1540, 705)], "preset sql", (1290, 998))
+    for x in (1285, 1470, 1655):
+        d.edge([(x, 430), (x, 560)])
+    d.edge([(1910, 460), (1910, 560)])
+    d.edge([(775, 440), (812, 440), (812, 268), (1110, 268), (1110, 600), (1162, 600)], "no", (960, 256))
+    d.edge([(1060, 660), (1162, 660)], "k = 3", (1106, 648))
+    d.node("tools", 870, 890, 190, 110, "Tool & CLI\nreference", "prompt cached", shape="file", style="white")
+    d.edge([(1060, 945), (1220, 945), (1220, 710)])
+    d.node("lossless", 1420, 820, 330, 150, "Full lossless schema", "only after the agent\nescalates with a reason", shape="db", style="optional")
+    d.edge([(1585, 710), (1585, 820)], "escalate", (1597, 770), lpos="right", style="dashed")
+    # tools: cli.py + SQL guard
+    d.zone(2280, 400, 640, 400, "Tools", "plain")
+    d.node("cli", 2320, 560, 190, 150, "cli.py", "ClaimClarity CLI", "terminal")
+    d.node("guard", 2600, 545, 280, 180, "SQL guard", "read-only SELECT\nfails fast on the schema", "shieldcheck")
+    d.edge([(2510, 635), (2600, 635)])
+    d.edge([(2000, 590), (2320, 590)], "writes cli calls with sql", (2160, 578))
+    d.edge([(2320, 635), (2000, 635)], "iterative querying · results", (2160, 623))
+    d.edge([(2000, 680), (2320, 680)], "final query + answer", (2160, 668), style="final")
+    d.text(2160, 712, "re-run by the server", "note", "middle")
+    d.edge([(660, 750), (660, 1110), (2740, 1110), (2740, 725)], "preset sql", (1700, 1098))
+    d.node("qs", 2600, 180, 280, 100, "DuckDB query service", "Quack server", "fargate")
+    d.edge([(2740, 545), (2740, 280)], "sql over quack", (2752, 420), lpos="right")
+    d.text(2752, 446, "per-run token", "note")
     return d
 
 

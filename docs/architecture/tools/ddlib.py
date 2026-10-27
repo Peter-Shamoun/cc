@@ -187,7 +187,7 @@ def node_layout(n):
     x, y, w, h, shape = n["x"], n["y"], n["w"], n["h"], n["shape"]
     names, subs = _lines(n["name"]), _lines(n["sub"])
     top_pad = {"db": 12, "folder": 8, "ui": 18}.get(shape, 0)
-    ic = n["icon"] if shape not in ("decision", "steps", "grid", "code") else None
+    ic = n["icon"] if shape not in ("decision", "steps", "grid", "code", "table") else None
     isz = 40 if h >= 76 else 32
     left = x + (30 if shape == "agent" else 16)
     widths = [_tw(s, NAME - 1, "mono") if _is_mono(s) else _tw(s, NAME, "sans") for s in names] + [_tw(s, SUB, "sans4") for s in subs]
@@ -219,7 +219,7 @@ def svg_node(n):
     elif style == "denied":
         fill, stroke, dash = "#FDF1F0", DENY, ' stroke-dasharray="6 4"'
     out = [f'<g data-node="{escape(n["id"])}">']
-    if shape in ("box", "steps", "ui", "grid") :
+    if shape in ("box", "steps", "ui", "grid", "table"):
         out.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="4" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"{dash}/>')
     elif shape == "db":
         c, ry = _cyl(x, y, w, h, fill, stroke); out.append(c)
@@ -242,7 +242,23 @@ def svg_node(n):
                    f'<circle cx="{x + 12}" cy="{y + 9}" r="3" fill="{PAPER}"/><circle cx="{x + 22}" cy="{y + 9}" r="3" fill="{PAPER}"/>'
                    f'<rect x="{x + 16}" y="{y + h - 36}" width="{w - 32}" height="22" rx="11" fill="{PAPER}" stroke="{LINE}"/>')
     L = node_layout(n)
-    if shape == "code":
+    if shape == "table":
+        rows = n["inner"]
+        out.append(_t(x + 16, y + 28, L["names"][0], NAME - 1, SANS, txt, 600))
+        ty = y + 44
+        rh = (h - 44 - 10) / len(rows)
+        cw = n.get("colw", (w - 32) / len(rows[0]))
+        for i, row in enumerate(rows):
+            ry = ty + i * rh
+            head = i == 0
+            out.append(f'<rect x="{x + 16}" y="{ry:.0f}" width="{w - 32}" height="{rh:.0f}" fill="{NAVY if head else PAPER}" stroke="{BLUE}" stroke-width="1"/>')
+            for j, cell in enumerate(row):
+                cx0 = x + 16 + j * cw
+                if j:
+                    out.append(f'<line x1="{cx0:.0f}" y1="{ry:.0f}" x2="{cx0:.0f}" y2="{ry + rh:.0f}" stroke="{BLUE}" stroke-width="1"/>')
+                m = _is_mono(cell) or "_" in cell
+                out.append(_t(cx0 + 10, ry + rh / 2 + 5, cell, 14, MONO if m and not head else SANS, PAPER if head else INK, 600 if head else 400))
+    elif shape == "code":
         out.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="6" fill="{NAVY}"/>'
                    f'<rect x="{x}" y="{y}" width="{w}" height="40" rx="6" fill="#24366B"/><rect x="{x}" y="{y + 30}" width="{w}" height="10" fill="#24366B"/>')
         out.append(_t(x + 18, y + 26, L["names"][0], 15, SANS, PAPER, 600))
@@ -310,11 +326,11 @@ def label_boxes(e):
 
 def svg_edge(e, uid):
     pts = e["pts"]
-    color = {"solid": BLUE, "dashed": BLUE, "deny": DENY, "link": LINK, "navy": NAVY}[e["style"]]
+    color = {"solid": BLUE, "dashed": BLUE, "deny": DENY, "link": LINK, "navy": NAVY, "final": NAVY}[e["style"]]
     dash = ' stroke-dasharray="7 5"' if e["style"] in ("dashed", "deny") else ""
-    me = f' marker-end="url(#{uid}-arr)"' if e["end"] and e["style"] != "deny" else ""
+    me = (f' marker-end="url(#{uid}-{"arrn" if e["style"] == "final" else "arr"})"') if e["end"] and e["style"] != "deny" else ""
     ms = f' marker-start="url(#{uid}-arrs)"' if e["start"] else ""
-    out = [f'<path d="{rounded_path(pts)}" fill="none" stroke="{color}" stroke-width="{2.2 if e["style"] == "deny" else 1.8}"{dash}{me}{ms}/>']
+    out = [f'<path d="{rounded_path(pts)}" fill="none" stroke="{color}" stroke-width="{ {"deny": 2.2, "final": 3}.get(e["style"], 1.8)}"{dash}{me}{ms}/>']
     if e["style"] == "deny":
         (xa, ya), (xb, yb) = pts[-2], pts[-1]
         if xa == xb:
@@ -328,7 +344,7 @@ def svg_edge(e, uid):
 
 
 def svg_edge_label(e):
-    color = {"solid": LINK, "dashed": LINK, "deny": DENY, "link": LINK, "navy": NAVY}[e["style"]]
+    color = {"solid": LINK, "dashed": LINK, "deny": DENY, "link": LINK, "navy": NAVY, "final": NAVY}[e["style"]]
     out = []
     for (bx, by, bw, bh), s in zip(label_boxes(e), (e["label"] or "").split("\n")):
         out.append(f'<rect x="{bx:.0f}" y="{by:.0f}" width="{bw:.0f}" height="{bh}" fill="{PAPER}"/>'
@@ -394,14 +410,15 @@ def _cross(s1, s2):
 
 def check(d):
     probs = []
-    boxes = {n["id"]: (n["x"], n["y"], n["w"], n["h"]) for n in d.nodes}
+    boxes = {n["id"]: ((n["x"] + 24, n["y"], n["w"] - 48, n["h"]) if n["shape"] == "agent" else (n["x"], n["y"], n["w"], n["h"]))
+             for n in d.nodes}
     for n in d.nodes:
         L = node_layout(n)
         if n["shape"] == "code":
             need = max(_tw(l, 13.5, "mono") for l in n["inner"]) + 36
             if need > n["w"]:
                 probs.append(f"code overflow in {n['id']}: needs {need:.0f}, has {n['w']}")
-        elif L["need"] > n["w"] + 1 and n["shape"] not in ("steps", "grid"):
+        elif L["need"] > n["w"] + 1 and n["shape"] not in ("steps", "grid", "table"):
             probs.append(f"text overflow in {n['id']}: needs {L['need']:.0f}, has {n['w']}")
     for g in d.gates:
         gb = gate_box(g); dia = (g["x"] - GR, g["y"] - GR, 2 * GR, 2 * GR)
@@ -460,7 +477,8 @@ def svg_text(t):
         return _t(t["x"], t["y"], t["s"].upper(), 14, COND, t["color"] or SOFT, 700, t["anchor"], ls="0.08em")
     if role == "mono":
         return _t(t["x"], t["y"], t["s"], 14, MONO, t["color"] or INK, 400, t["anchor"])
-    return _t(t["x"], t["y"], t["s"], 14, SANS, t["color"] or SOFT, 500, t["anchor"])
+    return "".join(_t(t["x"], t["y"] + i * 19, line, 15, SANS, t["color"] or SOFT, 500, t["anchor"], italic=True)
+                   for i, line in enumerate(t["s"].split("\n")))
 
 
 LEGEND = [("gate", "AWS permission gate (1–6)"), ("deny", "Denied path"), ("flow", "Data / request"),
@@ -480,6 +498,8 @@ def svg_legend(d, items):
                        f'<line x1="{x + 36}" y1="{y - 9}" x2="{x + 36}" y2="{y + 9}" stroke="{DENY}" stroke-width="4"/>'); off = 48
         elif k == "flow":
             out.append(f'<line x1="{x}" y1="{y}" x2="{x + 34}" y2="{y}" stroke="{BLUE}" stroke-width="1.6" marker-end="url(#{d.slug}-arr)"/>'); off = 46
+        elif k == "final":
+            out.append(f'<line x1="{x}" y1="{y}" x2="{x + 34}" y2="{y}" stroke="{NAVY}" stroke-width="3" marker-end="url(#{d.slug}-arrn)"/>'); off = 50
         elif k == "dashed":
             out.append(f'<line x1="{x}" y1="{y}" x2="{x + 34}" y2="{y}" stroke="{BLUE}" stroke-width="1.6" stroke-dasharray="7 5" marker-end="url(#{d.slug}-arr)"/>'); off = 46
         elif k == "phi":
@@ -508,6 +528,8 @@ def auto_legend(d):
     items.append(("flow", "Data / request"))
     if any(e["style"] == "dashed" for e in d.edges):
         items.append(("dashed", "Conditional / return"))
+    if any(e["style"] == "final" for e in d.edges):
+        items.append(("final", "Final query + answer"))
     if any(n["shape"] == "decision" for n in d.nodes):
         items.append(("decision", "Decision"))
     if any(n["shape"] == "agent" for n in d.nodes):
@@ -524,7 +546,9 @@ def to_svg(d, legend=None):
     defs = (f'<marker id="{uid}-arr" markerWidth="11" markerHeight="9" refX="10" refY="4.5" orient="auto" markerUnits="userSpaceOnUse">'
             f'<path d="M0,0 L11,4.5 L0,9 Z" fill="{BLUE}"/></marker>'
             f'<marker id="{uid}-arrs" markerWidth="10" markerHeight="8" refX="1" refY="4" orient="auto" markerUnits="userSpaceOnUse">'
-            f'<path d="M10,0 L0,4 L10,8 Z" fill="{BLUE}"/></marker>')
+            f'<path d="M10,0 L0,4 L10,8 Z" fill="{BLUE}"/></marker>'
+            f'<marker id="{uid}-arrn" markerWidth="13" markerHeight="11" refX="12" refY="5.5" orient="auto" markerUnits="userSpaceOnUse">'
+            f'<path d="M0,0 L13,5.5 L0,11 Z" fill="{NAVY}"/></marker>')
     parts = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {d.w} {d.h}" width="{d.w}" height="{d.h}" role="img" '
              f'aria-labelledby="{uid}-title {uid}-desc">',
              f'<title id="{uid}-title">{escape(d.title)}</title><desc id="{uid}-desc">{escape(d.desc)}</desc>',
@@ -611,7 +635,7 @@ def to_excalidraw(d):
                roundness={"type": 3})
         X.text(z["x"] + 14, z["y"] + 10, z["label"], 22)
     for e in d.edges:
-        col = {"deny": "#e03131", "navy": "#1e1e1e"}.get(e["style"], "#1e1e1e")
+        col = {"deny": "#e03131", "navy": "#1e1e1e", "final": "#e03131"}.get(e["style"], "#1e1e1e")
         a = X.line(e["pts"], "arrow", strokeColor=col, strokeStyle="dashed" if e["style"] in ("dashed", "deny") else "solid",
                    startArrowhead="arrow" if e["start"] else None, endArrowhead=("bar" if e["style"] == "deny" else "arrow") if e["end"] else None,
                    elbowed=False, roundness=None, roughness=0)
@@ -641,6 +665,15 @@ def to_excalidraw(d):
         if n["icon"] and n["icon"] not in GLYPHS and sh not in ("decision", "steps"):
             X.image(x + 8, y + (14 if sh == "db" else 8), 26, n["icon"])
         label = n["name"] + (("\n" + n["sub"]) if n["sub"] else "")
+        if sh == "table":
+            X.text(x + 16, y + 10, n["name"], 18)
+            rows = n["inner"]; rh = (h - 54) / len(rows); cw = n.get("colw", (w - 32) / len(rows[0]))
+            for i, row in enumerate(rows):
+                for j, cell in enumerate(row):
+                    X.rect(x + 16 + j * cw, y + 44 + i * rh, cw, rh, roughness=0, strokeWidth=1,
+                           backgroundColor="#e9ecef" if i == 0 else "transparent")
+                    X.text(x + 26 + j * cw, y + 50 + i * rh, cell, 15)
+            continue
         if sh == "code":
             X.rect(x, y, w, h, backgroundColor="#1e293b", strokeColor="#1e293b", roughness=0, roundness={"type": 3})
             X.text(x + 16, y + 10, n["name"], 18, color="#ffffff")
