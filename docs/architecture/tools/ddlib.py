@@ -113,9 +113,24 @@ def _t(x, y, s, size, fam, fill, weight=400, anchor="start", ls=None, italic=Fal
             f'text-anchor="{anchor}"{extra}{st}>{escape(s)}</text>')
 
 
+_FONTFILES = {"sans": "Barlow-SemiBold.ttf", "sans4": "Barlow-Regular.ttf", "cond": "BarlowCondensed-SemiBold.ttf",
+              "caps": "BarlowCondensed-SemiBold.ttf", "mono": "IBMPlexMono-Medium.ttf"}
+_fontcache = {}
+
+
 def _tw(s, size, fam="sans"):
-    k = {"sans": 0.52, "cond": 0.44, "mono": 0.6, "caps": 0.5}[fam]
-    return len(s) * size * k
+    """Text width: measured with the real font when it is installed, else estimated."""
+    try:
+        from PIL import ImageFont
+        key = (fam, size)
+        if key not in _fontcache:
+            _fontcache[key] = ImageFont.truetype(str(Path.home() / ".fonts" / _FONTFILES[fam]), size)
+        txt = s.upper() if fam == "caps" else s
+        w = _fontcache[key].getlength(txt)
+        return w * (1.04 if fam == "caps" else 1.0)
+    except Exception:
+        k = {"sans": 0.55, "sans4": 0.5, "cond": 0.44, "mono": 0.6, "caps": 0.5}[fam]
+        return len(s) * size * k
 
 
 def rounded_path(pts, r=10):
@@ -159,6 +174,36 @@ def _cyl(x, y, w, h, fill, stroke, sw=1.4):
             f'<path d="M{x},{y + ry} A{w / 2},{ry} 0 0 0 {x + w},{y + ry}" fill="none" stroke="{stroke}" stroke-width="{sw}"/>'), ry
 
 
+NAME, SUB, ALAB, GLAB, GR = 18, 14, 15, 16, 36   # node name, sublabel, arrow label, gate label, gate half-diagonal
+
+
+def _is_mono(s):
+    return s.rstrip().endswith("/") or s.startswith("_") or s.endswith(".py") or s.endswith(".*") or s.startswith("customer_")
+
+
+def node_layout(n):
+    """Where the icon and text lines go, and how wide the content is (for the overflow check)."""
+    x, y, w, h, shape = n["x"], n["y"], n["w"], n["h"], n["shape"]
+    names, subs = _lines(n["name"]), _lines(n["sub"])
+    top_pad = {"db": 12, "folder": 8, "ui": 18}.get(shape, 0)
+    ic = n["icon"] if shape not in ("decision", "steps") else None
+    isz = 40 if h >= 76 else 32
+    left = x + (30 if shape == "agent" else 16)
+    widths = [_tw(s, NAME - 1, "mono") if _is_mono(s) else _tw(s, NAME, "sans") for s in names] + [_tw(s, SUB, "sans4") for s in subs]
+    content = max(widths) if widths else 0
+    if ic:
+        tx, anchor, need = left + isz + 12, "start", (left - x) + isz + 12 + content + 14
+    else:
+        tx, anchor, need = x + w / 2, "middle", content + 28
+    if shape == "decision":
+        need = content * 1.9
+    if shape == "agent":
+        need += 30
+    lh = len(names) * 22 + len(subs) * 18
+    y0 = y + top_pad + (h - top_pad - lh) / 2 + 16
+    return dict(names=names, subs=subs, ic=ic, isz=isz, left=left, tx=tx, anchor=anchor, need=need, y0=y0, top_pad=top_pad)
+
+
 def svg_node(n):
     x, y, w, h, shape, style = n["x"], n["y"], n["w"], n["h"], n["shape"], n["style"]
     fill, stroke, txt, dash, sw = TINT, BLUE, INK, "", 1.4
@@ -173,144 +218,207 @@ def svg_node(n):
     elif style == "denied":
         fill, stroke, dash = "#FDF1F0", DENY, ' stroke-dasharray="6 4"'
     out = [f'<g data-node="{n["id"]}">']
-    top_pad = 0
-    if shape == "box" or shape == "steps" or shape == "ui":
+    if shape in ("box", "steps", "ui"):
         out.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="4" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"{dash}/>')
     elif shape == "db":
-        c, ry = _cyl(x, y, w, h, fill, stroke); out.append(c); top_pad = ry
+        c, ry = _cyl(x, y, w, h, fill, stroke); out.append(c)
     elif shape == "folder":
         out.append(f'<path d="M{x},{y + 12} V{y + 4} Q{x},{y} {x + 4},{y} H{x + 46} L{x + 56},{y + 10} H{x + w - 4} Q{x + w},{y + 10} {x + w},{y + 14} '
                    f'V{y + h - 4} Q{x + w},{y + h} {x + w - 4},{y + h} H{x + 4} Q{x},{y + h} {x},{y + h - 4} Z" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"{dash}/>')
-        top_pad = 6
-    elif shape == "file" or shape == "token":
-        f = 16
+    elif shape in ("file", "token"):
+        f = 18
         out.append(f'<path d="M{x},{y} H{x + w - f} L{x + w},{y + f} V{y + h} H{x} Z" fill="{fill if shape == "file" else PAPER}" stroke="{stroke}" stroke-width="{sw}"{dash}/>'
                    f'<path d="M{x + w - f},{y} V{y + f} H{x + w}" fill="none" stroke="{stroke}" stroke-width="{sw}"/>')
     elif shape == "agent":
-        k = 22
+        k = 24
         out.append(f'<path d="M{x + k},{y} H{x + w - k} L{x + w},{y + h / 2} L{x + w - k},{y + h} H{x + k} L{x},{y + h / 2} Z" fill="{NAVY}" stroke="{NAVY}"/>')
         txt = PAPER
     elif shape == "decision":
         cx, cy = x + w / 2, y + h / 2
         out.append(f'<path d="M{cx},{y} L{x + w},{cy} L{cx},{y + h} L{x},{cy} Z" fill="{PAPER}" stroke="{NAVY}" stroke-width="1.8"/>')
-    elif shape == "people":
-        out.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="4" fill="{PAPER}" stroke="#7A7F88" stroke-width="1.2" stroke-dasharray="5 4"/>')
     if shape == "ui":
         out.append(f'<rect x="{x}" y="{y}" width="{w}" height="18" rx="4" fill="{NAVY}"/>'
                    f'<circle cx="{x + 12}" cy="{y + 9}" r="3" fill="{PAPER}"/><circle cx="{x + 22}" cy="{y + 9}" r="3" fill="{PAPER}"/>'
-                   f'<rect x="{x + 14}" y="{y + h - 34}" width="{w - 28}" height="20" rx="10" fill="{PAPER}" stroke="{LINE}"/>')
-    # content
-    names, subs = _lines(n["name"]), _lines(n["sub"])
-    ic = n["icon"]
-    if shape in ("decision",):
-        cx, cy = x + w / 2, y + h / 2
-        tot = len(names) * 18 + len(subs) * 15
-        yy = cy - tot / 2 + 14
-        for s in names:
-            out.append(_t(cx, yy, s, 16, SANS, NAVY, 600, "middle")); yy += 18
-        for s in subs:
-            out.append(_t(cx, yy, s, 13, SANS, SOFT, 400, "middle")); yy += 15
-    elif shape == "steps":
-        # header + horizontal timeline of steps
-        hx = x + 16
-        if ic:
-            out.append(place_icon(ic, x + 14, y + 12, 32)); hx = x + 56
-        out.append(_t(hx, y + 34, names[0], 17, SANS, txt, 600))
+                   f'<rect x="{x + 16}" y="{y + h - 36}" width="{w - 32}" height="22" rx="11" fill="{PAPER}" stroke="{LINE}"/>')
+    L = node_layout(n)
+    if shape == "steps":
+        hx = x + 18
+        if n["icon"]:
+            out.append(place_icon(n["icon"], x + 16, y + 14, 34)); hx = x + 62
+        out.append(_t(hx, y + 37, L["names"][0], NAME, SANS, txt, 600))
         steps = n["inner"]
-        ly = y + h - 44
-        x0, x1 = x + 40, x + w - 40
-        out.append(f'<line x1="{x0}" y1="{ly}" x2="{x1}" y2="{ly}" stroke="{BLUE}" stroke-width="1.4"/>')
-        for i, s in enumerate(steps):
+        ly = y + h - 50
+        x0, x1 = x + 50, x + w - 50
+        out.append(f'<line x1="{x0}" y1="{ly}" x2="{x1}" y2="{ly}" stroke="{BLUE}" stroke-width="1.6"/>')
+        for i, st in enumerate(steps):
             sx = x0 + (x1 - x0) * i / (len(steps) - 1)
             last = i == len(steps) - 1
-            out.append(f'<circle cx="{sx}" cy="{ly}" r="7" fill="{NAVY if last else PAPER}" stroke="{NAVY}" stroke-width="1.6"/>')
-            out.append(_t(sx, ly + 26, s, 14, SANS, INK, 500, "middle"))
+            out.append(f'<circle cx="{sx}" cy="{ly}" r="8" fill="{NAVY if last else PAPER}" stroke="{NAVY}" stroke-width="1.8"/>')
+            out.append(_t(sx, ly + 30, st, 15, SANS, INK, 600, "middle"))
     else:
-        inner_left = x + 14
-        if ic:
-            isz = 40 if h >= 70 else 32
-            iy = y + top_pad + (h - top_pad - isz) / 2
-            if shape == "agent":
-                inner_left = x + 30
-            out.append(place_icon(ic, inner_left, iy, isz))
-            tx, anchor = inner_left + isz + 12, "start"
-        else:
-            tx, anchor = (x + w / 2, "middle") if shape in ("agent", "db", "token", "file", "folder") or n.get("center", True) else (x + 14, "start")
-        mono = shape in ("folder",) and n["name"].endswith("/")
-        nl = len(names) * 20 + len(subs) * 16
-        yy = y + top_pad + (h - top_pad - nl) / 2 + 15
-        for s in names:
-            is_mono = s.rstrip().endswith("/") or s.startswith("_") or s.endswith(".py") or s.endswith(".*")
-            out.append(_t(tx, yy, s, 16 if is_mono else 17, MONO if is_mono else SANS, txt, 500 if is_mono else 600, anchor)); yy += 20
-        for s in subs:
-            out.append(_t(tx, yy, s, 13, SANS, PAPER if txt == PAPER else SOFT, 400, anchor)); yy += 16
+        if L["ic"]:
+            iy = y + L["top_pad"] + (h - L["top_pad"] - L["isz"]) / 2
+            out.append(place_icon(L["ic"], L["left"], iy, L["isz"]))
+        yy = L["y0"]
+        ncol = NAVY if shape == "decision" else txt
+        for s in L["names"]:
+            m = _is_mono(s)
+            out.append(_t(L["tx"], yy, s, NAME - 1 if m else NAME, MONO if m else SANS, ncol, 500 if m else 600, L["anchor"])); yy += 22
+        for s in L["subs"]:
+            out.append(_t(L["tx"], yy, s, SUB, SANS, PAPER if txt == PAPER else SOFT, 400, L["anchor"])); yy += 18
     out.append("</g>")
     return "".join(out)
 
 
-def _label_box(x, y, s, color, size=14, anchor="middle"):
-    w = _tw(s, size, "caps") + 12
-    rx = x - w / 2 if anchor == "middle" else (x - 6 if anchor == "start" else x - w + 6)
-    return (f'<rect x="{rx:.0f}" y="{y - size - 2}" width="{w:.0f}" height="{size + 8}" fill="{PAPER}"/>'
-            + _t(x, y, s.upper(), size, COND, color, 600, anchor, ls="0.04em"))
+def label_boxes(e):
+    """Mask rects (x, y, w, h) of an edge label, one per line."""
+    if not e["label"]:
+        return []
+    x, y = e["at"]
+    out = []
+    for i, s in enumerate(e["label"].split("\n")):
+        w = _tw(s, ALAB, "caps") + 12
+        rx = x - w / 2 if e["lpos"] in ("above", "below") else (x - 6 if e["lpos"] == "right" else x - w + 6)
+        out.append((rx, y + i * 19 - ALAB - 1, w, ALAB + 7))
+    return out
 
 
 def svg_edge(e, uid):
     pts = e["pts"]
     color = {"solid": BLUE, "dashed": BLUE, "deny": DENY, "link": LINK, "navy": NAVY}[e["style"]]
     dash = ' stroke-dasharray="7 5"' if e["style"] in ("dashed", "deny") else ""
-    me = f' marker-end="url(#{uid}-{"deny" if e["style"] == "deny" else "arr"})"' if e["end"] and e["style"] != "deny" else ""
+    me = f' marker-end="url(#{uid}-arr)"' if e["end"] and e["style"] != "deny" else ""
     ms = f' marker-start="url(#{uid}-arrs)"' if e["start"] else ""
-    out = [f'<path d="{rounded_path(pts)}" fill="none" stroke="{color}" stroke-width="{2 if e["style"] == "deny" else 1.6}"{dash}{me}{ms}/>']
+    out = [f'<path d="{rounded_path(pts)}" fill="none" stroke="{color}" stroke-width="{2.2 if e["style"] == "deny" else 1.8}"{dash}{me}{ms}/>']
     if e["style"] == "deny":
         (xa, ya), (xb, yb) = pts[-2], pts[-1]
-        if xa == xb:   # vertical end -> horizontal bar
-            out.append(f'<line x1="{xb - 14}" y1="{yb}" x2="{xb + 14}" y2="{yb}" stroke="{DENY}" stroke-width="4"/>')
+        if xa == xb:
+            out.append(f'<line x1="{xb - 16}" y1="{yb}" x2="{xb + 16}" y2="{yb}" stroke="{DENY}" stroke-width="5"/>')
         else:
-            out.append(f'<line x1="{xb}" y1="{yb - 14}" x2="{xb}" y2="{yb + 14}" stroke="{DENY}" stroke-width="4"/>')
-        mx, my = (xa + xb) / 2, (ya + yb) / 2
-        out.append(f'<circle cx="{mx}" cy="{my}" r="11" fill="{PAPER}" stroke="{DENY}" stroke-width="2"/>'
-                   f'<path d="M{mx - 5},{my - 5} L{mx + 5},{my + 5} M{mx + 5},{my - 5} L{mx - 5},{my + 5}" stroke="{DENY}" stroke-width="2.4"/>')
+            out.append(f'<line x1="{xb}" y1="{yb - 16}" x2="{xb}" y2="{yb + 16}" stroke="{DENY}" stroke-width="5"/>')
+        mx, my = e.get("xat") or ((xa + xb) / 2, (ya + yb) / 2)
+        out.append(f'<circle cx="{mx}" cy="{my}" r="12" fill="{PAPER}" stroke="{DENY}" stroke-width="2.2"/>'
+                   f'<path d="M{mx - 5.5},{my - 5.5} L{mx + 5.5},{my + 5.5} M{mx + 5.5},{my - 5.5} L{mx - 5.5},{my + 5.5}" stroke="{DENY}" stroke-width="2.6"/>')
     return "".join(out)
 
 
 def svg_edge_label(e):
-    if not e["label"]:
-        return ""
     color = {"solid": LINK, "dashed": LINK, "deny": DENY, "link": LINK, "navy": NAVY}[e["style"]]
-    x, y = e["at"]
-    anchor = {"above": "middle", "left": "end", "right": "start", "below": "middle"}[e["lpos"]]
     out = []
-    for i, s in enumerate(e["label"].split("\n")):
-        out.append(_label_box(x, y + i * 18, s, color, 14, anchor))
+    for (bx, by, bw, bh), s in zip(label_boxes(e), (e["label"] or "").split("\n")):
+        out.append(f'<rect x="{bx:.0f}" y="{by:.0f}" width="{bw:.0f}" height="{bh}" fill="{PAPER}"/>'
+                   + _t(bx + 6, by + ALAB + 1, s.upper(), ALAB, COND, color, 600, "start", ls="0.04em"))
     return "".join(out)
+
+
+def gate_box(g):
+    lines = g["label"].split("\n")
+    wmax = max(_tw(s, GLAB, "sans") for s in lines) + (32 if g["icon"] else 0)
+    hgt = len(lines) * 20
+    x, y, side = g["x"], g["y"], g["side"]
+    if side == "above":
+        lx, ly = x - wmax / 2, y - GR - 14 - hgt
+    elif side == "below":
+        lx, ly = x - wmax / 2, y + GR + 14
+    elif side == "right":
+        lx, ly = x + GR + 14, y - hgt / 2
+    else:
+        lx, ly = x - GR - 14 - wmax, y - hgt / 2
+    return lx - 8, ly - 5, wmax + 16, hgt + 10
 
 
 def svg_gate(g):
     x, y, n = g["x"], g["y"], g["n"]
-    r = 30
+    r = GR
     out = [f'<path d="M{x},{y - r} L{x + r},{y} L{x},{y + r} L{x - r},{y} Z" fill="{NAVY}" stroke="{PAPER}" stroke-width="3"/>',
-           _t(x, y + 9, str(n), 26, COND, PAPER, 700, "middle")]
+           _t(x, y + 10, str(n), 30, COND, PAPER, 700, "middle")]
+    bx, by, bw, bh = gate_box(g)
+    out.append(f'<rect x="{bx:.0f}" y="{by:.0f}" width="{bw:.0f}" height="{bh}" rx="3" fill="{PAPER}" stroke="{NAVY}" stroke-width="1.2"/>')
+    tx = bx + 8
     lines = g["label"].split("\n")
-    side = g["side"]
-    size = 15
-    wmax = max(_tw(s, size, "sans") for s in lines) + (30 if g["icon"] else 0)
-    hgt = len(lines) * 19
-    if side == "above":
-        lx, ly = x - wmax / 2, y - r - 10 - hgt
-    elif side == "below":
-        lx, ly = x - wmax / 2, y + r + 10
-    elif side == "right":
-        lx, ly = x + r + 10, y - hgt / 2
-    else:
-        lx, ly = x - r - 10 - wmax, y - hgt / 2
-    out.append(f'<rect x="{lx - 6:.0f}" y="{ly - 3:.0f}" width="{wmax + 12:.0f}" height="{hgt + 8}" rx="3" fill="{PAPER}" stroke="{NAVY}" stroke-width="1"/>')
-    tx = lx
     if g["icon"]:
-        out.append(place_icon(g["icon"], lx, ly + (hgt - 24) / 2 + 2, 24)); tx = lx + 30
+        out.append(place_icon(g["icon"], tx, by + (bh - 26) / 2, 26)); tx += 32
     for i, s in enumerate(lines):
-        out.append(_t(tx, ly + 15 + i * 19, s, size, SANS, NAVY, 600))
+        out.append(_t(tx, by + 5 + 16 + i * 20, s, GLAB, SANS, NAVY, 600))
     return "".join(out)
+
+
+# ---- geometry check: run on every build, prints problems ---------------------------------------------------------
+def _ov(a, b, pad=0):
+    return a[0] < b[0] + b[2] + pad and b[0] < a[0] + a[2] + pad and a[1] < b[1] + b[3] + pad and b[1] < a[1] + a[3] + pad
+
+
+def _seg_hits_rect(p, q, r, shrink=3):
+    x0, y0, w, h = r[0] + shrink, r[1] + shrink, r[2] - 2 * shrink, r[3] - 2 * shrink
+    (ax, ay), (bx, by) = p, q
+    if ax == bx:
+        return x0 < ax < x0 + w and max(min(ay, by), y0) < min(max(ay, by), y0 + h)
+    if ay == by:
+        return y0 < ay < y0 + h and max(min(ax, bx), x0) < min(max(ax, bx), x0 + w)
+    return False
+
+
+def _cross(s1, s2):
+    (a, b), (c, d) = s1, s2
+    if a[0] == b[0] and c[1] == d[1]:
+        return min(c[0], d[0]) < a[0] < max(c[0], d[0]) and min(a[1], b[1]) < c[1] < max(a[1], b[1])
+    if a[1] == b[1] and c[0] == d[0]:
+        return _cross(s2, s1)
+    return False
+
+
+def check(d):
+    probs = []
+    boxes = {n["id"]: (n["x"], n["y"], n["w"], n["h"]) for n in d.nodes}
+    for n in d.nodes:
+        L = node_layout(n)
+        if L["need"] > n["w"] + 1 and n["shape"] != "steps":
+            probs.append(f"text overflow in {n['id']}: needs {L['need']:.0f}, has {n['w']}")
+    for g in d.gates:
+        gb = gate_box(g); dia = (g["x"] - GR, g["y"] - GR, 2 * GR, 2 * GR)
+        for k, b in boxes.items():
+            if _ov(gb, b, 6):
+                probs.append(f"gate {g['n']} label touches {k}")
+            if _ov(dia, b, 4):
+                probs.append(f"gate {g['n']} diamond touches {k}")
+        for z in d.zones:
+            for side in [(z["x"], z["y"], z["w"], 0), (z["x"], z["y"] + z["h"], z["w"], 0), (z["x"], z["y"], 0, z["h"]), (z["x"] + z["w"], z["y"], 0, z["h"])]:
+                if _ov(gb, side, 2):
+                    probs.append(f"gate {g['n']} label crosses zone '{z['label'][:20]}' border")
+    for i, e in enumerate(d.edges):
+        for lb in label_boxes(e):
+            for k, b in boxes.items():
+                if _ov(lb, b, 4):
+                    probs.append(f"edge {i} label '{e['label'][:16]}' touches {k}")
+            for g in d.gates:
+                if _ov(lb, gate_box(g), 4) or _ov(lb, (g["x"] - GR, g["y"] - GR, 2 * GR, 2 * GR), 4):
+                    probs.append(f"edge {i} label '{e['label'][:16]}' touches gate {g['n']}")
+        segs = list(zip(e["pts"], e["pts"][1:]))
+        for p, q in segs:
+            for k, b in boxes.items():
+                if _seg_hits_rect(p, q, b):
+                    probs.append(f"edge {i} runs through {k}")
+            for g in d.gates:
+                if _seg_hits_rect(p, q, gate_box(g), 1):
+                    probs.append(f"edge {i} runs through gate {g['n']} label")
+        for j, f in enumerate(d.edges[i + 1:], i + 1):
+            for s1 in segs:
+                for s2 in zip(f["pts"], f["pts"][1:]):
+                    if _cross(s1, s2):
+                        probs.append(f"edges {i} and {j} cross")
+            for lb in label_boxes(f):
+                for p, q in segs:
+                    if _seg_hits_rect(p, q, lb, 0):
+                        probs.append(f"edge {i} runs through label of edge {j}")
+            for lb in label_boxes(e):
+                for p, q in zip(f["pts"], f["pts"][1:]):
+                    if _seg_hits_rect(p, q, lb, 0):
+                        probs.append(f"edge {j} runs through label of edge {i}")
+    for g1 in d.gates:
+        for g2 in d.gates:
+            if g1 is not g2 and _ov(gate_box(g1), gate_box(g2), 4):
+                probs.append(f"gate labels {g1['n']} and {g2['n']} overlap")
+    return sorted(set(probs))
 
 
 def svg_text(t):
@@ -364,8 +472,8 @@ def svg_legend(d, items):
 
 def to_svg(d, legend=None):
     uid = d.slug
-    defs = (f'<marker id="{uid}-arr" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="userSpaceOnUse">'
-            f'<path d="M0,0 L10,4 L0,8 Z" fill="{BLUE}"/></marker>'
+    defs = (f'<marker id="{uid}-arr" markerWidth="11" markerHeight="9" refX="10" refY="4.5" orient="auto" markerUnits="userSpaceOnUse">'
+            f'<path d="M0,0 L11,4.5 L0,9 Z" fill="{BLUE}"/></marker>'
             f'<marker id="{uid}-arrs" markerWidth="10" markerHeight="8" refX="1" refY="4" orient="auto" markerUnits="userSpaceOnUse">'
             f'<path d="M10,0 L0,4 L10,8 Z" fill="{BLUE}"/></marker>')
     parts = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {d.w} {d.h}" width="{d.w}" height="{d.h}" role="img" '
@@ -478,7 +586,7 @@ def to_excalidraw(d):
                    strokeColor="#e03131" if n["style"] == "denied" else "#1e1e1e")
         tx, al = x + w / 2, "center"
         if n["icon"] and n["icon"] not in GLYPHS and sh not in ("decision", "steps"):
-            X.image(x + 10, y + (h - 36) / 2, 36, n["icon"]); tx = x + w / 2 + 22
+            X.image(x + 8, y + (14 if sh == "db" else 8), 26, n["icon"])
         label = n["name"] + (("\n" + n["sub"]) if n["sub"] else "")
         if sh == "steps":
             X.text(x + 16, y + 12, n["name"], 20)
@@ -490,7 +598,7 @@ def to_excalidraw(d):
                 X.text(sx, ly + 12, s, 18, "center")
         else:
             nl = label.count("\n") + 1
-            X.text(tx, y + h / 2 - nl * 11.5, label, 18, al)
+            X.text(tx, y + h / 2 - nl * 10 + (6 if n["icon"] else 0), label, 16, al)
     for g in d.gates:
         X.diamond(g["x"] - 30, g["y"] - 30, 60, 60, backgroundColor="#ffc9c9", strokeColor="#1e1e1e")
         X.text(g["x"], g["y"] - 14, str(g["n"]), 24, "center")
