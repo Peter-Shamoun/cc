@@ -188,54 +188,129 @@ def d03():
 
 
 def d04():
+    """04 keeps the user's excalidraw: content and layout come from drilldowns/04-analyzer.excalidraw (the user's
+    board, edited by analyzer04.py); every element is mapped to the house shape at its own position."""
+    import json
+    src = json.loads((OUT / "04-analyzer.excalidraw").read_text())
+    E = {e["id"][:10]: e for e in src["elements"] if not e.get("isDeleted")}
+    kpi = sorted((e for e in src["elements"] if e["id"].startswith("kpi_")), key=lambda e: e["id"])
+    OX, OY = 5390, -460                             # excalidraw canvas -> board pixels
+    X = lambda v: round(v + OX)
+    Y = lambda v: round(v + OY)
+
+    def box(k):
+        e = E[k]
+        return X(e["x"]), Y(e["y"]), round(e["width"]), round(e["height"])
+
+    def words(k):
+        tid = next(e["id"][:10] for e in E.values() if (e.get("containerId") or "")[:10] == k)
+        return [l for l in E[tid]["text"].split("\n") if l.strip()]
+
+    def kpi_el(typ, text_prefix=None):
+        for e in kpi:
+            if e["type"] == typ and (text_prefix is None or e.get("text", "").startswith(text_prefix)):
+                return e
+
     d = Diagram("04-analyzer", "04 · Analyzer",
-                "Inside the run worker, the KPI gate answers with a preset query when one fits; otherwise the Claim Query Agent, fed by its example bank, cached references and prompts, writes CLI calls with SQL that pass the SQL guard on the way to the DuckDB query service.",
-                2960, 1290)
+                "The user's analyzer board: the frontend sends a question to the KPI gate, which answers with a preset query when one fits; otherwise the Claim Query Agent, fed by its example bank, cached references and prompts, writes CLI calls with SQL that pass the SQL guard to the DuckDB query service, which reads only this customer's semantic layer.",
+                5940, 1340)
     d.text(40, 56, "04 · Analyzer", "title")
-    d.text(40, 86, "The Claim Query Agent is the run worker: one Fargate task per run, Claude Haiku on Amazon Bedrock.", "subtitle")
-    # frontend
-    d.node("ui", 40, 330, 260, 400, "ClaimClarity", "chat in the browser", shape="ui", style="white")
-    d.edge([(300, 440), (480, 440)], "question", (390, 428))
-    d.edge([(480, 620), (300, 620)], "answer · sse", (390, 608), style="dashed")
-    d.text(312, 652, "live steps, or a\nclarifying question", "note")
-    # run worker = KPI gate + Claim Query Agent
-    d.zone(480, 140, 1600, 1060, "Run worker · Fargate", "worker", "fargate")
-    d.zone(510, 200, 300, 820, "KPI gate", "plain")
-    d.node("kpi", 545, 360, 230, 160, "Preset fits?", shape="decision")
-    d.node("preset", 550, 640, 220, 110, "Preset KPI queries", "16 · fixed SQL", shape="file")
-    d.edge([(660, 520), (660, 640)], "yes · fill params", (672, 586), lpos="right")
-    d.zone(840, 200, 1210, 820, "Claim Query Agent", "dashed")
-    d.node("bank", 870, 330, 190, 520, "Solved example\nbank", "questions · SQL · answers", shape="db", style="white")
-    d.zone(1180, 250, 580, 210, "References · prompt cached", "plain")
-    d.node("rules", 1200, 300, 170, 130, "Rules", "past mistakes", shape="file", style="white")
-    d.node("gloss", 1385, 300, 170, 130, "EDI glossary", shape="file", style="white")
-    d.node("schema", 1570, 300, 170, 130, "Semantic schema", "+ allowed values", shape="file", style="white")
-    d.node("sys", 1800, 250, 220, 120, "System prompt\n+ history", "cached", shape="file", style="white")
-    d.node("newest", 1800, 380, 220, 80, "Newest prompt", shape="file", style="white")
-    a = d.node("agent", 1150, 560, 870, 150, "Claim Query Agent", "Claude Haiku · first: answer, clarify or escalate", "bedrock")
-    a["shape"] = "agent"
-    for x in (1285, 1470, 1655):
-        d.edge([(x, 430), (x, 560)])
-    d.edge([(1910, 460), (1910, 560)])
-    d.edge([(775, 440), (812, 440), (812, 268), (1110, 268), (1110, 600), (1162, 600)], "no", (960, 256))
-    d.edge([(1060, 660), (1162, 660)], "k = 3", (1106, 648))
-    d.node("tools", 870, 890, 190, 110, "Tool & CLI\nreference", "prompt cached", shape="file", style="white")
-    d.edge([(1060, 945), (1220, 945), (1220, 710)])
-    d.node("lossless", 1420, 820, 330, 150, "Full lossless schema", "only after the agent\nescalates with a reason", shape="db", style="optional")
-    d.edge([(1585, 710), (1585, 820)], "escalate", (1597, 770), lpos="right", style="dashed")
-    # tools: cli.py + SQL guard
-    d.zone(2280, 400, 640, 400, "Tools", "dashed")
-    d.node("cli", 2320, 560, 190, 150, "cli.py", "ClaimClarity CLI", "terminal")
-    d.node("guard", 2600, 545, 280, 180, "SQL guard", "read-only SELECT\nfails fast on the schema", "shieldcheck")
-    d.edge([(2510, 635), (2600, 635)])
-    d.edge([(2000, 590), (2320, 590)], "cli calls with sql", (2180, 578))
-    d.edge([(2320, 635), (2000, 635)], "results · iterate", (2180, 623))
-    d.edge([(2000, 680), (2320, 680)], "final query + answer", (2180, 668), style="final")
-    d.text(2180, 712, "re-run by the server", "note", "middle")
-    d.edge([(660, 750), (660, 1110), (2740, 1110), (2740, 725)], "preset sql", (1700, 1098))
-    d.node("qs", 2600, 180, 280, 100, "DuckDB query service", "Quack server", "fargate")
-    d.edge([(2740, 545), (2740, 280)], "sql over quack", (2752, 420), lpos="right")
-    d.text(2752, 446, "per-run token", "note")
+    d.text(40, 86, "The Claim Query Agent is the run worker. The DuckDB query service holds the credentials.", "subtitle")
+    # zones
+    d.zone(*box("rL8BxLtQ6X"), "Run worker · Fargate", "worker", "fargate")
+    d.zone(*box("RY0gNU6VDh"), "References (prompt cached)", "plain")
+    d.zone(*box("8DqM00NEH5"), "", "dashed")
+    d.zone(*box("z9Lwryh5kO"), "", "aws")
+    d.zone(*box("24W6ljDbGQ"), "Customer's S3 prefix · semantic_layer/ (gold)", "phi", "s3")
+    d.zone(*box("YcJQqyJI9K"), "", "accent")
+    # nodes
+    f = d.node("ui", *box("KyHx9De5HC"), "Frontend", shape="image")
+    f["href"] = src["files"][E["IIx3z_anQB"]["fileId"]]["dataURL"]
+    kr = kpi_el("rectangle"); kd = kpi_el("diamond")
+    d.node("preset", X(kr["x"]), Y(kr["y"]), round(kr["width"]), round(kr["height"]), "Preset KPI queries",
+           "16 presets, fixed SQL\nthe gate fills payer, payer class,\nmonth, CPT and CARC", shape="file", style="white")
+    d.node("kpi", X(kd["x"]), Y(kd["y"]), round(kd["width"]), round(kd["height"]), "KPI gate", "preset fits?", shape="decision")
+    d.node("bank", *box("BInIQNotFm"), "Solved Example\nQuestion Bank", shape="db", style="white")
+    d.node("tools", *box("nPO3M3NYGI"), "Tool & CLI\nreference", "(prompt cached)", shape="file", style="white")
+    d.node("rules", *box("6r2Y4_6Ln_"), "Rules from\npast mistakes", shape="file", style="white")
+    d.node("gloss", *box("NjiWEu8of1"), "EDI Business\nGlossary", shape="file", style="white")
+    d.node("schema", *box("SR-Lrc45uK"), "Semantic layer", "schema + allowed values", shape="file", style="white")
+    o = d.node("prompt_outer", *box("g53ojIwuNb"), "User Newest Prompt", shape="box", style="white")
+    o["valign"] = "bottom"
+    d.node("sysprompt", *box("dTyUfzF_bj"), "System Prompt +\nConversation History", "(prompt cached)", shape="file", style="white")
+    a_ = d.node("agent", *box("jybGrI_Izu"), "Claude Haiku", "one agent · Strands on\nAmazon Bedrock", "bedrock")
+    a_["shape"] = "agent"
+    d.node("lossless_schema", *box("3iBkr6axdX"), "Full lossless EDI schema",
+           "only after the agent\nescalates with a reason (logged)", shape="db", style="optional")
+    d.node("cli", *box("klRhw-nptO"), "cli.py", "ClaimClarity CLI", "terminal")
+    d.node("guard", *box("cStFoef2wJ"), "SQL Guard", "prevents non-read queries,\nand queries that will\nfail against the schema", "shieldcheck")
+    d.node("qs", *box("visPhHm5ok"), "DuckDB query service",
+           "Quack server, own Fargate service\none session per run\nread-only SELECT, row/time/cost caps", "fargate")
+    d.node("sem", *box("asHDa6G9m3"), "Semantic Layer", "(sem.*) curated tables", shape="db", style="white")
+    d.node("lossless", *box("l9RAy2prZT"), "Lossless EDI", "tables (lossless.*)", shape="db", style="white")
+
+    def ln(k):
+        e = E[k]
+        return [(X(e["x"] + px), Y(e["y"] + py)) for px, py in e["points"]]
+
+    def flat(k, style="solid"):                      # a straight excalidraw arrow, made exactly horizontal
+        (x0, y0), (x1, _) = ln(k)[0], ln(k)[-1]
+        d.edge([(x0, y0), (x1, y0)], style=style)
+
+    for k in ("liKA4lL-bL", "qI9MfLE4fF", "TvL2CjKkfN", "5BvdWNqcaP", "XIV8gXseuu", "lUFxtPcBGz", "3FgTcUyAcv",
+              "cPBMbTZMBk", "DO_Fs1q1rd", "T9DWBFXgC1"):
+        flat(k)
+    flat("rddg7eDfdV", "final")
+    for e in kpi:
+        if e["type"] == "arrow":
+            pts = [(X(e["x"] + px), Y(e["y"] + py)) for px, py in e["points"]]
+            d.edge(pts)
+    # references and the tool reference flow into Haiku with right-angle elbows
+    hx, hy, hw, hh = box("jybGrI_Izu")
+    rb = Y(E["RY0gNU6VDh"]["y"] + E["RY0gNU6VDh"]["height"])
+    mid = (rb + hy) // 2
+    for k, tx in (("eM4_BLOWAe", hx + 74), ("MujbKXp24X", hx + hw - 74)):
+        sx = ln(k)[0][0]
+        d.edge([(sx, rb), (sx, mid), (tx, mid), (tx, hy)])
+    gx = ln("uHzQHsbzJl")[0][0]
+    d.edge([(gx, rb), (gx, hy)])
+    tb = box("nPO3M3NYGI")
+    d.edge([(tb[0] + tb[2], ln("B-wjkiTGqr")[0][1]), (tb[0] + tb[2] + 50, ln("B-wjkiTGqr")[0][1]),
+            (tb[0] + tb[2] + 50, hy + hh - 24), (hx + 6, hy + hh - 24)])
+    d.edge(ln("fPXVIk0UzP"), style="dashed")
+    # the two reads, each with a big gate 6 on its arrow
+    q = box("visPhHm5ok")
+    (s1x, s1y), (e1x, _) = ln("qMsg83z7QP")[0], ln("qMsg83z7QP")[-1]
+    d.edge([(q[0] + q[2], s1y), (e1x, s1y)])
+    (s2x, s2y), (e2x, _) = ln("rOkWFwHs5r")[0], ln("rOkWFwHs5r")[-1]
+    d.edge([(q[0] + q[2], s2y), (e2x, s2y)], "only after a reasoned escalation", (X(E["kYzu4znOfs"]["x"] + 206), s2y - 12), style="solid")
+    for k, yy in (("499pBNb1Mh", s1y), ("AeKE4Dl3tF", s2y)):
+        dm = E[k]
+        d.gate(6, X(dm["x"] + dm["width"] / 2), yy, "", "above")
+    gtip = X(E["AeKE4Dl3tF"]["x"] + E["AeKE4Dl3tF"]["width"] / 2)
+    c0 = ln("DQGZJ5UYd0")[0]
+    d.edge([c0, (gtip, c0[1]), (gtip, s2y + GR_)], style="navy")
+    t = E["80_0YFkhw-"]
+    d.text(X(t["x"]), Y(t["y"]) + 26, "GATE 6 · IAM + KMS: this customer only", "gatenote")
+    # lossless tables -> semantic layer, the pink dashed hint, as an elbow
+    l0 = ln("QKNyGbgAu6")[0]; l1 = ln("QKNyGbgAu6")[-1]
+    hl = box("YcJQqyJI9K")
+    d.edge([(l0[0], Y(E["l9RAy2prZT"]["y"])), (l0[0], l1[1]), (hl[0] + hl[2], l1[1])], style="dashed")
+    # the user's words: arrow labels, notes and headings, at their own positions
+    def put(k, role, dy=0, anchor="start", text=None):
+        e = E[k]
+        d.text(X(e["x"]), Y(e["y"]) + {"label": 15, "note": 15, "heading": 17}[role] + dy, text or e["text"], role, anchor)
+    for k in ("k7SIsJ3M_h", "ZmjSuQpPF_", "Y-9ygs7teF", "h0yKh0RZM8", "Zaky5DrGkd", "YMAUWRuvhl", "X0Pit0Z_6d",
+              "EWI5qb2A46", "jDqN4Xr_II"):
+        put(k, "label")
+    for e in kpi:
+        if e["type"] == "text" and e["text"] in ("yes", "no") or e.get("text", "").startswith("preset SQL"):
+            d.text(X(e["x"]), Y(e["y"]) + 15, e["text"], "label")
+    put("-A8dMCxTwW", "heading")
+    put("qHtTjH_-AM", "heading", text="Claim Query Agent: the backend for ClaimClarity, and part of the backend for Agentic Next Best Actions")
+    put("9kVIq4ZuaA", "heading")
+    put("6sE7--PXrr", "note")
+    put("Hli_0rnnE0", "note")
     return d
 
 
@@ -275,7 +350,7 @@ def d05():
     return d
 
 
-DIAGRAMS = {"00": d00, "01": d01, "02": d02, "03": d03, "05": d05}   # 04: the user excalidraw, edited by analyzer04.py
+DIAGRAMS = {"00": d00, "01": d01, "02": d02, "03": d03, "04": d04, "05": d05}
 
 
 SKILL = Path(os.environ.get("DIAGRAM_DESIGN", Path.home() / ".claude/skills/diagram-design")) / "scripts"
@@ -300,7 +375,8 @@ def main(which):
         d = DIAGRAMS[k]()
         for prob in check(d):
             print(f"  {d.slug}: {prob}")
-        (OUT / f"{d.slug}.excalidraw").write_text(to_excalidraw(d))
+        if k != "04":                 # 04's .excalidraw is the source (the user's board, edited by analyzer04.py)
+            (OUT / f"{d.slug}.excalidraw").write_text(to_excalidraw(d))
         html = tmp / f"{d.slug}.html"
         html.write_text(to_html(d, getattr(d, "legend_items", None)))
         subprocess.run([PY, str(SKILL / "export_svg.py"), str(html), str(OUT / f"{d.slug}.svg")], check=True)

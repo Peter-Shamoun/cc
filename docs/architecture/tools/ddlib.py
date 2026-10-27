@@ -158,6 +158,7 @@ def svg_zone(z):
            "worker": (f'fill="{TINT}" fill-opacity="0.35" stroke="#ED7100" stroke-width="1.6"', "#B35400"),
            "plain": (f'fill="none" stroke="{LINE}" stroke-width="1.2"', SOFT),
            "denied": (f'fill="#FDF1F0" fill-opacity="0.6" stroke="{DENY}" stroke-width="1.6" stroke-dasharray="8 5"', DENY),
+           "accent": (f'fill="none" stroke="{NAVY}" stroke-width="2.2"', NAVY),
            "dashed": (f'fill="none" stroke="{BLUE}" stroke-width="1.6" stroke-dasharray="8 5"', LINK),
            "lane": (f'fill="{TINT}" fill-opacity="0.30" stroke="none"', SOFT)}[k]
     out = [f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{0 if k in ("aws","vpc","lane") else 6}" {sty[0]}/>']
@@ -165,6 +166,8 @@ def svg_zone(z):
     if z["icon"]:
         out.append(place_icon(z["icon"], x + 12, y + 10, 26)); lx = x + 46
     lab = z["label"]
+    if not lab:
+        return "".join(out)
     out.append(f'<rect x="{lx - 4}" y="{y + 12}" width="{_tw(lab, 15, "caps") + 12:.0f}" height="22" fill="{PAPER}" opacity="{0 if k in ("subnet","worker","lane","denied") else 1}"/>')
     out.append(_t(lx, y + 29, lab.upper(), 15, COND, sty[1], 700, ls="0.06em"))
     return "".join(out)
@@ -189,7 +192,7 @@ def node_layout(n):
     x, y, w, h, shape = n["x"], n["y"], n["w"], n["h"], n["shape"]
     names, subs = _lines(n["name"]), _lines(n["sub"])
     top_pad = {"db": 12, "folder": 8, "ui": 18}.get(shape, 0)
-    ic = n["icon"] if shape not in ("decision", "steps", "grid", "code", "table") else None
+    ic = n["icon"] if shape not in ("decision", "steps", "grid", "code", "table", "image") else None
     isz = 40 if h >= 76 else 32
     left = x + (30 if shape == "agent" else 16)
     widths = [_tw(s, NAME - 1, "mono") if _is_mono(s) else _tw(s, NAME, "sans") for s in names] + [_tw(s, SUB, "sans4") for s in subs]
@@ -204,6 +207,8 @@ def node_layout(n):
         need += 30
     lh = len(names) * 22 + len(subs) * 18
     y0 = y + top_pad + (h - top_pad - lh) / 2 + 16
+    if n.get("valign") == "bottom":
+        y0 = y + h - lh - 10 + 16
     return dict(names=names, subs=subs, ic=ic, isz=isz, left=left, tx=tx, anchor=anchor, need=need, y0=y0, top_pad=top_pad)
 
 
@@ -221,6 +226,11 @@ def svg_node(n):
     elif style == "denied":
         fill, stroke, dash = "#FDF1F0", DENY, ' stroke-dasharray="6 4"'
     out = [f'<g data-node="{escape(n["id"])}">']
+    if shape == "image":
+        out.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="4" fill="{PAPER}" stroke="{BLUE}" stroke-width="1.4"/>'
+                   f'<image x="{x + 1}" y="{y + 1}" width="{w - 2}" height="{h - 2}" preserveAspectRatio="xMidYMid slice" href="{n["href"]}"/>')
+        out.append("</g>")
+        return "".join(out)
     if shape in ("box", "steps", "ui", "grid", "table"):
         out.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="4" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"{dash}/>')
     elif shape == "db":
@@ -355,6 +365,8 @@ def svg_edge_label(e):
 
 
 def gate_box(g):
+    if not g["label"]:
+        return (g["x"] - GR, g["y"] - GR, 2 * GR, 2 * GR)
     lines = g["label"].split("\n")
     wmax = max(_tw(s, GLAB, "sans") for s in lines) + (32 if g["icon"] else 0)
     hgt = len(lines) * 20
@@ -375,6 +387,8 @@ def svg_gate(g):
     r = GR
     out = [f'<path d="M{x},{y - r} L{x + r},{y} L{x},{y + r} L{x - r},{y} Z" fill="{NAVY}" stroke="{PAPER}" stroke-width="3"/>',
            _t(x, y + 10, str(n), 30, COND, PAPER, 700, "middle")]
+    if not g["label"]:
+        return "".join(out)
     bx, by, bw, bh = gate_box(g)
     out.append(f'<rect x="{bx:.0f}" y="{by:.0f}" width="{bw:.0f}" height="{bh}" rx="3" fill="{PAPER}" stroke="{NAVY}" stroke-width="1.2"/>')
     tx = bx + 8
@@ -420,7 +434,7 @@ def check(d):
             need = max(_tw(l, 13.5, "mono") for l in n["inner"]) + 36
             if need > n["w"]:
                 probs.append(f"code overflow in {n['id']}: needs {need:.0f}, has {n['w']}")
-        elif L["need"] > n["w"] + 1 and n["shape"] not in ("steps", "grid", "table"):
+        elif L["need"] > n["w"] + 1 and n["shape"] not in ("steps", "grid", "table", "image"):
             probs.append(f"text overflow in {n['id']}: needs {L['need']:.0f}, has {n['w']}")
     for g in d.gates:
         gb = gate_box(g); dia = (g["x"] - GR, g["y"] - GR, 2 * GR, 2 * GR)
@@ -447,7 +461,7 @@ def check(d):
                 if _seg_hits_rect(p, q, b):
                     probs.append(f"edge {i} runs through {k}")
             for g in d.gates:
-                if _seg_hits_rect(p, q, gate_box(g), 1):
+                if g["label"] and _seg_hits_rect(p, q, gate_box(g), 1):
                     probs.append(f"edge {i} runs through gate {g['n']} label")
         for j, f in enumerate(d.edges[i + 1:], i + 1):
             for s1 in segs:
@@ -465,6 +479,8 @@ def check(d):
     texts = []
     for z in d.zones:
         lx = z["x"] + (46 if z["icon"] else 14)
+        if not z["label"]:
+            continue
         texts.append((f"zone label '{z['label'][:18]}'", (lx - 4, z["y"] + 12, _tw(z["label"], 15, "caps") + 12, 22)))
     for t in d.texts:
         if t["role"] == "note":
@@ -502,6 +518,20 @@ def svg_text(t):
         return _t(t["x"], t["y"], t["s"], 16, SANS, SOFT, 400, t["anchor"])
     if role == "eyebrow":
         return _t(t["x"], t["y"], t["s"].upper(), 14, COND, t["color"] or SOFT, 700, t["anchor"], ls="0.08em")
+    if role == "label":
+        out = []
+        for i, line in enumerate(t["s"].split("\n")):
+            yy = t["y"] + i * 19
+            wd = _tw(line, ALAB, "caps")
+            x0 = t["x"] - (wd / 2 if t["anchor"] == "middle" else (wd if t["anchor"] == "end" else 0))
+            out.append(f'<rect x="{x0 - 4:.0f}" y="{yy - ALAB - 1}" width="{wd + 8:.0f}" height="{ALAB + 6}" fill="{PAPER}"/>'
+                       + _t(t["x"], yy, line.upper(), ALAB, COND, t["color"] or LINK, 600, t["anchor"], ls="0.04em"))
+        return "".join(out)
+    if role == "heading":
+        return "".join(_t(t["x"], t["y"] + i * 22, line, 17, SANS, t["color"] or INK, 600, t["anchor"])
+                       for i, line in enumerate(t["s"].split("\n")))
+    if role == "gatenote":
+        return _t(t["x"], t["y"], t["s"], GLAB + 2, SANS, NAVY, 700, t["anchor"])
     if role == "mono":
         return _t(t["x"], t["y"], t["s"], 14, MONO, t["color"] or INK, 400, t["anchor"])
     return "".join(_t(t["x"], t["y"] + i * 19, line, 15, SANS, t["color"] or SOFT, 500, t["anchor"], italic=True)
