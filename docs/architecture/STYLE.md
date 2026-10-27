@@ -77,6 +77,24 @@ The validator has a known false positive: waypoints inside containers are not of
 waypointed edges inside containers can be ignored. Open every PNG with Read and check it for overlaps, clipped
 text and edges through boxes. Do at most two repair rounds.
 
+## Clarity rules (these override everything else on this page)
+
+The user found the first diagrams confusing. Every diagram must pass these rules:
+1. One story per diagram, read left to right. Put parallel flows in separate horizontal lanes, each lane
+   labelled at its left ("DATA IN", "QUESTIONS", "SIGN-IN"). No arrows that go back up across a lane, unless
+   it is a single short vertical arrow to shared storage.
+2. L1 diagrams: at most 8 boxes. L2 diagrams: at most 10 boxes. Anything more goes into the page text or another page.
+3. A box has a name and at most ONE short line under it (about 50 characters). No pipelines written inside a
+   box ("A → B → C"): those are boxes and arrows, or text on the page.
+4. At most 3 edges per box. Edge labels are 1–2 words, or none.
+5. No crossing edges, and no edge running through a box.
+6. AWS gate diamonds only on the pages whose subject they are: 13 and 14 (gates 1–3), 22 (gates 4–6) and
+   23. Each diamond gets a plain question as its label ("Is the token valid?"). Elsewhere, mention gates in the
+   text only.
+7. Leave white space. Do not fill the canvas, and size the canvas to the content.
+8. Before you finish, look at the PNG and ask: "Could an IT reader say what happens, in order, in 10 seconds?"
+   If not, simplify. Remove boxes and move detail to the text.
+
 ## Diagram style
 
 Copy these styles exactly. They come from `diagrams/CC_Backend.drawio`.

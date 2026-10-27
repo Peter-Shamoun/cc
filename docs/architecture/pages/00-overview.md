@@ -15,38 +15,44 @@ signed-in user can only reach the one customer their token names. The design is 
 
 | # | Box | What it does | Details |
 |---|---|---|---|
-| 1 | Customer labs | Send daily 837, 835 and 277 files over SFTP | [Ingestion & lake](10-ingestion.md) |
-| 2 | XiFin users | Use the React chat app in the browser | [Chat backend](30-chat-backend.md) |
-| 3 | Microsoft Entra ID | Company sign-in. The CC app is assigned to groups. | [Identity & access](20-identity.md) |
-| 4 | Ingestion & lake | Lands files in raw. A parser task per batch writes the lossless (silver) and semantic (gold) tables. | [Ingestion & lake](10-ingestion.md) |
-| 5 | ClaimClarity bucket | One S3 bucket, with one prefix, KMS key and IAM role per customer. It holds the lake and all chat state. | [S3 layout](12-s3-layout.md) |
-| 6 | Edge | CloudFront and WAF serve the web app and pass API calls to the chat API through the load balancer | [Edge](31-edge.md) |
-| 7 | Chat backend | The chat API accepts a question and queues a run. Run workers execute it and stream the answer back. | [Chat backend](30-chat-backend.md) |
-| 8 | Analyzer | Strands agent inside the run worker. A KPI gate sends each question to a standard KPI query or to custom analysis. | [Agent analyzer](40-analyzer.md) |
+| 1 | Customer labs | Send daily 837, 835 and 277 files | [SFTP intake](11-sftp-intake.md) |
+| 2 | SFTP intake | AWS Transfer Family lands each file in the customer's raw prefix | [SFTP intake](11-sftp-intake.md) |
+| 3 | Parser task | One Fargate task per batch, running as the customer's role. It writes the lossless (silver) tables and publishes a new gold version. | [Ingestion & lake](10-ingestion.md) |
+| 4 | ClaimClarity bucket | One S3 bucket, with a prefix, KMS key and IAM role per customer. It holds raw, silver, gold and all chat state. | [S3 layout](12-s3-layout.md) |
+| 5 | XiFin users | Use the chat app in the browser | [Chat backend](30-chat-backend.md) |
+| 6 | CloudFront + WAF | Serve the web app and pass API calls to the chat API | [Edge](31-edge.md) |
+| 7 | Chat API | Verifies the token, queues one run per question, streams the answer back | [One chat turn](32-chat-turn.md) |
+| 8 | Analyzer | Strands agent in the run workers. A KPI gate sends each question to a standard KPI query or to custom analysis. | [Agent analyzer](40-analyzer.md) |
 | 9 | Amazon Bedrock | Claude Haiku: the only model the analyzer calls | [Model calls](45-model-calls.md) |
-| 10 | Identity & access | The Cognito id token names the customer. STS exchanges it for 15-minute credentials of that customer's role. | [Identity & access](20-identity.md) |
-| 11 | Network & security | Private subnets, VPC endpoints, KMS per customer, CloudTrail and the agent audit | [Network & security](50-network-security.md) |
-| 12 | Operations | Images, deploys, monitoring and the regression set that gates analyzer changes | [Operations](60-operations.md) |
+| 10 | Microsoft Entra ID | Company sign-in. The ClaimClarity app is assigned to groups. | [Sign-in](21-sign-in.md) |
+| 11 | Amazon Cognito | Federates Entra and issues the id token that names the customer | [Identity & access](20-identity.md) |
+| 12 | Network & security | Private subnets, VPC endpoints, KMS per customer, CloudTrail and the agent audit | [Network & security](50-network-security.md) |
+| 13 | Operations | Images, deploys, monitoring and the regression set that gates analyzer changes | [Operations](60-operations.md) |
 
 ## How it works
 
-1. A customer lab drops its daily files on SFTP (1). They land in that customer's raw prefix in the ClaimClarity bucket (5).
-2. When a batch is complete, EventBridge starts a parser task on Fargate as that customer's role (4). The task
-   writes the lossless tables, then publishes a new version of the gold tables. Gates 1–3 check every step.
-3. A XiFin user signs in with Entra ID (3). Cognito issues an id token that names the customer. The browser
-   holds it in an httpOnly session cookie (10).
-4. The user asks a question in the chat app (2). It goes through CloudFront and WAF (6) to the chat API (7). The
-   API verifies the token (gate 4) and queues a run.
-5. A run worker exchanges the token at STS for that customer's role (gate 5). It opens a read-only session on
-   the current gold version only (gate 6).
-6. The analyzer (8) first asks the KPI gate whether a standard KPI query answers the question exactly:
+**Data in**
+1. A customer lab sends its daily files over SFTP (1, 2). They land in that customer's raw prefix (4).
+2. When a batch is complete, EventBridge starts a parser task as that customer's role (3). It writes the
+   lossless tables, then publishes a new version of the gold tables.
+
+**Sign-in**
+1. A XiFin user signs in with Entra ID (10).
+2. Cognito (11) issues an id token that names the customer. The browser holds it in an httpOnly session cookie.
+
+**Questions**
+1. The user asks a question (5). It goes through CloudFront and WAF (6) to the chat API (7), which verifies the
+   token and queues a run.
+2. A run worker exchanges the token at STS for 15-minute credentials of that customer's role. It opens a
+   read-only session on the current gold version only.
+3. The analyzer (8) asks the KPI gate whether a standard KPI query answers the question exactly:
    - **Yes:** fixed SQL runs with the values filled in.
    - **No:** the custom analysis agent writes SQL over gold behind a guard.
 
    Every model call goes to Claude Haiku on Bedrock (9).
-7. The server runs the final SQL itself, so the numbers come from the database. The answer, with its SQL and
-   result, streams back to the browser. The conversation, run events and an audit record of every query are
-   stored under the customer's prefix, encrypted with the customer's key (5).
+4. The server runs the final SQL itself, so the numbers come from the database. The answer streams back with its
+   SQL and result. The conversation, run events and an audit record of every query are stored under the
+   customer's prefix, encrypted with the customer's key (4).
 
 ## Areas
 

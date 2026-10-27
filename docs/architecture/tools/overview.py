@@ -19,51 +19,52 @@ def e(cid, src, dst, label, exit_, entry, both=False):
     cells.append(f'<mxCell id="{cid}" value="{escape(label)}" style="{style}" edge="1" parent="1" source="{src}" target="{dst}"><mxGeometry relative="1" as="geometry"/></mxCell>')
 def box(n, title, lines): return f"<b>{n} · {title}</b><br>{lines}"
 
-v("title", "<b style='font-size:20px'>CLAIMCLARITY · ARCHITECTURE OVERVIEW</b>&nbsp;&nbsp;&nbsp;claims analytics chat for clinical labs · numbers link to the area pages", TEXT + "fontColor=#1C2B57;", 20, 14, 1100, 36)
-v("grp-aws", "", GROUP, 320, 80, 1240, 830)
-v("lbl-aws", "<b>AWS ACCOUNT · CLAIMCLARITY</b>&nbsp; all tasks on Amazon ECS on AWS Fargate in private subnets", "text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#1A1D23;fontFamily=Helvetica;", 334, 88, 700, 24)
+v("title", "<b style='font-size:20px'>CLAIMCLARITY · ARCHITECTURE OVERVIEW</b>&nbsp;&nbsp;&nbsp;numbers link to the area pages", TEXT, 20, 14, 900, 36)
+LANE = "text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#3A5A9E;fontStyle=1;fontFamily=Helvetica;"
+v("grp-aws", "", GROUP, 380, 70, 1030, 650)
+v("lbl-aws", "<b>AWS · CLAIMCLARITY ACCOUNT</b>", "text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#1A1D23;fontFamily=Helvetica;", 394, 76, 400, 22)
+v("lane-data", "DATA IN", LANE, 20, 132, 90, 20)
+v("lane-q", "QUESTIONS", LANE, 20, 472, 90, 20)
+v("lane-signin", "SIGN-IN", LANE, 20, 652, 90, 20)
 
-v("ext-labs", box(1, "CUSTOMER LABS", "Daily 837 · 835 · 277 files over SFTP"), EXT, 40, 140, 230, 72)
-v("ext-users", box(2, "XIFIN USERS", "Browser · React chat app"), EXT, 40, 484, 230, 72)
-v("ext-entra", box(3, "MICROSOFT ENTRA ID", "Company sign-in"), EXT, 40, 664, 230, 72)
+v("ext-labs", box(1, "CUSTOMER LABS", "daily 837 · 835 · 277 files"), EXT, 130, 110, 210, 64)
+v("svc-sftp", box(2, "SFTP INTAKE", "AWS Transfer Family"), SVC, 420, 110, 220, 64)
+v("svc-parser", box(3, "PARSER TASK", "ECS on Fargate · one per batch"), SVC, 800, 110, 240, 64)
+v("phi-bucket", "", PHI, 410, 252, 760, 90)
+v("svc-bucket", box(4, "CLAIMCLARITY BUCKET (S3)", "lake and chat state · own prefix and key per customer"), SVC, 420, 262, 740, 70)
 
-v("svc-ingest", box(4, "INGESTION &amp; LAKE", "Transfer Family → raw → parser task (Fargate)<br>→ lossless (silver) → semantic (gold) · gates 1–3"), SVC, 380, 136, 390, 80)
-v("phi-bucket", "", PHI, 860, 116, 660, 120)
-v("svc-bucket", box(5, "CLAIMCLARITY BUCKET (S3)", "One prefix, one KMS key and one IAM role per customer<br>raw · silver · gold · conversations · run events · audit"), SVC, 880, 136, 620, 80)
-v("lbl-phi", "PHI BOUNDARY · per customer", "text;html=1;align=left;verticalAlign=middle;fontSize=10;fontColor=#1C2B57;fontFamily=Helvetica;fontStyle=1;", 866, 238, 260, 18)
+v("ext-users", box(5, "XIFIN USERS", "browser chat app"), EXT, 130, 450, 210, 64)
+v("svc-edge", box(6, "CLOUDFRONT + WAF", "web app and API entry"), SVC, 420, 450, 200, 64)
+v("svc-chat", box(7, "CHAT API", "ECS on Fargate · queues runs"), SVC, 680, 450, 210, 64)
+v("agt-analyzer", "<b>8 · ANALYZER</b><br>runs in the run workers", AGENT, 950, 442, 200, 80)
+v("svc-bedrock", box(9, "AMAZON BEDROCK", "Claude Haiku"), SVC, 1210, 450, 180, 64)
 
-v("svc-edge", box(6, "EDGE", "CloudFront + WAF · static app from S3<br>load balancer → chat API"), SVC, 380, 480, 270, 80)
-v("svc-chat", box(7, "CHAT BACKEND", "Chat API · SQS run queue · run workers<br>streams each answer (SSE)"), SVC, 710, 480, 300, 80)
-v("agt-analyzer", "<b>8 · ANALYZER</b><br>Strands agent in the run worker<br>KPI gate → standard KPI or custom analysis", AGENT, 1060, 466, 260, 108)
-v("svc-bedrock", box(9, "AMAZON BEDROCK", "Claude Haiku"), SVC, 1370, 480, 160, 80)
-v("svc-identity", box(10, "IDENTITY &amp; ACCESS", "Cognito id token names the customer<br>STS → that customer's role, 15 min"), SVC, 710, 655, 300, 90)
+v("ext-entra", box(10, "MICROSOFT ENTRA ID", "company sign-in"), EXT, 130, 630, 210, 64)
+v("svc-cognito", box(11, "AMAZON COGNITO", "issues the customer token"), SVC, 680, 630, 210, 64)
 
-v("svc-netsec", box(11, "NETWORK &amp; SECURITY", "Private subnets · VPC endpoints · KMS per customer<br>CloudTrail · hash-chained agent audit"), SVC, 380, 800, 540, 80)
-v("svc-ops", box(12, "OPERATIONS", "ECR · CI deploys · CloudWatch alarms<br>regression set re-run on every analyzer change"), SVC, 980, 800, 550, 80)
+v("lane-all", "ACROSS<br>EVERYTHING", LANE, 20, 808, 90, 40)
+v("svc-netsec", box(12, "NETWORK &amp; SECURITY", "private subnets · KMS · audit"), SVC, 420, 790, 320, 56)
+v("svc-ops", box(13, "OPERATIONS", "deploys · monitoring · regression tests"), SVC, 780, 790, 320, 56)
 
-e("e-labs-ingest", "ext-labs", "svc-ingest", "SFTP", (1, .5), (0, .5))
-e("e-ingest-bucket", "svc-ingest", "svc-bucket", "write", (1, .5), (0, .5))
+e("e-labs-sftp", "ext-labs", "svc-sftp", "SFTP", (1, .5), (0, .5))
+e("e-sftp-bucket", "svc-sftp", "svc-bucket", "raw files", (.5, 1), (.1486, 0))
+e("e-parser-bucket", "svc-parser", "svc-bucket", "silver · gold", (.5, 1), (.6757, 0), both=True)
 e("e-users-edge", "ext-users", "svc-edge", "HTTPS", (1, .5), (0, .5))
-e("e-users-entra", "ext-users", "ext-entra", "sign in", (.5, 1), (.5, 0))
-e("e-entra-identity", "ext-entra", "svc-identity", "federation", (1, .5), (0, .5))
 e("e-edge-chat", "svc-edge", "svc-chat", "", (1, .5), (0, .5))
-e("e-chat-identity", "svc-chat", "svc-identity", "verify · creds", (.5, 1), (.5, 0), both=True)
 e("e-chat-analyzer", "svc-chat", "agt-analyzer", "", (1, .5), (0, .5))
 e("e-analyzer-bedrock", "agt-analyzer", "svc-bedrock", "", (1, .5), (0, .5))
-e("e-analyzer-bucket", "agt-analyzer", "svc-bucket", "read gold", (.5, 0), (.5, 1))
+e("e-analyzer-bucket", "agt-analyzer", "svc-bucket", "read gold", (.5, 0), (.8514, 1))
+e("e-users-entra", "ext-users", "ext-entra", "sign in", (.5, 1), (.5, 0))
+e("e-entra-cognito", "ext-entra", "svc-cognito", "federation", (1, .5), (0, .5))
+e("e-cognito-chat", "svc-cognito", "svc-chat", "token", (.5, 0), (.5, 1))
 
-v("gate-4", "4", GATE, 905, 590, 30, 30)
-v("gate-4-lbl", "Token valid? · 5 Trust allows?", "text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#1C2B57;fontFamily=Helvetica;", 941, 590, 200, 30)
-v("gate-6", "6", GATE, 1225, 330, 30, 30)
-v("gate-6-lbl", "IAM + KMS allow?", "text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#1C2B57;fontFamily=Helvetica;", 1261, 330, 140, 30)
-
-lx, ly = 900, 940
+lx, ly = 760, 880
 for i, (style, w, h, label) in enumerate([(AGENT, 26, 18, "AGENT"), (SVC.replace("spacingLeft=14;", ""), 26, 18, "SERVICE"), (EXT, 26, 18, "EXTERNAL"),
-                                          (PHI, 26, 18, "PHI BOUNDARY"), (GATE, 20, 20, "AWS GATE")]):
+                                          (PHI, 26, 18, "PHI BOUNDARY")]):
     v(f"leg-{i}", "", style, lx + i * 130, ly, w, h)
     v(f"leg-{i}-t", f"<b>{label}</b>", "text;html=1;align=left;verticalAlign=middle;fontSize=10;fontColor=#1A1D23;fontFamily=Helvetica;", lx + i * 130 + w + 6, ly - 2, 96, 22)
 
 xml = ('<mxfile host="drawio"><diagram id="00-overview" name="Overview"><mxGraphModel dx="1600" dy="1000" grid="0" gridSize="10" '
-       'guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" '
+       'guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1420" pageHeight="920" '
        'math="0" shadow="0"><root><mxCell id="0"/><mxCell id="1" parent="0"/>' + "".join(cells) + "</root></mxGraphModel></diagram></mxfile>\n")
 Path(__file__).resolve().parent.parent.joinpath("src", "00-overview.drawio").write_text(xml)
