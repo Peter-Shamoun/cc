@@ -19,7 +19,7 @@ PLACEMENT = {
     "01-ingestion": dict(x=2300, y=-1340, side="bottom"),
     "02-login": dict(x=-2900, y=975, side="right"),
     "03-query-path": dict(x=3475, y=975, side="left"),
-    "04-analyzer": dict(x=-34, y=2654, side="top"),
+    "04-analyzer": dict(x=454, y=2654, side="top"),
     "05-access-matrix": dict(x=-3120, y=-1340, side=None),
 }
 
