@@ -585,9 +585,28 @@ let workspace = { current: null, boards: {} };
 const clone = o => JSON.parse(JSON.stringify(o));
 const snap = (v, force) => (state.snap && !force ? Math.round(v / 10) * 10 : Math.round(v));
 
+/* A short fingerprint of a published board, so a saved copy knows which version it was edited from. */
+function fingerprint(board) {
+  let h = 2166136261;
+  for (const ch of JSON.stringify(board)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+  return h.toString(36);
+}
 function loadWorkspace() {
   try { const raw = localStorage.getItem(STORE_KEY); if (raw) workspace = JSON.parse(raw); } catch (_) { /* storage unavailable */ }
   workspace.boards = workspace.boards || {};
+  workspace.bases = workspace.bases || {};
+  /* When a board was republished after you edited it, open the new version and keep your edits as a separate copy. */
+  const kept = [];
+  for (const published of PUBLISHED_BOARDS) {
+    const slug = published.slug, saved = workspace.boards[slug];
+    if (!saved || workspace.bases[slug] === fingerprint(published)) continue;
+    const copySlug = `${slug}-earlier`;
+    workspace.boards[copySlug] = { ...saved, slug: copySlug, title: `${saved.title} (your earlier copy)` };
+    delete workspace.boards[slug];
+    delete workspace.bases[slug];
+    kept.push(published.title);
+  }
+  if (kept.length) setTimeout(() => toast(`Updated: ${kept.join(", ")}. Your earlier edits are kept as "(your earlier copy)" in the board list.`), 600);
 }
 let saveTimer = null;
 function persist(boardChanged = true) {
@@ -595,7 +614,11 @@ function persist(boardChanged = true) {
   if (boardChanged) state.dirty = true;
   saveTimer = setTimeout(() => {
     workspace.current = state.board.slug;
-    if (state.dirty) workspace.boards[state.board.slug] = state.board;
+    if (state.dirty) {
+      workspace.boards[state.board.slug] = state.board;
+      const published = PUBLISHED_BOARDS.find(x => x.slug === state.board.slug);
+      if (published && !workspace.bases[state.board.slug]) workspace.bases[state.board.slug] = fingerprint(published);
+    }
     try { localStorage.setItem(STORE_KEY, JSON.stringify(workspace)); if (state.dirty) refreshBoardPicker(); }
     catch (_) { toast("Autosave is off in this browser (storage full or blocked). Use Save to keep your work."); }
   }, 400);
@@ -1680,6 +1703,7 @@ $("btnRevert").addEventListener("click", () => {
   }
   revertArmedUntil = 0;
   delete workspace.boards[slug];
+  delete workspace.bases[slug];
   openBoard(publishedBoard(slug));
 });
 /* Inside a claude.ai artifact, files go through the viewer's download prompt; opened from disk, a plain link works. */
