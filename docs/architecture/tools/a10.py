@@ -146,7 +146,7 @@ link(d, "b1", "a1", "read", *up)
 link(d, "a2", "b2", "write", *down)
 link(d, "a3", "b3", "publish", *down)
 link(d, "a4", "b4", "summary", *down)
-gate(d, "g3", "3", "IAM + KMS allow?", 1300, 300)
+gate(d, "g3", "3", "IAM + KMS allow? (every read and write)", 1220, 240)
 strip(d, "s2", 420, 210, "A FILE THAT FAILS TO PARSE")
 y = 505
 c0 = item(d, "c0", "note", "X12 file", 160, y)

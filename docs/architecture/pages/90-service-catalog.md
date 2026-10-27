@@ -2,7 +2,7 @@
 
 [Overview](00-overview.md) › Service catalog
 
-One card per AWS service CC uses: what it does in CC, what it talks to, who may do what, encryption, data held, limits, failure behaviour and logging. Each card links to the pages that use it.
+One card per AWS service ClaimClarity uses: what it does in ClaimClarity, what it talks to, who may do what, encryption, data held, limits, failure behaviour and logging. Each card links to the pages that use it.
 
 ### AWS Transfer Family
 | | |

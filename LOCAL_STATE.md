@@ -55,3 +55,15 @@ The newest working version of CC is NOT in this repo. It is on Peter's other mac
 8. A repeatable regression test for the gate, including reworded questions.
 9. On `core`: 26 failing old API tests, stale contract examples, and the docs (`docs/frontend_handoff.md` §5.9,
    `docs/api.md`).
+
+## Architecture docs for Confluence (built 2026-10-27, on this branch)
+
+- Location: `docs/architecture/`.
+  - `pages/` holds one markdown file per Confluence page.
+  - `png/` and `svg/` hold the diagrams. `src/` holds one `.drawio` file per diagram.
+  - Bundles: `CC_Architecture.drawio` (every diagram), `.html` and `.pdf`.
+- Generators: `tools/l1.py` (overview, the area pages and the analyzer), `tools/a10.py`, `a20.py`, `a30.py` and
+  `a40.py` (sub-pages), all built on `tools/dlib.py`.
+- Rebuild with `python3 docs/architecture/build.py`.
+- `STYLE.md`'s "FINAL STRUCTURE" holds the rules the user approved.
+- Decisions the user still has to make: `pages/93-open-decisions.md`.

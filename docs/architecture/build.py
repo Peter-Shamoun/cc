@@ -48,7 +48,7 @@ def service_catalog() -> None:
     ordered = [cards.pop(name) for name in CARD_ORDER if name in cards] + [cards[name] for name in sorted(cards)]
     (HERE / "pages" / "90-service-catalog.md").write_text(
         "# AWS service catalog\n\n[Overview](00-overview.md) › Service catalog\n\n"
-        "One card per AWS service CC uses: what it does in CC, what it talks to, who may do what, encryption, data "
+        "One card per AWS service ClaimClarity uses: what it does in ClaimClarity, what it talks to, who may do what, encryption, data "
         "held, limits, failure behaviour and logging. Each card links to the pages that use it.\n\n" + "\n\n".join(ordered) + "\n")
 
 
@@ -77,7 +77,7 @@ def build_html(ids: list[str]) -> Path:
         nav.append(f'<a class="d{depth}" href="#{page_id}">{html.escape(title_of(markdown, page_id))}</a>')
     out = HERE / "CC_Architecture.html"
     out.write_text(f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>CC Architecture</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>ClaimClarity Architecture</title>
 <style>
 :root {{ --ink:#1A1D23; --navy:#1C2B57; --blue:#4A6BB0; --tint:#EAF0F9; --line:#D5DCE8; --paper:#FFFFFF; }}
 body {{ margin:0; font:15px/1.55 Helvetica, Arial, sans-serif; color:var(--ink); background:var(--paper); }}
@@ -103,7 +103,7 @@ pre {{ background:#F1F3F7; padding:10px; overflow:auto; }}
   .diagram svg {{ width:100%; height:auto; max-height:160mm; display:block; margin:0 auto; }}
   h1, h2 {{ break-after:avoid; }} tr {{ break-inside:avoid; }} body {{ font-size:12px; }} }}
 </style></head><body>
-<nav><b>CC ARCHITECTURE</b>{''.join(nav)}</nav>
+<nav><b>CLAIMCLARITY ARCHITECTURE</b>{''.join(nav)}</nav>
 <main>{''.join(sections)}</main></body></html>""")
     return out
 
