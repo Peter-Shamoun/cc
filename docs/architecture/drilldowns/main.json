@@ -11,8 +11,8 @@
    {
     "id": "z_sftp",
     "kind": "bucket",
-    "label": "SFTP",
-    "icon": null,
+    "label": "AWS Transfer Family · SFTP",
+    "icon": "transfer",
     "x": 50,
     "y": 125,
     "w": 1475,
@@ -21,7 +21,7 @@
    {
     "id": "z_bucket",
     "kind": "bucket",
-    "label": "Prod S3 bucket · claimclarity/",
+    "label": "xifin-dl-curated-prod/ClaimClarity",
     "icon": "s3",
     "x": 50,
     "y": 400,
@@ -31,22 +31,22 @@
    {
     "id": "z_custA",
     "kind": "phi",
-    "label": "Customer A",
+    "label": "customer_a/",
     "icon": null,
     "x": 100,
     "y": 488,
     "w": 650,
-    "h": 875
+    "h": 780
    },
    {
     "id": "z_custB",
     "kind": "phi",
-    "label": "Customer B",
+    "label": "customer_b/",
     "icon": null,
     "x": 834,
     "y": 488,
     "w": 650,
-    "h": 875
+    "h": 780
    },
    {
     "id": "z_write",
@@ -101,7 +101,7 @@
    {
     "id": "z_bucket2",
     "kind": "bucket",
-    "label": "Prod S3 bucket · claimclarity/",
+    "label": "xifin-dl-curated-prod/ClaimClarity",
     "icon": "s3",
     "x": 2500,
     "y": 1475,
@@ -116,9 +116,9 @@
     "y": 188,
     "w": 650,
     "h": 105,
-    "name": "Customer A",
-    "sub": "Daily 837 · 835 · 277",
-    "icon": null,
+    "name": "Customer A lab",
+    "sub": "SFTP login · daily 837 · 835 · 277",
+    "icon": "building",
     "shape": "box",
     "style": "external",
     "inner": null
@@ -129,9 +129,9 @@
     "y": 188,
     "w": 650,
     "h": 105,
-    "name": "Customer B",
-    "sub": "Daily 837 · 835 · 277",
-    "icon": null,
+    "name": "Customer B lab",
+    "sub": "SFTP login · daily 837 · 835 · 277",
+    "icon": "building",
     "shape": "box",
     "style": "external",
     "inner": null
@@ -247,7 +247,7 @@
     "w": 325,
     "h": 88,
     "name": "STS",
-    "sub": "15-min B creds for\nthe query service",
+    "sub": "Temp customer  creds for\nthe query service",
     "icon": "sts",
     "shape": "box",
     "style": "service",
@@ -302,7 +302,7 @@
     "sub": null,
     "icon": null,
     "shape": "box",
-    "style": "external",
+    "style": "denied",
     "inner": null
    },
    {
@@ -311,8 +311,8 @@
     "y": 1662,
     "w": 450,
     "h": 112,
-    "name": "customer_b/\nparquet + semantic_layer",
-    "sub": null,
+    "name": "customer_b/semantic_layer/",
+    "sub": "parquet/ only after escalation",
     "icon": null,
     "shape": "box",
     "style": "service",
@@ -323,25 +323,11 @@
     "x": 125,
     "y": 562,
     "w": 600,
-    "h": 250,
+    "h": 200,
     "name": "raw/",
-    "sub": "received_date=YYYY-MM-DD/ · raw EDI · bronze layer",
+    "sub": "received_date=YYYY-MM-DD/ · bronze · Object Lock",
     "icon": null,
-    "shape": "box",
-    "style": "service",
-    "inner": null,
-    "valign": "top"
-   },
-   {
-    "id": "aftA",
-    "x": 125,
-    "y": 950,
-    "w": 600,
-    "h": 288,
-    "name": "After parsing",
-    "sub": "parquet/ lossless parquet tables · silver layer\nsemantic_layer/ all sem.* views as Parquet · gold layer\nstaging/ · in-progress load\nquarantine/ · failed files",
-    "icon": null,
-    "shape": "box",
+    "shape": "folder",
     "style": "service",
     "inner": null,
     "valign": "top"
@@ -400,28 +386,14 @@
    },
    {
     "id": "rawB",
-    "x": 850,
+    "x": 859,
     "y": 562,
     "w": 600,
-    "h": 250,
+    "h": 200,
     "name": "raw/",
-    "sub": "received_date=YYYY-MM-DD/ · raw EDI · bronze layer",
+    "sub": "received_date=YYYY-MM-DD/ · bronze · Object Lock",
     "icon": null,
-    "shape": "box",
-    "style": "service",
-    "inner": null,
-    "valign": "top"
-   },
-   {
-    "id": "aftB",
-    "x": 850,
-    "y": 950,
-    "w": 600,
-    "h": 288,
-    "name": "After parsing",
-    "sub": "parquet/ lossless parquet tables · silver layer\nsemantic_layer/ all sem.* views as Parquet · gold layer\nstaging/ · in-progress load\nquarantine/ · failed files",
-    "icon": null,
-    "shape": "box",
+    "shape": "folder",
     "style": "service",
     "inner": null,
     "valign": "top"
@@ -559,7 +531,7 @@
    {
     "id": "aud_json",
     "x": 2525,
-    "y": 1858,
+    "y": 1848,
     "w": 450,
     "h": 276,
     "name": "Audit record",
@@ -644,6 +616,110 @@
     "shape": "badge",
     "style": "service",
     "inner": null
+   },
+   {
+    "id": "quarA",
+    "x": 125,
+    "y": 840,
+    "w": 290,
+    "h": 110,
+    "name": "quarantine/",
+    "sub": "failed parses",
+    "icon": null,
+    "shape": "folder",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "auditA",
+    "x": 435,
+    "y": 840,
+    "w": 290,
+    "h": 110,
+    "name": "audit/",
+    "sub": "one JSON line per SQL · 6 yr",
+    "icon": null,
+    "shape": "folder",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "silverA",
+    "x": 125,
+    "y": 1090,
+    "w": 290,
+    "h": 130,
+    "name": "parquet/",
+    "sub": "silver layer",
+    "icon": null,
+    "shape": "db",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "goldA",
+    "x": 435,
+    "y": 1090,
+    "w": 290,
+    "h": 130,
+    "name": "semantic_layer/",
+    "sub": "gold layer",
+    "icon": null,
+    "shape": "db",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "quarB",
+    "x": 859,
+    "y": 840,
+    "w": 290,
+    "h": 110,
+    "name": "quarantine/",
+    "sub": "failed parses",
+    "icon": null,
+    "shape": "folder",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "auditB",
+    "x": 1169,
+    "y": 840,
+    "w": 290,
+    "h": 110,
+    "name": "audit/",
+    "sub": "one JSON line per SQL · 6 yr",
+    "icon": null,
+    "shape": "folder",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "silverB",
+    "x": 859,
+    "y": 1090,
+    "w": 290,
+    "h": 130,
+    "name": "parquet/",
+    "sub": "silver layer",
+    "icon": null,
+    "shape": "db",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "goldB",
+    "x": 1169,
+    "y": 1090,
+    "w": 290,
+    "h": 130,
+    "name": "semantic_layer/",
+    "sub": "gold layer",
+    "icon": null,
+    "shape": "db",
+    "style": "service",
+    "inner": null
    }
   ],
   "edges": [
@@ -663,7 +739,7 @@
       562
      ]
     ],
-    "label": "Copy script",
+    "label": "write · copy role A",
     "at": [
      600,
      434
@@ -671,7 +747,17 @@
     "style": "solid",
     "end": true,
     "start": false,
-    "lpos": "above"
+    "lpos": "above",
+    "src": {
+     "id": "sftpA",
+     "fx": 0.7692307692307693,
+     "fy": 0.9904761904761905
+    },
+    "dst": {
+     "id": "rawA",
+     "fx": 0.7916666666666666,
+     "fy": 0
+    }
    },
    {
     "id": "e2",
@@ -689,7 +775,7 @@
       562
      ]
     ],
-    "label": "Copy script",
+    "label": "write · copy role B",
     "at": [
      1325,
      434
@@ -697,13 +783,23 @@
     "style": "solid",
     "end": true,
     "start": false,
-    "lpos": "above"
+    "lpos": "above",
+    "src": {
+     "id": "sftpB",
+     "fx": 0.7692307692307693,
+     "fy": 0.9904761904761905
+    },
+    "dst": {
+     "id": "rawB",
+     "fx": 0.7916666666666666,
+     "fy": 0
+    }
    },
    {
     "id": "e3",
     "pts": [
      [
-      1450,
+      1459,
       575
      ],
      [
@@ -716,7 +812,13 @@
     "style": "solid",
     "end": true,
     "start": false,
-    "lpos": "above"
+    "lpos": "above",
+    "src": null,
+    "dst": {
+     "id": "eb",
+     "fx": 0,
+     "fy": 0.5
+    }
    },
    {
     "id": "e4",
@@ -735,7 +837,17 @@
     "style": "solid",
     "end": true,
     "start": false,
-    "lpos": "above"
+    "lpos": "above",
+    "src": {
+     "id": "eb",
+     "fx": 0.5,
+     "fy": 1
+    },
+    "dst": {
+     "id": "launch",
+     "fx": 0.5,
+     "fy": 0
+    }
    },
    {
     "id": "e5",
@@ -754,13 +866,19 @@
     "style": "solid",
     "end": true,
     "start": false,
-    "lpos": "above"
+    "lpos": "above",
+    "src": {
+     "id": "launch",
+     "fx": 0.5,
+     "fy": 1
+    },
+    "dst": null
    },
    {
     "id": "e6",
     "pts": [
      [
-      1450,
+      1459,
       750
      ],
      [
@@ -779,12 +897,18 @@
     "label": "Read",
     "at": [
      1525,
-     980
+     830
     ],
     "style": "solid",
     "end": true,
     "start": false,
-    "lpos": "above"
+    "lpos": "above",
+    "src": null,
+    "dst": {
+     "id": "st2",
+     "fx": 0,
+     "fy": 0.5
+    }
    },
    {
     "id": "e7",
@@ -794,23 +918,29 @@
       1156
      ],
      [
-      1562,
-      1156
-     ],
-     [
-      1450,
+      1459,
       1156
      ]
     ],
     "label": "Write",
     "at": [
-     1481,
+     1491,
      1162
     ],
     "style": "solid",
     "end": true,
     "start": false,
-    "lpos": "above"
+    "lpos": "above",
+    "src": {
+     "id": "st3",
+     "fx": 0,
+     "fy": 0.5
+    },
+    "dst": {
+     "id": "goldB",
+     "fx": 1,
+     "fy": 0.5076923076923077
+    }
    },
    {
     "id": "e8",
@@ -832,7 +962,17 @@
     "style": "solid",
     "end": true,
     "start": false,
-    "lpos": "above"
+    "lpos": "above",
+    "src": {
+     "id": "gh",
+     "fx": 0,
+     "fy": 0.648
+    },
+    "dst": {
+     "id": "st3",
+     "fx": 1,
+     "fy": 0.5
+    }
    },
    {
     "id": "e_user",
@@ -851,7 +991,17 @@
     "style": "solid",
     "end": true,
     "start": false,
-    "lpos": "above"
+    "lpos": "above",
+    "src": {
+     "id": "user",
+     "fx": 1,
+     "fy": 0.5089285714285714
+    },
+    "dst": {
+     "id": "entra",
+     "fx": 0,
+     "fy": 0.5089285714285714
+    }
    },
    {
     "id": "e_entra",
@@ -870,7 +1020,17 @@
     "style": "solid",
     "end": true,
     "start": false,
-    "lpos": "above"
+    "lpos": "above",
+    "src": {
+     "id": "entra",
+     "fx": 0.9963636363636363,
+     "fy": 0.5089285714285714
+    },
+    "dst": {
+     "id": "cog",
+     "fx": 0,
+     "fy": 0.5089285714285714
+    }
    },
    {
     "id": "e_cog",
@@ -889,7 +1049,17 @@
     "style": "solid",
     "end": true,
     "start": false,
-    "lpos": "above"
+    "lpos": "above",
+    "src": {
+     "id": "cog",
+     "fx": 1,
+     "fy": 0.5089285714285714
+    },
+    "dst": {
+     "id": "tok",
+     "fx": 0,
+     "fy": 0.5089285714285714
+    }
    },
    {
     "id": "e_tok",
@@ -908,7 +1078,17 @@
     "style": "solid",
     "end": true,
     "start": false,
-    "lpos": "above"
+    "lpos": "above",
+    "src": {
+     "id": "tok",
+     "fx": 1,
+     "fy": 0.5089285714285714
+    },
+    "dst": {
+     "id": "api",
+     "fx": 0,
+     "fy": 0.5089285714285714
+    }
    },
    {
     "id": "e_api",
@@ -927,7 +1107,17 @@
     "style": "solid",
     "end": true,
     "start": false,
-    "lpos": "above"
+    "lpos": "above",
+    "src": {
+     "id": "api",
+     "fx": 1,
+     "fy": 0.5089285714285714
+    },
+    "dst": {
+     "id": "agent",
+     "fx": 0,
+     "fy": 0.504
+    }
    },
    {
     "id": "e_agent",
@@ -946,7 +1136,17 @@
     "style": "solid",
     "end": true,
     "start": false,
-    "lpos": "above"
+    "lpos": "above",
+    "src": {
+     "id": "agent",
+     "fx": 1,
+     "fy": 0.504
+    },
+    "dst": {
+     "id": "duck",
+     "fx": 0,
+     "fy": 0.5
+    }
    },
    {
     "id": "e_duck",
@@ -965,7 +1165,17 @@
     "style": "solid",
     "end": true,
     "start": false,
-    "lpos": "above"
+    "lpos": "above",
+    "src": {
+     "id": "duck",
+     "fx": 0.9965277777777778,
+     "fy": 0.5
+    },
+    "dst": {
+     "id": "s3b",
+     "fx": 0,
+     "fy": 0.5089285714285714
+    }
    },
    {
     "id": "e_sts1",
@@ -984,7 +1194,17 @@
     "style": "solid",
     "end": true,
     "start": true,
-    "lpos": "above"
+    "lpos": "above",
+    "src": {
+     "id": "duck",
+     "fx": 0.5,
+     "fy": 1
+    },
+    "dst": {
+     "id": "sts",
+     "fx": 0.5015384615384615,
+     "fy": 0
+    }
    },
    {
     "id": "e_aud",
@@ -1011,7 +1231,61 @@
     "style": "solid",
     "end": true,
     "start": false,
-    "lpos": "above"
+    "lpos": "above",
+    "src": {
+     "id": "duck",
+     "fx": 0.9965277777777778,
+     "fy": 0.8985507246376812
+    },
+    "dst": {
+     "id": "aud",
+     "fx": 0,
+     "fy": 0.509090909090909
+    }
+   },
+   {
+    "id": "e_badA",
+    "pts": [
+     [
+      270,
+      762
+     ],
+     [
+      270,
+      840
+     ]
+    ],
+    "label": "bad files",
+    "at": [
+     282,
+     806
+    ],
+    "style": "dashed",
+    "end": true,
+    "start": false,
+    "lpos": "right"
+   },
+   {
+    "id": "e_badB",
+    "pts": [
+     [
+      1004,
+      762
+     ],
+     [
+      1004,
+      840
+     ]
+    ],
+    "label": "bad files",
+    "at": [
+     1016,
+     806
+    ],
+    "style": "dashed",
+    "end": true,
+    "start": false,
+    "lpos": "right"
    }
   ],
   "gates": [
@@ -1037,7 +1311,7 @@
     "id": "g3a",
     "n": 3,
     "x": 1525,
-    "y": 912,
+    "y": 1010,
     "label": "IAM + KMS allow?",
     "side": "left",
     "icon": "kms"
@@ -1093,15 +1367,15 @@
     "id": "t_cw2",
     "x": 2375,
     "y": 436,
-    "s": "Shown for Customer B · same per customer",
+    "s": "Shown for Customer B",
     "role": "note",
     "anchor": "end",
     "color": null
    },
    {
     "id": "t_keyA",
-    "x": 552,
-    "y": 524,
+    "x": 618,
+    "y": 474,
     "s": "Key A · Role A",
     "role": "heading",
     "anchor": "start",
@@ -1110,8 +1384,8 @@
    },
    {
     "id": "t_keyB",
-    "x": 1278,
-    "y": 524,
+    "x": 1344,
+    "y": 474,
     "s": "Key B · Role B",
     "role": "heading",
     "anchor": "start",
@@ -1145,6 +1419,6 @@
     "Zoom-in"
    ]
   ],
-  "show_legend": true
+  "show_legend": false
  }
 }
