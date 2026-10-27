@@ -24,8 +24,8 @@ signed-in user can only reach the one customer their token names. The design is 
 | 7 | Chat API | Verifies the token, queues one run per question, streams the answer back | [One chat turn](32-chat-turn.md) |
 | 8 | Analyzer | Strands agent in the run workers. A KPI gate sends each question to a standard KPI query or to custom analysis. | [Agent analyzer](40-analyzer.md) |
 | 9 | Amazon Bedrock | Claude Haiku: the only model the analyzer calls | [Model calls](45-model-calls.md) |
-| 10 | Microsoft Entra ID | Company sign-in. The ClaimClarity app is assigned to groups. | [Sign-in](21-sign-in.md) |
-| 11 | Amazon Cognito | Federates Entra and issues the id token that names the customer | [Identity & access](20-identity.md) |
+| 10 | Amazon Cognito | Federates Entra and issues the id token that names the customer | [Identity & access](20-identity.md) |
+| 11 | Microsoft Entra ID | Company sign-in. The ClaimClarity app is assigned to groups. | [Sign-in](21-sign-in.md) |
 | 12 | Network & security | Private subnets, VPC endpoints, KMS per customer, CloudTrail and the agent audit | [Network & security](50-network-security.md) |
 | 13 | Operations | Images, deploys, monitoring and the regression set that gates analyzer changes | [Operations](60-operations.md) |
 
@@ -37,8 +37,8 @@ signed-in user can only reach the one customer their token names. The design is 
    lossless tables, then publishes a new version of the gold tables.
 
 **Sign-in**
-1. A XiFin user signs in with Entra ID (10).
-2. Cognito (11) issues an id token that names the customer. The browser holds it in an httpOnly session cookie.
+1. A XiFin user signs in through Cognito (10), which federates to Entra ID (11).
+2. Cognito issues an id token that names the customer. The browser holds it in an httpOnly session cookie.
 
 **Questions**
 1. The user asks a question (5). It goes through CloudFront and WAF (6) to the chat API (7), which verifies the

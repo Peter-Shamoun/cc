@@ -95,6 +95,81 @@ The user found the first diagrams confusing. Every diagram must pass these rules
 8. Before you finish, look at the PNG and ask: "Could an IT reader say what happens, in order, in 10 seconds?"
    If not, simplify. Remove boxes and move detail to the text.
 
+## Shapes: use real icons, not plain boxes (overrides the "Service box" rule below)
+
+The user rejected plain boxes. Every AWS service is drawn as its official AWS architecture icon, and every
+other thing is drawn as what it is. Compare /home/user/cc/diagrams/CC_Data_Backend.png, which puts an icon on
+each item.
+
+- **AWS service** = a 48x48 icon with its label below:
+  `sketch=0;outlineConnect=0;fontColor=#232F3E;fillColor=<COLOR>;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontFamily=Helvetica;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.<NAME>;`
+  - Label: `<b>N · Service name</b><br>one short line`.
+  - Do NOT set whiteSpace=wrap on icons, or the label wraps to the icon's width.
+  - Leave at least 170 px between icon centres, so the labels don't collide.
+  - Names and colours (verified to render; other names may draw a blank square, so check your PNG):
+
+  | Service | NAME | COLOR |
+  |---|---|---|
+  | S3 | s3 | #7AA116 |
+  | Transfer Family | transfer_family | #7AA116 |
+  | KMS | key_management_service | #DD344C |
+  | IAM | identity_and_access_management | #DD344C |
+  | STS | sts | #DD344C |
+  | Cognito | cognito | #DD344C |
+  | WAF | waf | #DD344C |
+  | Secrets Manager | secrets_manager | #DD344C |
+  | EventBridge | eventbridge | #E7157B |
+  | SQS | sqs | #E7157B |
+  | CloudWatch | cloudwatch_2 | #E7157B |
+  | CloudTrail | cloudtrail | #E7157B |
+  | Fargate | fargate | #ED7100 |
+  | ECS | ecs | #ED7100 |
+  | ECR | ecr | #ED7100 |
+  | CloudFront | cloudfront | #8C4FFF |
+  | Elastic Load Balancing | elastic_load_balancing | #8C4FFF |
+  | VPC | vpc | #8C4FFF |
+  | Amazon Bedrock | bedrock | #01A88D |
+
+  NOT working: elastic_container_service, elastic_container_registry, simple_storage_service.
+
+- **AWS resource icons** (no tile), same label rule:
+  `sketch=0;outlineConnect=0;fontColor=#232F3E;fillColor=<COLOR>;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontFamily=Helvetica;aspect=fixed;shape=mxgraph.aws4.<NAME>;`
+  - application_load_balancer (#8C4FFF)
+  - endpoints, i.e. VPC endpoint (#8C4FFF)
+  - role, i.e. an IAM role (#DD344C)
+  - data_encryption_key, i.e. a KMS key (#DD344C)
+  - bucket (#7AA116)
+  - container_1, i.e. a task or container (#ED7100)
+  - users (#232F3E)
+  - client, i.e. a browser (#232F3E)
+  - corporate_data_center, i.e. a customer lab (#232F3E)
+  - traditional_server (#232F3E)
+  - database (#232F3E)
+- **Database or query engine** (DuckDB reader session, answer key):
+  `shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontSize=11;fontFamily=Helvetica;`
+- **Table** (sem.* tables, silver tables, conversation object fields): an ERD-style list, with the title row and
+  up to 5 field rows (then "…"):
+  `swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=26;fillColor=#EAF0F9;strokeColor=#4A6BB0;horizontalStack=0;resizeParent=1;resizeLast=0;collapsible=0;marginBottom=0;html=1;fontSize=12;fontFamily=Helvetica;`
+  - Child rows: `text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;fontFamily=Helvetica;`
+    with parent = the table and geometry y = 26 + 26·k, height 26.
+- **File or object** (raw X12 file, manifest, CURRENT pointer, conversation JSON):
+  `shape=note;size=12;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#4A6BB0;fontSize=11;fontFamily=Helvetica;`
+- **S3 prefix or folder**: `shape=mxgraph.aws4.folder;html=1;fillColor=#4A6BB0;strokeColor=none;aspect=fixed;`
+  with the label below.
+- **Agent or model-driven step**: keep the navy hexagon from the "Agent" style below.
+- **Our own code that isn't an AWS service** (the chat API process, the SQL guard, the KPI gate check): the
+  plain service box is still allowed. Put the icon of whatever it runs on (fargate or ecs) inside it at the left,
+  24x24.
+- **External, non-AWS** (Microsoft Entra ID, GitHub): a dashed box (External style), or an AWS resource icon such
+  as users or client when it is a person or a device.
+- **Groups**: AWS standard groups instead of plain containers, wherever the grouping is an AWS boundary.
+  - AWS Cloud: `points=[[0,0]];outlineConnect=0;html=1;whiteSpace=wrap;fontSize=12;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_aws_cloud_alt;strokeColor=#232F3E;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontColor=#232F3E;dashed=0;`
+  - VPC: the same with `grIcon=mxgraph.aws4.group_vpc2;strokeColor=#8C4FFF;fontColor=#8C4FFF;`
+  - Private subnet: the same with `grIcon=mxgraph.aws4.group_security_group;grStroke=0;strokeColor=#00A4A6;fillColor=#E6F6F7;fontColor=#147EBA;`
+  - Keep the navy dashed PHI boundary for a customer's data.
+- **Legend**: show the shape kinds the page uses (AWS service icon, table, file, database, agent, external,
+  PHI boundary, AWS gate).
+
 ## Diagram style
 
 Copy these styles exactly. They come from `diagrams/CC_Backend.drawio`.
