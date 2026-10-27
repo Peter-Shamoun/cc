@@ -71,6 +71,8 @@ This board zooms in on one customer's folder in the shared bucket `xifin-dl-cura
 
 The folder follows a bronze, silver, gold layout, and each layer has one writer. Transfer Family writes raw EDI into `raw/` as the Customer B copy role. `raw/` is under Object Lock, so files can't be changed once they land and the raw data stays the source of truth. The parser (parser role B, through gate 3) reads `raw/`, writes the lossless tables to `parquet/` (silver), builds the views into `semantic_layer/` (gold), and sends bad files to `quarantine/`. On the read side, the DuckDB query service reads `semantic_layer/` with Customer B read access, through gate 6 (IAM + KMS for reader role B).
 
+Uploads arrive daily, and Parquet files are never edited, so each batch adds new files instead of changing old ones. Left alone, that would mean one more small file per table every day, and queries would slow as they open more and more files. The parser keeps this in check at the end of each batch. In `parquet/`, files are grouped by the month they were received. Once a month has closed, its daily files are merged into one compacted file per table. The month still in progress is also merged early, once a table has four daily files. In `semantic_layer/`, the three most recent months each keep their own file, and older months are folded into one file per quarter. Quarters rather than years means a late-arriving claim rewrites at most one quarter's file. Each gold build is a new version listed in a manifest. Files a new version no longer uses are deleted only after open reader sessions have had time to finish, so a query never loses a file mid-read. `raw/` is never compacted.
+
 `audit/` keeps a record of every query: one JSON Lines record per SQL statement, hash-chained, under a 6-year retention rule. Each record holds the hash of the record before it (`prev_hash`) and its own `hash`, so the records form a chain. The example below shows the fields.
 
 Customer A's roles are drawn on the right with a "Denied" arrow. IAM and KMS both block them from Customer B's folder, so a mistake in one customer's setup can't expose another customer's data.
@@ -78,8 +80,8 @@ Customer A's roles are drawn on the right with a "Denied" arrow. IAM and KMS bot
 **Key components:**
 
 - **`raw/`**: The bronze layer, raw EDI exactly as received, under Object Lock (write once). It is written by the Customer B copy role through Transfer Family and read by the parser.
-- **`parquet/`**: The silver layer of lossless Parquet tables, written by parser role B during the parse step.
-- **`semantic_layer/`**: The gold layer. Parser role B builds it from the view SQL ("Build view"). The DuckDB query service reads it with Customer B read access.
+- **`parquet/`**: The silver layer of lossless Parquet tables, written by parser role B during the parse step. Each batch adds one file per table under `received_month=YYYY-MM/`. A closed month is merged into one `compacted-<run>.parquet` per table, and the current month is merged once a table has four daily files.
+- **`semantic_layer/`**: The gold layer. Parser role B builds it from the view SQL ("Build view"). The DuckDB query service reads it with Customer B read access. Each build is a version: `CURRENT` points to `v=<run>/manifest.json`, which lists the exact files. The three most recent months have a file each, and older months are folded into quarter files.
 - **`quarantine/`**: Holds failed parses. The parser writes files it couldn't parse here ("Bad files").
 - **`audit/`**: The query audit trail. It holds one JSON Lines record per SQL statement, hash-chained, with a 6-year retention rule.
 - **Data encryption key (KMS)**: Customer B's own KMS key, which encrypts the customer's folder. Each customer has their own key, so reading or writing needs permission on that key as well as the IAM role.
