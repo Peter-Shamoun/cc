@@ -1,0 +1,28 @@
+%% 06 Network & security. Only two public entries.
+flowchart LR
+  users["Users"] -->|HTTPS| cf
+  labs["Labs"] -->|SFTP · port 22 · lab IPs only| sftp
+  internet["Anyone else"] -.->|DENIED · no public IP| vpc
+  subgraph aws["AWS Cloud"]
+    cf["CloudFront + WAF"]
+    sftp["Transfer Family SFTP endpoint"]
+    subgraph vpc["VPC · 2 AZs"]
+      subgraph priv["Private subnets"]
+        alb["Load balancer"] --> g4{{"Gate 4 · token valid"}} --> api["Chat API"]
+        api --> worker["Run workers"]
+        worker --> qs["DuckDB query service"]
+        parser["Parser"]
+      end
+      endpoints["VPC endpoints<br/>S3 · STS · KMS · Bedrock · ECR · Logs · SQS · Secrets Manager"]
+      subgraph egress["Egress subnet"]
+        nat["NAT gateway"] --> fw["Network Firewall<br/>Cognito hosts only"]
+      end
+    end
+    managed["AWS services<br/>S3 · STS · KMS · Bedrock · ECR · Logs · SQS · Secrets Manager"]
+    sec["Keys (KMS) · Roles (IAM) · CloudTrail 6 yr · Agent audit · App logs 1 yr"]
+  end
+  cf --> alb
+  sftp --> s3land["S3 landing/"]
+  priv --> endpoints --> managed
+  priv --> nat
+  fw --> cognito["Amazon Cognito hosts"]

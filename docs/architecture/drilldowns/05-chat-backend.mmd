@@ -1,0 +1,13 @@
+%% 05 Chat backend
+flowchart LR
+  user["User (browser)"] --> cf["Amazon CloudFront + AWS WAF"]
+  cf --> alb["Internal load balancer"]
+  alb --> g4{{"Gate 4 · token valid"}} --> api["Chat API (Fargate)<br/>3 unfinished runs per user"]
+  api --> sqs["Amazon SQS run queue"]
+  sqs --> worker["Run worker (Fargate)<br/>Claim Query Agent · 110 s deadline"]
+  worker --> bedrock["Amazon Bedrock<br/>Claude Haiku"]
+  worker <-->|Quack| qs["DuckDB query service"]
+  api -->|If-Match| conv[/"conversations/"/]
+  worker -->|append| events[/"run-events/"/]
+  events -.->|replay on reconnect| api
+  api -.->|SSE stream| user

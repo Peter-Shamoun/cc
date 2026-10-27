@@ -1,0 +1,30 @@
+%% 00 Storage & isolation. Source of truth for the drill-down. Gates are nodes on the edges they guard.
+flowchart LR
+  sftp["AWS Transfer Family (SFTP)<br/>SFTP copy role B"]
+  custA["Customer A roles"]
+  subgraph bucket["S3 · ClaimClarity data bucket (one bucket, one prefix per customer)"]
+    subgraph prefB["customer_b/ · bucket policy: customer B roles only"]
+      landing[/"landing/"/]
+      raw[("raw/ · bronze<br/>Object Lock 7 yr · _SUCCESS last")]
+      silver[("parquet/ · silver")]
+      gold[("semantic_layer/ · gold<br/>CURRENT version")]
+      quarantine[/"quarantine/ · 1 yr"/]
+      staging[/"staging/"/]
+      chat[/"conversations/ + run-events/"/]
+      audit[/"audit/ · write-once"/]
+    end
+  end
+  qs["DuckDB query service<br/>reader role B"]
+  keys{{"Keys B: lake key · transcript key<br/>platform query audit key (statement per customer)"}}
+  roles{{"Roles B: SFTP copy · parser · reader · transcripts · audit"}}
+
+  sftp -->|write| landing
+  landing -->|copy| raw
+  raw --> g3{{"Gate 3 · IAM + KMS (parser)"}} -->|parse| silver
+  silver -->|publish| gold
+  raw -.->|bad files| quarantine
+  staging -.->|batch lease| silver
+  gold --> g6{{"Gate 6 · IAM + KMS (reader)"}} -->|read| qs
+  custA -->|DENIED by bucket policy + KMS| prefB
+  keys -.- prefB
+  roles -.- prefB

@@ -1,0 +1,21 @@
+%% 03 Query path. Secure paved road. The agent never holds AWS credentials.
+flowchart LR
+  api["Chat API<br/>customer from token only"]
+  reqA["Request for customer A"] -.->|DENIED by the API| api
+  subgraph worker["Run worker (Fargate) · no AWS credentials"]
+    agent["Claim Query Agent"] --> cli["ClaimClarity CLI (cli.py)"] --> guard["SQL guard"]
+  end
+  api -->|run| agent
+  guard -->|SQL over Quack · per-run token| qs
+  subgraph qsz["DuckDB query service (Fargate) · holds 15-min STS credentials"]
+    qs["DuckDB Quack server"]
+  end
+  qs --> g5{{"Gate 5 · role trust policy allows this token (STS)"}} --> sts["AWS STS<br/>reader role B · 15 min"]
+  subgraph s3["S3 · ClaimClarity data bucket"]
+    gold[("customer_b/semantic_layer/<br/>current gold")]
+    lossless[("lossless.*<br/>PHI-stripped")]
+    prefA[("customer_a/")]
+  end
+  qs --> g6{{"Gate 6 · IAM + KMS (reader)"}} -->|read-only| gold
+  qs -.->|only after a reasoned escalation| lossless
+  qs -.->|DENIED by IAM + KMS| prefA

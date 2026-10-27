@@ -1,0 +1,32 @@
+%% 04 Analyzer. The Claim Query Agent IS the run worker (Fargate). Model: Claude Haiku on Amazon Bedrock via Strands.
+flowchart LR
+  ui["ClaimClarity frontend"] -->|question| kpi
+  subgraph worker["Run worker (Fargate) = Claim Query Agent"]
+    kpi{"KPI gate<br/>preset fits?"}
+    preset["Preset KPI queries (16)<br/>gate fills the parameters"]
+    subgraph inputs["Agent inputs"]
+      bank[("Solved example bank · K = 3")]
+      refs["References (prompt cached)<br/>rules · EDI glossary · semantic schema + allowed values"]
+      tools["Tool & CLI reference (prompt cached)"]
+      sys["System prompt + history (cached)"]
+      newest["Newest prompt"]
+    end
+    agent["Claim Query Agent<br/>Claude Haiku · Amazon Bedrock"]
+    decide{"Answer · Clarify · Escalate"}
+    cli["cli.py (ClaimClarity CLI)"]
+    guard["SQL guard"]
+    lossless[("Full lossless schema<br/>after escalation only")]
+  end
+  kpi -->|yes| preset --> guard
+  kpi -->|no| agent
+  bank --> agent
+  refs --> agent
+  tools --> agent
+  sys --> agent
+  newest --> agent
+  agent --> decide
+  decide -->|answer| cli --> guard
+  decide -.->|escalate, with a reason| lossless -.-> agent
+  decide -.->|clarify| ui
+  guard -->|Quack| qs["DuckDB query service"]
+  worker -->|answer · SSE| ui

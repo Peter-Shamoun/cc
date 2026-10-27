@@ -1,0 +1,10 @@
+%% 02 Login & customer mapping. Order: user -> Entra ID -> Cognito -> token.
+flowchart LR
+  user["User"] -->|sign in| entra["Microsoft Entra ID"]
+  entra --> group["Assigned group<br/>ClaimClarity · customer B"]
+  group -->|federation| cognito["Amazon Cognito<br/>group → one customer"]
+  cognito --> token[/"ID token<br/>customer = B · 60 min"/]
+  token --> cookie[/"httpOnly cookie"/]
+  cookie --> g4{{"Gate 4 · token valid"}} --> api["Chat API (Fargate)"]
+  entra -.->|not in an assigned group| noaccess["No access"]
+  g4 -.->|invalid or expired| reject["401 · sign in again"]

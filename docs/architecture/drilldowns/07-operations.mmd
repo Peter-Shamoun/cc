@@ -1,0 +1,15 @@
+%% 07 Operations
+flowchart LR
+  subgraph ship["Ship a change"]
+    git["Git"] --> ci["CI · build + test"] --> ecr["Amazon ECR"] --> deploy["ECS rolling deploy"] --> healthy{"Healthy?"}
+    healthy -->|yes| live["Live"]
+    healthy -->|no| rollback["Roll back"]
+  end
+  subgraph watch["Watch it"]
+    services["ECS services · SQS · Bedrock · parser"] --> cw["CloudWatch alarms"]
+  end
+  subgraph right["Keep answers right"]
+    feedback["Feedback · sampled chats"] --> reg["Regression set"] --> holds{"Accuracy holds?"}
+    holds -->|yes| shipit["Ship"]
+    holds -->|no| block["Don't ship"]
+  end
