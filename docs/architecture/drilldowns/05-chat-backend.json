@@ -416,7 +416,7 @@
     "n": 4,
     "x": 1095,
     "y": 285,
-    "label": "Session valid",
+    "label": "Token valid",
     "side": "above",
     "icon": "cognito"
    }

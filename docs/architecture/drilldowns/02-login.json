@@ -4,7 +4,7 @@
  "board": {
   "slug": "02-login",
   "title": "Login & customer mapping",
-  "desc": "The user signs in at Microsoft Entra ID; Cognito maps the user's one assigned group to a customer and issues an ID token to the chat API, which keeps it in a server-side session and gives the browser only a random session id that gate 4 checks on every request.",
+  "desc": "The user signs in at Microsoft Entra ID; Cognito maps the user's one assigned group to a customer and gives the ID token to the chat API, which puts it in the session cookie encrypted, so the browser can't read or reuse it; gate 4 checks it on every request.",
   "w": 3000,
   "h": 1360,
   "zones": [
@@ -70,7 +70,7 @@
     "w": 300,
     "h": 180,
     "name": "Session cookie",
-    "sub": "random id only\nHttpOnly · Secure · SameSite",
+    "sub": "encrypted ID token\nHttpOnly · Secure · SameSite",
     "icon": null,
     "shape": "file",
     "style": "white",
@@ -175,22 +175,9 @@
     "w": 380,
     "h": 110,
     "name": "Chat API",
-    "sub": "every request",
+    "sub": "decrypts + verifies the token",
     "icon": "fargate",
     "shape": "box",
-    "style": "service",
-    "inner": null
-   },
-   {
-    "id": "sessions",
-    "x": 2620,
-    "y": 735,
-    "w": 300,
-    "h": 140,
-    "name": "Sessions table",
-    "sub": "DynamoDB · tokens encrypted",
-    "icon": null,
-    "shape": "db",
     "style": "service",
     "inner": null
    },
@@ -205,6 +192,19 @@
     "icon": null,
     "shape": "box",
     "style": "denied",
+    "inner": null
+   },
+   {
+    "id": "key",
+    "x": 2620,
+    "y": 760,
+    "w": 300,
+    "h": 90,
+    "name": "Cookie key",
+    "sub": "Secrets Manager",
+    "icon": "secrets",
+    "shape": "box",
+    "style": "service",
     "inner": null
    }
   ],
@@ -367,15 +367,15 @@
     "id": "e_store",
     "pts": [
      [
-      2480,
+      2620,
       805
      ],
      [
-      2620,
+      2480,
       805
      ]
     ],
-    "label": "store",
+    "label": "key",
     "at": [
      2550,
      793
@@ -405,7 +405,7 @@
       925
      ]
     ],
-    "label": "set cookie · random id",
+    "label": "set cookie · encrypted token",
     "at": [
      1190,
      913
@@ -441,24 +441,24 @@
     "id": "e_check",
     "pts": [
      [
+      2700,
+      850
+     ],
+     [
+      2700,
+      1040
+     ],
+     [
       2480,
       1040
-     ],
-     [
-      2660,
-      1040
-     ],
-     [
-      2660,
-      875
      ]
     ],
-    "label": "look up session",
+    "label": "key",
     "at": [
-     2672,
-     960
+     2712,
+     950
     ],
-    "style": "dashed",
+    "style": "solid",
     "end": true,
     "start": false,
     "lpos": "right"
@@ -477,13 +477,13 @@
     ],
     "label": "invalid or expired",
     "at": [
-     1990,
+     1946,
      1146
     ],
     "style": "deny",
     "end": true,
     "start": false,
-    "lpos": "right",
+    "lpos": "left",
     "xat": [
      1960,
      1104
@@ -496,9 +496,9 @@
     "n": 4,
     "x": 1960,
     "y": 1040,
-    "label": "Session valid",
+    "label": "Token valid",
     "side": "above",
-    "icon": "lock"
+    "icon": "cognito"
    }
   ],
   "texts": [
@@ -515,7 +515,7 @@
     "id": "t_sub",
     "x": 40,
     "y": 86,
-    "s": "Sign-in happens at Entra ID. The browser keeps only a random session id; the tokens stay on the server.",
+    "s": "Sign-in happens at Entra ID. The browser gets the token only encrypted, so it can't read or reuse it.",
     "role": "subtitle",
     "anchor": "start",
     "color": null
@@ -524,7 +524,7 @@
     "id": "t_note",
     "x": 2580,
     "y": 1110,
-    "s": "Sign-out or the 8-hour limit\ndeletes the row, so a copied\ncookie stops working.",
+    "s": "A copied cookie works only until\nthe token expires (60 min). Then\nthe user signs in again (SSO).",
     "role": "note",
     "anchor": "start",
     "color": null
