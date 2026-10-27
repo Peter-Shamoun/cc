@@ -1,0 +1,159 @@
+# Architecture docs: conventions (read before drawing or writing)
+
+Audience: the company's IT and security reviewers. They should be able to build, secure and operate the system
+from these pages. Describe the architecture as designed, in the present tense ("the parser task reads..."), as
+one system.
+
+## Never write
+
+- "simulated", "simulator", "ccsim", "mock", "prototype", "not built", "planned" or any other build-status words.
+  Exception: the overview page has one sentence about the demo data set.
+- Internal names: "B1", bundle names, benchmark run names, "claude -p", "grok". Call the agent "the analyzer"
+  and its two paths "the standard KPI path" and "the custom analysis path" (the free-SQL agent).
+- Deployment details: regions, account ids, profile names, ARNs with ids, CIDRs, bucket or role names with
+  environment suffixes. Use logical names instead: "the CC bucket", "Customer B's role", "Customer B's key".
+- Model ids. Say "Claude Haiku on Amazon Bedrock".
+
+## Facts fixed for all pages
+
+- Compute: Amazon ECS on AWS Fargate for the chat API, the run workers and the parser. Not EC2.
+- One S3 bucket. Each customer has its own prefix, its own KMS key and its own IAM role.
+- Sign-in: Microsoft Entra ID (company login) federated into Amazon Cognito. The Cognito id token names the
+  customer. It is exchanged at STS (AssumeRoleWithWebIdentity) for short-lived credentials of that customer's role.
+- Analyzer: a Strands agent running inside the run workers, calling Claude Haiku on Amazon Bedrock. Every turn
+  passes a KPI gate first. The gate sends the question to a standard KPI query (fixed SQL) or to the custom
+  analysis agent (free SQL over gold behind a guard). The agent escalates to the lossless silver tables only
+  with a stated, audited reason.
+- Data zones: raw (bronze), lossless (silver), semantic (gold, `sem.*`). The chat reads gold by default.
+- AWS gates are numbered 1–6 everywhere, with the same meaning:
+  1. EventBridge rule matches Customer B's prefix
+  2. iam:PassRole allowed for the launcher
+  3. IAM + KMS allow the parser (write path)
+  4. Token valid (Cognito signature, audience, expiry, customer claim)
+  5. Role trust policy allows this token (STS)
+  6. IAM + KMS allow the reader (read path)
+
+## Pages
+
+Ids are `NN-name`. One `.drawio` file, one `.md` file and one rendered PNG and SVG per page.
+
+```
+00-overview                      L0
+10-ingestion                     L1  ingestion & lake
+  11-sftp-intake, 12-s3-layout, 13-parse-trigger, 14-parser-task, 15-gold-publish
+20-identity                      L1  identity & access
+  21-sign-in, 22-token-to-credentials, 23-customer-isolation
+30-chat-backend                  L1  chat backend
+  31-edge, 32-chat-turn, 33-state, 34-limits
+40-analyzer                      L1  agent analyzer
+  41-kpi-gate, 42-standard-kpi-path, 43-custom-analysis-agent, 44-sql-guard-escalation, 45-model-calls
+50-network-security              L1  network & security
+  51-network, 52-encryption-keys, 53-audit-logging
+60-operations                    L1  operations
+  61-deploy, 62-monitoring, 63-eval-regression
+90-service-catalog, 91-iam-kms-matrix, 92-glossary   appendix (markdown only)
+```
+
+## Files
+
+- `src/<id>.drawio`: one page, `<diagram id="<id>" name="<short title>">`.
+- `png/<id>.png` and `svg/<id>.svg`: renders.
+- `pages/<id>.md`: the page text.
+- `cards/<service>.md`: an AWS service spec card for the appendix (template below).
+
+Render with:
+
+```sh
+S=/tmp/claude-0/-home-user-cc/0e6bb8ac-ae6e-51d1-adaa-a5d39fba27c7/scratchpad
+export HOME=/tmp
+xvfb-run -a $S/squashfs-root/drawio -x -f png --width 2000 -o png/<id>.png src/<id>.drawio --no-sandbox --disable-gpu
+xvfb-run -a $S/squashfs-root/drawio -x -f svg -o svg/<id>.svg src/<id>.drawio --no-sandbox --disable-gpu
+python3 -I $S/drawio-skill/skills/drawio-skill/scripts/validate.py src/<id>.drawio
+```
+
+Run the renders one at a time: concurrent drawio processes can collide. If a render fails, retry once.
+
+The validator has a known false positive: waypoints inside containers are not offset, so crossing warnings on
+waypointed edges inside containers can be ignored. Open every PNG with Read and check it for overlaps, clipped
+text and edges through boxes. Do at most two repair rounds.
+
+## Diagram style
+
+Copy these styles exactly. They come from `diagrams/CC_Backend.drawio`.
+
+- Canvas: about 1600 x 1000. Title at the top left: `CC · <AREA>` in bold 20px navy #1C2B57, plus a 12px
+  subtitle.
+- L2 pages: put a breadcrumb under the title, e.g. `Overview › Chat backend › Chat turn`, 11px #3A5A9E.
+- Service box:
+  `rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF0F9;strokeColor=#4A6BB0;fontColor=#1A1D23;align=left;spacingLeft=14;spacingRight=10;verticalAlign=middle;fontSize=12;fontFamily=Helvetica;`
+  - Label: `<b>N · NAME IN CAPS</b><br>one or two short lines`. N is the box number used in the page's
+    "In this diagram" table.
+  - Numbering: number the boxes the reader acts on or links from. Not every box needs one.
+- External actor or system (customer, user, Entra, GitHub): white fill, `strokeColor=#8A8E95;dashed=1`, same
+  text style.
+- Group container:
+  `rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#4A6BB0;strokeWidth=1.5;container=1;pointerEvents=0;collapsible=0;`
+  with a bold 11px caps title text cell inside at the top left.
+- PHI boundary container: `strokeColor=#1C2B57;dashed=1;dashPattern=6 4;strokeWidth=1.5`, no fill.
+- Agent (model-driven step):
+  `shape=hexagon;perimeter=hexagonPerimeter2;size=0.12;whiteSpace=wrap;html=1;fillColor=#1C2B57;strokeColor=#1C2B57;fontColor=#FFFFFF;fontFamily=Helvetica;fontSize=11;`
+- AWS gate: a navy rhombus 30x30
+  `rhombus;html=1;fillColor=#1C2B57;strokeColor=#1C2B57;fontColor=#FFFFFF;fontStyle=1;fontSize=13;fontFamily=Helvetica;`
+  with its number, and a text label beside it ("Token valid?").
+- Edge:
+  `edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4A6BB0;strokeWidth=1.5;endArrow=block;endFill=1;endSize=6;fontSize=11;fontColor=#3A5A9E;labelBackgroundColor=#FFFFFF;fontFamily=Helvetica;`
+  - Pin exitX/exitY/entryX/entryY on every edge, and bind every edge to source and target.
+  - Keep labels to two or three words.
+- Sequence diagrams (one chat turn, sign-in): lifelines as service boxes along the top, dashed vertical
+  lines, numbered horizontal messages, top to bottom.
+- Legend at the bottom right: AGENT · SERVICE · EXTERNAL · PHI BOUNDARY · AWS GATE, the same as the existing
+  diagram. Show only the symbols that page uses.
+- At most about 12 boxes per diagram, not counting the legend. Split the rest into another L2 page.
+- Ids: stable and descriptive (`svc-sqs`, `edge-api-sqs`). Never reuse `0` or `1` except for the root cells.
+
+## Page text (`pages/<id>.md`)
+
+```
+# <Title>
+
+<Breadcrumb: Overview › Area › Page as links: [Overview](00-overview.md) › ...>
+
+<2–3 sentences: what this part does and why it is built this way.>
+
+![<title>](../png/<id>.png)
+
+## In this diagram
+| # | Box | What it does | Details |
+|---|---|---|---|
+| 1 | Chat API | ... | [Chat turn](32-chat-turn.md) |
+
+## How it works
+1. Numbered steps that match the numbers on the diagram.
+
+## Specification
+Tables for what IT needs: permissions (actions on which resources, in words), encryption, data held and
+whether it is PHI, limits and timeouts, failure behaviour and retries, logging. Concrete values where the code
+has them (e.g. "credentials live 15 minutes", "60 s total query time per question").
+
+## Related
+Up: [<L1 page>](...) · See also: ...
+```
+
+L1 pages also have a "Pages in this area" list. Keep the language plain and the sentences short.
+
+## Spec card (`cards/<service>.md`)
+
+```
+### <AWS service>
+| | |
+|---|---|
+| Purpose in CC | |
+| Talks to | |
+| Permissions | who can do what, in words |
+| Encryption | |
+| Data held / PHI | |
+| Scaling and limits | |
+| Failure behaviour | |
+| Logging and audit | |
+| Used on pages | links |
+```
