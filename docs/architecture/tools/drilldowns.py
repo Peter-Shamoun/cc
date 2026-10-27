@@ -104,28 +104,34 @@ def d01():
 
 def d02():
     d = Diagram("02-login", "02 · Login & customer mapping",
-                "Sign-in goes from the user to Microsoft Entra ID to Amazon Cognito, which maps the user's group to one customer and issues the token that gate 4 checks.",
-                2320, 720)
+                "The user signs in at Microsoft Entra ID; Amazon Cognito federates the sign-in, maps the user's assigned group to exactly one customer and issues the ID token that gate 4 checks on every request.",
+                2400, 1200)
     d.text(40, 56, "02 · Login & customer mapping", "title")
-    d.text(40, 86, "The token is the only place the customer comes from.", "subtitle")
-    cy = 300
-    d.node("user", 40, cy - 45, 180, 90, "User", "browser", "users")
-    d.node("entra", 310, cy - 50, 270, 100, "Microsoft Entra ID", "company sign-in", "entra", style="external")
-    d.node("group", 670, cy - 50, 260, 100, "Assigned group", "ClaimClarity · customer B", "users", style="external")
-    d.node("cognito", 1030, cy - 50, 260, 100, "Amazon Cognito", "group → one customer", "cognito")
-    d.node("token", 1390, cy - 55, 230, 110, "ID token", "customer = B · 60 min", shape="token")
-    d.node("cookie", 1710, cy - 45, 190, 90, "Cookie", "httpOnly · Secure", shape="file", style="white")
-    d.node("api", 2100, cy - 45, 190, 90, "Chat API", "Fargate", "fargate")
-    d.edge([(220, cy), (310, cy)], "sign in", (265, cy - 12))
-    d.edge([(580, cy), (670, cy)], "member", (625, cy - 12))
-    d.edge([(930, cy), (1030, cy)], "federate", (980, cy - 12))
-    d.edge([(1290, cy), (1390, cy)], "issue", (1340, cy - 12))
-    d.edge([(1620, cy), (1710, cy)], "store", (1665, cy - 12))
-    d.edge([(1900, cy), (2100, cy)], "every request", (2000, cy - GR_ - 16))
-    d.gate(4, 2000, cy, G4, "below", "cognito")
-    d.node("noacc", 330, 520, 230, 90, "No access", "not in an assigned group", style="denied")
-    d.edge([(445, cy + 50), (445, 520)], "denied", (457, 420), lpos="right", style="deny")
-    d.zone(290, 180, 670, 200, "Microsoft Entra ID tenant", "plain")
+    d.text(40, 86, "Sign-in order: user → Entra ID → Cognito → token. The token is the only place the customer comes from.", "subtitle")
+    d.zone(40, 160, 380, 860, "Browser", "plain")
+    d.node("user", 80, 230, 300, 100, "User", "company account", "users")
+    d.node("cookie", 80, 790, 300, 130, "Session cookie", "ID token · httpOnly · Secure", shape="file", style="white")
+    d.zone(540, 160, 580, 520, "Microsoft Entra ID tenant", "plain")
+    d.node("entra", 580, 230, 500, 100, "Microsoft Entra ID", "company sign-in", "entra", style="external")
+    d.node("group", 580, 470, 500, 120, "Assigned group", "ClaimClarity · customer B", "users", style="external")
+    d.edge([(380, 280), (580, 280)], "sign in", (480, 268))
+    d.edge([(830, 330), (830, 470)], "member of", (842, 404), lpos="right")
+    d.zone(1240, 160, 660, 860, "Amazon Cognito", "dashed", "cognito")
+    d.node("pool", 1280, 230, 580, 100, "User pool", "federated with Entra ID", "cognito")
+    d.edge([(1080, 280), (1280, 280)], "federate", (1180, 268))
+    t = d.node("map", 1280, 420, 580, 220, "Group → customer", shape="table", style="white")
+    t["inner"] = [["Assigned group", "Customer"], ["ClaimClarity · customer A", "customer_a"], ["ClaimClarity · customer B", "customer_b"]]
+    t["colw"] = 330
+    d.edge([(1080, 530), (1280, 530)], "group claim", (1180, 518))
+    d.edge([(1570, 330), (1570, 420)], "look up", (1582, 384), lpos="right")
+    d.node("token", 1380, 720, 380, 130, "ID token", "customer = B · 60 min", shape="token")
+    d.edge([(1570, 640), (1570, 720)], "issue", (1582, 688), lpos="right")
+    d.edge([(1380, 820), (380, 820)], "set cookie", (880, 808), style="dashed")
+    d.node("api", 2080, 840, 260, 100, "Chat API", "Fargate", "fargate")
+    d.edge([(380, 890), (2080, 890)], "every request", (880, 878))
+    d.gate(4, 1990, 890, G4, "above", "cognito")
+    d.node("reject", 1880, 1030, 220, 80, "Rejected", "sign in again", style="denied")
+    d.edge([(1990, 926), (1990, 1030)], "invalid", (2002, 984), lpos="right", style="deny")
     return d
 
 
@@ -220,28 +226,36 @@ def d04():
 
 def d05():
     d = Diagram("05-chat-backend", "05 · Chat backend",
-                "A question enters through CloudFront and WAF, passes gate 4 at the chat API, waits in the SQS run queue, and is answered by a run worker that calls Bedrock and the DuckDB query service; the answer streams back live over SSE.",
-                2400, 880)
+                "A question passes CloudFront and WAF, the internal load balancer and gate 4 at the chat API, waits in the SQS run queue, and is answered by the run worker, which calls Bedrock and the DuckDB query service; the answer streams back live over SSE.",
+                2520, 1110)
     d.text(40, 56, "05 · Chat backend", "title")
     d.text(40, 86, "One run per question. The answer streams back live.", "subtitle")
-    cy = 380
-    d.node("user", 40, cy - 45, 180, 90, "User", "browser", "users")
-    d.node("cf", 300, cy - 50, 270, 100, "CloudFront + WAF", "public entry", "cloudfront")
-    d.node("alb", 650, cy - 50, 250, 100, "Load balancer", "internal", "elb")
-    d.node("api", 1120, cy - 50, 240, 100, "Chat API", "3 open runs per user", "fargate")
-    d.node("sqs", 1440, cy - 50, 220, 100, "Run queue", "Amazon SQS", "sqs")
-    d.node("worker", 1740, cy - 50, 280, 100, "Run worker", "Claim Query Agent · 110 s", "fargate")
-    d.node("bedrock", 2120, cy - 50, 240, 100, "Amazon Bedrock", "Claude Haiku", "bedrock")
-    d.node("qs", 1740, 620, 280, 100, "DuckDB query service", "Quack server", "fargate")
-    d.edge([(220, cy), (300, cy)], "https", (260, cy - 12))
-    d.edge([(570, cy), (650, cy)])
-    d.edge([(900, cy), (1120, cy)])
-    d.gate(4, 1010, cy, G4, "below", "cognito")
-    d.edge([(1360, cy), (1440, cy)], "enqueue", (1400, cy - 12))
-    d.edge([(1660, cy), (1740, cy)])
-    d.edge([(2020, cy), (2120, cy)])
-    d.edge([(1880, cy + 50), (1880, 620)], "sql over quack", (1892, 540), lpos="right", start=True)
-    d.edge([(1880, cy - 50), (1880, 220), (130, 220), (130, cy - 45)], "answer · sse · live", (1000, 208), style="dashed")
+    d.node("user", 40, 375, 200, 100, "User", "browser", "users")
+    d.zone(320, 290, 330, 290, "Edge", "plain")
+    d.node("cf", 350, 355, 270, 140, "CloudFront + WAF", "public entry", "cloudfront")
+    d.edge([(240, 405), (350, 405)], "question", (295, 393))
+    d.edge([(350, 455), (240, 455)], "answer · sse", (295, 487), style="dashed")
+    d.zone(740, 270, 760, 560, "Chat service · Fargate", "worker", "fargate")
+    d.node("alb", 780, 360, 230, 130, "Load balancer", "internal", "elb")
+    d.node("api", 1180, 350, 290, 150, "Chat API", "3 unfinished runs per user", "fargate")
+    d.edge([(620, 405), (780, 405)])
+    d.edge([(780, 455), (620, 455)], style="dashed")
+    d.edge([(1010, 405), (1180, 405)])
+    d.gate(4, 1095, 405, G4, "above", "cognito")
+    d.edge([(1180, 455), (1010, 455)], style="dashed")
+    d.node("sqs", 1180, 640, 290, 110, "Run queue", "Amazon SQS", "sqs")
+    d.edge([(1325, 500), (1325, 640)], "enqueue", (1337, 576), lpos="right")
+    d.zone(1620, 270, 560, 560, "Run worker · Fargate", "worker", "fargate")
+    a = d.node("agent", 1660, 620, 480, 150, "Claim Query Agent", "110 s run deadline")
+    a["shape"] = "agent"
+    d.edge([(1470, 695), (1672, 695)], "one run", (1560, 683))
+    d.edge([(1900, 620), (1900, 425), (1470, 425)], "answer stream", (1685, 413), style="dashed")
+    d.node("bedrock", 2260, 640, 230, 110, "Amazon Bedrock", "Claude Haiku", "bedrock")
+    d.edge([(2128, 670), (2260, 670)], "prompt", (2194, 658))
+    d.edge([(2260, 720), (2128, 720)], "tokens", (2194, 752), style="dashed")
+    d.node("qs", 1720, 920, 360, 100, "DuckDB query service", "Quack server", "fargate")
+    d.edge([(1840, 770), (1840, 920)], "sql · quack", (1828, 876), lpos="left")
+    d.edge([(1960, 920), (1960, 770)], "rows", (1972, 876), lpos="right")
     return d
 
 
