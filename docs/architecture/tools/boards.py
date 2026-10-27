@@ -16,8 +16,6 @@ LAYOUT = {
     "s3": ("03", "Query path", 4500, 1550, 2600, 1150),
     "s4": ("04", "Analyzer", -900, 2800, 3000, 1050),
     "s5": ("05", "Chat backend", 2300, 2800, 2600, 900),
-    "s6": ("06", "Network & security", -900, 4000, 3000, 1150),
-    "s7": ("07", "Operations", 2300, 3850, 2600, 800),
 }
 
 
@@ -263,6 +261,6 @@ def operations(cells):
 
 def boards():
     cells = []
-    for build in (storage, ingestion, login, query_path, analyzer, chat_backend, network, operations):
+    for build in (storage, ingestion, login, query_path, analyzer, chat_backend):
         build(cells)
     return cells

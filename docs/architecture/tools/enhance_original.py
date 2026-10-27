@@ -103,13 +103,8 @@ text = text.replace("resIcon=mxgraph.aws4.ec2;fillColor=#1C2B57;", f"resIcon=mxg
 extra = boards()
 zoom(extra, "ov_z04", "04", 1592, 1312, "ov")   # Claim Query Agent
 zoom(extra, "ov_z05", "05", 1500, 1225, "ov")   # chat API + run workers
-zoom(extra, "ov_z06", "06", 1110, 1625, "ov")   # network & security, beside the legend
-zoom(extra, "ov_z07", "07", 1150, 1625, "ov")   # operations
-extra.append('<mxCell id="ov_z67_t" value="06 network &amp; security · 07 operations" style="html=1;text;fontFamily=Barlow;fontSize=13;'
-             'fontColor=#1C2B57;align=left;verticalAlign=middle;" vertex="1" parent="ov"><mxGeometry x="1186" y="1625" width="300" height="26" '
-             'as="geometry"/></mxCell>')
 link_style = re.search(r'<mxCell id="zl_00"[^>]*style="([^"]*)"', text).group(1)
-for n in range(4, 8):
+for n in range(4, 6):
     extra.append(f'<mxCell id="zl_0{n}" value="" style="{link_style}" edge="1" parent="1" source="ov_z0{n}" target="s{n}">'
                  f'<mxGeometry relative="1" as="geometry"/></mxCell>')
 text = text.replace("</root>", "".join(extra) + "</root>", 1)

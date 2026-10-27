@@ -5,7 +5,7 @@
 A Confluence-ready architecture set that the company's IT and security teams can build, secure and operate from.
 The set has three parts:
 - one main board, the overview;
-- eight drill-downs, one per area;
+- six drill-downs (00–05), one per app area;
 - a short document with one section per board (image plus a 3–8 row spec table).
 
 Formats:
@@ -38,8 +38,6 @@ Middle-ground length: about 15–20 PDF pages. No 100-page sets.
 | 03 | Query path | Run worker: Claim Query Agent → ClaimClarity CLI (`cli.py`) → SQL guard → over Quack → DuckDB query service. The query service exchanges the token at STS (gate 5) and reads `customer_b/semantic_layer/` (gate 6); `lossless.*` only after a reasoned escalation. Customer A is blocked by the API and by IAM. |
 | 04 | Analyzer | The user's excalidraw: frontend ⇄ Claim Query Agent. The agent's inputs: the solved example bank (K = 3), references (prompt cached: rules, EDI glossary, semantic schema + allowed values), the tool and CLI reference (prompt cached), the system prompt + history (cached) and the newest prompt. It runs Claude Haiku, first decides to answer, clarify or escalate, then calls `cli.py` → SQL guard. The full lossless schema is reachable only after escalation. **Add the KPI gate** in front: a preset fits → preset KPI queries (the gate fills the parameters); otherwise → the agent. |
 | 05 | Chat backend | User → CloudFront + WAF → internal load balancer → gate 4 → chat API (Fargate) → SQS run queue → run worker (Fargate, the Claim Query Agent) → Bedrock. The run worker talks to the DuckDB query service over Quack. The answer streams back live (SSE). Limits. No chat storage (out of scope). |
-| 06 | Network & security | AWS Cloud ⊃ VPC (2 AZs) ⊃ private subnets (load balancer, chat API, run workers, DuckDB query service, parser), VPC endpoints (S3, STS, KMS, Bedrock, ECR, Logs, SQS, Secrets Manager), and an egress subnet (NAT + Network Firewall, Cognito hosts only). CloudFront + WAF and the Transfer Family SFTP endpoint (lab IPs only, port 22) are the only public entries. Keys, roles, CloudTrail, agent audit and logs. |
-| 07 | Operations | Git → CI → ECR → ECS rolling deploy (roll back if unhealthy). CloudWatch alarms. Feedback → regression set → ship only if accuracy holds. |
 
 ## Hard rules: the user's feedback, in their words where it matters
 
@@ -87,6 +85,10 @@ Middle-ground length: about 15–20 PDF pages. No 100-page sets.
     enhancing".
 
 ## Settled facts
+
+- **Scope (user decision): we own the app, not the platform.** Network & security (VPC, endpoints, NAT, firewall) and
+  operations (deploy, monitoring, alarms, log retention) are owned by IT: no boards 06/07. The set is the main board
+  plus drill-downs 00–05.
 
 - **Query audit (user decision: keep it, and show it with its record structure).** The DuckDB query service writes one
   JSON Lines record per SQL statement to `customer_b/audit/` (write-once, platform audit key, kept 6 years, each
