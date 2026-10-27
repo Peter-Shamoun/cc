@@ -56,14 +56,14 @@ The newest working version of CC is NOT in this repo. It is on Peter's other mac
 9. On `core`: 26 failing old API tests, stale contract examples, and the docs (`docs/frontend_handoff.md` §5.9,
    `docs/api.md`).
 
-## Architecture docs for Confluence (built 2026-10-27, on this branch)
+## Architecture docs for Confluence
 
-- Location: `docs/architecture/`.
-  - `pages/` holds one markdown file per Confluence page.
-  - `png/` and `svg/` hold the diagrams. `src/` holds one `.drawio` file per diagram.
-  - Bundles: `CC_Architecture.drawio` (every diagram), `.html` and `.pdf`.
-- Generators: `tools/l1.py` (overview, the area pages and the analyzer), `tools/a10.py`, `a20.py`, `a30.py` and
-  `a40.py` (sub-pages), all built on `tools/dlib.py`.
-- Rebuild with `python3 docs/architecture/build.py`.
-- `STYLE.md`'s "FINAL STRUCTURE" holds the rules the user approved.
-- Decisions the user still has to make: `pages/93-open-decisions.md`.
+- `docs/architecture/ClaimClarity_Architecture.drawio` is the original icon canvas
+  (`diagrams/CC_Data_Backend_uncompressed.drawio`), enhanced:
+  - fixed labels: Fargate, analyzer, ClaimClarity;
+  - official AWS icon colours;
+  - new zoom boards 04 Analyzer, 05 Chat backend, 06 Network & security, 07 Operations.
+- `ClaimClarity_Architecture.md` holds one section per board, with an image and a spec table. It builds to the
+  HTML and the 18-page PDF.
+- Rebuild with `python3 docs/architecture/tools/build.py`. The new boards are in `tools/boards.py`, in the original
+  style from `tools/olib.py`.
