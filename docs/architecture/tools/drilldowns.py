@@ -23,6 +23,21 @@ G1, G2, G3, G4, G5, G6 = ("Rule matches\ncustomer B", "PassRole\nparser role B",
                           "Token valid", "Trust policy\nallows this token", "IAM + KMS\nreader role B")
 
 
+def lift(d, dy, below=100):
+    """Move everything under y = below up by dy (to close an empty band under the title)."""
+    for coll in (d.zones, d.nodes, d.gates, d.texts):
+        for e in coll:
+            if e["y"] > below:
+                e["y"] -= dy
+    for e in d.edges:
+        e["pts"] = [(x, y - dy) for x, y in e["pts"]]
+        if e["at"]:
+            e["at"] = (e["at"][0], e["at"][1] - dy)
+        if e.get("xat"):
+            e["xat"] = (e["xat"][0], e["xat"][1] - dy)
+    d.h -= dy
+
+
 def d00():
     d = Diagram("00-storage", "00 · Storage & isolation",
                 "Customer B's prefixes in the one ClaimClarity data bucket, the roles and keys that guard them, and Customer A denied.",
@@ -235,7 +250,7 @@ def d05():
     d.node("cf", 350, 355, 270, 140, "CloudFront + WAF", "public entry", "cloudfront")
     d.edge([(240, 405), (350, 405)], "question", (295, 393))
     d.edge([(350, 455), (240, 455)], "answer · sse", (295, 487), style="dashed")
-    d.zone(740, 270, 760, 560, "Chat service · Fargate", "worker", "fargate")
+    d.zone(740, 270, 760, 560, "Chat service", "worker", "fargate")
     d.node("alb", 780, 360, 230, 130, "Load balancer", "internal", "elb")
     d.node("api", 1180, 350, 290, 150, "Chat API", "3 unfinished runs per user", "fargate")
     d.edge([(620, 405), (780, 405)])
@@ -256,6 +271,7 @@ def d05():
     d.node("qs", 1720, 920, 360, 100, "DuckDB query service", "Quack server", "fargate")
     d.edge([(1840, 770), (1840, 920)], "sql · quack", (1828, 876), lpos="left")
     d.edge([(1960, 920), (1960, 770)], "rows", (1972, 876), lpos="right")
+    lift(d, 120)
     return d
 
 

@@ -697,7 +697,8 @@ def to_excalidraw(d):
             rows = n["inner"]; rh = (h - 54) / len(rows); cw = n.get("colw", (w - 32) / len(rows[0]))
             for i, row in enumerate(rows):
                 for j, cell in enumerate(row):
-                    X.rect(x + 16 + j * cw, y + 44 + i * rh, cw, rh, roughness=0, strokeWidth=1,
+                    cwj = cw if j < len(row) - 1 else (w - 32) - cw * (len(row) - 1)
+                    X.rect(x + 16 + j * cw, y + 44 + i * rh, cwj, rh, roughness=0, strokeWidth=1,
                            backgroundColor="#e9ecef" if i == 0 else "transparent")
                     X.text(x + 26 + j * cw, y + 50 + i * rh, cell, 15)
             continue
