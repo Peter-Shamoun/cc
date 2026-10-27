@@ -1,6 +1,6 @@
 # ClaimClarity architecture
 
-ClaimClarity answers questions about a clinical lab's claims (837P) and remittances (835). Each customer's data
+ClaimClarity answers questions about a customer's claims (837P) and remittances (835). Each customer's data
 sits in its own S3 prefix, under its own KMS key and IAM roles. Six AWS checks, the numbered diamonds, enforce that
 on every write and read. The main board shows the whole system, and drill-downs 00–04 zoom into each part.
 
@@ -19,7 +19,7 @@ on every write and read. The main board shows the whole system, and drill-downs 
 
 | Part | What it does | Key facts |
 |---|---|---|
-| SFTP | Each lab sends daily 837 · 835 · 277 files | AWS Transfer Family, lab IP addresses only, straight into `raw/` |
+| SFTP | Each customer sends daily 837 · 835 · 277 files | AWS Transfer Family, customer IP addresses only, straight into `raw/` |
 | ClaimClarity data bucket | One prefix per customer: raw → silver → gold, plus quarantine and audit | One bucket for all customer data |
 | Compute · write | EventBridge → ECS RunTask → one Fargate parser task per batch | Runs as the customer's parser role. Gates 1–3. |
 | Access | Entra ID → Cognito → token naming the customer | The token is the only source of the customer. Gate 4. |
@@ -45,7 +45,7 @@ on every write and read. The main board shows the whole system, and drill-downs 
 
 | Step | What happens |
 |---|---|
-| Intake | The lab uploads over SFTP (port 22, lab IP addresses only). Transfer Family writes straight into `raw/` as the SFTP copy role, `_SUCCESS` last. |
+| Intake | The customer uploads over SFTP (port 22, customer IP addresses only). Transfer Family writes straight into `raw/` as the SFTP copy role, `_SUCCESS` last. |
 | Gate 1 | The customer's EventBridge rule matches `_SUCCESS` under `customer_b/raw/` only |
 | Launch | ECS RunTask starts one parser task. EventBridge retries the launch 3 times. |
 | Gate 2 | `iam:PassRole` lets the launcher pass only customer B's parser role, and only to ECS tasks |

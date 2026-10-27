@@ -4,7 +4,7 @@
  "board": {
   "slug": "01-ingestion",
   "title": "01 · Ingestion & parse",
-  "desc": "Lab files arrive over SFTP straight into raw, and the _SUCCESS marker triggers one Fargate parser task that writes silver and publishes a new gold version.",
+  "desc": "Customer files arrive over SFTP straight into raw, and the _SUCCESS marker triggers one Fargate parser task that writes silver and publishes a new gold version.",
   "w": 2200,
   "h": 840,
   "zones": [
@@ -26,8 +26,8 @@
     "y": 215,
     "w": 200,
     "h": 90,
-    "name": "Lab",
-    "sub": "customer B",
+    "name": "Customer B",
+    "sub": "daily files",
     "icon": "building",
     "shape": "box",
     "style": "external",
