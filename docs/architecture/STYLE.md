@@ -4,6 +4,61 @@ Audience: the company's IT and security reviewers. They should be able to build,
 from these pages. Describe the architecture as designed, in the present tense ("the parser task reads..."), as
 one system.
 
+## FINAL STRUCTURE (approved by the user; overrides every other section of this file)
+
+The user approved these and rejected everything before them:
+- `png/00-overview.png` and the six area diagrams `png/10-…` to `png/60-…`
+- the analyzer diagram `png/40-analyzer.png`
+
+Their generator is `tools/l1.py`, built on `tools/dlib.py`. Every other diagram must look like them.
+
+1. **Build with `tools/dlib.py`.** Use `Diagram`, `icon`, `chain`, `strip`, `badge`, `legend_drilldown`, `group`
+   and the styles DECISION, STEPBOX, NOTE, CYL, PHI, EXT, AGENT. Write each area's generator in the repo at
+   `tools/<area>.py` (e.g. `tools/a10.py`), not in the scratchpad, so it can be regenerated.
+2. **Layout: strips.**
+   - Each strip is one left-to-right flow, with a caps title ("SIGN-IN", "EVERY QUESTION").
+   - One to three strips per page.
+   - The sequence layout (see `tools/variants.py`, variant C) is allowed only on 32-chat-turn and 21-sign-in.
+3. **Names only.**
+   - An item shows its name and nothing else.
+   - At most a 2–4-word qualifier where the name alone would mislead ("S3 · raw", "B's gold only").
+   - No subtitles under titles, and no explanatory sentences inside diagrams.
+   - Edge labels: 0–2 words.
+4. **Drill-down.** An item that has a detail page gets a `badge` with that page's number. Pages with badges
+   get `legend_drilldown` at the bottom right.
+5. **Real shapes.**
+   - AWS services: their icons.
+   - Tables: table shapes. Files: NOTE. Databases: CYL. Decisions: DECISION. Our code: STEPBOX.
+   - Customer data: the PHI container.
+6. **The analyzer is never a service.**
+   - It is code inside the run worker (Fargate).
+   - The model is "Claude Haiku on Amazon Bedrock".
+   - Analyzer sub-pages (41–45) are zoom-ins of `png/40-analyzer.png`: the same boxes, the same names, the same
+     look (frontend panel, Claim Query Agent box, cached refs, each-turn bank, cc CLI + SQL guard, reader session,
+     customer prefix).
+   - Don't go into internals that don't matter to IT: effort levels, rule counts, benchmark numbers, prompt
+     wording.
+7. **Sign-in order is always user → Microsoft Entra ID → Amazon Cognito → ID token.**
+8. **Page text must be short and match the diagram.**
+   - A 2-sentence summary.
+   - "In this diagram": the items, left to right, as `| Item | What it does (one sentence) | Details |`.
+   - "How it works": at most 6 steps.
+   - "Specification": tables with only what IT needs to build, secure or operate it (permissions in words, keys,
+     data held / PHI, limits, failure behaviour, logging).
+   - Delete anything else: history, rationale essays, benchmark detail.
+9. **Facts settled after the first drafts. Make every page agree with these:**
+   - **Roles and keys:** each customer has several IAM roles (parser, reader, SFTP copy, transcripts, audit) and
+     its own KMS keys (lake, transcripts), as `ccsim/infra.py` defines. The query audit key is one platform key
+     with one statement per customer. Never say "one role and one key per customer". Say "the customer's roles
+     and keys".
+   - **Buckets:** one S3 bucket holds all customer data. The web app and the access logs have their own buckets.
+   - **Gate numbering:** 1 EventBridge rule · 2 PassRole · 3 IAM + KMS for the parser · 4 token valid ·
+     5 trust policy · 6 IAM + KMS for the reader.
+   - **Escalation:** lossless.* is PHI-stripped tables published next to gold. The reader never reads silver
+     objects.
+   - **Open decisions:** where the code and the design disagree and the user hasn't decided, write the default
+     named in `pages/93-open-decisions.md`. Don't flag it on the page itself.
+
 ## Never write
 
 - "simulated", "simulator", "ccsim", "mock", "prototype", "not built", "planned" or any other build-status words.

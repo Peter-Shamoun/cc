@@ -104,8 +104,8 @@ d.add("pre", "<b>16 presets</b> · fixed SQL, reviewed once<br>the gate fills th
 # Claim Query Agent
 d.add("ag-cap", "Claim Query Agent · backend for ClaimClarity, and part of the backend for Agentic Next Best Actions", CAP, 640, 128, 560, 24)
 d.add("ag", "", PANEL, 640, 156, 560, 540)
-d.add("bank", "<b>Solved example<br>question bank</b><br>(training set)", STEPBOX, 660, 180, 120, 490)
-d.add("ref-cap", "References", "text;html=1;align=center;verticalAlign=middle;fontSize=12;fontColor=#1A1D23;fontFamily=Helvetica;", 840, 172, 340, 22)
+d.add("bank", "<b>EACH TURN</b><br><br><b>Solved example<br>question bank</b><br>(training set)<br><br>+ today&#39;s date<br>+ data coverage<br>+ conversation<br>history", STEPBOX, 660, 180, 120, 490)
+d.add("ref-cap", "<b>CACHED</b> · same for every question", "text;html=1;align=center;verticalAlign=middle;fontSize=12;fontColor=#1A1D23;fontFamily=Helvetica;", 840, 172, 340, 22)
 d.add("refs", "", "rounded=1;arcSize=6;html=1;fillColor=none;strokeColor=#1A1D23;", 830, 170, 355, 140)
 d.add("r1", "<b>Playbook</b><br>14 rules from<br>past mistakes", STEPBOX, 845, 200, 100, 90)
 d.add("r2", "<b>EDI business<br>glossary</b>", STEPBOX, 957, 200, 100, 90)
@@ -115,6 +115,7 @@ d.add("ll-s", "<b>Full lossless EDI schema</b><br><br>only after the agent escal
 d.edge("e-r1", "r1", "llm", "", exit_=(.5, 1), entry=(.2, 0)); d.edge("e-r2", "r2", "llm", "", exit_=(.5, 1), entry=(.5, 0)); d.edge("e-r3", "r3", "llm", "", exit_=(.5, 1), entry=(.8, 0))
 d.edge("e-bank", "bank", "llm", "K = 3 most similar<br>question + SQL<br>+ answer", exit_=(1, .5), entry=(0, .5))
 d.edge("e-ll", "llm", "ll-s", "", exit_=(.5, 1), entry=(.5, 0), dashed=True)
+d.add("decide", "<b>First, the agent decides:</b><br>answer, ask a clarifying question, or escalate to the lossless schema", "text;html=1;align=left;verticalAlign=top;fontSize=11;fontColor=#1C2B57;fontFamily=Helvetica;whiteSpace=wrap;", 790, 540, 130, 110)
 
 # frontend <-> gate / agent
 d.edge("e-q", "fe", "gate", "user question", exit_=(1, .25), entry=(0, .5))
