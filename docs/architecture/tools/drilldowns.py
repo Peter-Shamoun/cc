@@ -194,7 +194,7 @@ def d04():
     src = json.loads((OUT / "04-analyzer.excalidraw").read_text())
     E = {e["id"][:10]: e for e in src["elements"] if not e.get("isDeleted")}
     kpi = sorted((e for e in src["elements"] if e["id"].startswith("kpi_")), key=lambda e: e["id"])
-    OX, OY = 5390, -460                             # excalidraw canvas -> board pixels
+    OX, OY = 5390, -600                             # excalidraw canvas -> board pixels
     X = lambda v: round(v + OX)
     Y = lambda v: round(v + OY)
 
@@ -213,7 +213,7 @@ def d04():
 
     d = Diagram("04-analyzer", "04 · Analyzer",
                 "The user's analyzer board: the frontend sends a question to the KPI gate, which answers with a preset query when one fits; otherwise the Claim Query Agent, fed by its example bank, cached references and prompts, writes CLI calls with SQL that pass the SQL guard to the DuckDB query service, which reads only this customer's semantic layer.",
-                5940, 1340)
+                5940, 1200)
     d.text(40, 56, "04 · Analyzer", "title")
     d.text(40, 86, "The Claim Query Agent is the run worker. The DuckDB query service holds the credentials.", "subtitle")
     # zones
@@ -228,8 +228,8 @@ def d04():
     f["href"] = src["files"][E["IIx3z_anQB"]["fileId"]]["dataURL"]
     kr = kpi_el("rectangle"); kd = kpi_el("diamond")
     d.node("preset", X(kr["x"]), Y(kr["y"]), round(kr["width"]), round(kr["height"]), "Preset KPI queries",
-           "16 presets, fixed SQL\nthe gate fills payer, payer class,\nmonth, CPT and CARC", shape="file", style="white")
-    d.node("kpi", X(kd["x"]), Y(kd["y"]), round(kd["width"]), round(kd["height"]), "KPI gate", "preset fits?", shape="decision")
+           "16 presets, fixed SQL · the gate fills\npayer, payer class, month, CPT, CARC", shape="file", style="white")
+    d.node("kpi", X(kd["x"]), Y(kd["y"]), round(kd["width"]), round(kd["height"]), "KPI gate", "does a preset\nanswer it?", shape="decision")
     d.node("bank", *box("BInIQNotFm"), "Solved Example\nQuestion Bank", shape="db", style="white")
     d.node("tools", *box("nPO3M3NYGI"), "Tool & CLI\nreference", "(prompt cached)", shape="file", style="white")
     d.node("rules", *box("6r2Y4_6Ln_"), "Rules from\npast mistakes", shape="file", style="white")
@@ -242,8 +242,6 @@ def d04():
     a_["shape"] = "agent"
     d.node("lossless_schema", *box("3iBkr6axdX"), "Full lossless EDI schema",
            "only after the agent\nescalates with a reason (logged)", shape="db", style="optional")
-    d.node("cli", *box("klRhw-nptO"), "cli.py", "ClaimClarity CLI", "terminal")
-    d.node("guard", *box("cStFoef2wJ"), "SQL Guard", "prevents non-read queries,\nand queries that will\nfail against the schema", "shieldcheck")
     d.node("qs", *box("visPhHm5ok"), "DuckDB query service",
            "Quack server, own Fargate service\none session per run\nread-only SELECT, row/time/cost caps", "fargate")
     d.node("sem", *box("asHDa6G9m3"), "Semantic Layer", "(sem.*) curated tables", shape="db", style="white")
@@ -257,13 +255,41 @@ def d04():
         (x0, y0), (x1, _) = ln(k)[0], ln(k)[-1]
         d.edge([(x0, y0), (x1, y0)], style=style)
 
-    for k in ("liKA4lL-bL", "qI9MfLE4fF", "TvL2CjKkfN", "5BvdWNqcaP", "XIV8gXseuu", "lUFxtPcBGz", "3FgTcUyAcv",
-              "cPBMbTZMBk", "DO_Fs1q1rd", "T9DWBFXgC1"):
+    for k in ("liKA4lL-bL", "qI9MfLE4fF", "TvL2CjKkfN", "5BvdWNqcaP"):
         flat(k)
-    flat("rddg7eDfdV", "final")
-    for e in kpi:
+    # the tools box, redrawn to show what happens there: the CLI's commands, then the SQL guard's checks
+    CL = (-2400, 1140, 310, 240)                    # in excalidraw coordinates, inside the dashed tools box
+    cli = d.node("cli", X(CL[0]), Y(CL[1]), CL[2], CL[3], "cli.py · ClaimClarity CLI", "the agent's one tool", shape="code")
+    cli["inner"] = ['sql "SELECT …"', "lookup <dimension> <text>", "describe <relation>", "list",
+                    'escalate "<reason>"', 'answer --sql … --text …', "ask · refuse"]
+    for k, style in (("XIV8gXseuu", "solid"), ("rddg7eDfdV", "final")):      # agent -> CLI
+        (x0, y0) = ln(k)[0]
+        d.edge([(x0, y0), (X(CL[0]), y0)], style=style)
+    (x0, y0) = ln("lUFxtPcBGz")[-1]                                         # CLI -> agent (results)
+    d.edge([(X(CL[0]), y0), (x0, y0)])
+    checks = [("Read-only SELECT", "one statement"), ("Allowed tables + functions", "sem.* · lossless.* after escalate"),
+              ("Valid against the schema", "would it fail? stop it here"), ("Join cost", "no keyless joins > 100 M row pairs"),
+              ("Time + row limits", "25 s · 60 s per question · 1,000 rows")]
+    GX, GW, GY, GH, GS = -2050, 280, 1080, 64, 80
+    d.text(X(GX), Y(GY) - 16, "SQL guard", "heading")
+    d.texts[-1]["icon"] = "shieldcheck"
+    for i, (nm, sb) in enumerate(checks):
+        d.node(f"check{i}", X(GX), Y(GY + i * GS), GW, GH, nm, sb, style="white")
+        if i:
+            d.edge([(X(GX + GW / 2), Y(GY + i * GS - GS + GH)), (X(GX + GW / 2), Y(GY + i * GS))])
+    last = GY + 4 * GS
+    qs_left = X(E["visPhHm5ok"]["x"])
+    d.edge([(X(GX + GW), Y(last + GH / 2)), (X(-1730), Y(last + GH / 2)), (X(-1730), Y(1303)), (qs_left, Y(1303))],
+           "passes", (X(-1718), Y(1395)), lpos="right")
+    d.edge([(X(CL[0] + CL[2]), Y(1200)), (X(-2070), Y(1200)), (X(-2070), Y(1030)), (X(-1950), Y(1030)), (X(-1950), Y(GY))])
+    hx_, hy_, hw_, hh_ = box("jybGrI_Izu")
+    d.edge([(X(GX), Y(1440)), (hx_ + hw_ - 40, Y(1440)), (hx_ + hw_ - 40, hy_ + hh_)], "fails a check: error to the agent",
+           (X(-2470), Y(1428)), style="dashed")
+    for e in kpi:                                   # the KPI gate's arrows; the preset path ends on the guard's first check
         if e["type"] == "arrow":
             pts = [(X(e["x"] + px), Y(e["y"] + py)) for px, py in e["points"]]
+            if len(pts) > 2:
+                pts = pts[:2] + [(X(-1880), pts[1][1]), (X(-1880), Y(GY))]
             d.edge(pts)
     # references and the tool reference flow into Haiku with right-angle elbows
     hx, hy, hw, hh = box("jybGrI_Izu")

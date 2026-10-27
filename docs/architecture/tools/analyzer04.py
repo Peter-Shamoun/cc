@@ -1,8 +1,9 @@
 """python3 docs/architecture/tools/analyzer04.py <user's agent_analyzer.excalidraw>: write drilldowns/04-analyzer.excalidraw.
 
 04 is the user's own excalidraw, edited, not redrawn. Every element keeps its position and label, except:
-1. the KPI gate (a diamond on the "User Query" arrow) and the "Preset KPI queries" box are added; everything from the
-   Claim Query Agent rightwards shifts right to make room; the yes path runs to the presets, then to the SQL guard;
+1. the KPI gate (a diamond on the "User Query" arrow) and the "Preset KPI queries" box are added inside the Claim Query
+   Agent box, at its entry; the box grows left and everything right of it shifts right to make room; yes runs to the
+   presets and on to the SQL guard, no continues into the agent path;
 2. wording: the agent node, the DuckDB box (now the DuckDB query service) and cli.py;
 3. the two IAM + KMS diamonds are bigger, numbered 6, and the callout reads "GATE 6 · IAM + KMS: this customer only".
 Render it with the excalidraw-diagram skill's renderer (references/render_excalidraw.py).
@@ -68,25 +69,26 @@ def main(src):
         a = by[aid]; a["points"][-1][0] += SHIFT; a["width"] += SHIFT
     a = by["TvL2CjKkfN"]                               # answer arrow: agent zone -> frontend, starts further right
     a["points"][-1][0] -= SHIFT; a["width"] += SHIFT    # (the loop above already moved its start)
-    # the User Query arrow now ends at the KPI gate, and a "no" arrow continues into the agent
-    uq = by["liKA4lL-bL"]
-    gx, gy, gw, gh = -4400, 1120, 240, 200            # KPI gate diamond, centred on the User Query arrow (y = 1220)
+    # the agent box grows left by the same amount, so the KPI gate and the presets sit inside it, at its entry
+    zone = by["rL8BxLtQ6X"]; zone["x"] -= SHIFT; zone["width"] += SHIFT
+    by["qHtTjH_-AM"]["x"] -= SHIFT                    # the box's title stays at its top-left corner
+    uq = by["liKA4lL-bL"]                             # User Query: frontend -> the gate
+    gx, gy, gw, gh = -4250, 1120, 240, 200            # KPI gate diamond, centred on the User Query arrow (y = 1220)
     uq["points"][-1][0] = gx - uq["x"]; uq["width"] = gx - uq["x"]; uq["endBinding"] = None
-    zone_left = by["rL8BxLtQ6X"]["x"]
+    bank = by["BInIQNotFm"]
     new("diamond", gx, gy, gw, gh, backgroundColor="#fff3bf")
-    text(gx + gw / 2, gy + gh / 2 - 25, "KPI gate\npreset fits?", 20)
-    arrow([(gx + gw, 1220), (zone_left, 1220)])
-    text((gx + gw + zone_left) / 2, 1188, "no", 20)
-    # presets above the gate; yes path up, then over the top to the SQL guard
-    px, py, pw, ph = -4500, 600, 440, 190
+    text(gx + gw / 2, gy + gh / 2 - 38, "KPI gate\ndoes a preset\nanswer it?", 20)
+    arrow([(gx + gw, 1220), (bank["x"], 1220)])        # no: the question goes on to the agent path
+    text((gx + gw + bank["x"]) / 2, 1188, "no", 20)
+    px, py, pw, ph = -4290, 930, 420, 160             # presets, inside the box above the gate
     new("rectangle", px, py, pw, ph, roundness={"type": 3}, strokeWidth=4)
-    text(px + pw / 2, py + 18, "Preset KPI queries\n\n16 presets, fixed SQL; the gate fills\npayer, payer class, month, CPT, CARC", 20)
+    text(px + pw / 2, py + 14, "Preset KPI queries\n16 presets, fixed SQL; the gate fills\npayer, payer class, month, CPT, CARC", 20)
     arrow([(gx + gw / 2, gy), (gx + gw / 2, py + ph)])
-    text(gx + gw / 2 + 30, 1000, "yes", 20, "left", w=40)
+    text(gx + gw / 2 + 14, 1098, "yes", 20, "left", w=40)
     guard = by["cStFoef2wJ"]
     gcx = guard["x"] + guard["width"] / 2
-    arrow([(px + pw, py + 70), (gcx, py + 70), (gcx, guard["y"])])
-    text((px + pw + gcx) / 2, py + 36, "preset SQL, parameters checked against the data", 20)
+    arrow([(px + 100, py), (px + 100, 790), (gcx, 790), (gcx, guard["y"])])
+    text((px + gcx) / 2, 756, "preset SQL, parameters checked against the data", 20)
 
     # 2. wording
     retext("rpSyu-mhGo", "Claude Haiku · one agent\n(Strands on Amazon Bedrock)")

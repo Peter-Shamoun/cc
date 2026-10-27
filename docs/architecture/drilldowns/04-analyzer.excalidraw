@@ -1029,9 +1029,9 @@
   {
    "id": "rL8BxLtQ6XZcO1k-2ywXc",
    "type": "rectangle",
-   "x": -3613.9952832217077,
+   "x": -4313.995283221708,
    "y": 881.5785542781596,
-   "width": 1190,
+   "width": 1890,
    "height": 777,
    "angle": 0,
    "strokeColor": "#1e1e1e",
@@ -1085,7 +1085,7 @@
   {
    "id": "qHtTjH_-AMPQhDO7K5Rr3",
    "type": "text",
-   "x": -3611.3579245745987,
+   "x": -4311.357924574599,
    "y": 853.2317331148372,
    "width": 1145.0791015625,
    "height": 25,
@@ -1209,7 +1209,7 @@
    "type": "arrow",
    "x": -4526.28428252457,
    "y": 1220.828398001628,
-   "width": 126.28428252456979,
+   "width": 276.2842825245698,
    "height": 0.05916529363230438,
    "angle": 0,
    "strokeColor": "#1e1e1e",
@@ -1238,7 +1238,7 @@
      0
     ],
     [
-     126.28428252456979,
+     276.2842825245698,
      0.05916529363230438
     ]
    ],
@@ -3400,7 +3400,7 @@
   {
    "id": "kpi_diamond_900011",
    "type": "diamond",
-   "x": -4400,
+   "x": -4250,
    "y": 1120,
    "width": 240,
    "height": 200,
@@ -3427,10 +3427,10 @@
   {
    "id": "kpi_text_900022",
    "type": "text",
-   "x": -4347.2,
-   "y": 1195.0,
-   "width": 134.4,
-   "height": 50.0,
+   "x": -4202.8,
+   "y": 1182.0,
+   "width": 145.60000000000002,
+   "height": 75.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -3450,8 +3450,8 @@
    "updated": 1,
    "link": null,
    "locked": false,
-   "text": "KPI gate\npreset fits?",
-   "originalText": "KPI gate\npreset fits?",
+   "text": "KPI gate\ndoes a preset\nanswer it?",
+   "originalText": "KPI gate\ndoes a preset\nanswer it?",
    "fontSize": 20,
    "fontFamily": 5,
    "textAlign": "center",
@@ -3463,9 +3463,9 @@
   {
    "id": "kpi_arrow_900033",
    "type": "arrow",
-   "x": -4160,
+   "x": -4010,
    "y": 1220,
-   "width": 546.0047167782923,
+   "width": 414.53054686627456,
    "height": 0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
@@ -3492,7 +3492,7 @@
      0
     ],
     [
-     546.0047167782923,
+     414.53054686627456,
      0
     ]
    ],
@@ -3506,7 +3506,7 @@
   {
    "id": "kpi_text_900044",
    "type": "text",
-   "x": -3898.1976416108537,
+   "x": -3813.9347265668625,
    "y": 1188,
    "width": 22.400000000000002,
    "height": 25.0,
@@ -3542,10 +3542,10 @@
   {
    "id": "kpi_rectangle_900055",
    "type": "rectangle",
-   "x": -4500,
-   "y": 600,
-   "width": 440,
-   "height": 190,
+   "x": -4290,
+   "y": 930,
+   "width": 420,
+   "height": 160,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -3571,10 +3571,10 @@
   {
    "id": "kpi_text_900066",
    "type": "text",
-   "x": -4487.2,
-   "y": 618,
+   "x": -4287.2,
+   "y": 944,
    "width": 414.40000000000003,
-   "height": 100.0,
+   "height": 75.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -3594,8 +3594,8 @@
    "updated": 1,
    "link": null,
    "locked": false,
-   "text": "Preset KPI queries\n\n16 presets, fixed SQL; the gate fills\npayer, payer class, month, CPT, CARC",
-   "originalText": "Preset KPI queries\n\n16 presets, fixed SQL; the gate fills\npayer, payer class, month, CPT, CARC",
+   "text": "Preset KPI queries\n16 presets, fixed SQL; the gate fills\npayer, payer class, month, CPT, CARC",
+   "originalText": "Preset KPI queries\n16 presets, fixed SQL; the gate fills\npayer, payer class, month, CPT, CARC",
    "fontSize": 20,
    "fontFamily": 5,
    "textAlign": "center",
@@ -3607,10 +3607,10 @@
   {
    "id": "kpi_arrow_900077",
    "type": "arrow",
-   "x": -4280.0,
+   "x": -4130.0,
    "y": 1120,
    "width": 0.0,
-   "height": 330,
+   "height": 30,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -3637,7 +3637,7 @@
     ],
     [
      0.0,
-     -330
+     -30
     ]
    ],
    "lastCommittedPoint": null,
@@ -3650,8 +3650,8 @@
   {
    "id": "kpi_text_900088",
    "type": "text",
-   "x": -4250.0,
-   "y": 1000,
+   "x": -4116.0,
+   "y": 1098,
    "width": 40,
    "height": 25.0,
    "angle": 0,
@@ -3686,10 +3686,10 @@
   {
    "id": "kpi_arrow_900099",
    "type": "arrow",
-   "x": -4060,
-   "y": 670,
-   "width": 2098.852902680831,
-   "height": 518.0240654553381,
+   "x": -4190,
+   "y": 930,
+   "width": 2228.852902680831,
+   "height": 398.02406545533813,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -3715,12 +3715,16 @@
      0
     ],
     [
-     2098.852902680831,
-     0
+     0,
+     -140
     ],
     [
-     2098.852902680831,
-     518.0240654553381
+     2228.852902680831,
+     -140
+    ],
+    [
+     2228.852902680831,
+     258.02406545533813
     ]
    ],
    "lastCommittedPoint": null,
@@ -3733,8 +3737,8 @@
   {
    "id": "kpi_text_900110",
    "type": "text",
-   "x": -3273.773548659585,
-   "y": 636,
+   "x": -3388.773548659585,
+   "y": 756,
    "width": 526.4000000000001,
    "height": 25.0,
    "angle": 0,
