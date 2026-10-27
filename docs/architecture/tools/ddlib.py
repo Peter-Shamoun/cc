@@ -20,6 +20,7 @@ ICONS = Path(__file__).parent / "icons"
 # ClaimClarity tokens (diagram-design style guide, ClaimClarity profile)
 NAVY, BLUE, TINT, INK, LINE = "#1C2B57", "#4A6BB0", "#EAF0F9", "#1A1D23", "#C9CBCE"
 SOFT, LINK, DENY, PAPER = "#5B6472", "#3A5A9E", "#B42318", "#FFFFFF"
+BUILT = "#C2255C"      # the user excalidraw's pink dashed "built from" relation, darkened to read on white
 COND, SANS, MONO = "'Barlow Condensed', 'Arial Narrow', sans-serif", "'Barlow', Arial, sans-serif", "'IBM Plex Mono', ui-monospace, monospace"
 FONTS = "https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
 
@@ -338,9 +339,9 @@ def label_boxes(e):
 
 def svg_edge(e, uid):
     pts = e["pts"]
-    color = {"solid": BLUE, "dashed": BLUE, "deny": DENY, "link": LINK, "navy": NAVY, "final": NAVY}[e["style"]]
-    dash = ' stroke-dasharray="7 5"' if e["style"] in ("dashed", "deny") else ""
-    me = (f' marker-end="url(#{uid}-{"arrn" if e["style"] == "final" else "arr"})"') if e["end"] and e["style"] != "deny" else ""
+    color = {"solid": BLUE, "dashed": BLUE, "deny": DENY, "link": LINK, "navy": NAVY, "final": NAVY, "built": BUILT}[e["style"]]
+    dash = ' stroke-dasharray="7 5"' if e["style"] in ("dashed", "deny", "built") else ""
+    me = (f' marker-end="url(#{uid}-{ {"final": "arrn", "built": "arrb"}.get(e["style"], "arr")})"') if e["end"] and e["style"] != "deny" else ""
     ms = f' marker-start="url(#{uid}-arrs)"' if e["start"] else ""
     out = [f'<path d="{rounded_path(pts)}" fill="none" stroke="{color}" stroke-width="{ {"deny": 2.2, "final": 3}.get(e["style"], 1.8)}"{dash}{me}{ms}/>']
     if e["style"] == "deny":
@@ -356,7 +357,7 @@ def svg_edge(e, uid):
 
 
 def svg_edge_label(e):
-    color = {"solid": LINK, "dashed": LINK, "deny": DENY, "link": LINK, "navy": NAVY, "final": NAVY}[e["style"]]
+    color = {"solid": LINK, "dashed": LINK, "deny": DENY, "link": LINK, "navy": NAVY, "final": NAVY, "built": BUILT}[e["style"]]
     out = []
     for (bx, by, bw, bh), s in zip(label_boxes(e), (e["label"] or "").split("\n")):
         out.append(f'<rect x="{bx:.0f}" y="{by:.0f}" width="{bw:.0f}" height="{bh}" fill="{PAPER}"/>'
@@ -557,6 +558,8 @@ def svg_legend(d, items):
                        f'<line x1="{x + 36}" y1="{y - 9}" x2="{x + 36}" y2="{y + 9}" stroke="{DENY}" stroke-width="4"/>'); off = 48
         elif k == "flow":
             out.append(f'<line x1="{x}" y1="{y}" x2="{x + 34}" y2="{y}" stroke="{BLUE}" stroke-width="1.6" marker-end="url(#{d.slug}-arr)"/>'); off = 46
+        elif k == "built":
+            out.append(f'<line x1="{x}" y1="{y}" x2="{x + 34}" y2="{y}" stroke="{BUILT}" stroke-width="1.8" stroke-dasharray="7 5" marker-end="url(#{d.slug}-arrb)"/>'); off = 46
         elif k == "final":
             out.append(f'<line x1="{x}" y1="{y}" x2="{x + 34}" y2="{y}" stroke="{NAVY}" stroke-width="3" marker-end="url(#{d.slug}-arrn)"/>'); off = 50
         elif k == "dashed":
@@ -587,6 +590,8 @@ def auto_legend(d):
     items.append(("flow", "Data / request"))
     if any(e["style"] == "dashed" for e in d.edges):
         items.append(("dashed", "Conditional / return"))
+    if any(e["style"] == "built" for e in d.edges):
+        items.append(("built", "Built from"))
     if any(e["style"] == "final" for e in d.edges):
         items.append(("final", "Final query + answer"))
     if any(n["shape"] == "decision" for n in d.nodes):
@@ -606,6 +611,8 @@ def to_svg(d, legend=None):
             f'<path d="M0,0 L11,4.5 L0,9 Z" fill="{BLUE}"/></marker>'
             f'<marker id="{uid}-arrs" markerWidth="10" markerHeight="8" refX="1" refY="4" orient="auto" markerUnits="userSpaceOnUse">'
             f'<path d="M10,0 L0,4 L10,8 Z" fill="{BLUE}"/></marker>'
+            f'<marker id="{uid}-arrb" markerWidth="11" markerHeight="9" refX="10" refY="4.5" orient="auto" markerUnits="userSpaceOnUse">'
+            f'<path d="M0,0 L11,4.5 L0,9 Z" fill="{BUILT}"/></marker>'
             f'<marker id="{uid}-arrn" markerWidth="13" markerHeight="11" refX="12" refY="5.5" orient="auto" markerUnits="userSpaceOnUse">'
             f'<path d="M0,0 L13,5.5 L0,11 Z" fill="{NAVY}"/></marker>')
     parts = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {d.w} {d.h}" width="{d.w}" height="{d.h}" role="img" '
@@ -694,8 +701,8 @@ def to_excalidraw(d):
                roundness={"type": 3})
         X.text(z["x"] + 14, z["y"] + 10, z["label"], 22)
     for e in d.edges:
-        col = {"deny": "#e03131", "navy": "#1e1e1e", "final": "#e03131"}.get(e["style"], "#1e1e1e")
-        a = X.line(e["pts"], "arrow", strokeColor=col, strokeStyle="dashed" if e["style"] in ("dashed", "deny") else "solid",
+        col = {"deny": "#e03131", "navy": "#1e1e1e", "final": "#e03131", "built": "#ff8787"}.get(e["style"], "#1e1e1e")
+        a = X.line(e["pts"], "arrow", strokeColor=col, strokeStyle="dashed" if e["style"] in ("dashed", "deny", "built") else "solid",
                    startArrowhead="arrow" if e["start"] else None, endArrowhead=("bar" if e["style"] == "deny" else "arrow") if e["end"] else None,
                    elbowed=False, roundness=None, roughness=0)
         if e["style"] == "deny":

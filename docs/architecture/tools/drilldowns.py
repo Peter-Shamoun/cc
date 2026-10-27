@@ -55,7 +55,7 @@ def d00():
     d.edge([(270, cy), (440, cy)], "write", (350, cy - 12))
     d.edge([(670, cy), (920, cy)], "parse", (795, cy - GR_ - 14))
     d.gate(3, 795, cy, G3, "below", "iam")
-    d.edge([(1120, cy), (1230, cy)], "publish", (1175, cy - 12))
+    d.edge([(1120, cy), (1230, cy)], "built from", (1175, cy - 12), style="built")
     d.node("qs", 1750, cy - 45, 270, 90, "DuckDB query service", "reader role B", "fargate")
     d.edge([(1450, cy), (1750, cy)], "read", (1710, cy - 12))
     d.gate(6, 1620, cy, G6, "below", "iam")
@@ -78,7 +78,7 @@ def d00():
 def d01():
     d = Diagram("01-ingestion", "01 · Ingestion & parse",
                 "Lab files arrive over SFTP straight into raw, and the _SUCCESS marker triggers one Fargate parser task that writes silver and publishes a new gold version.",
-                2200, 840)
+                2200, 1330)
     d.text(40, 56, "01 · Ingestion & parse", "title")
     d.text(40, 86, "One batch for customer B, from the lab's upload to a new CURRENT gold version.", "subtitle")
     X = -260                      # everything right of the SFTP endpoint
@@ -103,6 +103,34 @@ def d01():
     t = d.node("task", 1580 + X, 530, 680, 180, "Fargate parser task · one per batch", icon="fargate", shape="steps",
                inner=["Start", "Parse", "Silver", "Gold", "Exit"])
     t["badge"] = ("lock", "Batch lease")
+    # how gold is built: the parser's gold step
+    zy = 780
+    d.zone(40, zy, 2120, 460, "How gold is built · the parser's gold step", "dashed")
+    gs = 1320 + 50 + (680 - 100) * 3 / 4          # the "Gold" step on the parser timeline
+    d.edge([(gs, 710), (gs, zy)], "gold step", (gs + 12, 752), lpos="right", style="dashed")
+    sv = d.node("silver_t", 80, zy + 60, 460, 200, "parquet/ · silver", shape="table", style="white")
+    sv["inner"] = [["schema", "tables (lossless, one per EDI structure)"], ["edi.*", "source_file · segment · entity · amount …"],
+                   ["c837.*", "claim · service_line · hl · other_payer …"], ["r835.*", "payment · claim_payment · remark …"]]
+    sv["colw"] = 90
+    vs = d.node("views", 640, zy + 90, 300, 120, "View SQL", "semantic_layer_views.sql\nversioned in Git · every batch", "git", shape="file", style="white")
+    rf = d.node("ref", 640, zy + 290, 300, 130, "Reference seeds", shape="table", style="white")
+    rf["inner"] = [["ref.*"], ["payer_alias · denial_carc"], ["claim_status …"]]
+    si = d.node("semint", 1040, zy + 60, 300, 200, "sem_int.* · intermediate", shape="table", style="white")
+    si["inner"] = [["views"], ["submission · remit_event"], ["claim_cas · line_match"], ["payer_835 · payer_837"]]
+    se = d.node("sem", 1440, zy + 60, 320, 200, "sem.* · 10 gold tables", shape="table", style="white")
+    se["inner"] = [["materialized as Parquet"], ["claims · claim_lines"], ["remit_claims · remit_lines"], ["adjustments · payments …"]]
+    d.node("vn", 1840, zy + 100, 190, 120, "semantic_layer/vN", "new version", shape="db", style="white")
+    d.node("cur2", 2060, zy + 120, 80, 80, "CURRENT", shape="file", style="white")
+    d.node("lossless_t", 80, zy + 300, 460, 120, "lossless.*", "c837.claim · c837.service_line · c837.hl\nr835.claim_payment · PHI-stripped", shape="db", style="optional")
+    c = zy + 160
+    d.edge([(540, c), (640, c)], "built from", (590, c - 12), style="built")
+    d.edge([(790, zy + 290), (790, zy + 210)])
+    d.edge([(940, c), (1040, c)], style="built")
+    d.edge([(1340, c), (1440, c)], style="built")
+    d.edge([(1760, c), (1840, c)], "write", (1800, c - 12))
+    d.edge([(2030, c), (2060, c)])
+    d.text(2100, zy + 236, "manifest, then\ncompare-and-set", "note", "middle")
+    d.edge([(310, zy + 260), (310, zy + 300)], "phi-stripped copy", (322, zy + 286), lpos="right", style="built")
     d.edge([(pe, y1 + h1), (pe, y2)], "_success", (pe + 12, 372), lpos="right")
     d.gate(1, pe, 470, G1, "left", "eventbridge")
     d.edge([(pe + 110, c2), (1200 + X, c2)])
