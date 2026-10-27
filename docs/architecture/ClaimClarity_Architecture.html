@@ -1,4 +1,4 @@
-<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>ClaimClarity Architecture</title><style>body{font:14px/1.5 Barlow,Helvetica,Arial,sans-serif;color:#1A1D23;max-width:1200px;margin:24px auto;padding:0 16px;background:#fff}h1,h2{color:#1C2B57;font-family:'Barlow Condensed',Barlow,sans-serif} img{width:100%;border:1px solid #D5DCE8}table{border-collapse:collapse;width:100%} th,td{border:1px solid #D5DCE8;padding:5px 8px;text-align:left;vertical-align:top}th{background:#EAF0F9} code{font-family:'IBM Plex Mono',monospace;font-size:0.92em}@media print{body{font-size:11.5px;line-height:1.4} th,td{padding:3px 6px} h2{break-before:page;margin:0 0 6px} img{width:100%;height:auto;max-height:104mm;object-fit:contain} tr{break-inside:avoid}}</style><h1 id="claimclarity-architecture">ClaimClarity architecture</h1>
+<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>ClaimClarity Architecture</title><style>body{font:14px/1.5 Barlow,Helvetica,Arial,sans-serif;color:#1A1D23;max-width:1200px;margin:24px auto;padding:0 16px;background:#fff}h1,h2{color:#1C2B57;font-family:'Barlow Condensed',Barlow,sans-serif;line-height:1.15} h1{font-size:34px;margin:0 0 12px} h2{font-size:24px;margin:28px 0 10px} img{width:100%;border:1px solid #D5DCE8}table{border-collapse:collapse;width:100%} th,td{border:1px solid #D5DCE8;padding:5px 8px;text-align:left;vertical-align:top}th{background:#EAF0F9} code{font-family:'IBM Plex Mono',monospace;font-size:0.92em}@media print{body{font-size:11.5px;line-height:1.4} th,td{padding:3px 6px} h2{break-before:page;margin:0 0 6px} img{width:100%;height:auto;max-height:104mm;object-fit:contain} tr{break-inside:avoid}}</style><h1 id="claimclarity-architecture">ClaimClarity architecture</h1>
 <p>ClaimClarity answers questions about a clinical lab's claims (837P)
 and remittances (835). Each customer's data sits in its own S3 prefix,
 under its own KMS key and IAM roles. Six AWS checks, the numbered
@@ -317,6 +317,14 @@ most similar solved examples and the newest prompt.</td>
 tables with a reason, which is logged</td>
 </tr>
 <tr class="even">
+<td><code>cli.py</code> · SQL guard</td>
+<td>The agent's one tool: <code>sql</code>, <code>lookup</code>,
+<code>describe</code>, <code>list</code>, <code>escalate</code>, then
+<code>answer</code>, <code>ask</code> or <code>refuse</code>. Every
+query passes the guard's checks (limits in 03). A failed check goes back
+to the agent as an error.</td>
+</tr>
+<tr class="odd">
 <td>Answer</td>
 <td>Streams back with live steps. The server re-runs the final SQL, so
 the numbers come from the database.</td>
