@@ -79,39 +79,81 @@ d.edge("e-a5-a8", "a5", "a8", "", exit_=(.5, 1), entry=(.5, 0))
 legend_drilldown(d, 1290, 440)
 save(d)
 
-# 40 analyzer: the excalidraw design, productionized ---------------------------------------------------
-d = Diagram("40-analyzer", "Analyzer", 1800, 760)
-d.title("CLAIMCLARITY · ANALYZER", "code inside the run worker · every model call goes to Amazon Bedrock · gold tables by default")
-GRP = "rounded=0;html=1;fillColor=none;strokeColor=#ED7100;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=40;spacingTop=8;fontSize=12;fontStyle=1;fontColor=#ED7100;fontFamily=Helvetica;"
-PROMPT = "rounded=0;html=1;fillColor=#FFFFFF;strokeColor=#4A6BB0;dashed=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=4;fontSize=11;fontStyle=1;fontColor=#1C2B57;fontFamily=Helvetica;"
-d.icon("app", "client", "Chat app", "", 90, 300, tile=F, label="above")
-d.add("rw", "RUN WORKER · ECS on Fargate", GRP, 210, 70, 1130, 560)
-d.icon("rw-i", "fargate", "", "", 236, 92, size=26)
+# 40 analyzer: the excalidraw (diagrams/agent_analyzer.excalidraw) in our format, plus the KPI gate and presets
+d = Diagram("40-analyzer", "Analyzer", 2720, 800)
+d.title("CLAIMCLARITY · ANALYZER")
+PANEL = "rounded=1;arcSize=3;html=1;fillColor=none;strokeColor=#1A1D23;strokeWidth=1.5;"
+CAP = "text;html=1;align=left;verticalAlign=bottom;fontSize=12;fontColor=#1A1D23;fontFamily=Helvetica;whiteSpace=wrap;"
+SMALL = "text;html=1;align=left;verticalAlign=top;fontSize=11;fontColor=#3A5A9E;fontFamily=Helvetica;whiteSpace=wrap;"
+RED = "strokeColor=#C0392B;fontColor=#C0392B;"
+def table(cid, title, rows, x, y, w, extra=""):
+    d.add(cid, title, "swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=26;fillColor=#EAF0F9;strokeColor=#4A6BB0;horizontalStack=0;resizeParent=1;resizeLast=0;collapsible=0;marginBottom=0;html=1;fontSize=12;fontFamily=Helvetica;" + extra, x, y, w, 26 + 22 * len(rows))
+    for k, r in enumerate(rows):
+        d.cells.append(f'<mxCell id="{cid}-r{k}" value="{r}" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;fontFamily=Helvetica;" vertex="1" parent="{cid}"><mxGeometry y="{26 + 22 * k}" width="{w}" height="22" as="geometry"/></mxCell>')
+
+# frontend
+d.add("fe-cap", "Frontend user interface · shared between apps", CAP, 20, 150, 330, 24)
+d.add("fe", "", PANEL, 20, 180, 300, 400)
+d.icon("fe-i", "client", "Chat app", "", 170, 370, tile=F, size=80)
+
+# NEW: the KPI gate and the preset queries
+d.add("gate", "<b>KPI gate</b><br>does a preset<br>answer it?", DECISION, 420, 270, 150, 120)
+d.add("pre-cap", "<b>NEW · Preset KPI queries</b>", CAP, 640, 32, 500, 24)
+d.add("pre", "<b>16 presets</b> · fixed SQL, reviewed once<br>the gate fills the <b>parameters</b>: payer · payer class · month · CPT · CARC", STEPBOX + "align=left;spacingLeft=12;", 640, 60, 520, 60)
+
+# Claim Query Agent
+d.add("ag-cap", "Claim Query Agent · backend for ClaimClarity, and part of the backend for Agentic Next Best Actions", CAP, 640, 128, 560, 24)
+d.add("ag", "", PANEL, 640, 156, 560, 540)
+d.add("bank", "<b>Solved example<br>question bank</b><br>(training set)", STEPBOX, 660, 180, 120, 490)
+d.add("ref-cap", "References", "text;html=1;align=center;verticalAlign=middle;fontSize=12;fontColor=#1A1D23;fontFamily=Helvetica;", 840, 172, 340, 22)
+d.add("refs", "", "rounded=1;arcSize=6;html=1;fillColor=none;strokeColor=#1A1D23;", 830, 170, 355, 140)
+d.add("r1", "<b>Playbook</b><br>14 rules from<br>past mistakes", STEPBOX, 845, 200, 100, 90)
+d.add("r2", "<b>EDI business<br>glossary</b>", STEPBOX, 957, 200, 100, 90)
+d.add("r3", "<b>Gold schema</b><br>dictionary +<br>allowed values", STEPBOX, 1069, 200, 100, 90)
+d.add("llm", "<b>Claude Haiku</b><br>Strands agent on Amazon Bedrock<br>one agent", AGENT, 915, 370, 240, 130)
+d.add("ll-s", "<b>Full lossless EDI schema</b><br><br>only after the agent escalates<br>with a reason (logged, shown to user)", NOTE + "dashed=1;fontSize=11;", 930, 560, 210, 110)
+d.edge("e-r1", "r1", "llm", "", exit_=(.5, 1), entry=(.2, 0)); d.edge("e-r2", "r2", "llm", "", exit_=(.5, 1), entry=(.5, 0)); d.edge("e-r3", "r3", "llm", "", exit_=(.5, 1), entry=(.8, 0))
+d.edge("e-bank", "bank", "llm", "K = 3 most similar<br>question + SQL<br>+ answer", exit_=(1, .5), entry=(0, .5))
+d.edge("e-ll", "llm", "ll-s", "", exit_=(.5, 1), entry=(.5, 0), dashed=True)
+
+# frontend <-> gate / agent
+d.edge("e-q", "fe", "gate", "user question", exit_=(1, .25), entry=(0, .5))
+d.edge("e-f", "fe", "ag", "follow-up or clarify answers", exit_=(1, .6), entry=(0, .45), waypoints=[(380, 420), (600, 420)])
+d.edge("e-ans", "ag", "fe", "answer + formatting + live steps, or clarifying questions", exit_=(0, .85), entry=(1, .85))
+d.edge("e-yes", "gate", "pre", "yes", exit_=(.5, 0), entry=(0, .5))
+d.edge("e-no", "gate", "ag", "no", exit_=(1, .5), entry=(0, .27))
+
+# cli + guard
+d.add("cli", "<b>cc CLI<br>+ SQL guard</b>", STEPBOX, 1430, 370, 120, 130)
+d.edge("e-pre-cli", "pre", "cli", "preset SQL", exit_=(1, .5), entry=(.5, 0))
+d.edge("e-c1", "llm", "cli", "agent writes CLI<br>calls with SQL", exit_=(1, .2), entry=(0, .2))
+d.edge("e-c2", "cli", "llm", "iterative querying<br>+ result streaming", exit_=(0, .5), entry=(1, .5))
+d.edge("e-c3", "llm", "cli", "final query + answer<br>(re-run by the server)", exit_=(1, .8), entry=(0, .8))
+d.cells[-1] = d.cells[-1].replace("strokeColor=#4A6BB0;", "strokeColor=#C0392B;").replace("fontColor=#3A5A9E;", "fontColor=#C0392B;")
+
+# core principle
+d.add("cp-cap", "<b>Core principle: enforce the semantic layer.</b> A schema of curated tables the agent can query to answer nearly every question. The full lossless schema is the exception. This saves tokens and keeps queries simple.", CAP, 1640, 92, 1060, 44)
+d.add("cp", "", PANEL, 1640, 140, 1060, 600)
+d.add("duck", "<b>DuckDB reader session</b><br>one per run<br>read-only SELECT · row, time and cost caps", CYL, 1860, 370, 240, 130)
+d.edge("e-cli-duck", "cli", "duck", "", exit_=(1, .5), entry=(0, .5))
+d.add("n1", "SQL over a per-run channel; the agent never holds credentials", SMALL, 1655, 330, 190, 50)
+d.add("n2", "temporary (15-min) AWS credentials for the signed-in customer", SMALL, 1655, 455, 190, 50)
+d.add("pfx", "", "rounded=1;arcSize=2;html=1;fillColor=none;strokeColor=#7AA116;dashed=1;strokeWidth=2;", 2160, 170, 520, 540)
+d.icon("pfx-i", "s3", "", "", 2190, 200, size=28)
 d.cells[-1] = d.cells[-1].replace('value="&lt;b&gt;&lt;/b&gt;"', 'value=""')
-d.add("g", "<b>KPI gate</b><br>standard KPI fits?", DECISION, 250, 245, 170, 110); badge(d, "g-b", "41", 384, 250)
-d.add("k", "<b>Standard KPI query</b><br>fixed SQL, values filled in", STEPBOX, 480, 112, 210, 56); badge(d, "k-b", "42", 678, 100)
-d.add("ag", "<b>AGENT</b><br>Strands · Claude Haiku", AGENT, 480, 390, 210, 90); badge(d, "ag-b", "43", 672, 380)
-d.add("pr", "AGENT PROMPT", PROMPT, 730, 370, 300, 230)
-d.add("pr1", "<b>Cached for every question</b><br>playbook · glossary<br>gold schema + allowed values<br>the cc tool", NOTE, 745, 400, 270, 86)
-d.add("pr2", "<b>Added each turn</b><br>today's date · data coverage<br>3 similar solved questions · history", NOTE, 745, 500, 270, 80)
-d.add("gd", "<b>cc tool + SQL guard</b><br>read-only · cost and time limits", STEPBOX, 800, 250, 210, 60); badge(d, "gd-b", "44", 998, 238)
-d.add("rs", "<b>DuckDB reader session</b><br>one per run", CYL, 1110, 235, 170, 90)
-d.icon("bed", "bedrock", "Amazon Bedrock", "", 585, 700, label="right"); badge(d, "bed-b", "45", 605, 658)
-d.add("phi", "CUSTOMER B'S PREFIX · IAM + KMS allow this customer only", PHI, 1400, 90, 370, 520)
-d.add("sem", "<b>sem.* · gold</b><br>curated tables · the default", STEPBOX.replace("#EAF0F9", "#E8F3E0").replace("#4A6BB0", "#7AA116"), 1440, 245, 290, 70)
-d.add("ll", "<b>lossless.* · silver</b><br>every EDI field, no patient ids<br>only after a reasoned escalation", STEPBOX.replace("#EAF0F9", "#FFFFFF") + "dashed=1;", 1440, 440, 290, 80); badge(d, "ll-b", "44", 1718, 428)
-d.edge("e-app-g", "app", "g", "question", exit_=(1, .5), entry=(0, .5))
-d.edge("e-g-k", "g", "k", "yes", exit_=(.5, 0), entry=(0, .5))
-d.edge("e-g-ag", "g", "ag", "no", exit_=(.5, 1), entry=(0, .5))
-d.edge("e-k-gd", "k", "gd", "", exit_=(1, .5), entry=(.5, 0))
-d.edge("e-ag-gd", "ag", "gd", "SQL", exit_=(.5, 0), entry=(0, .5))
-d.edge("e-ag-bed", "ag", "bed", "", exit_=(.5, 1), entry=(.5, 0))
-d.edge("e-gd-rs", "gd", "rs")
-d.edge("e-pr-ag", "pr", "ag", "", exit_=(0, .3), entry=(1, .5), dashed=True)
-d.edge("e-rs-sem", "rs", "sem", "read", exit_=(1, .5), entry=(0, .5))
-d.edge("e-rs-ll", "rs", "ll", "escalation", exit_=(.5, 1), entry=(0, .5), dashed=True)
-d.edge("e-rw-app", "rw", "app", "answer + SQL + rows", exit_=(0, .62), entry=(.5, 1), dashed=True)
-legend_drilldown(d, 1560, 720)
+d.add("pfx-t", "<b>Customer's S3 prefix</b><br>semantic_layer/ (gold)", "text;html=1;align=left;verticalAlign=top;fontSize=13;fontColor=#1A1D23;fontFamily=Helvetica;", 2212, 186, 320, 44)
+d.add("sem-n", "Curated tables built from silver by the parser at load time; simple to understand and query", SMALL, 2200, 250, 250, 40)
+table("sem", "sem.* · semantic layer", ["claims", "remit_claims", "remit_lines", "adjustments", "…"], 2220, 300, 210, extra="strokeColor=#E8A0A0;")
+table("ll", "lossless.* · EDI tables", ["c837_claim", "r835_claim_payment", "…"], 2440, 470, 210)
+d.add("ll-n", "Every field from the raw EDI files, structured, patient identifiers removed. Opened only when the agent decides the curated tables cannot answer.", SMALL, 2430, 560, 240, 80)
+GATE = "rhombus;html=1;fillColor=#1C2B57;strokeColor=#1C2B57;fontColor=#FFFFFF;fontStyle=1;fontSize=12;fontFamily=Helvetica;"
+d.add("g1", "", GATE, 2120, 375, 28, 28); d.add("g2", "", GATE, 2120, 496, 28, 28)
+d.edge("e-duck-g1", "duck", "g1", "", exit_=(1, .2), entry=(0, .5)); d.edge("e-g1-sem", "g1", "sem", "", exit_=(1, .5), entry=(0, .45))
+d.edge("e-duck-g2", "duck", "g2", "", exit_=(1, .9), entry=(0, .5)); d.edge("e-g2-ll", "g2", "ll", "ONLY AFTER A REASONED ESCALATION", exit_=(1, .5), entry=(0, .45))
+d.edge("e-built", "ll", "sem", "built from", exit_=(.5, 0), entry=(1, .5), dashed=True)
+d.cells[-1] = d.cells[-1].replace("strokeColor=#4A6BB0;", "strokeColor=#E07A7A;")
+d.add("g-t", "IAM + KMS gate: this customer only", "text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#1A1D23;fontFamily=Helvetica;", 1960, 600, 260, 24)
+d.edge("e-gt", "g-t", "g2", "", exit_=(.7, 0), entry=(.5, 1))
 save(d)
 
 # 50 network & security -----------------------------------------------------------------------------------
