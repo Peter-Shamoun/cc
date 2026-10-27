@@ -12,7 +12,7 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from ddlib import DENY, GR as GR_, Diagram, check, to_excalidraw, to_html  # noqa: E402
+from ddlib import DENY, GR as GR_, _tw, Diagram, check, to_excalidraw, to_html  # noqa: E402
 
 OUT = Path(__file__).resolve().parent.parent / "drilldowns"
 AUDIT = ['{', '  "ts": "2026-10-27T14:03:11Z",', '  "customer": "customer_b",', '  "user": "ana@xifin.example",',
@@ -281,15 +281,15 @@ def d04():
     qs_left = X(E["visPhHm5ok"]["x"])
     d.edge([(X(GX + GW), Y(last + GH / 2)), (X(-1730), Y(last + GH / 2)), (X(-1730), Y(1303)), (qs_left, Y(1303))],
            "passes", (X(-1718), Y(1395)), lpos="right")
-    d.edge([(X(CL[0] + CL[2]), Y(1200)), (X(-2070), Y(1200)), (X(-2070), Y(1030)), (X(-1950), Y(1030)), (X(-1950), Y(GY))])
+    d.edge([(X(CL[0] + CL[2]), Y(1200)), (X(-2070), Y(1200)), (X(-2070), Y(GY + GH / 2)), (X(GX), Y(GY + GH / 2))])
     hx_, hy_, hw_, hh_ = box("jybGrI_Izu")
     d.edge([(X(GX), Y(1440)), (hx_ + hw_ - 40, Y(1440)), (hx_ + hw_ - 40, hy_ + hh_)], "fails a check: error to the agent",
-           (X(-2470), Y(1428)), style="dashed")
+           (X(-2240), Y(1428)), style="dashed")
     for e in kpi:                                   # the KPI gate's arrows; the preset path ends on the guard's first check
         if e["type"] == "arrow":
             pts = [(X(e["x"] + px), Y(e["y"] + py)) for px, py in e["points"]]
-            if len(pts) > 2:
-                pts = pts[:2] + [(X(-1880), pts[1][1]), (X(-1880), Y(GY))]
+            if len(pts) > 2:                        # leave the presets right of the box title, then over to the guard
+                pts = [(X(-3900), pts[0][1]), (X(-3900), pts[1][1]), (X(-1880), pts[1][1]), (X(-1880), Y(GY))]
             d.edge(pts)
     # references and the tool reference flow into Haiku with right-angle elbows
     hx, hy, hw, hh = box("jybGrI_Izu")
@@ -314,10 +314,12 @@ def d04():
         dm = E[k]
         d.gate(6, X(dm["x"] + dm["width"] / 2), yy, "", "above")
     gtip = X(E["AeKE4Dl3tF"]["x"] + E["AeKE4Dl3tF"]["width"] / 2)
-    c0 = ln("DQGZJ5UYd0")[0]
-    d.edge([c0, (gtip, c0[1]), (gtip, s2y + GR_)], style="navy")
     t = E["80_0YFkhw-"]
-    d.text(X(t["x"]), Y(t["y"]) + 26, "GATE 6 · IAM + KMS: this customer only", "gatenote")
+    note = "GATE 6 · IAM + KMS: this customer only"
+    tx0, ty0 = X(t["x"]), Y(t["y"]) + 26
+    d.text(tx0, ty0, note, "gatenote")
+    tend = tx0 + _tw(note, 18, "sans") + 14
+    d.edge([(tend, ty0 - 6), (gtip, ty0 - 6), (gtip, s2y + GR_)], style="navy")
     # lossless tables -> semantic layer, the pink dashed hint, as an elbow
     l0 = ln("QKNyGbgAu6")[0]; l1 = ln("QKNyGbgAu6")[-1]
     hl = box("YcJQqyJI9K")
@@ -334,8 +336,9 @@ def d04():
         if e["type"] == "text" and e["text"] in ("yes", "no") or e.get("text", "").startswith("preset SQL"):
             d.text(X(e["x"]), Y(e["y"]) + 15, e["text"], "label")
     put("-A8dMCxTwW", "heading")
-    put("qHtTjH_-AM", "heading", text="Claim Query Agent · the run worker on Fargate: the backend for ClaimClarity, and part of the backend for Agentic Next Best Actions")
+    put("qHtTjH_-AM", "heading", text="Claim Query Agent · run worker on Fargate")
     d.texts[-1]["icon"] = "fargate"
+    d.text(X(-3850), Y(E["qHtTjH_-AM"]["y"]) + 17, "the backend for ClaimClarity, and part of the backend for Agentic Next Best Actions", "heading")
     put("9kVIq4ZuaA", "heading")
     put("6sE7--PXrr", "note")
     put("Hli_0rnnE0", "note")

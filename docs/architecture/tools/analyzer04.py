@@ -87,7 +87,7 @@ def main(src):
     text(gx + gw / 2 + 14, 1098, "yes", 20, "left", w=40)
     guard = by["cStFoef2wJ"]
     gcx = guard["x"] + guard["width"] / 2
-    arrow([(px + 100, py), (px + 100, 790), (gcx, 790), (gcx, guard["y"])])
+    arrow([(px + pw - 30, py), (px + pw - 30, 790), (gcx, 790), (gcx, guard["y"])])
     text((px + gcx) / 2, 756, "preset SQL, parameters checked against the data", 20)
 
     # 2. wording
