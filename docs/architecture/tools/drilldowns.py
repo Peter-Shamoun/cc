@@ -100,7 +100,7 @@ def d01():
 def d02():
     d = Diagram("02-login", "02 · Login & customer mapping",
                 "Sign-in goes from the user to Microsoft Entra ID to Amazon Cognito, which maps the user's group to one customer and issues the token that gate 4 checks.",
-                2320, 760)
+                2320, 720)
     d.text(40, 56, "02 · Login & customer mapping", "title")
     d.text(40, 86, "The token is the only place the customer comes from.", "subtitle")
     cy = 300
@@ -120,7 +120,7 @@ def d02():
     d.gate(4, 2000, cy, G4, "below", "cognito")
     d.node("noacc", 330, 520, 230, 90, "No access", "not in an assigned group", style="denied")
     d.edge([(445, cy + 50), (445, 520)], "denied", (457, 420), lpos="right", style="deny")
-    d.zone(300, 220, 650, 160, "Microsoft Entra ID tenant", "plain")
+    d.zone(290, 180, 670, 200, "Microsoft Entra ID tenant", "plain")
     return d
 
 
@@ -155,7 +155,7 @@ def d03():
     d.edge([(1660, cy), (1950, cy)], "read", (1910 - 40, cy - 12))
     d.gate(6, 1790, cy, G6, "above", "iam")
     d.edge([(1660, 360), (1880, 360), (1880, 540), (1950, 540)], style="dashed")
-    d.edge([(1660, 380), (1840, 380), (1840, 740), (1950, 740)], "iam + kms", (1828, 760), lpos="left", style="deny")
+    d.edge([(1660, 380), (1840, 380), (1840, 740), (1950, 740)], "denied\niam + kms", (1828, 742), lpos="left", style="deny")
     d.edges[-1]["xat"] = (1895, 740)
     # Customer A at the API
     d.node("reqa", 40, 560, 210, 90, "Request for A", "token names B", style="denied")

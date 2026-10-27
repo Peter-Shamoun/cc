@@ -483,6 +483,26 @@ def svg_legend(d, items):
     return "".join(out)
 
 
+def auto_legend(d):
+    items = []
+    if d.gates:
+        items.append(("gate", "AWS permission gate (1–6)"))
+    if any(e["style"] == "deny" for e in d.edges):
+        items.append(("deny", "Denied path"))
+    items.append(("flow", "Data / request"))
+    if any(e["style"] == "dashed" for e in d.edges):
+        items.append(("dashed", "Conditional / return"))
+    if any(n["shape"] == "decision" for n in d.nodes):
+        items.append(("decision", "Decision"))
+    if any(n["shape"] == "agent" for n in d.nodes):
+        items.append(("agent", "Claim Query Agent"))
+    if any(n["shape"] == "db" for n in d.nodes):
+        items.append(("store", "Data store / prefix"))
+    if any(z["kind"] == "phi" for z in d.zones):
+        items.append(("phi", "Customer B boundary"))
+    return items
+
+
 def to_svg(d, legend=None):
     uid = d.slug
     defs = (f'<marker id="{uid}-arr" markerWidth="11" markerHeight="9" refX="10" refY="4.5" orient="auto" markerUnits="userSpaceOnUse">'
@@ -499,7 +519,7 @@ def to_svg(d, legend=None):
     parts += [svg_edge_label(e) for e in d.edges]
     parts += [svg_gate(g) for g in d.gates]
     parts += [svg_text(t) for t in d.texts]
-    parts.append(svg_legend(d, legend or LEGEND))
+    parts.append(svg_legend(d, legend or auto_legend(d)))
     parts.append("</svg>")
     return "\n".join(parts)
 
