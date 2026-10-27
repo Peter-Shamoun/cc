@@ -32,8 +32,8 @@ Middle-ground length: about 15–20 PDF pages. No 100-page sets.
 
 | # | Board | Must show |
 |---|---|---|
-| 00 | Storage & isolation | One bucket, the `customer_b/` prefixes (landing, raw, parquet/silver, semantic_layer/gold, staging, quarantine, conversations + run-events, audit), the customer's roles, keys and bucket policy, and Customer A denied |
-| 01 | Ingestion & parse | Lab → SFTP (Transfer Family) → landing → copy step → raw → `_SUCCESS` → EventBridge rule → ECS RunTask → Fargate parser task (start, parse, silver, gold, exit) → gold publish (new CURRENT version). Gates 1, 2 and 3. |
+| 00 | Storage & isolation | One bucket, the `customer_b/` prefixes (raw, parquet/silver, semantic_layer/gold, quarantine, conversations + run-events, audit), the customer's roles, keys and bucket policy, and Customer A denied |
+| 01 | Ingestion & parse | Lab → SFTP intake → raw → `_SUCCESS` → EventBridge rule → ECS RunTask → Fargate parser task (start, parse, silver, gold, exit) → gold publish (new CURRENT version). Gates 1, 2 and 3. |
 | 02 | Login & customer mapping | User → Microsoft Entra ID → assigned group → Cognito (group → one customer) → ID token (customer = B, 60 min, httpOnly cookie) → gate 4 → chat API |
 | 03 | Query path | Run worker: Claim Query Agent → ClaimClarity CLI (`cli.py`) → SQL guard → over Quack → DuckDB query service. The query service exchanges the token at STS (gate 5) and reads `customer_b/semantic_layer/` (gate 6); `lossless.*` only after a reasoned escalation. Customer A is blocked by the API and by IAM. |
 | 04 | Analyzer | The user's excalidraw: frontend ⇄ Claim Query Agent. The agent's inputs: the solved example bank (K = 3), references (prompt cached: rules, EDI glossary, semantic schema + allowed values), the tool and CLI reference (prompt cached), the system prompt + history (cached) and the newest prompt. It runs Claude Haiku, first decides to answer, clarify or escalate, then calls `cli.py` → SQL guard. The full lossless schema is reachable only after escalation. **Add the KPI gate** in front: a preset fits → preset KPI queries (the gate fills the parameters); otherwise → the agent. |
@@ -75,6 +75,11 @@ Middle-ground length: about 15–20 PDF pages. No 100-page sets.
     enhancing".
 
 ## Settled facts
+
+- **No landing zone and no staging zone (user decision).** SFTP intake writes straight into `raw/`. The batch lease
+  is a lock object owned by the parser, drawn as a small lock on the parser and not as a prefix or zone. Prefixes per
+  customer: `raw/`, `parquet/` (silver), `semantic_layer/` (gold), `quarantine/`, chat state (`conversations/`,
+  `run-events/`) and `audit/`.
 
 - **Bucket:** one bucket holds all customer data, one prefix per customer. The web app and the access logs have their
   own buckets.

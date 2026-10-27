@@ -59,7 +59,52 @@ def d00():
     return d
 
 
-DIAGRAMS = {"00": d00}
+def d01():
+    d = Diagram("01-ingestion", "01 · Ingestion & parse",
+                "Lab files arrive over SFTP, are copied to raw, and the _SUCCESS marker triggers one Fargate parser task that writes silver and publishes a new gold version.",
+                2440, 980)
+    d.text(40, 56, "01 · Ingestion & parse", "title")
+    d.text(40, 86, "One batch for customer B, from the lab's upload to a new CURRENT gold version.", "subtitle")
+    d.zone(630, 140, 1790, 200, "S3 · customer_b/", "phi", "s3")
+    y1, h1 = 200, 120
+    c1 = y1 + h1 // 2
+    d.node("lab", 40, c1 - 45, 200, 90, "Lab", "customer B", "building", style="external")
+    d.node("sftp", 340, c1 - 45, 240, 90, "Transfer Family", "SFTP endpoint", "transfer")
+    d.node("landing", 670, y1, 190, h1, "landing/", shape="folder")
+    d.node("raw", 940, y1, 270, h1, "raw/", "837 · 835 · 277 · _SUCCESS last", shape="db")
+    d.node("silver", 1700, y1, 200, h1, "parquet/", "silver", shape="db")
+    d.node("gold", 1990, y1, 210, h1, "semantic_layer/", "gold · new version", shape="db", style="white")
+    d.node("current", 2270, c1 - 40, 120, 80, "CURRENT", shape="file", style="white")
+    d.edge([(240, c1), (340, c1)], "port 22", (290, c1 - 12))
+    d.edge([(580, c1), (670, c1)], "write", (625, c1 - 12))
+    d.edge([(860, c1), (940, c1)], "copy", (900, c1 - 12))
+    d.edge([(2200, c1), (2270, c1)])
+    d.text(2330, c1 + 70, "compare-and-set", "note", "middle")
+    # trigger chain
+    y2, h2 = 570, 100
+    c2 = y2 + h2 // 2
+    pe, pr = 1000, 1150           # raw bottom ports: event, read
+    d.node("eb", pe - 110, y2, 220, h2, "EventBridge rule", "customer B", "eventbridge")
+    d.node("run", 1200, y2, 200, h2, "ECS RunTask", "launcher", "ecs")
+    d.node("task", 1580, 530, 680, 180, "Fargate parser task · one per batch", icon="fargate", shape="steps",
+           inner=["Start", "Parse", "Silver", "Gold", "Exit"])
+    d.edge([(pe, y1 + h1), (pe, y2)], "_success", (pe + 12, 372), lpos="right")
+    d.gate(1, pe, 470, G1, "left", "eventbridge")
+    d.edge([(pe + 110, c2), (1200, c2)])
+    d.edge([(1400, c2), (1580, c2)])
+    d.gate(2, 1490, c2, G2, "below", "iam")
+    d.edge([(pr, y1 + h1), (pr, 450), (1630, 450), (1630, 530)], "read", (1500, 438))
+    d.gate(3, 1300, 450, G3, "above", "iam")
+    d.edge([(1800, 530), (1800, y1 + h1)], "write", (1812, 506), lpos="right")
+    d.gate(3, 1800, 425, G3, "right", "iam")
+    d.edge([(2095, 530), (2095, y1 + h1)], "write", (2107, 506), lpos="right")
+    d.gate(3, 2095, 425, G3, "right", "iam")
+    d.node("dlq", pe - 110, 790, 220, 80, "Dead-letter queue", icon="sqs")
+    d.edge([(pe, y2 + h2), (pe, 790)], "after 3 retries", (pe + 12, 736), lpos="right", style="dashed")
+    return d
+
+
+DIAGRAMS = {"00": d00, "01": d01}
 
 
 SKILL = Path(os.environ.get("DIAGRAM_DESIGN", Path.home() / ".claude/skills/diagram-design")) / "scripts"
