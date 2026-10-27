@@ -11,7 +11,7 @@ one system.
 - Internal names: "B1", bundle names, benchmark run names, "claude -p", "grok". Call the agent "the analyzer"
   and its two paths "the standard KPI path" and "the custom analysis path" (the free-SQL agent).
 - Deployment details: regions, account ids, profile names, ARNs with ids, CIDRs, bucket or role names with
-  environment suffixes. Use logical names instead: "the CC bucket", "Customer B's role", "Customer B's key".
+  environment suffixes. Use logical names instead: "the ClaimClarity bucket", "Customer B's role", "Customer B's key".
 - Model ids. Say "Claude Haiku on Amazon Bedrock".
 
 ## Facts fixed for all pages
@@ -81,7 +81,8 @@ text and edges through boxes. Do at most two repair rounds.
 
 Copy these styles exactly. They come from `diagrams/CC_Backend.drawio`.
 
-- Canvas: about 1600 x 1000. Title at the top left: `CC · <AREA>` in bold 20px navy #1C2B57, plus a 12px
+- Product name in diagrams: **ClaimClarity** (titles in caps: `CLAIMCLARITY · <AREA>`), never "CC". Logical names follow it: "the ClaimClarity bucket".
+- Canvas: about 1600 x 1000. Title at the top left: `CLAIMCLARITY · <AREA>` in bold 20px navy #1C2B57, plus a 12px
   subtitle.
 - L2 pages: put a breadcrumb under the title, e.g. `Overview › Chat backend › Chat turn`, 11px #3A5A9E.
 - Service box:

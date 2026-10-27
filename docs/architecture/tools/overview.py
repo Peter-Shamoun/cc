@@ -19,9 +19,9 @@ def e(cid, src, dst, label, exit_, entry, both=False):
     cells.append(f'<mxCell id="{cid}" value="{escape(label)}" style="{style}" edge="1" parent="1" source="{src}" target="{dst}"><mxGeometry relative="1" as="geometry"/></mxCell>')
 def box(n, title, lines): return f"<b>{n} · {title}</b><br>{lines}"
 
-v("title", "<b style='font-size:20px'>CC · ARCHITECTURE OVERVIEW</b>&nbsp;&nbsp;&nbsp;claims analytics chat for clinical labs · numbers link to the area pages", TEXT + "fontColor=#1C2B57;", 20, 14, 1100, 36)
+v("title", "<b style='font-size:20px'>CLAIMCLARITY · ARCHITECTURE OVERVIEW</b>&nbsp;&nbsp;&nbsp;claims analytics chat for clinical labs · numbers link to the area pages", TEXT + "fontColor=#1C2B57;", 20, 14, 1100, 36)
 v("grp-aws", "", GROUP, 320, 80, 1240, 830)
-v("lbl-aws", "<b>AWS ACCOUNT · CC</b>&nbsp; all tasks on Amazon ECS on AWS Fargate in private subnets", "text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#1A1D23;fontFamily=Helvetica;", 334, 88, 700, 24)
+v("lbl-aws", "<b>AWS ACCOUNT · CLAIMCLARITY</b>&nbsp; all tasks on Amazon ECS on AWS Fargate in private subnets", "text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#1A1D23;fontFamily=Helvetica;", 334, 88, 700, 24)
 
 v("ext-labs", box(1, "CUSTOMER LABS", "Daily 837 · 835 · 277 files over SFTP"), EXT, 40, 140, 230, 72)
 v("ext-users", box(2, "XIFIN USERS", "Browser · React chat app"), EXT, 40, 484, 230, 72)
@@ -29,7 +29,7 @@ v("ext-entra", box(3, "MICROSOFT ENTRA ID", "Company sign-in"), EXT, 40, 664, 23
 
 v("svc-ingest", box(4, "INGESTION &amp; LAKE", "Transfer Family → raw → parser task (Fargate)<br>→ lossless (silver) → semantic (gold) · gates 1–3"), SVC, 380, 136, 390, 80)
 v("phi-bucket", "", PHI, 860, 116, 660, 120)
-v("svc-bucket", box(5, "CC BUCKET (S3)", "One prefix, one KMS key and one IAM role per customer<br>raw · silver · gold · conversations · run events · audit"), SVC, 880, 136, 620, 80)
+v("svc-bucket", box(5, "CLAIMCLARITY BUCKET (S3)", "One prefix, one KMS key and one IAM role per customer<br>raw · silver · gold · conversations · run events · audit"), SVC, 880, 136, 620, 80)
 v("lbl-phi", "PHI BOUNDARY · per customer", "text;html=1;align=left;verticalAlign=middle;fontSize=10;fontColor=#1C2B57;fontFamily=Helvetica;fontStyle=1;", 866, 238, 260, 18)
 
 v("svc-edge", box(6, "EDGE", "CloudFront + WAF · static app from S3<br>load balancer → chat API"), SVC, 380, 480, 270, 80)

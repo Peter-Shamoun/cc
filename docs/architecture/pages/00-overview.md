@@ -1,6 +1,6 @@
-# CC architecture overview
+# ClaimClarity architecture overview
 
-CC is a chat assistant for XiFin staff. It answers questions about a clinical lab customer's claims (837P) and
+ClaimClarity is a chat assistant for XiFin staff. It answers questions about a clinical lab customer's claims (837P) and
 remittances (835) in plain language, and shows the SQL and data behind every answer.
 
 Each customer's data stays inside its own boundary: its own S3 prefix, its own KMS key and its own IAM role. A
@@ -19,7 +19,7 @@ signed-in user can only reach the one customer their token names. The design is 
 | 2 | XiFin users | Use the React chat app in the browser | [Chat backend](30-chat-backend.md) |
 | 3 | Microsoft Entra ID | Company sign-in. The CC app is assigned to groups. | [Identity & access](20-identity.md) |
 | 4 | Ingestion & lake | Lands files in raw. A parser task per batch writes the lossless (silver) and semantic (gold) tables. | [Ingestion & lake](10-ingestion.md) |
-| 5 | CC bucket | One S3 bucket, with one prefix, KMS key and IAM role per customer. It holds the lake and all chat state. | [S3 layout](12-s3-layout.md) |
+| 5 | ClaimClarity bucket | One S3 bucket, with one prefix, KMS key and IAM role per customer. It holds the lake and all chat state. | [S3 layout](12-s3-layout.md) |
 | 6 | Edge | CloudFront and WAF serve the web app and pass API calls to the chat API through the load balancer | [Edge](31-edge.md) |
 | 7 | Chat backend | The chat API accepts a question and queues a run. Run workers execute it and stream the answer back. | [Chat backend](30-chat-backend.md) |
 | 8 | Analyzer | Strands agent inside the run worker. A KPI gate sends each question to a standard KPI query or to custom analysis. | [Agent analyzer](40-analyzer.md) |
@@ -30,7 +30,7 @@ signed-in user can only reach the one customer their token names. The design is 
 
 ## How it works
 
-1. A customer lab drops its daily files on SFTP (1). They land in that customer's raw prefix in the CC bucket (5).
+1. A customer lab drops its daily files on SFTP (1). They land in that customer's raw prefix in the ClaimClarity bucket (5).
 2. When a batch is complete, EventBridge starts a parser task on Fargate as that customer's role (4). The task
    writes the lossless tables, then publishes a new version of the gold tables. Gates 1–3 check every step.
 3. A XiFin user signs in with Entra ID (3). Cognito issues an id token that names the customer. The browser
