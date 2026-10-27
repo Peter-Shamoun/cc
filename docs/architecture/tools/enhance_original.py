@@ -59,6 +59,7 @@ value("ov_h_t", "")
 for cid in ("ov_l_bkt", "ov_l_s3r"):
     swap(cid, ("cc/", "claimclarity/"))
 swap("ov_l_ec2", ("API backend · EC2", "Chat API + run workers · ECS on Fargate"))
+swap("ov_api", ("Verifies token, gets creds", "Verifies token, queues the run"))
 value("ov_agent", caps("Claim Query Agent", 17, "#FFFFFF") + '<br><span style="font-size:12px;color:#FFFFFF">run worker · Claude Haiku</span>')
 value("ov_duck", caps("DuckDB query service") + '<br><span style="font-size:13px">Quack server · own Fargate task · holds B\'s creds</span>')
 value("ov_sts", caps("STS") + '<br><span style="font-size:14px">15-min B creds for the query service</span>')
@@ -76,6 +77,22 @@ for edge_id in ("ov_e_sts1", "ov_e_sts2"):
     e.set("source", "ov_duck" if e.get("source") == "ov_api" else e.get("source"))
     e.set("target", "ov_duck" if e.get("target") == "ov_api" else e.get("target"))
     e.set("style", re.sub(r"(exit|entry)[XY]=[^;]*;|(exit|entry)D[xy]=[^;]*;", "", e.get("style")))
+
+# the query audit: an audit/ row in the bucket, its JSON Lines record, and an edge from the query service that writes it
+geometry("ov_zs3r", height=440)
+def add_cell(cid, value_text, style, x, y, w, h, parent="ov"):
+    c = ET.SubElement(graph_root, "mxCell", id=cid, value=value_text, style=style, vertex="1", parent=parent)
+    ET.SubElement(c, "mxGeometry", x=str(x), y=str(y), width=str(w), height=str(h), **{"as": "geometry"})
+add_cell("ov_aud", "customer_b/audit/ · one JSON line per SQL", cells["ov_s3b"].get("style"), 2020, 1432, 360, 44)
+add_cell("ov_aud_json", '{"ts":"2026-10-27T14:03:11Z",<br>&nbsp;"customer":"customer_b","user":"ana@xifin.example",<br>'
+         '&nbsp;"run_id":"r_7f3c","seq":3,<br>&nbsp;"sql":"SELECT payer_name, … (first 500 chars)",<br>'
+         '&nbsp;"tables":["sem.remit_claims"],"rows":12,"ms":184,<br>&nbsp;"escalation_reason":null,"prev_hash":"9c1e…","hash":"4b7a…"}',
+         "html=1;whiteSpace=wrap;rounded=0;fillColor=#1A1D23;strokeColor=none;fontColor=#E6E8EB;fontFamily=IBM Plex Mono;"
+         "fontSize=10;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;", 2020, 1486, 360, 122)
+e = ET.SubElement(graph_root, "mxCell", id="ov_e_aud", value="", edge="1", parent="ov", source="ov_duck", target="ov_aud",
+                  style=re.sub(r"(exit|entry)[XY]=[^;]*;|(exit|entry)D[xy]=[^;]*;", "", cells["ov_e_duck"].get("style"))
+                  + "exitX=1;exitY=0.9;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;")
+ET.SubElement(e, "mxGeometry", relative="1", **{"as": "geometry"})
 
 text = ET.tostring(tree.getroot(), encoding="unicode")
 for res, color in COLORS.items():   # official AWS icon colours

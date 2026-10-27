@@ -76,6 +76,13 @@ Middle-ground length: about 15–20 PDF pages. No 100-page sets.
 
 ## Settled facts
 
+- **Query audit (user decision: keep it, and show it with its record structure).** The DuckDB query service writes one
+  JSON Lines record per SQL statement to `customer_b/audit/` (write-once, platform audit key, kept 6 years, each
+  record chained by hash). Show this record as an evidence artifact on 00, 03 and the main board:
+  `{"ts":"2026-10-27T14:03:11Z","customer":"customer_b","user":"ana@xifin.example","run_id":"r_7f3c","seq":3,`
+  `"sql":"SELECT payer_name, avg(is_denied::INT) … (first 500 chars)","tables":["sem.remit_claims"],"rows":12,`
+  `"ms":184,"escalation_reason":null,"prev_hash":"9c1e…","hash":"4b7a…"}`
+
 - **Out of scope (user decision): chat transcripts and conversation storage.** No `conversations/` or `run-events/`
   prefix, no transcript role and no transcript key. They would need their own ids and database, which is a later
   design. The chat streams answers live over SSE.
@@ -89,7 +96,7 @@ Middle-ground length: about 15–20 PDF pages. No 100-page sets.
   own buckets.
 - **Roles and keys:** per customer, roles for SFTP copy, parser, reader and audit. Keys: see the two-key decision above.
 - **Raw:** write-once (Object Lock, 7 years). `_SUCCESS` is written last. Bad files go to `quarantine/` (kept 1 year).
-- **Parser:** EventBridge retries 3 times, then raises an alarm (no dead-letter queue, user decision). The batch is re-run from the same `_SUCCESS`. The task needs 4–8 GB of memory. Gold publishes a
+- **Parser:** EventBridge retries the launch 3 times. Nothing else: no dead-letter queue, no alarm (user decision: "fallbacks for the sake of fallbacks"). The task needs 4–8 GB of memory. Gold publishes a
   new version, and `CURRENT` moves by compare-and-set; old versions stay readable for sessions already open.
 - **Reader:** STS credentials last 15 minutes, renewed with the same token when fewer than 3 minutes remain. Read-only.
   Only the current gold version. `lossless.*` holds PHI-stripped tables published next to gold.

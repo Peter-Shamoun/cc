@@ -10,7 +10,7 @@ flowchart LR
       silver[("parquet/ · silver")]
       gold[("semantic_layer/ · gold<br/>CURRENT version")]
       quarantine[/"quarantine/ · 1 yr"/]
-      audit[/"audit/ · write-once"/]
+      audit[/"audit/ · write-once · 6 yr · hash-chained"/]
     end
   end
   qs["DuckDB query service<br/>reader role B"]
@@ -29,4 +29,6 @@ flowchart LR
   keyB -.- gold
   keyB -.- quarantine
   keyAudit -.- audit
+  record[/"audit record (JSON Lines, one per SQL):<br/>ts · customer · user · run_id · seq · sql (first 500 chars) · tables · rows · ms · escalation_reason · prev_hash · hash"/]
+  audit -.- record
   roles -.- prefB

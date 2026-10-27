@@ -14,8 +14,10 @@ flowchart LR
   subgraph s3["S3 · ClaimClarity data bucket"]
     gold[("customer_b/semantic_layer/<br/>current gold")]
     lossless[("lossless.*<br/>PHI-stripped")]
+    audit[/"customer_b/audit/<br/>write-once · platform audit key · 6 yr"/]
     prefA[("customer_a/")]
   end
   qs --> g6{{"Gate 6 · IAM + KMS (reader)"}} -->|read-only| gold
   qs -.->|only after a reasoned escalation| lossless
   qs -.->|DENIED by IAM + KMS| prefA
+  qs -->|one JSON Lines record per SQL, hash-chained| audit

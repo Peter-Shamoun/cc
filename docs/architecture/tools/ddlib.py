@@ -187,7 +187,7 @@ def node_layout(n):
     x, y, w, h, shape = n["x"], n["y"], n["w"], n["h"], n["shape"]
     names, subs = _lines(n["name"]), _lines(n["sub"])
     top_pad = {"db": 12, "folder": 8, "ui": 18}.get(shape, 0)
-    ic = n["icon"] if shape not in ("decision", "steps", "grid") else None
+    ic = n["icon"] if shape not in ("decision", "steps", "grid", "code") else None
     isz = 40 if h >= 76 else 32
     left = x + (30 if shape == "agent" else 16)
     widths = [_tw(s, NAME - 1, "mono") if _is_mono(s) else _tw(s, NAME, "sans") for s in names] + [_tw(s, SUB, "sans4") for s in subs]
@@ -219,7 +219,7 @@ def svg_node(n):
     elif style == "denied":
         fill, stroke, dash = "#FDF1F0", DENY, ' stroke-dasharray="6 4"'
     out = [f'<g data-node="{escape(n["id"])}">']
-    if shape in ("box", "steps", "ui", "grid"):
+    if shape in ("box", "steps", "ui", "grid") :
         out.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="4" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"{dash}/>')
     elif shape == "db":
         c, ry = _cyl(x, y, w, h, fill, stroke); out.append(c)
@@ -242,7 +242,19 @@ def svg_node(n):
                    f'<circle cx="{x + 12}" cy="{y + 9}" r="3" fill="{PAPER}"/><circle cx="{x + 22}" cy="{y + 9}" r="3" fill="{PAPER}"/>'
                    f'<rect x="{x + 16}" y="{y + h - 36}" width="{w - 32}" height="22" rx="11" fill="{PAPER}" stroke="{LINE}"/>')
     L = node_layout(n)
-    if shape == "grid":
+    if shape == "code":
+        out.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="6" fill="{NAVY}"/>'
+                   f'<rect x="{x}" y="{y}" width="{w}" height="40" rx="6" fill="#24366B"/><rect x="{x}" y="{y + 30}" width="{w}" height="10" fill="#24366B"/>')
+        out.append(_t(x + 18, y + 26, L["names"][0], 15, SANS, PAPER, 600))
+        if L["subs"]:
+            out.append(_t(x + w - 18, y + 26, L["subs"][0], 13, SANS, "#AFC2E6", 400, "end"))
+        for i, line in enumerate(n["inner"]):
+            ly = y + 66 + i * 21
+            m = re.match(r'^(\s*)(.*)$', line)
+            parts = re.split(r'("[^"]*"\s*:)', m.group(2))
+            tsp = "".join(f'<tspan fill="{"#AFC2E6" if p2.endswith(":") else "#FFFFFF"}">{escape(p2)}</tspan>' for p2 in parts if p2)
+            out.append(f'<text x="{x + 18 + len(m.group(1)) * 8}" y="{ly}" font-family="{MONO}" font-size="13.5" xml:space="preserve">{tsp}</text>')
+    elif shape == "grid":
         out.append(_t(x + 18, y + 34, L["names"][0], NAME, SANS, txt, 600))
         items, cols = n["inner"], n.get("cols", 2)
         cw = (w - 36) / cols
@@ -385,7 +397,11 @@ def check(d):
     boxes = {n["id"]: (n["x"], n["y"], n["w"], n["h"]) for n in d.nodes}
     for n in d.nodes:
         L = node_layout(n)
-        if L["need"] > n["w"] + 1 and n["shape"] not in ("steps", "grid"):
+        if n["shape"] == "code":
+            need = max(_tw(l, 13.5, "mono") for l in n["inner"]) + 36
+            if need > n["w"]:
+                probs.append(f"code overflow in {n['id']}: needs {need:.0f}, has {n['w']}")
+        elif L["need"] > n["w"] + 1 and n["shape"] not in ("steps", "grid"):
             probs.append(f"text overflow in {n['id']}: needs {L['need']:.0f}, has {n['w']}")
     for g in d.gates:
         gb = gate_box(g); dia = (g["x"] - GR, g["y"] - GR, 2 * GR, 2 * GR)
@@ -625,6 +641,11 @@ def to_excalidraw(d):
         if n["icon"] and n["icon"] not in GLYPHS and sh not in ("decision", "steps"):
             X.image(x + 8, y + (14 if sh == "db" else 8), 26, n["icon"])
         label = n["name"] + (("\n" + n["sub"]) if n["sub"] else "")
+        if sh == "code":
+            X.rect(x, y, w, h, backgroundColor="#1e293b", strokeColor="#1e293b", roughness=0, roundness={"type": 3})
+            X.text(x + 16, y + 10, n["name"], 18, color="#ffffff")
+            X.text(x + 16, y + 48, "\n".join(n["inner"]), 14, color="#22c55e", w=w - 32)
+            continue
         if sh == "grid":
             X.text(x + 16, y + 12, n["name"], 20)
             cols = n.get("cols", 2); cw = (w - 36) / cols
