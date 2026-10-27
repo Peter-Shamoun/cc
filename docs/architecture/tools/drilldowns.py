@@ -131,53 +131,38 @@ def d02():
 
 def d03():
     d = Diagram("03-query-path", "03 · Query path",
-                "The run worker sends SQL over Quack to the DuckDB query service, which alone holds customer B's 15-minute STS credentials, reads only customer B's gold and writes one audit record per SQL; Customer A is denied by the API and by IAM.",
-                2720, 1440)
+                "The run worker sends SQL over Quack to the DuckDB query service, which alone exchanges the token at STS for customer B's 15-minute credentials and reads only customer B's gold; customer A's prefix is denied.",
+                2620, 1000)
     d.text(40, 56, "03 · Query path", "title")
     d.text(40, 86, "Only the DuckDB query service touches the data, with 15-minute credentials for one customer.", "subtitle")
-    d.zone(320, 130, 2370, 1230, "AWS account · ClaimClarity", "aws")
-    d.node("reqa", 40, 300, 220, 100, "Request for A", "token names B", style="denied")
-    d.node("api", 380, 300, 220, 100, "Chat API", "Fargate", "fargate")
-    d.edge([(260, 350), (380, 350)], "denied", (320, 326), style="deny")
-    d.edges[-1]["xat"] = (330, 350)
-    d.text(620, 345, "the customer comes\nfrom the token only", "note")
-    # run worker
-    d.zone(360, 480, 640, 480, "Run worker · no AWS credentials", "worker", "fargate")
-    a = d.node("agent", 400, 550, 560, 120, "Claim Query Agent", "run worker")
+    d.zone(40, 300, 660, 520, "Run worker · Fargate", "worker", "fargate")
+    a = d.node("agent", 80, 380, 580, 120, "Claim Query Agent", "Claude Haiku")
     a["shape"] = "agent"
-    d.edge([(490, 400), (490, 550)], "run", (502, 480 - 6), lpos="right")
-    d.node("cli", 400, 770, 240, 110, "cli.py", "ClaimClarity CLI", "terminal")
-    d.node("guard", 720, 770, 240, 110, "SQL guard", "read-only", "shieldcheck")
-    d.edge([(520, 670), (520, 770)])
-    d.edge([(640, 825), (720, 825)])
-    d.text(720, 916, "the agent never holds AWS credentials", "note")
-    # query service
-    d.zone(1120, 480, 520, 620, "DuckDB query service · Fargate", "worker", "fargate")
-    d.node("qs", 1160, 740, 440, 220, "Quack server", "holds customer B's\n15-min credentials", "duck")
-    d.edge([(960, 800), (1160, 800)], "sql · quack", (1060, 788))
-    d.edge([(1160, 850), (960, 850)], "rows", (1060, 838))
-    d.node("sts", 1240, 200, 280, 100, "AWS STS", "reader role B", "sts")
-    d.edge([(1340, 740), (1340, 300)], "token", (1328, 660), lpos="left")
-    d.gate(5, 1340, 400, G5, "left", "sts")
-    d.edge([(1420, 300), (1420, 740)], "15-min credentials", (1432, 520), lpos="right")
-    d.text(1432, 548, "renewed with the same\ntoken, under 3 min left", "note")
-    # bucket
-    d.zone(1780, 160, 870, 1170, "ClaimClarity data bucket", "bucket", "s3")
-    d.zone(1810, 220, 810, 820, "customer_b/", "phi")
-    d.node("gold", 2000, 290, 400, 130, "semantic_layer/", "sem.* · current gold", shape="db", style="white")
-    d.text(2000, 448, "curated tables answer nearly every question", "note")
-    d.node("lossless", 2000, 520, 400, 120, "lossless.*", "PHI-stripped", shape="db", style="optional")
-    d.node("audit", 2000, 830, 400, 100, "audit/", "write-once · audit key · 6 yr", shape="folder")
-    d.zone(1810, 1090, 810, 200, "customer_a/", "denied")
-    d.node("gold_a", 2000, 1150, 400, 110, "semantic_layer/", shape="db", style="denied")
-    d.edge([(1600, 760), (1680, 760), (1680, 355), (2000, 355)], "read-only", (1828, 343), lpos="right")
-    d.gate(6, 1680, 560, G6, "left", "iam")
-    d.edge([(1600, 800), (1720, 800), (1720, 580), (2000, 580)], "after escalation", (1828, 568), lpos="right", style="dashed")
-    d.edge([(1600, 880), (2000, 880)], "one record per sql", (1828, 868), lpos="right")
-    d.edge([(1600, 940), (1660, 940), (1660, 1205), (1810, 1205)], "denied · iam + kms", (1648, 1150), lpos="left", style="deny")
-    d.edges[-1]["xat"] = (1740, 1205)
-    c = d.node("rec", 360, 1010, 720, 320, "Audit record · customer_b/audit/", "one per SQL · hash-chained", shape="code")
-    c["inner"] = AUDIT
+    d.node("cli", 80, 600, 250, 110, "cli.py", "ClaimClarity CLI", "terminal")
+    d.node("guard", 410, 600, 250, 110, "SQL guard", "read-only", "shieldcheck")
+    d.edge([(205, 500), (205, 600)])
+    d.edge([(330, 655), (410, 655)])
+    d.text(80, 780, "the agent never holds AWS credentials", "note")
+    d.zone(860, 300, 560, 520, "DuckDB query service · Fargate", "worker", "fargate")
+    d.node("qs", 900, 480, 400, 200, "Quack server", "customer B · 15-min credentials", "duck")
+    d.edge([(660, 630), (900, 630)], "sql · per-run token", (780, 618))
+    d.edge([(900, 680 - 10), (660, 680 - 10)], "rows", (780, 658))
+    d.node("sts", 1060, 120, 280, 100, "AWS STS", "reader role B", "sts")
+    d.edge([(1150, 480), (1150, 220)], "token", (1138, 420), lpos="left")
+    d.gate(5, 1150, 260, G5, "left", "sts")
+    d.edge([(1260, 220), (1260, 480)], "15-min credentials", (1272, 420), lpos="right")
+    d.zone(1760, 160, 820, 740, "ClaimClarity data bucket", "bucket", "s3")
+    d.zone(1790, 220, 760, 450, "customer_b/", "phi")
+    d.node("gold", 1960, 280, 480, 120, "semantic_layer/", "gold · current version", shape="db", style="white")
+    d.node("lossless", 1960, 500, 480, 120, "lossless.*", "PHI-stripped", shape="db", style="optional")
+    d.edge([(1300, 500), (1520, 500), (1520, 340), (1960, 340)], "read-only", (1805, 328), lpos="right")
+    d.gate(6, 1520, 420, G6, "right", "iam")
+    d.edge([(1300, 560), (1960, 560)], "after escalation", (1805, 548), lpos="right", style="dashed")
+    d.gate(6, 1650, 560, G6, "below", "iam")
+    d.zone(1790, 710, 760, 160, "customer_a/  ·  denied by IAM + KMS", "denied")
+    d.node("gold_a", 1960, 760, 480, 90, "semantic_layer/", shape="db", style="denied")
+    d.edge([(1300, 650), (1460, 650), (1460, 805), (1790, 805)], "denied", (1650, 793), style="deny")
+    d.edges[-1]["xat"] = (1540, 805)
     return d
 
 
@@ -260,7 +245,7 @@ def d05():
     return d
 
 
-DIAGRAMS = {"00": d00, "01": d01, "02": d02, "03": d03, "04": d04, "05": d05}
+DIAGRAMS = {"00": d00, "01": d01, "02": d02, "03": d03, "05": d05}   # 04: the user excalidraw, edited by analyzer04.py
 
 
 SKILL = Path(os.environ.get("DIAGRAM_DESIGN", Path.home() / ".claude/skills/diagram-design")) / "scripts"
