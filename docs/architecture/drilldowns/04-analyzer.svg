@@ -2,7 +2,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5940 1200" width="5940" height="1200" role="img" aria-labelledby="04-analyzer-title 04-analyzer-desc" id="d-04-analyzer-root">
 <title id="04-analyzer-title">04 · Analyzer</title><desc id="04-analyzer-desc">The user&#x27;s analyzer board: the frontend sends a question to the KPI gate, which answers with a preset query when one fits; otherwise the Claim Query Agent, fed by its example bank, cached references and prompts, writes CLI calls with SQL that pass the SQL guard to the DuckDB query service, which reads only this customer&#x27;s semantic layer.</desc>
 <defs>
-      <style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Serif:ital@0;1&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');
+      <style>@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&amp;family=Barlow+Condensed:wght@500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap');
       #d-04-analyzer-root { color: #1A1D23; font-family: 'Barlow', Arial, sans-serif; }
       #d-04-analyzer-root .diagram-container { width:100%;overflow-x:auto }
       @media print {

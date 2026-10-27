@@ -2,7 +2,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2200 840" width="2200" height="840" role="img" aria-labelledby="01-ingestion-title 01-ingestion-desc" id="d-01-ingestion-root">
 <title id="01-ingestion-title">01 · Ingestion &amp; parse</title><desc id="01-ingestion-desc">Lab files arrive over SFTP straight into raw, and the _SUCCESS marker triggers one Fargate parser task that writes silver and publishes a new gold version.</desc>
 <defs>
-      <style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Serif:ital@0;1&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');
+      <style>@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&amp;family=Barlow+Condensed:wght@500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap');
       #d-01-ingestion-root { color: #1A1D23; font-family: 'Barlow', Arial, sans-serif; }
       #d-01-ingestion-root .diagram-container { width:100%;overflow-x:auto }
       @media print {

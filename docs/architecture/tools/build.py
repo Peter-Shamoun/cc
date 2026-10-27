@@ -50,10 +50,10 @@ def main():
     md = re.sub(r"!\[([^\]]*)\]\(([^)]+\.png)\)", image, md)
     body = subprocess.run(["pandoc", "-f", "gfm", "-t", "html"], input=md, capture_output=True, text=True, check=True).stdout
     css = ("body{font:14px/1.5 Barlow,Helvetica,Arial,sans-serif;color:#1A1D23;max-width:1200px;margin:24px auto;padding:0 16px;background:#fff}"
-           "h1,h2{color:#1C2B57;font-family:'Barlow Condensed',Barlow,sans-serif} img{width:100%;border:1px solid #D5DCE8}"
+           "h1,h2{color:#1C2B57;font-family:'Barlow Condensed',Barlow,sans-serif;line-height:1.15} h1{font-size:34px;margin:0 0 12px} h2{font-size:24px;margin:28px 0 10px} img{width:100%;border:1px solid #D5DCE8}"
            "table{border-collapse:collapse;width:100%} th,td{border:1px solid #D5DCE8;padding:5px 8px;text-align:left;vertical-align:top}"
            "th{background:#EAF0F9} code{font-family:'IBM Plex Mono',monospace;font-size:0.92em}"
-           "@media print{h2{break-before:page} img{width:100%;height:auto;max-height:165mm;object-fit:contain} tr{break-inside:avoid}}")
+           "@media print{body{font-size:11.5px;line-height:1.4} th,td{padding:3px 6px} h2{break-before:page;margin:0 0 6px} img{width:100%;height:auto;max-height:104mm;object-fit:contain} tr{break-inside:avoid}}")
     html = V2 / "ClaimClarity_Architecture.html"
     html.write_text(f"<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
                     f"<title>ClaimClarity Architecture</title><style>{css}</style>{body}")

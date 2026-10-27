@@ -90,6 +90,7 @@ on every write and read. The main board shows the whole system, and drill-downs 
 | Claim Query Agent | The run worker itself (Fargate): Claude Haiku, Strands on Amazon Bedrock |
 | Prompt | Cached: rules, EDI glossary, semantic schema with allowed values, tool and CLI reference, system prompt and history. Per question: the 3 most similar solved examples and the newest prompt. |
 | First decision | Answer, ask a clarifying question, or escalate to the lossless tables with a reason, which is logged |
+| `cli.py` · SQL guard | The agent's one tool: `sql`, `lookup`, `describe`, `list`, `escalate`, then `answer`, `ask` or `refuse`. Every query passes the guard's checks (limits in 03). A failed check goes back to the agent as an error. |
 | Answer | Streams back with live steps. The server re-runs the final SQL, so the numbers come from the database. |
 
 ## 05 · Chat backend

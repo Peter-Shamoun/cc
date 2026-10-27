@@ -6,13 +6,14 @@ and .png. Needs the diagram-design skill (~/.claude/skills/diagram-design) and a
 The Mermaid files next to them (<nn>-<name>.mmd) are the structural source of truth; this file is the layout.
 """
 import os
+import re
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from ddlib import DENY, GR as GR_, _tw, Diagram, check, to_excalidraw, to_html  # noqa: E402
+from ddlib import DENY, FONTS, GR as GR_, _tw, Diagram, check, to_excalidraw, to_html  # noqa: E402
 
 OUT = Path(__file__).resolve().parent.parent / "drilldowns"
 UI_LIGHT = "data:image/png;base64," + __import__("base64").b64encode(
@@ -415,7 +416,11 @@ def main(which):
             (OUT / f"{d.slug}.excalidraw").write_text(to_excalidraw(d))
         html = tmp / f"{d.slug}.html"
         html.write_text(to_html(d, getattr(d, "legend_items", None)))
-        subprocess.run([PY, str(SKILL / "export_svg.py"), str(html), str(OUT / f"{d.slug}.svg")], check=True)
+        svg = OUT / f"{d.slug}.svg"
+        subprocess.run([PY, str(SKILL / "export_svg.py"), str(html), str(svg)], check=True)
+        # the exporter imports the skill's default faces; the board uses the ClaimClarity ones
+        svg.write_text(re.sub(r"@import url\('https://fonts\.googleapis\.com/css2\?[^']*'\);",
+                              "@import url('" + FONTS.replace("&", "&amp;") + "');", svg.read_text()))
         png = OUT / f"{d.slug}.png"
         subprocess.run([PY, str(SKILL / "export_png.py"), str(html), str(png), str(min(2, max(1, MAX_PNG / d.w)))], check=True)
         cap_png(png)
