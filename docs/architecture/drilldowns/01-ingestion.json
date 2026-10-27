@@ -1,0 +1,465 @@
+{
+ "format": "claimclarity-diagram",
+ "version": 1,
+ "board": {
+  "slug": "01-ingestion",
+  "title": "01 · Ingestion & parse",
+  "desc": "Lab files arrive over SFTP straight into raw, and the _SUCCESS marker triggers one Fargate parser task that writes silver and publishes a new gold version.",
+  "w": 2200,
+  "h": 840,
+  "zones": [
+   {
+    "x": 640,
+    "y": 140,
+    "w": 1370,
+    "h": 200,
+    "label": "S3 · customer_b/",
+    "kind": "phi",
+    "icon": "s3",
+    "id": "zone1"
+   }
+  ],
+  "nodes": [
+   {
+    "id": "lab",
+    "x": 40,
+    "y": 215,
+    "w": 200,
+    "h": 90,
+    "name": "Lab",
+    "sub": "customer B",
+    "icon": "building",
+    "shape": "box",
+    "style": "external",
+    "inner": null
+   },
+   {
+    "id": "sftp",
+    "x": 340,
+    "y": 215,
+    "w": 240,
+    "h": 90,
+    "name": "Transfer Family",
+    "sub": "SFTP endpoint",
+    "icon": "transfer",
+    "shape": "box",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "raw",
+    "x": 680,
+    "y": 200,
+    "w": 270,
+    "h": 120,
+    "name": "raw/",
+    "sub": "837 · 835 · 277 · _SUCCESS trigger",
+    "icon": null,
+    "shape": "db",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "silver",
+    "x": 1440,
+    "y": 200,
+    "w": 200,
+    "h": 120,
+    "name": "parquet/",
+    "sub": "silver",
+    "icon": null,
+    "shape": "db",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "gold",
+    "x": 1730,
+    "y": 200,
+    "w": 210,
+    "h": 120,
+    "name": "semantic_layer/",
+    "sub": "gold · rebuilt",
+    "icon": null,
+    "shape": "db",
+    "style": "white",
+    "inner": null
+   },
+   {
+    "id": "eb",
+    "x": 630,
+    "y": 570,
+    "w": 220,
+    "h": 100,
+    "name": "EventBridge",
+    "sub": null,
+    "icon": "eventbridge",
+    "shape": "box",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "run",
+    "x": 940,
+    "y": 570,
+    "w": 200,
+    "h": 100,
+    "name": "ECS RunTask",
+    "sub": "launcher",
+    "icon": "ecs",
+    "shape": "box",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "task",
+    "x": 1320,
+    "y": 530,
+    "w": 680,
+    "h": 180,
+    "name": "Fargate parser task · one per batch",
+    "sub": null,
+    "icon": "fargate",
+    "shape": "steps",
+    "style": "service",
+    "inner": [
+     "Start",
+     "Parse",
+     "Silver",
+     "Gold",
+     "Exit"
+    ],
+    "badge": null
+   }
+  ],
+  "edges": [
+   {
+    "pts": [
+     [
+      240,
+      260
+     ],
+     [
+      340,
+      260
+     ]
+    ],
+    "label": null,
+    "at": [
+     290,
+     248
+    ],
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above",
+    "id": "edge1",
+    "src": {
+     "id": "lab",
+     "fx": 1,
+     "fy": 0.5
+    },
+    "dst": {
+     "id": "sftp",
+     "fx": 0,
+     "fy": 0.5
+    }
+   },
+   {
+    "pts": [
+     [
+      580,
+      260
+     ],
+     [
+      680,
+      260
+     ]
+    ],
+    "label": "write",
+    "at": [
+     608,
+     248
+    ],
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above",
+    "id": "edge2",
+    "src": {
+     "id": "sftp",
+     "fx": 1,
+     "fy": 0.5
+    },
+    "dst": {
+     "id": "raw",
+     "fx": 0,
+     "fy": 0.5
+    }
+   },
+   {
+    "pts": [
+     [
+      740,
+      320
+     ],
+     [
+      740,
+      570
+     ]
+    ],
+    "label": "_success",
+    "at": [
+     752,
+     372
+    ],
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "right",
+    "id": "edge4",
+    "src": {
+     "id": "raw",
+     "fx": 0.2222222222222222,
+     "fy": 1
+    },
+    "dst": {
+     "id": "eb",
+     "fx": 0.5,
+     "fy": 0
+    }
+   },
+   {
+    "pts": [
+     [
+      850,
+      620
+     ],
+     [
+      940,
+      620
+     ]
+    ],
+    "label": null,
+    "at": null,
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above",
+    "id": "edge5",
+    "src": {
+     "id": "eb",
+     "fx": 1,
+     "fy": 0.5
+    },
+    "dst": {
+     "id": "run",
+     "fx": 0,
+     "fy": 0.5
+    }
+   },
+   {
+    "pts": [
+     [
+      1140,
+      620
+     ],
+     [
+      1320,
+      620
+     ]
+    ],
+    "label": null,
+    "at": null,
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above",
+    "id": "edge6",
+    "src": {
+     "id": "run",
+     "fx": 1,
+     "fy": 0.5
+    },
+    "dst": {
+     "id": "task",
+     "fx": 0,
+     "fy": 0.5
+    }
+   },
+   {
+    "pts": [
+     [
+      890,
+      320
+     ],
+     [
+      890,
+      450
+     ],
+     [
+      1370,
+      450
+     ],
+     [
+      1370,
+      530
+     ]
+    ],
+    "label": "read",
+    "at": [
+     1240,
+     438
+    ],
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above",
+    "id": "edge7",
+    "src": {
+     "id": "raw",
+     "fx": 0.7777777777777778,
+     "fy": 1
+    },
+    "dst": {
+     "id": "task",
+     "fx": 0.07352941176470588,
+     "fy": 0
+    }
+   },
+   {
+    "pts": [
+     [
+      1540,
+      530
+     ],
+     [
+      1540,
+      320
+     ]
+    ],
+    "label": "write",
+    "at": [
+     1552,
+     506
+    ],
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "right",
+    "id": "edge8",
+    "src": {
+     "id": "task",
+     "fx": 0.3235294117647059,
+     "fy": 0
+    },
+    "dst": {
+     "id": "silver",
+     "fx": 0.5,
+     "fy": 1
+    }
+   },
+   {
+    "pts": [
+     [
+      1835,
+      530
+     ],
+     [
+      1835,
+      320
+     ]
+    ],
+    "label": "write",
+    "at": [
+     1847,
+     506
+    ],
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "right",
+    "id": "edge9",
+    "src": {
+     "id": "task",
+     "fx": 0.7573529411764706,
+     "fy": 0
+    },
+    "dst": {
+     "id": "gold",
+     "fx": 0.5,
+     "fy": 1
+    }
+   }
+  ],
+  "gates": [
+   {
+    "n": 1,
+    "x": 740,
+    "y": 470,
+    "label": "Rule matches\ncustomer B",
+    "side": "left",
+    "icon": "eventbridge",
+    "id": "gate1"
+   },
+   {
+    "n": 2,
+    "x": 1230,
+    "y": 620,
+    "label": "PassRole\nparser role B",
+    "side": "below",
+    "icon": "iam",
+    "id": "gate2"
+   },
+   {
+    "n": 3,
+    "x": 1040,
+    "y": 450,
+    "label": "IAM + KMS\nparser role B",
+    "side": "above",
+    "icon": "iam",
+    "id": "gate3"
+   },
+   {
+    "n": 3,
+    "x": 1540,
+    "y": 425,
+    "label": "IAM + KMS\nparser role B",
+    "side": "right",
+    "icon": "iam",
+    "id": "gate4"
+   },
+   {
+    "n": 3,
+    "x": 1835,
+    "y": 425,
+    "label": "IAM + KMS\nparser role B",
+    "side": "right",
+    "icon": "iam",
+    "id": "gate5"
+   }
+  ],
+  "texts": [
+   {
+    "x": 40,
+    "y": 56,
+    "s": "Ingestion & parse",
+    "role": "title",
+    "anchor": "start",
+    "color": null,
+    "id": "text1"
+   },
+   {
+    "x": 40,
+    "y": 86,
+    "s": "One ingestion cycle, shown for customer B. Cycles run on a schedule.",
+    "role": "subtitle",
+    "anchor": "start",
+    "color": null,
+    "id": "text2"
+   }
+  ],
+  "legend_items": null,
+  "show_legend": false
+ }
+}

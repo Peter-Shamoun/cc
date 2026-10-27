@@ -59,7 +59,11 @@ value("ov_h_t", "")
 for cid in ("ov_l_bkt", "ov_l_s3r"):
     swap(cid, ("cc/", "claimclarity/"))
 swap("ov_l_ec2", ("API backend · EC2", "Chat API + run workers · ECS on Fargate"))
-swap("ov_api", ("Verifies token, gets creds", "Verifies token, queues the run"))
+swap("ov_api", ("Verifies token, gets creds", "Checks the session, queues the run"))
+# sign-in: the browser holds only a random session id; Cognito's tokens stay in the chat API's sessions table
+swap("ov_cog", ("Issues token", "Maps group → customer"))
+swap("ov_tok", ("Signed token", "Session"), ("Names the customer", "Kept server-side"))
+swap("ov_g_tok", ("Token valid?", "Session valid?"))
 value("ov_agent", caps("Claim Query Agent", 17, "#FFFFFF") + '<br><span style="font-size:12px;color:#FFFFFF">run worker · Claude Haiku</span>')
 value("ov_duck", caps("DuckDB query service") + '<br><span style="font-size:13px">Quack server · own Fargate task · holds B\'s creds</span>')
 value("ov_sts", caps("STS") + '<br><span style="font-size:14px">15-min B creds for the query service</span>')

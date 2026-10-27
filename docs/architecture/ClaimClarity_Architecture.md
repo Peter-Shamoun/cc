@@ -9,7 +9,7 @@ on every write and read. The main board shows the whole system, and drill-downs 
 | 1 | The EventBridge rule matches the customer |
 | 2 | `iam:PassRole` allows only the customer's parser role |
 | 3 | IAM + KMS for the parser |
-| 4 | The token is valid |
+| 4 | The session is valid |
 | 5 | The reader role's trust policy allows this token (STS) |
 | 6 | IAM + KMS for the reader |
 
@@ -22,7 +22,7 @@ on every write and read. The main board shows the whole system, and drill-downs 
 | SFTP | Each lab sends daily 837 · 835 · 277 files | AWS Transfer Family, lab IP addresses only, straight into `raw/` |
 | ClaimClarity data bucket | One prefix per customer: raw → silver → gold, plus quarantine and audit | One bucket for all customer data |
 | Compute · write | EventBridge → ECS RunTask → one Fargate parser task per batch | Runs as the customer's parser role. Gates 1–3. |
-| Access | Entra ID → Cognito → ID token naming the customer | The token is the only source of the customer. Gate 4. |
+| Access | Entra ID → Cognito → server-side session naming the customer | The session is the only source of the customer. The browser holds a random session id, never a token. Gate 4. |
 | Compute · read | Chat API → run worker (the Claim Query Agent) → DuckDB query service → STS → gold | 15-minute credentials, this customer's gold only. Gates 5–6. |
 
 ## 00 · Storage & isolation
@@ -61,9 +61,12 @@ on every write and read. The main board shows the whole system, and drill-downs 
 |---|---|
 | Microsoft Entra ID | Company sign-in. The ClaimClarity app is assigned to groups. |
 | Assigned group | One group per customer |
-| Amazon Cognito | Federates Entra ID, maps the group to exactly one customer, and issues an ID token naming that customer, valid 60 minutes |
-| Session cookie | httpOnly and Secure. It carries the ID token. |
-| Gate 4 | The chat API checks the token's signature, audience, expiry and customer on every request. An invalid token is rejected. |
+| Amazon Cognito | Single sign-on with Entra ID (OIDC). Maps the group to a customer and issues an ID token naming that customer, valid 60 minutes. |
+| Sign-in (chat API) | Gets the tokens from Cognito server to server, with the code from the sign-in redirect. Refuses a user in no ClaimClarity group or in more than one. |
+| Sessions table | DynamoDB. One row per session: user, customer, and the Cognito tokens encrypted with KMS. The chat API renews the ID token before it expires. |
+| Session cookie | A random session id only: `HttpOnly`, `Secure`, `SameSite=Strict`. Page scripts can't read it and other sites can't send it. |
+| Gate 4 | The chat API looks up the session on every request. A missing, expired or signed-out session is rejected. Sessions end after 30 minutes idle or 8 hours. |
+| Sign-out | Deletes the session row and revokes the Cognito tokens, so a copied cookie stops working |
 
 ## 03 · Query path
 
@@ -74,10 +77,10 @@ on every write and read. The main board shows the whole system, and drill-downs 
 | Run worker | The Claim Query Agent sends SQL through `cli.py` and the SQL guard. It holds no AWS credentials. |
 | SQL guard | Read-only SELECT. Blocks queries that would fail against the schema. 25 s per query, 60 s per question, 1,000 rows. Refuses keyless joins over 100 million row pairs. |
 | Quack | SQL goes to the DuckDB query service over Quack with a per-run token, and rows come back the same way |
-| Gate 5 | The reader role's trust policy accepts only this token's customer. STS returns read-only credentials for 15 minutes, renewed with the same token when fewer than 3 minutes remain. |
+| Gate 5 | The reader role's trust policy accepts only this token's customer. STS returns read-only credentials for 15 minutes, renewed with the session's current ID token when fewer than 3 minutes remain. |
 | Gate 6 | IAM + KMS allow reader role B only `customer_b/semantic_layer/`, current gold version |
 | `lossless.*` | PHI-stripped tables published next to gold, read only after the agent escalates with a reason |
-| Customer A | Denied twice: the API takes the customer only from the token, and IAM + KMS deny reader role B on `customer_a/` |
+| Customer A | Denied twice: the API takes the customer only from the session, and IAM + KMS deny reader role B on `customer_a/` |
 
 ## 04 · Analyzer
 

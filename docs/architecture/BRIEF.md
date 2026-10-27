@@ -34,7 +34,7 @@ Middle-ground length: about 15–20 PDF pages. No 100-page sets.
 |---|---|---|
 | 00 | Storage & isolation | One bucket, the `customer_b/` prefixes (raw, parquet/silver, semantic_layer/gold, quarantine, audit), the customer's roles, keys and bucket policy, and Customer A denied |
 | 01 | Ingestion & parse | Lab → SFTP intake → raw → `_SUCCESS` → EventBridge rule → ECS RunTask → Fargate parser task (start, parse, silver, gold, exit) → gold publish (new CURRENT version). Gates 1, 2 and 3. |
-| 02 | Login & customer mapping | User → Microsoft Entra ID → assigned group → Cognito (group → one customer) → ID token (customer = B, 60 min, httpOnly cookie) → gate 4 → chat API |
+| 02 | Login & customer mapping | User → Microsoft Entra ID → assigned group → Cognito (group → one customer) → ID token to the chat API (server to server) → sessions table → browser gets a random session id cookie → gate 4 (session valid) → chat API |
 | 03 | Query path | Run worker: Claim Query Agent → ClaimClarity CLI (`cli.py`) → SQL guard → over Quack → DuckDB query service. The query service exchanges the token at STS (gate 5) and reads `customer_b/semantic_layer/` (gate 6); `lossless.*` only after a reasoned escalation. Customer A is blocked by the API and by IAM. |
 | 04 | Analyzer | The user's excalidraw: frontend ⇄ Claim Query Agent. The agent's inputs: the solved example bank (K = 3), references (prompt cached: rules, EDI glossary, semantic schema + allowed values), the tool and CLI reference (prompt cached), the system prompt + history (cached) and the newest prompt. It runs Claude Haiku, first decides to answer, clarify or escalate, then calls `cli.py` → SQL guard. The full lossless schema is reachable only after escalation. **Add the KPI gate** in front: a preset fits → preset KPI queries (the gate fills the parameters); otherwise → the agent. |
 | 05 | Chat backend | User → CloudFront + WAF → internal load balancer → gate 4 → chat API (Fargate) → SQS run queue → run worker (Fargate, the Claim Query Agent) → Bedrock. The run worker talks to the DuckDB query service over Quack. The answer streams back live (SSE). Limits. No chat storage (out of scope). |
@@ -119,7 +119,10 @@ Middle-ground length: about 15–20 PDF pages. No 100-page sets.
 - **KPI gate:** one Haiku call with structured output. 16 preset queries with fixed SQL. The parameters (payer,
   payer class, month, CPT, CARC) are checked against the data. A preset that doesn't fit, or anything else wrong,
   goes to the agent.
-- **Chat:** the API checks the token on every request. 3 unfinished runs per user, 110 s run deadline. The answer
+- **Sessions (decided 2026-10-27):** the browser never holds a token. The chat API keeps Cognito's tokens in a DynamoDB sessions
+  table (encrypted) and sets a random session id cookie (HttpOnly, Secure, SameSite=Strict). 30 minutes idle, 8 hours max;
+  sign-out deletes the row. Say "single sign-on", not "federate".
+- **Chat:** the API checks the session on every request. 3 unfinished runs per user, 110 s run deadline. The answer
   streams live over SSE. The server re-runs the final SQL, so the numbers come from
   the database.
 - **Audit:** CloudTrail is kept 6 years. The agent audit is hash-chained, one record per SQL, write-once. App logs are
@@ -134,5 +137,7 @@ Middle-ground length: about 15–20 PDF pages. No 100-page sets.
   file.
 - **Playwright and Chromium** are preinstalled (`require('playwright')`). Don't install another copy.
 - **Python 3.13, PIL, pandoc.**
+- **Drill-down sources:** `docs/architecture/drilldowns/<nn>-<name>.json`, the files `diagram-editor.html` opens and saves.
+  `tools/drilldowns.py` renders them (set `PYTHON` to a Python with Playwright); `tools/build_editor.py` rebuilds the editor.
 - **The current build:** `python3 docs/architecture/tools/build.py`. It renders the drawio, crops the boards and
   builds the HTML and PDF from `ClaimClarity_Architecture.md`.

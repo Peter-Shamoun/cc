@@ -36,7 +36,7 @@ class Diagram:
         self.zones.append(dict(x=x, y=y, w=w, h=h, label=label, kind=kind, icon=icon))
 
     def node(self, id, x, y, w, h, name, sub=None, icon=None, shape="box", style="service", inner=None):
-        """shape: box, db, folder, file, agent, decision, ui, token, steps, people.
+        """shape: box, db, folder, file, token, agent, decision, ui, code, table, steps, grid, image, badge.
         style: service (tint fill), white, external (dashed grey), focal (navy fill), optional (dashed)."""
         n = dict(id=id, x=x, y=y, w=w, h=h, name=name, sub=sub, icon=icon, shape=shape, style=style, inner=inner)
         self.nodes.append(n)
@@ -231,6 +231,11 @@ def svg_node(n):
         out.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="4" fill="{PAPER}" stroke="{BLUE}" stroke-width="1.4"/>'
                    f'<image x="{x + 1}" y="{y + 1}" width="{w - 2}" height="{h - 2}" preserveAspectRatio="xMidYMid {n.get('fit', 'slice')}" href="{n["href"]}"/>')
         out.append("</g>")
+        return "".join(out)
+    if shape == "badge":       # a zoom badge, as on the main board
+        r, cx, cy = min(w, h) / 2, x + w / 2, y + h / 2
+        out.append(f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="{NAVY if style == "focal" else BLUE}" stroke="{PAPER}" stroke-width="2"/>'
+                   + _t(cx, cy + r * 0.32, n["name"] or "", round(r * 0.9), COND, PAPER, 700, "middle") + "</g>")
         return "".join(out)
     if shape in ("box", "steps", "ui", "grid", "table"):
         out.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="4" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"{dash}/>')
@@ -625,7 +630,8 @@ def to_svg(d, legend=None):
     parts += [svg_edge_label(e) for e in d.edges]
     parts += [svg_gate(g) for g in d.gates]
     parts += [svg_text(t) for t in d.texts]
-    parts.append(svg_legend(d, legend or auto_legend(d)))
+    if getattr(d, "show_legend", True):
+        parts.append(svg_legend(d, legend or auto_legend(d)))
     parts.append("</svg>")
     return "\n".join(parts)
 

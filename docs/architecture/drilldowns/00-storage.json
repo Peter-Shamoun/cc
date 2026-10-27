@@ -1,0 +1,447 @@
+{
+ "format": "claimclarity-diagram",
+ "version": 1,
+ "board": {
+  "slug": "00-storage",
+  "title": "00 · Storage & isolation",
+  "desc": "Customer B's prefixes in the one ClaimClarity data bucket, the roles and keys that guard them, and Customer A denied.",
+  "w": 2300,
+  "h": 800,
+  "zones": [
+   {
+    "x": 360,
+    "y": 130,
+    "w": 1160,
+    "h": 720,
+    "label": "xifin-dl-curated-prod/ClaimClarity",
+    "kind": "bucket",
+    "icon": "s3",
+    "id": "zone1"
+   },
+   {
+    "x": 390,
+    "y": 180,
+    "w": 1100,
+    "h": 640,
+    "label": "customer_b/",
+    "kind": "phi",
+    "icon": null,
+    "id": "zone2"
+   }
+  ],
+  "nodes": [
+   {
+    "id": "sftp",
+    "x": 40,
+    "y": 265,
+    "w": 230,
+    "h": 90,
+    "name": "Transfer Family",
+    "sub": "Customer B copy role",
+    "icon": "transfer",
+    "shape": "box",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "raw",
+    "x": 440,
+    "y": 250,
+    "w": 230,
+    "h": 120,
+    "name": "raw/",
+    "sub": "Bronze layer · Object Lock",
+    "icon": null,
+    "shape": "db",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "silver",
+    "x": 920,
+    "y": 250,
+    "w": 200,
+    "h": 120,
+    "name": "parquet/",
+    "sub": "Silver layer",
+    "icon": null,
+    "shape": "db",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "gold",
+    "x": 1230,
+    "y": 250,
+    "w": 220,
+    "h": 120,
+    "name": "semantic_layer/",
+    "sub": "Gold layer",
+    "icon": null,
+    "shape": "db",
+    "style": "white",
+    "inner": null
+   },
+   {
+    "id": "qs",
+    "x": 1750,
+    "y": 265,
+    "w": 290,
+    "h": 90,
+    "name": "DuckDB query service",
+    "sub": "Customer B read access",
+    "icon": "fargate",
+    "shape": "box",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "quar",
+    "x": 440,
+    "y": 500,
+    "w": 230,
+    "h": 110,
+    "name": "quarantine/",
+    "sub": "Failed parses",
+    "icon": null,
+    "shape": "folder",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "audit",
+    "x": 1210,
+    "y": 500,
+    "w": 240,
+    "h": 110,
+    "name": "audit/",
+    "sub": "6 yr retention rule",
+    "icon": null,
+    "shape": "folder",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "rec",
+    "x": 1560,
+    "y": 450,
+    "w": 510,
+    "h": 290,
+    "name": "Audit record",
+    "sub": "JSON Lines · one per SQL · hash-chained",
+    "icon": null,
+    "shape": "code",
+    "style": "service",
+    "inner": [
+     "{",
+     "  \"ts\": \"2026-10-27T14:03:11Z\",",
+     "  \"customer\": \"customer_b\",",
+     "  \"user\": \"ana@xifin.example\",",
+     "  \"run_id\": \"r_7f3c\",  \"seq\": 3,",
+     "  \"sql\": \"SELECT payer_name, avg(is_denied::INT) …",
+     "          (first 500 chars)\",",
+     "  \"tables\": [\"sem.remit_claims\"],  \"rows\": 12,  \"ms\": 184,",
+     "  \"escalation_reason\": null,",
+     "  \"prev_hash\": \"9c1e…\",  \"hash\": \"4b7a…\"",
+     "}"
+    ]
+   },
+   {
+    "id": "k_cust",
+    "x": 650,
+    "y": 700,
+    "w": 680,
+    "h": 80,
+    "name": "Data encryption key",
+    "sub": "Customer's folder is encrypted with a KMS key. Each customer has their own key/encryption",
+    "icon": "kms",
+    "shape": "box",
+    "style": "white",
+    "inner": null
+   },
+   {
+    "id": "custA",
+    "x": 40,
+    "y": 595,
+    "w": 230,
+    "h": 90,
+    "name": "Customer A roles",
+    "sub": "bucket policy + KMS",
+    "icon": "role",
+    "shape": "box",
+    "style": "denied",
+    "inner": null
+   }
+  ],
+  "edges": [
+   {
+    "pts": [
+     [
+      270,
+      310
+     ],
+     [
+      440,
+      310
+     ]
+    ],
+    "label": "write",
+    "at": [
+     350,
+     298
+    ],
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above",
+    "id": "edge1",
+    "src": {
+     "id": "sftp",
+     "fx": 1,
+     "fy": 0.5
+    },
+    "dst": {
+     "id": "raw",
+     "fx": 0,
+     "fy": 0.5
+    }
+   },
+   {
+    "pts": [
+     [
+      670,
+      310
+     ],
+     [
+      920,
+      310
+     ]
+    ],
+    "label": "parse",
+    "at": [
+     795,
+     260
+    ],
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above",
+    "id": "edge2",
+    "src": {
+     "id": "raw",
+     "fx": 1,
+     "fy": 0.5
+    },
+    "dst": {
+     "id": "silver",
+     "fx": 0,
+     "fy": 0.5
+    }
+   },
+   {
+    "pts": [
+     [
+      1120,
+      310
+     ],
+     [
+      1230,
+      310
+     ]
+    ],
+    "label": "Build View",
+    "at": [
+     1175,
+     298
+    ],
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above",
+    "id": "edge3",
+    "src": {
+     "id": "silver",
+     "fx": 1,
+     "fy": 0.5
+    },
+    "dst": {
+     "id": "gold",
+     "fx": 0,
+     "fy": 0.5
+    }
+   },
+   {
+    "pts": [
+     [
+      1450,
+      310
+     ],
+     [
+      1750,
+      310
+     ]
+    ],
+    "label": "read",
+    "at": [
+     1710,
+     298
+    ],
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above",
+    "id": "edge4",
+    "src": {
+     "id": "gold",
+     "fx": 1,
+     "fy": 0.5
+    },
+    "dst": {
+     "id": "qs",
+     "fx": 0,
+     "fy": 0.5
+    }
+   },
+   {
+    "pts": [
+     [
+      1450,
+      555
+     ],
+     [
+      1560,
+      555
+     ]
+    ],
+    "label": null,
+    "at": null,
+    "style": "dashed",
+    "end": false,
+    "start": false,
+    "lpos": "above",
+    "id": "edge5",
+    "src": {
+     "id": "audit",
+     "fx": 1,
+     "fy": 0.5
+    },
+    "dst": {
+     "id": "rec",
+     "fx": 0,
+     "fy": 0.3620689655172414
+    }
+   },
+   {
+    "pts": [
+     [
+      555,
+      370
+     ],
+     [
+      555,
+      500
+     ]
+    ],
+    "label": "bad files",
+    "at": [
+     567,
+     441
+    ],
+    "style": "dashed",
+    "end": true,
+    "start": false,
+    "lpos": "right",
+    "id": "edge6",
+    "src": {
+     "id": "raw",
+     "fx": 0.5,
+     "fy": 1
+    },
+    "dst": {
+     "id": "quar",
+     "fx": 0.5,
+     "fy": 0
+    }
+   },
+   {
+    "pts": [
+     [
+      270,
+      640
+     ],
+     [
+      390,
+      640
+     ]
+    ],
+    "label": "denied",
+    "at": [
+     330,
+     616
+    ],
+    "style": "deny",
+    "end": true,
+    "start": false,
+    "lpos": "above",
+    "id": "edge7",
+    "src": {
+     "id": "custA",
+     "fx": 1,
+     "fy": 0.5
+    },
+    "dst": null
+   }
+  ],
+  "gates": [
+   {
+    "n": 3,
+    "x": 795,
+    "y": 310,
+    "label": "IAM + KMS\nparser role B",
+    "side": "below",
+    "icon": "iam",
+    "id": "gate1"
+   },
+   {
+    "n": 6,
+    "x": 1620,
+    "y": 310,
+    "label": "IAM + KMS\nreader role B",
+    "side": "below",
+    "icon": "iam",
+    "id": "gate2"
+   }
+  ],
+  "texts": [
+   {
+    "x": 40,
+    "y": 56,
+    "s": "Storage & isolation",
+    "role": "title",
+    "anchor": "start",
+    "color": null,
+    "id": "text1"
+   },
+   {
+    "x": 40,
+    "y": 86,
+    "s": "Each customer has their own folder, shown here is Customer B",
+    "role": "subtitle",
+    "anchor": "start",
+    "color": null,
+    "id": "text2"
+   },
+   {
+    "x": 670,
+    "y": 682,
+    "s": "KMS keys",
+    "role": "eyebrow",
+    "anchor": "start",
+    "color": null,
+    "id": "text3"
+   }
+  ],
+  "legend_items": null,
+  "show_legend": false
+ }
+}

@@ -1,0 +1,520 @@
+{
+ "format": "claimclarity-diagram",
+ "version": 1,
+ "board": {
+  "slug": "03-query-path",
+  "title": "03 · Query path",
+  "desc": "The run worker sends SQL over Quack to the DuckDB query service, which alone exchanges the token at STS for customer B's 15-minute credentials and reads only customer B's gold; customer A's prefix is denied.",
+  "w": 2620,
+  "h": 1000,
+  "zones": [
+   {
+    "x": 40,
+    "y": 300,
+    "w": 660,
+    "h": 520,
+    "label": "Run worker · Fargate",
+    "kind": "worker",
+    "icon": "fargate",
+    "id": "zone1"
+   },
+   {
+    "x": 860,
+    "y": 300,
+    "w": 560,
+    "h": 520,
+    "label": "DuckDB query service · Fargate",
+    "kind": "worker",
+    "icon": "fargate",
+    "id": "zone2"
+   },
+   {
+    "x": 1760,
+    "y": 160,
+    "w": 820,
+    "h": 740,
+    "label": "xifin-dl-curated-prod/ClaimClarity",
+    "kind": "bucket",
+    "icon": "s3",
+    "id": "zone3"
+   },
+   {
+    "x": 1790,
+    "y": 220,
+    "w": 760,
+    "h": 450,
+    "label": "customer_b/",
+    "kind": "phi",
+    "icon": null,
+    "id": "zone4"
+   },
+   {
+    "x": 1790,
+    "y": 710,
+    "w": 760,
+    "h": 160,
+    "label": "customer_a/  ·  denied by IAM + KMS",
+    "kind": "denied",
+    "icon": null,
+    "id": "zone5"
+   }
+  ],
+  "nodes": [
+   {
+    "id": "agent",
+    "x": 80,
+    "y": 380,
+    "w": 580,
+    "h": 120,
+    "name": "Claim Query Agent",
+    "sub": "Claude Haiku",
+    "icon": "bedrock",
+    "shape": "agent",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "cli",
+    "x": 80,
+    "y": 600,
+    "w": 250,
+    "h": 110,
+    "name": "cli.py",
+    "sub": "ClaimClarity CLI",
+    "icon": "terminal",
+    "shape": "box",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "guard",
+    "x": 410,
+    "y": 600,
+    "w": 250,
+    "h": 110,
+    "name": "SQL guard",
+    "sub": "read-only",
+    "icon": "shieldcheck",
+    "shape": "box",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "qs",
+    "x": 900,
+    "y": 480,
+    "w": 400,
+    "h": 200,
+    "name": "Quack server",
+    "sub": "customer B · 15-min credentials",
+    "icon": "duck",
+    "shape": "box",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "sts",
+    "x": 1060,
+    "y": 120,
+    "w": 280,
+    "h": 100,
+    "name": "AWS STS",
+    "sub": "reader role B",
+    "icon": "sts",
+    "shape": "box",
+    "style": "service",
+    "inner": null
+   },
+   {
+    "id": "gold",
+    "x": 1960,
+    "y": 280,
+    "w": 480,
+    "h": 120,
+    "name": "semantic_layer/",
+    "sub": "gold layer views",
+    "icon": null,
+    "shape": "db",
+    "style": "white",
+    "inner": null
+   },
+   {
+    "id": "lossless",
+    "x": 1960,
+    "y": 500,
+    "w": 480,
+    "h": 120,
+    "name": "lossless.*",
+    "sub": "Silver layer parquet",
+    "icon": null,
+    "shape": "db",
+    "style": "optional",
+    "inner": null
+   },
+   {
+    "id": "gold_a",
+    "x": 1960,
+    "y": 760,
+    "w": 480,
+    "h": 90,
+    "name": "semantic_layer/",
+    "sub": null,
+    "icon": null,
+    "shape": "db",
+    "style": "denied",
+    "inner": null
+   }
+  ],
+  "edges": [
+   {
+    "pts": [
+     [
+      205,
+      500
+     ],
+     [
+      205,
+      600
+     ]
+    ],
+    "label": null,
+    "at": null,
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above",
+    "id": "edge1",
+    "src": {
+     "id": "agent",
+     "fx": 0.21551724137931033,
+     "fy": 1
+    },
+    "dst": {
+     "id": "cli",
+     "fx": 0.5,
+     "fy": 0
+    }
+   },
+   {
+    "pts": [
+     [
+      330,
+      655
+     ],
+     [
+      410,
+      655
+     ]
+    ],
+    "label": null,
+    "at": null,
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above",
+    "id": "edge2",
+    "src": {
+     "id": "cli",
+     "fx": 1,
+     "fy": 0.5
+    },
+    "dst": {
+     "id": "guard",
+     "fx": 0,
+     "fy": 0.5
+    }
+   },
+   {
+    "pts": [
+     [
+      660,
+      630
+     ],
+     [
+      900,
+      630
+     ]
+    ],
+    "label": "sql · per-run token",
+    "at": [
+     780,
+     618
+    ],
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above",
+    "id": "edge3",
+    "src": {
+     "id": "guard",
+     "fx": 1,
+     "fy": 0.2727272727272727
+    },
+    "dst": {
+     "id": "qs",
+     "fx": 0,
+     "fy": 0.75
+    }
+   },
+   {
+    "pts": [
+     [
+      900,
+      670
+     ],
+     [
+      660,
+      670
+     ]
+    ],
+    "label": "rows",
+    "at": [
+     780,
+     658
+    ],
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "above",
+    "id": "edge4",
+    "src": {
+     "id": "qs",
+     "fx": 0,
+     "fy": 0.95
+    },
+    "dst": {
+     "id": "guard",
+     "fx": 1,
+     "fy": 0.6363636363636364
+    }
+   },
+   {
+    "pts": [
+     [
+      1150,
+      480
+     ],
+     [
+      1150,
+      220
+     ]
+    ],
+    "label": "token",
+    "at": [
+     1138,
+     420
+    ],
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "left",
+    "id": "edge5",
+    "src": {
+     "id": "qs",
+     "fx": 0.625,
+     "fy": 0
+    },
+    "dst": {
+     "id": "sts",
+     "fx": 0.32142857142857145,
+     "fy": 1
+    }
+   },
+   {
+    "pts": [
+     [
+      1260,
+      220
+     ],
+     [
+      1260,
+      480
+     ]
+    ],
+    "label": "15-min credentials",
+    "at": [
+     1272,
+     420
+    ],
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "right",
+    "id": "edge6",
+    "src": {
+     "id": "sts",
+     "fx": 0.7142857142857143,
+     "fy": 1
+    },
+    "dst": {
+     "id": "qs",
+     "fx": 0.9,
+     "fy": 0
+    }
+   },
+   {
+    "pts": [
+     [
+      1300,
+      500
+     ],
+     [
+      1520,
+      500
+     ],
+     [
+      1520,
+      340
+     ],
+     [
+      1960,
+      340
+     ]
+    ],
+    "label": "read-only",
+    "at": [
+     1805,
+     328
+    ],
+    "style": "solid",
+    "end": true,
+    "start": false,
+    "lpos": "right",
+    "id": "edge7",
+    "src": {
+     "id": "qs",
+     "fx": 1,
+     "fy": 0.1
+    },
+    "dst": {
+     "id": "gold",
+     "fx": 0,
+     "fy": 0.5
+    }
+   },
+   {
+    "pts": [
+     [
+      1300,
+      560
+     ],
+     [
+      1960,
+      560
+     ]
+    ],
+    "label": "after escalation",
+    "at": [
+     1805,
+     548
+    ],
+    "style": "dashed",
+    "end": true,
+    "start": false,
+    "lpos": "right",
+    "id": "edge8",
+    "src": {
+     "id": "qs",
+     "fx": 1,
+     "fy": 0.4
+    },
+    "dst": {
+     "id": "lossless",
+     "fx": 0,
+     "fy": 0.5
+    }
+   },
+   {
+    "pts": [
+     [
+      1300,
+      650
+     ],
+     [
+      1460,
+      650
+     ],
+     [
+      1460,
+      805
+     ],
+     [
+      1790,
+      805
+     ]
+    ],
+    "label": "denied",
+    "at": [
+     1650,
+     793
+    ],
+    "style": "deny",
+    "end": true,
+    "start": false,
+    "lpos": "above",
+    "xat": [
+     1540,
+     805
+    ],
+    "id": "edge9",
+    "src": {
+     "id": "qs",
+     "fx": 1,
+     "fy": 0.85
+    },
+    "dst": null
+   }
+  ],
+  "gates": [
+   {
+    "n": 5,
+    "x": 1150,
+    "y": 260,
+    "label": "Trust policy\nallows this token",
+    "side": "left",
+    "icon": "sts",
+    "id": "gate1"
+   },
+   {
+    "n": 6,
+    "x": 1520,
+    "y": 420,
+    "label": "IAM + KMS\nreader role B",
+    "side": "right",
+    "icon": "iam",
+    "id": "gate2"
+   },
+   {
+    "n": 6,
+    "x": 1650,
+    "y": 560,
+    "label": "IAM + KMS\nreader role B",
+    "side": "below",
+    "icon": "iam",
+    "id": "gate3"
+   }
+  ],
+  "texts": [
+   {
+    "x": 40,
+    "y": 56,
+    "s": "03 · Query path",
+    "role": "title",
+    "anchor": "start",
+    "color": null,
+    "id": "text1"
+   },
+   {
+    "x": 40,
+    "y": 86,
+    "s": "Only the DuckDB query service touches the data, with 15-minute credentials for one customer.",
+    "role": "subtitle",
+    "anchor": "start",
+    "color": null,
+    "id": "text2"
+   }
+  ],
+  "legend_items": null,
+  "show_legend": false
+ }
+}
