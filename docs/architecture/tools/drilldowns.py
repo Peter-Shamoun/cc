@@ -266,6 +266,17 @@ SKILL = Path(os.environ.get("DIAGRAM_DESIGN", Path.home() / ".claude/skills/diag
 PY = os.environ.get("PYTHON", sys.executable)
 
 
+MAX_PNG = 4000                # longest side of a drill-down PNG; the SVG keeps full detail
+
+
+def cap_png(png):
+    from PIL import Image
+    im = Image.open(png)
+    k = MAX_PNG / max(im.size)
+    if k < 1:
+        im.resize((round(im.width * k), round(im.height * k)), Image.LANCZOS).save(png, optimize=True)
+
+
 def main(which):
     OUT.mkdir(exist_ok=True)
     tmp = Path(tempfile.mkdtemp())
@@ -277,7 +288,9 @@ def main(which):
         html = tmp / f"{d.slug}.html"
         html.write_text(to_html(d, getattr(d, "legend_items", None)))
         subprocess.run([PY, str(SKILL / "export_svg.py"), str(html), str(OUT / f"{d.slug}.svg")], check=True)
-        subprocess.run([PY, str(SKILL / "export_png.py"), str(html), str(OUT / f"{d.slug}.png"), "2"], check=True)
+        png = OUT / f"{d.slug}.png"
+        subprocess.run([PY, str(SKILL / "export_png.py"), str(html), str(png), str(min(2, max(1, MAX_PNG / d.w)))], check=True)
+        cap_png(png)
         print(d.slug)
 
 
