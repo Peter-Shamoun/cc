@@ -107,5 +107,5 @@ def chain(d, prefix, items, y, x0=120, step=200):
 
 
 def legend_drilldown(d, x, y):
-    badge(d, "leg-b", "11", x, y)
+    badge(d, "leg-b", "#", x, y)
     d.add("leg-b-t", "page with the detail", TEXT + "fontColor=#3A5A9E;", x + 28, y - 2, 200, 26)
