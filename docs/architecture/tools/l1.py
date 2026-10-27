@@ -2,7 +2,7 @@
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
-from dlib import DECISION, EXT, NOTE, PHI, STEPBOX, CYL, TEXT, LANE, Diagram, badge, chain, group, legend_drilldown, strip
+from dlib import AGENT, DECISION, EXT, NOTE, PHI, STEPBOX, CYL, TEXT, LANE, Diagram, badge, chain, group, legend_drilldown, strip
 
 SRC = Path(__file__).resolve().parent.parent / "src"
 T, F = True, False
@@ -79,26 +79,39 @@ d.edge("e-a5-a8", "a5", "a8", "", exit_=(.5, 1), entry=(.5, 0))
 legend_drilldown(d, 1290, 440)
 save(d)
 
-# 40 analyzer: code inside the run worker -----------------------------------------------------------------
-d = Diagram("40-analyzer", "Analyzer", 1560, 520)
-d.title("CLAIMCLARITY · ANALYZER", "code inside the run worker · every model call goes to Amazon Bedrock")
-strip(d, "s1", 70, 380, "HOW ONE QUESTION IS ANSWERED")
-d.add("q", "<b>Question</b>", NOTE, 60, 236, 110, 50)
-d.add("g", "<b>Standard KPI<br>fits?</b>", DECISION, 240, 206, 150, 110); badge(d, "g-b", "41", 362, 206)
-d.add("k", "<b>Standard KPI query</b>", STEPBOX, 500, 120, 200, 56); badge(d, "k-b", "42", 688, 108)
-d.add("c", "<b>Custom analysis</b>", STEPBOX, 500, 346, 200, 56); badge(d, "c-b", "43", 688, 334)
-d.add("gd", "<b>SQL guard</b>", STEPBOX, 780, 346, 160, 56); badge(d, "gd-b", "44", 928, 334)
-d.add("r", "<b>Reader session</b><br>B's gold only", CYL, 1040, 216, 130, 90)
-d.add("a", "<b>Answer</b><br>+ SQL + rows", NOTE, 1280, 236, 130, 56)
-d.edge("e-q-g", "q", "g")
+# 40 analyzer: the excalidraw design, productionized ---------------------------------------------------
+d = Diagram("40-analyzer", "Analyzer", 1800, 760)
+d.title("CLAIMCLARITY · ANALYZER", "code inside the run worker · every model call goes to Amazon Bedrock · gold tables by default")
+GRP = "rounded=0;html=1;fillColor=none;strokeColor=#ED7100;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=40;spacingTop=8;fontSize=12;fontStyle=1;fontColor=#ED7100;fontFamily=Helvetica;"
+PROMPT = "rounded=0;html=1;fillColor=#FFFFFF;strokeColor=#4A6BB0;dashed=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=4;fontSize=11;fontStyle=1;fontColor=#1C2B57;fontFamily=Helvetica;"
+d.icon("app", "client", "Chat app", "", 90, 300, tile=F, label="above")
+d.add("rw", "RUN WORKER · ECS on Fargate", GRP, 210, 70, 1130, 560)
+d.icon("rw-i", "fargate", "", "", 236, 92, size=26)
+d.cells[-1] = d.cells[-1].replace('value="&lt;b&gt;&lt;/b&gt;"', 'value=""')
+d.add("g", "<b>KPI gate</b><br>standard KPI fits?", DECISION, 250, 245, 170, 110); badge(d, "g-b", "41", 384, 250)
+d.add("k", "<b>Standard KPI query</b><br>fixed SQL, values filled in", STEPBOX, 480, 112, 210, 56); badge(d, "k-b", "42", 678, 100)
+d.add("ag", "<b>AGENT</b><br>Strands · Claude Haiku", AGENT, 480, 390, 210, 90); badge(d, "ag-b", "43", 672, 380)
+d.add("pr", "AGENT PROMPT", PROMPT, 730, 370, 300, 230)
+d.add("pr1", "<b>Cached for every question</b><br>playbook · glossary<br>gold schema + allowed values<br>the cc tool", NOTE, 745, 400, 270, 86)
+d.add("pr2", "<b>Added each turn</b><br>today's date · data coverage<br>3 similar solved questions · history", NOTE, 745, 500, 270, 80)
+d.add("gd", "<b>cc tool + SQL guard</b><br>read-only · cost and time limits", STEPBOX, 800, 250, 210, 60); badge(d, "gd-b", "44", 998, 238)
+d.add("rs", "<b>DuckDB reader session</b><br>one per run", CYL, 1110, 235, 170, 90)
+d.icon("bed", "bedrock", "Amazon Bedrock", "", 585, 700, label="right"); badge(d, "bed-b", "45", 605, 658)
+d.add("phi", "CUSTOMER B'S PREFIX · IAM + KMS allow this customer only", PHI, 1400, 90, 370, 520)
+d.add("sem", "<b>sem.* · gold</b><br>curated tables · the default", STEPBOX.replace("#EAF0F9", "#E8F3E0").replace("#4A6BB0", "#7AA116"), 1440, 245, 290, 70)
+d.add("ll", "<b>lossless.* · silver</b><br>every EDI field, no patient ids<br>only after a reasoned escalation", STEPBOX.replace("#EAF0F9", "#FFFFFF") + "dashed=1;", 1440, 440, 290, 80); badge(d, "ll-b", "44", 1718, 428)
+d.edge("e-app-g", "app", "g", "question", exit_=(1, .5), entry=(0, .5))
 d.edge("e-g-k", "g", "k", "yes", exit_=(.5, 0), entry=(0, .5))
-d.edge("e-g-c", "g", "c", "no", exit_=(.5, 1), entry=(0, .5))
-d.edge("e-k-r", "k", "r", "", exit_=(1, .5), entry=(.5, 0))
-d.edge("e-c-gd", "c", "gd")
-d.edge("e-gd-r", "gd", "r", "", exit_=(1, .5), entry=(.5, 1))
-d.edge("e-r-a", "r", "a")
-d.icon("bed", "bedrock", "Amazon Bedrock", "", 1360, 400, label="left", size=44); badge(d, "bed-b", "45", 1376, 366)
-legend_drilldown(d, 1290, 480)
+d.edge("e-g-ag", "g", "ag", "no", exit_=(.5, 1), entry=(0, .5))
+d.edge("e-k-gd", "k", "gd", "", exit_=(1, .5), entry=(.5, 0))
+d.edge("e-ag-gd", "ag", "gd", "SQL", exit_=(.5, 0), entry=(0, .5))
+d.edge("e-ag-bed", "ag", "bed", "", exit_=(.5, 1), entry=(.5, 0))
+d.edge("e-gd-rs", "gd", "rs")
+d.edge("e-pr-ag", "pr", "ag", "", exit_=(0, .3), entry=(1, .5), dashed=True)
+d.edge("e-rs-sem", "rs", "sem", "read", exit_=(1, .5), entry=(0, .5))
+d.edge("e-rs-ll", "rs", "ll", "escalation", exit_=(.5, 1), entry=(0, .5), dashed=True)
+d.edge("e-rw-app", "rw", "app", "answer + SQL + rows", exit_=(0, .62), entry=(.5, 1), dashed=True)
+legend_drilldown(d, 1560, 720)
 save(d)
 
 # 50 network & security -----------------------------------------------------------------------------------
