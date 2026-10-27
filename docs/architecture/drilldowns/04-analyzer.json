@@ -4,8 +4,8 @@
  "board": {
   "slug": "04-analyzer",
   "title": "04 · Analyzer",
-  "desc": "The user's analyzer board: the frontend sends a question to the KPI gate, which answers with a preset query when one fits; otherwise the Claim Query Agent, fed by its example bank, cached references and prompts, writes CLI calls with SQL that pass the SQL guard to the DuckDB query service, which reads only this customer's semantic layer.",
-  "w": 5940,
+  "desc": "The analyzer: the frontend sends a question to the KPI gate, which answers with a preset query or hands it to the Claim Query Agent; the agent writes SQL through cli.py and the SQL guard, and the query continues on 03.",
+  "w": 4080,
   "h": 1200,
   "zones": [
    {
@@ -27,36 +27,6 @@
     "kind": "plain",
     "icon": null,
     "id": "zone2"
-   },
-   {
-    "x": 3688,
-    "y": 411,
-    "w": 2184,
-    "h": 637,
-    "label": "",
-    "kind": "aws",
-    "icon": null,
-    "id": "zone4"
-   },
-   {
-    "x": 4609,
-    "y": 436,
-    "w": 1246,
-    "h": 580,
-    "label": "Customer's S3 folder ",
-    "kind": "phi",
-    "icon": "s3",
-    "id": "zone5"
-   },
-   {
-    "x": 4744,
-    "y": 526,
-    "w": 272,
-    "h": 176,
-    "label": "",
-    "kind": "accent",
-    "icon": null,
-    "id": "zone6"
    }
   ],
   "nodes": [
@@ -207,45 +177,6 @@
     "inner": null
    },
    {
-    "id": "qs",
-    "x": 3953,
-    "y": 549,
-    "w": 518,
-    "h": 287,
-    "name": "DuckDB query service",
-    "sub": "Quack server, own Fargate service\none session per run\nread-only SELECT, row/time/cost caps",
-    "icon": "fargate",
-    "shape": "box",
-    "style": "service",
-    "inner": null
-   },
-   {
-    "id": "sem",
-    "x": 4756,
-    "y": 550,
-    "w": 240,
-    "h": 127,
-    "name": "Semantic Layer",
-    "sub": "(sem.*) curated tables",
-    "icon": null,
-    "shape": "db",
-    "style": "white",
-    "inner": null
-   },
-   {
-    "id": "lossless",
-    "x": 5303,
-    "y": 713,
-    "w": 253,
-    "h": 147,
-    "name": "Lossless EDI",
-    "sub": "parquet",
-    "icon": null,
-    "shape": "db",
-    "style": "white",
-    "inner": null
-   },
-   {
     "id": "cli",
     "x": 2990,
     "y": 540,
@@ -332,60 +263,17 @@
     "y": 570
    },
    {
-    "id": "node2",
+    "id": "next_qs",
+    "x": 3720,
+    "y": 655,
+    "w": 320,
+    "h": 96,
+    "name": "DuckDB query service",
+    "sub": "continues on 03 · Query path",
+    "icon": "duck",
     "shape": "box",
-    "style": "service",
-    "icon": "sts",
-    "sub": "Temporary (15-min)\nAWS credentials for\nthe login's customer",
-    "inner": null,
-    "w": 210,
-    "h": 80,
-    "name": "STS",
-    "x": 3710,
-    "y": 610
-   },
-   {
-    "id": "node3",
-    "shape": "box",
-    "style": "service",
-    "icon": "iam",
-    "sub": "",
-    "inner": [
-     [
-      "role",
-      "SFTP copy"
-     ],
-     [
-      "role",
-      "Parser"
-     ],
-     [
-      "role",
-      "Reader"
-     ],
-     [
-      "role",
-      "Audit"
-     ]
-    ],
-    "w": 110,
-    "h": 70,
-    "name": "IAM",
-    "x": 3970,
-    "y": 960
-   },
-   {
-    "id": "node4",
-    "shape": "box",
-    "style": "service",
-    "icon": "kms",
-    "sub": "",
-    "inner": null,
-    "w": 110,
-    "h": 70,
-    "name": "KMS",
-    "x": 4090,
-    "y": 960
+    "style": "external",
+    "inner": null
    }
   ],
   "edges": [
@@ -658,19 +546,19 @@
       703
      ],
      [
-      3953,
+      3720,
       703
      ]
     ],
     "label": "passes",
     "at": [
-     3672,
-     795
+     3690,
+     691
     ],
     "style": "solid",
     "end": true,
     "start": false,
-    "lpos": "right",
+    "lpos": "above",
     "id": "edge12",
     "src": {
      "id": "check3",
@@ -678,9 +566,9 @@
      "fy": 0.5
     },
     "dst": {
-     "id": "qs",
+     "id": "next_qs",
      "fx": 0,
-     "fy": 0.5365853658536586
+     "fy": 0.5
     }
    },
    {
@@ -1007,106 +895,9 @@
     "id": "edge22",
     "src": null,
     "dst": null
-   },
-   {
-    "pts": [
-     [
-      4471,
-      633
-     ],
-     [
-      4750,
-      633
-     ]
-    ],
-    "label": null,
-    "at": null,
-    "style": "solid",
-    "end": true,
-    "start": false,
-    "lpos": "above",
-    "id": "edge23",
-    "src": {
-     "id": "qs",
-     "fx": 1,
-     "fy": 0.2926829268292683
-    },
-    "dst": null
-   },
-   {
-    "pts": [
-     [
-      4471,
-      797
-     ],
-     [
-      5297,
-      797
-     ]
-    ],
-    "label": "only after a reasoned escalation",
-    "at": [
-     4888,
-     785
-    ],
-    "style": "dashed",
-    "end": true,
-    "start": false,
-    "lpos": "above",
-    "id": "edge24",
-    "src": {
-     "id": "qs",
-     "fx": 1,
-     "fy": 0.8641114982578397
-    },
-    "dst": null
-   },
-   {
-    "pts": [
-     [
-      4205.625,
-      1016
-     ],
-     [
-      4537,
-      1016
-     ],
-     [
-      4537,
-      833
-     ]
-    ],
-    "label": null,
-    "at": null,
-    "style": "navy",
-    "end": true,
-    "start": false,
-    "lpos": "above",
-    "id": "edge25",
-    "src": null,
-    "dst": null
    }
   ],
-  "gates": [
-   {
-    "n": 6,
-    "x": 4537,
-    "y": 633,
-    "label": "",
-    "side": "above",
-    "icon": null,
-    "id": "gate1"
-   },
-   {
-    "n": 6,
-    "x": 4537,
-    "y": 797,
-    "label": "",
-    "side": "above",
-    "icon": null,
-    "id": "gate2"
-   }
-  ],
+  "gates": [],
   "texts": [
    {
     "x": 40,
