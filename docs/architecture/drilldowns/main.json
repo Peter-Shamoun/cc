@@ -99,6 +99,16 @@
     "h": 275
    },
    {
+    "id": "z_query",
+    "kind": "worker",
+    "label": "Query service · Fargate",
+    "icon": "fargate",
+    "x": 2057,
+    "y": 1550,
+    "w": 343,
+    "h": 275
+   },
+   {
     "id": "z_bucket2",
     "kind": "bucket",
     "label": "xifin-dl-curated-prod/ClaimClarity",
@@ -231,10 +241,10 @@
     "id": "duck",
     "x": 2075,
     "y": 1650,
-    "w": 288,
+    "w": 250,
     "h": 138,
     "name": "DuckDB query service",
-    "sub": "Quack server · own Fargate task\nholds B's creds",
+    "sub": "Quack server\nholds the customer's creds",
     "icon": "duck",
     "shape": "box",
     "style": "service",
@@ -1110,7 +1120,7 @@
     "id": "e_duck",
     "pts": [
      [
-      2362,
+      2325,
       1719
      ],
      [
@@ -1126,7 +1136,7 @@
     "lpos": "above",
     "src": {
      "id": "duck",
-     "fx": 0.9965277777777778,
+     "fx": 1,
      "fy": 0.5
     },
     "dst": {
@@ -1168,7 +1178,7 @@
     "id": "e_aud",
     "pts": [
      [
-      2362,
+      2325,
       1774
      ],
      [
@@ -1192,7 +1202,7 @@
     "lpos": "above",
     "src": {
      "id": "duck",
-     "fx": 0.9965277777777778,
+     "fx": 1,
      "fy": 0.8985507246376812
     },
     "dst": {
