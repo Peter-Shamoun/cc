@@ -105,9 +105,10 @@ def fire_schedule_now(settings: CustomerPipelineSettings) -> str:
 
 
 # --- Fargate ---------------------------------------------------------------------------------------------------
-def process_tree_memory_bytes(process_id: int) -> tuple[int, int]:
-    """(resident, anonymous) memory of a process and its descendants (the parser task's parser processes), from
-    /proc. Resident includes the pages of memory-mapped files, which the kernel can drop; anonymous is the heap."""
+def process_tree_memory_bytes(process_id: int) -> tuple[int, int, int]:
+    """(resident, anonymous, anonymous of the process itself) for a process and its descendants (the parser task's
+    parser processes), from /proc. Resident includes the pages of memory-mapped files, which the kernel can drop;
+    anonymous is the heap."""
     children_by_parent: dict[int, list[int]] = {}
     memory: dict[int, tuple[int, int]] = {}
     for entry in Path("/proc").iterdir():
@@ -127,7 +128,7 @@ def process_tree_memory_bytes(process_id: int) -> tuple[int, int]:
         resident += memory.get(current, (0, 0))[0]
         anonymous += memory.get(current, (0, 0))[1]
         stack += children_by_parent.get(current, [])
-    return resident, anonymous
+    return resident, anonymous, memory.get(process_id, (0, 0))[1]
 
 
 @dataclass
@@ -140,6 +141,7 @@ class _LocalTask:
     peak_ephemeral_storage_bytes: int = 0
     peak_resident_memory_bytes: int = 0
     peak_anonymous_memory_bytes: int = 0
+    peak_main_process_anonymous_memory_bytes: int = 0      # without the parser processes
 
 
 class LocalFargate:
@@ -182,9 +184,11 @@ class LocalFargate:
         for task_arn, local in list(self.running.items()):
             local.peak_ephemeral_storage_bytes = max(local.peak_ephemeral_storage_bytes,
                                                      directory_size_bytes(local.ephemeral_storage))
-            resident, anonymous = process_tree_memory_bytes(local.process.pid)
+            resident, anonymous, main_anonymous = process_tree_memory_bytes(local.process.pid)
             local.peak_resident_memory_bytes = max(local.peak_resident_memory_bytes, resident)
             local.peak_anonymous_memory_bytes = max(local.peak_anonymous_memory_bytes, anonymous)
+            local.peak_main_process_anonymous_memory_bytes = max(local.peak_main_process_anonymous_memory_bytes,
+                                                                 main_anonymous)
             exit_code = local.process.poll()
             stopped_by_ecs = task_arn not in tasks or tasks[task_arn]["desiredStatus"] == "STOPPED"
             if exit_code is None and stopped_by_ecs:
@@ -222,7 +226,8 @@ class LocalFargate:
                      stopped_by="ECS" if stopped_by_ecs else "container exit",
                      peak_ephemeral_storage_bytes=local.peak_ephemeral_storage_bytes,
                      peak_resident_memory_bytes=local.peak_resident_memory_bytes,
-                     peak_anonymous_memory_bytes=local.peak_anonymous_memory_bytes)
+                     peak_anonymous_memory_bytes=local.peak_anonymous_memory_bytes,
+                     peak_main_process_anonymous_memory_bytes=local.peak_main_process_anonymous_memory_bytes)
         if not stopped_by_ecs:            # the container exited: ECS stops the task, and replaces a service's task
             self.ecs.stop_task(cluster=self.settings.ecs_cluster_name, task=local.task_arn,
                                reason=f"Essential container in task exited (code {exit_code})")
