@@ -7,7 +7,8 @@ Outside the pipeline (IT's mover jobs, XiFin's on-prem SFTP server):
 Emulator gaps (observed on AWS Emulator 1.0.322; each is done by AWS itself in a real account):
     publish_queue_depth_metrics         SQS reports its depth to CloudWatch; the emulator publishes no SQS metrics
     LocalFargate                        Fargate runs the task's container on fresh ephemeral storage; the emulator
-                                        records ECS tasks but cannot run a container here
+                                        records ECS tasks but cannot run a container here, and does not replace a
+                                        service task whose container exited
     fire_schedule_now                   EventBridge Scheduler launches the ECS target; the emulator stores the
                                         schedule but never launches it
 
@@ -170,19 +171,15 @@ class LocalFargate:
             if task_arn in self.handled_task_arns:
                 continue
             self.handled_task_arns.add(task_arn)
-            is_service_task = task.get("group", "").startswith("service:")
-            # The emulator stops a standalone task at once (it cannot pull an image), so a new standalone task is
-            # run whatever its status; a service task is run while ECS wants it running.
-            if not is_service_task or task["desiredStatus"] == "RUNNING":
-                self._start(task, is_service_task)
+            if task["desiredStatus"] == "RUNNING":
+                self._start(task, task.get("group", "").startswith("service:"))
         for task_arn, local in list(self.running.items()):
             local.peak_ephemeral_storage_bytes = max(local.peak_ephemeral_storage_bytes,
                                                      directory_size_bytes(local.ephemeral_storage))
             local.peak_resident_memory_bytes = max(local.peak_resident_memory_bytes,
                                                    process_tree_resident_memory_bytes(local.process.pid))
             exit_code = local.process.poll()
-            stopped_by_ecs = local.is_service_task and (
-                task_arn not in tasks or tasks[task_arn]["desiredStatus"] == "STOPPED")
+            stopped_by_ecs = task_arn not in tasks or tasks[task_arn]["desiredStatus"] == "STOPPED"
             if exit_code is None and stopped_by_ecs:
                 local.process.send_signal(signal.SIGTERM)             # ECS sends SIGTERM, then SIGKILL
                 try:
@@ -215,12 +212,15 @@ class LocalFargate:
         self.exit_codes[local.task_arn] = exit_code
         shutil.rmtree(local.ephemeral_storage)
         self._record("task stopped, ephemeral storage torn down", local, exit_code=exit_code,
-                     stopped_by="ECS (service scaled in)" if stopped_by_ecs else "task exit",
+                     stopped_by="ECS" if stopped_by_ecs else "container exit",
                      peak_ephemeral_storage_bytes=local.peak_ephemeral_storage_bytes,
                      peak_resident_memory_bytes=local.peak_resident_memory_bytes)
-        if local.is_service_task and not stopped_by_ecs:              # it crashed: tell ECS, which replaces it
+        if not stopped_by_ecs:            # the container exited: ECS stops the task, and replaces a service's task
             self.ecs.stop_task(cluster=self.settings.ecs_cluster_name, task=local.task_arn,
-                               reason=f"container exited with code {exit_code}")
+                               reason=f"Essential container in task exited (code {exit_code})")
+            if local.is_service_task:     # the emulator's service scheduler does not start the replacement itself
+                self.ecs.update_service(cluster=self.settings.ecs_cluster_name,
+                                        service=self.settings.parser_service_name, forceNewDeployment=True)
 
     def stop_all(self):
         for local in list(self.running.values()):

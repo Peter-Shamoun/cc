@@ -89,6 +89,29 @@ def _role(session, role_name: str, service_principal: str) -> str:
         return iam.get_role(RoleName=role_name)["Role"]["Arn"]
 
 
+def _task_network(session, settings) -> dict:
+    """A VPC for the customer's tasks whose subnet has a route to the internet, so Fargate can pull the task image
+    and the task can reach S3, SQS, Glue and CloudWatch. The design does not cover networking; a production
+    pipeline carrying PHI would more likely use private subnets with VPC endpoints for those services and ECR."""
+    ec2 = session.client("ec2")
+    name_tag = [{"Key": "Name", "Value": settings.resource_name_prefix}]
+    by_name = [{"Name": "tag:Name", "Values": [settings.resource_name_prefix]}]
+    subnets = ec2.describe_subnets(Filters=by_name)["Subnets"]
+    if not subnets:
+        vpc_id = ec2.create_vpc(CidrBlock="10.0.0.0/16", TagSpecifications=[
+            {"ResourceType": "vpc", "Tags": name_tag}])["Vpc"]["VpcId"]
+        gateway_id = ec2.create_internet_gateway(TagSpecifications=[
+            {"ResourceType": "internet-gateway", "Tags": name_tag}])["InternetGateway"]["InternetGatewayId"]
+        ec2.attach_internet_gateway(InternetGatewayId=gateway_id, VpcId=vpc_id)
+        route_table_id = ec2.create_route_table(VpcId=vpc_id, TagSpecifications=[
+            {"ResourceType": "route-table", "Tags": name_tag}])["RouteTable"]["RouteTableId"]
+        ec2.create_route(RouteTableId=route_table_id, DestinationCidrBlock="0.0.0.0/0", GatewayId=gateway_id)
+        subnets = [ec2.create_subnet(VpcId=vpc_id, CidrBlock="10.0.1.0/24", TagSpecifications=[
+            {"ResourceType": "subnet", "Tags": name_tag}])["Subnet"]]
+        ec2.associate_route_table(RouteTableId=route_table_id, SubnetId=subnets[0]["SubnetId"])
+    return {"subnets": [subnet["SubnetId"] for subnet in subnets], "assignPublicIp": "ENABLED"}
+
+
 def _ecs(session, settings, parser_task_module: str, parser_task_extra_environment: dict[str, str]) -> dict:
     ecs = session.client("ecs")
     ecs.create_cluster(clusterName=settings.ecs_cluster_name)
@@ -113,8 +136,7 @@ def _ecs(session, settings, parser_task_module: str, parser_task_extra_environme
              settings.parser_task_memory_mib, parser_task_extra_environment)
     register(settings.candidate_task_family, "candidate_selection_task", settings.candidate_task_vcpu_count,
              settings.candidate_task_memory_mib, {})
-    subnet_ids = [s["SubnetId"] for s in session.client("ec2").describe_subnets()["Subnets"]][:2]
-    network = {"subnets": subnet_ids, "assignPublicIp": "DISABLED"}
+    network = _task_network(session, settings)
     services = ecs.describe_services(cluster=settings.ecs_cluster_name, services=[settings.parser_service_name])
     if not [s for s in services["services"] if s["status"] == "ACTIVE"]:
         ecs.create_service(cluster=settings.ecs_cluster_name, serviceName=settings.parser_service_name,
