@@ -16,6 +16,7 @@ import logging
 import os
 import time
 from datetime import UTC, datetime
+from pathlib import Path
 from urllib.parse import urlparse
 
 import boto3
@@ -59,10 +60,42 @@ def iceberg_table_name(lossless_table: str) -> str:
     return lossless_table.replace(".", "_")
 
 
-def _lossless_arrow_schemas() -> dict[str, pa.Schema]:
+def _lossless_schemas() -> tuple[dict[str, pa.Schema], dict[str, list[str]]]:
+    """Per lossless table: its Arrow schema, and the columns the DDL declares NOT NULL."""
     con = duckdb.connect()
     con.execute(STAGING_DDL)
-    return {t: con.sql(f"SELECT * FROM {t} LIMIT 0").to_arrow_table().schema for t in SILVER_TABLES}
+    schemas = {t: con.sql(f"SELECT * FROM {t} LIMIT 0").to_arrow_table().schema for t in SILVER_TABLES}
+    required = {t: [] for t in SILVER_TABLES}
+    for table, column in con.execute("SELECT table_schema || '.' || table_name, column_name FROM "
+                                     "information_schema.columns WHERE is_nullable = 'NO'").fetchall():
+        if table in required:
+            required[table].append(column)
+    return schemas, required
+
+
+LOSSLESS_ARROW_SCHEMAS, REQUIRED_COLUMNS = _lossless_schemas()
+
+
+def conform_to_lossless_schema(table: str, rows: pa.Table) -> pa.Table:
+    """rows with the table's columns in DDL order and types, matched by name; a column rows lacks is NULL, and
+    a column the table lacks is an error."""
+    schema = LOSSLESS_ARROW_SCHEMAS[table]
+    unknown = set(rows.schema.names) - set(schema.names)
+    if unknown:
+        raise ValueError(f"{table}: no such column(s) {sorted(unknown)}")
+    def column(field: pa.Field):
+        if field.name not in rows.schema.names:
+            return pa.nulls(rows.num_rows, field.type)
+        values = rows[field.name]
+        if pa.types.is_list(field.type) and pa.types.is_string(values.type):   # the parser writes lists as JSON
+            return pa.array([None if v is None else json.loads(v) for v in values.to_pylist()], field.type)
+        return values.cast(field.type)
+    return pa.table([column(field) for field in schema], schema=schema)
+
+
+def read_arrow_file(path: Path) -> pa.Table:
+    with pa.memory_map(str(path)) as source:
+        return pa.ipc.open_file(source).read_all()
 
 
 class SilverLake:
@@ -84,7 +117,7 @@ class SilverLake:
             self.catalog.create_namespace(self.settings.glue_database_name)
         except NamespaceAlreadyExistsError:
             pass
-        schemas = {iceberg_table_name(t): s for t, s in _lossless_arrow_schemas().items()} | CANDIDATE_TABLE_SCHEMAS
+        schemas = {iceberg_table_name(t): s for t, s in LOSSLESS_ARROW_SCHEMAS.items()} | CANDIDATE_TABLE_SCHEMAS
         for name, schema in schemas.items():
             self.catalog.create_table_if_not_exists(f"{self.settings.glue_database_name}.{name}", schema=schema)
 
@@ -122,19 +155,13 @@ class SilverLake:
         rows = self.read(COMMIT_RECORD_TABLE, ("sha256", "file_id"))
         return dict(zip(rows["sha256"].to_pylist(), rows["file_id"].to_pylist(), strict=True))
 
-    def export_slot(self, slot: duckdb.DuckDBPyConnection, export_id: str) -> dict:
-        """Dedup, write Parquet, commit. slot holds staged rows under STAGING_DDL. Returns counts; afterwards every
-        file that was in the slot is in the lake (loaded by this export, or a duplicate of a loaded file).
+    def export_slot(self, parsed_directories: list[Path], export_id: str) -> dict:
+        """Dedup, write Parquet, commit. A slot is the parsed directories of its files: one .arrow file per lossless
+        table, already in the lake's column types. Returns counts; afterwards every file of the slot is in the lake
+        (loaded by this export, or a duplicate of a loaded file).
 
-        The slot is left as it was found, whether the export succeeds or raises, so a failed export can simply be
-        called again: its partial appends are undone through the journal first."""
-        slot.execute("BEGIN")
-        try:
-            return self._export_slot(slot, export_id)
-        finally:
-            slot.execute("ROLLBACK")
-
-    def _export_slot(self, slot: duckdb.DuckDBPyConnection, export_id: str) -> dict:
+        Nothing in the slot is changed, so a failed export can simply be called again: its partial appends are
+        undone through the journal first."""
         clock = time.monotonic()
         seconds = {}
 
@@ -144,53 +171,55 @@ class SilverLake:
             clock = time.monotonic()
         self.recover_interrupted_exports()
         lap("recover_interrupted_exports")
-        files_seen = slot.execute(f"SELECT count(*) FROM {COMMIT_RECORD_TABLE}").fetchall()[0][0]
-        duplicate_file_ids = self._remove_duplicate_files(slot)
+        commit_records = {directory: read_arrow_file(directory / f"{COMMIT_RECORD_TABLE}.arrow")
+                          for directory in parsed_directories}
+        # Skip every file whose bytes are already in the lake, or earlier in this slot (by S3 key).
+        sha256_seen = set(self.loaded_file_ids_by_sha256())
+        kept = []
+        for directory in sorted(parsed_directories, key=lambda d: commit_records[d]["s3_key"][0].as_py()):
+            sha256 = commit_records[directory]["sha256"][0].as_py()
+            if sha256 not in sha256_seen:
+                sha256_seen.add(sha256)
+                kept.append(directory)
         lap("dedup")
-        file_ids = [r[0] for r in slot.execute(f"SELECT file_id FROM {COMMIT_RECORD_TABLE}").fetchall()]
-        result = {"export_id": export_id, "files_seen": files_seen, "files_loaded": len(file_ids),
-                  "duplicate_files_skipped": len(duplicate_file_ids), "rows_by_table": {},
+        result = {"export_id": export_id, "files_seen": len(parsed_directories), "files_loaded": len(kept),
+                  "duplicate_files_skipped": len(parsed_directories) - len(kept), "rows_by_table": {},
                   "export_step_seconds": seconds}
-        if not file_ids:
+        if not kept:
             return result
         now = datetime.now(UTC).replace(tzinfo=None)
-        slot.execute(f"UPDATE {COMMIT_RECORD_TABLE} SET ingest_run_id = ?, ingested_at = ?", [export_id, now])
-        slot.execute(f"INSERT INTO {INGEST_RUN_TABLE} (ingest_run_id, started_at, finished_at, status, parser_name, "
-                     "parser_version, schema_version, files_seen, files_loaded, files_rejected, triggered_by, notes) "
-                     "VALUES (?, ?, ?, 'SUCCEEDED', 'ccsim.parser', '1', '1', ?, ?, 0, 'ecs-parser-task', ?)",
-                     [export_id, now, now, files_seen, len(file_ids),
-                      f"skipped {len(duplicate_file_ids)} files whose bytes are already in the lake"])
+        file_ids = [commit_records[directory]["file_id"][0].as_py() for directory in kept]
         journal_key = f"{EXPORT_JOURNAL_PREFIX}{export_id}.json"
         self.s3.put_object(Bucket=self.settings.bucket_name, Key=journal_key,
                            Body=json.dumps({"export_id": export_id, "file_ids": file_ids}).encode())
         lap("journal")
         for table in SILVER_TABLES:
-            rows = slot.sql(f"SELECT * FROM {table}").to_arrow_table()
+            if table == INGEST_RUN_TABLE:
+                rows = pa.Table.from_pylist([dict(
+                    ingest_run_id=export_id, started_at=now, finished_at=now, status="SUCCEEDED",
+                    parser_name="ccsim.parser", parser_version="1", schema_version="1",
+                    files_seen=len(parsed_directories), files_loaded=len(kept), files_rejected=0,
+                    triggered_by="ecs-parser-task",
+                    notes=f"skipped {len(parsed_directories) - len(kept)} files whose bytes are already in the lake")],
+                    schema=LOSSLESS_ARROW_SCHEMAS[INGEST_RUN_TABLE])
+            else:
+                parts = [read_arrow_file(path) for directory in kept
+                         if (path := directory / f"{table}.arrow").exists()]
+                if not parts:
+                    continue
+                rows = pa.concat_tables(parts)
+                if table == COMMIT_RECORD_TABLE:              # the run that committed the file, and when
+                    rows = rows.set_column(rows.schema.get_field_index("ingest_run_id"), "ingest_run_id",
+                                           pa.array([export_id] * rows.num_rows, pa.string()))
+                    rows = rows.set_column(rows.schema.get_field_index("ingested_at"), "ingested_at",
+                                           pa.array([now] * rows.num_rows, pa.timestamp("us")))
             lap("read_slot")
-            if rows.num_rows:
-                self.append(table, rows, {EXPORT_ID_SNAPSHOT_PROPERTY: export_id})
-                result["rows_by_table"][table] = rows.num_rows
-                lap("write_parquet_and_commit")
+            self.append(table, rows, {EXPORT_ID_SNAPSHOT_PROPERTY: export_id})
+            result["rows_by_table"][table] = rows.num_rows
+            lap("write_parquet_and_commit")
         self.s3.delete_object(Bucket=self.settings.bucket_name, Key=journal_key)
         lap("journal")
         return result
-
-    def _remove_duplicate_files(self, slot: duckdb.DuckDBPyConnection) -> list[str]:
-        """Delete from the slot every file whose bytes are already in the lake, or earlier in this slot."""
-        in_lake = pa.table({"sha256": list(self.loaded_file_ids_by_sha256())})
-        slot.register("sha256_in_lake", in_lake)
-        duplicates = [r[0] for r in slot.execute(
-            f"SELECT file_id FROM (SELECT file_id, sha256, row_number() OVER (PARTITION BY sha256 ORDER BY s3_key, "
-            f"file_id) AS delivery_number FROM {COMMIT_RECORD_TABLE}) "
-            "WHERE delivery_number > 1 OR sha256 IN (SELECT sha256 FROM sha256_in_lake)").fetchall()]
-        slot.unregister("sha256_in_lake")
-        if duplicates:
-            slot.register("duplicate_file", pa.table({"file_id": duplicates}))
-            for table in SILVER_TABLES:
-                if table != INGEST_RUN_TABLE:
-                    slot.execute(f"DELETE FROM {table} WHERE file_id IN (SELECT file_id FROM duplicate_file)")
-            slot.unregister("duplicate_file")
-        return duplicates
 
     def recover_interrupted_exports(self) -> list[str]:
         """Undo every export that left its journal behind. Returns their export ids."""

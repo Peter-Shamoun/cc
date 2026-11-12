@@ -89,10 +89,19 @@ def merged_files_directory(raw_directory: Path, files_per_merged_file: int) -> P
             files = sorted(f for f in kind_directory.iterdir() if f.is_file())
             target = scratch / kind_directory.relative_to(raw_directory)
             target.mkdir(parents=True)
-            for group_number, start in enumerate(range(0, len(files), files_per_merged_file)):
-                with open(target / f"merged_{group_number:04d}.x12", "wb") as out:
-                    for file in files[start:start + files_per_merged_file]:
-                        out.write(file.read_bytes())
+            # Only files that start at ISA with the same delimiters can share a file; the rest stay as they are.
+            by_delimiters: dict[bytes, list[Path]] = {}
+            for file in files:
+                head = file.read_bytes()[:106]
+                mergeable = head.startswith(b"ISA") and len(head) == 106 and head.isascii()
+                by_delimiters.setdefault(head[3:4] + head[104:106] if mergeable else file.name.encode(), []).append(file)
+            group_number = 0
+            for group in by_delimiters.values():
+                for start in range(0, len(group), files_per_merged_file):
+                    group_number += 1
+                    with open(target / f"merged_{group_number:04d}.x12", "wb") as out:
+                        for file in group[start:start + files_per_merged_file]:
+                            out.write(file.read_bytes().rstrip(b" \r\n\x00") + b"\n")
         scratch.rename(merged)
     return merged
 
@@ -204,10 +213,10 @@ def run_data_plane_scenario(scenario: str, working_directory: Path, settings: Cu
             "export_seconds_mean": round(sum(e["export_seconds"] for e in exports) / len(exports), 1) if exports else None,
             "export_seconds_max": max((e["export_seconds"] for e in exports), default=None),
             "failed_export_attempts": sum(e["failed_attempts"] for e in exports),
-            # where the task's time goes: worker-seconds per stage (download, parse, insert are summed over their
-            # workers) and the exporter's steps
+            # where the task's time goes: worker-seconds per stage (summed over the stage's workers) and the
+            # exporter's steps
             "stage_worker_seconds": {stage: round(sum(e.get("stage_seconds", {}).get(stage, 0) for e in exports), 1)
-                                     for stage in ("download", "parse", "insert")},
+                                     for stage in ("download", "parse", "stage")},
             "export_step_seconds": {step: round(sum(e.get("export_step_seconds", {}).get(step, 0) for e in exports), 1)
                                     for step in sorted({k for e in exports for k in e.get("export_step_seconds", {})})},
             "silver_megabytes": round(sum(o["Size"] for o in silver_objects) * megabytes, 1),

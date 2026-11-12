@@ -5,15 +5,19 @@
       -> URI queue           (in memory, bounded)
     M downloader threads write each raw file to ephemeral storage; they wait while the disk is over its cap
       -> raw file queue      (in memory, bounded; holds a pointer to the file on disk)
-    N parser processes   N = vCPUs - 1. Parse a raw file into .arrow files, then delete the raw file
+    N parser processes   N = vCPUs - 1. Parse a raw file into .arrow files (one per lossless table, in the lake's
+                         column types, NOT NULL columns checked), then delete the raw file
       -> parsed file queue   (in memory, bounded; holds a pointer to the .arrow directory)
-    1 DuckDB writer      inserts a parsed file's rows into the filling slot, then deletes the .arrow files
-    2 slots              DuckDB files on ephemeral storage. A slot is exported when it reaches its size limit or
-                         no more files are left to stage; the writer carries on in the other slot
+    1 stager thread      moves a parsed file's directory into the filling slot
+    2 slots              directories of parsed files on ephemeral storage. A slot is exported when it reaches its
+                         size limit or no more files are left to stage; staging carries on in the other slot
     1 exporter thread    dedup, write Parquet, Iceberg commit, tell the SQS manager which files are committed,
                          wipe the slot
 
-A file that fails (download, parse or insert) is not deleted from SQS. The manager stops extending its
+Rows are written once: the exporter builds each table's Parquet straight from the slot's .arrow files. (The design
+staged rows in a DuckDB database per slot; inserting them there and reading them back was 80% of the task's time.)
+
+A file that fails (download, parse or staging) is not deleted from SQS. The manager stops extending its
 visibility, SQS redelivers it, and after the queue's maxReceiveCount SQS moves it to the dead-letter queue.
 A slot export that fails is retried inside the task instead: that failure is not the files'.
 
@@ -38,13 +42,12 @@ from pathlib import Path
 from urllib.parse import unquote_plus
 
 import boto3
-import duckdb
 import pyarrow as pa
 
-from ccsim.silver_staging import STAGING_DDL, _parse_in_worker, arrow_table, file_id_of, insert_arrow
+from ccsim.silver_staging import _parse_in_worker, arrow_table, file_id_of
 
 from .customer_settings import CustomerPipelineSettings
-from .silver_lake import COMMIT_RECORD_TABLE, SilverLake
+from .silver_lake import COMMIT_RECORD_TABLE, REQUIRED_COLUMNS, SilverLake, conform_to_lossless_schema
 
 log = logging.getLogger("claim_clarity_pipeline.ingestion_task")
 QUEUE_POLL_SECONDS = 0.5
@@ -245,6 +248,10 @@ def parser_process(customer_code: str, parsed_root: str, raw_file_queue, parsed_
                 tables = {t: pa.concat_tables(parts, promote_options="default") for t, parts in tables.items()}
                 tables[COMMIT_RECORD_TABLE] = arrow_table(COMMIT_RECORD_TABLE, [source_file_row])
                 for table_name, rows in tables.items():
+                    rows = conform_to_lossless_schema(table_name, rows)
+                    missing = [c for c in REQUIRED_COLUMNS[table_name] if rows[c].null_count]
+                    if missing:
+                        raise ValueError(f"{table_name}: NULL in NOT NULL column(s) {missing}")
                     with pa.OSFile(str(parsed_directory / f"{table_name}.arrow"), "wb") as sink, \
                             pa.ipc.new_file(sink, rows.schema) as writer:
                         writer.write_table(rows)
@@ -256,47 +263,36 @@ def parser_process(customer_code: str, parsed_root: str, raw_file_queue, parsed_
         parsed_file_queue.put(file)
 
 
-# --- slots, DuckDB writer, exporter ----------------------------------------------------------------------------
+# --- slots, stager, exporter -----------------------------------------------------------------------------------
 class Slot:
-    """A DuckDB database file on ephemeral storage holding staged rows under the lossless schema."""
+    """A directory on ephemeral storage holding the parsed files staged for one export."""
 
     def __init__(self, name: str, directory: Path):
-        self.name, self.database_path = name, directory / f"slot_{name}.duckdb"
+        self.name, self.directory = name, directory / f"slot_{name}"
         self.is_free = threading.Event()
         self._open()
 
     def _open(self):
-        self.connection = duckdb.connect(str(self.database_path))
-        self.connection.execute(STAGING_DDL)
+        self.directory.mkdir()
         self.files: list[IngestFile] = []
         self.staged_bytes = 0
         self.is_free.set()
 
-    def insert_parsed_file(self, file: IngestFile):
-        """All of the file's rows or none."""
-        self.connection.execute("BEGIN")
-        try:
-            for arrow_path in sorted(Path(file.parsed_directory).glob("*.arrow")):
-                with pa.memory_map(str(arrow_path)) as source:
-                    rows = pa.ipc.open_file(source).read_all()
-                    insert_arrow(self.connection, arrow_path.stem, rows)
-                    self.staged_bytes += rows.nbytes
-            self.connection.execute("COMMIT")
-        except Exception:
-            self.connection.execute("ROLLBACK")
-            raise
+    def stage_parsed_file(self, file: IngestFile):
+        staged_directory = self.directory / Path(file.parsed_directory).name
+        Path(file.parsed_directory).rename(staged_directory)
+        file.parsed_directory = str(staged_directory)
+        self.staged_bytes += directory_size_bytes(staged_directory)
         self.files.append(file)
 
     def wipe(self):
-        self.connection.close()
-        for path in self.database_path.parent.glob(self.database_path.name + "*"):   # the database and its WAL
-            path.unlink()
+        shutil.rmtree(self.directory)
         self._open()
 
 
-def duckdb_writer_thread(settings: CustomerPipelineSettings, slots: list[Slot], parsed_file_queue,
-                         slots_to_export: queue.Queue, resolved_files: queue.Queue, progress: PipelineProgress,
-                         stop_requested: threading.Event):
+def stager_thread(settings: CustomerPipelineSettings, slots: list[Slot], parsed_file_queue,
+                  slots_to_export: queue.Queue, resolved_files: queue.Queue, progress: PipelineProgress,
+                  stop_requested: threading.Event):
     filling = slots[0]
     last_file_at = time.monotonic()
 
@@ -322,11 +318,11 @@ def duckdb_writer_thread(settings: CustomerPipelineSettings, slots: list[Slot], 
         if file.failure is None:
             started = time.monotonic()
             try:
-                filling.insert_parsed_file(file)
-            except Exception as error:                    # noqa: BLE001 - any insert failure is a failed file
-                file.failure = f"insert: {type(error).__name__}: {error}"
-            file.stage_seconds["insert"] = time.monotonic() - started
-            shutil.rmtree(file.parsed_directory, ignore_errors=True)    # staged (or failed): the .arrow files go
+                filling.stage_parsed_file(file)
+            except Exception as error:                    # noqa: BLE001 - any staging failure is a failed file
+                file.failure = f"stage: {type(error).__name__}: {error}"
+                shutil.rmtree(file.parsed_directory, ignore_errors=True)
+            file.stage_seconds["stage"] = time.monotonic() - started
         progress.add(-1)
         if file.failure is not None:
             resolved_files.put(file)
@@ -348,7 +344,8 @@ def exporter_thread(lake: SilverLake, slots_to_export: queue.Queue, resolved_fil
         # count a receive against every file of the slot and dead-letter good files after three failures.
         while not stop_requested.is_set():
             try:
-                result = lake.export_slot(slot.connection, export_id)  # 1 dedup, 2 write Parquet, 3 Iceberg commit
+                result = lake.export_slot([Path(f.parsed_directory) for f in slot.files],
+                                          export_id)              # 1 dedup, 2 write Parquet, 3 Iceberg commit
             except Exception:                             # noqa: BLE001 - retried
                 failed_attempts += 1
                 retry_in_seconds = min(EXPORT_RETRY_MAX_SECONDS, EXPORT_RETRY_FIRST_SECONDS * 2 ** (failed_attempts - 1))
@@ -361,7 +358,7 @@ def exporter_thread(lake: SilverLake, slots_to_export: queue.Queue, resolved_fil
                        "raw_bytes": sum(f.source_file_provenance["size_bytes"] for f in slot.files),
                        # time spent on this slot's files before the export, summed over the workers of each stage
                        "stage_seconds": {stage: round(sum(f.stage_seconds.get(stage, 0) for f in slot.files), 2)
-                                         for stage in ("download", "parse", "insert")}}
+                                         for stage in ("download", "parse", "stage")}}
             log.info("committed slot: %s", json.dumps(result))
             for file in slot.files:                       # 4 the SQS manager deletes the committed files' messages
                 resolved_files.put(file)
@@ -393,7 +390,7 @@ def run_parser_task(settings: CustomerPipelineSettings, ephemeral_storage: Path,
     threads += [threading.Thread(target=downloader_thread, name=f"downloader-{n}", daemon=True, args=(
         settings, ephemeral_storage, uri_queue, raw_file_queue, resolved_files, progress, stop_requested))
         for n in range(settings.downloader_thread_count)]
-    threads.append(threading.Thread(target=duckdb_writer_thread, name="duckdb-writer", daemon=True, args=(
+    threads.append(threading.Thread(target=stager_thread, name="stager", daemon=True, args=(
         settings, slots, parsed_file_queue, slots_to_export, resolved_files, progress, stop_requested)))
     threads.append(threading.Thread(target=exporter_thread, name="exporter", daemon=True, args=(
         lake, slots_to_export, resolved_files, stop_requested)))
