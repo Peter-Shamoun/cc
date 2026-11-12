@@ -98,6 +98,7 @@ class IncrementalGold:
         seed_ref(self.work)
         self.work.execute(DDL_SEMANTIC)
         attach_gold(self.work, gold_directory)
+        self.work.execute("CALL gold.set_option('parquet_compression', 'zstd')")     # the default is half as dense
         self.tables_exist = False
 
     def _create_tables(self, rows: dict[str, pa.Table]):
@@ -199,8 +200,10 @@ class IncrementalGold:
         """Merge the small files of earlier inserts, fold delete markers into their data files, and drop the
         files no snapshot needs any more."""
         started = time.monotonic()
+        # a file is rewritten if any of its rows has a delete marker: by default only when most have, which leaves
+        # a file and its marker file per daily insert
+        self.work.execute("CALL ducklake_rewrite_data_files('gold', delete_threshold => 0.0)")
         self.work.execute("CALL ducklake_merge_adjacent_files('gold')")
-        self.work.execute("CALL ducklake_rewrite_data_files('gold')")
         self.work.execute("CALL ducklake_expire_snapshots('gold', older_than => now())")
         self.work.execute("CALL ducklake_cleanup_old_files('gold', cleanup_all => true)")
         return {"seconds": round(time.monotonic() - started, 3)}
