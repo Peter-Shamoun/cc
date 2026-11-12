@@ -107,20 +107,35 @@ class SqsManager(threading.Thread):
         self.queue_url = self.sqs.get_queue_url(QueueName=settings.ingestion_queue_name)["QueueUrl"]
         self.in_flight: dict[str, _InFlightMessage] = {}
         self.visibility_extended_at = time.monotonic()
+        self.seconds = {"receive": 0.0, "delete": 0.0, "extend_visibility": 0.0, "uri_queue_full": 0.0}
+        self.receive_calls = self.messages_received = 0
+
+    def _timed(self, step: str, action):
+        started = time.monotonic()
+        action()
+        self.seconds[step] += time.monotonic() - started
 
     def run(self):
         while not self.stop_requested.is_set():
-            self._handle_resolved_files()
-            self._extend_visibility_of_in_flight_messages()
+            self._timed("delete", self._handle_resolved_files)
+            self._timed("extend_visibility", self._extend_visibility_of_in_flight_messages)
             self._receive()
+        log.info("sqs manager totals: %s", json.dumps({
+            "receive_calls": self.receive_calls, "messages_received": self.messages_received,
+            "seconds": {step: round(seconds, 1) for step, seconds in self.seconds.items()}}))
 
     def _receive(self):
         free_slots = self.settings.in_memory_queue_max_files - self.uri_queue.qsize()
         if free_slots <= 0:                               # downstream is busy: leave the messages in SQS
             time.sleep(QUEUE_POLL_SECONDS)
+            self.seconds["uri_queue_full"] += QUEUE_POLL_SECONDS
             return
+        started = time.monotonic()
         messages = self.sqs.receive_message(QueueUrl=self.queue_url, MaxNumberOfMessages=min(10, free_slots),
                                             WaitTimeSeconds=SQS_LONG_POLL_SECONDS).get("Messages", [])
+        self.seconds["receive"] += time.monotonic() - started
+        self.receive_calls += 1
+        self.messages_received += len(messages)
         for message in messages:
             files = [IngestFile(message["MessageId"], record["s3"]["bucket"]["name"],
                                 unquote_plus(record["s3"]["object"]["key"]))
@@ -133,6 +148,7 @@ class SqsManager(threading.Thread):
             self.in_flight[message["MessageId"]] = _InFlightMessage(message["ReceiptHandle"], len(files))
             self.progress.add(len(files))
             for file in files:
+                file.stage_seconds["queued_at"] = time.monotonic()
                 self.uri_queue.put(file)
 
     def _extend_visibility_of_in_flight_messages(self):
@@ -184,9 +200,23 @@ def directory_size_bytes(directory: Path) -> int:
     return total
 
 
-def downloader_thread(settings: CustomerPipelineSettings, ephemeral_storage: Path, uri_queue: queue.Queue,
-                      raw_file_queue, resolved_files: queue.Queue, progress: PipelineProgress,
-                      stop_requested: threading.Event):
+class EphemeralDiskUsage(threading.Thread):
+    """Measures the ephemeral storage directory once a second. The downloaders check the cap against the last
+    measurement: walking the directory before every download made each file wait seconds for a downloader."""
+
+    def __init__(self, ephemeral_storage: Path, stop_requested: threading.Event):
+        super().__init__(name="ephemeral-disk-usage", daemon=True)
+        self.ephemeral_storage, self.stop_requested = ephemeral_storage, stop_requested
+        self.bytes_used = 0
+
+    def run(self):
+        while not self.stop_requested.wait(1.0):
+            self.bytes_used = directory_size_bytes(self.ephemeral_storage)
+
+
+def downloader_thread(settings: CustomerPipelineSettings, ephemeral_storage: Path, disk_usage: EphemeralDiskUsage,
+                      uri_queue: queue.Queue, raw_file_queue, resolved_files: queue.Queue,
+                      progress: PipelineProgress, stop_requested: threading.Event):
     s3 = boto3.client("s3", region_name=settings.aws_region)
     raw_directory = ephemeral_storage / "raw"
     while not stop_requested.is_set():
@@ -194,10 +224,10 @@ def downloader_thread(settings: CustomerPipelineSettings, ephemeral_storage: Pat
             file: IngestFile = uri_queue.get(timeout=QUEUE_POLL_SECONDS)
         except queue.Empty:
             continue
-        while (directory_size_bytes(ephemeral_storage) > settings.ephemeral_disk_cap_bytes
-               and not stop_requested.is_set()):
+        while disk_usage.bytes_used > settings.ephemeral_disk_cap_bytes and not stop_requested.is_set():
             time.sleep(QUEUE_POLL_SECONDS)                # the parsers and the exporter free disk
         started = time.monotonic()
+        file.stage_seconds["wait_for_downloader"] = started - file.stage_seconds.pop("queued_at")
         try:
             s3_object = s3.get_object(Bucket=file.s3_bucket, Key=file.s3_key)
             raw_file_path = raw_directory / uuid.uuid4().hex
@@ -222,6 +252,7 @@ def downloader_thread(settings: CustomerPipelineSettings, ephemeral_storage: Pat
             resolved_files.put(file)
             continue
         file.stage_seconds["download"] = time.monotonic() - started
+        file.stage_seconds["queued_at"] = time.monotonic()
         raw_file_queue.put(file)
 
 
@@ -231,7 +262,8 @@ def parser_process(customer_code: str, parsed_root: str, raw_file_queue, parsed_
     signal.signal(signal.SIGTERM, signal.SIG_DFL)
     signal.signal(signal.SIGINT, signal.SIG_IGN)          # the task process decides when the parsers stop
     while (file := raw_file_queue.get()) is not None:
-        started = time.monotonic()
+        started = time.monotonic()                        # CLOCK_MONOTONIC is the same clock in every process
+        file.stage_seconds["wait_for_parser"] = started - file.stage_seconds.pop("queued_at")
         try:
             provenance = file.source_file_provenance
             file_id = file_id_of(file.s3_key, provenance["s3_version_id"])
@@ -259,6 +291,7 @@ def parser_process(customer_code: str, parsed_root: str, raw_file_queue, parsed_
         except Exception as error:                        # noqa: BLE001 - any parse failure is a failed file
             file.failure = f"parse: {type(error).__name__}: {error}"
         file.stage_seconds["parse"] = time.monotonic() - started
+        file.stage_seconds["queued_at"] = time.monotonic()
         Path(file.raw_file_path).unlink(missing_ok=True)  # parsed (or failed): the raw file leaves the disk
         parsed_file_queue.put(file)
 
@@ -315,6 +348,7 @@ def stager_thread(settings: CustomerPipelineSettings, slots: list[Slot], parsed_
                 export_filling_slot_and_switch()
             continue
         last_file_at = time.monotonic()
+        file.stage_seconds["wait_for_stager"] = last_file_at - file.stage_seconds.pop("queued_at", last_file_at)
         if file.failure is None:
             started = time.monotonic()
             try:
@@ -358,7 +392,8 @@ def exporter_thread(lake: SilverLake, slots_to_export: queue.Queue, resolved_fil
                        "raw_bytes": sum(f.source_file_provenance["size_bytes"] for f in slot.files),
                        # time spent on this slot's files before the export, summed over the workers of each stage
                        "stage_seconds": {stage: round(sum(f.stage_seconds.get(stage, 0) for f in slot.files), 2)
-                                         for stage in ("download", "parse", "stage")}}
+                                         for stage in ("wait_for_downloader", "download", "wait_for_parser", "parse",
+                                                       "wait_for_stager", "stage")}}
             log.info("committed slot: %s", json.dumps(result))
             for file in slot.files:                       # 4 the SQS manager deletes the committed files' messages
                 resolved_files.put(file)
@@ -386,9 +421,11 @@ def run_parser_task(settings: CustomerPipelineSettings, ephemeral_storage: Path,
     parsers = [spawn.Process(target=parser_process, name=f"parser-{n}", daemon=True, args=(
         settings.customer_code, str(ephemeral_storage / "parsed"), raw_file_queue, parsed_file_queue))
         for n in range(parser_process_count)]
-    threads = [SqsManager(settings, uri_queue, resolved_files, progress, stop_requested)]
+    disk_usage = EphemeralDiskUsage(ephemeral_storage, stop_requested)
+    threads = [SqsManager(settings, uri_queue, resolved_files, progress, stop_requested), disk_usage]
     threads += [threading.Thread(target=downloader_thread, name=f"downloader-{n}", daemon=True, args=(
-        settings, ephemeral_storage, uri_queue, raw_file_queue, resolved_files, progress, stop_requested))
+        settings, ephemeral_storage, disk_usage, uri_queue, raw_file_queue, resolved_files, progress,
+        stop_requested))
         for n in range(settings.downloader_thread_count)]
     threads.append(threading.Thread(target=stager_thread, name="stager", daemon=True, args=(
         settings, slots, parsed_file_queue, slots_to_export, resolved_files, progress, stop_requested)))

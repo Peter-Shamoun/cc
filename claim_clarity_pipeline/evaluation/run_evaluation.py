@@ -118,6 +118,16 @@ def committed_slots(task_log_directory: Path) -> list[dict]:
     return sorted(exports, key=lambda export: export["committed_at"])
 
 
+def sqs_manager_totals(task_log_directory: Path) -> dict | None:
+    """What the last parser task's SQS manager logged when it stopped."""
+    totals = None
+    for task_log in sorted(task_log_directory.glob("*-parser-*.log")):
+        for line in task_log.read_text().splitlines():
+            if "sqs manager totals: " in line:
+                totals = json.loads(line.split("sqs manager totals: ", 1)[1])
+    return totals
+
+
 def run_data_plane_scenario(scenario: str, working_directory: Path, settings: CustomerPipelineSettings,
                             raw_directory: Path, parser_task_extra_environment: dict[str, str],
                             run_candidate_selection: bool, timeout_seconds: float) -> dict:
@@ -216,7 +226,9 @@ def run_data_plane_scenario(scenario: str, working_directory: Path, settings: Cu
             # where the task's time goes: worker-seconds per stage (summed over the stage's workers) and the
             # exporter's steps
             "stage_worker_seconds": {stage: round(sum(e.get("stage_seconds", {}).get(stage, 0) for e in exports), 1)
-                                     for stage in ("download", "parse", "stage")},
+                                     for stage in ("wait_for_downloader", "download", "wait_for_parser", "parse",
+                                                   "wait_for_stager", "stage")},
+            "sqs_manager": sqs_manager_totals(working_directory / "task-logs"),
             "export_step_seconds": {step: round(sum(e.get("export_step_seconds", {}).get(step, 0) for e in exports), 1)
                                     for step in sorted({k for e in exports for k in e.get("export_step_seconds", {})})},
             "silver_megabytes": round(sum(o["Size"] for o in silver_objects) * megabytes, 1),
