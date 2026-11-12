@@ -25,6 +25,7 @@ import duckdb
 import pyarrow as pa
 import pyarrow.dataset
 import pyarrow.fs
+import pyarrow.parquet as pq
 from pyiceberg.catalog import Catalog, load_catalog
 from pyiceberg.exceptions import NamespaceAlreadyExistsError, NoSuchTableError
 from pyiceberg.expressions import EqualTo, In
@@ -46,6 +47,7 @@ INGEST_RUN_TABLE = "edi.ingest_run"
 SILVER_TABLES = [INGEST_RUN_TABLE] + [t for t in PARSED_TABLES if t != COMMIT_RECORD_TABLE] + [COMMIT_RECORD_TABLE]
 EXPORT_JOURNAL_PREFIX = f"{SILVER_PREFIX}/_export_journal/"
 EXPORT_ID_SNAPSHOT_PROPERTY = "claim-clarity.export-id"
+PARQUET_ROW_GROUP_BYTES = 128 * 1024 ** 2                    # uncompressed rows gathered before a row group is written
 
 CANDIDATE_SELECTION_TABLE = "candidate_selection"            # one row per claim ever selected, with its run id
 CANDIDATE_EXPORT_TABLE = "candidate_export"                  # one row per run whose CSV was written
@@ -109,6 +111,15 @@ def read_arrow_file(path: Path) -> pa.Table:
         return pa.ipc.open_file(source).read_all()
 
 
+def arrow_file_batches(paths: list[Path]):
+    """The record batches of the files, one in memory at a time."""
+    for path in paths:
+        with pa.memory_map(str(path)) as source:
+            reader = pa.ipc.open_file(source)
+            for number in range(reader.num_record_batches):
+                yield reader.get_batch(number)
+
+
 class SilverLake:
     def __init__(self, settings: CustomerPipelineSettings):
         self.settings = settings
@@ -119,6 +130,9 @@ class SilverLake:
             properties |= {"glue.endpoint": self.endpoint_url, "s3.endpoint": self.endpoint_url}
         self.catalog: Catalog = load_catalog("glue", **properties)
         self.s3 = boto3.client("s3", region_name=settings.aws_region)
+        endpoint = urlparse(self.endpoint_url) if self.endpoint_url else None
+        self.filesystem = pa.fs.S3FileSystem(region=settings.aws_region, **(
+            {"endpoint_override": endpoint.netloc, "scheme": endpoint.scheme} if endpoint else {}))
         self._tables: dict[str, Table] = {}
 
     # --- tables --------------------------------------------------------------------------------------------------
@@ -158,11 +172,7 @@ class SilverLake:
         paths = [task.file.file_path.removeprefix("s3://") for task in table.scan().plan_files()]
         if not paths:
             return table.schema().as_arrow().empty_table()
-        endpoint = urlparse(self.endpoint_url) if self.endpoint_url else None
-        filesystem = pa.fs.S3FileSystem(region=self.settings.aws_region,
-                                        **({"endpoint_override": endpoint.netloc, "scheme": endpoint.scheme}
-                                           if endpoint else {}))
-        return pa.dataset.dataset(paths, filesystem=filesystem, format="parquet")
+        return pa.dataset.dataset(paths, filesystem=self.filesystem, format="parquet")
 
     # --- slot export ---------------------------------------------------------------------------------------------
     def loaded_file_ids_by_sha256(self) -> dict[str, str]:
@@ -216,19 +226,38 @@ class SilverLake:
                     triggered_by="ecs-parser-task",
                     notes=f"skipped {len(parsed_directories) - len(kept)} files whose bytes are already in the lake")],
                     schema=LOSSLESS_ARROW_SCHEMAS[INGEST_RUN_TABLE])
-            else:
-                parts = [read_arrow_file(path) for directory in kept
-                         if (path := directory / f"{table}.arrow").exists()]
-                if not parts:
-                    return table, 0
-                rows = pa.concat_tables(parts)
-                if table == COMMIT_RECORD_TABLE:              # the run that committed the file, and when
-                    rows = rows.set_column(rows.schema.get_field_index("ingest_run_id"), "ingest_run_id",
-                                           pa.array([export_id] * rows.num_rows, pa.string()))
-                    rows = rows.set_column(rows.schema.get_field_index("ingested_at"), "ingested_at",
-                                           pa.array([now] * rows.num_rows, pa.timestamp("us")))
-            self.append(table, rows, {EXPORT_ID_SNAPSHOT_PROPERTY: export_id})
-            return table, rows.num_rows
+                self.append(table, rows, {EXPORT_ID_SNAPSHOT_PROPERTY: export_id})
+                return table, rows.num_rows
+            if table == COMMIT_RECORD_TABLE:                  # small: one row per file, with the run that committed it
+                rows = pa.concat_tables(commit_records[directory] for directory in kept)
+                rows = rows.set_column(rows.schema.get_field_index("ingest_run_id"), "ingest_run_id",
+                                       pa.array([export_id] * rows.num_rows, rows.schema.field("ingest_run_id").type))
+                rows = rows.set_column(rows.schema.get_field_index("ingested_at"), "ingested_at",
+                                       pa.array([now] * rows.num_rows, pa.timestamp("us")))
+                self.append(table, rows, {EXPORT_ID_SNAPSHOT_PROPERTY: export_id})
+                return table, rows.num_rows
+            paths = [path for directory in kept if (path := directory / f"{table}.arrow").exists()]
+            if not paths:
+                return table, 0
+            # Stream the slot's .arrow files into one Parquet file in the lake, a row group at a time: the
+            # export's memory does not grow with the slot. Then one Iceberg commit adds the file to the table.
+            iceberg_table = self.table(table)
+            data_file_uri = f"{iceberg_table.location()}/data/{export_id}.parquet"
+            row_count = 0
+            with pq.ParquetWriter(data_file_uri.removeprefix("s3://"), LOSSLESS_ARROW_SCHEMAS[table],
+                                  filesystem=self.filesystem, compression="zstd") as writer:
+                row_group, row_group_bytes = [], 0
+                for batch in arrow_file_batches(paths):
+                    row_group.append(batch)
+                    row_group_bytes += batch.nbytes
+                    row_count += batch.num_rows
+                    if row_group_bytes >= PARQUET_ROW_GROUP_BYTES:
+                        writer.write_table(pa.Table.from_batches(row_group))
+                        row_group, row_group_bytes = [], 0
+                if row_group:
+                    writer.write_table(pa.Table.from_batches(row_group))
+            iceberg_table.add_files([data_file_uri], snapshot_properties={EXPORT_ID_SNAPSHOT_PROPERTY: export_id})
+            return table, row_count
 
         # The tables are independent Iceberg tables: their appends run side by side. The commit record goes last,
         # alone, once every other table has committed.

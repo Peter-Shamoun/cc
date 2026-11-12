@@ -57,6 +57,9 @@ from .silver_lake import (COMMIT_RECORD_TABLE, REQUIRED_COLUMNS, SEGMENT_TABLE, 
 
 log = logging.getLogger("claim_clarity_pipeline.ingestion_task")
 QUEUE_POLL_SECONDS = 0.5
+# Parsed rows wait on ephemeral storage until their slot is exported. Uncompressed they take about 20 times the
+# raw file; LZ4 is cheap to write and to read back a batch at a time.
+PARSED_FILE_OPTIONS = pa.ipc.IpcWriteOptions(compression="lz4")
 _BYTE_OFFSET, _BYTE_LENGTH = SEGMENT_FIELDS.index("byte_offset"), SEGMENT_FIELDS.index("byte_length")
 EXPORT_RETRY_FIRST_SECONDS = 2.0
 EXPORT_RETRY_MAX_SECONDS = 60.0
@@ -325,7 +328,7 @@ class _ArrowFilesSink(TableRows):
             raise ValueError(f"{table}: NULL in NOT NULL column(s) {missing}")
         if table not in self.writers:
             sink = pa.OSFile(str(self.parsed_directory / f"{table}.arrow"), "wb")
-            self.writers[table] = (sink, pa.ipc.new_file(sink, rows.schema))
+            self.writers[table] = (sink, pa.ipc.new_file(sink, rows.schema, options=PARSED_FILE_OPTIONS))
         self.writers[table][1].write_table(rows)
 
     def finish(self):
