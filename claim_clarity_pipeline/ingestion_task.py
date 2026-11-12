@@ -6,7 +6,9 @@
     M downloader threads write each raw file to ephemeral storage; they wait while the disk is over its cap
       -> raw file queue      (in memory, bounded; holds a pointer to the file on disk)
     N parser processes   N = vCPUs - 1. Parse a raw file into .arrow files (one per lossless table, in the lake's
-                         column types, NOT NULL columns checked), then delete the raw file
+                         column types, NOT NULL columns checked), then delete the raw file. The raw file is read
+                         from disk and its rows written to disk a piece at a time, so a parser's memory does not
+                         grow with the size of the file
       -> parsed file queue   (in memory, bounded; holds a pointer to the .arrow directory)
     1 stager thread      moves a parsed file's directory into the filling slot
     2 slots              directories of parsed files on ephemeral storage. A slot is exported when it reaches its
@@ -25,9 +27,11 @@ Everything on disk is under the task's ephemeral storage directory, which Fargat
 """
 from __future__ import annotations
 
+import gc
 import hashlib
 import json
 import logging
+import mmap
 import multiprocessing
 import os
 import queue
@@ -44,7 +48,8 @@ from urllib.parse import unquote_plus
 import boto3
 import pyarrow as pa
 
-from ccsim.silver_staging import _parse_in_worker, arrow_table, file_id_of
+from ccsim.parser import SEGMENT_FIELDS, TableRows, parse_file
+from ccsim.silver_staging import FLUSH_SEGMENTS, _drain, arrow_table, file_id_of
 
 from .customer_settings import CustomerPipelineSettings
 from .silver_lake import (COMMIT_RECORD_TABLE, REQUIRED_COLUMNS, SEGMENT_TABLE, SilverLake,
@@ -52,6 +57,7 @@ from .silver_lake import (COMMIT_RECORD_TABLE, REQUIRED_COLUMNS, SEGMENT_TABLE, 
 
 log = logging.getLogger("claim_clarity_pipeline.ingestion_task")
 QUEUE_POLL_SECONDS = 0.5
+_BYTE_OFFSET, _BYTE_LENGTH = SEGMENT_FIELDS.index("byte_offset"), SEGMENT_FIELDS.index("byte_length")
 EXPORT_RETRY_FIRST_SECONDS = 2.0
 EXPORT_RETRY_MAX_SECONDS = 60.0
 SQS_LONG_POLL_SECONDS = 2
@@ -258,51 +264,117 @@ def downloader_thread(settings: CustomerPipelineSettings, ephemeral_storage: Pat
 
 
 # --- parser processes ------------------------------------------------------------------------------------------
+class _RawFileOnDisk:
+    """The raw file as the bytes-like object ccsim.parser reads, backed by a memory map: the operating system
+    pages the file in as the parser walks it, so a parser's memory does not grow with the file's size."""
+
+    def __init__(self, mapped: mmap.mmap):
+        self._mapped = mapped
+
+    def __len__(self):
+        return len(self._mapped)
+
+    def __getitem__(self, key):
+        return self._mapped[key]
+
+    def startswith(self, prefix: bytes) -> bool:
+        return self._mapped[:len(prefix)] == prefix
+
+    def isascii(self) -> bool:
+        return all(self._mapped[start:start + (1 << 20)].isascii() for start in range(0, len(self._mapped), 1 << 20))
+
+
+class _ArrowFilesSink(TableRows):
+    """Where the parser puts a file's rows: every FLUSH_SEGMENTS segments they are written to the file's .arrow
+    files (one per lossless table, in the lake's column types, NOT NULL columns checked) and dropped from memory."""
+
+    def __init__(self, raw: _RawFileOnDisk, parsed_directory: Path):
+        super().__init__()
+        self.raw, self.parsed_directory = raw, parsed_directory
+        self.writers: dict[str, tuple[pa.OSFile, pa.ipc.RecordBatchFileWriter]] = {}
+        self.leading_bytes: bytes | None = None
+
+    def after_chunk(self):
+        if len(self.rows[SEGMENT_TABLE]) >= FLUSH_SEGMENTS:
+            self._flush(file_is_complete=False)
+
+    def _flush(self, file_is_complete: bool):
+        # Silver keeps every byte of the file: each segment row gets its text as received and the bytes up to the
+        # next segment. The last segment parsed so far stays in memory until the next one says where it ends.
+        segments = self.rows[SEGMENT_TABLE]
+        writable = segments[:len(segments) if file_is_complete else -1]
+        del segments[:len(writable)]
+        if writable:
+            offsets = [row[_BYTE_OFFSET] for row in writable]
+            ends = [row[_BYTE_OFFSET] + row[_BYTE_LENGTH] for row in writable]
+            next_offsets = offsets[1:] + [segments[0][_BYTE_OFFSET] if segments else len(self.raw)]
+            if self.leading_bytes is None:
+                self.leading_bytes = self.raw[:offsets[0]]
+            self._write(SEGMENT_TABLE, arrow_table(SEGMENT_TABLE, writable).append_column("raw_text", pa.array(
+                [self.raw[offset:end].decode("ascii") for offset, end in zip(offsets, ends, strict=True)])
+            ).append_column("separator_after", pa.array(
+                [self.raw[end:following].decode("ascii") for end, following in zip(ends, next_offsets, strict=True)])))
+        other_tables = {t: rows for t, rows in self.rows.items() if t != SEGMENT_TABLE}
+        for table, rows in _drain(other_tables, keep_latest_rows=not file_is_complete):
+            self._write(table, rows)
+
+    def _write(self, table: str, rows: pa.Table):
+        rows = conform_to_lossless_schema(table, rows)
+        missing = [c for c in REQUIRED_COLUMNS[table] if rows[c].null_count]
+        if missing:
+            raise ValueError(f"{table}: NULL in NOT NULL column(s) {missing}")
+        if table not in self.writers:
+            sink = pa.OSFile(str(self.parsed_directory / f"{table}.arrow"), "wb")
+            self.writers[table] = (sink, pa.ipc.new_file(sink, rows.schema))
+        self.writers[table][1].write_table(rows)
+
+    def finish(self):
+        """After the parser has read the whole file: write what is still in memory, and the file's commit record."""
+        (source_file_row,) = self.rows.pop(COMMIT_RECORD_TABLE)
+        self._flush(file_is_complete=True)
+        source_file_row["leading_bytes"] = self.leading_bytes
+        self._write(COMMIT_RECORD_TABLE, arrow_table(COMMIT_RECORD_TABLE, [source_file_row]))
+        self.close()
+
+    def close(self):
+        for sink, writer in self.writers.values():
+            writer.close()
+            sink.close()
+        self.writers = {}
+
+
+def parse_raw_file_to_arrow_files(file: IngestFile, customer_code: str, parsed_root: str):
+    """Parse the raw file on disk into a directory of .arrow files, reading it and writing its rows a piece at a
+    time. Sets file.parsed_directory, or file.failure."""
+    file_id = file_id_of(file.s3_key, file.source_file_provenance["s3_version_id"])
+    parsed_directory = Path(parsed_root) / f"{file_id}-{uuid.uuid4().hex[:8]}"
+    parsed_directory.mkdir(parents=True)
+    sink = None
+    try:
+        with open(file.raw_file_path, "rb") as raw_file, \
+                mmap.mmap(raw_file.fileno(), 0, access=mmap.ACCESS_READ) as mapped:
+            sink = _ArrowFilesSink(_RawFileOnDisk(mapped), parsed_directory)
+            # ingest_run_id and ingested_at are set by the exporter, when the file's slot is committed
+            parse_file(sink.raw, file_id, customer_code, file.source_file_provenance, "not-exported-yet",
+                       datetime.now(UTC).replace(tzinfo=None), sink=sink)
+            sink.finish()
+        file.parsed_directory = str(parsed_directory)
+    except Exception as error:                            # noqa: BLE001 - any parse failure is a failed file
+        if sink is not None:
+            sink.close()
+        shutil.rmtree(parsed_directory, ignore_errors=True)
+        file.failure = f"parse: {type(error).__name__}: {error}"
+
+
 def parser_process(customer_code: str, parsed_root: str, raw_file_queue, parsed_file_queue):
-    """Runs in its own process until it reads None. Raw file -> one .arrow file per lossless table."""
+    """Runs in its own process until it reads None. Raw file on disk -> one .arrow file per lossless table."""
     signal.signal(signal.SIGTERM, signal.SIG_DFL)
     signal.signal(signal.SIGINT, signal.SIG_IGN)          # the task process decides when the parsers stop
+    gc.disable()                                          # parsing allocates millions of short-lived, acyclic rows
     while (file := raw_file_queue.get()) is not None:
         started = time.monotonic()                        # CLOCK_MONOTONIC is the same clock in every process
         file.stage_seconds["wait_for_parser"] = started - file.stage_seconds.pop("queued_at")
-        try:
-            provenance = file.source_file_provenance
-            file_id = file_id_of(file.s3_key, provenance["s3_version_id"])
-            body = Path(file.raw_file_path).read_bytes()
-            # ingest_run_id and ingested_at are set by the exporter, when the file's slot is committed
-            outcome = _parse_in_worker(body, file_id, customer_code, provenance, "not-exported-yet",
-                                       datetime.now(UTC).replace(tzinfo=None))
-            if isinstance(outcome, str):
-                file.failure = f"parse: {outcome}"
-            else:
-                tables, source_file_row = outcome
-                parsed_directory = Path(parsed_root) / f"{file_id}-{uuid.uuid4().hex[:8]}"
-                parsed_directory.mkdir(parents=True)
-                tables = {t: pa.concat_tables(parts, promote_options="default") for t, parts in tables.items()}
-                # Silver is the source of truth: it keeps every byte of the file. Each segment row gets its text
-                # as received and the bytes up to the next segment; the file's row gets the bytes before the first.
-                segments = tables[SEGMENT_TABLE]
-                offsets = segments["byte_offset"].to_pylist()
-                ends = [offset + length for offset, length in zip(offsets, segments["byte_length"].to_pylist(),
-                                                                 strict=True)]
-                next_offsets = offsets[1:] + [len(body)]
-                tables[SEGMENT_TABLE] = segments.append_column("raw_text", pa.array(
-                    [body[offset:end].decode("ascii") for offset, end in zip(offsets, ends, strict=True)])
-                ).append_column("separator_after", pa.array(
-                    [body[end:following].decode("ascii") for end, following in zip(ends, next_offsets, strict=True)]))
-                source_file_row["leading_bytes"] = body[:offsets[0]]
-                tables[COMMIT_RECORD_TABLE] = arrow_table(COMMIT_RECORD_TABLE, [source_file_row])
-                for table_name, rows in tables.items():
-                    rows = conform_to_lossless_schema(table_name, rows)
-                    missing = [c for c in REQUIRED_COLUMNS[table_name] if rows[c].null_count]
-                    if missing:
-                        raise ValueError(f"{table_name}: NULL in NOT NULL column(s) {missing}")
-                    with pa.OSFile(str(parsed_directory / f"{table_name}.arrow"), "wb") as sink, \
-                            pa.ipc.new_file(sink, rows.schema) as writer:
-                        writer.write_table(rows)
-                file.parsed_directory = str(parsed_directory)
-        except Exception as error:                        # noqa: BLE001 - any parse failure is a failed file
-            file.failure = f"parse: {type(error).__name__}: {error}"
+        parse_raw_file_to_arrow_files(file, customer_code, parsed_root)
         file.stage_seconds["parse"] = time.monotonic() - started
         file.stage_seconds["queued_at"] = time.monotonic()
         Path(file.raw_file_path).unlink(missing_ok=True)  # parsed (or failed): the raw file leaves the disk

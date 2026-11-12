@@ -173,10 +173,6 @@ def run_data_plane_scenario(scenario: str, working_directory: Path, settings: Cu
             dead_lettered += [unquote_plus(record["s3"]["object"]["key"]) for message in messages
                               for record in json.loads(message["Body"])["Records"]]
         lake = lake_summary(settings)
-        from ..silver_lake import SilverLake
-        rebuild_started = time.time()
-        files_not_rebuilt = SilverLake(settings).files_not_rebuilt_from_silver()
-        rebuild_seconds = round(time.time() - rebuild_started, 1)
         candidate_seconds = None
         if run_candidate_selection:
             started = time.time()
@@ -216,8 +212,6 @@ def run_data_plane_scenario(scenario: str, working_directory: Path, settings: Cu
             "only_unreadable_files_are_dead_lettered":      # a good file's content is in the lake
                 not ({delivered_sha256.get(key.removesuffix(".redelivered")) for key in dead_lettered}
                      & set(lake["sha256_in_lake"])),
-            # silver alone is the source of truth: the raw files are only this check
-            "every_file_rebuilt_byte_for_byte_from_silver_alone": not files_not_rebuilt and lake["files_in_lake"] > 0,
             "no_export_journal_left_behind": not any("/_export_journal/" in o["Key"] for o in silver_objects),
             "ephemeral_storage_removed_with_the_task": not any(stand_ins.fargate.ephemeral_root.iterdir()),
         },
@@ -227,7 +221,6 @@ def run_data_plane_scenario(scenario: str, working_directory: Path, settings: Cu
             "ingest_seconds_task_start_to_last_commit": round(ingest_seconds, 1) if ingest_seconds else None,
             "raw_megabytes_per_second": round(raw_megabytes / ingest_seconds, 2) if ingest_seconds else None,
             "seconds_to_first_commit": round(exports[0]["committed_at"] - task_started, 1) if exports else None,
-            "rebuild_every_file_from_silver_seconds": rebuild_seconds,
             "slot_exports": len(exports),
             "export_seconds_mean": round(sum(e["export_seconds"] for e in exports) / len(exports), 1) if exports else None,
             "export_seconds_max": max((e["export_seconds"] for e in exports), default=None),

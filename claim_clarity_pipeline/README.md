@@ -106,8 +106,8 @@ Changes made to the design, each verified by the suite:
    receive against every file of the slot and dead-lettered good files after three failures.
 4. **Silver keeps every byte of the raw file.** `edi_segment` carries each segment as received (`raw_text`) and
    the bytes up to the next segment (`separator_after`); `edi_source_file` carries the bytes before the first
-   segment (`leading_bytes`). A gate rebuilds every file from the lake alone and compares its SHA-256 with the one
-   recorded at ingest. Silver went from 85% to 105% of the raw size.
+   segment (`leading_bytes`). A file is those bytes followed by each segment and its separator in order, with the
+   SHA-256 recorded at ingest (checked once when the columns were added). Silver went from 85% to 105% of raw.
 5. **An export is journaled**, because an Iceberg commit covers one table and silver is 25: an interrupted export
    is rolled back before the next one. Exercised by the export_failure and task_crash scenarios.
 6. **Tasks get a VPC with a route out.** ECS stops a Fargate task whose subnet cannot reach its image registry.

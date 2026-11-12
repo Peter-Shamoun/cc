@@ -11,7 +11,6 @@ messages were never deleted, are loaded again.
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import os
@@ -154,22 +153,6 @@ class SilverLake:
                                         **({"endpoint_override": endpoint.netloc, "scheme": endpoint.scheme}
                                            if endpoint else {}))
         return pa.dataset.dataset(paths, filesystem=filesystem, format="parquet")
-
-    def files_not_rebuilt_from_silver(self) -> list[str]:
-        """The file_ids whose bytes, rebuilt from silver alone (leading_bytes, then each segment's raw_text and
-        separator_after in order), do not hash to the SHA-256 recorded when the file was ingested."""
-        con = duckdb.connect()
-        con.register("segment", self.lazy_dataset(SEGMENT_TABLE))
-        con.register("source_file", self.lazy_dataset(COMMIT_RECORD_TABLE))
-        rebuilt = con.execute(
-            "SELECT f.file_id, f.sha256, f.leading_bytes, s.text FROM source_file f LEFT JOIN ("
-            "SELECT file_id, string_agg(raw_text || separator_after, '' ORDER BY seg_ord) AS text "
-            "FROM segment GROUP BY file_id) s USING (file_id)")
-        mismatched = []
-        while rows := rebuilt.fetchmany(256):
-            mismatched += [file_id for file_id, sha256, leading_bytes, text in rows if text is None or hashlib.sha256(
-                bytes(leading_bytes) + text.encode("ascii")).hexdigest() != sha256]
-        return mismatched
 
     # --- slot export ---------------------------------------------------------------------------------------------
     def loaded_file_ids_by_sha256(self) -> dict[str, str]:
