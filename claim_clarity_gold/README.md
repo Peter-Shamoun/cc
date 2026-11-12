@@ -42,14 +42,39 @@ are written against the semantic views, and finds the relations and columns each
 Underneath, those queries reach 16 of silver's 24 tables and about 80 of their 370 columns; no query reaches
 `edi.segment`, the envelopes, contacts or the miscellaneous segments.
 
-## Scorecard (30 days of silver, 95 MB of raw EDI)
+## Scorecard
+
+On 30 days of silver (95 MB of raw EDI), full build:
 
 | Criterion | Result |
 |---|---|
 | 1. Subset | every gold column is a semantic-view column over silver; gold answers 155 of 156 queries |
 | 2. Easy | 7 relations, 111 columns (semantic layer: 10 and 236; silver: 24 tables) |
 | 3. Fast | all 155 queries return the same rows as the views over silver; median 23 ms against 837 ms |
-| 4. Build cost | gold is 15.1 MB, 26% of silver's 58.1 MB. Applied a day at a time (21 batches) it equals a full rebuild in every relation; a batch took 2.1 s early and 2.9 s late in the month, so whether it levels off needs a longer run |
+| 4. Build cost | gold is 15.1 MB, 26% of silver's 58.1 MB |
+
+On a year of silver (1.2 GB of raw EDI, 16.4 million gold rows), applied one day at a time (255 batches):
+
+| Measure | Result |
+|---|---|
+| Equals a full rebuild | yes, in all seven relations |
+| Computing a batch's rows | 1.15 s per batch, the same in the first month and the last |
+| Key index | 0.06 s per batch, flat |
+| Rewriting older files | 0.8 to 3.2 s per batch: it follows the rows a batch demotes (116 to 428), not gold's size |
+| A whole batch | 2.7 s on average in the first third of the year, 3.3 s in the last; a full rebuild takes 37 s at that size |
+| Queries | median 98 ms over 364 files (batches older than 45 days merged per month); one file per relation: 77 ms |
+| Size | gold 193 MB, 26% of silver's 748 MB |
+
+Open points:
+
+- **Demoting a row rewrites its file.** Over the year 233 MB was written for new rows and 5.1 GB rewritten to flip
+  the flags of 59,669 older rows (0.4% of gold). The cost is bounded by a day's or a month's file, not by gold, but
+  it is 22 times the new data. An Iceberg writer with merge-on-read deletes a row and inserts its new version
+  without rewriting the file; this prototype rewrites plain Parquet. 87% of demoted rows are less than 45 days
+  old, 97% less than 60.
+- **The key index is 209 MB**, larger than gold's own data: a row per claim and payer, and per claim.
+- **One workload query** (`a_bafe309836`) returns other rows on the incremental layout than on a single file while
+  the relations are equal: its `row_number()` ordering has ties, so its result depends on row order.
 
 ## Modules
 
