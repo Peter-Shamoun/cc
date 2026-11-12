@@ -361,6 +361,7 @@ def parser_process(customer_code: str, parsed_root: str, raw_file_queue, parsed_
         file.stage_seconds["queued_at"] = time.monotonic()
         Path(file.raw_file_path).unlink(missing_ok=True)  # parsed (or failed): the raw file leaves the disk
         parsed_file_queue.put(file)
+        gc.collect()                                      # between files: what the paused collector left behind
 
 
 # --- slots, stager, exporter -----------------------------------------------------------------------------------

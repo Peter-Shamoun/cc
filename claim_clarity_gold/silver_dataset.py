@@ -48,3 +48,26 @@ def build_silver_database(raw_directory: Path, database_path: Path, parser_proce
 
 def open_silver(database_path: Path, read_only: bool = True) -> duckdb.DuckDBPyConnection:
     return duckdb.connect(str(database_path), read_only=read_only)
+
+
+def export_silver_batches(database_path: Path, batches_directory: Path) -> list[str]:
+    """Write silver as the ingestion pipeline leaves it: one Parquet file per lossless table per batch, a batch
+    being the files received on one day. Returns the batch ids in order.
+
+        <batches_directory>/<table>/batch=<YYYY-MM-DD>/data_0.parquet"""
+    from ccsim.parser import TABLES
+    silver = open_silver(database_path)
+    silver.execute("SET memory_limit = '8GB'")
+    for table in TABLES:
+        target = batches_directory / table
+        target.mkdir(parents=True, exist_ok=True)
+        silver.execute(
+            f"COPY (SELECT t.*, strftime(f.received_at, '%Y-%m-%d') AS batch FROM {table} t "
+            f"JOIN edi.source_file f ON f.file_id = t.file_id) TO '{target}' "
+            "(FORMAT parquet, COMPRESSION zstd, PARTITION_BY (batch), OVERWRITE_OR_IGNORE)")
+    return sorted(path.name.removeprefix("batch=") for path in (batches_directory / "edi.source_file").iterdir())
+
+
+def batch_table_files(batches_directory: Path, batch_id: str) -> dict[str, list[Path]]:
+    from ccsim.parser import TABLES
+    return {table: sorted((batches_directory / table / f"batch={batch_id}").glob("*.parquet")) for table in TABLES}
