@@ -47,7 +47,7 @@ INGEST_RUN_TABLE = "edi.ingest_run"
 SILVER_TABLES = [INGEST_RUN_TABLE] + [t for t in PARSED_TABLES if t != COMMIT_RECORD_TABLE] + [COMMIT_RECORD_TABLE]
 EXPORT_JOURNAL_PREFIX = f"{SILVER_PREFIX}/_export_journal/"
 EXPORT_ID_SNAPSHOT_PROPERTY = "claim-clarity.export-id"
-PARQUET_ROW_GROUP_BYTES = 128 * 1024 ** 2                    # uncompressed rows gathered before a row group is written
+PARQUET_ROW_GROUP_BYTES = 64 * 1024 ** 2                     # uncompressed rows gathered before a row group is written
 
 CANDIDATE_SELECTION_TABLE = "candidate_selection"            # one row per claim ever selected, with its run id
 CANDIDATE_EXPORT_TABLE = "candidate_export"                  # one row per run whose CSV was written
@@ -80,8 +80,6 @@ def _lossless_schemas() -> tuple[dict[str, pa.Schema], dict[str, list[str]]]:
                                      "information_schema.columns WHERE is_nullable = 'NO'").fetchall():
         if table in required:
             required[table].append(column)
-    required[SEGMENT_TABLE] += ["raw_text", "separator_after"]      # nullable in the DDL for the older pipeline
-    required[COMMIT_RECORD_TABLE] += ["leading_bytes"]
     return schemas, required
 
 
@@ -160,6 +158,10 @@ class SilverLake:
         if not rows.schema.equals(lake_schema, check_metadata=False):
             rows = rows.cast(lake_schema)
         table.append(rows, snapshot_properties=snapshot_properties or {})
+
+    def add_data_file(self, name: str, data_file_uri: str, snapshot_properties: dict[str, str]):
+        """Commit a Parquet file that is already in the table's location."""
+        self.table(name).add_files([data_file_uri], snapshot_properties=snapshot_properties)
 
     def read(self, name: str, columns: tuple[str, ...] = ("*",), row_filter=None) -> pa.Table:
         scan = self.table(name).scan(selected_fields=columns, **({"row_filter": row_filter} if row_filter else {}))
@@ -256,7 +258,7 @@ class SilverLake:
                         row_group, row_group_bytes = [], 0
                 if row_group:
                     writer.write_table(pa.Table.from_batches(row_group))
-            iceberg_table.add_files([data_file_uri], snapshot_properties={EXPORT_ID_SNAPSHOT_PROPERTY: export_id})
+            self.add_data_file(table, data_file_uri, {EXPORT_ID_SNAPSHOT_PROPERTY: export_id})
             return table, row_count
 
         # The tables are independent Iceberg tables: their appends run side by side. The commit record goes last,

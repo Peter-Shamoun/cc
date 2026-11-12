@@ -1,13 +1,14 @@
 """The parser task with faults injected into its lake writes. Used only by the evaluation suite.
 
-    CLAIM_CLARITY_EVALUATION_FAIL_LAKE_APPENDS=first-last   appends number first..last (1-based) raise
-    CLAIM_CLARITY_EVALUATION_CRASH_AT_LAKE_APPEND=n         the task process dies at append number n, once per
-                                                            customer (a marker object in S3 records that it did)
+    CLAIM_CLARITY_EVALUATION_FAIL_LAKE_APPENDS=first-last   table commits number first..last (1-based) raise
+    CLAIM_CLARITY_EVALUATION_CRASH_AT_LAKE_APPEND=n         the task process dies at table commit number n, once
+                                                            per customer (a marker object in S3 records that it did)
 
-A slot export makes one append per silver table, so a range inside one export fails it part-way.
+A slot export makes one commit per silver table, so a range inside one export fails it part-way.
 """
 import logging
 import os
+import threading
 
 import boto3
 from botocore.exceptions import ClientError
@@ -25,8 +26,8 @@ def main():
                                                                   "0-0").split("-"))
     crash_at = int(os.environ.get("CLAIM_CLARITY_EVALUATION_CRASH_AT_LAKE_APPEND", "0"))
     s3 = boto3.client("s3", region_name=settings.aws_region)
-    append_to_lake = SilverLake.append
-    append_count = 0
+    commit_count = 0
+    commit_count_lock = threading.Lock()
 
     def already_crashed() -> bool:
         try:
@@ -35,18 +36,23 @@ def main():
         except ClientError:
             return False
 
-    def faulty_append(lake, name, rows, snapshot_properties=None):
-        nonlocal append_count
-        append_count += 1
-        if first_failing <= append_count <= last_failing:
-            raise OSError(f"injected fault: lake append number {append_count} ({name}) refused")
-        if append_count == crash_at and not already_crashed():
-            s3.put_object(Bucket=settings.bucket_name, Key=CRASH_MARKER_KEY, Body=b"")
-            logging.getLogger(__name__).error("injected fault: task dies at lake append number %d", append_count)
-            os._exit(137)
-        return append_to_lake(lake, name, rows, snapshot_properties)
+    def with_faults(commit):
+        def faulty_commit(lake, name, *arguments, **keywords):
+            nonlocal commit_count
+            with commit_count_lock:
+                commit_count += 1
+                number = commit_count
+            if first_failing <= number <= last_failing:
+                raise OSError(f"injected fault: lake commit number {number} ({name}) refused")
+            if number == crash_at and not already_crashed():
+                s3.put_object(Bucket=settings.bucket_name, Key=CRASH_MARKER_KEY, Body=b"")
+                logging.getLogger(__name__).error("injected fault: task dies at lake commit number %d", number)
+                os._exit(137)
+            return commit(lake, name, *arguments, **keywords)
+        return faulty_commit
 
-    SilverLake.append = faulty_append
+    SilverLake.append = with_faults(SilverLake.append)                # the two ways a table gets a commit
+    SilverLake.add_data_file = with_faults(SilverLake.add_data_file)
     ingestion_task.main()
 
 

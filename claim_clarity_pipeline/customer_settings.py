@@ -37,10 +37,10 @@ class CustomerPipelineSettings:
     downloader_thread_count: int = 4
     in_memory_queue_max_files: int = 64              # bound of the URI, raw file and parsed file queues
     ephemeral_disk_cap_bytes: int = 150 * 1024 ** 3  # downloaders wait while raw + parsed + slots use more
-    # A slot is exported when its parsed files reach this size on disk (about 14 bytes per raw byte). 2 GiB was
-    # the fastest of 0.5 / 2 / 4 GiB on 292 MB of raw files, with a third of the Parquet files of 0.5 GiB; task
-    # memory at export and ephemeral disk grow with it (4.4 GB and 4.0 GB at 2 GiB).
-    slot_size_limit_bytes: int = 2 * 1024 ** 3
+    # A slot is exported when its parsed files reach this size on disk (LZ4-compressed, about 4 bytes per raw
+    # byte). Larger slots mean fewer, larger Parquet files and a later first commit; export memory does not grow
+    # with it.
+    slot_size_limit_bytes: int = 1024 ** 3
     slot_idle_export_seconds: float = 5.0            # ... or when no file has arrived for this long
     export_table_thread_count: int = 8               # silver tables appended at once during a slot export
     # --- candidate selection -------------------------------------------------------------------------------------

@@ -97,8 +97,7 @@ CREATE TABLE edi.source_file (
     interchange_count    INTEGER,
     transaction_count    INTEGER,
     duplicate_of_file_id VARCHAR,                  -- same bytes seen earlier under another key
-    superseded_by_file_id VARCHAR,                 -- if a later delivery replaces this file
-    leading_bytes        BLOB                      -- every byte before the first segment (a BOM, whitespace)
+    superseded_by_file_id VARCHAR                  -- if a later delivery replaces this file
 );
 
 -- =============================================================================
@@ -110,14 +109,9 @@ CREATE TABLE edi.source_file (
 --   ALTER TABLE edi.segment DROP COLUMN raw_text;
 --   byte_offset is now into the bronze object as stored (it was into the text
 --   after removing a BOM, leading whitespace and 80-column line breaks).
--- Change 2026-11 (silver is the source of truth; the raw file is only a check):
---   ALTER TABLE edi.segment ADD COLUMN raw_text VARCHAR;
---   ALTER TABLE edi.segment ADD COLUMN separator_after VARCHAR;
---   ALTER TABLE edi.source_file ADD COLUMN leading_bytes BLOB;
---   A file is rebuilt from silver alone as
---     leading_bytes || (raw_text || separator_after of each segment, by seg_ord)
---   and its SHA-256 equals edi.source_file.sha256. byte_offset / byte_length stay as the
---   position of raw_text in that file.
+-- 2026-11: silver is the source of truth and the raw file only a check. The segment text is not stored: every
+--   element value is in a typed row made or filled from its segment, or in edi.misc_segment
+--   (tests/test_segment_lossless.py). byte_offset / byte_length only locate the segment in the raw file.
 
 CREATE TABLE edi.segment (
     file_id              VARCHAR NOT NULL REFERENCES edi.source_file(file_id),
@@ -133,10 +127,6 @@ CREATE TABLE edi.segment (
     byte_offset          BIGINT,                   -- first byte of the segment in the bronze object
     byte_length          INTEGER,                  -- its length; excludes the terminator, includes line breaks
                                                    -- inside a wrapped segment
-    raw_text             VARCHAR,                  -- the segment exactly as received: the byte_length bytes at
-                                                   -- byte_offset (ASCII; line breaks of a wrapped segment kept)
-    separator_after      VARCHAR,                  -- every byte between this segment and the next one (the
-                                                   -- terminator, line breaks, padding), or up to the end of the file
     PRIMARY KEY (file_id, seg_ord)
 );
 

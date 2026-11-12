@@ -48,7 +48,7 @@ from urllib.parse import unquote_plus
 import boto3
 import pyarrow as pa
 
-from ccsim.parser import SEGMENT_FIELDS, TableRows, parse_file
+from ccsim.parser import TableRows, parse_file
 from ccsim.silver_staging import FLUSH_SEGMENTS, _drain, arrow_table, file_id_of
 
 from .customer_settings import CustomerPipelineSettings
@@ -60,7 +60,6 @@ QUEUE_POLL_SECONDS = 0.5
 # Parsed rows wait on ephemeral storage until their slot is exported. Uncompressed they take about 20 times the
 # raw file; LZ4 is cheap to write and to read back a batch at a time.
 PARSED_FILE_OPTIONS = pa.ipc.IpcWriteOptions(compression="lz4")
-_BYTE_OFFSET, _BYTE_LENGTH = SEGMENT_FIELDS.index("byte_offset"), SEGMENT_FIELDS.index("byte_length")
 EXPORT_RETRY_FIRST_SECONDS = 2.0
 EXPORT_RETRY_MAX_SECONDS = 60.0
 SQS_LONG_POLL_SECONDS = 2
@@ -291,35 +290,15 @@ class _ArrowFilesSink(TableRows):
     """Where the parser puts a file's rows: every FLUSH_SEGMENTS segments they are written to the file's .arrow
     files (one per lossless table, in the lake's column types, NOT NULL columns checked) and dropped from memory."""
 
-    def __init__(self, raw: _RawFileOnDisk, parsed_directory: Path):
+    def __init__(self, parsed_directory: Path):
         super().__init__()
-        self.raw, self.parsed_directory = raw, parsed_directory
+        self.parsed_directory = parsed_directory
         self.writers: dict[str, tuple[pa.OSFile, pa.ipc.RecordBatchFileWriter]] = {}
-        self.leading_bytes: bytes | None = None
 
     def after_chunk(self):
         if len(self.rows[SEGMENT_TABLE]) >= FLUSH_SEGMENTS:
-            self._flush(file_is_complete=False)
-
-    def _flush(self, file_is_complete: bool):
-        # Silver keeps every byte of the file: each segment row gets its text as received and the bytes up to the
-        # next segment. The last segment parsed so far stays in memory until the next one says where it ends.
-        segments = self.rows[SEGMENT_TABLE]
-        writable = segments[:len(segments) if file_is_complete else -1]
-        del segments[:len(writable)]
-        if writable:
-            offsets = [row[_BYTE_OFFSET] for row in writable]
-            ends = [row[_BYTE_OFFSET] + row[_BYTE_LENGTH] for row in writable]
-            next_offsets = offsets[1:] + [segments[0][_BYTE_OFFSET] if segments else len(self.raw)]
-            if self.leading_bytes is None:
-                self.leading_bytes = self.raw[:offsets[0]]
-            self._write(SEGMENT_TABLE, arrow_table(SEGMENT_TABLE, writable).append_column("raw_text", pa.array(
-                [self.raw[offset:end].decode("ascii") for offset, end in zip(offsets, ends, strict=True)])
-            ).append_column("separator_after", pa.array(
-                [self.raw[end:following].decode("ascii") for end, following in zip(ends, next_offsets, strict=True)])))
-        other_tables = {t: rows for t, rows in self.rows.items() if t != SEGMENT_TABLE}
-        for table, rows in _drain(other_tables, keep_latest_rows=not file_is_complete):
-            self._write(table, rows)
+            for table, rows in _drain(self.rows, keep_latest_rows=True):
+                self._write(table, rows)
 
     def _write(self, table: str, rows: pa.Table):
         rows = conform_to_lossless_schema(table, rows)
@@ -332,10 +311,10 @@ class _ArrowFilesSink(TableRows):
         self.writers[table][1].write_table(rows)
 
     def finish(self):
-        """After the parser has read the whole file: write what is still in memory, and the file's commit record."""
+        """After the parser has read the whole file: write what is still in memory, the commit record last."""
         (source_file_row,) = self.rows.pop(COMMIT_RECORD_TABLE)
-        self._flush(file_is_complete=True)
-        source_file_row["leading_bytes"] = self.leading_bytes
+        for table, rows in _drain(self.rows, keep_latest_rows=False):
+            self._write(table, rows)
         self._write(COMMIT_RECORD_TABLE, arrow_table(COMMIT_RECORD_TABLE, [source_file_row]))
         self.close()
 
@@ -356,9 +335,9 @@ def parse_raw_file_to_arrow_files(file: IngestFile, customer_code: str, parsed_r
     try:
         with open(file.raw_file_path, "rb") as raw_file, \
                 mmap.mmap(raw_file.fileno(), 0, access=mmap.ACCESS_READ) as mapped:
-            sink = _ArrowFilesSink(_RawFileOnDisk(mapped), parsed_directory)
+            sink = _ArrowFilesSink(parsed_directory)
             # ingest_run_id and ingested_at are set by the exporter, when the file's slot is committed
-            parse_file(sink.raw, file_id, customer_code, file.source_file_provenance, "not-exported-yet",
+            parse_file(_RawFileOnDisk(mapped), file_id, customer_code, file.source_file_provenance, "not-exported-yet",
                        datetime.now(UTC).replace(tzinfo=None), sink=sink)
             sink.finish()
         file.parsed_directory = str(parsed_directory)
