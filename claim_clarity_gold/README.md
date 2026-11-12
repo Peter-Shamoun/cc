@@ -17,8 +17,13 @@ python -m claim_clarity_gold.benchmark_gold --working-directory /tmp/gold-1 --da
 3. **Fast.** Sorted Parquet, no joins to silver.
 4. **Cheap to keep current.** `incremental_build.py` applies one silver batch at a time: the batch's gold rows
    from the batch's silver rows, a key-index lookup for the top-ranked event each claim had before, a flag flip on
-   whichever side loses, one new file per relation. Only two flags ever change on an existing row
-   (`is_current_adjudication` and `is_latest_submission`).
+   whichever side loses, an insert. Only two flags ever change on an existing row (`is_current_adjudication` and
+   `is_latest_submission`).
+
+Gold is stored as merge-on-read tables partitioned by month: an UPDATE writes the changed rows and a delete marker
+and leaves the data file alone, and `compact()` merges the small files of daily inserts into one per relation per
+month. The store here is DuckLake (Parquet plus a catalog, read and written by DuckDB); it stands in for any
+merge-on-read format, Iceberg included, and is not a decision about gold's production format.
 
 Gold is not a fallback and not a de-identified copy. A query gold cannot answer goes to silver.
 
@@ -53,28 +58,36 @@ On 30 days of silver (95 MB of raw EDI), full build:
 | 3. Fast | all 155 queries return the same rows as the views over silver; median 23 ms against 837 ms |
 | 4. Build cost | gold is 15.1 MB, 26% of silver's 58.1 MB |
 
-On a year of silver (1.2 GB of raw EDI, 16.4 million gold rows), applied one day at a time (255 batches):
+On a year of silver (1.2 GB of raw EDI, 16.4 million gold rows), applied one day at a time (255 batches,
+compaction every 30):
 
 | Measure | Result |
 |---|---|
 | Equals a full rebuild | yes, in all seven relations |
+| A whole batch | 2.4 s on average in the first third of the year, 2.6 s in the last; a full rebuild takes 37 s at that size |
 | Computing a batch's rows | 1.15 s per batch, the same in the first month and the last |
-| Key index | 0.06 s per batch, flat |
-| Rewriting older files | 0.8 to 3.2 s per batch: it follows the rows a batch demotes (116 to 428), not gold's size |
-| A whole batch | 2.7 s on average in the first third of the year, 3.3 s in the last; a full rebuild takes 37 s at that size |
-| Queries | median 98 ms over 364 files (batches older than 45 days merged per month); one file per relation: 77 ms |
-| Size | gold 193 MB, 26% of silver's 748 MB |
+| Key index | 0.06 s per batch |
+| Inserting the batch | 0.15 s per batch |
+| Demoting older rows | 0.6 to 1.9 s per batch: 4 to 6 ms per demoted row all year (a batch demotes 116 to 428) |
+| Compaction | 43 s over the year in nine runs, 7 s at most |
+| Queries | median 100 ms over 77 files; with one file per relation, 77 ms |
+| Size | 208 MB of data and an 11 MB catalog; one file per relation is 193 MB; silver is 748 MB |
+
+What the year runs ruled out:
+
+- **Plain Parquet files, rewritten to flip a flag**: 233 MB written for new rows and 5.1 GB rewritten to demote
+  59,669 older rows (0.4% of gold).
+- **The store's default compaction**: it rewrites a file only when most of its rows are deleted, which left 2,186
+  files, a median query of 178 ms and a demotion cost that crept up through the year. `compact()` rewrites any
+  file with a delete marker.
 
 Open points:
 
-- **Demoting a row rewrites its file.** Over the year 233 MB was written for new rows and 5.1 GB rewritten to flip
-  the flags of 59,669 older rows (0.4% of gold). The cost is bounded by a day's or a month's file, not by gold, but
-  it is 22 times the new data. An Iceberg writer with merge-on-read deletes a row and inserts its new version
-  without rewriting the file; this prototype rewrites plain Parquet. 87% of demoted rows are less than 45 days
-  old, 97% less than 60.
-- **The key index is 209 MB**, larger than gold's own data: a row per claim and payer, and per claim.
-- **One workload query** (`a_bafe309836`) returns other rows on the incremental layout than on a single file while
-  the relations are equal: its `row_number()` ordering has ties, so its result depends on row order.
+- **The key index is 218 MB**, about the size of gold's data: a row per claim and payer, and per claim. It is
+  build state, read by key.
+- **Two workload queries** (`a_bafe309836`, `a_258e64fde0`) return other rows on the month-partitioned layout than
+  on a single file while the relations are equal: their `row_number()` orderings have ties, so their results
+  depend on row order.
 
 ## Modules
 
@@ -84,6 +97,6 @@ Open points:
 | `gold_schema.py` | The seven relations and their columns |
 | `silver_dataset.py` | Silver in a DuckDB file, parsed from mock EDI |
 | `build_gold.py` | The full build, and a session over a gold directory |
-| `incremental_build.py` | The per-batch build and its key index |
+| `incremental_build.py` | The per-batch build, the merge-on-read store and its key index |
 | `benchmark_gold.py` | The scorecard |
 | `benchmark_incremental.py` | Seconds per batch against gold's size, and the check against a full rebuild |
