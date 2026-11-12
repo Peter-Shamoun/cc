@@ -93,7 +93,7 @@ appends one after another.
 | 30 days as 20x larger files (93 deliveries) | not measured | 23.7 s, 4.0 MB/s (before segment text was added) |
 | 3 customers at once, 30 days each | 147-149 s each | 79-81 s each (before segment text was added) |
 | 90 days (292 MB), slot 0.5 / 2 / 4 GiB | not measured | 113.6 / 92.4 / 106.0 s |
-| 1 year (1.2 GB, 8,849 deliveries) | about 22 min | about 11 min (slot 0.5 GiB, before segment text was added) |
+| 1 year (1.2 GB, 8,849 deliveries) | about 22 min, 802 Parquet files | 6.8 min, 3.0 MB/s, 315 Parquet files (slot 2 GiB); every file rebuilt from silver in 11 s |
 
 Changes made to the design, each verified by the suite:
 
