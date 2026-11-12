@@ -105,24 +105,29 @@ def fire_schedule_now(settings: CustomerPipelineSettings) -> str:
 
 
 # --- Fargate ---------------------------------------------------------------------------------------------------
-def process_tree_resident_memory_bytes(process_id: int) -> int:
-    """Resident memory of a process and its descendants (the parser task's parser processes), from /proc."""
+def process_tree_memory_bytes(process_id: int) -> tuple[int, int]:
+    """(resident, anonymous) memory of a process and its descendants (the parser task's parser processes), from
+    /proc. Resident includes the pages of memory-mapped files, which the kernel can drop; anonymous is the heap."""
     children_by_parent: dict[int, list[int]] = {}
-    resident_pages: dict[int, int] = {}
+    memory: dict[int, tuple[int, int]] = {}
     for entry in Path("/proc").iterdir():
         if entry.name.isdigit():
             try:
-                fields = (entry / "stat").read_text().rsplit(")", 1)[1].split()
+                parent = int((entry / "stat").read_text().rsplit(")", 1)[1].split()[1])
+                status = dict(line.split(":", 1) for line in (entry / "status").read_text().splitlines() if ":" in line)
             except (FileNotFoundError, ProcessLookupError):
                 continue
-            children_by_parent.setdefault(int(fields[1]), []).append(int(entry.name))
-            resident_pages[int(entry.name)] = int(fields[21])
-    total, stack = 0, [process_id]
+            children_by_parent.setdefault(parent, []).append(int(entry.name))
+            memory[int(entry.name)] = (int(status.get("VmRSS", "0 kB").split()[0]) * 1024,
+                                       int(status.get("RssAnon", "0 kB").split()[0]) * 1024)
+    resident = anonymous = 0
+    stack = [process_id]
     while stack:
         current = stack.pop()
-        total += resident_pages.get(current, 0)
+        resident += memory.get(current, (0, 0))[0]
+        anonymous += memory.get(current, (0, 0))[1]
         stack += children_by_parent.get(current, [])
-    return total * os.sysconf("SC_PAGE_SIZE")
+    return resident, anonymous
 
 
 @dataclass
@@ -134,6 +139,7 @@ class _LocalTask:
     log_path: Path
     peak_ephemeral_storage_bytes: int = 0
     peak_resident_memory_bytes: int = 0
+    peak_anonymous_memory_bytes: int = 0
 
 
 class LocalFargate:
@@ -176,8 +182,9 @@ class LocalFargate:
         for task_arn, local in list(self.running.items()):
             local.peak_ephemeral_storage_bytes = max(local.peak_ephemeral_storage_bytes,
                                                      directory_size_bytes(local.ephemeral_storage))
-            local.peak_resident_memory_bytes = max(local.peak_resident_memory_bytes,
-                                                   process_tree_resident_memory_bytes(local.process.pid))
+            resident, anonymous = process_tree_memory_bytes(local.process.pid)
+            local.peak_resident_memory_bytes = max(local.peak_resident_memory_bytes, resident)
+            local.peak_anonymous_memory_bytes = max(local.peak_anonymous_memory_bytes, anonymous)
             exit_code = local.process.poll()
             stopped_by_ecs = task_arn not in tasks or tasks[task_arn]["desiredStatus"] == "STOPPED"
             if exit_code is None and stopped_by_ecs:
@@ -214,7 +221,8 @@ class LocalFargate:
         self._record("task stopped, ephemeral storage torn down", local, exit_code=exit_code,
                      stopped_by="ECS" if stopped_by_ecs else "container exit",
                      peak_ephemeral_storage_bytes=local.peak_ephemeral_storage_bytes,
-                     peak_resident_memory_bytes=local.peak_resident_memory_bytes)
+                     peak_resident_memory_bytes=local.peak_resident_memory_bytes,
+                     peak_anonymous_memory_bytes=local.peak_anonymous_memory_bytes)
         if not stopped_by_ecs:            # the container exited: ECS stops the task, and replaces a service's task
             self.ecs.stop_task(cluster=self.settings.ecs_cluster_name, task=local.task_arn,
                                reason=f"Essential container in task exited (code {exit_code})")

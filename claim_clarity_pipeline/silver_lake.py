@@ -28,6 +28,8 @@ import pyarrow.fs
 from pyiceberg.catalog import Catalog, load_catalog
 from pyiceberg.exceptions import NamespaceAlreadyExistsError, NoSuchTableError
 from pyiceberg.expressions import EqualTo, In
+from pyiceberg.io.pyarrow import _pyarrow_to_schema_without_ids, schema_to_pyarrow
+from pyiceberg.schema import assign_fresh_schema_ids
 from pyiceberg.table import Table
 
 from ccsim.parser import TABLES as PARSED_TABLES
@@ -66,7 +68,11 @@ def _lossless_schemas() -> tuple[dict[str, pa.Schema], dict[str, list[str]]]:
     """Per lossless table: its Arrow schema, and the columns the DDL declares NOT NULL."""
     con = duckdb.connect()
     con.execute(STAGING_DDL)
-    schemas = {t: con.sql(f"SELECT * FROM {t} LIMIT 0").to_arrow_table().schema for t in SILVER_TABLES}
+    # In the Arrow types Iceberg reads and writes (large_string, ...): a slot's .arrow files are then appended to
+    # the lake as they are. A cast from string to large_string copies every value into memory.
+    schemas = {t: schema_to_pyarrow(assign_fresh_schema_ids(_pyarrow_to_schema_without_ids(
+        con.sql(f"SELECT * FROM {t} LIMIT 0").to_arrow_table().schema)), include_field_ids=False)
+        for t in SILVER_TABLES}
     required = {t: [] for t in SILVER_TABLES}
     for table, column in con.execute("SELECT table_schema || '.' || table_name, column_name FROM "
                                      "information_schema.columns WHERE is_nullable = 'NO'").fetchall():
@@ -91,7 +97,8 @@ def conform_to_lossless_schema(table: str, rows: pa.Table) -> pa.Table:
         if field.name not in rows.schema.names:
             return pa.nulls(rows.num_rows, field.type)
         values = rows[field.name]
-        if pa.types.is_list(field.type) and pa.types.is_string(values.type):   # the parser writes lists as JSON
+        if (pa.types.is_list(field.type) or pa.types.is_large_list(field.type)) and pa.types.is_string(values.type):
+            # the parser writes lists as JSON
             return pa.array([None if v is None else json.loads(v) for v in values.to_pylist()], field.type)
         return values.cast(field.type)
     return pa.table([column(field) for field in schema], schema=schema)
@@ -135,7 +142,10 @@ class SilverLake:
 
     def append(self, name: str, rows: pa.Table, snapshot_properties: dict[str, str] | None = None):
         table = self.table(name)
-        table.append(rows.cast(table.schema().as_arrow()), snapshot_properties=snapshot_properties or {})
+        lake_schema = table.schema().as_arrow()
+        if not rows.schema.equals(lake_schema, check_metadata=False):
+            rows = rows.cast(lake_schema)
+        table.append(rows, snapshot_properties=snapshot_properties or {})
 
     def read(self, name: str, columns: tuple[str, ...] = ("*",), row_filter=None) -> pa.Table:
         scan = self.table(name).scan(selected_fields=columns, **({"row_filter": row_filter} if row_filter else {}))

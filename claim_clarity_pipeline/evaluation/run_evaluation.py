@@ -243,6 +243,9 @@ def run_data_plane_scenario(scenario: str, working_directory: Path, settings: Cu
                                                           default=0) * megabytes, 1),
             "peak_task_memory_megabytes": round(max((t["peak_resident_memory_bytes"] for t in parser_tasks),
                                                     default=0) * megabytes, 1),
+            # the heap alone: resident memory minus the pages of memory-mapped raw and .arrow files
+            "peak_task_heap_megabytes": round(max((t["peak_anonymous_memory_bytes"] for t in parser_tasks),
+                                                  default=0) * megabytes, 1),
             "max_messages_in_flight": max_in_flight,
             "dead_lettered_files": len(dead_lettered),
             "candidate_selection_seconds": candidate_seconds,
