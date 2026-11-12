@@ -15,7 +15,10 @@ python -m claim_clarity_gold.benchmark_gold --working-directory /tmp/gold-1 --da
 2. **Easy to query.** Seven relations named after what they hold; one row is one EDI thing (a CLP, an SVC, a CLM,
    an SV1, a CAS, a BPR/TRN, a PLB).
 3. **Fast.** Sorted Parquet, no joins to silver.
-4. **Cheap to keep current.** Not yet: the build is a full rebuild. The incremental build is the next step.
+4. **Cheap to keep current.** `incremental_build.py` applies one silver batch at a time: the batch's gold rows
+   from the batch's silver rows, a key-index lookup for the top-ranked event each claim had before, a flag flip on
+   whichever side loses, one new file per relation. Only two flags ever change on an existing row
+   (`is_current_adjudication` and `is_latest_submission`).
 
 Gold is not a fallback and not a de-identified copy. A query gold cannot answer goes to silver.
 
@@ -46,7 +49,7 @@ Underneath, those queries reach 16 of silver's 24 tables and about 80 of their 3
 | 1. Subset | every gold column is a semantic-view column over silver; gold answers 155 of 156 queries |
 | 2. Easy | 7 relations, 111 columns (semantic layer: 10 and 236; silver: 24 tables) |
 | 3. Fast | all 155 queries return the same rows as the views over silver; median 23 ms against 837 ms |
-| 4. Build cost | 4.5 s, a full rebuild; gold is 15.1 MB, 26% of silver's 58.1 MB |
+| 4. Build cost | gold is 15.1 MB, 26% of silver's 58.1 MB. Applied a day at a time (21 batches) it equals a full rebuild in every relation; a batch took 2.1 s early and 2.9 s late in the month, so whether it levels off needs a longer run |
 
 ## Modules
 
@@ -56,4 +59,6 @@ Underneath, those queries reach 16 of silver's 24 tables and about 80 of their 3
 | `gold_schema.py` | The seven relations and their columns |
 | `silver_dataset.py` | Silver in a DuckDB file, parsed from mock EDI |
 | `build_gold.py` | The full build, and a session over a gold directory |
+| `incremental_build.py` | The per-batch build and its key index |
 | `benchmark_gold.py` | The scorecard |
+| `benchmark_incremental.py` | Seconds per batch against gold's size, and the check against a full rebuild |
