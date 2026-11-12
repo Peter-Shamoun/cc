@@ -11,6 +11,7 @@ messages were never deleted, are loaded again.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -38,6 +39,7 @@ from .customer_settings import SILVER_PREFIX, CustomerPipelineSettings
 log = logging.getLogger(__name__)
 
 COMMIT_RECORD_TABLE = "edi.source_file"
+SEGMENT_TABLE = "edi.segment"
 INGEST_RUN_TABLE = "edi.ingest_run"
 # Append order: the commit record last.
 SILVER_TABLES = [INGEST_RUN_TABLE] + [t for t in PARSED_TABLES if t != COMMIT_RECORD_TABLE] + [COMMIT_RECORD_TABLE]
@@ -71,6 +73,8 @@ def _lossless_schemas() -> tuple[dict[str, pa.Schema], dict[str, list[str]]]:
                                      "information_schema.columns WHERE is_nullable = 'NO'").fetchall():
         if table in required:
             required[table].append(column)
+    required[SEGMENT_TABLE] += ["raw_text", "separator_after"]      # nullable in the DDL for the older pipeline
+    required[COMMIT_RECORD_TABLE] += ["leading_bytes"]
     return schemas, required
 
 
@@ -150,6 +154,22 @@ class SilverLake:
                                         **({"endpoint_override": endpoint.netloc, "scheme": endpoint.scheme}
                                            if endpoint else {}))
         return pa.dataset.dataset(paths, filesystem=filesystem, format="parquet")
+
+    def files_not_rebuilt_from_silver(self) -> list[str]:
+        """The file_ids whose bytes, rebuilt from silver alone (leading_bytes, then each segment's raw_text and
+        separator_after in order), do not hash to the SHA-256 recorded when the file was ingested."""
+        con = duckdb.connect()
+        con.register("segment", self.lazy_dataset(SEGMENT_TABLE))
+        con.register("source_file", self.lazy_dataset(COMMIT_RECORD_TABLE))
+        rebuilt = con.execute(
+            "SELECT f.file_id, f.sha256, f.leading_bytes, s.text FROM source_file f LEFT JOIN ("
+            "SELECT file_id, string_agg(raw_text || separator_after, '' ORDER BY seg_ord) AS text "
+            "FROM segment GROUP BY file_id) s USING (file_id)")
+        mismatched = []
+        while rows := rebuilt.fetchmany(256):
+            mismatched += [file_id for file_id, sha256, leading_bytes, text in rows if text is None or hashlib.sha256(
+                bytes(leading_bytes) + text.encode("ascii")).hexdigest() != sha256]
+        return mismatched
 
     # --- slot export ---------------------------------------------------------------------------------------------
     def loaded_file_ids_by_sha256(self) -> dict[str, str]:

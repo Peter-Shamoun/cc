@@ -47,7 +47,8 @@ import pyarrow as pa
 from ccsim.silver_staging import _parse_in_worker, arrow_table, file_id_of
 
 from .customer_settings import CustomerPipelineSettings
-from .silver_lake import COMMIT_RECORD_TABLE, REQUIRED_COLUMNS, SilverLake, conform_to_lossless_schema
+from .silver_lake import (COMMIT_RECORD_TABLE, REQUIRED_COLUMNS, SEGMENT_TABLE, SilverLake,
+                          conform_to_lossless_schema)
 
 log = logging.getLogger("claim_clarity_pipeline.ingestion_task")
 QUEUE_POLL_SECONDS = 0.5
@@ -278,6 +279,18 @@ def parser_process(customer_code: str, parsed_root: str, raw_file_queue, parsed_
                 parsed_directory = Path(parsed_root) / f"{file_id}-{uuid.uuid4().hex[:8]}"
                 parsed_directory.mkdir(parents=True)
                 tables = {t: pa.concat_tables(parts, promote_options="default") for t, parts in tables.items()}
+                # Silver is the source of truth: it keeps every byte of the file. Each segment row gets its text
+                # as received and the bytes up to the next segment; the file's row gets the bytes before the first.
+                segments = tables[SEGMENT_TABLE]
+                offsets = segments["byte_offset"].to_pylist()
+                ends = [offset + length for offset, length in zip(offsets, segments["byte_length"].to_pylist(),
+                                                                 strict=True)]
+                next_offsets = offsets[1:] + [len(body)]
+                tables[SEGMENT_TABLE] = segments.append_column("raw_text", pa.array(
+                    [body[offset:end].decode("ascii") for offset, end in zip(offsets, ends, strict=True)])
+                ).append_column("separator_after", pa.array(
+                    [body[end:following].decode("ascii") for end, following in zip(ends, next_offsets, strict=True)]))
+                source_file_row["leading_bytes"] = body[:offsets[0]]
                 tables[COMMIT_RECORD_TABLE] = arrow_table(COMMIT_RECORD_TABLE, [source_file_row])
                 for table_name, rows in tables.items():
                     rows = conform_to_lossless_schema(table_name, rows)
