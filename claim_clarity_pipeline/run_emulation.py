@@ -13,6 +13,7 @@ CustomerPipelineSettings holds the production defaults.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import subprocess
@@ -108,7 +109,7 @@ def lake_summary(settings: CustomerPipelineSettings) -> dict:
                         "parquet_files": len(list(table.scan().plan_files())), "snapshots": len(table.snapshots())}
     source_files = lake.read("edi.source_file", ("s3_key", "sha256", "file_kind"))
     return {"tables": tables, "files_in_lake": source_files.num_rows,
-            "s3_keys_in_lake": sorted(source_files["s3_key"].to_pylist()),
+            "sha256_in_lake": sorted(source_files["sha256"].to_pylist()),
             "distinct_file_contents_in_lake": len(set(source_files["sha256"].to_pylist())),
             "file_kinds": {kind: source_files["file_kind"].to_pylist().count(kind)
                            for kind in sorted(set(source_files["file_kind"].to_pylist()))},
@@ -120,16 +121,17 @@ def check_report(report: dict):
     """The run did what the design says, or it fails here."""
     lake, mover = report["silver_lake"], report["mover_job"]
     problems = []
-    # a duplicate delivery may be the copy that was loaded: compare under the name the file was first given
-    first_names_in_lake = [key.removesuffix(".redelivered") for key in lake["s3_keys_in_lake"]]
+    # Files are compared by content: the mover job redelivers files, and the mock generator delivers some
+    # byte-identical files under two names itself. Each distinct content belongs in the lake exactly once.
     dead_lettered = set(report["dead_letter_queue_keys"])
-    if set(first_names_in_lake) | dead_lettered != set(report["delivered_s3_keys"]):
+    sha256_of_good_deliveries = {sha256 for key, sha256 in report["delivered_sha256_by_s3_key"].items()
+                                 if key not in dead_lettered}
+    if set(lake["sha256_in_lake"]) != sha256_of_good_deliveries:
         problems.append("a delivered file is neither in the lake nor in the dead-letter queue")
-    if set(first_names_in_lake) & dead_lettered or len(set(first_names_in_lake)) != len(first_names_in_lake):
-        problems.append("a file is in the lake twice, or in the lake and the dead-letter queue")
-    if lake["distinct_file_contents_in_lake"] != lake["files_in_lake"]:
-        problems.append("a duplicate delivery was loaded")
-    if sum(run["files_seen"] - run["files_loaded"] for run in lake["ingest_runs"]) != mover["duplicate_deliveries"]:
+    if len(set(lake["sha256_in_lake"])) != len(lake["sha256_in_lake"]):
+        problems.append("the same file content is in the lake twice")
+    deliveries = len(report["delivered_sha256_by_s3_key"]) + mover["duplicate_deliveries"] - len(dead_lettered)
+    if sum(run["files_seen"] - run["files_loaded"] for run in lake["ingest_runs"]) != deliveries - lake["files_in_lake"]:
         problems.append("the exports did not skip exactly the duplicate deliveries")
     if not any(key.endswith("corrupt_delivery.x12") for key in dead_lettered):
         problems.append(f"the corrupt file is not in the dead-letter queue: {sorted(dead_lettered)}")
@@ -195,8 +197,9 @@ def run(working_directory: Path, customer_code: str, mock_days: int, emulator_po
             dead_letter_bodies += [json.loads(message["Body"]) for message in messages]
         report["dead_letter_queue_keys"] = sorted(unquote_plus(record["s3"]["object"]["key"])
                                                   for body in dead_letter_bodies for record in body["Records"])
-        report["delivered_s3_keys"] = sorted(
-            "input/" + path.relative_to(sftp_incoming).as_posix() for path in sftp_incoming.rglob("*.x12"))
+        report["delivered_sha256_by_s3_key"] = {
+            "input/" + path.relative_to(sftp_incoming).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in sorted(sftp_incoming.rglob("*.x12"))}
         report["silver_lake"] = lake_summary(settings)
 
         report["candidate_selection_runs"] = []

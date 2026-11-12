@@ -90,7 +90,12 @@ Design points the runs raised:
 
 Limits of the emulator for this work:
 
-- **S3 is capped in the emulator's source** (`MAX_OBJECTS_PER_BUCKET = 1000`, 64 MB per bucket, 128 MB in total).
-  A 30-day run hit the object cap after six exports. The emulator cannot hold a lake at scale.
+- **S3 is capped in the emulator's source** (`MAX_OBJECTS_PER_BUCKET = 1000`, 64 MB per bucket, 128 MB in total,
+  in `services/service-com-amazonaws-s3-amazons3/src/state.rs`). With the packaged binary a 30-day run hit the
+  object cap after six exports. For larger runs, build the emulator from source with those constants raised (the
+  objects are held in memory, so size them to the machine's RAM). A build of only the services this pipeline
+  reaches (29 crates: trim `core/router/Cargo.toml` and `core/router/src/lib.rs` to them) took 9 minutes and
+  8.5 GB of disk; on that build the 30-day run passed (313 files, 310 distinct contents loaded in four exports,
+  781 objects in the bucket).
 - It runs no containers here and publishes no SQS metrics, and EventBridge Scheduler does not launch ECS targets
   (the stand-ins above).
