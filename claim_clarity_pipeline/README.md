@@ -39,7 +39,7 @@ scorecards. `evaluation/fault_injecting_ingestion_task.py` is the parser task wi
 |---|---|
 | `customer_settings.py` | One customer's resource names and tunables. The pipeline is cloned per customer from this. |
 | `provision_customer.py` | Onboarding: bucket, S3 event -> SQS queue + DLQ (redrive after 3 receives), the two CloudWatch alarms, App Auto Scaling policies, ECS cluster / service / task definitions, the candidate schedule, the Iceberg tables. |
-| `ingestion_task.py` | The ECS parser task: SQS manager thread, downloader threads, parser processes (vCPUs - 1), one DuckDB writer, two slots, exporter. |
+| `ingestion_task.py` | The ECS parser task: SQS manager thread, downloader threads, parser processes (vCPUs - 1), stager, two slots, exporter. |
 | `silver_lake.py` | Silver as Iceberg tables in a Glue catalog: one per lossless table, `edi_source_file` appended last as the commit record, plus the candidate tables. Slot export with dedup and an export journal. |
 | `candidate_selection_task.py` | The one-shot task: re-export unexported runs, load the preset, query silver in DuckDB, commit candidates with the run id, write the CSV, record the export. |
 | `emulator_stand_ins.py` | What is outside the pipeline or missing from the emulator (below). |
@@ -81,37 +81,57 @@ The run shortens the timings (alarm periods of 10 s, a 20 s visibility timeout, 
   goes into the CSV) and `candidate_export` (one row per run whose CSV was written). A run with rows in the first
   and none in the second is re-exported at the start of the next run.
 
-## What the runs showed (2026-11-12, AWS Emulator 1.0.322)
+## What the evaluation showed (2026-11-12)
 
-A run with 20 days of mock data: 189 files delivered plus 18 duplicate deliveries. The alarm started the task 14 s
-after the files arrived, 187 files were committed in three slot exports (98, 101 and 6 files seen), the 18
-duplicates were skipped, two unreadable files reached the dead-letter queue after three receives each, the idle
-alarm stopped the task 30 s after the queue emptied, and its ephemeral storage was removed. Candidate selection
-picked 13 claims, then 0 on the second run.
+Benchmarks on a 4-core machine, emulator built from source with its S3 and SQS caps raised (below). All gates
+pass in every row. "Baseline" is the design as drawn: a DuckDB writer inserting into DuckDB slots, 25 Iceberg
+appends one after another.
 
-Design points the runs raised:
+| Workload | Baseline | Now |
+|---|---|---|
+| 30 days (95 MB, 738 deliveries) | 119 s, 0.79 MB/s | 39.7 s, 2.39 MB/s |
+| 30 days as 20x larger files (93 deliveries) | not measured | 23.7 s, 4.0 MB/s (before segment text was added) |
+| 3 customers at once, 30 days each | 147-149 s each | 79-81 s each (before segment text was added) |
+| 90 days (292 MB), slot 0.5 / 2 / 4 GiB | not measured | 113.6 / 92.4 / 106.0 s |
+| 1 year (1.2 GB, 8,849 deliveries) | about 22 min | about 11 min (slot 0.5 GiB, before segment text was added) |
 
-1. **A slot export is not atomic.** An Iceberg commit covers one table and silver is 25 tables. The export
-   journal in `silver_lake.py` rolls an interrupted export back; without it a retry duplicates rows. It was
-   exercised when exports failed mid-way (below).
-2. **A failed export sends good files to the dead-letter queue.** When an export fails for a reason that is not
-   the file's fault (here, S3 refusing a write), every file of the slot is released to SQS and retried; after
-   three such failures all of them are dead-lettered. One run dead-lettered 50 good files this way.
-3. **Each slot export writes about 100 S3 objects** (per table: a data file, a manifest, a manifest list and a
-   metadata file), whatever the slot's size. Small slots multiply objects and snapshots.
-4. **Onboarding starts the parser task once.** Configuring the bucket notification makes S3 send `s3:TestEvent`
-   messages; the queue alarm sees them. The task deletes them and is scaled back to zero.
-5. **The idle alarm needs one-minute periods in production.** `AWS/SQS` metrics are reported once a minute; the
-   10 s periods here work only because the stand-in publishes high-resolution metrics.
+Changes made to the design, each verified by the suite:
+
+1. **Slots are directories of parsed Arrow files, not DuckDB databases.** Inserting rows into a slot database and
+   reading them back was 95 of the 119 s. The parser processes now write rows in the lake's column types and check
+   NOT NULL columns; the exporter concatenates a table's files into its append. The DuckDB writer is gone.
+2. **A slot export appends the silver tables side by side**, the commit record (`edi_source_file`) last and alone.
+   25 appends one after another took about 23 s per slot.
+3. **A failed export is retried inside the task** while its files' messages stay hidden. Releasing them counted a
+   receive against every file of the slot and dead-lettered good files after three failures.
+4. **Silver keeps every byte of the raw file.** `edi_segment` carries each segment as received (`raw_text`) and
+   the bytes up to the next segment (`separator_after`); `edi_source_file` carries the bytes before the first
+   segment (`leading_bytes`). A gate rebuilds every file from the lake alone and compares its SHA-256 with the one
+   recorded at ingest. Silver went from 85% to 105% of the raw size.
+5. **An export is journaled**, because an Iceberg commit covers one table and silver is 25: an interrupted export
+   is rolled back before the next one. Exercised by the export_failure and task_crash scenarios.
+6. **Tasks get a VPC with a route out.** ECS stops a Fargate task whose subnet cannot reach its image registry.
+   The design does not cover networking; with PHI, private subnets with VPC endpoints are the likelier choice.
+
+Open design points:
+
+- **Silver stores the content twice**: as segment text and in the typed tables. A single segment table with the
+  elements as an array measured 38 MB for the 30-day set (typed tables: 80 MB) and about 9 s of CPU to produce
+  (typed parsing: about 55 s). The typed tables would then be views over it, or part of gold.
+- **Small files**: 25 tables share a slot, so Parquet files average 1.2 MB at a 0.5 GiB slot and 3.5 MB at 2 GiB.
+  Compaction is not built.
+- **The parsers are the limit** once the above is in place: about 1.6 MB/s per parser process.
+- **Onboarding starts the parser task once**: configuring the bucket notification sends `s3:TestEvent` messages.
+- **Alarm periods**: `AWS/SQS` metrics are per minute, so start-up and scale-down each take a minute or more in
+  production; the runs here use 10 s periods on high-resolution metrics.
 
 Limits of the emulator for this work:
 
-- **S3 is capped in the emulator's source** (`MAX_OBJECTS_PER_BUCKET = 1000`, 64 MB per bucket, 128 MB in total,
-  in `services/service-com-amazonaws-s3-amazons3/src/state.rs`). With the packaged binary a 30-day run hit the
-  object cap after six exports. For larger runs, build the emulator from source with those constants raised (the
-  objects are held in memory, so size them to the machine's RAM). A build of only the services this pipeline
-  reaches (29 crates: trim `core/router/Cargo.toml` and `core/router/src/lib.rs` to them) took 9 minutes and
-  8.5 GB of disk; on that build the 30-day run passed (313 files, 310 distinct contents loaded in four exports,
-  781 objects in the bucket).
-- It runs no containers here and publishes no SQS metrics, and EventBridge Scheduler does not launch ECS targets
+- **The emulator's capacity limits are constants in its source**, sized for small tests: S3 1,000 objects and
+  64 MB per bucket (128 MB in total), SQS 1,000 messages per queue (further S3 events are dropped silently), 32
+  S3 event deliveries at once, 512 ECS tasks. The runs above use a build from source with those raised (S3 to
+  10 GiB and 5,000,000 objects, SQS to 2,000,000 messages) and the router trimmed to the 29 service crates this
+  pipeline reaches: 9 minutes and 8.5 GB of disk to build. S3 objects are held in memory.
+- It runs no containers here, does not replace a service task whose container exited, publishes no SQS
+  metrics, and EventBridge Scheduler does not launch ECS targets
   (the stand-ins above).
