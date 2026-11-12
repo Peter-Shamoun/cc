@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from datetime import UTC, datetime
 from urllib.parse import urlparse
 
@@ -134,12 +135,22 @@ class SilverLake:
             slot.execute("ROLLBACK")
 
     def _export_slot(self, slot: duckdb.DuckDBPyConnection, export_id: str) -> dict:
+        clock = time.monotonic()
+        seconds = {}
+
+        def lap(step: str):
+            nonlocal clock
+            seconds[step] = round(seconds.get(step, 0) + time.monotonic() - clock, 2)
+            clock = time.monotonic()
         self.recover_interrupted_exports()
+        lap("recover_interrupted_exports")
         files_seen = slot.execute(f"SELECT count(*) FROM {COMMIT_RECORD_TABLE}").fetchall()[0][0]
         duplicate_file_ids = self._remove_duplicate_files(slot)
+        lap("dedup")
         file_ids = [r[0] for r in slot.execute(f"SELECT file_id FROM {COMMIT_RECORD_TABLE}").fetchall()]
         result = {"export_id": export_id, "files_seen": files_seen, "files_loaded": len(file_ids),
-                  "duplicate_files_skipped": len(duplicate_file_ids), "rows_by_table": {}}
+                  "duplicate_files_skipped": len(duplicate_file_ids), "rows_by_table": {},
+                  "export_step_seconds": seconds}
         if not file_ids:
             return result
         now = datetime.now(UTC).replace(tzinfo=None)
@@ -152,12 +163,16 @@ class SilverLake:
         journal_key = f"{EXPORT_JOURNAL_PREFIX}{export_id}.json"
         self.s3.put_object(Bucket=self.settings.bucket_name, Key=journal_key,
                            Body=json.dumps({"export_id": export_id, "file_ids": file_ids}).encode())
+        lap("journal")
         for table in SILVER_TABLES:
             rows = slot.sql(f"SELECT * FROM {table}").to_arrow_table()
+            lap("read_slot")
             if rows.num_rows:
                 self.append(table, rows, {EXPORT_ID_SNAPSHOT_PROPERTY: export_id})
                 result["rows_by_table"][table] = rows.num_rows
+                lap("write_parquet_and_commit")
         self.s3.delete_object(Bucket=self.settings.bucket_name, Key=journal_key)
+        lap("journal")
         return result
 
     def _remove_duplicate_files(self, slot: duckdb.DuckDBPyConnection) -> list[str]:

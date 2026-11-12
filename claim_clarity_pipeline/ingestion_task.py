@@ -65,6 +65,7 @@ class IngestFile:
     parsed_directory: str | None = None              # set by the parser
     source_file_provenance: dict = field(default_factory=dict)   # the S3 columns of edi.source_file
     failure: str | None = None
+    stage_seconds: dict = field(default_factory=dict)            # download / parse / insert time spent on this file
 
 
 @dataclass
@@ -193,6 +194,7 @@ def downloader_thread(settings: CustomerPipelineSettings, ephemeral_storage: Pat
         while (directory_size_bytes(ephemeral_storage) > settings.ephemeral_disk_cap_bytes
                and not stop_requested.is_set()):
             time.sleep(QUEUE_POLL_SECONDS)                # the parsers and the exporter free disk
+        started = time.monotonic()
         try:
             s3_object = s3.get_object(Bucket=file.s3_bucket, Key=file.s3_key)
             raw_file_path = raw_directory / uuid.uuid4().hex
@@ -216,6 +218,7 @@ def downloader_thread(settings: CustomerPipelineSettings, ephemeral_storage: Pat
             progress.add(-1)
             resolved_files.put(file)
             continue
+        file.stage_seconds["download"] = time.monotonic() - started
         raw_file_queue.put(file)
 
 
@@ -225,6 +228,7 @@ def parser_process(customer_code: str, parsed_root: str, raw_file_queue, parsed_
     signal.signal(signal.SIGTERM, signal.SIG_DFL)
     signal.signal(signal.SIGINT, signal.SIG_IGN)          # the task process decides when the parsers stop
     while (file := raw_file_queue.get()) is not None:
+        started = time.monotonic()
         try:
             provenance = file.source_file_provenance
             file_id = file_id_of(file.s3_key, provenance["s3_version_id"])
@@ -247,6 +251,7 @@ def parser_process(customer_code: str, parsed_root: str, raw_file_queue, parsed_
                 file.parsed_directory = str(parsed_directory)
         except Exception as error:                        # noqa: BLE001 - any parse failure is a failed file
             file.failure = f"parse: {type(error).__name__}: {error}"
+        file.stage_seconds["parse"] = time.monotonic() - started
         Path(file.raw_file_path).unlink(missing_ok=True)  # parsed (or failed): the raw file leaves the disk
         parsed_file_queue.put(file)
 
@@ -315,10 +320,12 @@ def duckdb_writer_thread(settings: CustomerPipelineSettings, slots: list[Slot], 
             continue
         last_file_at = time.monotonic()
         if file.failure is None:
+            started = time.monotonic()
             try:
                 filling.insert_parsed_file(file)
             except Exception as error:                    # noqa: BLE001 - any insert failure is a failed file
                 file.failure = f"insert: {type(error).__name__}: {error}"
+            file.stage_seconds["insert"] = time.monotonic() - started
             shutil.rmtree(file.parsed_directory, ignore_errors=True)    # staged (or failed): the .arrow files go
         progress.add(-1)
         if file.failure is not None:
@@ -350,7 +357,11 @@ def exporter_thread(lake: SilverLake, slots_to_export: queue.Queue, resolved_fil
                 stop_requested.wait(retry_in_seconds)
                 continue
             result |= {"slot": slot.name, "slot_staged_bytes": slot.staged_bytes, "failed_attempts": failed_attempts,
-                       "export_seconds": round(time.monotonic() - started, 2)}
+                       "export_seconds": round(time.monotonic() - started, 2),
+                       "raw_bytes": sum(f.source_file_provenance["size_bytes"] for f in slot.files),
+                       # time spent on this slot's files before the export, summed over the workers of each stage
+                       "stage_seconds": {stage: round(sum(f.stage_seconds.get(stage, 0) for f in slot.files), 2)
+                                         for stage in ("download", "parse", "insert")}}
             log.info("committed slot: %s", json.dumps(result))
             for file in slot.files:                       # 4 the SQS manager deletes the committed files' messages
                 resolved_files.put(file)

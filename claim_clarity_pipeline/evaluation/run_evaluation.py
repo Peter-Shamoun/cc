@@ -28,6 +28,7 @@ import shutil
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import unquote_plus
@@ -75,6 +76,25 @@ def mock_edi_directory(cache_directory: Path, days: int, megabytes_per_day: floa
         (scratch / "acme_labs" / "raw").rename(directory / "raw")
         shutil.rmtree(scratch)
     return directory / "raw"
+
+
+def merged_files_directory(raw_directory: Path, files_per_merged_file: int) -> Path:
+    """The same data as fewer, larger files: each day's files of one kind concatenated in groups (an X12 file may
+    hold several interchanges). Built once, next to raw_directory."""
+    merged = raw_directory.parent / f"raw-merged-{files_per_merged_file}"
+    if not merged.exists():
+        scratch = raw_directory.parent / f"raw-merged-{files_per_merged_file}.building"
+        shutil.rmtree(scratch, ignore_errors=True)
+        for kind_directory in sorted(d for d in raw_directory.glob("*/*") if d.is_dir()):
+            files = sorted(f for f in kind_directory.iterdir() if f.is_file())
+            target = scratch / kind_directory.relative_to(raw_directory)
+            target.mkdir(parents=True)
+            for group_number, start in enumerate(range(0, len(files), files_per_merged_file)):
+                with open(target / f"merged_{group_number:04d}.x12", "wb") as out:
+                    for file in files[start:start + files_per_merged_file]:
+                        out.write(file.read_bytes())
+        scratch.rename(merged)
+    return merged
 
 
 def committed_slots(task_log_directory: Path) -> list[dict]:
@@ -184,6 +204,12 @@ def run_data_plane_scenario(scenario: str, working_directory: Path, settings: Cu
             "export_seconds_mean": round(sum(e["export_seconds"] for e in exports) / len(exports), 1) if exports else None,
             "export_seconds_max": max((e["export_seconds"] for e in exports), default=None),
             "failed_export_attempts": sum(e["failed_attempts"] for e in exports),
+            # where the task's time goes: worker-seconds per stage (download, parse, insert are summed over their
+            # workers) and the exporter's steps
+            "stage_worker_seconds": {stage: round(sum(e.get("stage_seconds", {}).get(stage, 0) for e in exports), 1)
+                                     for stage in ("download", "parse", "insert")},
+            "export_step_seconds": {step: round(sum(e.get("export_step_seconds", {}).get(step, 0) for e in exports), 1)
+                                    for step in sorted({k for e in exports for k in e.get("export_step_seconds", {})})},
             "silver_megabytes": round(sum(o["Size"] for o in silver_objects) * megabytes, 1),
             "silver_s3_objects": len(silver_objects),
             "silver_parquet_files": len(data_files),
@@ -238,6 +264,10 @@ def main():
     arguments.add_argument("--throughput-megabytes-per-day", type=float, default=5.0)
     arguments.add_argument("--throughput-raw-directory", type=Path,
                            help="deliver the files under this directory instead of generating mock data")
+    arguments.add_argument("--throughput-files-per-merged-file", type=int, default=1,
+                           help="deliver the same data as larger files: this many files of a day concatenated")
+    arguments.add_argument("--throughput-customers", type=int, default=1,
+                           help="run this many customers' pipelines at once, each with the same data")
     arguments.add_argument("--throughput-timeout-seconds", type=float, default=3600)
     arguments.add_argument("--mock-cache-directory", type=Path, default=Path.home() / ".cache" / "claim-clarity-mock-edi")
     arguments.add_argument("--set", action="append", default=[], metavar="SETTING=VALUE",
@@ -277,8 +307,28 @@ def main():
                 elif scenario == "throughput":
                     raw_directory = options.throughput_raw_directory or mock_edi_directory(
                         options.mock_cache_directory, options.throughput_days, options.throughput_megabytes_per_day)
-                    result = run_data_plane_scenario(scenario, directory, settings, raw_directory, {}, True,
-                                                     options.throughput_timeout_seconds)
+                    if options.throughput_files_per_merged_file > 1:
+                        raw_directory = merged_files_directory(raw_directory, options.throughput_files_per_merged_file)
+                    if options.throughput_customers == 1:
+                        result = run_data_plane_scenario(scenario, directory, settings, raw_directory, {}, True,
+                                                         options.throughput_timeout_seconds)
+                    else:                                 # every customer gets the same data, at the same time
+                        def one_customer(number: int) -> dict:
+                            customer_directory = directory / f"customer{number}"
+                            customer_directory.mkdir()
+                            return run_data_plane_scenario(
+                                scenario, customer_directory, evaluation_settings(f"{customer_code}{number}", overrides),
+                                raw_directory, {}, True, options.throughput_timeout_seconds)
+                        with ThreadPoolExecutor(options.throughput_customers) as pool:
+                            per_customer = list(pool.map(one_customer, range(1, options.throughput_customers + 1)))
+                        result = {
+                            "gates": {gate: all(r["gates"][gate] for r in per_customer) for gate in per_customer[0]["gates"]},
+                            "scores": {"customers": len(per_customer)} | {
+                                f"{name}_{statistic.__name__}": statistic(r["scores"][name] for r in per_customer)
+                                for name in ("ingest_seconds_delivery_to_last_commit", "raw_megabytes_per_second",
+                                             "peak_task_memory_megabytes", "peak_ephemeral_storage_megabytes",
+                                             "candidate_selection_seconds") for statistic in (min, max)},
+                            "details": {"per_customer": per_customer}}
                 else:
                     raise ValueError(f"unknown scenario {scenario!r}; choose from {SCENARIOS}")
         except Exception as error:                        # noqa: BLE001 - a scenario that cannot finish fails its gate
