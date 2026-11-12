@@ -17,6 +17,22 @@ stops the task. It then fires candidate selection twice and moves the CSV to SFT
 `emulation_report.json` (timeline of queue depth, alarm states, desired count; lake contents; candidate runs) and
 fails if the result is not what the design promises (`check_report`).
 
+## Evaluation suite
+
+```bash
+python -m claim_clarity_pipeline.evaluation.run_evaluation --working-directory /tmp/evaluation-1
+    [--scenarios control_plane,export_failure,task_crash,throughput] [--throughput-days 7]
+    [--set slot_size_limit_bytes=268435456 --set downloader_thread_count=8 ...]
+```
+
+It writes `scorecard.json` and exits non-zero if a gate fails. Gates are the design's guarantees (each good file's
+content in the lake exactly once, only unreadable files dead-lettered, no export journal left, ephemeral storage
+gone with the task, a failed export retried without dead-lettering, a crashed task's work finished by its
+replacement). Scores are what a design change should move: MB/s, seconds to first commit, export time, S3 objects
+and Parquet files written, snapshot count, peak ephemeral disk, peak task memory, messages in flight, candidate
+selection time. A design candidate is a code change or a `--set` of any `CustomerPipelineSettings` field; compare
+scorecards. `evaluation/fault_injecting_ingestion_task.py` is the parser task with failing or fatal lake appends.
+
 ## Modules
 
 | Module | What it is |

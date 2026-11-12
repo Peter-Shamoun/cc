@@ -23,6 +23,7 @@ import signal
 import subprocess
 import sys
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -30,7 +31,7 @@ from pathlib import Path
 import boto3
 
 from .customer_settings import CANDIDATE_OUTPUT_PREFIX, INPUT_PREFIX, CustomerPipelineSettings
-from .ingestion_task import EPHEMERAL_STORAGE_DIRECTORY_VARIABLE
+from .ingestion_task import EPHEMERAL_STORAGE_DIRECTORY_VARIABLE, directory_size_bytes
 from .provision_customer import IN_FLIGHT_METRIC, VISIBLE_METRIC
 
 log = logging.getLogger("claim_clarity_pipeline.emulator_stand_ins")
@@ -39,19 +40,21 @@ REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 
 # --- IT's mover jobs -------------------------------------------------------------------------------------------
 def move_sftp_incoming_to_s3_input(settings: CustomerPipelineSettings, sftp_incoming_directory: Path,
-                                   redeliver_every_nth_file: int = 0) -> dict:
+                                   redeliver_every_nth_file: int = 0, upload_thread_count: int = 8) -> dict:
     """Upload every file under the SFTP directory to the input prefix. With redeliver_every_nth_file = n, every
     nth file is uploaded a second time under another name: the IT job is known to move duplicates."""
     s3 = boto3.client("s3", region_name=settings.aws_region)
-    moved = redelivered = 0
+    uploads = []
     for number, path in enumerate(sorted(p for p in sftp_incoming_directory.rglob("*") if p.is_file()), start=1):
         key = INPUT_PREFIX + path.relative_to(sftp_incoming_directory).as_posix()
-        s3.upload_file(str(path), settings.bucket_name, key)
-        moved += 1
+        uploads.append((path, key))
         if redeliver_every_nth_file and number % redeliver_every_nth_file == 0:
-            s3.upload_file(str(path), settings.bucket_name, f"{key}.redelivered")
-            redelivered += 1
-    return {"files_moved": moved, "duplicate_deliveries": redelivered}
+            uploads.append((path, f"{key}.redelivered"))
+    with ThreadPoolExecutor(upload_thread_count) as pool:
+        list(pool.map(lambda upload: s3.upload_file(str(upload[0]), settings.bucket_name, upload[1]), uploads))
+    duplicate_deliveries = sum(key.endswith(".redelivered") for _, key in uploads)
+    return {"files_moved": len(uploads) - duplicate_deliveries, "duplicate_deliveries": duplicate_deliveries,
+            "bytes_moved": sum(path.stat().st_size for path, _ in uploads)}
 
 
 def move_s3_output_to_sftp_outgoing(settings: CustomerPipelineSettings, sftp_outgoing_directory: Path) -> list[Path]:
@@ -101,6 +104,26 @@ def fire_schedule_now(settings: CustomerPipelineSettings) -> str:
 
 
 # --- Fargate ---------------------------------------------------------------------------------------------------
+def process_tree_resident_memory_bytes(process_id: int) -> int:
+    """Resident memory of a process and its descendants (the parser task's parser processes), from /proc."""
+    children_by_parent: dict[int, list[int]] = {}
+    resident_pages: dict[int, int] = {}
+    for entry in Path("/proc").iterdir():
+        if entry.name.isdigit():
+            try:
+                fields = (entry / "stat").read_text().rsplit(")", 1)[1].split()
+            except (FileNotFoundError, ProcessLookupError):
+                continue
+            children_by_parent.setdefault(int(fields[1]), []).append(int(entry.name))
+            resident_pages[int(entry.name)] = int(fields[21])
+    total, stack = 0, [process_id]
+    while stack:
+        current = stack.pop()
+        total += resident_pages.get(current, 0)
+        stack += children_by_parent.get(current, [])
+    return total * os.sysconf("SC_PAGE_SIZE")
+
+
 @dataclass
 class _LocalTask:
     task_arn: str
@@ -108,6 +131,8 @@ class _LocalTask:
     process: subprocess.Popen
     ephemeral_storage: Path
     log_path: Path
+    peak_ephemeral_storage_bytes: int = 0
+    peak_resident_memory_bytes: int = 0
 
 
 class LocalFargate:
@@ -151,6 +176,10 @@ class LocalFargate:
             if not is_service_task or task["desiredStatus"] == "RUNNING":
                 self._start(task, is_service_task)
         for task_arn, local in list(self.running.items()):
+            local.peak_ephemeral_storage_bytes = max(local.peak_ephemeral_storage_bytes,
+                                                     directory_size_bytes(local.ephemeral_storage))
+            local.peak_resident_memory_bytes = max(local.peak_resident_memory_bytes,
+                                                   process_tree_resident_memory_bytes(local.process.pid))
             exit_code = local.process.poll()
             stopped_by_ecs = local.is_service_task and (
                 task_arn not in tasks or tasks[task_arn]["desiredStatus"] == "STOPPED")
@@ -186,7 +215,9 @@ class LocalFargate:
         self.exit_codes[local.task_arn] = exit_code
         shutil.rmtree(local.ephemeral_storage)
         self._record("task stopped, ephemeral storage torn down", local, exit_code=exit_code,
-                     stopped_by="ECS (service scaled in)" if stopped_by_ecs else "task exit")
+                     stopped_by="ECS (service scaled in)" if stopped_by_ecs else "task exit",
+                     peak_ephemeral_storage_bytes=local.peak_ephemeral_storage_bytes,
+                     peak_resident_memory_bytes=local.peak_resident_memory_bytes)
         if local.is_service_task and not stopped_by_ecs:              # it crashed: tell ECS, which replaces it
             self.ecs.stop_task(cluster=self.settings.ecs_cluster_name, task=local.task_arn,
                                reason=f"container exited with code {exit_code}")

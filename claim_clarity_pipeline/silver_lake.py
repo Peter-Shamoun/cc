@@ -123,7 +123,17 @@ class SilverLake:
 
     def export_slot(self, slot: duckdb.DuckDBPyConnection, export_id: str) -> dict:
         """Dedup, write Parquet, commit. slot holds staged rows under STAGING_DDL. Returns counts; afterwards every
-        file that was in the slot is in the lake (loaded by this export, or a duplicate of a loaded file)."""
+        file that was in the slot is in the lake (loaded by this export, or a duplicate of a loaded file).
+
+        The slot is left as it was found, whether the export succeeds or raises, so a failed export can simply be
+        called again: its partial appends are undone through the journal first."""
+        slot.execute("BEGIN")
+        try:
+            return self._export_slot(slot, export_id)
+        finally:
+            slot.execute("ROLLBACK")
+
+    def _export_slot(self, slot: duckdb.DuckDBPyConnection, export_id: str) -> dict:
         self.recover_interrupted_exports()
         files_seen = slot.execute(f"SELECT count(*) FROM {COMMIT_RECORD_TABLE}").fetchall()[0][0]
         duplicate_file_ids = self._remove_duplicate_files(slot)

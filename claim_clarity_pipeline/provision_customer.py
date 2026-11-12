@@ -25,12 +25,16 @@ CONTAINER_NAME = "task"
 CONTAINER_IMAGE = "claimclarity/pipeline:emulated"       # the local Fargate stand-in runs the command, not an image
 
 
-def provision_customer(settings: CustomerPipelineSettings, candidate_selection_preset: dict | None = None):
+def provision_customer(settings: CustomerPipelineSettings, candidate_selection_preset: dict | None = None,
+                       parser_task_module: str = "ingestion_task",
+                       parser_task_extra_environment: dict[str, str] | None = None):
+    """parser_task_module and parser_task_extra_environment let the evaluation suite run the parser task under
+    fault injection (evaluation/fault_injecting_ingestion_task.py)."""
     session = boto3.Session(region_name=settings.aws_region)
     _bucket(session, settings)
     queue_arn = _queues_and_s3_events(session, settings)
     SilverLake(settings).create_tables()
-    network = _ecs(session, settings)
+    network = _ecs(session, settings, parser_task_module, parser_task_extra_environment or {})
     _alarms_and_scaling(session, settings)
     _candidate_selection_schedule(session, settings, network)
     if candidate_selection_preset is not None:
@@ -85,13 +89,13 @@ def _role(session, role_name: str, service_principal: str) -> str:
         return iam.get_role(RoleName=role_name)["Role"]["Arn"]
 
 
-def _ecs(session, settings) -> dict:
+def _ecs(session, settings, parser_task_module: str, parser_task_extra_environment: dict[str, str]) -> dict:
     ecs = session.client("ecs")
     ecs.create_cluster(clusterName=settings.ecs_cluster_name)
     task_role_arn = _role(session, f"{settings.resource_name_prefix}-task", "ecs-tasks.amazonaws.com")
 
-    def register(family: str, module: str, vcpu_count: int, memory_mib: int):
-        environment = settings.to_environment() | {
+    def register(family: str, module: str, vcpu_count: int, memory_mib: int, extra_environment: dict[str, str]):
+        environment = settings.to_environment() | extra_environment | {
             TASK_VCPU_COUNT_VARIABLE: str(vcpu_count),
             # Fargate mounts the task's ephemeral storage here; nothing else in the task writes to disk
             EPHEMERAL_STORAGE_DIRECTORY_VARIABLE: "/ephemeral"}
@@ -105,10 +109,10 @@ def _ecs(session, settings) -> dict:
                 "command": ["python", "-m", f"claim_clarity_pipeline.{module}"],
                 "environment": [{"name": k, "value": v} for k, v in sorted(environment.items())]}])
 
-    register(settings.parser_task_family, "ingestion_task", settings.parser_task_vcpu_count,
-             settings.parser_task_memory_mib)
+    register(settings.parser_task_family, parser_task_module, settings.parser_task_vcpu_count,
+             settings.parser_task_memory_mib, parser_task_extra_environment)
     register(settings.candidate_task_family, "candidate_selection_task", settings.candidate_task_vcpu_count,
-             settings.candidate_task_memory_mib)
+             settings.candidate_task_memory_mib, {})
     subnet_ids = [s["SubnetId"] for s in session.client("ec2").describe_subnets()["Subnets"]][:2]
     network = {"subnets": subnet_ids, "assignPublicIp": "DISABLED"}
     services = ecs.describe_services(cluster=settings.ecs_cluster_name, services=[settings.parser_service_name])

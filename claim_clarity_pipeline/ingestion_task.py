@@ -13,8 +13,9 @@
     1 exporter thread    dedup, write Parquet, Iceberg commit, tell the SQS manager which files are committed,
                          wipe the slot
 
-A file that fails (download, parse, insert or export) is not deleted from SQS. The manager stops extending its
+A file that fails (download, parse or insert) is not deleted from SQS. The manager stops extending its
 visibility, SQS redelivers it, and after the queue's maxReceiveCount SQS moves it to the dead-letter queue.
+A slot export that fails is retried inside the task instead: that failure is not the files'.
 
 Everything on disk is under the task's ephemeral storage directory, which Fargate tears down with the task.
 """
@@ -47,6 +48,8 @@ from .silver_lake import COMMIT_RECORD_TABLE, SilverLake
 
 log = logging.getLogger("claim_clarity_pipeline.ingestion_task")
 QUEUE_POLL_SECONDS = 0.5
+EXPORT_RETRY_FIRST_SECONDS = 2.0
+EXPORT_RETRY_MAX_SECONDS = 60.0
 SQS_LONG_POLL_SECONDS = 2
 EPHEMERAL_STORAGE_DIRECTORY_VARIABLE = "CLAIM_CLARITY_EPHEMERAL_STORAGE_DIRECTORY"
 TASK_VCPU_COUNT_VARIABLE = "CLAIM_CLARITY_TASK_VCPU_COUNT"
@@ -332,17 +335,27 @@ def exporter_thread(lake: SilverLake, slots_to_export: queue.Queue, resolved_fil
         except queue.Empty:
             continue
         export_id = f"export_{datetime.now(UTC):%Y%m%dT%H%M%S}_{uuid.uuid4().hex[:8]}"
-        files = slot.files
-        try:
-            result = lake.export_slot(slot.connection, export_id)      # 1 dedup, 2 write Parquet, 3 Iceberg commit
-            log.info("committed slot %s: %s", slot.name, json.dumps(result))
-        except Exception as error:                        # noqa: BLE001 - the slot's files go back to SQS
-            log.exception("export of slot %s failed", slot.name)
-            for file in files:
-                file.failure = f"export: {type(error).__name__}: {error}"
-        for file in files:                                # 4 the SQS manager deletes the committed files' messages
-            resolved_files.put(file)
-        slot.wipe()                                       # 5
+        started, failed_attempts = time.monotonic(), 0
+        # A failed export is the lake's fault (S3, the catalog), not the files': it is retried here for as long as
+        # the task runs, while the SQS manager keeps the files' messages hidden. Releasing them instead would
+        # count a receive against every file of the slot and dead-letter good files after three failures.
+        while not stop_requested.is_set():
+            try:
+                result = lake.export_slot(slot.connection, export_id)  # 1 dedup, 2 write Parquet, 3 Iceberg commit
+            except Exception:                             # noqa: BLE001 - retried
+                failed_attempts += 1
+                retry_in_seconds = min(EXPORT_RETRY_MAX_SECONDS, EXPORT_RETRY_FIRST_SECONDS * 2 ** (failed_attempts - 1))
+                log.exception("export of slot %s failed (attempt %d); retrying in %.0f s", slot.name, failed_attempts,
+                              retry_in_seconds)
+                stop_requested.wait(retry_in_seconds)
+                continue
+            result |= {"slot": slot.name, "slot_staged_bytes": slot.staged_bytes, "failed_attempts": failed_attempts,
+                       "export_seconds": round(time.monotonic() - started, 2)}
+            log.info("committed slot: %s", json.dumps(result))
+            for file in slot.files:                       # 4 the SQS manager deletes the committed files' messages
+                resolved_files.put(file)
+            slot.wipe()                                   # 5
+            break
 
 
 # --- the task --------------------------------------------------------------------------------------------------
