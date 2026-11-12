@@ -180,7 +180,9 @@ def run(working_directory: Path, customer_code: str, mock_days: int, emulator_po
         report["mover_job"]["corrupt_files"] = 1
         log.info("IT mover job: %s", report["mover_job"])
         observer.wait_until("alarm set the service's desired count to 1 and the task started",
-                            lambda s: s["service_desired_count"] == 1 and s["local_parser_tasks_running"] == 1, 120)
+                            lambda s: s["service_desired_count"] == 1 and s["local_parser_tasks_running"] == 1, 400)
+        # Usually ~8 s after the alarm. Once, on an emulator already holding two other customers, App Auto Scaling
+        # acted 130 s after the alarm changed state.
         observer.wait_until("the corrupt file reached the dead-letter queue", lambda s: s["dead_letter_queue"] >= 1,
                             300)
         observer.wait_until("queue empty and nothing in flight", lambda s: s["queue_visible"] == 0

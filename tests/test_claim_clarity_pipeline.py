@@ -35,7 +35,7 @@ def test_whole_design_end_to_end_on_the_emulator(tmp_path):
     completed = subprocess.run(
         [sys.executable, "-m", "claim_clarity_pipeline.run_emulation", "--working-directory", str(working_directory),
          "--customer-code", customer_code, "--mock-days", "20", "--emulator-port", str(EMULATOR_PORT)],
-        cwd=REPOSITORY_ROOT, capture_output=True, text=True, timeout=900)
+        cwd=REPOSITORY_ROOT, capture_output=True, text=True, timeout=1500)
     assert completed.returncode == 0, completed.stderr[-4000:]
     report = json.loads((working_directory / "emulation_report.json").read_text())
     assert report["silver_lake"]["files_in_lake"] > 100
