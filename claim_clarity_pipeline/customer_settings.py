@@ -39,6 +39,7 @@ class CustomerPipelineSettings:
     ephemeral_disk_cap_bytes: int = 150 * 1024 ** 3  # downloaders wait while raw + parsed + slots use more
     slot_size_limit_bytes: int = 512 * 1024 ** 2     # a slot is exported when its staged rows reach this size
     slot_idle_export_seconds: float = 5.0            # ... or when no file has arrived for this long
+    export_table_thread_count: int = 8               # silver tables appended at once during a slot export
     # --- candidate selection -------------------------------------------------------------------------------------
     candidate_selection_schedule_expression: str = "cron(0 9 * * ? *)"    # nightly, 09:00 UTC
     candidate_task_vcpu_count: int = 2

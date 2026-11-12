@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlparse
@@ -193,7 +194,7 @@ class SilverLake:
         self.s3.put_object(Bucket=self.settings.bucket_name, Key=journal_key,
                            Body=json.dumps({"export_id": export_id, "file_ids": file_ids}).encode())
         lap("journal")
-        for table in SILVER_TABLES:
+        def append_table(table: str) -> tuple[str, int]:
             if table == INGEST_RUN_TABLE:
                 rows = pa.Table.from_pylist([dict(
                     ingest_run_id=export_id, started_at=now, finished_at=now, status="SUCCEEDED",
@@ -206,17 +207,24 @@ class SilverLake:
                 parts = [read_arrow_file(path) for directory in kept
                          if (path := directory / f"{table}.arrow").exists()]
                 if not parts:
-                    continue
+                    return table, 0
                 rows = pa.concat_tables(parts)
                 if table == COMMIT_RECORD_TABLE:              # the run that committed the file, and when
                     rows = rows.set_column(rows.schema.get_field_index("ingest_run_id"), "ingest_run_id",
                                            pa.array([export_id] * rows.num_rows, pa.string()))
                     rows = rows.set_column(rows.schema.get_field_index("ingested_at"), "ingested_at",
                                            pa.array([now] * rows.num_rows, pa.timestamp("us")))
-            lap("read_slot")
             self.append(table, rows, {EXPORT_ID_SNAPSHOT_PROPERTY: export_id})
-            result["rows_by_table"][table] = rows.num_rows
-            lap("write_parquet_and_commit")
+            return table, rows.num_rows
+
+        # The tables are independent Iceberg tables: their appends run side by side. The commit record goes last,
+        # alone, once every other table has committed.
+        with ThreadPoolExecutor(self.settings.export_table_thread_count) as pool:
+            appended = list(pool.map(append_table, [t for t in SILVER_TABLES if t != COMMIT_RECORD_TABLE]))
+        lap("write_parquet_and_commit_tables")
+        appended.append(append_table(COMMIT_RECORD_TABLE))
+        lap("write_parquet_and_commit_record")
+        result["rows_by_table"] = {table: rows for table, rows in appended if rows}
         self.s3.delete_object(Bucket=self.settings.bucket_name, Key=journal_key)
         lap("journal")
         return result
