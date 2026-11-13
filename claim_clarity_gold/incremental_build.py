@@ -49,23 +49,29 @@ CREATE TABLE IF NOT EXISTS top_submission (
     claim_key TEXT NOT NULL PRIMARY KEY, claim_id TEXT NOT NULL, rank_key TEXT NOT NULL, submission_date TEXT
 ) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS claim_payer (
-    claim_key TEXT NOT NULL, payer_key TEXT NOT NULL, payer_class TEXT, first_activity_month TEXT,
-    first_submission_date TEXT, first_primary_submission_date TEXT, submission_count INTEGER NOT NULL,
-    claim_charge_amount TEXT, claim_frequency_code TEXT, first_remit_date TEXT, remit_count INTEGER NOT NULL,
-    has_current_adjudication INTEGER NOT NULL, current_payment_date TEXT, current_paid_amount TEXT,
+    claim_key TEXT NOT NULL, payer_key TEXT NOT NULL, payer_class TEXT, payer_responsibility TEXT,
+    first_activity_month TEXT, first_submission_date TEXT, first_primary_submission_date TEXT,
+    last_submission_date TEXT, submission_count INTEGER NOT NULL, claim_charge_amount TEXT,
+    claim_frequency_code TEXT, first_remit_date TEXT, remit_count INTEGER NOT NULL,
+    has_current_adjudication INTEGER NOT NULL, current_payment_date TEXT, current_charge_amount TEXT,
+    current_paid_amount TEXT, current_patient_responsibility_amount TEXT, current_co_amount TEXT,
     current_is_denied INTEGER, PRIMARY KEY (claim_key, payer_key)) WITHOUT ROWID;
 """
 # The batch's part of each claim_payers row, from the batch's claims and remit_claims rows.
 BATCH_SUBMISSIONS_SQL = """
-SELECT claim_key, payer_key, any_value(payer_class), min(submission_date)::VARCHAR,
-       (min(submission_date) FILTER (WHERE payer_responsibility = 'P'))::VARCHAR, count(*)
+SELECT claim_key, payer_key, any_value(payer_class), min(payer_responsibility), min(submission_date)::VARCHAR,
+       (min(submission_date) FILTER (WHERE payer_responsibility = 'P'))::VARCHAR, max(submission_date)::VARCHAR,
+       count(*)
 FROM batch_claims GROUP BY claim_key, payer_key"""
 BATCH_REMITS_SQL = """
 SELECT claim_key, payer_key, any_value(payer_class), min(payment_date)::VARCHAR, count(*),
        count(*) FILTER (WHERE is_current_adjudication) > 0,
+       any_value(is_denied) FILTER (WHERE is_current_adjudication),
        (any_value(payment_date) FILTER (WHERE is_current_adjudication))::VARCHAR,
+       (any_value(charge_amount) FILTER (WHERE is_current_adjudication))::VARCHAR,
        (any_value(paid_amount) FILTER (WHERE is_current_adjudication))::VARCHAR,
-       any_value(is_denied) FILTER (WHERE is_current_adjudication)
+       (any_value(patient_responsibility_amount) FILTER (WHERE is_current_adjudication))::VARCHAR,
+       (any_value(co_amount) FILTER (WHERE is_current_adjudication))::VARCHAR
 FROM batch_remit_claims GROUP BY claim_key, payer_key"""
 BATCH_LATEST_SUBMISSIONS_SQL = ("SELECT claim_key, charge_amount::VARCHAR, frequency_code FROM batch_claims "
                                 "WHERE is_latest_submission")
@@ -245,6 +251,9 @@ class IncrementalGold:
         def earlier(one: str | None, other: str | None) -> str | None:
             return min(filter(None, (one, other)), default=None)
 
+        def later(one: str | None, other: str | None) -> str | None:
+            return max(filter(None, (one, other)), default=None)
+
         def row_of(claim_key: str, payer_key: str) -> list:
             key = (claim_key, payer_key)
             if key not in changed:
@@ -267,23 +276,26 @@ class IncrementalGold:
 
         work.register("batch_claims", batch_claims)
         work.register("batch_remit_claims", batch_remit_claims)
-        for claim_key, payer_key, payer_class, first, first_primary, count in work.execute(BATCH_SUBMISSIONS_SQL).fetchall():
+        for (claim_key, payer_key, payer_class, payer_responsibility, first, first_primary, last,
+             count) in work.execute(BATCH_SUBMISSIONS_SQL).fetchall():
             row = row_of(claim_key, payer_key)
             row[column["payer_class"]] = payer_class
+            row[column["payer_responsibility"]] = earlier(row[column["payer_responsibility"]], payer_responsibility)
+            row[column["last_submission_date"]] = later(row[column["last_submission_date"]], last)
             row[column["first_submission_date"]] = earlier(row[column["first_submission_date"]], first)
             row[column["first_primary_submission_date"]] = earlier(row[column["first_primary_submission_date"]], first_primary)
             row[column["submission_count"]] += count
-        for (claim_key, payer_key, payer_class, first, count, has_current, current_payment_date, current_paid_amount,
-             current_is_denied) in work.execute(BATCH_REMITS_SQL).fetchall():
+        current_columns = [column[name] for name in (
+            "has_current_adjudication", "current_is_denied", "current_payment_date", "current_charge_amount",
+            "current_paid_amount", "current_patient_responsibility_amount", "current_co_amount")]
+        for claim_key, payer_key, payer_class, first, count, *current in work.execute(BATCH_REMITS_SQL).fetchall():
             row = row_of(claim_key, payer_key)
             row[column["payer_class"]] = row[column["payer_class"]] or payer_class
             row[column["first_remit_date"]] = earlier(row[column["first_remit_date"]], first)
             row[column["remit_count"]] += count
             if (claim_key, payer_key) in claim_payers_with_new_top_remit:
-                row[column["has_current_adjudication"]] = has_current
-                row[column["current_payment_date"]] = current_payment_date
-                row[column["current_paid_amount"]] = current_paid_amount
-                row[column["current_is_denied"]] = current_is_denied
+                for position, value in zip(current_columns, current):
+                    row[position] = value
         for claim_key, charge_amount, frequency_code in work.execute(BATCH_LATEST_SUBMISSIONS_SQL).fetchall():
             if claim_key not in claims_with_new_top_submission:
                 continue

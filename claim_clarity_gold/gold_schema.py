@@ -89,16 +89,18 @@ GOLD_RELATIONS: dict[str, GoldRelation] = {
 # One row per claim and payer: what was submitted to the payer and what the payer has answered. Defined over the
 # gold relations claims and remit_claims, named by the two placeholders.
 CLAIM_PAYERS_COLUMNS = [
-    "claim_key", "payer_key", "payer_class", "first_activity_month", "first_submission_date",
-    "first_primary_submission_date", "submission_count", "claim_charge_amount", "claim_frequency_code",
-    "first_remit_date", "remit_count", "has_current_adjudication", "current_payment_date", "current_paid_amount",
-    "current_is_denied"]
+    "claim_key", "payer_key", "payer_class", "payer_responsibility", "first_activity_month",
+    "first_submission_date", "first_primary_submission_date", "last_submission_date", "submission_count",
+    "claim_charge_amount", "claim_frequency_code", "first_remit_date", "remit_count", "has_current_adjudication",
+    "current_payment_date", "current_charge_amount", "current_paid_amount", "current_patient_responsibility_amount",
+    "current_co_amount", "current_is_denied"]
 CLAIM_PAYERS_PARTITION_BY = "first_activity_month"
 CLAIM_PAYERS_SQL = """
 WITH latest AS (SELECT claim_key, charge_amount, frequency_code FROM {claims} WHERE is_latest_submission),
 submissions AS (
     SELECT claim_key, payer_key, any_value(payer_class) AS payer_class,
-           min(submission_date) AS first_submission_date,
+           min(payer_responsibility) AS payer_responsibility,      -- 'P' if the payer was ever billed as primary
+           min(submission_date) AS first_submission_date, max(submission_date) AS last_submission_date,
            min(submission_date) FILTER (WHERE payer_responsibility = 'P') AS first_primary_submission_date,
            count(*) AS submission_count
     FROM {claims} GROUP BY claim_key, payer_key),
@@ -107,15 +109,21 @@ remits AS (
            min(payment_date) AS first_remit_date, count(*) AS remit_count,
            count(*) FILTER (WHERE is_current_adjudication) > 0 AS has_current_adjudication,
            any_value(payment_date) FILTER (WHERE is_current_adjudication) AS current_payment_date,
+           any_value(charge_amount) FILTER (WHERE is_current_adjudication) AS current_charge_amount,
            any_value(paid_amount) FILTER (WHERE is_current_adjudication) AS current_paid_amount,
+           any_value(patient_responsibility_amount) FILTER (WHERE is_current_adjudication)
+               AS current_patient_responsibility_amount,
+           any_value(co_amount) FILTER (WHERE is_current_adjudication) AS current_co_amount,
            any_value(is_denied) FILTER (WHERE is_current_adjudication) AS current_is_denied
     FROM {remit_claims} GROUP BY claim_key, payer_key)
-SELECT claim_key, payer_key, coalesce(s.payer_class, r.payer_class) AS payer_class,
+SELECT claim_key, payer_key, coalesce(s.payer_class, r.payer_class) AS payer_class, s.payer_responsibility,
        date_trunc('month', least(s.first_submission_date, r.first_remit_date))::DATE AS first_activity_month,
-       s.first_submission_date, s.first_primary_submission_date, coalesce(s.submission_count, 0) AS submission_count,
+       s.first_submission_date, s.first_primary_submission_date, s.last_submission_date,
+       coalesce(s.submission_count, 0) AS submission_count,
        l.charge_amount AS claim_charge_amount, l.frequency_code AS claim_frequency_code,
        r.first_remit_date, coalesce(r.remit_count, 0) AS remit_count,
        coalesce(r.has_current_adjudication, false) AS has_current_adjudication,
-       r.current_payment_date, r.current_paid_amount, r.current_is_denied
+       r.current_payment_date, r.current_charge_amount, r.current_paid_amount,
+       r.current_patient_responsibility_amount, r.current_co_amount, r.current_is_denied
 FROM submissions s FULL JOIN remits r USING (claim_key, payer_key) LEFT JOIN latest l USING (claim_key)
 """
