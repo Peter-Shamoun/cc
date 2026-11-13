@@ -155,7 +155,10 @@ Open design points:
   file (`edi_ingest_run`, the envelopes); the evaluation's `silver_parquet_files_by_table` lists them. Delivered a
   day at a time, as in production, the task runs once a day and each run exports at least once, so a year is at
   least 365 files per table, about 10,000 files, most of them small: that is what a compaction schedule has to work
-  on.
+  on. The `daily` scenario (`--scenarios daily`) runs it that way: on 30 days (21 received days, 95 MB) every gate
+  passes, a day's run takes 23.5 s on average from task start to stop, and silver ends with 525 Parquet files
+  averaging 0.18 MB (`edi.segment`: 21 files, median 1.1 MB; a dozen tables: 21 files of about 5 KB each). At that
+  rate a year is about 6,400 files.
 - **The parsers are the limit**: about 1.9 MB/s for a parser process with a core to itself, 3 MB per second of
   parser time on large files. With small files staged together, what is left beside the parsing itself is
   turning the rows into Arrow: about a quarter of a parser's time, of which turning row dicts into columns is
