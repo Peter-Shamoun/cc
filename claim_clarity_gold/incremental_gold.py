@@ -6,7 +6,7 @@
 
 A batch's cost follows the batch and the size of a month, not the size of silver.
 
-    <catalog>                       the Iceberg tables gold.<relation>, partitioned by month
+    <catalog>                       the Iceberg tables <namespace>.<relation>, partitioned by month
     <gold>/_key_index.sqlite        build state, not for queries: for each claim, and each claim and payer, the
                                     month partition its state row is in and the rank of its top-ranked event (to
                                     tell whether the batch's event outranks it)
@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import sqlite3
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -32,7 +33,6 @@ from ccsim.silver_staging import STAGING_DDL
 from .gold_relations import (CLAIM_PAYERS_SQL, CLAIMS_SQL, EVENT_RELATIONS, LATEST_SUBMISSION_COLUMNS,
                              STATE_MONTH_COLUMN, STATE_SORT_COLUMNS)
 
-GOLD_NAMESPACE = "gold"
 # The semantic views rank events with these keys; as text that sorts the same way. NULL dates rank last.
 REMIT_RANK_KEY_SQL = ("concat_ws('|', CASE WHEN is_duplicate_claim_denial THEN '0' ELSE '1' END, "
                       "coalesce(strftime(payment_date, '%Y%m%d'), '00000000'), "
@@ -68,10 +68,11 @@ CLAIM_PAYERS_FOLD = {
 
 
 class IncrementalGold:
-    def __init__(self, gold_directory: Path, catalog: Catalog):
+    def __init__(self, gold_directory: Path, catalog: Catalog, namespace: str):
+        """namespace: the catalog database holding this customer's gold tables."""
         gold_directory.mkdir(parents=True, exist_ok=True)
-        self.catalog = catalog
-        catalog.create_namespace_if_not_exists(GOLD_NAMESPACE)
+        self.catalog, self.namespace = catalog, namespace
+        catalog.create_namespace_if_not_exists(namespace)
         self.key_index = sqlite3.connect(gold_directory / "_key_index.sqlite")
         self.key_index.executescript(KEY_INDEX_DDL)
         self.key_index.execute("CREATE TEMP TABLE wanted (claim_key TEXT PRIMARY KEY) WITHOUT ROWID")
@@ -89,7 +90,7 @@ class IncrementalGold:
 
     # --- Iceberg ---------------------------------------------------------------------------------------------------
     def _table(self, name: str, rows: pa.Table, month_column: str):
-        identifier = f"{GOLD_NAMESPACE}.{name}"
+        identifier = f"{self.namespace}.{name}"
         if not self.catalog.table_exists(identifier):
             table = self.catalog.create_table(identifier, schema=rows.schema,
                                               properties={"commit.manifest-merge.enabled": "true"})
@@ -101,7 +102,7 @@ class IncrementalGold:
     def _read_state_months(self, name: str, months: set[str | None], into: str):
         """The rows of a state table in these month partitions, as the work relation `into`."""
         self.work.execute(f"CREATE OR REPLACE TEMP TABLE {into} AS SELECT * FROM empty_{name}")
-        identifier = f"{GOLD_NAMESPACE}.{name}"
+        identifier = f"{self.namespace}.{name}"
         if not months or not self.catalog.table_exists(identifier):
             return
         named = sorted(month for month in months if month is not None)
@@ -148,14 +149,14 @@ class IncrementalGold:
                              "hive_partitioning = false)")
         lap("load_batch")
 
-        # event tables: append
-        event_rows_added = 0
-        for name, relation in EVENT_RELATIONS.items():
-            rows = work.sql(f"SELECT {', '.join(relation.columns)} FROM sem.{relation.semantic_relation} "
-                            f"ORDER BY {relation.sort_columns}").to_arrow_table()
-            if rows.num_rows:
-                self._table(name, rows, relation.month_column).append(rows)
-                event_rows_added += rows.num_rows
+        # event tables: append. They are independent Iceberg tables, so their commits run side by side.
+        event_rows = {name: work.sql(f"SELECT {', '.join(relation.columns)} FROM sem.{relation.semantic_relation} "
+                                     f"ORDER BY {relation.sort_columns}").to_arrow_table()
+                      for name, relation in EVENT_RELATIONS.items()}
+        with ThreadPoolExecutor(len(EVENT_RELATIONS)) as pool:
+            list(pool.map(lambda name: self._table(name, event_rows[name], EVENT_RELATIONS[name].month_column)
+                          .append(event_rows[name]), [name for name, rows in event_rows.items() if rows.num_rows]))
+        event_rows_added = sum(rows.num_rows for rows in event_rows.values())
         lap("append_events")
 
         # the batch's part of the state, from the batch's rows alone
@@ -272,8 +273,8 @@ class IncrementalGold:
         sort_columns = {name: relation.sort_columns for name, relation in EVENT_RELATIONS.items()} | STATE_SORT_COLUMNS
         month_columns = {name: relation.month_column for name, relation in EVENT_RELATIONS.items()} | dict.fromkeys(
             STATE_SORT_COLUMNS, STATE_MONTH_COLUMN)
-        for _, name in self.catalog.list_tables(GOLD_NAMESPACE):
-            table = self.catalog.load_table(f"{GOLD_NAMESPACE}.{name}")
+        for _, name in self.catalog.list_tables(self.namespace):
+            table = self.catalog.load_table(f"{self.namespace}.{name}")
             files_per_month: dict[int | None, int] = {}     # a month as Iceberg stores it: days since 1970
             for task in table.scan().plan_files():
                 month = task.file.partition[0]
@@ -289,7 +290,7 @@ class IncrementalGold:
                 table.overwrite(merged, overwrite_filter=month_filter)
                 files_merged += file_count
             table.maintenance.expire_snapshots().older_than(datetime.now()).commit()
-            table = self.catalog.load_table(f"{GOLD_NAMESPACE}.{name}")
+            table = self.catalog.load_table(f"{self.namespace}.{name}")
             in_use = {task.file.file_path for task in table.scan().plan_files()}
             filesystem, data_path = pa.fs.FileSystem.from_uri(f"{table.location()}/data")
             for file in filesystem.get_file_info(pa.fs.FileSelector(data_path, recursive=True)):
@@ -304,13 +305,14 @@ class IncrementalGold:
         self.key_index.close()
 
 
-def open_incremental_gold(catalog: Catalog, filesystem: pa.fs.FileSystem | None = None) -> duckdb.DuckDBPyConnection:
+def open_incremental_gold(catalog: Catalog, namespace: str,
+                          filesystem: pa.fs.FileSystem | None = None) -> duckdb.DuckDBPyConnection:
     """A DuckDB session with every gold relation as gold.<name>, over the Iceberg tables' current data files.
     filesystem: where the files are when not on local disk (S3, as the silver lake opens it)."""
     con = duckdb.connect()
     con.execute("CREATE SCHEMA gold")
-    for _, name in catalog.list_tables(GOLD_NAMESPACE):
-        paths = [task.file.file_path for task in catalog.load_table(f"{GOLD_NAMESPACE}.{name}").scan().plan_files()]
+    for _, name in catalog.list_tables(namespace):
+        paths = [task.file.file_path for task in catalog.load_table(f"{namespace}.{name}").scan().plan_files()]
         if filesystem is None:
             con.execute(f"CREATE VIEW gold.{name} AS SELECT * FROM read_parquet("
                         f"{[path.removeprefix('file://') for path in paths]})")
