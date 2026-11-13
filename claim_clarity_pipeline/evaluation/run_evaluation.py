@@ -128,6 +128,17 @@ def sqs_manager_totals(task_log_directory: Path) -> dict | None:
     return totals
 
 
+def _parquet_files_by_table(data_files: list[dict]) -> dict[str, dict]:
+    """For each silver table (the path segment before /data/): how many Parquet files, their total and median MB."""
+    sizes_by_table: dict[str, list[int]] = {}
+    for data_file in data_files:
+        table = data_file["Key"].split("/data/")[0].rsplit("/", 1)[-1]
+        sizes_by_table.setdefault(table, []).append(data_file["Size"])
+    return {table: {"files": len(sizes), "megabytes": round(sum(sizes) / 1e6, 1),
+                    "median_megabytes": round(sorted(sizes)[len(sizes) // 2] / 1e6, 3)}
+            for table, sizes in sorted(sizes_by_table.items(), key=lambda item: -sum(item[1]))}
+
+
 def run_data_plane_scenario(scenario: str, working_directory: Path, settings: CustomerPipelineSettings,
                             raw_directory: Path, parser_task_extra_environment: dict[str, str],
                             run_candidate_selection: bool, timeout_seconds: float) -> dict:
@@ -250,6 +261,8 @@ def run_data_plane_scenario(scenario: str, working_directory: Path, settings: Cu
             "silver_parquet_files": len(data_files),
             "silver_parquet_megabytes_mean": round(sum(o["Size"] for o in data_files) * megabytes / len(data_files), 3)
             if data_files else None,
+            # what a compaction schedule would work on: each table's Parquet files (an export writes one per table)
+            "silver_parquet_files_by_table": _parquet_files_by_table(data_files),
             "iceberg_snapshots_per_table_max": max(t["snapshots"] for t in lake["tables"].values()),
             "peak_ephemeral_storage_megabytes": round(max((t["peak_ephemeral_storage_bytes"] for t in parser_tasks),
                                                           default=0) * megabytes, 1),
