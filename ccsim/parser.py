@@ -1,4 +1,4 @@
-"""X12 837P / 835 parser -> rows for the lossless schema (claude/schema/01_lossless_edi_schema.sql).
+"""X12 837P / 835 / 277CA parser -> rows for the lossless schema (claude/schema/01_lossless_edi_schema.sql).
 
 Lossless at two levels: every segment lands in edi.segment with its exact location in the bronze object (byte_offset,
 byte_length; bronze is immutable under Object Lock), and every element of every segment lands in a typed table or,
@@ -26,10 +26,11 @@ import duckdb
 
 DDL_LOSSLESS = (Path(__file__).resolve().parent.parent / "claude/schema/01_lossless_edi_schema.sql").read_text()
 TABLES = ["edi.source_file", "edi.segment", "edi.interchange", "edi.functional_group", "edi.transaction_set",
-          "edi.entity", "edi.reference", "edi.date_time", "edi.amount", "edi.adjustment", "edi.contact",
-          "edi.misc_segment", "c837.hl", "c837.claim", "c837.claim_code", "c837.other_payer", "c837.service_line",
-          "c837.line_adjudication", "r835.payment", "r835.claim_payment", "r835.medicare_adjudication",
-          "r835.service_payment", "r835.remark", "r835.provider_adjustment"]
+          "edi.entity", "edi.reference", "edi.date_time", "edi.amount", "edi.quantity", "edi.adjustment",
+          "edi.contact", "edi.misc_segment", "c837.hl", "c837.claim", "c837.claim_code", "c837.other_payer",
+          "c837.service_line", "c837.line_adjudication", "r835.payment", "r835.claim_payment",
+          "r835.medicare_adjudication", "r835.service_payment", "r835.remark", "r835.provider_adjustment",
+          "a277.status_trace", "a277.service_line", "a277.status"]
 # edi.segment rows are tuples of these. bronze[byte_offset:byte_offset + byte_length] is the segment as received
 # (without its terminator; an 80-column-wrapped segment includes its line breaks).
 SEGMENT_FIELDS = ("file_id", "seg_ord", "interchange_uid", "group_uid", "txn_uid", "segment_id", "loop_id",
@@ -38,6 +39,9 @@ TEXT_CHUNK_CHARS = 1 << 20
 
 LOOP_837_NM1 = {"41": "1000A", "40": "1000B", "85": "2010AA", "87": "2010AB", "IL": "2010BA", "PR": "2010BB",
                 "QC": "2010CA", "DN": "2310A", "82": "2310B", "77": "2310C", "DQ": "2310D"}
+IMPLEMENTATION_277CA = "005010X214"                           # the only 277 parsed: the claim acknowledgment
+HL_LEVEL_277CA = {"20": "A", "21": "B", "19": "C", "PT": "D"}   # HL03 -> the letter of its loops (2000A, 2100A, ...)
+FILE_KIND = {"837": "837P", "277": "277CA"}                   # edi.source_file.file_kind of a file of one kind
 
 
 class ParseError(ValueError):
@@ -203,8 +207,9 @@ class _State:
         self.hl20 = self.hl22 = self.hl23 = self.hl = None
         self.claim = self.line = self.other_payer = self.svd = None
         self.pay = self.clp = self.svc = None
+        self.trace = self.status_line = None                  # 277CA: the open TRN loop, its open service line
         self.ent = None
-        self.n_claim = self.n_clp = self.n_svc = self.n_hi = self.code_seq = self.cas_n = self.n_op = 0
+        self.n_claim = self.n_clp = self.n_svc = self.n_hi = self.code_seq = self.cas_n = self.n_op = self.n_stc = 0
         self.st_ord = 0
         self.hl_uid_by_hl01 = {}       # latest HL with each HL01 in the file: the HL02 parent lookup
         self.n_interchanges = self.n_transactions = 0
@@ -241,6 +246,8 @@ def _parse(data, file_id, tenant, s3, ingest_run_id, ingested_at, sink: TableRow
                     _seg_837(st, add, e, sid, so, u, file_id, comp)
                 elif st.kind == "835":
                     _seg_835(st, add, e, sid, so, u, file_id, comp)
+                elif st.kind == "277":
+                    _seg_277(st, add, e, sid, so, u, file_id, comp)
                 else:
                     raise ParseError(f"unsupported transaction set {st.kind}")
             elif sid == "ISA":
@@ -276,6 +283,8 @@ def _parse(data, file_id, tenant, s3, ingest_run_id, ingested_at, sink: TableRow
                 st.gp_row.update(ge01_txn_count=int(e[1]), ge02_control_number=e[2], ge_seg_ord=so)
                 st.gp = None
             elif sid == "ST":
+                if e[1] == "277" and _el(e, 3) != IMPLEMENTATION_277CA:
+                    raise ParseError(f"unsupported transaction set 277 {_el(e, 3)}: only {IMPLEMENTATION_277CA}")
                 st.tx, st.kind, st.st_ord, st.loop = u, e[1], so, "HEADER"
                 txn_uid = u
                 st.tx_row = add["edi.transaction_set"](
@@ -284,7 +293,7 @@ def _parse(data, file_id, tenant, s3, ingest_run_id, ingested_at, sink: TableRow
                 st.n_transactions += 1
                 st.txn_kinds.add(e[1])
                 st.hl20 = st.hl22 = st.hl23 = st.hl = st.claim = st.line = st.other_payer = st.svd = None
-                st.clp = st.svc = st.ent = None
+                st.clp = st.svc = st.ent = st.trace = st.status_line = None
                 st.n_claim = st.n_clp = 0
                 st.pay = add["r835.payment"](payment_uid=u + "/pay", txn_uid=u, file_id=file_id, seg_ord=so) \
                     if e[1] == "835" else None
@@ -310,7 +319,7 @@ def _parse(data, file_id, tenant, s3, ingest_run_id, ingested_at, sink: TableRow
         raise ParseError("no transaction sets")
     kinds = st.txn_kinds
     add["edi.source_file"](file_id=file_id, tenant_code=tenant,
-                           file_kind="837P" if kinds == {"837"} else "/".join(sorted(kinds)),
+                           file_kind="/".join(FILE_KIND.get(k, k) for k in sorted(kinds)),
                            ingest_run_id=ingest_run_id, ingested_at=ingested_at, parse_status="PARSED",
                            segment_count=so, interchange_count=st.n_interchanges,
                            transaction_count=st.n_transactions, **s3)
@@ -358,6 +367,9 @@ def _child(st, add, e, sid, so, u, file_id, owner, owner_table) -> bool:
     elif sid == "AMT":
         add["edi.amount"](amt_uid=u, txn_uid=tx, owner_uid=owner, owner_table=owner_table, file_id=file_id, seg_ord=so,
             loop_id=st.loop, qualifier=e[1], amount=_num(_el(e, 2)), raw_amount=_el(e, 2), credit_debit_flag=_el(e, 3))
+    elif sid == "QTY" and len(e) <= 4:                           # a QTY04 has no column: that QTY goes to misc_segment
+        add["edi.quantity"](qty_uid=u, txn_uid=tx, owner_uid=owner, owner_table=owner_table, file_id=file_id, seg_ord=so,
+            loop_id=st.loop, qualifier=e[1], quantity=_num(_el(e, 2)), raw_quantity=_el(e, 2), qty03_raw=_el(e, 3))
     elif sid == "PER":
         add["edi.contact"](contact_uid=u, txn_uid=tx, owner_uid=owner, owner_table=owner_table, file_id=file_id,
             seg_ord=so, loop_id=st.loop, function_code=e[1], contact_name=_el(e, 2), comm1_qual=_el(e, 3),
@@ -391,23 +403,32 @@ def _close(obj, so):
         obj["seg_ord_end"] = so - 1
 
 
+def _bht(st, e):
+    st.tx_row.update(bht01_structure_code=e[1], bht02_purpose_code=e[2], bht03_reference_id=e[3],
+                     bht04_date=_d8(e[4]), bht05_time=_el(e, 5), bht06_claim_or_encounter=_el(e, 6))
+
+
+def _hl(st, add, e, so, u, file_id, loop):
+    """HL of an 837 or a 277CA -> c837.hl; it becomes the open level (st.hl) and st.loop."""
+    st.loop = loop
+    parent = st.hl_uid_by_hl01.get(_el(e, 2))
+    st.hl_uid_by_hl01[e[1]] = u
+    st.hl = add["c837.hl"](hl_uid=u, txn_uid=st.tx, file_id=file_id, seg_ord=so, loop_id=loop, hl01_id=e[1],
+                hl02_parent_id=_el(e, 2), hl03_level_code=e[3], hl04_child_code=_el(e, 4), parent_hl_uid=parent)
+
+
 # --- 837P -----------------------------------------------------------------------------------------
 def _seg_837(st, add, e, sid, so, u, file_id, comp):
     tx = st.tx
     if sid == "BHT":
-        st.tx_row.update(bht01_structure_code=e[1], bht02_purpose_code=e[2], bht03_reference_id=e[3],
-                         bht04_date=_d8(e[4]), bht05_time=_el(e, 5), bht06_claim_or_encounter=_el(e, 6))
+        _bht(st, e)
         return
     if sid == "HL":
         _close(st.line, so)
         _close(st.claim, so)
         st.line = st.claim = st.other_payer = st.svd = st.ent = None
         level = e[3]
-        st.loop = {"20": "2000A", "22": "2000B", "23": "2000C"}.get(level, "2000")
-        parent = st.hl_uid_by_hl01.get(_el(e, 2))
-        st.hl_uid_by_hl01[e[1]] = u
-        st.hl = add["c837.hl"](hl_uid=u, txn_uid=tx, file_id=file_id, seg_ord=so, loop_id=st.loop, hl01_id=e[1],
-                    hl02_parent_id=_el(e, 2), hl03_level_code=level, hl04_child_code=_el(e, 4), parent_hl_uid=parent)
+        _hl(st, add, e, so, u, file_id, {"20": "2000A", "22": "2000B", "23": "2000C"}.get(level, "2000"))
         if level == "20":
             st.hl20, st.hl22, st.hl23 = u, None, None
         elif level == "22":
@@ -643,3 +664,67 @@ def _seg_835(st, add, e, sid, so, u, file_id, comp):
         _misc(st, add, e, sid, so, u, file_id, owner, ot)
     if sid == "REF" and e[1] == "6R" and st.svc is not None:
         st.svc["line_item_control_number"] = _el(e, 2)
+
+
+# --- 277CA ----------------------------------------------------------------------------------------
+def _seg_277(st, add, e, sid, so, u, file_id, comp):
+    """Loops, per hierarchical level A-D (HL_LEVEL_277CA): 2000x HL / 2100x NM1 / 2200x TRN and what it owns (STC,
+    REF, DTP, QTY, AMT) / 2220D SVC and what it owns (STC, REF, DTP)."""
+    tx = st.tx
+    if sid == "BHT":
+        _bht(st, e)
+        return
+    if sid == "HL":
+        st.trace = st.status_line = st.ent = None
+        _hl(st, add, e, so, u, file_id, "2000" + HL_LEVEL_277CA.get(e[3], ""))
+        return
+    level = st.hl["loop_id"][4:]                              # a segment before the first HL is malformed (TypeError)
+    if sid == "NM1":
+        st.loop = "2100" + level
+        _entity(st, add, e, so, u, file_id, st.hl["hl_uid"], "c837.hl", st.loop, sid)
+        return
+    if sid == "TRN":
+        st.status_line = st.ent = None
+        st.n_stc = 0
+        st.loop = "2200" + level
+        st.trace = add["a277.status_trace"](status_trace_uid=u, txn_uid=tx, hl_uid=st.hl["hl_uid"], file_id=file_id,
+                       seg_ord=so, loop_id=st.loop, trn01_trace_type=_el(e, 1), trn02_trace_identifier=e[2],
+                       trn03=_el(e, 3), trn04=_el(e, 4))
+        return
+    if sid == "SVC":
+        p = _proc(e[1], comp)
+        st.n_stc = 0
+        st.loop = "2220" + level
+        st.status_line = add["a277.service_line"](service_line_uid=u, status_trace_uid=st.trace["status_trace_uid"],
+                             txn_uid=tx, file_id=file_id, seg_ord=so, svc01_raw=e[1], svc01_1_qualifier=p[0],
+                             svc01_2_procedure_code=p[1], svc01_3_mod1=p[2], svc01_4_mod2=p[3], svc01_5_mod3=p[4],
+                             svc01_6_mod4=p[5], svc01_7_description=p[6], svc01_8=p[7],
+                             svc02_charge=_num(_el(e, 2)), raw_svc02=_el(e, 2), svc03=_el(e, 3),
+                             svc04_revenue_code=_el(e, 4), svc05=_el(e, 5), svc06=_el(e, 6),
+                             svc07_units=_num(_el(e, 7)), raw_svc07=_el(e, 7))
+        return
+    if st.status_line is not None:
+        owner, ot = st.status_line["service_line_uid"], "a277.service_line"
+    elif st.trace is not None:
+        owner, ot = st.trace["status_trace_uid"], "a277.status_trace"
+    else:
+        owner, ot = st.hl["hl_uid"], "c837.hl"
+    if sid == "STC" and ot != "c837.hl" and len(e) <= 13:
+        st.n_stc += 1
+        for composite_index, position in ((1, 1), (2, 10), (3, 11)):
+            composite = _el(e, position)
+            if composite is None:
+                continue
+            parts = (composite.split(comp) + [None] * 4)[:4]
+            add["a277.status"](status_uid=f"{u}:{composite_index}", txn_uid=tx, owner_uid=owner, owner_table=ot,
+                file_id=file_id, seg_ord=so, loop_id=st.loop, stc_ordinal=st.n_stc, composite_index=composite_index,
+                raw_composite=composite, category_code=parts[0], status_code=parts[1] or None,
+                entity_code=parts[2] or None, code_list_qualifier=parts[3] or None, status_date=_d8(_el(e, 2)),
+                raw_status_date=_el(e, 2), action_code=_el(e, 3), amount=_num(_el(e, 4)), raw_amount=_el(e, 4),
+                stc05=_el(e, 5), stc06=_el(e, 6), stc07=_el(e, 7), stc08=_el(e, 8), stc09=_el(e, 9),
+                free_text=_el(e, 12))
+        if _el(e, 1) is None:
+            raise ParseError("STC without STC01")             # its other elements would have no row
+        return
+    if not _child(st, add, e, sid, so, u, file_id, owner, ot):
+        _misc(st, add, e, sid, so, u, file_id, owner, ot)

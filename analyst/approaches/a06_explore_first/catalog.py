@@ -322,6 +322,23 @@ VIEWS: tuple[View, ...] = (
         claim_submissions measure
         payments measure
     """),
+    _view("sem.claim_acknowledgments", "one claim-level status on a 277CA front-end acknowledgment", """
+        acknowledgment_id key
+        claim_key key
+        payer_key key
+        payer_name text
+        payer_class enum
+        status_category_code enum
+        status_code code
+        entity_code code
+        is_accepted boolean
+        is_rejected boolean
+        acknowledgment_date date
+        status_effective_date date
+        payer_claim_control_number identifier
+        total_charge_amount measure
+        source_file_id identifier
+    """),
 )
 
 # Fact-table fan-out first. Payer-dimension edges are last so a 3-join cap still

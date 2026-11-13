@@ -1,7 +1,7 @@
 -- =============================================================================
 -- CC — SEMANTIC LAYER (views over the lossless schema)
 -- =============================================================================
--- The agent sees ONLY schema `sem` (10 views, one documented grain each).
+-- The agent sees ONLY schema `sem` (11 views, one documented grain each).
 -- `sem_int` holds plumbing (payer resolution, reversal ordering, 837<->835 line
 -- matching) and is never exposed to the model.
 --
@@ -604,3 +604,67 @@ SELECT file_id, file_kind, s3_uri, s3_version_id, original_filename, size_bytes,
        received_at, ingested_at, parse_status, transaction_count, segment_count,
        duplicate_of_file_id, superseded_by_file_id, ingest_run_id
 FROM edi.source_file;
+
+-- =============================================================================
+-- 11) sem.claim_acknowledgments — GRAIN: one claim-level status (STC in loop
+--     2200D) of a 277CA (005010X214): the payer's front end accepting a
+--     submitted claim into adjudication or rejecting it before it.
+--     Separate from views 1-10: it reads only the 277CA tables (a277.*) and the
+--     shared rows a 277CA owns. Status codes are those of the STC's first
+--     composite (STC01); STC10 / STC11 are in a277.status (composite_index 2, 3).
+--     claim_key = TRN02 of 2200D = the 837's CLM01, as in sem.claims.
+--     Payer: the 2100A information source (NM1*PR), resolved through the
+--     837_2010BB aliases (the front end names itself as the claim named it);
+--     a clearinghouse source (NM1*AY) gives 'Unknown payer'.
+--     is_accepted: category A0-A2; is_rejected: A3, A4, A6-A8 (A5 split: neither).
+-- =============================================================================
+CREATE OR REPLACE VIEW sem.claim_acknowledgments AS
+WITH claim_status AS (
+    SELECT s.status_uid, s.txn_uid, s.file_id, s.owner_uid AS status_trace_uid, s.category_code, s.status_code,
+           s.entity_code, s.status_date, s.amount
+    FROM a277.status s
+    WHERE s.owner_table = 'a277.status_trace' AND s.loop_id = '2200D' AND s.composite_index = 1
+),
+source_payer AS (                    -- 2000D patient -> 2000C provider -> 2000B receiver -> 2000A source
+    SELECT patient.hl_uid AS patient_hl_uid,
+           arg_min(e.name_last_or_org, e.seg_ord) AS payer_name_as_sent,
+           arg_min(e.id_value, e.seg_ord)         AS payer_id_as_sent
+    FROM c837.hl patient
+    JOIN c837.hl provider ON provider.hl_uid = patient.parent_hl_uid
+    JOIN c837.hl receiver ON receiver.hl_uid = provider.parent_hl_uid
+    JOIN edi.entity e     ON e.owner_uid = receiver.parent_hl_uid AND e.loop_id = '2100A' AND e.entity_id_code = 'PR'
+    WHERE patient.loop_id = '2000D'
+    GROUP BY patient.hl_uid
+),
+payer_claim_number AS (
+    SELECT owner_uid AS status_trace_uid, arg_min(value, seg_ord) AS payer_claim_control_number
+    FROM edi.reference WHERE owner_table = 'a277.status_trace' AND qualifier = '1K'
+    GROUP BY owner_uid
+)
+SELECT
+    cs.status_uid                                 AS acknowledgment_id,
+    tr.trn02_trace_identifier                     AS claim_key,
+    COALESCE(pa.payer_key,
+             upper(regexp_replace(COALESCE(sp.payer_name_as_sent, sp.payer_id_as_sent, 'UNKNOWN'), '[^A-Za-z0-9]', '', 'g')))
+                                                  AS payer_key,
+    COALESCE(pa.payer_name, sp.payer_name_as_sent, 'Unknown payer') AS payer_name,
+    pa.payer_class,
+    cs.category_code                              AS status_category_code,
+    cs.status_code,
+    cs.entity_code,
+    cs.category_code IN ('A0', 'A1', 'A2')        AS is_accepted,
+    cs.category_code IN ('A3', 'A4', 'A6', 'A7', 'A8') AS is_rejected,
+    t.bht04_date                                  AS acknowledgment_date,
+    cs.status_date                                AS status_effective_date,
+    pcn.payer_claim_control_number,
+    cs.amount                                     AS total_charge_amount,
+    cs.file_id                                    AS source_file_id
+FROM claim_status cs
+JOIN a277.status_trace tr     ON tr.status_trace_uid = cs.status_trace_uid
+JOIN edi.transaction_set t    ON t.txn_uid = cs.txn_uid
+LEFT JOIN source_payer sp     ON sp.patient_hl_uid = tr.hl_uid
+LEFT JOIN payer_claim_number pcn ON pcn.status_trace_uid = cs.status_trace_uid
+LEFT JOIN ref.payer_alias pa
+       ON pa.alias_source = '837_2010BB'
+      AND pa.alias_id IS NOT DISTINCT FROM sp.payer_id_as_sent
+      AND pa.alias_name IS NOT DISTINCT FROM sp.payer_name_as_sent;

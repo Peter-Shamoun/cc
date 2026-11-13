@@ -2,8 +2,8 @@
 
 | File | What it is |
 |---|---|
-| `01_lossless_edi_schema.sql` | 41 tables (28 EDI + 13 reference/config; DuckDB/Parquet): provenance incl. S3 location, byte-level segment spine, envelopes, shared children, 837P loops, 835 loops, code sets/config |
-| `02_semantic_layer_views.sql` | 10 public `sem.*` views (one grain each) + `sem_int.*` plumbing the agent never sees |
+| `01_lossless_edi_schema.sql` | 44 tables (32 EDI + 12 reference/config; DuckDB/Parquet): provenance incl. S3 location, byte-level segment spine, envelopes, shared children, 837P loops, 835 loops, 277CA status loops, code sets/config |
+| `02_semantic_layer_views.sql` | 11 public `sem.*` views (one grain each) + `sem_int.*` plumbing the agent never sees |
 | `03_semantic_model.yaml` | 36 metrics, 48 dimensions, glossary, 13 verified requests |
 | `04_agent_interface.py` | Compiler + 5 tools (Anthropic tool schemas included), SQL guard for the escape hatch |
 | `05_agent_system_prompt.md` | Prompt section that binds the agent to the semantic layer |
@@ -53,4 +53,6 @@ The compiler sees `procedure_code` isn't on `sem.remit_claims`, picks `sem.remit
 - **Payer matching** between 837 2010BB and 835 1000A relies on `ref.payer_alias`; until populated, payer_key is a normalized name, so the same payer can appear twice if names differ across sides.
 - **Line matching** is heuristic when REF*6R is missing; `remit_match_method` records which tier matched.
 - **Time-range presets** anchor to today by default; historical conversion files should use `anchor: data`.
-- **Not modeled**: 277CA/999 rejections (not in 835/837), 2320/2330 COB detail in `sem` (it is in the lossless layer).
+- **277CA (claim acknowledgment, 005010X214)** is in the lossless layer: `a277.status_trace` (the TRN of each level; at 2200D `trn02_trace_identifier` is the 837's CLM01), `a277.status` (STC, one row per status composite) and `a277.service_line` (2220D), with HL / NM1 / REF / DTP / AMT / QTY in the shared tables (HL in `c837.hl`, told apart by the transaction's `txn_type`). An accepted claim has `action_code = 'WQ'` (categories A0-A2), a rejected one `'U'` (A3-A8); a rejected claim has no 835.
+- **277CA in `sem`**: one view, `sem.claim_acknowledgments` (one claim-level STC per row, `claim_key` = CLM01 as in `sem.claims`); it has no metrics in `03_semantic_model.yaml` yet and the gold pipeline (`ccsim/pipeline.py` SEM_TABLES) does not materialize it.
+- **Not modeled**: 999 / TA1 acknowledgments; 2320/2330 COB detail in `sem` (it is in the lossless layer).

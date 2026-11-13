@@ -1,4 +1,4 @@
-"""Mock 837P / 835 X12 for ACME tenants (clinical reference labs), plus an independent ground-truth ledger.
+"""Mock 837P / 835 / 277CA X12 for ACME tenants (clinical reference labs), plus an independent ground-truth ledger.
 
 Calibrated to `research/edi_realism_calibration.yaml` (sourced targets; see `research/edi_realism_notes.md`).
 Patients, providers, tax ids, EINs, bank accounts and addresses are invented. Payer names and payer ids follow
@@ -29,6 +29,10 @@ Every billed code is on the CMS CY2026 Clinical Laboratory Fee Schedule (`ccsim/
                IR, forward balances (FB); zero-pay advices (BPR01=H)
   calendar     837s on business days only (Monday catch-up, day after a holiday 1.5x), 835s on each payer's own
                cycle and never on weekends or federal holidays; EFT (BPR16) up to 3 business days after the 835
+  front end    every 837 batch is answered by a 277CA (005010X214) the same or the next business day: one
+               transaction per payer, each claim accepted (A1 / A2, REF*1K payer claim number) or rejected (A3 /
+               A6 / A7 / A8: subscriber not found, member id, NPI, duplicate, ..., some on a service line); batch
+               and provider totals (QTY, AMT). A rejected claim never gets an 835 (FRONT_END_REJECTIONS)
   delivery     clearinghouse as 835 ISA sender, TRN03 = 1 + payer EIN, REF*2U on some payers, 835 payer names
                that differ from the 837's, byte-identical re-deliveries, multi-ST files, three delimiter styles,
                corrupt deliveries (truncated / not X12) that must be quarantined
@@ -43,7 +47,7 @@ Volume and streaming. `Scenario.target_mb_per_day` sets each tenant's claims per
 claim (`bytes_per_day_model`); `volume_scale` still works when it is unset. A run steps one calendar day at a
 time and writes each day's files as soon as the day is final, so memory stays flat over multi-year runs. On disk:
 
-  <out>/<tenant>/raw/received_date=<day>/{837,835}/*.x12
+  <out>/<tenant>/raw/received_date=<day>/{837,835,277}/*.x12
   <out>/truth.json                    index: scenario, files, file days, PLB log per tenant
   <out>/truth/<tenant>/claims.jsonl   one finalized ledger row per claim (.jsonl.gz with truth_gzip)
 
@@ -60,6 +64,7 @@ import gzip
 import hashlib
 import json
 import math
+import os
 import random
 from dataclasses import asdict, dataclass, field, replace
 from datetime import date, timedelta
@@ -71,7 +76,7 @@ from typing import Iterator, NamedTuple
 
 from ccsim import edi_reference as R
 
-GENERATOR_VERSION = "3.3"
+GENERATOR_VERSION = "3.4"
 RECOUPMENT_CANDIDATE_SHARE = .15   # paid claims kept as possible targets of a later PLB recoupment (bounded memory)
 RECOUPMENT_MAX_DAYS = 400          # recoupments reach back at most about a year
 CLEARINGHOUSE_ID = "CC"
@@ -1065,7 +1070,7 @@ class Scenario:
     days: int = 30
     seed: int = 7
     volume_scale: float = 1.0
-    target_mb_per_day: float | None = None  # raw EDI MB per file day per tenant; overrides claims_per_day * volume_scale
+    target_mb_per_day: float | None = None  # 837 + 835 MB per file day per tenant (277CA on top); overrides claims_per_day * volume_scale
     # rates below are the spec's typical values (research/edi_realism_calibration.yaml); low-confidence ones are tunable
     denial_rate_scale: float = 1.0        # multiplies every initial denial probability (spec blended ~11% of claims)
     p_never_remitted: float = .01         # pended or lost beyond the window (paper-only payers add ~2% more)
@@ -1235,6 +1240,8 @@ class Claim:
     interest_exempt: bool = False   # pended for information: not a clean claim, so no prompt-pay interest
     line_edits: dict = field(default_factory=dict)   # line -> (group, CARC, RARC, category): the primary payer's
     #                                 deterministic edits (NCCI residue, NCD coverage, ABN liability, sex edits)
+    front_end_rejection: str | None = None   # key of FRONT_END_REJECTIONS: the payer's 277CA rejects the claim
+    reworked_on: date | None = None          # the day the lab sent its corrected claim (_maybe_rework)
 
 
 DELIMS = {  # element, component, repetition, segment terminator, line ending after terminator
@@ -1392,6 +1399,61 @@ def _chargemaster(tenant: str, code: str, price_mult: float) -> float:
 
 
 # --- generator -------------------------------------------------------------------------------------
+# --- 277CA: the payer front end's answer to an 837 batch -------------------------------------------
+class FrontEndRejection(NamedTuple):
+    weight: float                   # share of rejections
+    medicare_weight: float          # share at a MAC, where most exact duplicates die (MEDICARE_DUPLICATES_REMITTED)
+    claim_statuses: tuple           # the claim STC's composites (STC01, STC10): (category, claim status code, entity)
+    line_status: tuple | None       # the composite of the STC on the one rejected service line (2220D), if any
+    text: str                       # STC12, from the payers that send free text
+
+
+# Categories: A3 returned as unprocessable, A6 rejected for missing information, A7 rejected for invalid
+# information, A8 rejected for a relational field in error. The 837 itself is unchanged: the payer's files
+# disagree with it (a member it cannot find, an NPI it has not enrolled), as most front-end rejections do.
+FRONT_END_REJECTIONS = {
+    "subscriber_not_found": FrontEndRejection(.26, .20, (("A3", "33", "IL"),), None,
+                                              "SUBSCRIBER AND SUBSCRIBER ID NOT FOUND"),
+    "invalid_member_id": FrontEndRejection(.20, .16, (("A7", "164", "IL"),), None, "INVALID MEMBER ID"),
+    "birth_date_mismatch": FrontEndRejection(.08, .06, (("A7", "158", "IL"),), None,
+                                             "SUBSCRIBER DATE OF BIRTH DOES NOT MATCH"),
+    "invalid_referring_npi": FrontEndRejection(.14, .12, (("A7", "562", "DN"),), None,
+                                               "REFERRING PROVIDER NPI NOT ON FILE"),
+    "missing_rendering_npi": FrontEndRejection(.06, .04, (("A6", "562", "82"),), None,
+                                               "RENDERING PROVIDER NPI REQUIRED"),
+    "billing_npi_tax_id_mismatch": FrontEndRejection(.06, .04, (("A8", "562", "85"), ("A8", "128", "85")), None,
+                                                     "BILLING PROVIDER NPI AND TAX ID DO NOT MATCH"),
+    "duplicate_claim": FrontEndRejection(.10, .30, (("A3", "54", ""),), None,
+                                         "DUPLICATE OF A PREVIOUSLY PROCESSED CLAIM"),
+    "invalid_diagnosis_code": FrontEndRejection(.04, .03, (("A7", "255", ""),), None, "INVALID DIAGNOSIS CODE"),
+    "invalid_procedure_code": FrontEndRejection(.06, .05, (("A3", "21", ""),), ("A7", "507", ""),
+                                                "PROCEDURE CODE INVALID FOR DATE OF SERVICE"),
+}
+# The simulation leaves Scenario.p_never_remitted of the claims without any 835. This share of them was rejected
+# at the payer's front end and never corrected; the rest was accepted, then pended or lost. Rejections are taken
+# from these claims so that the 277CA changes no claim, 837 or 835 of a seed. For the same reason
+# Scenario.target_mb_per_day counts 837 and 835 bytes only: the 277CA files come on top.
+FRONT_END_REJECTED_SHARE_OF_NEVER_REMITTED = .7
+P_PAYER_ACKNOWLEDGES_RECEIPT_ONLY = .15   # payers whose 277CA says A1 (received), with no claim number yet (no REF*1K)
+P_PAYER_SENDS_STATUS_TEXT = .3            # payers that explain a rejection in STC12
+P_ACKNOWLEDGED_NEXT_BUSINESS_DAY = .12    # besides the batches sent in the evening
+
+
+def front_end_rejection(seed: int, c: Claim) -> str | None:
+    """Why the payer's front end rejected a claim that never gets a remit (a key of FRONT_END_REJECTIONS), or None:
+    it was accepted. Decided from the claim alone, so it draws nothing from the simulation's random stream."""
+    r = random.Random(_derive_seed(seed, c.pcn, "front-end-rejection"))
+    if r.random() >= FRONT_END_REJECTED_SHARE_OF_NEVER_REMITTED:
+        return None
+    medicare = c.patient.coverages[0].payer.is_medicare
+    return _pick(r, {k: v.medicare_weight if medicare else v.weight for k, v in FRONT_END_REJECTIONS.items()})
+
+
+def batch_reference_837(t: Tenant, d: date, batch: int) -> str:
+    """BHT03 of the day's nth 837 batch; its 277CA quotes it (2200B TRN02)."""
+    return f"{t.sender_id}{d:%Y%m%d}{batch:02d}"
+
+
 class Generator:
     def __init__(self, sc: Scenario, tenants=None):
         self.sc = sc
@@ -1599,7 +1661,7 @@ class Generator:
 
     def _file_837(self, t: Tenant, d: date, items: list, batch: int, sent_at: str) -> str:
         x = X12(t.delimiters)
-        x.s("BHT", "0019", "00", f"{t.sender_id}{d:%Y%m%d}{batch:02d}", f"{d:%Y%m%d}", sent_at[:4], "CH")
+        x.s("BHT", "0019", "00", batch_reference_837(t, d, batch), f"{d:%Y%m%d}", sent_at[:4], "CH")
         x.s("NM1", "41", "2", t.name, "", "", "", "", "46", t.tax_id)
         x.s("PER", "IC", "BILLING OFFICE", "TE", t.billing_phone)
         x.s("NM1", "40", "2", CLEARINGHOUSE_NAME, "", "", "", "", "46", "CCCH01")
@@ -1614,6 +1676,74 @@ class Generator:
             self._claim_837(x, t, c, seq, freq, hl, prior, orig_icn)
         return interchange(t.delimiters, t.sender_id, CLEARINGHOUSE_ID, d, self._next_ctl(t.sender_id, CLEARINGHOUSE_ID),
                            "HC", "005010X222A1", [x], "837", sent_at=sent_at)
+
+    # -- 277CA -----------------------------------------------------------------------------------------
+    @staticmethod
+    def _st_277ca(x: X12, t: Tenant, payer: Payer, claims: list, received: date, processed: date, sent_at: str,
+                  reference_837: str):
+        """One payer's acknowledgment of its claims in one 837 batch. claims: (claim, coverage index, rejection key
+        or None, payer claim control number or None). Loops 2000A information source (the payer) / 2000B information
+        receiver (the submitter, with the batch totals) / 2000C billing provider / 2000D one per claim."""
+        day = f"{processed:%Y%m%d}"
+        charges = [round(sum(l.charge for l in c.lines), 2) for c, _, _, _ in claims]
+        rejected = [rejection is not None for _, _, rejection, _ in claims]
+        n_rejected, n_accepted = sum(rejected), len(claims) - sum(rejected)
+        amount_rejected = round(sum(a for a, bad in zip(charges, rejected) if bad), 2)
+        amount_accepted = round(sum(charges) - amount_rejected, 2)
+        acknowledgment_id = f"{reference_837}{payer.payer_id}"
+        x.s("BHT", "0085", "08", acknowledgment_id, day, sent_at[:4], "TH")
+        x.s("HL", "1", "", "20", "1")
+        x.s("NM1", "PR", "2", payer.name, "", "", "", "", "PI", payer.payer_id)
+        x.s("TRN", "1", acknowledgment_id)
+        x.s("DTP", "050", "D8", f"{received:%Y%m%d}")
+        x.s("DTP", "009", "D8", day)
+        x.s("HL", "2", "1", "21", "1")
+        x.s("NM1", "41", "2", t.name, "", "", "", "", "46", t.tax_id)
+        x.s("TRN", "2", reference_837)
+        x.s("STC", x.c("A1", "19", "PR"), day, "WQ", money(sum(charges)))
+
+        def totals(accepted_qualifier: str, rejected_qualifier: str):     # zero counts and amounts are not sent
+            if n_accepted:
+                x.s("QTY", accepted_qualifier, str(n_accepted))
+            if n_rejected:
+                x.s("QTY", rejected_qualifier, str(n_rejected))
+            if amount_accepted:
+                x.s("AMT", "YU", money(amount_accepted))
+            if amount_rejected:
+                x.s("AMT", "YY", money(amount_rejected))
+        totals("90", "AA")
+        x.s("HL", "3", "2", "19", "1")
+        x.s("NM1", "85", "2", t.name, "", "", "", "", "XX", npi(t.npi_seed))
+        x.s("TRN", "1", "0")
+        x.s("REF", "TJ", t.tax_id)
+        totals("QA", "QC")
+        receipt_only = _stable_unit("277ca-receipt-only", payer.payer_id) < P_PAYER_ACKNOWLEDGES_RECEIPT_ONLY
+        sends_text = _stable_unit("277ca-status-text", payer.payer_id) < P_PAYER_SENDS_STATUS_TEXT
+        for hl, ((c, seq, rejection, icn), charge) in enumerate(zip(claims, charges), 4):
+            cov, pat = c.patient.coverages[seq], c.patient.person
+            x.s("HL", str(hl), "3", "PT")
+            x.s("NM1", "QC", "1", pat.last, pat.first, pat.middle, "", "", "MI", cov.member_id)
+            x.s("TRN", "2", c.pcn)
+            if rejection is None:
+                x.s("STC", x.c("A1", "19", "PR") if receipt_only else x.c("A2", "20", "PR"), day, "WQ", money(charge))
+                if icn:
+                    x.s("REF", "1K", icn)
+            else:
+                reason = FRONT_END_REJECTIONS[rejection]
+                first, second = (list(reason.claim_statuses) + [()])[:2]
+                x.s("STC", x.c(*first), day, "U", money(charge), "", "", "", "", "", x.c(*second), "",
+                    reason.text if sends_text else "")
+            if c.trace:
+                x.s("REF", "D9", c.trace)
+            x.s("DTP", "472", "D8", f"{c.dos:%Y%m%d}")
+            if rejection is not None and reason.line_status:
+                i = _stable_int(c.pcn, "277ca-rejected-line") % len(c.lines)
+                l = c.lines[i]
+                x.s("SVC", x.c("HC", l.cpt, *l.modifiers), money(l.charge), "", "", "", "", str(l.units))
+                x.s("STC", x.c(*reason.line_status), day, "U", money(l.charge))
+                if c.sends_line_ids:
+                    x.s("REF", "FJ", f"{c.pcn}{i + 1:02d}")
+                x.s("DTP", "472", "D8", f"{c.dos:%Y%m%d}")
 
     # -- adjudication ----------------------------------------------------------------------------------
     def _deductible_left(self, c: Claim, payer: Payer, accum: dict, base: float) -> tuple[float, tuple]:
@@ -2122,9 +2252,10 @@ class Generator:
         return f"{hour % 24:02d}{minute % 60:02d}{self.rng.randint(0, 59):02d}"
 
     def _file_name(self, t: Tenant, kind: str, day: date, sent_at: str, payer_id: str | None = None) -> str:
-        """As the clearinghouse names them: sender, transaction, payer (835), and the send timestamp. Names are
+        """As the clearinghouse names them: sender, transaction (837P, 277CA, ERA), payer (835), send timestamp. Names are
         unique within a day; a re-delivery is a new name (new timestamp) with the same bytes."""
         stem = (f"{t.sender_id}_837P_{day:%Y%m%d}{sent_at}" if kind == "837" else
+                f"277CA_{t.sender_id}_{day:%Y%m%d}{sent_at}" if kind == "277" else
                 f"ERA_{payer_id}_{t.sender_id}_{day:%Y%m%d}{sent_at}" if payer_id else
                 f"ERA_{t.sender_id}_{day:%Y%m%d}{sent_at}")
         name, n = f"{stem}.x12", 1
@@ -2304,6 +2435,7 @@ class _TenantRun(Generator):
         self.send_outs = send_out_codes(tc)
         self.accum: dict = {}                                 # plan year -> {(pid, payer): deductible met here}
         self.outbox: dict[date, list] = {}                    # day -> 837 items
+        self.acknowledgments_due: dict[date, list] = {}       # day -> 277CA files to deliver
         self.pending: dict[date, dict] = {}                   # 835 day -> {payer_id: events}
         self.claims: dict[str, dict] = {}                     # ledger of claims still in flight
         self.open: dict[str, int] = {}                        # pcn -> deliveries still to come
@@ -2821,7 +2953,10 @@ class _TenantRun(Generator):
         sc, r, accum = self.sc, self.rng, self.accum
         cov = c.patient.coverages[0]
         payer = cov.payer
-        if not payer.era or r.random() < sc.p_never_remitted:
+        if not payer.era:
+            return
+        if r.random() < sc.p_never_remitted:
+            c.front_end_rejection = front_end_rejection(sc.seed, c)
             return
         received = self._next_business_day(d + timedelta(days=1))
         adj = self._adjudication_day(payer, received, c)
@@ -2948,6 +3083,7 @@ class _TenantRun(Generator):
             return
         rs = self._next_business_day(pay + timedelta(days=round(_tri(r, 2, 12, 60))))
         freq = "1" if payer.is_medicare else "7"
+        c.reworked_on = rs
         self._bill(rs, (c, 0, freq, None, e["icn"] if freq == "7" else None))
         received = self._next_business_day(rs + timedelta(days=1))
         adj = self._adjudication_day(payer, received, c)
@@ -3018,15 +3154,21 @@ class _TenantRun(Generator):
         touched: list[str] = []
         items = self.outbox.pop(d, None)
         if items:
+            submissions = []                                  # today's ledger rows, in item order
             for c, seq, freq, prior, orig in items:
                 if self.emit:
-                    self.claims[c.pcn]["submissions"].append(dict(
-                        date=str(d), payer_id=c.patient.coverages[seq].payer.payer_id, seq=seq, frequency=freq))
+                    submissions.append(dict(date=str(d), payer_id=c.patient.coverages[seq].payer.payer_id, seq=seq,
+                                            frequency=freq))
+                    self.claims[c.pcn]["submissions"].append(submissions[-1])
                 touched.append(c.pcn)
+            n_batched = 0
             for b, (chunk, sent_at) in enumerate(self._batches_837(items), 1):
                 if self.emit:
                     files.append(dict(day=d, kind="837", name=self._file_name(t, "837", d, sent_at),
                                       body=self._noise(self._file_837(t, d, chunk, b, sent_at)), expect="parsed"))
+                    self._acknowledge(d, chunk, submissions[n_batched:n_batched + len(chunk)], b, sent_at,
+                                      files[-1]["name"])
+                    n_batched += len(chunk)
                 else:
                     self._next_ctl(t.sender_id, CLEARINGHOUSE_ID)
         remits = []
@@ -3037,6 +3179,9 @@ class _TenantRun(Generator):
             files += self._concatenate(remits, d)
             if files and r.random() < sc.p_corrupt_file:
                 files.append(self._corrupt(r.choice(files), d))
+            for f in self.acknowledgments_due.pop(d, []):     # after the draws above: they must not see these files
+                sent_at = f.pop("sent_at")
+                files.append(dict(f, name=self._file_name(t, "277", d, sent_at)))
         done = []
         for pcn in touched:
             k = self.open[pcn] - 1
@@ -3048,6 +3193,46 @@ class _TenantRun(Generator):
                 if led is not None:
                     done.append(led)
         return files, done
+
+    def _acknowledge(self, d: date, chunk: list, ledger_rows: list, batch: int, sent_at: str, name_837: str):
+        """Queue the 277CA that answers one 837 batch (one transaction per payer, in one interchange from the
+        clearinghouse) and record each claim's acknowledgment in the ledger. An acknowledgment due after the
+        window is never delivered. Nothing here draws from the simulation's random stream."""
+        t = self.t
+        u = _stable_unit(self.sc.seed, name_837, "277ca-turnaround")
+        hour = int(sent_at[:2]) + 1 + int(u * 40) % 4             # one to four hours after the batch
+        if hour >= 20 or u < P_ACKNOWLEDGED_NEXT_BUSINESS_DAY:    # the front end's overnight run
+            ack_day, hour = self._next_business_day(d + timedelta(days=1)), 2 + int(u * 40) % 4
+        else:
+            ack_day = d
+        if ack_day >= self.end:
+            return
+        ack_sent_at = f"{hour:02d}{int(u * 3600) % 60:02d}{int(u * 216000) % 60:02d}"
+        by_payer: dict[str, list] = {}
+        for (c, seq, freq, _, _), row in zip(chunk, ledger_rows, strict=True):
+            payer = c.patient.coverages[seq].payer
+            icn = None
+            if (c.front_end_rejection is None
+                    and _stable_unit("277ca-receipt-only", payer.payer_id) >= P_PAYER_ACKNOWLEDGES_RECEIPT_ONLY):
+                # the number the claim's 835 carries as CLP07: salted as _plan / _duplicate / _maybe_rework salt the
+                # adjudication (a void's reversal keeps the original's number), received the next business day
+                salt = ("orig" if seq or d == c.submitted or freq == "8" else "rework" if d == c.reworked_on
+                        else f"dup{d}")
+                icn = self._icn(payer, c, salt, self._next_business_day(d + timedelta(days=1)))
+            row["acknowledgment"] = dict(date=str(ack_day), accepted=c.front_end_rejection is None,
+                                         rejection=c.front_end_rejection, payer_claim_control_number=icn)
+            by_payer.setdefault(payer.payer_id, []).append((c, seq, c.front_end_rejection, icn))
+        transactions = []
+        for payer_id, claims in by_payer.items():
+            transactions.append(X12(t.delimiters))
+            self._st_277ca(transactions[-1], t, PAYER_BY_ID[payer_id], claims, d, ack_day, ack_sent_at,
+                           batch_reference_837(t, d, batch))
+        # its own ISA13 counter: the clearinghouse's 835 interchanges keep the numbers they had without 277CAs
+        ctl = self._next_ctl(f"{CLEARINGHOUSE_ID}/277CA", t.sender_id)
+        body = interchange(t.delimiters, CLEARINGHOUSE_ID, t.sender_id, ack_day, ctl, "HN", "005010X214",
+                           transactions, "277", sent_at=ack_sent_at)
+        self.acknowledgments_due.setdefault(ack_day, []).append(
+            dict(day=ack_day, kind="277", sent_at=ack_sent_at, body=body, expect="parsed", acknowledges=name_837))
 
     def burn_in(self):
         """Simulate the days before the window without writing anything (see the class docstring)."""
@@ -3091,6 +3276,7 @@ class _TenantRun(Generator):
         self.open.clear()
         self.outbox.clear()
         self.pending.clear()
+        self.acknowledgments_due.clear()
         return out
 
 
@@ -3149,7 +3335,8 @@ class _TenantWriter:
             if folder not in made:
                 folder.mkdir(parents=True, exist_ok=True)
                 made.add(folder)
-            (folder / f["name"]).write_bytes(body)
+            with open(os.path.join(folder, f["name"]), "wb") as fh:   # not a Path: pathlib interns every file name
+                fh.write(body)
             nbytes += len(body)
             meta.append({k: (str(v) if k == "day" else v) for k, v in f.items() if k != "body"})
         self.files += meta
@@ -3313,6 +3500,7 @@ def bytes_per_day_model(sc: Scenario, tc: str) -> tuple[float, float]:
             total = n_days = 0
             for d in _calendar(cal):
                 files, _ = sim.step(d)
+                files = [f for f in files if f["kind"] != "277"]   # see FRONT_END_REJECTED_SHARE_OF_NEVER_REMITTED
                 if files:
                     total += sum(len(f["body"]) for f in files)
                     n_days += 1

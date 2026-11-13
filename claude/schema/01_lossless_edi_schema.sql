@@ -1,5 +1,5 @@
 -- =============================================================================
--- CC — LOSSLESS EDI STORAGE SCHEMA (835 5010X221A1 + 837P 5010X222A1)
+-- CC — LOSSLESS EDI STORAGE SCHEMA (835 5010X221A1 + 837P 5010X222A1 + 277CA 5010X214)
 -- Target: DuckDB over Parquet (one Parquet dataset per table), one copy per
 --         customer bucket/prefix (tenant isolation is physical, not a column).
 -- =============================================================================
@@ -41,12 +41,13 @@
 --
 -- Suggested Parquet layout (per tenant):
 --   s3://<tenant-bucket>/cc/lossless/<schema>.<table>/
---        file_kind=<835|837P>/received_month=YYYY-MM/part-*.parquet
+--        file_kind=<835|837P|277CA>/received_month=YYYY-MM/part-*.parquet
 -- =============================================================================
 
 CREATE SCHEMA IF NOT EXISTS edi;   -- envelopes, provenance, shared children
 CREATE SCHEMA IF NOT EXISTS c837;  -- 837P-specific loops
 CREATE SCHEMA IF NOT EXISTS r835;  -- 835-specific loops
+CREATE SCHEMA IF NOT EXISTS a277;  -- 277CA-specific loops (claim acknowledgment)
 CREATE SCHEMA IF NOT EXISTS ref;   -- code sets & tenant configuration
 
 -- =============================================================================
@@ -72,7 +73,7 @@ CREATE TABLE edi.ingest_run (
 CREATE TABLE edi.source_file (
     file_id              VARCHAR PRIMARY KEY,      -- sha256 of raw bytes (hex). Content address => dedupe.
     tenant_code          VARCHAR NOT NULL,         -- e.g. 'LABCORP' (redundant w/ bucket, useful in exports)
-    file_kind            VARCHAR NOT NULL,         -- '835' | '837P' | 'UNKNOWN'
+    file_kind            VARCHAR NOT NULL,         -- '835' | '837P' | '277CA' | 'UNKNOWN'
     s3_uri               VARCHAR NOT NULL,         -- s3://bucket/key (canonical, for engineers)
     s3_bucket            VARCHAR NOT NULL,
     s3_key               VARCHAR NOT NULL,
@@ -159,39 +160,41 @@ CREATE TABLE edi.functional_group (                 -- GS / GE
     interchange_uid      VARCHAR NOT NULL REFERENCES edi.interchange(interchange_uid),
     file_id              VARCHAR NOT NULL,
     seg_ord              INTEGER NOT NULL,
-    gs01_functional_id   VARCHAR,                  -- HP (835) / HC (837)
+    gs01_functional_id   VARCHAR,                  -- HP (835) / HC (837) / HN (277CA)
     gs02_sender_code VARCHAR, gs03_receiver_code VARCHAR,
     gs04_date VARCHAR, gs05_time VARCHAR,
     gs06_control_number VARCHAR, gs07_agency VARCHAR,
-    gs08_version VARCHAR,                          -- 005010X221A1 / 005010X222A1
+    gs08_version VARCHAR,                          -- 005010X221A1 / 005010X222A1 / 005010X214
     ge01_txn_count INTEGER, ge02_control_number VARCHAR,
     ge_seg_ord INTEGER
 );
 
-CREATE TABLE edi.transaction_set (                  -- ST / SE (+ BHT for 837)
+CREATE TABLE edi.transaction_set (                  -- ST / SE (+ BHT for 837 and 277CA)
     txn_uid              VARCHAR PRIMARY KEY,
     group_uid            VARCHAR NOT NULL REFERENCES edi.functional_group(group_uid),
     file_id              VARCHAR NOT NULL,
     seg_ord              INTEGER NOT NULL,
     seg_ord_end          INTEGER NOT NULL,         -- SE position
-    txn_type             VARCHAR NOT NULL,         -- '835' | '837'
+    txn_type             VARCHAR NOT NULL,         -- '835' | '837' | '277'
     st01 VARCHAR, st02_control_number VARCHAR, st03_impl_convention VARCHAR,
     se01_segment_count INTEGER, se02_control_number VARCHAR,
-    -- 837 only (BHT)
-    bht01_structure_code VARCHAR, bht02_purpose_code VARCHAR,       -- 00 original / 18 reissue
+    -- 837 and 277CA (BHT)
+    bht01_structure_code VARCHAR, bht02_purpose_code VARCHAR,       -- 00 original / 18 reissue / 08 status (277CA)
     bht03_reference_id VARCHAR, bht04_date DATE, bht05_time VARCHAR,
-    bht06_claim_or_encounter VARCHAR,                                -- CH chargeable / RP reporting
+    bht06_claim_or_encounter VARCHAR,                                -- CH chargeable / RP reporting / TH (277CA)
     count_check_ok       BOOLEAN                   -- SE01 matches actual segment count
 );
 
 -- =============================================================================
--- D. SHARED CHILD TABLES (used by both 835 and 837)
+-- D. SHARED CHILD TABLES (used by 835, 837 and 277CA)
 --    owner_table names the typed table the owner_uid belongs to.
 -- =============================================================================
 
 -- Every NM1/N1 "name loop" with its N2/N3/N4/PRV/DMG/RDM in one row.
 -- 837: 1000A/B, 2010AA/AB/AC, 2010BA/BB, 2010CA, 2310A-F, 2330A-G, 2420A-H
 -- 835: 1000A (payer), 1000B (payee), 2100 NM1 (QC/IL/74/82/TT/PR/GB)
+-- 277CA: 2100A (information source: payer PR / clearinghouse AY), 2100B (information receiver 41),
+--        2100C (billing provider 85), 2100D (patient QC)
 CREATE TABLE edi.entity (
     entity_uid           VARCHAR PRIMARY KEY,
     txn_uid              VARCHAR NOT NULL,
@@ -235,13 +238,13 @@ CREATE TABLE edi.reference (                        -- REF at any level
     owner_table          VARCHAR NOT NULL,
     file_id VARCHAR NOT NULL, seg_ord INTEGER NOT NULL,
     loop_id              VARCHAR,
-    qualifier            VARCHAR NOT NULL,         -- REF01: 6R line ctl, F8 original ref, G1 prior auth, 1K payer claim #, EA medical record, 2U payer id, EV, TJ, ...
+    qualifier            VARCHAR NOT NULL,         -- REF01: 6R line ctl, F8 original ref, G1 prior auth, 1K payer claim # (835, and 277CA accepted claims), EA medical record, 2U payer id, EV, TJ, D9 clearinghouse trace, FJ line ctl (277CA), ...
     value                VARCHAR,                  -- REF02
     description          VARCHAR,                  -- REF03
     ref04_raw            VARCHAR                   -- REF04 composite, raw
 );
 
-CREATE TABLE edi.date_time (                        -- DTP (837) and DTM (835)
+CREATE TABLE edi.date_time (                        -- DTP (837, 277CA) and DTM (835)
     dt_uid               VARCHAR PRIMARY KEY,
     txn_uid              VARCHAR NOT NULL,
     owner_uid            VARCHAR NOT NULL,
@@ -249,7 +252,7 @@ CREATE TABLE edi.date_time (                        -- DTP (837) and DTM (835)
     file_id VARCHAR NOT NULL, seg_ord INTEGER NOT NULL,
     loop_id              VARCHAR,
     segment_id           VARCHAR NOT NULL,         -- DTP | DTM
-    qualifier            VARCHAR NOT NULL,         -- 472 service, 431 onset, 454 initial tx, 405 production, 232/233 claim period, 050 received, 036 expiration, 150/151 period
+    qualifier            VARCHAR NOT NULL,         -- 472 service, 431 onset, 454 initial tx, 405 production, 232/233 claim period, 050 received, 009 processed (277CA), 036 expiration, 150/151 period
     format_qualifier     VARCHAR,                  -- D8 | RD8 | DT | TM ...
     raw_value            VARCHAR NOT NULL,
     date_start           DATE,                     -- parsed
@@ -261,20 +264,21 @@ CREATE TABLE edi.amount (                           -- AMT
     amt_uid              VARCHAR PRIMARY KEY,
     txn_uid VARCHAR NOT NULL, owner_uid VARCHAR NOT NULL, owner_table VARCHAR NOT NULL,
     file_id VARCHAR NOT NULL, seg_ord INTEGER NOT NULL, loop_id VARCHAR,
-    qualifier            VARCHAR NOT NULL,         -- 835: AU coverage, B6 allowed, KH late filing, T tax, T2, ZK.., I interest, D8 discount; 837: F5 patient paid, D, EAF, A8, ...
+    qualifier            VARCHAR NOT NULL,         -- 835: AU coverage, B6 allowed, KH late filing, T tax, T2, ZK.., I interest, D8 discount; 837: F5 patient paid, D, EAF, A8, ...; 277CA: YU accepted / YY rejected total charges
     amount               DECIMAL(18,2),
     raw_amount           VARCHAR,
     credit_debit_flag    VARCHAR                   -- AMT03
 );
 
-CREATE TABLE edi.quantity (                         -- QTY (835) and MEA-like counts
+CREATE TABLE edi.quantity (                         -- QTY (835, 277CA) and MEA-like counts
     qty_uid              VARCHAR PRIMARY KEY,
     txn_uid VARCHAR NOT NULL, owner_uid VARCHAR NOT NULL, owner_table VARCHAR NOT NULL,
     file_id VARCHAR NOT NULL, seg_ord INTEGER NOT NULL, loop_id VARCHAR,
-    qualifier            VARCHAR NOT NULL,         -- CA covered days, ZK, ...
+    qualifier            VARCHAR NOT NULL,         -- CA covered days, ZK, ...; 277CA claim counts: 90 accepted / AA rejected
+                                                   -- (2200B batch), QA accepted / QC rejected (2200C provider)
     quantity             DECIMAL(18,4),
     raw_quantity         VARCHAR,
-    qty03_raw            VARCHAR
+    qty03_raw            VARCHAR                   -- a QTY that also has QTY04 goes to edi.misc_segment, whole
 );
 
 CREATE TABLE edi.note (                             -- NTE (837 claim + line), K3
@@ -334,14 +338,17 @@ CREATE TABLE edi.misc_segment (
 -- =============================================================================
 
 -- 2000A / 2000B / 2000C hierarchical levels (HL + SBR / PAT + CUR)
+-- Also the HL of a 277CA (it is the same segment; the name of the schema is historical): 2000A information
+-- source (20) / 2000B information receiver (21) / 2000C billing provider (19) / 2000D patient (PT). Tell the two
+-- apart by the transaction: edi.transaction_set.txn_type of txn_uid.
 CREATE TABLE c837.hl (
     hl_uid               VARCHAR PRIMARY KEY,
     txn_uid              VARCHAR NOT NULL,
     file_id VARCHAR NOT NULL, seg_ord INTEGER NOT NULL,
-    loop_id              VARCHAR NOT NULL,         -- 2000A | 2000B | 2000C
+    loop_id              VARCHAR NOT NULL,         -- 2000A | 2000B | 2000C (277CA: also 2000D)
     hl01_id              VARCHAR NOT NULL,
     hl02_parent_id       VARCHAR,
-    hl03_level_code      VARCHAR NOT NULL,         -- 20 billing / 22 subscriber / 23 patient
+    hl03_level_code      VARCHAR NOT NULL,         -- 20 billing / 22 subscriber / 23 patient; 277CA: 20 / 21 / 19 / PT
     hl04_child_code      VARCHAR,
     parent_hl_uid        VARCHAR,
     -- SBR (2000B)
@@ -625,7 +632,79 @@ CREATE TABLE r835.provider_adjustment (
 );
 
 -- =============================================================================
--- G. REFERENCE CODE SETS & TENANT CONFIG (small, loaded from published lists)
+-- G. 277CA — Health Care Claim Acknowledgment
+-- =============================================================================
+-- The answer of a payer's (or clearinghouse's) front end to an 837 batch: every claim is accepted into
+-- adjudication or rejected before it. A rejected claim never reaches an 835.
+-- Shared tables hold what is the same thing as in an 837 / 835: ST/SE + BHT -> edi.transaction_set ; HL -> c837.hl ;
+-- NM1 2100A-D -> edi.entity (owner: the hl) ; REF (1K payer claim number, D9, FJ, TJ) -> edi.reference ;
+-- DTP (050 received, 009 processed, 472 service) -> edi.date_time ; AMT (YU / YY) -> edi.amount ;
+-- QTY (90 / AA, QA / QC) -> edi.quantity. Their owner is the status trace or the service line below.
+
+-- 2200A-D: the TRN that opens the status loop of a hierarchical level
+CREATE TABLE a277.status_trace (
+    status_trace_uid     VARCHAR PRIMARY KEY,
+    txn_uid              VARCHAR NOT NULL,
+    hl_uid               VARCHAR NOT NULL,         -- c837.hl: the level this trace reports on
+    file_id VARCHAR NOT NULL, seg_ord INTEGER NOT NULL,
+    loop_id              VARCHAR NOT NULL,         -- 2200A | 2200B | 2200C | 2200D
+    trn01_trace_type     VARCHAR,                  -- 1 current transaction / 2 referenced transaction
+    trn02_trace_identifier VARCHAR NOT NULL,       -- 2200D: the claim's patient control number (837 CLM01);
+                                                   -- 2200B: the 837 batch (its BHT03); 2200A: this acknowledgment
+    trn03 VARCHAR, trn04 VARCHAR
+);
+
+-- 2220D service line: sent when the status is about a line of the claim
+CREATE TABLE a277.service_line (
+    service_line_uid     VARCHAR PRIMARY KEY,
+    status_trace_uid     VARCHAR NOT NULL,         -- the claim's 2200D trace
+    txn_uid VARCHAR NOT NULL, file_id VARCHAR NOT NULL, seg_ord INTEGER NOT NULL,
+    svc01_raw            VARCHAR NOT NULL,         -- submitted procedure composite
+    svc01_1_qualifier    VARCHAR,                  -- HC / NU / ...
+    svc01_2_procedure_code VARCHAR,
+    svc01_3_mod1 VARCHAR, svc01_4_mod2 VARCHAR, svc01_5_mod3 VARCHAR, svc01_6_mod4 VARCHAR,
+    svc01_7_description  VARCHAR,
+    svc01_8              VARCHAR,
+    svc02_charge         DECIMAL(18,2),
+    raw_svc02            VARCHAR,
+    svc03 VARCHAR,
+    svc04_revenue_code   VARCHAR,
+    svc05 VARCHAR, svc06 VARCHAR,
+    svc07_units          DECIMAL(18,4),
+    raw_svc07            VARCHAR
+    -- REF*FJ (line item control number) -> edi.reference ; DTP*472 -> edi.date_time ; STC -> a277.status
+);
+
+-- STC exploded to ONE ROW PER STATUS COMPOSITE (STC01, STC10, STC11), as CAS is in edi.adjustment.
+-- Every row of an STC repeats the segment's own elements (date, action, amount, text): count or sum
+-- them WHERE composite_index = 1.
+CREATE TABLE a277.status (
+    status_uid           VARCHAR PRIMARY KEY,      -- file_id:seg_ord:composite_index
+    txn_uid              VARCHAR NOT NULL,
+    owner_uid            VARCHAR NOT NULL,         -- status_trace_uid or service_line_uid
+    owner_table          VARCHAR NOT NULL,         -- a277.status_trace | a277.service_line
+    file_id VARCHAR NOT NULL, seg_ord INTEGER NOT NULL, loop_id VARCHAR,
+    stc_ordinal          INTEGER NOT NULL,         -- nth STC under this owner
+    composite_index      SMALLINT NOT NULL,        -- 1 = STC01, 2 = STC10, 3 = STC11
+    raw_composite        VARCHAR NOT NULL,
+    category_code        VARCHAR NOT NULL,         -- A0 forwarded, A1 receipt acknowledged, A2 accepted into adjudication,
+                                                   -- A3 returned as unprocessable, A4 not found, A5 split, A6 rejected:
+                                                   -- missing information, A7 rejected: invalid information, A8 rejected:
+                                                   -- relational field in error
+    status_code          VARCHAR,                  -- claim status code (x12.org list): 19 receipt, 20 accepted, 33 subscriber not found, 54 duplicate, 562 NPI, ...
+    entity_code          VARCHAR,                  -- who the status is about: PR, IL, 85, DN, 82, ...
+    code_list_qualifier  VARCHAR,                  -- 4th component (RX: the status code is an NCPDP reject code)
+    status_date          DATE,                     -- STC02
+    raw_status_date      VARCHAR,
+    action_code          VARCHAR,                  -- STC03: WQ accept / U reject
+    amount               DECIMAL(18,2),            -- STC04: total charge of the claim (line: the line's charge)
+    raw_amount           VARCHAR,
+    stc05 VARCHAR, stc06 VARCHAR, stc07 VARCHAR, stc08 VARCHAR, stc09 VARCHAR,   -- not used by the 277CA; kept
+    free_text            VARCHAR                   -- STC12
+);
+
+-- =============================================================================
+-- H. REFERENCE CODE SETS & TENANT CONFIG (small, loaded from published lists)
 -- =============================================================================
 
 CREATE TABLE ref.claim_status (              -- 835 CLP02

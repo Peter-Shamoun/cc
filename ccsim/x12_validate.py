@@ -1,4 +1,4 @@
-"""Independent X12 checks for 837P (005010X222A1) and 835 (005010X221A1) files.
+"""Independent X12 checks for 837P (005010X222A1), 835 (005010X221A1) and 277CA (005010X214) files.
 
 It shares no code with the generator or the parser. It checks structure and money, the rules a
 clearinghouse or a payer's front end would apply:
@@ -13,6 +13,11 @@ clearinghouse or a payer's front end would apply:
              AMT*B6 (allowed) = SVC03 + line PR + CO-253 sequestration, and CO-253 = 2% of (allowed - PR);
              SVC05 (units paid) <= SVC07 (units billed); CLP05 = sum(PR CAS) unless reversal; payee NPI Luhn;
              interest: sum(claim AMT*I) = -sum(PLB L6); Medicare (CLP06 = MB): no claim-level CAS, no PI group
+  277CA      ST03 = 005010X214; BHT = 0085 / 08 / TH; HL ids sequential, levels nest 20 > 21 > 19 > PT, each with its
+             NM1 (PR or AY, 41, 85, QC) and a TRN; billing NPI (NM1*85*XX) passes Luhn; every STC has a category
+             A0-A8 with a status code, a real date, and action WQ with A0-A2 (accepted) or U with A3-A8 (rejected);
+             every claim (2200D TRN) has an STC, REF*1K only when accepted, and is rejected when one of its service
+             lines is; batch (QTY*90 / AA, AMT*YU / YY) and provider (QTY*QA / QC, AMT*YU / YY) totals = the claims
 
     python -m ccsim.x12_validate FILE...     # exit 1 if any file has errors
 """
@@ -138,7 +143,7 @@ def _check_interchange(segs, comp) -> list[str]:
     for tx in tx_segments:
         kind = tx[0][1]
         errs += (_check_837(tx, comp) if kind == "837" else _check_835(tx, comp) if kind == "835"
-                 else [f"unexpected transaction set {kind}"])
+                 else _check_277ca(tx, comp) if kind == "277" else [f"unexpected transaction set {kind}"])
     return errs
 
 
@@ -335,6 +340,125 @@ def _check_835(tx, comp) -> list[str]:
         errs.append(f"BPR01={bpr[1]} with BPR02={total}: H is required exactly when nothing is paid")
     if bpr[1] == "H" and bpr[4] != "NON":
         errs.append("BPR01=H requires BPR04=NON")
+    return errs
+
+
+_LEVELS_277CA = {"20": (None, ("PR", "AY")), "21": ("20", ("41",)), "19": ("21", ("85",)), "PT": ("19", ("QC",))}
+_ACCEPTED_CATEGORIES_277CA, _REJECTED_CATEGORIES_277CA = {"A0", "A1", "A2"}, {"A3", "A4", "A5", "A6", "A7", "A8"}
+
+
+def _check_277ca(tx, comp) -> list[str]:
+    errs = []
+    if len(tx[0]) < 4 or tx[0][3] != "005010X214":
+        return [f"277 implementation {tx[0][3] if len(tx[0]) > 3 else ''} is not the claim acknowledgment 005010X214"]
+    bht = tx[1]
+    if bht[0] != "BHT" or bht[1:3] != ["0085", "08"] or len(bht) < 7 or bht[6] != "TH":
+        errs.append("277CA BHT must be 0085 / 08 / TH")
+    elif not _date_ok(bht[4]):
+        errs.append(f"bad date {bht[4]}")
+    level_of_hl: dict[str, str] = {}
+    hl_rows = []
+    hl = trace = svc = None                     # the open HL, its open TRN, the claim's open service line
+    hl_has_name = hl_has_trace = True
+    claims = []                                 # per 2200D TRN: dict(pcn, accepted, amount, has_status, provider)
+    totals: dict[tuple, dict] = {}              # (level, HL01) -> {QTY / AMT qualifier: value}
+    provider = None
+
+    def close_hl():
+        if hl is not None and not hl_has_name:
+            errs.append(f"HL {hl[1]}: no NM1 {' or '.join(_LEVELS_277CA.get(hl[3], (None, ('?',)))[1])}")
+        if hl is not None and not hl_has_trace:
+            errs.append(f"HL {hl[1]}: no TRN")
+
+    for s in tx[2:-1]:
+        sid = s[0]
+        if sid == "HL":
+            close_hl()
+            hl, trace, svc, hl_has_name, hl_has_trace = s, None, None, False, False
+            if s[1] in level_of_hl or int(s[1]) != len(level_of_hl) + 1:
+                errs.append(f"HL ids not sequential at {s[1]}")
+            parent_level = level_of_hl.get(s[2]) if s[2] else None
+            if s[3] not in _LEVELS_277CA:
+                errs.append(f"HL {s[1]}: level {s[3]} is not 20 / 21 / 19 / PT")
+            elif parent_level != _LEVELS_277CA[s[3]][0]:
+                errs.append(f"HL {s[1]}: level {s[3]} under parent level {parent_level}")
+            level_of_hl[s[1]] = s[3]
+            hl_rows.append(s)
+            if s[3] in ("21", "19"):
+                totals[(s[3], s[1])] = {}
+            if s[3] == "19":
+                provider = s[1]
+        elif hl is None:
+            errs.append(f"{sid} before the first HL")
+        elif sid == "NM1" and trace is None:
+            hl_has_name = s[1] in _LEVELS_277CA.get(hl[3], (None, ()))[1]
+            if s[1] == "85" and (len(s) < 10 or s[8] != "XX" or not _luhn_npi(s[9])):
+                errs.append("billing provider NPI missing or fails Luhn")
+        elif sid == "TRN":
+            hl_has_trace, svc = True, None
+            trace = s
+            if hl[3] == "PT":
+                if s[1] != "2" or len(s) < 3 or not s[2]:
+                    errs.append(f"HL {hl[1]}: claim TRN must be TRN*2*<patient control number>")
+                claims.append(dict(pcn=s[2] if len(s) > 2 else "", accepted=True, amount=Decimal(0), has_status=False,
+                                   provider=provider))
+        elif trace is None:
+            errs.append(f"HL {hl[1]}: {sid} before the TRN")
+        elif sid == "SVC":
+            svc = s
+            if hl[3] != "PT":
+                errs.append(f"HL {hl[1]}: SVC outside a claim")
+        elif sid == "STC":
+            where = f"TRN {trace[2] if len(trace) > 2 else ''}"
+            action = s[3] if len(s) > 3 else ""
+            composites = [c for c in (s[1], *(s[10:12] if len(s) > 10 else ())) if c]
+            categories = {c.split(comp)[0] for c in composites}
+            if not s[1] or any(len(c.split(comp)) < 2 or not c.split(comp)[1] for c in composites):
+                errs.append(f"{where}: STC needs a category and a status code")
+            if not categories <= _ACCEPTED_CATEGORIES_277CA | _REJECTED_CATEGORIES_277CA:
+                errs.append(f"{where}: STC category {sorted(categories)} is not A0-A8")
+            if not _date_ok(s[2] if len(s) > 2 else ""):
+                errs.append(f"bad date {s[2] if len(s) > 2 else ''}")
+            accepted = action == "WQ"
+            if action not in ("WQ", "U") or not categories <= (
+                    _ACCEPTED_CATEGORIES_277CA if accepted else _REJECTED_CATEGORIES_277CA):
+                errs.append(f"{where}: STC action {action} with category {sorted(categories)}: "
+                            "WQ goes with A0-A2 (accepted), U with A3-A8 (rejected)")
+            if hl[3] == "PT":
+                claim = claims[-1]
+                if svc is None:
+                    claim["has_status"] = True
+                    claim["amount"] = _dec(s[4] if len(s) > 4 else "")
+                    claim["accepted"] = claim["accepted"] and accepted
+                elif not accepted and claim["accepted"]:
+                    errs.append(f"{where}: service line rejected but the claim is accepted")
+        elif sid == "REF" and s[1] == "1K" and hl[3] == "PT" and not claims[-1]["accepted"]:
+            errs.append(f"TRN {claims[-1]['pcn']}: REF*1K (payer claim number) on a rejected claim")
+        elif sid == "DTP":
+            dates = s[3].split("-") if s[2] == "RD8" else [s[3]]
+            if s[2] not in ("D8", "RD8") or not all(_date_ok(d) for d in dates):
+                errs.append(f"bad date {s[3]}")
+        elif sid in ("QTY", "AMT") and hl[3] in ("21", "19"):
+            totals.setdefault((hl[3], hl[1]), {})[s[1]] = _dec(s[2])
+    close_hl()
+    for c in claims:
+        if not c["has_status"]:
+            errs.append(f"TRN {c['pcn']}: claim without STC")
+    parents = {h[2] for h in hl_rows if h[2]}
+    for h in hl_rows:
+        if (h[1] in parents) != (len(h) > 4 and h[4] == "1"):
+            errs.append(f"HL {h[1]}: HL04 does not say whether it has a child HL")
+    for (level, hl_id), sent in totals.items():
+        mine = [c for c in claims if level == "21" or c["provider"] == hl_id]
+        accepted_qualifier, rejected_qualifier = ("90", "AA") if level == "21" else ("QA", "QC")
+        expected = {accepted_qualifier: Decimal(sum(c["accepted"] for c in mine)),
+                    rejected_qualifier: Decimal(sum(not c["accepted"] for c in mine)),
+                    "YU": sum((c["amount"] for c in mine if c["accepted"]), Decimal(0)),
+                    "YY": sum((c["amount"] for c in mine if not c["accepted"]), Decimal(0))}
+        for qualifier, value in expected.items():
+            if sent.get(qualifier, Decimal(0)) != value:
+                errs.append(f"HL {hl_id}: {'AMT' if qualifier in ('YU', 'YY') else 'QTY'}*{qualifier} "
+                            f"{sent.get(qualifier, 0)} != {value} from the claims")
     return errs
 
 

@@ -82,7 +82,8 @@ def samples(stress):
     s837 = next(b for _, f, b in _files(out, truth) if f["kind"] == "837" and f["expect"] == "parsed" and _plain(b)).decode()
     s835 = next(b for _, f, b in _files(out, truth) if f["kind"] == "835" and f["expect"] == "parsed" and _plain(b)
                 and b"\nCAS*CO" in b and b"\nSVC*" in b and b"\nPLB" not in b and b"\nBPR*I*" in b).decode()
-    return s837, s835
+    s277 = next(b for _, f, b in _files(out, truth) if f["kind"] == "277" and _plain(b) and b"\nDTP*472*D8*" in b).decode()
+    return s837, s835, s277
 
 
 def _plain(body: bytes) -> bool:
@@ -109,9 +110,16 @@ def _sub(text, pattern, repl):
     ("835", r"^(CAS\*[A-Z]{2}\*\w+\*)([0-9.-]+)", r"\g<1>0.01", "CLP"),
     ("835", r"^(N1\*PE\*[^*]+\*XX\*\d{9})\d", r"\g<1>0", "NPI"),
     ("835", r"^(DTM\*472\*)\d{8}", r"\g<1>20260231", "bad date"),
+    ("277", r"^(ST\*277\*\d+\*)005010X214", r"\g<1>005010X212", "005010X214"),
+    ("277", r"^HL\*2\*1\*", r"HL*5*1*", "HL"),
+    ("277", r"^(QTY\*(?:90|AA)\*)\d+", r"\g<1>999", "QTY"),
+    ("277", r"^(AMT\*(?:YU|YY)\*)[0-9.]+", r"\g<1>0.01", "AMT"),
+    ("277", r"^(STC\*A1\W19\W\w+\*\d{8}\*)WQ", r"\g<1>U", "STC action"),
+    ("277", r"^(DTP\*472\*D8\*)\d{8}", r"\g<1>20261399", "bad date"),
+    ("277", r"^(NM1\*QC\*[^~]*~\r?\nTRN\*2\*\w+~\r?\n)STC\*[^~]*~", r"\g<1>REF*EA*X~", "without STC"),
 ])
 def test_validator_catches_each_mutation(samples, which, pattern, repl, expect):
-    text = samples[0] if which == "837" else samples[1]
+    text = dict(zip(("837", "835", "277"), samples))[which]
     assert not validate(text)
     errs = validate(_sub(text, pattern, repl))
     assert errs and any(expect.lower() in e.lower() for e in errs), errs
@@ -261,12 +269,13 @@ def test_default_benchmark_scenario_exercises_money_features(tmp_path):
     assert any(a["seq"] == 1 and a["paid_current"] > 0 for c in t["claims"].values() for a in c["adjudications"].values())
 
 
-def test_every_parsed_value_survives_into_the_lossless_tables(stress):
+@pytest.mark.parametrize("kind,marker", [("837", b"\nSVD*"), ("277", b"\nSVC*")])
+def test_every_parsed_value_survives_into_the_lossless_tables(stress, kind, marker):
     """Parser rows -> the batch's constrained staging tables (as the Fargate task stages them): no field dropped."""
     from ccsim.parser import TABLES
     from ccsim.silver_staging import RawFile, SilverBatch
     out, truth = stress
-    tc, f, body = next((tc, f, b) for tc, f, b in _files(out, truth) if f["kind"] == "837" and b"\nSVD*" in b)
+    tc, f, body = next((tc, f, b) for tc, f, b in _files(out, truth) if f["kind"] == kind and marker in b)
     meta = dict(s3_uri="x", s3_bucket="x", s3_key="x", size_bytes=1, sha256="x")
     rows = parse_file(body, "F1", tc, meta, "r1", datetime(2026, 1, 1))
     batch = SilverBatch("r1", datetime(2026, 1, 1), triggered_by="t", notes=None, parser_version="test")
@@ -292,11 +301,13 @@ def _tree_digest(root):
 
 
 def test_target_mb_per_day_sets_volume_from_measured_bytes(tmp_path):
-    """Steady-state raw volume (once remits for earlier claims have ramped up) lands within 15% of the target over
-    20 business days, and still varies day to day."""
+    """Steady-state 837 + 835 volume (once remits for earlier claims have ramped up) lands within 15% of the target
+    over 20 business days, and still varies day to day. The 277CA files come on top of the target."""
     target = .15
     sc = Scenario(start=edi_mock.CAL_START, days=edi_mock.CAL_WARMUP_DAYS + 28, seed=5, target_mb_per_day=target)
-    sizes = [dd.bytes for dd in edi_mock.generate_days(tmp_path, sc, ["acme_labs"])]
+    sizes = [sum(p.stat().st_size for kind in ("837", "835") for p in (dd.path / kind).glob("*"))
+             for dd in edi_mock.generate_days(tmp_path, sc, ["acme_labs"])]
+    sizes = [n for n in sizes if n]
     last = sizes[-20:]
     mean = sum(last) / len(last)
     assert abs(mean / (target * 1e6) - 1) < .15, mean
@@ -378,3 +389,65 @@ def test_memory_stays_flat_while_streaming(tmp_path):
     (m1, n1), (m2, n2) = [[sum(x) / len(x) for x in zip(*win[k])] for k in "ab"]
     assert n2 - n1 > 1500
     assert (m2 - m1) / (n2 - n1) < 1500, ((m2 - m1) / (n2 - n1), m1, m2)
+
+
+# --- 277CA: the front end's answer to each 837 batch ----------------------------------------------------------------
+def _rows(body: bytes) -> dict:
+    return parse_file(body, "F", "t", dict(s3_uri="x", s3_bucket="x", s3_key="x", size_bytes=1, sha256="x"), "r",
+                      datetime(2026, 1, 1))
+
+
+def test_277ca_answers_each_837_batch_with_its_claims(stress):
+    out, truth = stress
+    files = list(_files(out, truth))
+    claims_of_837 = {f["name"]: sorted(c["clm01_patient_control_number"] for c in _rows(b)["c837.claim"])
+                     for _, f, b in files if f["kind"] == "837" and f["expect"] == "parsed"}
+    n_acknowledgments = 0
+    for _, f, body in files:
+        if f["kind"] == "277":
+            rows = _rows(body)
+            assert {r["file_kind"] for r in rows["edi.source_file"]} == {"277CA"}
+            assert sorted(t["trn02_trace_identifier"] for t in rows["a277.status_trace"]
+                          if t["loop_id"] == "2200D") == claims_of_837[f["acknowledges"]]
+            n_acknowledgments += 1
+    assert n_acknowledgments >= .9 * len(claims_of_837)       # the window's last batches are answered after it
+
+
+def test_277ca_rejects_only_claims_that_get_no_835_and_quotes_the_835_claim_number(stress):
+    _, truth = stress
+    acknowledged = [(c, s, s["acknowledgment"]) for T in truth["tenants"].values() for c in T["claims"].values()
+                    for s in c["submissions"] if "acknowledgment" in s]
+    rejected = [(c, a) for c, _, a in acknowledged if not a["accepted"]]
+    assert rejected and len(rejected) < .05 * len(acknowledged)
+    assert all(not c["adjudications"] and a["payer_claim_control_number"] is None for c, a in rejected)
+    assert len({a["rejection"] for _, a in rejected}) >= 3
+    compared = 0
+    for c, s, a in acknowledged:
+        if a["payer_claim_control_number"] and len(c["submissions"]) == 1 and not c["resubmitted"]:
+            numbers = {e["icn"] for ad in c["adjudications"].values() if ad["payer_id"] == s["payer_id"]
+                       and ad["seq"] == s["seq"] for e in ad["events"]}
+            if numbers:                                            # an 835 in the window: REF*1K = its CLP07
+                assert a["payer_claim_control_number"] in numbers, (c["pcn"], a, numbers)
+                compared += 1
+    assert compared > 20
+
+
+def test_277ca_changes_no_837_or_835_byte(tmp_path, monkeypatch):
+    def digest(root, kinds):
+        return {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in Path(root).rglob("*.x12")
+                if p.parent.name in kinds}
+    sc = Scenario.stress(days=12, volume_scale=.2, seed=5)
+    generate(tmp_path / "with", sc, return_claims=False)
+    monkeypatch.setattr(edi_mock._TenantRun, "_acknowledge", lambda *args: None)
+    generate(tmp_path / "without", sc, return_claims=False)
+    assert digest(tmp_path / "with", {"277"}) and not digest(tmp_path / "without", {"277"})
+    assert digest(tmp_path / "with", {"837", "835"}) == digest(tmp_path / "without", {"837", "835"})
+
+
+def test_parser_fails_loudly_on_other_277s_and_unknown_transaction_sets(samples):
+    s277 = samples[2]
+    assert _rows(s277.encode())["a277.status"]
+    for pattern, repl in ((r"^(ST\*277\*\d+\*)005010X214", r"\g<1>005010X212"),   # a claim status response
+                          (r"^ST\*277\*", "ST*999*")):
+        with pytest.raises(ParseError):
+            _rows(_sub(s277, pattern, repl).encode())
