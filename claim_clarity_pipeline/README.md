@@ -150,8 +150,12 @@ Changes made to the design, each verified by the suite:
 
 Open design points:
 
-- **Small files**: 25 tables share a slot, so Parquet files average 1.2 MB at a 0.5 GiB slot and 3.5 MB at 2 GiB.
-  Compaction is not built.
+- **Silver compaction is not built.** Every slot export writes one Parquet file per table. A year delivered at
+  once (the throughput scenario) leaves 8 exports: 196 files, 930 MB, from 50 MB (`edi.segment`) to a few KB per
+  file (`edi_ingest_run`, the envelopes); the evaluation's `silver_parquet_files_by_table` lists them. Delivered a
+  day at a time, as in production, the task runs once a day and each run exports at least once, so a year is at
+  least 365 files per table, about 10,000 files, most of them small: that is what a compaction schedule has to work
+  on.
 - **The parsers are the limit**: about 1.9 MB/s for a parser process with a core to itself, 3 MB per second of
   parser time on large files. With small files staged together, what is left beside the parsing itself is
   turning the rows into Arrow: about a quarter of a parser's time, of which turning row dicts into columns is
