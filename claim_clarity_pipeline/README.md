@@ -106,7 +106,7 @@ appends one after another.
 | 90 days as 2 large files (278 MB) | not measured | 3.4-3.65 MB/s, 2.2 GB peak heap; run alternately with the code before staging (3.2-3.5 MB/s) it is 4-6% faster, so staging costs large files nothing. Earlier runs measured 4.2 MB/s under other conditions |
 | 30 days with 277CA files (111 MB) | not measured | 3.3 MB/s, first commit after 34 s, 103 staged units |
 | 3 customers at once, 30 days each | 147-149 s each | 1.16-1.19 MB/s each, about 3.5 MB/s together |
-| 1 year (1.2 GB, 8,849 deliveries) | about 22 min, 802 Parquet files | 8.4 min, 3.1 MB/s, 9 slot exports of 1 GiB |
+| 1 year (1.2 GB, 8,849 deliveries) | about 22 min, 802 Parquet files | 7.5 min, 3.8 MB/s, 8 slot exports of 1 GiB, 1,154 staged units; parser task 2.5 GB peak heap, candidate selection 5.0 GB (before staging: 8.4 min, 3.1 MB/s) |
 
 277CA acknowledgments go through the pipeline unchanged: the parser reads them into the `a277.*` tables, which
 onboarding creates with the other lossless tables. On 30 days generated with them (`python -m ccsim.edi_mock <out>
