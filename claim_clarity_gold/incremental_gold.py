@@ -166,9 +166,13 @@ class IncrementalGold:
         event_rows = {name: work.sql(f"SELECT {', '.join(relation.columns)} FROM sem.{relation.semantic_relation} "
                                      f"ORDER BY {relation.sort_columns}").to_arrow_table()
                       for name, relation in EVENT_RELATIONS.items()}
+        # every table exists from the first batch on, empty or not: a customer without 277CA files still has
+        # gold.claim_acknowledgments
         with ThreadPoolExecutor(len(EVENT_RELATIONS)) as pool:
-            list(pool.map(lambda name: self._table(name, event_rows[name], EVENT_RELATIONS[name].month_column)
-                          .append(event_rows[name]), [name for name, rows in event_rows.items() if rows.num_rows]))
+            tables = dict(zip(event_rows, pool.map(lambda name: self._table(
+                name, event_rows[name], EVENT_RELATIONS[name].month_column), event_rows)))
+            list(pool.map(lambda name: tables[name].append(event_rows[name]),
+                          [name for name, rows in event_rows.items() if rows.num_rows]))
         event_rows_added = sum(rows.num_rows for rows in event_rows.values())
         lap("append_events")
 
@@ -260,8 +264,9 @@ class IncrementalGold:
             WHERE o.current_remit_claim_id IS NOT NULL
               AND o.current_remit_claim_id IS DISTINCT FROM n.current_remit_claim_id
             ORDER BY {SUPERSEDED_REMIT_CLAIMS_SORT_COLUMNS}""").to_arrow_table()
+        superseded_table = self._table("superseded_remit_claims", superseded, "payment_month")
         if superseded.num_rows:
-            self._table("superseded_remit_claims", superseded, "payment_month").append(superseded)
+            superseded_table.append(superseded)
         lap("fold_state")
 
         # replace the month partitions the new rows leave and enter
