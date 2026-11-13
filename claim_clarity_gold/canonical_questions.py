@@ -33,7 +33,7 @@ CANONICAL_QUESTIONS: dict[str, str] = {
     "allowed_and_paid_by_procedure": """
         SELECT l.procedure_code, count(*) AS lines, sum(l.line_charge_amount) AS billed,
                sum(l.line_allowed_amount) AS allowed, sum(l.line_paid_amount) AS paid
-        FROM gold.remit_lines l JOIN gold.claim_payers p ON l.remit_claim_id = p.current_remit_claim_id
+        FROM gold.remit_lines l ANTI JOIN gold.superseded_remit_claims USING (remit_claim_id)
         GROUP BY 1 ORDER BY paid DESC LIMIT 25""",
     "billed_by_referring_provider": """
         SELECT referring_npi, count(*) AS claims, sum(charge_amount) AS billed, sum(total_paid_amount) AS paid
@@ -45,7 +45,7 @@ CANONICAL_QUESTIONS: dict[str, str] = {
         FROM gold.claim_payers WHERE has_current_adjudication GROUP BY 1 ORDER BY adjudicated DESC""",
     "top_denial_reasons": """
         SELECT a.carc_code, a.carc_description, count(DISTINCT a.claim_key) AS claims, sum(a.adjustment_amount) AS amount
-        FROM gold.adjustments a JOIN gold.claim_payers p ON a.remit_claim_id = p.current_remit_claim_id
+        FROM gold.adjustments a ANTI JOIN gold.superseded_remit_claims USING (remit_claim_id)
         WHERE a.is_denial_carc GROUP BY 1, 2 ORDER BY claims DESC LIMIT 20""",
     "front_end_rejections_by_payer_and_reason": """
         SELECT payer_name, status_code, count(DISTINCT claim_key) AS claims, sum(total_charge_amount) AS billed

@@ -10,16 +10,16 @@ import duckdb
 
 from .gold_relations import EVENT_RELATIONS
 
-_CURRENT = "(SELECT current_remit_claim_id FROM gold.claim_payers WHERE current_remit_claim_id IS NOT NULL)"
+_SUPERSEDED = "(SELECT remit_claim_id FROM gold.superseded_remit_claims)"
 _LATEST = "(SELECT latest_claim_id FROM gold.claims WHERE latest_claim_id IS NOT NULL)"
 COMPATIBILITY_VIEWS = {
     "claims": f"SELECT *, claim_id IN {_LATEST} AS is_latest_submission FROM gold.claim_submissions",
     "claim_lines": f"SELECT *, claim_id IN {_LATEST} AS is_latest_submission FROM gold.claim_lines",
-    "remit_claims": f"""SELECT *, remit_claim_id IN {_CURRENT} AS is_current_adjudication,
-        CASE WHEN is_reversal THEN 'reversal' WHEN remit_claim_id IN {_CURRENT} THEN 'current'
+    "remit_claims": f"""SELECT *, remit_claim_id NOT IN {_SUPERSEDED} AS is_current_adjudication,
+        CASE WHEN is_reversal THEN 'reversal' WHEN remit_claim_id NOT IN {_SUPERSEDED} THEN 'current'
              ELSE 'superseded' END AS adjudication_state FROM gold.remit_claims""",
-    "remit_lines": f"SELECT *, remit_claim_id IN {_CURRENT} AS is_current_adjudication FROM gold.remit_lines",
-    "adjustments": f"SELECT *, remit_claim_id IN {_CURRENT} AS is_current_adjudication FROM gold.adjustments",
+    "remit_lines": f"SELECT *, remit_claim_id NOT IN {_SUPERSEDED} AS is_current_adjudication FROM gold.remit_lines",
+    "adjustments": f"SELECT *, remit_claim_id NOT IN {_SUPERSEDED} AS is_current_adjudication FROM gold.adjustments",
     "claim_acknowledgments": "SELECT * FROM gold.claim_acknowledgments",
     "payments": "SELECT * FROM gold.payments",
     "provider_adjustments": "SELECT * FROM gold.provider_adjustments",

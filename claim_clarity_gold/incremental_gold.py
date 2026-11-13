@@ -31,6 +31,7 @@ from ccsim.pipeline import DDL_SEMANTIC, seed_ref
 from ccsim.silver_staging import STAGING_DDL
 
 from .gold_relations import (CLAIM_PAYERS_SQL, CLAIMS_SQL, EVENT_RELATIONS, LATEST_SUBMISSION_COLUMNS,
+                             SUPERSEDED_REMIT_CLAIMS_COLUMNS, SUPERSEDED_REMIT_CLAIMS_SORT_COLUMNS,
                              STATE_MONTH_COLUMN, STATE_SORT_COLUMNS)
 
 # The semantic views rank events with these keys; as text that sorts the same way. NULL dates rank last.
@@ -246,6 +247,21 @@ class IncrementalGold:
                      "INSERT INTO new_claims BY NAME " + CLAIMS_SQL.format(
                          latest_submissions="latest_submissions_of_touched_claims",
                          claim_payers="claim_payers_of_touched_claims"))
+        # the batch's claim payments that are not current after the fold, and the previous current adjudications
+        # the batch replaced
+        superseded = work.sql(f"""
+            SELECT {', '.join('r.' + c for c in SUPERSEDED_REMIT_CLAIMS_COLUMNS)} FROM sem.remit_claims r
+            WHERE r.remit_claim_id NOT IN (SELECT current_remit_claim_id FROM new_claim_payers
+                                           WHERE current_remit_claim_id IS NOT NULL)
+            UNION ALL
+            SELECT o.current_remit_claim_id, o.claim_key, o.payer_key,
+                   date_trunc('month', o.current_payment_date)::DATE
+            FROM previous_claim_payers o JOIN new_claim_payers n USING (claim_key, payer_key)
+            WHERE o.current_remit_claim_id IS NOT NULL
+              AND o.current_remit_claim_id IS DISTINCT FROM n.current_remit_claim_id
+            ORDER BY {SUPERSEDED_REMIT_CLAIMS_SORT_COLUMNS}""").to_arrow_table()
+        if superseded.num_rows:
+            self._table("superseded_remit_claims", superseded, "payment_month").append(superseded)
         lap("fold_state")
 
         # replace the month partitions the new rows leave and enter
@@ -286,9 +302,10 @@ class IncrementalGold:
         its previous files behind. Merge every month partition that has several files into one sorted file, keep
         only the current snapshot, and delete the data files it does not use."""
         started, files_merged, files_deleted = time.monotonic(), 0, 0
-        sort_columns = {name: relation.sort_columns for name, relation in EVENT_RELATIONS.items()} | STATE_SORT_COLUMNS
+        sort_columns = ({name: relation.sort_columns for name, relation in EVENT_RELATIONS.items()} | STATE_SORT_COLUMNS
+                        | {"superseded_remit_claims": SUPERSEDED_REMIT_CLAIMS_SORT_COLUMNS})
         month_columns = {name: relation.month_column for name, relation in EVENT_RELATIONS.items()} | dict.fromkeys(
-            STATE_SORT_COLUMNS, STATE_MONTH_COLUMN)
+            STATE_SORT_COLUMNS, STATE_MONTH_COLUMN) | {"superseded_remit_claims": "payment_month"}
         for _, name in self.catalog.list_tables(self.namespace):
             table = self.catalog.load_table(f"{self.namespace}.{name}")
             files_per_month: dict[int | None, int] = {}     # a month as Iceberg stores it: days since 1970

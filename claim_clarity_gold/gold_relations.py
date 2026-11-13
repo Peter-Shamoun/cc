@@ -89,6 +89,13 @@ EVENT_RELATIONS: dict[str, EventRelation] = {
         month_column="payment_month", sort_columns="payment_id, provider_adjustment_id"),
 }
 
+# Claim payments that are not, or are no longer, their claim and payer's current adjudication: reversals, and
+# adjudications a later one has replaced. A small minority (about 5%), and a payment that leaves the current
+# adjudication never comes back, so rows are only ever added. "The current adjudication's lines / adjustments" is
+# then a remit_lines or adjustments query that skips these, which is cheaper than joining to claim_payers.
+SUPERSEDED_REMIT_CLAIMS_COLUMNS = ["remit_claim_id", "claim_key", "payer_key", "payment_month"]
+SUPERSEDED_REMIT_CLAIMS_SORT_COLUMNS = "remit_claim_id"
+
 STATE_MONTH_COLUMN = "first_activity_month"      # both state tables are partitioned by it
 
 # One row per claim and payer. {claims}, {claim_acknowledgments} and {remit_claims} name the semantic relations

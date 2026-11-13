@@ -27,8 +27,7 @@ from pyiceberg.catalog.sql import SqlCatalog
 
 from .benchmark_compatibility import create_compatibility_views
 from .canonical_questions import CANONICAL_QUESTIONS
-from .full_build import build_gold_from_scratch, open_gold
-from .gold_relations import EVENT_RELATIONS, STATE_RELATIONS
+from .full_build import ALL_RELATIONS, build_gold_from_scratch, open_gold
 from .incremental_gold import IncrementalGold, open_incremental_gold
 from .query_workload import load_workload
 from .silver_dataset import batch_table_files, build_silver_database, export_silver_batches, open_silver
@@ -93,7 +92,7 @@ def run(working_directory: Path, cache_directory: Path, days: int, compact_every
     if compare_with_full_build:
         full_build = build_gold_from_scratch(silver, working_directory / "full")
         full = open_gold(working_directory / "full")
-    for name in [*EVENT_RELATIONS, *STATE_RELATIONS] if compare_with_full_build else []:
+    for name in ALL_RELATIONS if compare_with_full_build else []:
         full_file = working_directory / "full" / f"{name}.parquet"
         columns = ", ".join(row[0] for row in incremental.execute(f"DESCRIBE gold.{name}").fetchall())
         differing_rows[name] = incremental.execute(
@@ -126,13 +125,13 @@ def run(working_directory: Path, cache_directory: Path, days: int, compact_every
 
     third = max(1, len(batches) // 3)
     column_count = sum(len(incremental.execute(f"DESCRIBE gold.{name}").fetchall())
-                       for name in [*EVENT_RELATIONS, *STATE_RELATIONS])
+                       for name in ALL_RELATIONS)
     scorecard = {
         "silver_days": days, "batches": len(batches),
         "1_subset": {"incremental_equals_full_build": (not any(differing_rows.values())) if compare_with_full_build
                      else "not checked",
                      "differing_rows": differing_rows},
-        "2_easy": {"relations": len(EVENT_RELATIONS) + len(STATE_RELATIONS), "columns": column_count,
+        "2_easy": {"relations": len(ALL_RELATIONS), "columns": column_count,
                    "canonical_questions": len(canonical)},
         "3_fast": {
             "canonical_question_seconds": canonical,

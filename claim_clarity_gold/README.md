@@ -40,9 +40,13 @@ happened, never changed after it is written.
 | `adjustments` | event | one 835 adjustment (CAS group, reason, amount) | 835 |
 | `payments` | event | one 835 payment (BPR / TRN) | 835 |
 | `provider_adjustments` | event | one 835 provider-level adjustment (PLB) | 835 |
+| `superseded_remit_claims` | event | a claim payment that is not its claim and payer's current adjudication | 835 |
 
-Most questions are answered by a state table alone. History and detail join an event table to it by `claim_key`,
-or by `remit_claim_id = claim_payers.current_remit_claim_id` for "the current adjudication's lines / reasons".
+Most questions are answered by a state table alone. History and detail join an event table to it by `claim_key`.
+"The current adjudication's lines / reasons" is `remit_lines` or `adjustments` ANTI JOIN `superseded_remit_claims`:
+the payments that are not current are about 5% of them, and one that stops being current never becomes current
+again, so that relation only grows, and skipping a small set is cheaper than joining to `claim_payers` (on a year:
+95 ms instead of 265 ms).
 
 **What changes from v1.**
 
@@ -86,7 +90,7 @@ snapshots and deletes unused data files.
 | Criterion | Result |
 |---|---|
 | 1. Subset | every relation is defined over the semantic views over silver; the incremental build (21 daily batches) equals the full build in all nine relations |
-| 2. Easy | 10 relations, 224 columns; the 17 canonical questions are 3 to 15 lines each |
+| 2. Easy | 11 relations; the 17 canonical questions are 3 to 15 lines each |
 | 3. Fast | canonical questions: median 6 ms, at most 39 ms. The benchmark's 156 queries: gold covers 149 (median 55 ms through the compatibility views, against 343 ms on the views over silver); all 149 equal the full build, and 148 equal silver (`a_838170f50b` sums floating-point values, and the order of summation shows in the last digit) |
 | 4. Build cost | 2.3 s per batch in the first third, 3.4 s in the last; gold is 21.4 MB in 18 files after compaction (silver: 58 MB); key index 17 MB |
 
