@@ -32,6 +32,7 @@ import hashlib
 import json
 import logging
 import mmap
+import ctypes
 import multiprocessing
 import os
 import queue
@@ -432,6 +433,19 @@ def stager_thread(settings: CustomerPipelineSettings, slots: list[Slot], parsed_
             export_filling_slot_and_switch()
 
 
+def process_heap_megabytes() -> int:
+    """This process's anonymous memory: what it has allocated, without the pages of memory-mapped files."""
+    with open("/proc/self/status") as status:
+        return next(int(line.split()[1]) // 1024 for line in status if line.startswith("RssAnon"))
+
+
+def return_freed_memory_to_operating_system():
+    """An export allocates and frees a few hundred megabytes; the allocators keep most of it for reuse and the
+    task's memory then grows by that much per export. Hand it back."""
+    pa.default_memory_pool().release_unused()
+    ctypes.CDLL("libc.so.6").malloc_trim(0)
+
+
 def exporter_thread(lake: SilverLake, slots_to_export: queue.Queue, resolved_files: queue.Queue,
                     stop_requested: threading.Event):
     while not stop_requested.is_set():
@@ -441,6 +455,7 @@ def exporter_thread(lake: SilverLake, slots_to_export: queue.Queue, resolved_fil
             continue
         export_id = f"export_{datetime.now(UTC):%Y%m%dT%H%M%S}_{uuid.uuid4().hex[:8]}"
         started, failed_attempts = time.monotonic(), 0
+        heap_megabytes_before_export = process_heap_megabytes()
         # A failed export is the lake's fault (S3, the catalog), not the files': it is retried here for as long as
         # the task runs, while the SQS manager keeps the files' messages hidden. Releasing them instead would
         # count a receive against every file of the slot and dead-letter good files after three failures.
@@ -457,6 +472,7 @@ def exporter_thread(lake: SilverLake, slots_to_export: queue.Queue, resolved_fil
                 continue
             result |= {"slot": slot.name, "slot_staged_bytes": slot.staged_bytes, "failed_attempts": failed_attempts,
                        "export_seconds": round(time.monotonic() - started, 2),
+                       "task_heap_megabytes_before_export": heap_megabytes_before_export,
                        "raw_bytes": sum(f.source_file_provenance["size_bytes"] for f in slot.files),
                        # time spent on this slot's files before the export, summed over the workers of each stage
                        "stage_seconds": {stage: round(sum(f.stage_seconds.get(stage, 0) for f in slot.files), 2)
@@ -466,6 +482,7 @@ def exporter_thread(lake: SilverLake, slots_to_export: queue.Queue, resolved_fil
             for file in slot.files:                       # 4 the SQS manager deletes the committed files' messages
                 resolved_files.put(file)
             slot.wipe()                                   # 5
+            return_freed_memory_to_operating_system()
             break
 
 
