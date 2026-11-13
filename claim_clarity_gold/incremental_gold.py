@@ -20,6 +20,7 @@ from pathlib import Path
 
 import duckdb
 import pyarrow as pa
+import pyarrow.dataset
 import pyarrow.fs
 from pyiceberg.catalog import Catalog
 from pyiceberg.expressions import EqualTo, In, IsNull, Or
@@ -303,12 +304,18 @@ class IncrementalGold:
         self.key_index.close()
 
 
-def open_incremental_gold(catalog: Catalog) -> duckdb.DuckDBPyConnection:
-    """A DuckDB session with every gold relation as gold.<name>, over the Iceberg tables' current data files."""
+def open_incremental_gold(catalog: Catalog, filesystem: pa.fs.FileSystem | None = None) -> duckdb.DuckDBPyConnection:
+    """A DuckDB session with every gold relation as gold.<name>, over the Iceberg tables' current data files.
+    filesystem: where the files are when not on local disk (S3, as the silver lake opens it)."""
     con = duckdb.connect()
     con.execute("CREATE SCHEMA gold")
     for _, name in catalog.list_tables(GOLD_NAMESPACE):
-        files = [task.file.file_path.removeprefix("file://") for task in
-                 catalog.load_table(f"{GOLD_NAMESPACE}.{name}").scan().plan_files()]
-        con.execute(f"CREATE VIEW gold.{name} AS SELECT * FROM read_parquet({files})")
+        paths = [task.file.file_path for task in catalog.load_table(f"{GOLD_NAMESPACE}.{name}").scan().plan_files()]
+        if filesystem is None:
+            con.execute(f"CREATE VIEW gold.{name} AS SELECT * FROM read_parquet("
+                        f"{[path.removeprefix('file://') for path in paths]})")
+        else:
+            con.register(f"gold_{name}_files", pa.dataset.dataset(
+                [path.removeprefix("s3://") for path in paths], filesystem=filesystem, format="parquet"))
+            con.execute(f"CREATE VIEW gold.{name} AS SELECT * FROM gold_{name}_files")
     return con
