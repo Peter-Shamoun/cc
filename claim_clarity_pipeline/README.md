@@ -97,7 +97,9 @@ appends one after another.
 
 Memory over the year: the parser task peaks at 2.3 GB (1.3 GB in its main process, during a slot export; about
 0.5 GB between exports) of its 16 GB; candidate selection at 4.8 GB of its 8 GB, with DuckDB held to half the
-task's memory. A gate checks that each task stays within its task memory.
+task's memory: DuckDB fills what it is allowed (4 GiB) and the Parquet readers add 1 to 2 GB whatever the limit
+(the same query with a 1 GiB limit peaks at 3.0 GB and takes 34 s instead of 24 s). A gate checks that each task
+stays within its task memory.
 
 Settings swept on the 90-day set (parsers 1 / 3 / 7, export threads 2 / 8, slot 256 MB / 1 GiB, downloaders 2 / 4):
 only the parser count moves throughput (1.2 / 2.5 / 2.7 MB/s on 4 cores), and a smaller slot brings the first
