@@ -20,6 +20,7 @@ COMPATIBILITY_VIEWS = {
              ELSE 'superseded' END AS adjudication_state FROM gold.remit_claims""",
     "remit_lines": f"SELECT *, remit_claim_id IN {_CURRENT} AS is_current_adjudication FROM gold.remit_lines",
     "adjustments": f"SELECT *, remit_claim_id IN {_CURRENT} AS is_current_adjudication FROM gold.adjustments",
+    "claim_acknowledgments": "SELECT * FROM gold.claim_acknowledgments",
     "payments": "SELECT * FROM gold.payments",
     "provider_adjustments": "SELECT * FROM gold.provider_adjustments",
 }

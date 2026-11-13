@@ -40,6 +40,14 @@ EVENT_RELATIONS: dict[str, EventRelation] = {
                  "date_trunc('month', submission_date)::DATE AS submission_month", "rendering_npi",
                  "source_file_id"],
         month_column="submission_month", sort_columns="claim_key, claim_id, claim_line_id"),
+    "claim_acknowledgments": EventRelation(
+        grain="one 277CA claim status (STC): a payer's or clearinghouse's front-end accept or reject of a claim",
+        semantic_relation="claim_acknowledgments",
+        columns=["acknowledgment_id", "claim_key", "payer_key", "payer_name", "payer_class", "status_category_code",
+                 "status_code", "entity_code", "is_accepted", "is_rejected", "acknowledgment_date",
+                 "date_trunc('month', acknowledgment_date)::DATE AS acknowledgment_month", "status_effective_date",
+                 "payer_claim_control_number", "total_charge_amount", "source_file_id"],
+        month_column="acknowledgment_month", sort_columns="claim_key, acknowledgment_id"),
     "remit_claims": EventRelation(
         grain="one 835 claim payment (CLP): a payer's adjudication of a claim, or its reversal",
         semantic_relation="remit_claims",
@@ -83,8 +91,9 @@ EVENT_RELATIONS: dict[str, EventRelation] = {
 
 STATE_MONTH_COLUMN = "first_activity_month"      # both state tables are partitioned by it
 
-# One row per claim and payer. {claims} and {remit_claims} name the semantic relations (which know which
-# submission is the latest and which adjudication is current).
+# One row per claim and payer. {claims}, {claim_acknowledgments} and {remit_claims} name the semantic relations
+# (which know which submission is the latest and which adjudication is current). "Last acknowledgment" is the
+# latest by acknowledgment date, then acknowledgment id.
 CLAIM_PAYERS_SQL = """
 WITH submissions AS (
     SELECT claim_key, payer_key, any_value(payer_name) AS payer_name, any_value(payer_class) AS payer_class,
@@ -92,6 +101,14 @@ WITH submissions AS (
            min(submission_date) AS first_submission_date, max(submission_date) AS last_submission_date,
            count(*) AS submission_count
     FROM {claims} GROUP BY claim_key, payer_key),
+acknowledgments AS (
+    SELECT claim_key, payer_key, any_value(payer_name) AS payer_name, any_value(payer_class) AS payer_class,
+           min(acknowledgment_date) AS first_acknowledgment_date, max(acknowledgment_date) AS last_acknowledgment_date,
+           count(*) AS acknowledgment_count, count(*) FILTER (WHERE is_rejected) AS rejection_count,
+           arg_max(acknowledgment_id, (acknowledgment_date, acknowledgment_id)) AS last_acknowledgment_id,
+           arg_max(is_rejected, (acknowledgment_date, acknowledgment_id)) AS last_acknowledgment_is_rejected,
+           arg_max(status_code, (acknowledgment_date, acknowledgment_id)) AS last_acknowledgment_status_code
+    FROM {claim_acknowledgments} GROUP BY claim_key, payer_key),
 remits AS (
     SELECT claim_key, payer_key, any_value(payer_name) AS payer_name, any_value(payer_class) AS payer_class,
            min(payment_date) AS first_remit_date, max(payment_date) AS last_remit_date, count(*) AS remit_count,
@@ -106,16 +123,20 @@ remits AS (
            any_value(co_amount) FILTER (WHERE is_current_adjudication) AS current_co_amount,
            any_value(is_denied) FILTER (WHERE is_current_adjudication) AS current_is_denied
     FROM {remit_claims} GROUP BY claim_key, payer_key)
-SELECT claim_key, payer_key, coalesce(s.payer_name, r.payer_name) AS payer_name,
-       coalesce(s.payer_class, r.payer_class) AS payer_class, s.payer_responsibility,
-       date_trunc('month', least(s.first_submission_date, r.first_remit_date))::DATE AS first_activity_month,
+SELECT claim_key, payer_key, coalesce(s.payer_name, a.payer_name, r.payer_name) AS payer_name,
+       coalesce(s.payer_class, a.payer_class, r.payer_class) AS payer_class, s.payer_responsibility,
+       date_trunc('month', least(s.first_submission_date, a.first_acknowledgment_date, r.first_remit_date))::DATE
+           AS first_activity_month,
        s.first_submission_date, s.last_submission_date, coalesce(s.submission_count, 0) AS submission_count,
+       a.first_acknowledgment_date, a.last_acknowledgment_date,
+       coalesce(a.acknowledgment_count, 0) AS acknowledgment_count, coalesce(a.rejection_count, 0) AS rejection_count,
+       a.last_acknowledgment_id, a.last_acknowledgment_is_rejected, a.last_acknowledgment_status_code,
        r.first_remit_date, r.last_remit_date, coalesce(r.remit_count, 0) AS remit_count,
        coalesce(r.reversal_count, 0) AS reversal_count,
        r.current_remit_claim_id IS NOT NULL AS has_current_adjudication, r.current_remit_claim_id,
        r.current_payment_date, r.current_claim_status_code, r.current_charge_amount, r.current_paid_amount,
        r.current_patient_responsibility_amount, r.current_co_amount, r.current_is_denied
-FROM submissions s FULL JOIN remits r USING (claim_key, payer_key)
+FROM submissions s FULL JOIN acknowledgments a USING (claim_key, payer_key) FULL JOIN remits r USING (claim_key, payer_key)
 """
 
 # One row per claim: its latest submission, that submission's payer and the payer's current adjudication, and
@@ -127,6 +148,7 @@ over_payers AS (
     SELECT claim_key, min(first_activity_month) AS first_activity_month,
            min(first_submission_date) AS first_submission_date, max(last_submission_date) AS last_submission_date,
            sum(submission_count) AS submission_count, count(*) AS payer_count,
+           max(last_acknowledgment_date) AS last_acknowledgment_date, sum(rejection_count) AS rejection_count,
            min(first_remit_date) AS first_remit_date, max(last_remit_date) AS last_remit_date,
            count(*) FILTER (WHERE has_current_adjudication) AS payers_with_current_adjudication,
            sum(current_paid_amount) AS total_paid_amount,
@@ -137,6 +159,8 @@ SELECT o.claim_key, o.first_activity_month, l.claim_id AS latest_claim_id, l.fre
        l.service_date_to, l.service_month, l.billing_npi, l.rendering_npi, l.referring_npi,
        l.payer_key, l.payer_name, l.payer_class, l.payer_responsibility,
        o.first_submission_date, o.last_submission_date, o.submission_count, o.payer_count,
+       p.last_acknowledgment_date IS NOT NULL AS is_acknowledged, p.last_acknowledgment_is_rejected AS is_rejected,
+       o.last_acknowledgment_date, o.rejection_count,
        coalesce(p.has_current_adjudication, false) AS is_adjudicated, p.current_remit_claim_id,
        p.current_payment_date AS payment_date, p.current_paid_amount AS paid_amount,
        p.current_patient_responsibility_amount AS patient_responsibility_amount,

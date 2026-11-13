@@ -64,7 +64,18 @@ CLAIM_PAYERS_FOLD = {
     "last_remit_date": "greatest(o.last_remit_date, b.last_remit_date)",
     "remit_count": "coalesce(o.remit_count, 0) + coalesce(b.remit_count, 0)",
     "reversal_count": "coalesce(o.reversal_count, 0) + coalesce(b.reversal_count, 0)",
+    "first_acknowledgment_date": "least(o.first_acknowledgment_date, b.first_acknowledgment_date)",
+    "last_acknowledgment_date": "greatest(o.last_acknowledgment_date, b.last_acknowledgment_date)",
+    "acknowledgment_count": "coalesce(o.acknowledgment_count, 0) + coalesce(b.acknowledgment_count, 0)",
+    "rejection_count": "coalesce(o.rejection_count, 0) + coalesce(b.rejection_count, 0)",
 }
+# claim_payers columns that describe the last acknowledgment: the batch's, when it is later (by date, then id)
+LAST_ACKNOWLEDGMENT_COLUMNS = ["last_acknowledgment_id", "last_acknowledgment_is_rejected",
+                               "last_acknowledgment_status_code"]
+BATCH_ACKNOWLEDGMENT_IS_LATER = (
+    "b.last_acknowledgment_id IS NOT NULL AND (o.last_acknowledgment_id IS NULL "
+    "OR b.last_acknowledgment_date > o.last_acknowledgment_date "
+    "OR (b.last_acknowledgment_date = o.last_acknowledgment_date AND b.last_acknowledgment_id > o.last_acknowledgment_id))")
 
 
 class IncrementalGold:
@@ -83,7 +94,8 @@ class IncrementalGold:
         self.work.execute(DDL_SEMANTIC)
         # empty relations with the state tables' columns and types, from their definitions
         self.work.execute("CREATE TABLE empty_claim_payers AS SELECT * FROM (" + CLAIM_PAYERS_SQL.format(
-            claims="sem.claims", remit_claims="sem.remit_claims") + ") LIMIT 0")
+            claims="sem.claims", claim_acknowledgments="sem.claim_acknowledgments",
+            remit_claims="sem.remit_claims") + ") LIMIT 0")
         self.work.execute("CREATE TABLE empty_claims AS SELECT * FROM (" + CLAIMS_SQL.format(
             latest_submissions="(SELECT * FROM sem.claims WHERE is_latest_submission)",
             claim_payers="empty_claim_payers") + ") LIMIT 0")
@@ -161,7 +173,8 @@ class IncrementalGold:
 
         # the batch's part of the state, from the batch's rows alone
         work.execute("CREATE OR REPLACE TEMP TABLE batch_claim_payers AS " + CLAIM_PAYERS_SQL.format(
-            claims="sem.claims", remit_claims="sem.remit_claims"))
+            claims="sem.claims", claim_acknowledgments="sem.claim_acknowledgments",
+            remit_claims="sem.remit_claims"))
         work.execute(f"CREATE OR REPLACE TEMP TABLE batch_top_remit_event AS SELECT claim_key, payer_key, "
                      f"{REMIT_RANK_KEY_SQL} AS rank_key FROM sem_int.remit_event WHERE event_rank_desc = 1")
         work.execute(f"CREATE OR REPLACE TEMP TABLE batch_latest_submissions AS "
@@ -200,12 +213,15 @@ class IncrementalGold:
         fold = ", ".join(f"{expression} AS {column}" for column, expression in CLAIM_PAYERS_FOLD.items())
         current = ", ".join(f"CASE WHEN w.claim_key IS NOT NULL THEN b.{c} ELSE o.{c} END AS {c}"
                             for c in CURRENT_ADJUDICATION_COLUMNS)
+        current += ", " + ", ".join(f"CASE WHEN {BATCH_ACKNOWLEDGMENT_IS_LATER} THEN b.{c} ELSE o.{c} END AS {c}"
+                                    for c in LAST_ACKNOWLEDGMENT_COLUMNS)
         work.execute(f"""CREATE OR REPLACE TEMP TABLE new_claim_payers AS SELECT * FROM empty_claim_payers;
             INSERT INTO new_claim_payers BY NAME
             SELECT * REPLACE (coalesce(has_current_adjudication, false) AS has_current_adjudication) FROM (
                 SELECT claim_key, payer_key, {fold}, {current},
-                       date_trunc('month', least(least(o.first_submission_date, b.first_submission_date),
-                                                 least(o.first_remit_date, b.first_remit_date)))::DATE
+                       date_trunc('month', least(o.first_submission_date, b.first_submission_date,
+                                                 o.first_acknowledgment_date, b.first_acknowledgment_date,
+                                                 o.first_remit_date, b.first_remit_date))::DATE
                            AS {STATE_MONTH_COLUMN}
                 FROM batch_claim_payers b LEFT JOIN previous_claim_payers o USING (claim_key, payer_key)
                 LEFT JOIN batch_outranks w USING (claim_key, payer_key))""")

@@ -55,11 +55,14 @@ def timed(con, sql: str, repeats: int) -> tuple[list[tuple], float]:
 
 
 def run(working_directory: Path, cache_directory: Path, days: int, compact_every_batches: int,
-        compare_with_silver: bool, compare_with_full_build: bool) -> dict:
-    silver_path = cache_directory / f"silver-{days}d.duckdb"
+        compare_with_silver: bool, compare_with_full_build: bool, raw_directory: Path | None = None) -> dict:
+    """raw_directory: build silver from these raw files instead of the evaluation suite's mock cache for --days."""
+    data_set = f"{raw_directory.parent.parent.name}-{raw_directory.parent.name}" if raw_directory else f"{days}d"
+    raw_directory = raw_directory or MOCK_EDI_CACHE / f"acme_labs-{days}d-5mb" / "raw"
+    silver_path = cache_directory / f"silver-{data_set}.duckdb"
     if not silver_path.exists():
-        build_silver_database(MOCK_EDI_CACHE / f"acme_labs-{days}d-5mb" / "raw", silver_path)
-    batches_directory = cache_directory / f"silver-{days}d-batches"
+        build_silver_database(raw_directory, silver_path)
+    batches_directory = cache_directory / f"silver-{data_set}-batches"
     batch_ids = (sorted(p.name.removeprefix("batch=") for p in (batches_directory / "edi.source_file").iterdir())
                  if batches_directory.exists() else export_silver_batches(silver_path, batches_directory))
 
@@ -172,12 +175,14 @@ def main():
     arguments.add_argument("--compare-with-silver", action="store_true",
                            help="also run each benchmark query on the semantic views over silver (minutes per "
                                 "query on a large silver)")
+    arguments.add_argument("--raw-directory", type=Path,
+                           help="a tenant's raw/ directory written by ccsim.edi_mock (instead of --days' mock cache)")
     arguments.add_argument("--skip-full-build", action="store_true",
                            help="do not build gold from scratch to compare with (about 15 minutes and 5 GB on a year)")
     options = arguments.parse_args()
     options.working_directory.mkdir(parents=True, exist_ok=False)
     scorecard = run(options.working_directory, options.cache_directory, options.days, options.compact_every_batches,
-                    options.compare_with_silver, not options.skip_full_build)
+                    options.compare_with_silver, not options.skip_full_build, options.raw_directory)
     print(json.dumps({k: v for k, v in scorecard.items() if k != "per_batch"}, indent=2, default=str))
 
 
