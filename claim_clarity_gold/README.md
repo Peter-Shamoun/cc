@@ -39,8 +39,8 @@ rows of the claims and payers the batch names, and replaces those rows in gold. 
 `first_activity_month`, so a replacement opens only the months the replaced rows are in.
 
 Over a year of daily batches it equals its definition computed from scratch, and keeping it current takes 0.5 s
-of a 3 s batch, the same early in the year and late. It adds 139 MB to the key index (357 MB in all, against
-219 MB of gold data).
+of a 2.8 s batch, the same early in the year and late. It adds 168 MB to the key index (386 MB in all, against
+223 MB of gold data).
 
 `claim_payers_rewrites.json` holds 25 of those 55 queries rewritten against it, each returning the same rows as
 the original on a year of gold: 1.9 s in total instead of 4.6 s, median 63 ms instead of 160 ms, in 29% less SQL.
@@ -89,15 +89,15 @@ compaction every 30):
 
 | Measure | Result |
 |---|---|
-| Equals a full rebuild | yes, in all seven relations |
-| A whole batch | 2.4 s on average in the first third of the year, 2.6 s in the last; a full rebuild takes 37 s at that size |
+| Equals a full rebuild | yes, in all eight relations |
+| A whole batch | 2.8 s on average in the first third of the year, 2.7 s in the last, `claim_payers` included |
 | Computing a batch's rows | 1.15 s per batch, the same in the first month and the last |
 | Key index | 0.06 s per batch |
 | Inserting the batch | 0.15 s per batch |
 | Demoting older rows | 0.6 to 1.9 s per batch: 4 to 6 ms per demoted row all year (a batch demotes 116 to 428) |
 | Compaction | 43 s over the year in nine runs, 7 s at most |
-| Queries | median 100 ms over 77 files; with one file per relation, 77 ms |
-| Size | 208 MB of data and an 11 MB catalog; one file per relation is 193 MB; silver is 748 MB |
+| Queries | median 77 ms over 90 files, 15.0 s for all 155 (100 ms and 20.0 s before `claim_payers`) |
+| Size | 223 MB of data and a 14 MB catalog; silver is 748 MB |
 
 What the year runs ruled out:
 
@@ -109,7 +109,7 @@ What the year runs ruled out:
 
 Open points:
 
-- **The key index is 357 MB**, more than gold's data: the top event per claim and payer and per claim, and a copy
+- **The key index is 386 MB**, more than gold's data: the top event per claim and payer and per claim, and a copy
   of every `claim_payers` row. It is build state, read by key.
 - **Two workload queries** (`a_bafe309836`, `a_258e64fde0`) return other rows on the month-partitioned layout than
   on a single file while the relations are equal: their `row_number()` orderings have ties, so their results
