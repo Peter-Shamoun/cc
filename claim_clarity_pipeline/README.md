@@ -89,11 +89,19 @@ appends one after another.
 
 | Workload | Baseline | Now |
 |---|---|---|
-| 30 days (95 MB, 738 deliveries) | 119 s, 0.79 MB/s | 39.7 s, 2.39 MB/s |
-| 30 days as 20x larger files (93 deliveries) | not measured | 23.7 s, 4.0 MB/s (before segment text was added) |
-| 3 customers at once, 30 days each | 147-149 s each | 79-81 s each (before segment text was added) |
-| 90 days (292 MB), slot 0.5 / 2 / 4 GiB | not measured | 113.6 / 92.4 / 106.0 s |
-| 1 year (1.2 GB, 8,849 deliveries) | about 22 min, 802 Parquet files | 6.8 min, 3.0 MB/s, 315 Parquet files (slot 2 GiB) |
+| 30 days (95 MB, 738 deliveries) | 119 s, 0.79 MB/s | 39.7 s, 2.39 MB/s (before the per-file parser changes) |
+| 90 days (292 MB, 1,986 deliveries) | not measured | 3.1-3.2 MB/s, first commit after 75 s, 2.1 GB peak heap |
+| 90 days as 2 large files (278 MB) | not measured | 4.2 MB/s, 1.9 GB peak heap (before the per-file parser changes) |
+| 3 customers at once, 30 days each | 147-149 s each | 0.87 MB/s each, 2.6 MB/s together (before the per-file parser changes) |
+| 1 year (1.2 GB, 8,849 deliveries) | about 22 min, 802 Parquet files | 8.4 min, 3.1 MB/s, 9 slot exports of 1 GiB |
+
+Memory over the year: the parser task peaks at 2.3 GB (1.3 GB in its main process, during a slot export; about
+0.5 GB between exports) of its 16 GB; candidate selection at 4.8 GB of its 8 GB, with DuckDB held to half the
+task's memory. A gate checks that each task stays within its task memory.
+
+Settings swept on the 90-day set (parsers 1 / 3 / 7, export threads 2 / 8, slot 256 MB / 1 GiB, downloaders 2 / 4):
+only the parser count moves throughput (1.2 / 2.5 / 2.7 MB/s on 4 cores), and a smaller slot brings the first
+commit forward (31 s at 256 MB) for three times the Parquet files.
 
 Changes made to the design, each verified by the suite:
 
@@ -115,12 +123,11 @@ Changes made to the design, each verified by the suite:
 
 Open design points:
 
-- **Silver stores the content twice**: as segment text and in the typed tables. A single segment table with the
-  elements as an array measured 38 MB for the 30-day set (typed tables: 80 MB) and about 9 s of CPU to produce
-  (typed parsing: about 55 s). The typed tables would then be views over it, or part of gold.
 - **Small files**: 25 tables share a slot, so Parquet files average 1.2 MB at a 0.5 GiB slot and 3.5 MB at 2 GiB.
   Compaction is not built.
-- **The parsers are the limit** once the above is in place: about 1.6 MB/s per parser process.
+- **The parsers are the limit**: about 1.9 MB/s for a parser process with a core to itself, 3 MB per second of
+  parser time on large files. A small file costs about 25 ms beyond its bytes: its rows become up to 16 small
+  tables, each written to its own staging file.
 - **Onboarding starts the parser task once**: configuring the bucket notification sends `s3:TestEvent` messages.
 - **Alarm periods**: `AWS/SQS` metrics are per minute, so start-up and scale-down each take a minute or more in
   production; the runs here use 10 s periods on high-resolution metrics.
