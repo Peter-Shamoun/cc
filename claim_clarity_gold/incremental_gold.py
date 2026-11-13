@@ -128,17 +128,20 @@ class IncrementalGold:
         self.work.unregister("state_rows_read")
 
     def _replace_state_months(self, name: str, months: set[str | None], rows_relation: str):
-        """Each of these month partitions of a state table becomes the rows of rows_relation in that month."""
-        for month in sorted(months, key=str):
-            data = self.work.sql(
-                f"SELECT * FROM {rows_relation} WHERE CAST({STATE_MONTH_COLUMN} AS VARCHAR) IS NOT DISTINCT FROM ? "
-                f"ORDER BY {STATE_SORT_COLUMNS[name]}", params=[month]).to_arrow_table()
-            table = self._table(name, data, STATE_MONTH_COLUMN)
-            month_filter = IsNull(STATE_MONTH_COLUMN) if month is None else EqualTo(STATE_MONTH_COLUMN, month)
-            if data.num_rows:
-                table.overwrite(data, overwrite_filter=month_filter)
-            else:
-                table.delete(month_filter)
+        """These month partitions of a state table become the rows of rows_relation in them, in one commit."""
+        if not months:
+            return
+        data = self.work.sql(f"SELECT * FROM {rows_relation} ORDER BY {STATE_MONTH_COLUMN}, "
+                             f"{STATE_SORT_COLUMNS[name]}").to_arrow_table()
+        table = self._table(name, data, STATE_MONTH_COLUMN)
+        named = sorted(month for month in months if month is not None)
+        month_filter = In(STATE_MONTH_COLUMN, named) if named else None
+        if None in months:
+            month_filter = Or(month_filter, IsNull(STATE_MONTH_COLUMN)) if month_filter else IsNull(STATE_MONTH_COLUMN)
+        if data.num_rows:
+            table.overwrite(data, overwrite_filter=month_filter)
+        else:
+            table.delete(month_filter)
 
     def _months(self, relation: str) -> set[str | None]:
         return {row[0] for row in self.work.execute(
