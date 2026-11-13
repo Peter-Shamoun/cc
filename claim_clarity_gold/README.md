@@ -118,7 +118,10 @@ adjudication's adjustments and lines; joining them to `claim_payers` instead too
 The result equals the full build in all nine relations (17.4 million rows); 272 MB in 115 files (silver: 748 MB);
 key index 194 MB.
 
-On the emulator's S3 and Glue (four batches): build, compaction and read-back work; about 5 to 6 s per batch.
+On the emulator's S3 and Glue, as silver is stored (`--on-emulator-s3`; 30 days with 277CA, 21 batches): the
+incremental build equals the full build in all eleven relations, and the 149 covered benchmark queries return the
+full build's rows. 7.0 s per batch in the first third, 9.1 s in the last (the emulator's S3 and Glue calls are most
+of the difference from local disk); compaction 23 s; questions read through S3: median 22 ms, at most 141 ms.
 
 Open:
 
