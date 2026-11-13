@@ -94,13 +94,16 @@ Over a year (255 daily batches, local catalog): 4.4 s per batch in the first thi
 cost follows how many state month partitions it touches (about 2 s at 2, 3.5 to 4 s at 4, 5 to 6.5 s at 6), and
 the partition step at 6 partitions took 2.6 / 2.3 / 2.0 / 2.0 / 2.2 s from February to December. Why the last third
 averages 30% more than the first is not explained yet. Compaction: 8 to 14 s per run.
+The result equals the full build in all nine relations (17.4 million rows); 272 MB in 115 files (silver: 748 MB);
+key index 194 MB.
 
 On the emulator's S3 and Glue (four batches): build, compaction and read-back work; about 5 to 6 s per batch.
 
 Open:
 
-- The year comparison against a full build: building the semantic views over a year at once runs out of memory
-  at 8 GB; a spilling run is in progress.
+- The full build over a year needs one thread and spilling to disk to fit in 5 GB; it is a check, not part of
+  running gold.
+- The key index is 194 MB for a year, most of gold's size again: a row per claim and per claim and payer.
 - 277CA acknowledgments (`claim_acknowledgments`, and acknowledgment columns on `claims` and `claim_payers`) wait
   for 277CA in silver.
 - The storage format of the key index: build state beside the catalog, read by key.
