@@ -17,6 +17,7 @@ Silver is parsed once per --days into --cache-directory from the mock EDI cache 
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import statistics
 import time
@@ -34,6 +35,25 @@ from .silver_dataset import batch_table_files, build_silver_database, export_sil
 
 MOCK_EDI_CACHE = Path.home() / ".cache" / "claim-clarity-mock-edi"
 NAMESPACE = "gold"
+
+
+def emulator_s3_catalog(name: str):
+    """A Glue catalog with its warehouse in a new S3 bucket on the AWS Emulator, as silver is stored, and the
+    filesystem to read the data files with."""
+    from urllib.parse import urlparse
+
+    from claim_clarity_pipeline.emulator_connection import configure_process_for_emulator
+    configure_process_for_emulator()
+    import boto3
+    import pyarrow.fs
+    from pyiceberg.catalog import load_catalog
+    endpoint, bucket = os.environ["AWS_ENDPOINT_URL"], f"claimclarity-gold-{name}".lower().replace("_", "-")[:63]
+    boto3.client("s3", region_name="us-east-1").create_bucket(Bucket=bucket)
+    catalog = load_catalog("glue", **{"type": "glue", "warehouse": f"s3://{bucket}/gold", "glue.region": "us-east-1",
+                                      "s3.region": "us-east-1", "glue.endpoint": endpoint, "s3.endpoint": endpoint})
+    address = urlparse(endpoint)
+    return catalog, pyarrow.fs.S3FileSystem(region="us-east-1", endpoint_override=address.netloc,
+                                            scheme=address.scheme)
 
 
 def comparable_rows(rows: list[tuple]) -> list[str]:
@@ -54,7 +74,8 @@ def timed(con, sql: str, repeats: int) -> tuple[list[tuple], float]:
 
 
 def run(working_directory: Path, cache_directory: Path, days: int, compact_every_batches: int,
-        compare_with_silver: bool, compare_with_full_build: bool, raw_directory: Path | None = None) -> dict:
+        compare_with_silver: bool, compare_with_full_build: bool, raw_directory: Path | None = None,
+        on_emulator_s3: bool = False) -> dict:
     """raw_directory: build silver from these raw files instead of the evaluation suite's mock cache for --days."""
     data_set = f"{raw_directory.parent.parent.name}-{raw_directory.parent.name}" if raw_directory else f"{days}d"
     raw_directory = raw_directory or MOCK_EDI_CACHE / f"acme_labs-{days}d-5mb" / "raw"
@@ -67,8 +88,9 @@ def run(working_directory: Path, cache_directory: Path, days: int, compact_every
 
     # 4. build: one batch at a time
     (working_directory / "warehouse").mkdir()
-    catalog = SqlCatalog("gold", uri=f"sqlite:///{working_directory}/catalog.sqlite",
-                         warehouse=f"file://{working_directory}/warehouse")
+    catalog, filesystem = (emulator_s3_catalog(working_directory.name) if on_emulator_s3 else
+                           (SqlCatalog("gold", uri=f"sqlite:///{working_directory}/catalog.sqlite",
+                                       warehouse=f"file://{working_directory}/warehouse"), None))
     gold = IncrementalGold(working_directory, catalog, NAMESPACE)
     batches, compactions = [], []
     with open(working_directory / "batches.jsonl", "w") as batch_log:      # kept if a later step fails
@@ -80,14 +102,14 @@ def run(working_directory: Path, cache_directory: Path, days: int, compact_every
                 compactions.append(gold.compact())
     compactions.append(gold.compact())
     gold.close()
-    data_files = list((working_directory / "warehouse").rglob("*.parquet"))
+    data_files = [] if on_emulator_s3 else list((working_directory / "warehouse").rglob("*.parquet"))
 
     # 1. the incremental build against the full build
     silver = open_silver(silver_path)
     # the semantic views over a large silver at once: one thread, no insertion order, spill to disk
     silver.execute(f"SET memory_limit = '5GB'; SET threads = 1; SET preserve_insertion_order = false; "
                    f"SET temp_directory = '{working_directory / 'spill'}'")
-    incremental = open_incremental_gold(catalog, NAMESPACE)
+    incremental = open_incremental_gold(catalog, NAMESPACE, filesystem)
     differing_rows, full_build, full = {}, {}, None
     if compare_with_full_build:
         full_build = build_gold_from_scratch(silver, working_directory / "full")
@@ -176,12 +198,15 @@ def main():
                                 "query on a large silver)")
     arguments.add_argument("--raw-directory", type=Path,
                            help="a tenant's raw/ directory written by ccsim.edi_mock (instead of --days' mock cache)")
+    arguments.add_argument("--on-emulator-s3", action="store_true",
+                           help="keep gold in S3 with a Glue catalog on the AWS Emulator (as silver), not on local disk")
     arguments.add_argument("--skip-full-build", action="store_true",
                            help="do not build gold from scratch to compare with (about 15 minutes and 5 GB on a year)")
     options = arguments.parse_args()
     options.working_directory.mkdir(parents=True, exist_ok=False)
     scorecard = run(options.working_directory, options.cache_directory, options.days, options.compact_every_batches,
-                    options.compare_with_silver, not options.skip_full_build, options.raw_directory)
+                    options.compare_with_silver, not options.skip_full_build, options.raw_directory,
+                    options.on_emulator_s3)
     print(json.dumps({k: v for k, v in scorecard.items() if k != "per_batch"}, indent=2, default=str))
 
 
