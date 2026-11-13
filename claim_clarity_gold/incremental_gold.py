@@ -15,10 +15,12 @@ from __future__ import annotations
 
 import sqlite3
 import time
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import duckdb
 import pyarrow as pa
+import pyarrow.fs
 from pyiceberg.catalog import Catalog
 from pyiceberg.expressions import EqualTo, In, IsNull, Or
 from pyiceberg.transforms import IdentityTransform
@@ -260,6 +262,41 @@ class IncrementalGold:
                 "state_rows_replaced": sum(work.execute(f"SELECT count(*) FROM new_{n}").fetchall()[0][0]
                                            for n in ("claim_payers", "claims")),
                 "state_month_partitions_replaced": state_partitions_replaced}
+
+    def compact(self) -> dict:
+        """Daily appends leave a small file per day in each event month, and each replaced state partition leaves
+        its previous files behind. Merge every month partition that has several files into one sorted file, keep
+        only the current snapshot, and delete the data files it does not use."""
+        started, files_merged, files_deleted = time.monotonic(), 0, 0
+        sort_columns = {name: relation.sort_columns for name, relation in EVENT_RELATIONS.items()} | STATE_SORT_COLUMNS
+        month_columns = {name: relation.month_column for name, relation in EVENT_RELATIONS.items()} | dict.fromkeys(
+            STATE_SORT_COLUMNS, STATE_MONTH_COLUMN)
+        for _, name in self.catalog.list_tables(GOLD_NAMESPACE):
+            table = self.catalog.load_table(f"{GOLD_NAMESPACE}.{name}")
+            files_per_month: dict[int | None, int] = {}     # a month as Iceberg stores it: days since 1970
+            for task in table.scan().plan_files():
+                month = task.file.partition[0]
+                files_per_month[month] = files_per_month.get(month, 0) + 1
+            for month, file_count in files_per_month.items():
+                if file_count == 1:
+                    continue
+                month_filter = (IsNull(month_columns[name]) if month is None
+                                else EqualTo(month_columns[name], (date(1970, 1, 1) + timedelta(days=month)).isoformat()))
+                self.work.register("month_rows", table.scan(row_filter=month_filter).to_arrow())
+                merged = self.work.sql(f"SELECT * FROM month_rows ORDER BY {sort_columns[name]}").to_arrow_table()
+                self.work.unregister("month_rows")
+                table.overwrite(merged, overwrite_filter=month_filter)
+                files_merged += file_count
+            table.maintenance.expire_snapshots().older_than(datetime.now()).commit()
+            table = self.catalog.load_table(f"{GOLD_NAMESPACE}.{name}")
+            in_use = {task.file.file_path for task in table.scan().plan_files()}
+            filesystem, data_path = pa.fs.FileSystem.from_uri(f"{table.location()}/data")
+            for file in filesystem.get_file_info(pa.fs.FileSelector(data_path, recursive=True)):
+                if file.is_file and not any(used.endswith(file.path) for used in in_use):
+                    filesystem.delete_file(file.path)
+                    files_deleted += 1
+        return {"seconds": round(time.monotonic() - started, 3), "files_merged": files_merged,
+                "files_deleted": files_deleted}
 
     def close(self):
         self.work.close()
