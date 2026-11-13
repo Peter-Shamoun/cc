@@ -11,7 +11,7 @@ dependencies = [
     "cryptography>=42",
     "boto3>=1.36",
     "dill>=0.3.9",          # bench/lake_bench.py world snapshots
-    "pyiceberg[glue,pyarrow]>=0.9",   # claim_clarity_pipeline: the Iceberg silver lake
+    "pyiceberg[glue,pyarrow,sql-sqlite]>=0.9",   # claim_clarity_pipeline: the Iceberg silver lake
 ]
 
 [project.optional-dependencies]

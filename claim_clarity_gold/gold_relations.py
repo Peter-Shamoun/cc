@@ -119,9 +119,10 @@ FROM submissions s FULL JOIN remits r USING (claim_key, payer_key)
 """
 
 # One row per claim: its latest submission, that submission's payer and the payer's current adjudication, and
-# totals over every payer. {claims} names the semantic relation, {claim_payers} the relation above.
+# totals over every payer. {latest_submissions} is the latest submission of each claim (the semantic relation claims
+# WHERE is_latest_submission), {claim_payers} the relation above.
 CLAIMS_SQL = """
-WITH latest AS (SELECT * FROM {claims} WHERE is_latest_submission),
+WITH latest AS (SELECT * FROM {latest_submissions}),
 over_payers AS (
     SELECT claim_key, min(first_activity_month) AS first_activity_month,
            min(first_submission_date) AS first_submission_date, max(last_submission_date) AS last_submission_date,

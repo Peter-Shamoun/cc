@@ -28,7 +28,8 @@ def build_gold_from_scratch(silver: duckdb.DuckDBPyConnection, gold_directory: P
     claim_payers_file = f"'{gold_directory / 'claim_payers.parquet'}'"
     write("claim_payers", CLAIM_PAYERS_SQL.format(claims="sem.claims", remit_claims="sem.remit_claims"),
           STATE_SORT_COLUMNS["claim_payers"])
-    write("claims", CLAIMS_SQL.format(claims="sem.claims", claim_payers=claim_payers_file),
+    write("claims", CLAIMS_SQL.format(latest_submissions="(SELECT * FROM sem.claims WHERE is_latest_submission)",
+                                   claim_payers=claim_payers_file),
           STATE_SORT_COLUMNS["claims"])
     return report
 
