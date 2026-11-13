@@ -30,9 +30,9 @@ merge-on-read format, Iceberg included, and is not a decision about gold's produ
 
 55 of the 156 workload queries join `claims` to `remit_claims` per claim and payer, most to ask when the claim was
 first submitted, whether it has a current adjudication, and what was paid. `claim_payers` holds those answers
-(`gold_schema.CLAIM_PAYERS_SQL` is its definition over the two relations): first submission dates and count, the
-claim's latest charge and frequency code, first remit date and count, and the current adjudication's payment date,
-paid amount and denial flag.
+(`gold_schema.CLAIM_PAYERS_SQL` is its definition over the two relations): the payer's responsibility, first and last submission dates and
+count, the claim's latest charge and frequency code, first remit date and count, and the current adjudication's
+payment date, amounts and denial flag: 20 columns.
 
 Its rows change as files arrive, so the incremental build keeps each row in the key index, folds a batch into the
 rows of the claims and payers the batch names, and replaces those rows in gold. It is partitioned by
@@ -42,9 +42,14 @@ Over a year of daily batches it equals its definition computed from scratch, and
 of a 3 s batch, the same early in the year and late. It adds 139 MB to the key index (357 MB in all, against
 219 MB of gold data).
 
-Two workload queries rewritten against it return the same rows on a year of gold: days-to-pay by payer class in
-29 ms instead of 209 ms, open claims by age in 14 ms instead of 302 ms, each in about half the SQL. The workload's
-queries are not yet rewritten as a whole, so the scorecards below still time the seven-relation queries.
+`claim_payers_rewrites.json` holds 25 of those 55 queries rewritten against it, each returning the same rows as
+the original on a year of gold: 1.9 s in total instead of 4.6 s, median 63 ms instead of 160 ms, in 29% less SQL.
+The benchmarks ask gold those 25 in their rewritten form. Of the other 30, 12 compare individual remits or
+submissions and do not fit a row per claim and payer; the rest each need a column it does not have.
+
+Two things to know when querying it: `claim_charge_amount` and `claim_frequency_code` are the claim's, repeated on
+every payer row, so summing the charge over rows counts a multi-payer claim more than once; and
+`first_remit_date` counts every remit, reversals and duplicate-claim denials included.
 
 Gold is not a fallback and not a de-identified copy. A query gold cannot answer goes to silver.
 
