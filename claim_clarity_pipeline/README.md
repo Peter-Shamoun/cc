@@ -95,6 +95,12 @@ appends one after another.
 | 3 customers at once, 30 days each | 147-149 s each | 0.87 MB/s each, 2.6 MB/s together (before the per-file parser changes) |
 | 1 year (1.2 GB, 8,849 deliveries) | about 22 min, 802 Parquet files | 8.4 min, 3.1 MB/s, 9 slot exports of 1 GiB |
 
+277CA acknowledgments go through the pipeline unchanged: the parser reads them into the `a277.*` tables, which
+onboarding creates with the other lossless tables. On 30 days generated with them (`python -m ccsim.edi_mock <out>
+--days 30 --mb-per-day 5 --tenants acme_labs --seed 7`; 111 MB, 751 of the files 277CA) every gate passes, nothing
+is dead-lettered, and silver holds 74,333 `a277.status_trace` and 66,778 `a277.status` rows. (Its throughput,
+0.94 MB/s, was measured beside two other jobs and is not comparable.)
+
 Memory over the year: the parser task peaks at 2.3 GB (1.3 GB in its main process, during a slot export; about
 0.5 GB between exports) of its 16 GB; candidate selection at 4.8 GB of its 8 GB, with DuckDB held to half the
 task's memory: DuckDB fills what it is allowed (4 GiB) and the Parquet readers add 1 to 2 GB whatever the limit
