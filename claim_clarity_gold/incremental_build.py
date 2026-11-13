@@ -14,6 +14,8 @@ So applying a batch is:
     3. demote whichever loses: the batch's own row before it is written, or the older row with an
        UPDATE confined to the month that row is in                                                      O(month)
     4. insert the batch's rows, and update the key index                                                O(batch)
+    5. claim_payers: fold the batch into the rows of the claims and payers it names, held in the key
+       index, and replace those rows in the months they are in                                           O(batch)
 
 Gold is stored in a merge-on-read table format: an UPDATE writes the changed rows and a delete marker, it does not
 rewrite the data file. Here that is DuckLake (Parquet files plus a catalog, read and written by DuckDB); Iceberg
@@ -35,7 +37,7 @@ import pyarrow as pa
 from ccsim.pipeline import DDL_SEMANTIC, seed_ref
 from ccsim.silver_staging import STAGING_DDL
 
-from .gold_schema import GOLD_RELATIONS
+from .gold_schema import CLAIM_PAYERS_COLUMNS, CLAIM_PAYERS_PARTITION_BY, CLAIM_PAYERS_SQL, GOLD_RELATIONS
 
 REMIT_RELATIONS = ("remit_claims", "remit_lines", "adjustments")      # carry is_current_adjudication
 SUBMISSION_RELATIONS = ("claims", "claim_lines")                      # carry is_latest_submission
@@ -46,7 +48,27 @@ CREATE TABLE IF NOT EXISTS top_remit_event (
 CREATE TABLE IF NOT EXISTS top_submission (
     claim_key TEXT NOT NULL PRIMARY KEY, claim_id TEXT NOT NULL, rank_key TEXT NOT NULL, submission_date TEXT
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS claim_payer (
+    claim_key TEXT NOT NULL, payer_key TEXT NOT NULL, payer_class TEXT, first_activity_month TEXT,
+    first_submission_date TEXT, first_primary_submission_date TEXT, submission_count INTEGER NOT NULL,
+    claim_charge_amount TEXT, claim_frequency_code TEXT, first_remit_date TEXT, remit_count INTEGER NOT NULL,
+    has_current_adjudication INTEGER NOT NULL, current_payment_date TEXT, current_paid_amount TEXT,
+    current_is_denied INTEGER, PRIMARY KEY (claim_key, payer_key)) WITHOUT ROWID;
 """
+# The batch's part of each claim_payers row, from the batch's claims and remit_claims rows.
+BATCH_SUBMISSIONS_SQL = """
+SELECT claim_key, payer_key, any_value(payer_class), min(submission_date)::VARCHAR,
+       (min(submission_date) FILTER (WHERE payer_responsibility = 'P'))::VARCHAR, count(*)
+FROM batch_claims GROUP BY claim_key, payer_key"""
+BATCH_REMITS_SQL = """
+SELECT claim_key, payer_key, any_value(payer_class), min(payment_date)::VARCHAR, count(*),
+       count(*) FILTER (WHERE is_current_adjudication) > 0,
+       (any_value(payment_date) FILTER (WHERE is_current_adjudication))::VARCHAR,
+       (any_value(paid_amount) FILTER (WHERE is_current_adjudication))::VARCHAR,
+       any_value(is_denied) FILTER (WHERE is_current_adjudication)
+FROM batch_remit_claims GROUP BY claim_key, payer_key"""
+BATCH_LATEST_SUBMISSIONS_SQL = ("SELECT claim_key, charge_amount::VARCHAR, frequency_code FROM batch_claims "
+                                "WHERE is_latest_submission")
 # The semantic views rank events with these keys; rendered as text that sorts the same way, to compare a batch's
 # top event with the one the key index holds. NULL dates rank last, as NULLS LAST under DESC does.
 REMIT_RANK_KEY_SQL = ("concat_ws('|', CASE WHEN is_duplicate_claim_denial THEN '0' ELSE '1' END, "
@@ -108,6 +130,9 @@ class IncrementalGold:
             self.work.unregister("first_rows")
             if relation.partition_by:
                 self.work.execute(f"ALTER TABLE gold.{name} SET PARTITIONED BY ({relation.partition_by})")
+        claim_payers = CLAIM_PAYERS_SQL.format(claims="gold.claims", remit_claims="gold.remit_claims")
+        self.work.execute(f"CREATE TABLE IF NOT EXISTS gold.claim_payers AS SELECT * FROM ({claim_payers}) LIMIT 0")
+        self.work.execute(f"ALTER TABLE gold.claim_payers SET PARTITIONED BY ({CLAIM_PAYERS_PARTITION_BY})")
         self.tables_exist = True
 
     def apply_batch(self, batch_id: str, silver_table_files: dict[str, list[Path]]) -> dict:
@@ -143,6 +168,8 @@ class IncrementalGold:
         # 2. what the key index held for these keys, and 3. which side loses
         demoted_in_batch: dict[str, set[str]] = {"remit": set(), "submission": set()}
         demoted_older: dict[str, dict[str | None, set[str]]] = {"remit": {}, "submission": {}}   # by the row's month
+        claim_payers_with_new_top_remit: set[tuple[str, str]] = set()
+        claims_with_new_top_submission: set[str] = set()
         index = self.key_index
         for claim_key, payer_key, remit_claim_id, rank_key, is_reversal, payment_date in batch_top_remits:
             before = index.execute("SELECT remit_claim_id, rank_key, is_reversal, payment_date FROM top_remit_event "
@@ -153,6 +180,7 @@ class IncrementalGold:
             if before is not None and not before[2]:      # a reversal was never current: nothing to change in it
                 month = before[3][:7] + "-01" if before[3] else None
                 demoted_older["remit"].setdefault(month, set()).add(before[0])
+            claim_payers_with_new_top_remit.add((claim_key, payer_key))
             index.execute("INSERT OR REPLACE INTO top_remit_event VALUES (?, ?, ?, ?, ?, ?)",
                           (claim_key, payer_key, remit_claim_id, rank_key, int(is_reversal), payment_date))
         for claim_key, claim_id, rank_key, submission_date in batch_top_submissions:
@@ -164,6 +192,7 @@ class IncrementalGold:
             if before is not None:
                 month = before[2][:7] + "-01" if before[2] else None
                 demoted_older["submission"].setdefault(month, set()).add(before[0])
+            claims_with_new_top_submission.add(claim_key)
             index.execute("INSERT OR REPLACE INTO top_submission VALUES (?, ?, ?, ?)",
                           (claim_key, claim_id, rank_key, submission_date))
         lap("key_index")
@@ -188,13 +217,105 @@ class IncrementalGold:
                 for statement in statements.values():
                     work.execute(statement, [row_date])
                 work.unregister("demoted")
+        lap("demote_older_rows")
+
+        # 5. claim_payers
+        claim_payer_rows_replaced = self._fold_batch_into_claim_payers(
+            rows["claims"], rows["remit_claims"], claim_payers_with_new_top_remit, claims_with_new_top_submission)
         work.execute("COMMIT")
         index.commit()
-        lap("demote_older_rows")
+        lap("claim_payers")
         return {"batch_id": batch_id, "seconds": seconds, "seconds_total": round(sum(seconds.values()), 3),
                 "gold_rows_added": sum(table.num_rows for table in rows.values()),
+                "claim_payer_rows_replaced": claim_payer_rows_replaced,
                 "older_rows_demoted": sum(len(ids) for side in demoted_older.values() for ids in side.values()),
                 "batch_rows_demoted": sum(len(ids) for ids in demoted_in_batch.values())}
+
+    def _fold_batch_into_claim_payers(self, batch_claims: pa.Table, batch_remit_claims: pa.Table,
+                                      claim_payers_with_new_top_remit: set[tuple[str, str]],
+                                      claims_with_new_top_submission: set[str]) -> int:
+        """batch_claims and batch_remit_claims are the batch's gold rows, flags settled. Returns the number of
+        claim_payers rows written."""
+        work, index = self.work, self.key_index
+        column = {name: position for position, name in enumerate(CLAIM_PAYERS_COLUMNS)}
+        changed: dict[tuple[str, str], list] = {}
+        changed_payers_of_claim: dict[str, set[str]] = {}
+        months_before: dict[str | None, list[tuple[str, str]]] = {}     # where the rows to replace are
+
+        def earlier(one: str | None, other: str | None) -> str | None:
+            return min(filter(None, (one, other)), default=None)
+
+        def row_of(claim_key: str, payer_key: str) -> list:
+            key = (claim_key, payer_key)
+            if key not in changed:
+                changed_payers_of_claim.setdefault(claim_key, set()).add(payer_key)
+                stored = index.execute(f"SELECT {', '.join(CLAIM_PAYERS_COLUMNS)} FROM claim_payer "
+                                       "WHERE claim_key = ? AND payer_key = ?", key).fetchone()
+                if stored is not None:
+                    months_before.setdefault(stored[column["first_activity_month"]], []).append(key)
+                    changed[key] = list(stored)
+                else:           # a claim's rows all carry its latest submission's charge and frequency code
+                    sibling = index.execute("SELECT claim_charge_amount, claim_frequency_code FROM claim_payer "
+                                            "WHERE claim_key = ? LIMIT 1", (claim_key,)).fetchone() or (None, None)
+                    row = [None] * len(CLAIM_PAYERS_COLUMNS)
+                    row[column["claim_key"]], row[column["payer_key"]] = key
+                    row[column["submission_count"]] = row[column["remit_count"]] = 0
+                    row[column["has_current_adjudication"]] = False
+                    row[column["claim_charge_amount"]], row[column["claim_frequency_code"]] = sibling
+                    changed[key] = row
+            return changed[key]
+
+        work.register("batch_claims", batch_claims)
+        work.register("batch_remit_claims", batch_remit_claims)
+        for claim_key, payer_key, payer_class, first, first_primary, count in work.execute(BATCH_SUBMISSIONS_SQL).fetchall():
+            row = row_of(claim_key, payer_key)
+            row[column["payer_class"]] = payer_class
+            row[column["first_submission_date"]] = earlier(row[column["first_submission_date"]], first)
+            row[column["first_primary_submission_date"]] = earlier(row[column["first_primary_submission_date"]], first_primary)
+            row[column["submission_count"]] += count
+        for (claim_key, payer_key, payer_class, first, count, has_current, current_payment_date, current_paid_amount,
+             current_is_denied) in work.execute(BATCH_REMITS_SQL).fetchall():
+            row = row_of(claim_key, payer_key)
+            row[column["payer_class"]] = row[column["payer_class"]] or payer_class
+            row[column["first_remit_date"]] = earlier(row[column["first_remit_date"]], first)
+            row[column["remit_count"]] += count
+            if (claim_key, payer_key) in claim_payers_with_new_top_remit:
+                row[column["has_current_adjudication"]] = has_current
+                row[column["current_payment_date"]] = current_payment_date
+                row[column["current_paid_amount"]] = current_paid_amount
+                row[column["current_is_denied"]] = current_is_denied
+        for claim_key, charge_amount, frequency_code in work.execute(BATCH_LATEST_SUBMISSIONS_SQL).fetchall():
+            if claim_key not in claims_with_new_top_submission:
+                continue
+            payer_keys = {payer for (payer,) in index.execute(
+                "SELECT payer_key FROM claim_payer WHERE claim_key = ?", (claim_key,))}
+            payer_keys |= changed_payers_of_claim.get(claim_key, set())
+            for payer_key in payer_keys:
+                row = row_of(claim_key, payer_key)
+                row[column["claim_charge_amount"]], row[column["claim_frequency_code"]] = charge_amount, frequency_code
+        work.unregister("batch_claims")
+        work.unregister("batch_remit_claims")
+        if not changed:
+            return 0
+
+        for row in changed.values():
+            first_activity = earlier(row[column["first_submission_date"]], row[column["first_remit_date"]])
+            row[column["first_activity_month"]] = first_activity[:7] + "-01" if first_activity else None
+        for month, keys in months_before.items():
+            work.register("replaced", pa.table({"claim_key": [k[0] for k in keys], "payer_key": [k[1] for k in keys]}))
+            work.execute("DELETE FROM gold.claim_payers WHERE first_activity_month IS NOT DISTINCT FROM ?::DATE "
+                         "AND (claim_key, payer_key) IN (SELECT (claim_key, payer_key) FROM replaced)", [month])
+            work.unregister("replaced")
+        ordered = sorted(changed.values(), key=lambda row: (row[0], row[1]))
+        work.register("claim_payer_rows", pa.table(
+            {name: [bool(row[position]) if name in ("has_current_adjudication", "current_is_denied")
+                    and row[position] is not None else row[position] for row in ordered]
+             for name, position in column.items()}))
+        work.execute("INSERT INTO gold.claim_payers SELECT * FROM claim_payer_rows")
+        work.unregister("claim_payer_rows")
+        index.executemany(f"INSERT OR REPLACE INTO claim_payer VALUES ({', '.join('?' * len(CLAIM_PAYERS_COLUMNS))})",
+                          ordered)
+        return len(ordered)
 
     def compact(self) -> dict:
         """Merge the small files of earlier inserts, fold delete markers into their data files, and drop the

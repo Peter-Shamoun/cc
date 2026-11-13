@@ -10,7 +10,7 @@ from pathlib import Path
 
 import duckdb
 
-from .gold_schema import GOLD_RELATIONS
+from .gold_schema import CLAIM_PAYERS_SQL, GOLD_RELATIONS
 
 
 def build_gold_from_scratch(silver: duckdb.DuckDBPyConnection, gold_directory: Path) -> dict:
@@ -24,6 +24,14 @@ def build_gold_from_scratch(silver: duckdb.DuckDBPyConnection, gold_directory: P
                        f"TO '{path}' (FORMAT parquet, COMPRESSION zstd)")
         report[name] = {"seconds": round(time.monotonic() - started, 2), "bytes": path.stat().st_size,
                         "rows": silver.execute(f"SELECT count(*) FROM '{path}'").fetchall()[0][0]}
+    started = time.monotonic()
+    path = gold_directory / "claim_payers.parquet"
+    claim_payers = CLAIM_PAYERS_SQL.format(claims=f"'{gold_directory / 'claims.parquet'}'",
+                                           remit_claims=f"'{gold_directory / 'remit_claims.parquet'}'")
+    silver.execute(f"COPY (SELECT * FROM ({claim_payers}) ORDER BY claim_key, payer_key) "
+                   f"TO '{path}' (FORMAT parquet, COMPRESSION zstd)")
+    report["claim_payers"] = {"seconds": round(time.monotonic() - started, 2), "bytes": path.stat().st_size,
+                              "rows": silver.execute(f"SELECT count(*) FROM '{path}'").fetchall()[0][0]}
     return report
 
 
@@ -31,6 +39,6 @@ def open_gold(gold_directory: Path) -> duckdb.DuckDBPyConnection:
     """A DuckDB session with every gold relation as gold.<name>."""
     con = duckdb.connect()
     con.execute("CREATE SCHEMA gold")
-    for name in GOLD_RELATIONS:
+    for name in [*GOLD_RELATIONS, "claim_payers"]:
         con.execute(f"CREATE VIEW gold.{name} AS SELECT * FROM '{gold_directory / (name + '.parquet')}'")
     return con

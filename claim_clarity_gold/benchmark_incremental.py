@@ -52,7 +52,7 @@ def run(working_directory: Path, cache_directory: Path, days: int, compact_every
     incremental, full = open_incremental_gold(working_directory / "gold-incremental"), open_gold(working_directory / "gold-full")
     incremental.execute(f"ATTACH '{working_directory / 'compare.duckdb'}' AS compare")
     differing_rows = {}
-    for name in GOLD_RELATIONS:
+    for name in [*GOLD_RELATIONS, "claim_payers"]:
         full_file = working_directory / "gold-full" / f"{name}.parquet"
         differing_rows[name] = incremental.execute(
             f"SELECT (SELECT count(*) FROM (SELECT * FROM gold.{name} EXCEPT ALL SELECT * FROM '{full_file}')) + "

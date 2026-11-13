@@ -13,7 +13,8 @@ python -m claim_clarity_gold.benchmark_gold --working-directory /tmp/gold-1 --da
    (`claude/schema/02_semantic_layer_views.sql`), which is defined over silver. Gold holds the columns the query
    workload reads, the identifiers that join the relations, and `source_file_id`.
 2. **Easy to query.** Seven relations named after what they hold; one row is one EDI thing (a CLP, an SVC, a CLM,
-   an SV1, a CAS, a BPR/TRN, a PLB).
+   an SV1, a CAS, a BPR/TRN, a PLB). An eighth, `claim_payers`, is merged from `claims` and `remit_claims`: one
+   row per claim and payer with what was submitted and what the payer has answered (see below).
 3. **Fast.** Sorted Parquet, no joins to silver.
 4. **Cheap to keep current.** `incremental_build.py` applies one silver batch at a time: the batch's gold rows
    from the batch's silver rows, a key-index lookup for the top-ranked event each claim had before, a flag flip on
@@ -24,6 +25,22 @@ Gold is stored as merge-on-read tables partitioned by month: an UPDATE writes th
 and leaves the data file alone, and `compact()` merges the small files of daily inserts into one per relation per
 month. The store here is DuckLake (Parquet plus a catalog, read and written by DuckDB); it stands in for any
 merge-on-read format, Iceberg included, and is not a decision about gold's production format.
+
+## claim_payers
+
+55 of the 156 workload queries join `claims` to `remit_claims` per claim and payer, most to ask when the claim was
+first submitted, whether it has a current adjudication, and what was paid. `claim_payers` holds those answers
+(`gold_schema.CLAIM_PAYERS_SQL` is its definition over the two relations): first submission dates and count, the
+claim's latest charge and frequency code, first remit date and count, and the current adjudication's payment date,
+paid amount and denial flag.
+
+Its rows change as files arrive, so the incremental build keeps each row in the key index, folds a batch into the
+rows of the claims and payers the batch names, and replaces those rows in gold. It is partitioned by
+`first_activity_month`, so a replacement opens only the months the replaced rows are in.
+
+Two workload queries rewritten against it return the same rows on a year of gold: days-to-pay by payer class in
+29 ms instead of 209 ms, open claims by age in 14 ms instead of 302 ms, each in about half the SQL. The workload's
+queries are not yet rewritten as a whole, so the scorecards below still time the seven-relation queries.
 
 Gold is not a fallback and not a de-identified copy. A query gold cannot answer goes to silver.
 
