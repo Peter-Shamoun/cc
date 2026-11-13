@@ -349,11 +349,15 @@ def parse_raw_file_to_arrow_files(file: IngestFile, customer_code: str, parsed_r
         file.failure = f"parse: {type(error).__name__}: {error}"
 
 
+RAW_BYTES_BETWEEN_COLLECTIONS = 16 * 1024 ** 2
+
+
 def parser_process(customer_code: str, parsed_root: str, raw_file_queue, parsed_file_queue):
     """Runs in its own process until it reads None. Raw file on disk -> one .arrow file per lossless table."""
     signal.signal(signal.SIGTERM, signal.SIG_DFL)
     signal.signal(signal.SIGINT, signal.SIG_IGN)          # the task process decides when the parsers stop
     gc.disable()                                          # parsing allocates millions of short-lived, acyclic rows
+    raw_bytes_since_collection = 0
     while (file := raw_file_queue.get()) is not None:
         started = time.monotonic()                        # CLOCK_MONOTONIC is the same clock in every process
         file.stage_seconds["wait_for_parser"] = started - file.stage_seconds.pop("queued_at")
@@ -362,7 +366,12 @@ def parser_process(customer_code: str, parsed_root: str, raw_file_queue, parsed_
         file.stage_seconds["queued_at"] = time.monotonic()
         Path(file.raw_file_path).unlink(missing_ok=True)  # parsed (or failed): the raw file leaves the disk
         parsed_file_queue.put(file)
-        gc.collect()                                      # between files: what the paused collector left behind
+        # What the paused collector left behind. A collection takes about 30 ms whatever the file's size, so not
+        # after every small file.
+        raw_bytes_since_collection += file.source_file_provenance["size_bytes"]
+        if raw_bytes_since_collection >= RAW_BYTES_BETWEEN_COLLECTIONS:
+            gc.collect()
+            raw_bytes_since_collection = 0
 
 
 # --- slots, stager, exporter -----------------------------------------------------------------------------------

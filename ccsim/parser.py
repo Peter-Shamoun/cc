@@ -59,15 +59,20 @@ def _table_columns() -> dict[str, list[str]]:
 TABLE_COLUMNS = _table_columns()
 
 
+@lru_cache(maxsize=None)
+def _row_adder_code(columns: tuple[str, ...]):
+    """Compiled once per table: a file's parse makes an adder per table."""
+    return compile(f"def add(*, {', '.join(c + '=None' for c in columns)}):\n"
+                   f"    r = {{{', '.join(f'{c!r}: {c}' for c in columns)}}}\n"
+                   f"    append(r)\n"
+                   f"    return r\n", "<row adder>", "exec")
+
+
 def _row_adder(columns: list[str], rows: list):
     """add(**values) -> a new row dict holding every column in DDL order (None unless given), appended to rows.
     An unknown column is a TypeError."""
-    source = (f"def add(*, {', '.join(c + '=None' for c in columns)}):\n"
-              f"    r = {{{', '.join(f'{c!r}: {c}' for c in columns)}}}\n"
-              f"    append(r)\n"
-              f"    return r\n")
     namespace = {"append": rows.append}
-    exec(source, namespace)                                   # noqa: S102 - code generated from DDL column names
+    exec(_row_adder_code(tuple(columns)), namespace)          # noqa: S102 - code generated from DDL column names
     return namespace["add"]
 
 
