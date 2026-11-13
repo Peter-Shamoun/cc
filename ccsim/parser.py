@@ -10,10 +10,11 @@ control numbers that do not match, or a segment outside a transaction set. A wro
 flagged (edi.transaction_set.count_check_ok = false), since the content is still complete.
 
 Speed and memory (docs/data-backend/parser-optimization.md): the file is read in chunks of normalized text, never
-split whole. Rows go into a TableRows sink. Every row of a table is a dict with exactly the table's columns in DDL
-order, made by that table's generated adder, so a table turns into columns with one zip; edi.segment, the bulk,
-is kept as tuples (SEGMENT_FIELDS). The parser only ever changes the latest row of a table (the open claim, line,
-entity, envelope, ...), so a sink may flush every other row after any chunk (TableRows.after_chunk).
+split whole. Rows go into a TableRows sink, made by each table's generated adder, so a table turns into columns
+with one zip. A row the parser changes or reads after making it (the open claim, line, entity, envelope, ...) is a
+dict with exactly the table's columns in DDL order; every other row is a tuple of its fields in that order
+(TUPLE_ROW_FIELDS: a tuple is cheaper to make and to turn into columns). The parser only ever changes the latest row
+of a table, so a sink may flush every other row after any chunk (TableRows.after_chunk).
 """
 from __future__ import annotations
 
@@ -61,32 +62,45 @@ def _table_columns() -> dict[str, list[str]]:
 
 
 TABLE_COLUMNS = _table_columns()
+# Tables whose rows the parser never changes or reads after making them: their rows are tuples of every column in
+# DDL order, and their adders return None.
+TABLES_WITH_TUPLE_ROWS = ("edi.reference", "edi.date_time", "edi.amount", "edi.quantity", "edi.adjustment",
+                          "edi.contact", "edi.misc_segment", "c837.claim_code", "r835.medicare_adjudication",
+                          "r835.remark", "r835.provider_adjustment", "a277.status")
+# The fields of each table whose rows are tuples; every other table's rows are dicts.
+TUPLE_ROW_FIELDS = {"edi.segment": SEGMENT_FIELDS, **{t: tuple(TABLE_COLUMNS[t]) for t in TABLES_WITH_TUPLE_ROWS}}
 
 
 @lru_cache(maxsize=None)
-def _row_adder_code(columns: tuple[str, ...]):
+def _row_adder_code(columns: tuple[str, ...], row_is_tuple: bool):
     """Compiled once per table: a file's parse makes an adder per table."""
-    return compile(f"def add(*, {', '.join(c + '=None' for c in columns)}):\n"
+    parameters = ", ".join(c + "=None" for c in columns)
+    if row_is_tuple:
+        return compile(f"def add(*, {parameters}):\n"
+                       f"    append(({', '.join(columns)},))\n", "<row adder>", "exec")
+    return compile(f"def add(*, {parameters}):\n"
                    f"    r = {{{', '.join(f'{c!r}: {c}' for c in columns)}}}\n"
                    f"    append(r)\n"
                    f"    return r\n", "<row adder>", "exec")
 
 
-def _row_adder(columns: list[str], rows: list):
-    """add(**values) -> a new row dict holding every column in DDL order (None unless given), appended to rows.
-    An unknown column is a TypeError."""
+def _row_adder(table: str, rows: list):
+    """add(**values) appends a new row holding every column in DDL order (None unless given) to rows: a tuple for
+    a table in TABLES_WITH_TUPLE_ROWS, otherwise a dict, which it returns. An unknown column is a TypeError."""
     namespace = {"append": rows.append}
-    exec(_row_adder_code(tuple(columns)), namespace)          # noqa: S102 - code generated from DDL column names
+    code = _row_adder_code(tuple(TABLE_COLUMNS[table]), table in TABLES_WITH_TUPLE_ROWS)
+    exec(code, namespace)                                     # noqa: S102 - code generated from DDL column names
     return namespace["add"]
 
 
 class TableRows:
-    """Where the parser puts rows: rows[table] is a list of row dicts (tuples for edi.segment) and add[table](...)
-    makes one. after_chunk is called after each chunk of text; a streaming sink flushes there (see module doc)."""
+    """Where the parser puts rows: rows[table] is a list of row dicts, or of tuples of TUPLE_ROW_FIELDS[table], and
+    add[table](...) makes one. after_chunk is called after each chunk of text; a streaming sink flushes there (see
+    module doc)."""
 
     def __init__(self):
         self.rows = {t: [] for t in TABLES}
-        self.add = {t: _row_adder(TABLE_COLUMNS[t], self.rows[t]) for t in TABLES if t != "edi.segment"}
+        self.add = {t: _row_adder(t, self.rows[t]) for t in TABLES if t != "edi.segment"}
 
     def after_chunk(self):
         pass

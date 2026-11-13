@@ -26,7 +26,7 @@ from typing import NamedTuple
 import duckdb
 import pyarrow as pa
 
-from .parser import DDL_LOSSLESS, SEGMENT_FIELDS, TABLES, ParseError, TableRows, parse_file
+from .parser import DDL_LOSSLESS, TABLES, TUPLE_ROW_FIELDS, ParseError, TableRows, parse_file
 
 FLUSH_SEGMENTS = 50_000          # buffered segments that trigger a flush into DuckDB (or, in a worker, into Arrow)
 FLUSH_MIN_ROWS = 2_000           # a flush leaves smaller tables buffered: one insert per batch is cheaper
@@ -46,9 +46,9 @@ class RawFile(NamedTuple):
 # --- rows -> Arrow -> DuckDB ---------------------------------------------------------------------------------------
 def arrow_table(table: str, rows: list) -> pa.Table:
     """Rows of one table as Arrow: row dicts that all have the same keys in the same order (the parser's do), or
-    edi.segment's SEGMENT_FIELDS tuples. Columns are lists: pyarrow reads tuples ten times slower."""
-    if table == "edi.segment":
-        names, values = SEGMENT_FIELDS, zip(*rows, strict=True)
+    tuples of TUPLE_ROW_FIELDS[table]. Columns are lists: pyarrow reads tuples ten times slower."""
+    if table in TUPLE_ROW_FIELDS:
+        names, values = TUPLE_ROW_FIELDS[table], zip(*rows, strict=True)
     else:
         names, values = rows[0], zip(*map(dict.values, rows), strict=True)   # strict: a row with other keys fails
     return pa.table(dict(zip(names, map(list, values), strict=True)))
@@ -240,7 +240,8 @@ class SilverBatch(TableRows):
 
     def _discard_file(self, file_id: str):
         for t, rows in self.rows.items():
-            rows[:] = [r for r in rows if (r[0] if t == "edi.segment" else r["file_id"]) != file_id]
+            file_id_field = TUPLE_ROW_FIELDS[t].index("file_id") if t in TUPLE_ROW_FIELDS else "file_id"
+            rows[:] = [r for r in rows if r[file_id_field] != file_id]
             if self.flushed_during_file:
                 self.con.execute(f"DELETE FROM {t} WHERE file_id = ?", [file_id])
 

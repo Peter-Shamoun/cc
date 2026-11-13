@@ -272,12 +272,14 @@ def test_default_benchmark_scenario_exercises_money_features(tmp_path):
 @pytest.mark.parametrize("kind,marker", [("837", b"\nSVD*"), ("277", b"\nSVC*")])
 def test_every_parsed_value_survives_into_the_lossless_tables(stress, kind, marker):
     """Parser rows -> the batch's constrained staging tables (as the Fargate task stages them): no field dropped."""
-    from ccsim.parser import TABLES
+    from ccsim.parser import TABLES, TABLES_WITH_TUPLE_ROWS, TUPLE_ROW_FIELDS
     from ccsim.silver_staging import RawFile, SilverBatch
     out, truth = stress
     tc, f, body = next((tc, f, b) for tc, f, b in _files(out, truth) if f["kind"] == kind and marker in b)
     meta = dict(s3_uri="x", s3_bucket="x", s3_key="x", size_bytes=1, sha256="x")
     rows = parse_file(body, "F1", tc, meta, "r1", datetime(2026, 1, 1))
+    for t in TABLES_WITH_TUPLE_ROWS:                    # tuples of every column, in DDL order
+        rows[t] = [dict(zip(TUPLE_ROW_FIELDS[t], r, strict=True)) for r in rows[t]]
     batch = SilverBatch("r1", datetime(2026, 1, 1), triggered_by="t", notes=None, parser_version="test")
     assert [ok for _, ok in batch.add_raw_files([RawFile("x", body, "F1", meta)], tc, {})] == [True]
     con = batch.finish()
