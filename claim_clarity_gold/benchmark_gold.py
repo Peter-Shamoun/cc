@@ -1,13 +1,16 @@
-"""Score a gold build against the four criteria.
+"""Score gold against its four criteria.
 
     python -m claim_clarity_gold.benchmark_gold --working-directory /tmp/gold-1 [--days 30]
 
-    1. subset      every gold column comes from a semantic view over silver (true by construction of the build),
-                   and the share of workload queries gold can answer (all the columns the query reads are in gold)
-    2. easy        the size of the schema: relations and columns, against silver and the semantic layer
-    3. fast        each covered query on gold against the same query on the semantic views over silver, and
-                   whether both return the same rows
-    4. build cost  seconds to build gold, and gold's size against silver's
+Applies silver to gold one day's batch at a time (incremental_gold.py, Iceberg tables in a local catalog), then:
+
+    1. subset      every gold relation is defined over the semantic views over silver (true by construction), and
+                   the incremental build equals the full build (full_build.py), relation by relation
+    2. easy        the size of the schema; the canonical questions (canonical_questions.py) all run
+    3. fast        the canonical questions, and the benchmark's queries through the compatibility views
+                   (benchmark_compatibility.py): how many gold covers, whether the rows are the full build's (and,
+                   with --compare-with-silver, silver's), and how long they take
+    4. build cost  seconds per batch early and late, compaction, sizes
 
 Silver is parsed once per --days into --cache-directory from the mock EDI cache of the pipeline's evaluation suite.
 """
@@ -20,14 +23,18 @@ import time
 from decimal import Decimal
 from pathlib import Path
 
-from ccsim.parser import TABLES as SILVER_TABLES
+from pyiceberg.catalog.sql import SqlCatalog
 
-from .build_gold import build_gold_from_scratch, open_gold
-from .gold_schema import CLAIM_PAYERS_COLUMNS, GOLD_RELATIONS
-from .query_workload import CLAIM_PAYERS_REWRITES, column_usage, load_workload, semantic_relation_columns
-from .silver_dataset import build_silver_database, open_silver
+from .benchmark_compatibility import create_compatibility_views
+from .canonical_questions import CANONICAL_QUESTIONS
+from .full_build import build_gold_from_scratch, open_gold
+from .gold_relations import EVENT_RELATIONS, STATE_RELATIONS
+from .incremental_gold import IncrementalGold, open_incremental_gold
+from .query_workload import load_workload
+from .silver_dataset import batch_table_files, build_silver_database, export_silver_batches, open_silver
 
 MOCK_EDI_CACHE = Path.home() / ".cache" / "claim-clarity-mock-edi"
+NAMESPACE = "gold"
 
 
 def comparable_rows(rows: list[tuple]) -> list[str]:
@@ -47,78 +54,102 @@ def timed(con, sql: str, repeats: int) -> tuple[list[tuple], float]:
     return rows, min(seconds)
 
 
-def run(working_directory: Path, cache_directory: Path, days: int, time_queries_on_silver: bool = True) -> dict:
+def run(working_directory: Path, cache_directory: Path, days: int, compact_every_batches: int,
+        compare_with_silver: bool) -> dict:
     silver_path = cache_directory / f"silver-{days}d.duckdb"
     if not silver_path.exists():
         build_silver_database(MOCK_EDI_CACHE / f"acme_labs-{days}d-5mb" / "raw", silver_path)
+    batches_directory = cache_directory / f"silver-{days}d-batches"
+    batch_ids = (sorted(p.name.removeprefix("batch=") for p in (batches_directory / "edi.source_file").iterdir())
+                 if batches_directory.exists() else export_silver_batches(silver_path, batches_directory))
+
+    # 4. build: one batch at a time
+    (working_directory / "warehouse").mkdir()
+    catalog = SqlCatalog("gold", uri=f"sqlite:///{working_directory}/catalog.sqlite",
+                         warehouse=f"file://{working_directory}/warehouse")
+    gold = IncrementalGold(working_directory, catalog, NAMESPACE)
+    batches, compactions = [], []
+    for number, batch_id in enumerate(batch_ids, start=1):
+        batches.append(gold.apply_batch(batch_id, batch_table_files(batches_directory, batch_id)))
+        if number % compact_every_batches == 0:
+            compactions.append(gold.compact())
+    compactions.append(gold.compact())
+    gold.close()
+    data_files = list((working_directory / "warehouse").rglob("*.parquet"))
+
+    # 1. the incremental build against the full build
     silver = open_silver(silver_path)
     silver.execute("SET memory_limit = '8GB'")
+    full_build = build_gold_from_scratch(silver, working_directory / "full")
+    incremental, full = open_incremental_gold(catalog, NAMESPACE), open_gold(working_directory / "full")
+    differing_rows = {}
+    for name in [*EVENT_RELATIONS, *STATE_RELATIONS]:
+        full_file = working_directory / "full" / f"{name}.parquet"
+        columns = ", ".join(row[0] for row in incremental.execute(f"DESCRIBE gold.{name}").fetchall())
+        differing_rows[name] = incremental.execute(
+            f"SELECT (SELECT count(*) FROM (SELECT {columns} FROM gold.{name} EXCEPT ALL SELECT {columns} FROM '{full_file}'))"
+            f" + (SELECT count(*) FROM (SELECT {columns} FROM '{full_file}' EXCEPT ALL SELECT {columns} FROM gold.{name}))"
+        ).fetchall()[0][0]
+
+    # 2 and 3. the canonical questions
+    as_of = incremental.execute("SELECT max(payment_date) FROM gold.payments").fetchall()[0][0]
+    canonical = {}
+    for name, sql in CANONICAL_QUESTIONS.items():
+        rows, seconds = timed(incremental, sql.format(as_of=as_of), repeats=3)
+        canonical[name] = {"seconds": round(seconds, 4), "rows": len(rows)}
+    # 3. the benchmark's queries, through the compatibility views
+    view_columns = create_compatibility_views(incremental)
+    create_compatibility_views(full)
+    available = {(relation, column) for relation, columns in view_columns.items() for column in columns}
     workload = load_workload(silver)
-    gold_columns = {(name, column) for name, relation in GOLD_RELATIONS.items() for column in relation.columns}
-    semantic_columns = semantic_relation_columns(silver)
-
-    build = build_gold_from_scratch(silver, working_directory / "gold")
-    gold = open_gold(working_directory / "gold")
-    silver_parquet_bytes = 0
-    for table in SILVER_TABLES:                           # silver's size the same way gold's is measured
-        path = working_directory / "silver-size" / f"{table}.parquet"
-        path.parent.mkdir(exist_ok=True)
-        silver.execute(f"COPY (SELECT * FROM {table}) TO '{path}' (FORMAT parquet, COMPRESSION zstd)")
-        silver_parquet_bytes += path.stat().st_size
-    gold_bytes = sum(r["bytes"] for r in build.values())
-
-    covered = [query for query in workload if query.columns_read <= gold_columns]
-    per_query, wrong = [], []
+    covered = [query for query in workload if query.columns_read <= available]
+    benchmark_seconds, other_rows_than_full_build, other_rows_than_silver = [], [], []
     for query in covered:
-        gold_rows, gold_seconds = timed(gold, query.gold_sql, repeats=3)
-        if time_queries_on_silver:
-            silver_rows, silver_seconds = timed(silver, query.sql, repeats=1)
-        else:                                             # on a large silver the views take minutes per query
-            silver_rows, silver_seconds = gold_rows, 0.0
-        same = comparable_rows(gold_rows) == comparable_rows(silver_rows)
-        if not same:
-            wrong.append(query.query_id)
-        per_query.append({"query_id": query.query_id, "category": query.category, "same_rows": same,
-                          "gold_seconds": round(gold_seconds, 4), "silver_seconds": round(silver_seconds, 4)})
-    gold_times = sorted(q["gold_seconds"] for q in per_query)
-    silver_times = sorted(q["silver_seconds"] for q in per_query)
+        sql = query.sql.replace("sem.", "benchmark.")
+        rows, seconds = timed(incremental, sql, repeats=3)
+        benchmark_seconds.append(seconds)
+        if comparable_rows(rows) != comparable_rows(full.execute(sql).fetchall()):
+            other_rows_than_full_build.append(query.query_id)
+        if compare_with_silver and comparable_rows(rows) != comparable_rows(silver.execute(query.sql).fetchall()):
+            other_rows_than_silver.append(query.query_id)
 
-    def percentile(values, fraction):
-        return values[min(len(values) - 1, int(fraction * len(values)))]
-    usage = column_usage(workload)
+    third = max(1, len(batches) // 3)
+    column_count = sum(len(incremental.execute(f"DESCRIBE gold.{name}").fetchall())
+                       for name in [*EVENT_RELATIONS, *STATE_RELATIONS])
     scorecard = {
-        "silver_days": days,
-        "1_subset": {
-            "every_gold_column_is_a_semantic_view_column_over_silver": all(
-                column in semantic_columns[name] for name, column in gold_columns),
-            "workload_queries": len(workload), "queries_gold_can_answer": len(covered),
-            "share_of_queries_gold_can_answer": round(len(covered) / len(workload), 3),
-            "queries_left_to_silver": sorted(q.query_id for q in workload if q not in covered),
-        },
-        "2_easy": {
-            "gold_relations": len(GOLD_RELATIONS) + 1,                    # and claim_payers
-            "gold_columns": len(gold_columns) + len(CLAIM_PAYERS_COLUMNS),
-            "queries_asked_of_claim_payers": sum(q.query_id in CLAIM_PAYERS_REWRITES for q in covered),
-            "semantic_layer_relations": len(semantic_columns),
-            "semantic_layer_columns": sum(len(c) for c in semantic_columns.values()),
-            "silver_tables": len(SILVER_TABLES),
-            "gold_columns_no_query_reads": sorted(f"{n}.{c}" for n, c in gold_columns if not usage.get((n, c))),
-        },
+        "silver_days": days, "batches": len(batches),
+        "gold_rows": sum(relation["rows"] for relation in full_build.values()),
+        "1_subset": {"incremental_equals_full_build": not any(differing_rows.values()),
+                     "differing_rows": differing_rows},
+        "2_easy": {"relations": len(EVENT_RELATIONS) + len(STATE_RELATIONS), "columns": column_count,
+                   "canonical_questions": len(canonical)},
         "3_fast": {
-            "covered_queries_with_the_same_rows_as_silver": len(covered) - len(wrong), "queries_with_other_rows": wrong,
-            "gold_seconds_median": statistics.median(gold_times), "gold_seconds_p95": percentile(gold_times, 0.95),
-            "gold_seconds_total": round(sum(gold_times), 2),
-            "silver_views_seconds_median": statistics.median(silver_times),
-            "silver_views_seconds_p95": percentile(silver_times, 0.95),
-            "silver_views_seconds_total": round(sum(silver_times), 2),
-        },
+            "canonical_question_seconds": canonical,
+            "canonical_seconds_median": statistics.median(q["seconds"] for q in canonical.values()),
+            "canonical_seconds_max": max(q["seconds"] for q in canonical.values()),
+            "benchmark_queries": len(workload), "benchmark_queries_gold_covers": len(covered),
+            "benchmark_queries_left_to_silver": sorted(q.query_id for q in workload if q not in covered),
+            "benchmark_queries_with_other_rows_than_full_build": other_rows_than_full_build,
+            "benchmark_queries_with_other_rows_than_silver": other_rows_than_silver if compare_with_silver else None,
+            "benchmark_seconds_median": round(statistics.median(benchmark_seconds), 4),
+            "benchmark_seconds_total": round(sum(benchmark_seconds), 2)},
         "4_build_cost": {
-            "full_build_seconds": round(sum(r["seconds"] for r in build.values()), 2),
-            "gold_megabytes": round(gold_bytes / 1e6, 2), "silver_megabytes": round(silver_parquet_bytes / 1e6, 2),
-            "gold_share_of_silver_size": round(gold_bytes / silver_parquet_bytes, 3),
-            "per_relation": build,
-        },
-        "per_query": per_query,
+            "seconds_per_batch_first_third": round(statistics.mean(b["seconds_total"] for b in batches[:third]), 3),
+            "seconds_per_batch_last_third": round(statistics.mean(b["seconds_total"] for b in batches[-third:]), 3),
+            "seconds_all_batches": round(sum(b["seconds_total"] for b in batches), 1),
+            "step_seconds_first_third": {step: round(statistics.mean(b["seconds"][step] for b in batches[:third]), 3)
+                                         for step in batches[0]["seconds"]},
+            "step_seconds_last_third": {step: round(statistics.mean(b["seconds"][step] for b in batches[-third:]), 3)
+                                        for step in batches[0]["seconds"]},
+            "full_build_seconds": round(sum(relation["seconds"] for relation in full_build.values()), 1),
+            "compact_every_batches": compact_every_batches, "compactions": len(compactions),
+            "compaction_seconds_total": round(sum(c["seconds"] for c in compactions), 1),
+            "compaction_seconds_max": max(c["seconds"] for c in compactions),
+            "data_files": len(data_files),
+            "data_megabytes": round(sum(f.stat().st_size for f in data_files) / 1e6, 1),
+            "full_build_megabytes": round(sum(relation["bytes"] for relation in full_build.values()) / 1e6, 1),
+            "key_index_megabytes": round((working_directory / "_key_index.sqlite").stat().st_size / 1e6, 1)},
+        "per_batch": batches,
     }
     (working_directory / "gold_scorecard.json").write_text(json.dumps(scorecard, indent=2, default=str))
     return scorecard
@@ -129,12 +160,15 @@ def main():
     arguments.add_argument("--working-directory", type=Path, required=True)
     arguments.add_argument("--cache-directory", type=Path, default=Path.home() / ".cache" / "claim-clarity-gold")
     arguments.add_argument("--days", type=int, default=30)
-    arguments.add_argument("--gold-queries-only", action="store_true",
-                           help="do not run the workload on the semantic views over silver (slow on a large silver)")
+    arguments.add_argument("--compact-every-batches", type=int, default=30)
+    arguments.add_argument("--compare-with-silver", action="store_true",
+                           help="also run each benchmark query on the semantic views over silver (minutes per "
+                                "query on a large silver)")
     options = arguments.parse_args()
     options.working_directory.mkdir(parents=True, exist_ok=False)
-    scorecard = run(options.working_directory, options.cache_directory, options.days, not options.gold_queries_only)
-    print(json.dumps({k: v for k, v in scorecard.items() if k != "per_query"}, indent=2, default=str))
+    scorecard = run(options.working_directory, options.cache_directory, options.days, options.compact_every_batches,
+                    options.compare_with_silver)
+    print(json.dumps({k: v for k, v in scorecard.items() if k != "per_batch"}, indent=2, default=str))
 
 
 if __name__ == "__main__":
