@@ -146,5 +146,11 @@ SELECT o.claim_key, o.first_activity_month, l.claim_id AS latest_claim_id, l.fre
 FROM over_payers o LEFT JOIN latest l USING (claim_key)
 LEFT JOIN {claim_payers} p ON p.claim_key = o.claim_key AND p.payer_key = l.payer_key
 """
+# the columns of a claim's latest submission that claims carries, as the semantic relation claims names them
+LATEST_SUBMISSION_COLUMNS = [
+    "claim_key", "claim_id", "frequency_code", "charge_amount", "line_count", "place_of_service",
+    "principal_diagnosis_code", "diagnosis_codes", "service_date_from", "service_date_to", "service_month",
+    "billing_npi", "rendering_npi", "referring_npi", "payer_key", "payer_name", "payer_class",
+    "payer_responsibility"]
 STATE_RELATIONS = {"claim_payers": "one claim and one payer", "claims": "one claim"}
 STATE_SORT_COLUMNS = {"claim_payers": "claim_key, payer_key", "claims": "claim_key"}

@@ -7,9 +7,9 @@
 A batch's cost follows the batch and the size of a month, not the size of silver.
 
     <catalog>                       the Iceberg tables gold.<relation>, partitioned by month
-    <gold>/_build_state.sqlite      build state, not for queries: every state row by key (to read a claim's previous
-                                    state, and a month's rows, through an index), and the rank of each key's
-                                    top-ranked event (to tell whether the batch's event outranks it)
+    <gold>/_key_index.sqlite        build state, not for queries: for each claim, and each claim and payer, the
+                                    month partition its state row is in and the rank of its top-ranked event (to
+                                    tell whether the batch's event outranks it)
 """
 from __future__ import annotations
 
@@ -20,14 +20,14 @@ from pathlib import Path
 import duckdb
 import pyarrow as pa
 from pyiceberg.catalog import Catalog
-from pyiceberg.expressions import EqualTo, IsNull
-from pyiceberg.partitioning import PartitionField, PartitionSpec
+from pyiceberg.expressions import EqualTo, In, IsNull, Or
 from pyiceberg.transforms import IdentityTransform
 
 from ccsim.pipeline import DDL_SEMANTIC, seed_ref
 from ccsim.silver_staging import STAGING_DDL
 
-from .gold_relations import CLAIM_PAYERS_SQL, CLAIMS_SQL, EVENT_RELATIONS, STATE_MONTH_COLUMN, STATE_SORT_COLUMNS
+from .gold_relations import (CLAIM_PAYERS_SQL, CLAIMS_SQL, EVENT_RELATIONS, LATEST_SUBMISSION_COLUMNS,
+                             STATE_MONTH_COLUMN, STATE_SORT_COLUMNS)
 
 GOLD_NAMESPACE = "gold"
 # The semantic views rank events with these keys; as text that sorts the same way. NULL dates rank last.
@@ -38,8 +38,13 @@ REMIT_RANK_KEY_SQL = ("concat_ws('|', CASE WHEN is_duplicate_claim_denial THEN '
 SUBMISSION_RANK_KEY_SQL = ("concat_ws('|', coalesce(strftime(submission_date, '%Y%m%d'), '00000000'), "
                            "coalesce(strftime(file_received_at, '%Y%m%d%H%M%S'), '00000000000000'), file_id, "
                            "lpad(seg_ord::VARCHAR, 10, '0'))")
-STATE_KEY_COLUMNS = {"claim_payers": ["claim_key", "payer_key"], "claims": ["claim_key"],
-                     "latest_submissions": ["claim_key"]}
+STATE_KEY_COLUMNS = {"claim_payers": ["claim_key", "payer_key"], "claims": ["claim_key"]}
+KEY_INDEX_DDL = """
+CREATE TABLE IF NOT EXISTS claim_payers (claim_key TEXT NOT NULL, payer_key TEXT NOT NULL, month TEXT,
+    top_remit_rank_key TEXT, PRIMARY KEY (claim_key, payer_key)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS claims (claim_key TEXT NOT NULL PRIMARY KEY, month TEXT, latest_submission_rank_key TEXT)
+    WITHOUT ROWID;
+"""
 # claim_payers columns that describe the current adjudication: they follow the top-ranked remittance event
 CURRENT_ADJUDICATION_COLUMNS = [
     "has_current_adjudication", "current_remit_claim_id", "current_payment_date", "current_claim_status_code",
@@ -64,90 +69,63 @@ class IncrementalGold:
         gold_directory.mkdir(parents=True, exist_ok=True)
         self.catalog = catalog
         catalog.create_namespace_if_not_exists(GOLD_NAMESPACE)
-        self.state = sqlite3.connect(gold_directory / "_build_state.sqlite")
-        self.state.execute("CREATE TABLE IF NOT EXISTS top_remit_event (claim_key TEXT NOT NULL, payer_key TEXT "
-                           "NOT NULL, rank_key TEXT NOT NULL, PRIMARY KEY (claim_key, payer_key)) WITHOUT ROWID")
+        self.key_index = sqlite3.connect(gold_directory / "_key_index.sqlite")
+        self.key_index.executescript(KEY_INDEX_DDL)
+        self.key_index.execute("CREATE TEMP TABLE wanted (claim_key TEXT PRIMARY KEY) WITHOUT ROWID")
         # the batch's silver rows (emptied per batch), ref.*, and the semantic views over them
         self.work = duckdb.connect()
         self.work.execute(STAGING_DDL)
         seed_ref(self.work)
         self.work.execute(DDL_SEMANTIC)
-        # the state relations' columns and types, from their definitions
-        self.work.execute("CREATE TABLE claim_payers_shape AS SELECT * FROM (" + CLAIM_PAYERS_SQL.format(
+        # empty relations with the state tables' columns and types, from their definitions
+        self.work.execute("CREATE TABLE empty_claim_payers AS SELECT * FROM (" + CLAIM_PAYERS_SQL.format(
             claims="sem.claims", remit_claims="sem.remit_claims") + ") LIMIT 0")
-        self.work.execute("CREATE TABLE latest_submissions_shape AS SELECT * FROM sem.claims LIMIT 0")
-        self.work.execute("CREATE TABLE claims_shape AS SELECT * FROM (" + CLAIMS_SQL.format(
-            latest_submissions="latest_submissions_shape", claim_payers="claim_payers_shape") + ") LIMIT 0")
-        self.state_columns = {
-            name: self.work.execute(f"DESCRIBE {name}_shape").fetchall()
-            for name in ("claim_payers", "claims", "latest_submissions")}
-        for name, columns in self.state_columns.items():
-            keys = STATE_KEY_COLUMNS[name]
-            self.state.execute(
-                f"CREATE TABLE IF NOT EXISTS {name} ({', '.join(c[0] + ' TEXT' for c in columns)}"
-                f"{', rank_key TEXT' if name == 'latest_submissions' else ''}, PRIMARY KEY ({', '.join(keys)})) "
-                "WITHOUT ROWID")
-        for name in ("claim_payers", "claims"):
-            self.state.execute(f"CREATE INDEX IF NOT EXISTS {name}_by_month ON {name} ({STATE_MONTH_COLUMN})")
+        self.work.execute("CREATE TABLE empty_claims AS SELECT * FROM (" + CLAIMS_SQL.format(
+            latest_submissions="(SELECT * FROM sem.claims WHERE is_latest_submission)",
+            claim_payers="empty_claim_payers") + ") LIMIT 0")
 
     # --- Iceberg ---------------------------------------------------------------------------------------------------
     def _table(self, name: str, rows: pa.Table, month_column: str):
         identifier = f"{GOLD_NAMESPACE}.{name}"
         if not self.catalog.table_exists(identifier):
-            table = self.catalog.create_table(identifier, schema=rows.schema)
+            table = self.catalog.create_table(identifier, schema=rows.schema,
+                                              properties={"commit.manifest-merge.enabled": "true"})
             with table.update_spec() as spec:
                 spec.add_field(month_column, IdentityTransform(), month_column)
             return table
         return self.catalog.load_table(identifier)
 
-    # --- build state -----------------------------------------------------------------------------------------------
-    def _typed(self, name: str, text_rows: list[tuple], extra_text_columns: tuple[str, ...] = ()) -> str:
-        """Registers state rows read from the build state (all text) under a new name, in their types."""
-        columns = self.state_columns[name]
-        names = [c[0] for c in columns] + list(extra_text_columns)
-        raw = pa.table({n: pa.array([row[i] for row in text_rows], pa.string()) for i, n in enumerate(names)})
-        self.work.register("state_text_rows", raw)
-        relation = f"previous_{name}"
-        self.work.execute(
-            f"CREATE OR REPLACE TEMP TABLE {relation} AS SELECT "
-            + ", ".join(f"CAST({c[0]} AS {c[1]}) AS {c[0]}" for c in columns)
-            + "".join(f", {extra}" for extra in extra_text_columns) + " FROM state_text_rows")
-        self.work.unregister("state_text_rows")
-        return relation
+    def _read_state_months(self, name: str, months: set[str | None], into: str):
+        """The rows of a state table in these month partitions, as the work relation `into`."""
+        self.work.execute(f"CREATE OR REPLACE TEMP TABLE {into} AS SELECT * FROM empty_{name}")
+        identifier = f"{GOLD_NAMESPACE}.{name}"
+        if not months or not self.catalog.table_exists(identifier):
+            return
+        named = sorted(month for month in months if month is not None)
+        month_filter = In(STATE_MONTH_COLUMN, named) if named else None
+        if None in months:
+            month_filter = Or(month_filter, IsNull(STATE_MONTH_COLUMN)) if month_filter else IsNull(STATE_MONTH_COLUMN)
+        rows = self.catalog.load_table(identifier).scan(row_filter=month_filter).to_arrow()
+        self.work.register("state_rows_read", rows)
+        self.work.execute(f"INSERT INTO {into} BY NAME SELECT * FROM state_rows_read")
+        self.work.unregister("state_rows_read")
 
-    def _store(self, name: str, relation: str, extra_text_columns: tuple[str, ...] = ()):
-        columns = [c[0] for c in self.state_columns[name]] + list(extra_text_columns)
-        rows = self.work.execute(f"SELECT {', '.join(f'CAST({c} AS VARCHAR)' for c in columns)} FROM {relation}").fetchall()
-        self.state.executemany(f"INSERT OR REPLACE INTO {name} VALUES ({', '.join('?' * len(columns))})", rows)
-
-    def _previous(self, name: str, keys_relation: str, key_columns: list[str],
-                  extra_text_columns: tuple[str, ...] = ()) -> str:
-        """The stored rows of `name` matching the keys, read through the primary key index."""
-        self.state.execute("CREATE TEMP TABLE IF NOT EXISTS wanted (k1 TEXT, k2 TEXT)")
-        self.state.execute("DELETE FROM wanted")
-        keys = self.work.execute(f"SELECT DISTINCT {', '.join(key_columns)} FROM {keys_relation}").fetchall()
-        self.state.executemany(f"INSERT INTO wanted VALUES (?, {'?' if len(key_columns) == 2 else 'NULL'})", keys)
-        columns = [c[0] for c in self.state_columns[name]] + list(extra_text_columns)
-        on = " AND ".join(f"s.{column} = wanted.k{position}" for position, column in enumerate(key_columns, 1))
-        rows = self.state.execute(f"SELECT {', '.join('s.' + c for c in columns)} FROM wanted "
-                                  f"CROSS JOIN {name} s ON {on}").fetchall()
-        return self._typed(name, rows, extra_text_columns)
-
-    def _replace_month_partitions(self, name: str, months: set[str | None]):
-        """Each of these months of a state table becomes what the build state holds for it."""
-        columns = [c[0] for c in self.state_columns[name]]
+    def _replace_state_months(self, name: str, months: set[str | None], rows_relation: str):
+        """Each of these month partitions of a state table becomes the rows of rows_relation in that month."""
         for month in sorted(months, key=str):
-            rows = self.state.execute(
-                f"SELECT {', '.join(columns)} FROM {name} WHERE {STATE_MONTH_COLUMN} IS ?", (month,)).fetchall()
-            relation = self._typed(name, rows)
-            data = self.work.sql(f"SELECT {', '.join(columns)} FROM {relation} "
-                                 f"ORDER BY {STATE_SORT_COLUMNS[name]}").to_arrow_table()
+            data = self.work.sql(
+                f"SELECT * FROM {rows_relation} WHERE CAST({STATE_MONTH_COLUMN} AS VARCHAR) IS NOT DISTINCT FROM ? "
+                f"ORDER BY {STATE_SORT_COLUMNS[name]}", params=[month]).to_arrow_table()
             table = self._table(name, data, STATE_MONTH_COLUMN)
             month_filter = IsNull(STATE_MONTH_COLUMN) if month is None else EqualTo(STATE_MONTH_COLUMN, month)
             if data.num_rows:
                 table.overwrite(data, overwrite_filter=month_filter)
             else:
                 table.delete(month_filter)
+
+    def _months(self, relation: str) -> set[str | None]:
+        return {row[0] for row in self.work.execute(
+            f"SELECT DISTINCT CAST({STATE_MONTH_COLUMN} AS VARCHAR) FROM {relation}").fetchall()}
 
     # --- a batch ---------------------------------------------------------------------------------------------------
     def apply_batch(self, batch_id: str, silver_table_files: dict[str, list[Path]]) -> dict:
@@ -159,7 +137,7 @@ class IncrementalGold:
             nonlocal clock
             seconds[step] = round(time.monotonic() - clock, 3)
             clock = time.monotonic()
-        work = self.work
+        work, index = self.work, self.key_index
         for table, files in silver_table_files.items():
             work.execute(f"TRUNCATE {table}")
             if files:
@@ -182,87 +160,110 @@ class IncrementalGold:
             claims="sem.claims", remit_claims="sem.remit_claims"))
         work.execute(f"CREATE OR REPLACE TEMP TABLE batch_top_remit_event AS SELECT claim_key, payer_key, "
                      f"{REMIT_RANK_KEY_SQL} AS rank_key FROM sem_int.remit_event WHERE event_rank_desc = 1")
-        work.execute(f"CREATE OR REPLACE TEMP TABLE batch_latest_submissions AS SELECT c.*, r.rank_key FROM sem.claims c "
+        work.execute(f"CREATE OR REPLACE TEMP TABLE batch_latest_submissions AS "
+                     f"SELECT {', '.join('c.' + c for c in LATEST_SUBMISSION_COLUMNS)}, r.rank_key FROM sem.claims c "
                      f"JOIN (SELECT claim_uid, {SUBMISSION_RANK_KEY_SQL} AS rank_key FROM sem_int.submission "
                      "WHERE submission_rank_desc = 1) r ON r.claim_uid = c.claim_id")
-        work.execute("CREATE OR REPLACE TEMP TABLE touched_claims AS SELECT DISTINCT claim_key FROM batch_claim_payers")
         lap("batch_state")
 
-        # previous state of the claims the batch names
-        self._previous("claim_payers", "touched_claims", ["claim_key"])           # every payer of those claims
-        self._previous("latest_submissions", "touched_claims", ["claim_key"], ("rank_key",))
-        self._previous("claims", "touched_claims", ["claim_key"])
-        self.state.execute("DELETE FROM wanted")
-        self.state.executemany("INSERT INTO wanted VALUES (?, ?)", work.execute(
-            "SELECT claim_key, payer_key FROM batch_top_remit_event").fetchall())
-        previous_top = self.state.execute(
-            "SELECT s.claim_key, s.payer_key, s.rank_key FROM wanted CROSS JOIN top_remit_event s "
-            "ON s.claim_key = wanted.k1 AND s.payer_key = wanted.k2").fetchall()
-        work.register("previous_top_remit_event", pa.table(
-            {name: pa.array([row[position] for row in previous_top], pa.string())
-             for position, name in enumerate(("claim_key", "payer_key", "rank_key"))}))
+        # where the previous state of the claims the batch names is, and how their top events rank
+        index.execute("DELETE FROM wanted")
+        index.executemany("INSERT INTO wanted VALUES (?)", work.execute(
+            "SELECT DISTINCT claim_key FROM batch_claim_payers").fetchall())
+        indexed_pairs = index.execute("SELECT s.claim_key, s.payer_key, s.month, s.top_remit_rank_key "
+                                      "FROM wanted CROSS JOIN claim_payers s USING (claim_key)").fetchall()
+        indexed_claims = index.execute("SELECT s.claim_key, s.month, s.latest_submission_rank_key "
+                                       "FROM wanted CROSS JOIN claims s USING (claim_key)").fetchall()
+        for relation, names, rows in (
+                ("indexed_claim_payers", ("claim_key", "payer_key", "month", "top_remit_rank_key"), indexed_pairs),
+                ("indexed_claims", ("claim_key", "month", "latest_submission_rank_key"), indexed_claims)):
+            work.register("index_rows", pa.table({name: pa.array([row[position] for row in rows], pa.string())
+                                                  for position, name in enumerate(names)}))
+            work.execute(f"CREATE OR REPLACE TEMP TABLE {relation} AS SELECT * FROM index_rows")
+            work.unregister("index_rows")
+        previous_months = {"claim_payers": {row[2] for row in indexed_pairs},
+                           "claims": {row[1] for row in indexed_claims}}
+        self._read_state_months("claim_payers", previous_months["claim_payers"], "month_claim_payers")
+        self._read_state_months("claims", previous_months["claims"], "month_claims")
+        work.execute("CREATE OR REPLACE TEMP TABLE previous_claim_payers AS SELECT * FROM month_claim_payers "
+                     "SEMI JOIN indexed_claim_payers USING (claim_key, payer_key)")
         lap("read_previous_state")
 
         # fold: claim_payers
         work.execute("CREATE OR REPLACE TEMP TABLE batch_outranks AS SELECT b.claim_key, b.payer_key, b.rank_key "
-                     "FROM batch_top_remit_event b LEFT JOIN previous_top_remit_event p USING (claim_key, payer_key) "
-                     "WHERE p.rank_key IS NULL OR b.rank_key > p.rank_key")
+                     "FROM batch_top_remit_event b LEFT JOIN indexed_claim_payers p USING (claim_key, payer_key) "
+                     "WHERE p.top_remit_rank_key IS NULL OR b.rank_key > p.top_remit_rank_key")
         fold = ", ".join(f"{expression} AS {column}" for column, expression in CLAIM_PAYERS_FOLD.items())
         current = ", ".join(f"CASE WHEN w.claim_key IS NOT NULL THEN b.{c} ELSE o.{c} END AS {c}"
                             for c in CURRENT_ADJUDICATION_COLUMNS)
-        columns = ", ".join(c[0] for c in self.state_columns["claim_payers"])
-        work.execute(f"""CREATE OR REPLACE TEMP TABLE new_claim_payers AS
-            SELECT {columns} FROM (
+        work.execute(f"""CREATE OR REPLACE TEMP TABLE new_claim_payers AS SELECT * FROM empty_claim_payers;
+            INSERT INTO new_claim_payers BY NAME
+            SELECT * REPLACE (coalesce(has_current_adjudication, false) AS has_current_adjudication) FROM (
                 SELECT claim_key, payer_key, {fold}, {current},
                        date_trunc('month', least(least(o.first_submission_date, b.first_submission_date),
                                                  least(o.first_remit_date, b.first_remit_date)))::DATE
                            AS {STATE_MONTH_COLUMN}
                 FROM batch_claim_payers b LEFT JOIN previous_claim_payers o USING (claim_key, payer_key)
                 LEFT JOIN batch_outranks w USING (claim_key, payer_key))""")
-        work.execute("UPDATE new_claim_payers SET has_current_adjudication = coalesce(has_current_adjudication, false)")
-        # fold: the latest submission of each claim
-        latest_columns = ", ".join(c[0] for c in self.state_columns["latest_submissions"])
+        # fold: each claim's latest submission is the batch's if it outranks the indexed one, else the one its
+        # claims row carries
+        latest = ", ".join(LATEST_SUBMISSION_COLUMNS)
         work.execute(f"""CREATE OR REPLACE TEMP TABLE new_latest_submissions AS
-            SELECT {latest_columns}, rank_key FROM batch_latest_submissions b
-            WHERE NOT EXISTS (SELECT 1 FROM previous_latest_submissions o
-                              WHERE o.claim_key = b.claim_key AND o.rank_key > b.rank_key)""")
-        # claims: recomputed for the claims the batch names, from their payers' state and their latest submission
-        work.execute(f"""CREATE OR REPLACE TEMP TABLE claim_payers_of_touched_claims AS
-            SELECT * FROM new_claim_payers UNION ALL
+            SELECT {latest}, b.rank_key FROM batch_latest_submissions b LEFT JOIN indexed_claims i USING (claim_key)
+            WHERE i.latest_submission_rank_key IS NULL OR b.rank_key > i.latest_submission_rank_key""")
+        work.execute(f"""CREATE OR REPLACE TEMP TABLE latest_submissions_of_touched_claims AS
+            SELECT {latest} FROM new_latest_submissions UNION ALL
+            SELECT {latest.replace('claim_id', 'latest_claim_id AS claim_id')} FROM month_claims o
+            SEMI JOIN indexed_claims USING (claim_key)
+            WHERE o.latest_claim_id IS NOT NULL
+              AND NOT EXISTS (SELECT 1 FROM new_latest_submissions n WHERE n.claim_key = o.claim_key)""")
+        # claims: recomputed for the claims the batch names, from all their payers' state and their latest submission
+        work.execute("""CREATE OR REPLACE TEMP TABLE claim_payers_of_touched_claims AS
+            SELECT * FROM new_claim_payers UNION ALL BY NAME
             SELECT * FROM previous_claim_payers o WHERE NOT EXISTS (
                 SELECT 1 FROM new_claim_payers n WHERE n.claim_key = o.claim_key AND n.payer_key = o.payer_key)""")
-        work.execute(f"""CREATE OR REPLACE TEMP TABLE latest_submissions_of_touched_claims AS
-            SELECT {latest_columns} FROM new_latest_submissions UNION ALL
-            SELECT {latest_columns} FROM previous_latest_submissions o WHERE NOT EXISTS (
-                SELECT 1 FROM new_latest_submissions n WHERE n.claim_key = o.claim_key)""")
-        work.execute("CREATE OR REPLACE TEMP TABLE new_claims AS " + CLAIMS_SQL.format(
-            latest_submissions="latest_submissions_of_touched_claims", claim_payers="claim_payers_of_touched_claims"))
+        work.execute("CREATE OR REPLACE TEMP TABLE new_claims AS SELECT * FROM empty_claims; "
+                     "INSERT INTO new_claims BY NAME " + CLAIMS_SQL.format(
+                         latest_submissions="latest_submissions_of_touched_claims",
+                         claim_payers="claim_payers_of_touched_claims"))
         lap("fold_state")
 
-        # which month partitions change, then store the new state
-        months = {name: {row[0] for row in work.execute(
-            f"SELECT DISTINCT CAST({STATE_MONTH_COLUMN} AS VARCHAR) FROM new_{name} UNION "
-            f"SELECT DISTINCT CAST(o.{STATE_MONTH_COLUMN} AS VARCHAR) FROM previous_{name} o SEMI JOIN new_{name} n "
-            f"USING ({', '.join(STATE_KEY_COLUMNS[name])})").fetchall()} for name in ("claim_payers", "claims")}
-        self._store("claim_payers", "new_claim_payers")
-        self._store("latest_submissions", "new_latest_submissions", ("rank_key",))
-        self._store("claims", "new_claims")
-        self.state.executemany("INSERT OR REPLACE INTO top_remit_event VALUES (?, ?, ?)",
-                               work.execute("SELECT claim_key, payer_key, rank_key FROM batch_outranks").fetchall())
-        lap("store_state")
+        # replace the month partitions the new rows leave and enter
+        state_partitions_replaced = 0
         for name in ("claim_payers", "claims"):
-            self._replace_month_partitions(name, months[name])
-        self.state.commit()
+            keys = ", ".join(STATE_KEY_COLUMNS[name])
+            entered = self._months(f"new_{name}") - previous_months[name]
+            self._read_state_months(name, entered, f"entered_month_{name}")
+            work.execute(f"""CREATE OR REPLACE TEMP TABLE replaced_{name} AS
+                SELECT * FROM new_{name} UNION ALL BY NAME
+                SELECT * FROM (SELECT * FROM month_{name} UNION ALL BY NAME SELECT * FROM entered_month_{name}) o
+                ANTI JOIN new_{name} USING ({keys})""")
+            months = previous_months[name] | self._months(f"new_{name}")
+            self._replace_state_months(name, months, f"replaced_{name}")
+            state_partitions_replaced += len(months)
         lap("replace_state_partitions")
+
+        index.executemany("INSERT OR REPLACE INTO claim_payers VALUES (?, ?, ?, ?)", work.execute(
+            f"""SELECT n.claim_key, n.payer_key, CAST(n.{STATE_MONTH_COLUMN} AS VARCHAR),
+                       coalesce(w.rank_key, i.top_remit_rank_key)
+                FROM new_claim_payers n LEFT JOIN batch_outranks w USING (claim_key, payer_key)
+                LEFT JOIN indexed_claim_payers i USING (claim_key, payer_key)""").fetchall())
+        index.executemany("INSERT OR REPLACE INTO claims VALUES (?, ?, ?)", work.execute(
+            f"""SELECT n.claim_key, CAST(n.{STATE_MONTH_COLUMN} AS VARCHAR),
+                       coalesce(l.rank_key, i.latest_submission_rank_key)
+                FROM new_claims n LEFT JOIN new_latest_submissions l USING (claim_key)
+                LEFT JOIN indexed_claims i USING (claim_key)""").fetchall())
+        index.commit()
+        lap("key_index")
         return {"batch_id": batch_id, "seconds": seconds, "seconds_total": round(sum(seconds.values()), 3),
                 "event_rows_added": event_rows_added,
                 "state_rows_replaced": sum(work.execute(f"SELECT count(*) FROM new_{n}").fetchall()[0][0]
                                            for n in ("claim_payers", "claims")),
-                "state_month_partitions_replaced": sum(len(m) for m in months.values())}
+                "state_month_partitions_replaced": state_partitions_replaced}
 
     def close(self):
         self.work.close()
-        self.state.close()
+        self.key_index.close()
 
 
 def open_incremental_gold(catalog: Catalog) -> duckdb.DuckDBPyConnection:
