@@ -102,9 +102,10 @@ appends one after another.
 | Workload | Baseline | Now |
 |---|---|---|
 | 30 days (95 MB, 738 deliveries) | 119 s, 0.79 MB/s | 39.7 s, 2.39 MB/s (before the per-file parser changes) |
-| 90 days (292 MB, 1,986 deliveries) | not measured | 3.7 MB/s, first commit after 68 s, 2.2 GB peak heap, small files staged together (2026-11-13; the same machine at the same time without it: 2.3-2.7 MB/s, 91-105 s) |
-| 90 days as 2 large files (278 MB) | not measured | 4.2 MB/s, 1.9 GB peak heap (before the per-file parser changes); 3.5 MB/s on 2026-11-13 on a busy machine |
-| 3 customers at once, 30 days each | 147-149 s each | 0.87 MB/s each, 2.6 MB/s together (before the per-file parser changes) |
+| 90 days (292 MB, 2,184 deliveries) | not measured | 4.0-4.2 MB/s, first commit after 61-63 s, 2.1 GB peak heap, 272-275 staged units (two runs alone on a fresh emulator; before small files were staged together: 3.1-3.2 MB/s, 75 s) |
+| 90 days as 2 large files (278 MB) | not measured | 3.4-3.65 MB/s, 2.2 GB peak heap; run alternately with the code before staging (3.2-3.5 MB/s) it is 4-6% faster, so staging costs large files nothing. Earlier runs measured 4.2 MB/s under other conditions |
+| 30 days with 277CA files (111 MB) | not measured | 3.3 MB/s, first commit after 34 s, 103 staged units |
+| 3 customers at once, 30 days each | 147-149 s each | 1.16-1.19 MB/s each, about 3.5 MB/s together |
 | 1 year (1.2 GB, 8,849 deliveries) | about 22 min, 802 Parquet files | 8.4 min, 3.1 MB/s, 9 slot exports of 1 GiB |
 
 277CA acknowledgments go through the pipeline unchanged: the parser reads them into the `a277.*` tables, which
