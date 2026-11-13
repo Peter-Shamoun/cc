@@ -62,7 +62,7 @@ def run(working_directory: Path, cache_directory: Path, days: int, compact_every
     gold_columns = {(name, column) for name, relation in GOLD_RELATIONS.items() for column in relation.columns}
     query_seconds, other_rows = [], []
     for query in (q for q in workload if q.columns_read <= gold_columns):
-        sql = query.sql.replace("sem.", "gold.")
+        sql = query.gold_sql
         rows, seconds = timed(incremental, sql, repeats=3)
         query_seconds.append(seconds)
         if comparable_rows(rows) != comparable_rows(full.execute(sql).fetchall()):

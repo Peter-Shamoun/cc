@@ -23,8 +23,8 @@ from pathlib import Path
 from ccsim.parser import TABLES as SILVER_TABLES
 
 from .build_gold import build_gold_from_scratch, open_gold
-from .gold_schema import GOLD_RELATIONS
-from .query_workload import column_usage, load_workload, semantic_relation_columns
+from .gold_schema import CLAIM_PAYERS_COLUMNS, GOLD_RELATIONS
+from .query_workload import CLAIM_PAYERS_REWRITES, column_usage, load_workload, semantic_relation_columns
 from .silver_dataset import build_silver_database, open_silver
 
 MOCK_EDI_CACHE = Path.home() / ".cache" / "claim-clarity-mock-edi"
@@ -70,7 +70,7 @@ def run(working_directory: Path, cache_directory: Path, days: int, time_queries_
     covered = [query for query in workload if query.columns_read <= gold_columns]
     per_query, wrong = [], []
     for query in covered:
-        gold_rows, gold_seconds = timed(gold, query.sql.replace("sem.", "gold."), repeats=3)
+        gold_rows, gold_seconds = timed(gold, query.gold_sql, repeats=3)
         if time_queries_on_silver:
             silver_rows, silver_seconds = timed(silver, query.sql, repeats=1)
         else:                                             # on a large silver the views take minutes per query
@@ -96,7 +96,9 @@ def run(working_directory: Path, cache_directory: Path, days: int, time_queries_
             "queries_left_to_silver": sorted(q.query_id for q in workload if q not in covered),
         },
         "2_easy": {
-            "gold_relations": len(GOLD_RELATIONS), "gold_columns": len(gold_columns),
+            "gold_relations": len(GOLD_RELATIONS) + 1,                    # and claim_payers
+            "gold_columns": len(gold_columns) + len(CLAIM_PAYERS_COLUMNS),
+            "queries_asked_of_claim_payers": sum(q.query_id in CLAIM_PAYERS_REWRITES for q in covered),
             "semantic_layer_relations": len(semantic_columns),
             "semantic_layer_columns": sum(len(c) for c in semantic_columns.values()),
             "silver_tables": len(SILVER_TABLES),

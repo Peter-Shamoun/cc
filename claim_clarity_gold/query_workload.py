@@ -19,6 +19,9 @@ REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 AUTHORED_QUESTIONS_PATH = REPOSITORY_ROOT / "bench" / "authored_questions.json"
 
 
+CLAIM_PAYERS_REWRITES: dict[str, str] = json.loads((Path(__file__).parent / "claim_payers_rewrites.json").read_text())
+
+
 @dataclass(frozen=True)
 class WorkloadQuery:
     query_id: str
@@ -27,6 +30,11 @@ class WorkloadQuery:
     columns_read: frozenset[tuple[str, str]]            # (semantic relation, column)
 
     @property
+    def gold_sql(self) -> str:
+        """The query as it is asked of gold: on claim_payers where that is simpler (each such rewrite returns the
+        same rows), else the same query on the gold relation of the same name."""
+        return CLAIM_PAYERS_REWRITES.get(self.query_id) or self.sql.replace("sem.", "gold.")
+
     def relations_read(self) -> frozenset[str]:
         return frozenset(relation for relation, _ in self.columns_read)
 
