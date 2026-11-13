@@ -107,8 +107,9 @@ def lake_summary(settings: CustomerPipelineSettings) -> dict:
         table = lake.table(name)
         tables[name] = {"rows": sum(task.file.record_count for task in table.scan().plan_files()),
                         "parquet_files": len(list(table.scan().plan_files())), "snapshots": len(table.snapshots())}
-    source_files = lake.read("edi.source_file", ("s3_key", "sha256", "file_kind"))
+    source_files = lake.read("edi.source_file", ("s3_key", "sha256", "file_kind", "segment_count"))
     return {"tables": tables, "files_in_lake": source_files.num_rows,
+            "segments_counted_by_the_parser": sum(source_files["segment_count"].to_pylist()),
             "sha256_in_lake": sorted(source_files["sha256"].to_pylist()),
             "distinct_file_contents_in_lake": len(set(source_files["sha256"].to_pylist())),
             "file_kinds": {kind: source_files["file_kind"].to_pylist().count(kind)
@@ -130,6 +131,8 @@ def check_report(report: dict):
         problems.append("a delivered file is neither in the lake nor in the dead-letter queue")
     if len(set(lake["sha256_in_lake"])) != len(lake["sha256_in_lake"]):
         problems.append("the same file content is in the lake twice")
+    if lake["tables"]["edi.segment"]["rows"] != lake["segments_counted_by_the_parser"]:
+        problems.append("the lake's segment rows are not exactly those of its files")
     deliveries = len(report["delivered_sha256_by_s3_key"]) + mover["duplicate_deliveries"] - len(dead_lettered)
     if sum(run["files_seen"] - run["files_loaded"] for run in lake["ingest_runs"]) != deliveries - lake["files_in_lake"]:
         problems.append("the exports did not skip exactly the duplicate deliveries")

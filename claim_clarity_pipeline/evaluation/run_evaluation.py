@@ -212,6 +212,9 @@ def run_data_plane_scenario(scenario: str, working_directory: Path, settings: Cu
         "gates": {
             "every_good_file_content_is_in_the_lake_exactly_once":
                 sorted(lake["sha256_in_lake"]) == sorted(good_contents),
+            # no row of a skipped duplicate, no row missing: each file's edi.source_file row has its segment count
+            "the_lake_holds_exactly_the_segments_of_its_files":
+                lake["tables"]["edi.segment"]["rows"] == lake["segments_counted_by_the_parser"],
             "only_unreadable_files_are_dead_lettered":      # a good file's content is in the lake
                 not ({delivered_sha256.get(key.removesuffix(".redelivered")) for key in dead_lettered}
                      & set(lake["sha256_in_lake"])),
@@ -229,6 +232,8 @@ def run_data_plane_scenario(scenario: str, working_directory: Path, settings: Cu
             "raw_megabytes_per_second": round(raw_megabytes / ingest_seconds, 2) if ingest_seconds else None,
             "seconds_to_first_commit": round(exports[0]["committed_at"] - task_started, 1) if exports else None,
             "slot_exports": len(exports),
+            "staged_units": sum(e["staged_units"] for e in exports),
+            "duplicate_files_skipped": sum(e["duplicate_files_skipped"] for e in exports),
             "export_seconds_mean": round(sum(e["export_seconds"] for e in exports) / len(exports), 1) if exports else None,
             "export_seconds_max": max((e["export_seconds"] for e in exports), default=None),
             "failed_export_attempts": sum(e["failed_attempts"] for e in exports),
@@ -236,7 +241,7 @@ def run_data_plane_scenario(scenario: str, working_directory: Path, settings: Cu
             # exporter's steps
             "stage_worker_seconds": {stage: round(sum(e.get("stage_seconds", {}).get(stage, 0) for e in exports), 1)
                                      for stage in ("wait_for_downloader", "download", "wait_for_parser", "parse",
-                                                   "wait_for_stager", "stage")},
+                                                   "wait_in_unit", "wait_for_stager", "stage")},
             "sqs_manager": sqs_manager_totals(working_directory / "task-logs"),
             "export_step_seconds": {step: round(sum(e.get("export_step_seconds", {}).get(step, 0) for e in exports), 1)
                                     for step in sorted({k for e in exports for k in e.get("export_step_seconds", {})})},

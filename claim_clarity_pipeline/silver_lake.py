@@ -23,6 +23,7 @@ from urllib.parse import urlparse
 import boto3
 import duckdb
 import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.dataset
 import pyarrow.fs
 import pyarrow.parquet as pq
@@ -110,13 +111,36 @@ def read_arrow_file(path: Path) -> pa.Table:
         return pa.ipc.open_file(source).read_all()
 
 
-def arrow_file_batches(paths: list[Path]):
-    """The record batches of the files, one in memory at a time."""
-    for path in paths:
-        with pa.memory_map(str(path)) as source:
-            reader = pa.ipc.open_file(source)
-            for number in range(reader.num_record_batches):
-                yield reader.get_batch(number)
+def arrow_file_batches(path: Path):
+    """The record batches of the file, one in memory at a time."""
+    with pa.memory_map(str(path)) as source:
+        reader = pa.ipc.open_file(source)
+        for number in range(reader.num_record_batches):
+            yield reader.get_batch(number)
+
+
+def file_ids_to_load_by_unit(commit_records_by_unit: dict[Path, pa.Table], sha256_already_loaded: set[str]
+                             ) -> dict[Path, list[str]]:
+    """Dedup by content. Per staged unit, the file_ids of its files to load: not the files whose bytes are
+    already in the lake, or earlier in the slot (by S3 key)."""
+    files = []
+    for unit, commit_records in commit_records_by_unit.items():
+        file_ids = commit_records["file_id"].to_pylist()
+        if len(set(file_ids)) != len(file_ids):           # their rows could not be told apart
+            raise ValueError(f"staged unit {unit} holds the same file_id twice")
+        files += zip(commit_records["s3_key"].to_pylist(), commit_records["sha256"].to_pylist(), file_ids,
+                     [unit] * len(file_ids), strict=True)
+    sha256_seen = set(sha256_already_loaded)
+    to_load = {unit: [] for unit in commit_records_by_unit}
+    for _, sha256, file_id, unit in sorted(files, key=lambda file: file[0]):
+        if sha256 not in sha256_seen:
+            sha256_seen.add(sha256)
+            to_load[unit].append(file_id)
+    return to_load
+
+
+def rows_of_files(rows: pa.Table | pa.RecordBatch, file_ids: list[str]) -> pa.Table | pa.RecordBatch:
+    return rows.filter(pc.is_in(rows["file_id"], value_set=pa.array(file_ids, rows.schema.field("file_id").type)))
 
 
 class SilverLake:
@@ -182,10 +206,14 @@ class SilverLake:
         rows = self.read(COMMIT_RECORD_TABLE, ("sha256", "file_id"))
         return dict(zip(rows["sha256"].to_pylist(), rows["file_id"].to_pylist(), strict=True))
 
-    def export_slot(self, parsed_directories: list[Path], export_id: str) -> dict:
-        """Dedup, write Parquet, commit. A slot is the parsed directories of its files: one .arrow file per lossless
-        table, already in the lake's column types. Returns counts; afterwards every file of the slot is in the lake
-        (loaded by this export, or a duplicate of a loaded file).
+    def export_slot(self, unit_directories: list[Path], export_id: str) -> dict:
+        """Dedup, write Parquet, commit. A slot is its staged units: each a directory with one .arrow file per
+        lossless table, already in the lake's column types, holding the rows of one or more raw files (one
+        edi.source_file row each). Returns counts; afterwards every file of the slot is in the lake (loaded by
+        this export, or a duplicate of a loaded file).
+
+        A unit whose files are all loaded is streamed as it is; from a unit that holds a duplicate, only the rows
+        of its other files are taken (every row carries its file_id).
 
         Nothing in the slot is changed, so a failed export can simply be called again: its partial appends are
         undone through the journal first."""
@@ -198,24 +226,19 @@ class SilverLake:
             clock = time.monotonic()
         self.recover_interrupted_exports()
         lap("recover_interrupted_exports")
-        commit_records = {directory: read_arrow_file(directory / f"{COMMIT_RECORD_TABLE}.arrow")
-                          for directory in parsed_directories}
-        # Skip every file whose bytes are already in the lake, or earlier in this slot (by S3 key).
-        sha256_seen = set(self.loaded_file_ids_by_sha256())
-        kept = []
-        for directory in sorted(parsed_directories, key=lambda d: commit_records[d]["s3_key"][0].as_py()):
-            sha256 = commit_records[directory]["sha256"][0].as_py()
-            if sha256 not in sha256_seen:
-                sha256_seen.add(sha256)
-                kept.append(directory)
+        commit_records = {unit: read_arrow_file(unit / f"{COMMIT_RECORD_TABLE}.arrow") for unit in unit_directories}
+        to_load = file_ids_to_load_by_unit(commit_records, set(self.loaded_file_ids_by_sha256()))
+        units_with_duplicates = {unit for unit in unit_directories
+                                 if len(to_load[unit]) < commit_records[unit].num_rows}
+        file_ids = [file_id for unit in unit_directories for file_id in to_load[unit]]
+        files_seen = sum(records.num_rows for records in commit_records.values())
         lap("dedup")
-        result = {"export_id": export_id, "files_seen": len(parsed_directories), "files_loaded": len(kept),
-                  "duplicate_files_skipped": len(parsed_directories) - len(kept), "rows_by_table": {},
+        result = {"export_id": export_id, "files_seen": files_seen, "files_loaded": len(file_ids),
+                  "duplicate_files_skipped": files_seen - len(file_ids), "rows_by_table": {},
                   "export_step_seconds": seconds}
-        if not kept:
+        if not file_ids:
             return result
         now = datetime.now(UTC).replace(tzinfo=None)
-        file_ids = [commit_records[directory]["file_id"][0].as_py() for directory in kept]
         journal_key = f"{EXPORT_JOURNAL_PREFIX}{export_id}.json"
         self.s3.put_object(Bucket=self.settings.bucket_name, Key=journal_key,
                            Body=json.dumps({"export_id": export_id, "file_ids": file_ids}).encode())
@@ -225,32 +248,35 @@ class SilverLake:
                 rows = pa.Table.from_pylist([dict(
                     ingest_run_id=export_id, started_at=now, finished_at=now, status="SUCCEEDED",
                     parser_name="ccsim.parser", parser_version="1", schema_version="1",
-                    files_seen=len(parsed_directories), files_loaded=len(kept), files_rejected=0,
+                    files_seen=files_seen, files_loaded=len(file_ids), files_rejected=0,
                     triggered_by="ecs-parser-task",
-                    notes=f"skipped {len(parsed_directories) - len(kept)} files whose bytes are already in the lake")],
+                    notes=f"skipped {files_seen - len(file_ids)} files whose bytes are already in the lake")],
                     schema=LOSSLESS_ARROW_SCHEMAS[INGEST_RUN_TABLE])
                 self.append(table, rows, {EXPORT_ID_SNAPSHOT_PROPERTY: export_id})
                 return table, rows.num_rows
             if table == COMMIT_RECORD_TABLE:                  # small: one row per file, with the run that committed it
-                rows = pa.concat_tables(commit_records[directory] for directory in kept)
+                rows = pa.concat_tables(rows_of_files(commit_records[unit], to_load[unit])
+                                        for unit in unit_directories)
                 rows = rows.set_column(rows.schema.get_field_index("ingest_run_id"), "ingest_run_id",
                                        pa.array([export_id] * rows.num_rows, rows.schema.field("ingest_run_id").type))
                 rows = rows.set_column(rows.schema.get_field_index("ingested_at"), "ingested_at",
                                        pa.array([now] * rows.num_rows, pa.timestamp("us")))
                 self.append(table, rows, {EXPORT_ID_SNAPSHOT_PROPERTY: export_id})
                 return table, rows.num_rows
-            paths = [path for directory in kept if (path := directory / f"{table}.arrow").exists()]
-            if not paths:
+            units = [unit for unit in unit_directories if to_load[unit] and (unit / f"{table}.arrow").exists()]
+            if not units:
                 return table, 0
             # Stream the slot's .arrow files into one Parquet file in the lake, a row group at a time: the
             # export's memory does not grow with the slot. Then one Iceberg commit adds the file to the table.
+            batches = (rows_of_files(batch, to_load[unit]) if unit in units_with_duplicates else batch
+                       for unit in units for batch in arrow_file_batches(unit / f"{table}.arrow"))
             iceberg_table = self.table(table)
             data_file_uri = f"{iceberg_table.location()}/data/{export_id}.parquet"
             row_count = 0
             with pq.ParquetWriter(data_file_uri.removeprefix("s3://"), LOSSLESS_ARROW_SCHEMAS[table],
                                   filesystem=self.filesystem, compression="zstd") as writer:
                 row_group, row_group_bytes = [], 0
-                for batch in arrow_file_batches(paths):
+                for batch in batches:
                     row_group.append(batch)
                     row_group_bytes += batch.nbytes
                     row_count += batch.num_rows

@@ -26,7 +26,8 @@ python -m claim_clarity_pipeline.evaluation.run_evaluation --working-directory /
 ```
 
 It writes `scorecard.json` and exits non-zero if a gate fails. Gates are the design's guarantees (each good file's
-content in the lake exactly once, only unreadable files dead-lettered, no export journal left, ephemeral storage
+content in the lake exactly once, the lake's segment rows exactly those its files' `edi_source_file` rows count,
+only unreadable files dead-lettered, no export journal left, ephemeral storage
 gone with the task, a failed export retried without dead-lettering, a crashed task's work finished by its
 replacement). Scores are what a design change should move: MB/s, seconds to first commit, export time, S3 objects
 and Parquet files written, snapshot count, peak ephemeral disk, peak task memory, messages in flight, candidate
@@ -39,7 +40,7 @@ scorecards. `evaluation/fault_injecting_ingestion_task.py` is the parser task wi
 |---|---|
 | `customer_settings.py` | One customer's resource names and tunables. The pipeline is cloned per customer from this. |
 | `provision_customer.py` | Onboarding: bucket, S3 event -> SQS queue + DLQ (redrive after 3 receives), the two CloudWatch alarms, App Auto Scaling policies, ECS cluster / service / task definitions, the candidate schedule, the Iceberg tables. |
-| `ingestion_task.py` | The ECS parser task: SQS manager thread, downloader threads, parser processes (vCPUs - 1), stager, two slots, exporter. |
+| `ingestion_task.py` | The ECS parser task: SQS manager thread, downloader threads, parser processes (vCPUs - 1) that stage small files together in units, stager, two slots, exporter. |
 | `silver_lake.py` | Silver as Iceberg tables in a Glue catalog: one per lossless table, `edi_source_file` appended last as the commit record, plus the candidate tables. Slot export with dedup and an export journal. |
 | `candidate_selection_task.py` | The one-shot task: re-export unexported runs, load the preset, query silver in DuckDB, commit candidates with the run id, write the CSV, record the export. |
 | `emulator_stand_ins.py` | What is outside the pipeline or missing from the emulator (below). |
@@ -72,6 +73,17 @@ The run shortens the timings (alarm periods of 10 s, a 20 s visibility timeout, 
 - **Iceberg catalog:** Glue. Silver is one Iceberg table per lossless table (25), unpartitioned for now.
 - **Dedup key:** the SHA-256 of the file's bytes, compared with `edi_source_file` in the lake and with earlier
   files in the same slot. A duplicate delivery is skipped, counted in `edi_ingest_run`, and its SQS message deleted.
+  A staged unit can hold a duplicate next to files that are not: the export then takes only the other files' rows
+  from that unit, by `file_id`, which every row carries. Units without a duplicate are streamed as they are.
+- **A staged unit** is what a parser process writes: one directory of Arrow files (one per lossless table) with the
+  rows of the small files it parsed in a row, or of one large file. It is written when its raw files reach 1 MiB
+  or 50,000 segments, when its oldest file has waited 2 s, or when the parser has had no file for 0.2 s; a file
+  of 1 MiB or more gets its own unit and is written a piece at a time, as before. So a parser holds the rows of
+  less than 2 MiB of raw files, and a parsed file waits at most about 2 s for its unit (`wait_in_unit` in the
+  scores). A file that fails to parse is taken back out of the rows in memory and fails alone. Raw files stay on
+  disk until their unit is written: if the unit cannot be written (a NULL in a NOT NULL column shows only then),
+  its files are parsed again one per unit and only the bad one fails. Units a task had staged or was gathering
+  when it died are lost with its storage; their messages were never deleted, so SQS redelivers the files.
 - **A slot is exported** at its size limit, or when no file is left to stage (nothing between SQS and the writer,
   and no new file for `slot_idle_export_seconds`).
 - **Candidate preset:** a JSON object in S3 with a DuckDB query and its parameters. The bucket is versioned and
@@ -90,8 +102,8 @@ appends one after another.
 | Workload | Baseline | Now |
 |---|---|---|
 | 30 days (95 MB, 738 deliveries) | 119 s, 0.79 MB/s | 39.7 s, 2.39 MB/s (before the per-file parser changes) |
-| 90 days (292 MB, 1,986 deliveries) | not measured | 3.1-3.2 MB/s, first commit after 75 s, 2.1 GB peak heap |
-| 90 days as 2 large files (278 MB) | not measured | 4.2 MB/s, 1.9 GB peak heap (before the per-file parser changes) |
+| 90 days (292 MB, 1,986 deliveries) | not measured | 3.7 MB/s, first commit after 68 s, 2.2 GB peak heap, small files staged together (2026-11-13; the same machine at the same time without it: 2.3-2.7 MB/s, 91-105 s) |
+| 90 days as 2 large files (278 MB) | not measured | 4.2 MB/s, 1.9 GB peak heap (before the per-file parser changes); 3.5 MB/s on 2026-11-13 on a busy machine |
 | 3 customers at once, 30 days each | 147-149 s each | 0.87 MB/s each, 2.6 MB/s together (before the per-file parser changes) |
 | 1 year (1.2 GB, 8,849 deliveries) | about 22 min, 802 Parquet files | 8.4 min, 3.1 MB/s, 9 slot exports of 1 GiB |
 
@@ -128,14 +140,22 @@ Changes made to the design, each verified by the suite:
    is rolled back before the next one. Exercised by the export_failure and task_crash scenarios.
 6. **Tasks get a VPC with a route out.** ECS stops a Fargate task whose subnet cannot reach its image registry.
    The design does not cover networking; with PHI, private subnets with VPC endpoints are the likelier choice.
+7. **Small files are staged together.** A parser process wrote each raw file to its own directory of up to 16
+   Arrow files, about 25 ms per file beyond its bytes: at 150 KB per file, a quarter of the parser's time. It now
+   writes the rows of consecutive small files as one staged unit (above): the 2,184 deliveries of the 90-day set
+   become about 280 units, and parsing 300 of those files takes 15.5 s of one core instead of 20.5 s. The export
+   opens an eighth of the files. `edi_source_file` still has one row per raw file, written last.
 
 Open design points:
 
 - **Small files**: 25 tables share a slot, so Parquet files average 1.2 MB at a 0.5 GiB slot and 3.5 MB at 2 GiB.
   Compaction is not built.
 - **The parsers are the limit**: about 1.9 MB/s for a parser process with a core to itself, 3 MB per second of
-  parser time on large files. A small file costs about 25 ms beyond its bytes: its rows become up to 16 small
-  tables, each written to its own staging file.
+  parser time on large files. With small files staged together, what is left beside the parsing itself is
+  turning the rows into Arrow: about a quarter of a parser's time, of which turning row dicts into columns is
+  40% and Python values into Arrow arrays 50%. Building the arrays directly in the lake's types (no type
+  inference, no cast) gives identical tables and saves only a sixth of that (4% of the parser's time), so it is
+  not built; the larger part would need the parser to append to columns instead of making a dict per row.
 - **Onboarding starts the parser task once**: configuring the bucket notification sends `s3:TestEvent` messages.
 - **Alarm periods**: `AWS/SQS` metrics are per minute, so start-up and scale-down each take a minute or more in
   production; the runs here use 10 s periods on high-resolution metrics.
