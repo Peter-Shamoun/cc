@@ -197,8 +197,11 @@ def run_data_plane_scenario(scenario: str, working_directory: Path, settings: Cu
     silver_objects = [o for page in s3.get_paginator("list_objects_v2").paginate(
         Bucket=settings.bucket_name, Prefix=f"{SILVER_PREFIX}/") for o in page.get("Contents", [])]
     data_files = [o for o in silver_objects if o["Key"].endswith(".parquet")]
-    parser_tasks = [e for e in stand_ins.fargate.events if e["event"].startswith("task stopped")
-                    and "peak_resident_memory_bytes" in e]
+    family_of_task = {e["task"]: e["family"] for e in stand_ins.fargate.events if e["event"] == "task started"}
+    stopped_tasks = [e for e in stand_ins.fargate.events if e["event"].startswith("task stopped")
+                     and "peak_resident_memory_bytes" in e]
+    parser_tasks = [e for e in stopped_tasks if family_of_task[e["task"]].endswith("-parser")]
+    candidate_selection_tasks = [e for e in stopped_tasks if e not in parser_tasks]
     raw_megabytes = sum(path.stat().st_size for path in raw_directory.rglob("*") if path.is_file()) / 1e6
     last_commit = exports[-1]["committed_at"] if exports else None
     task_started = min(datetime.fromisoformat(e["at"]).timestamp() for e in stand_ins.fargate.events
@@ -214,6 +217,10 @@ def run_data_plane_scenario(scenario: str, working_directory: Path, settings: Cu
                      & set(lake["sha256_in_lake"])),
             "no_export_journal_left_behind": not any("/_export_journal/" in o["Key"] for o in silver_objects),
             "ephemeral_storage_removed_with_the_task": not any(stand_ins.fargate.ephemeral_root.iterdir()),
+            "each_task_stays_within_its_task_memory":
+                all(t["peak_resident_memory_bytes"] < settings.parser_task_memory_mib * 2**20 for t in parser_tasks)
+                and all(t["peak_resident_memory_bytes"] < settings.candidate_task_memory_mib * 2**20
+                        for t in candidate_selection_tasks),
         },
         "scores": {
             "raw_megabytes": round(raw_megabytes, 1),
@@ -251,6 +258,8 @@ def run_data_plane_scenario(scenario: str, working_directory: Path, settings: Cu
             "max_messages_in_flight": max_in_flight,
             "dead_lettered_files": len(dead_lettered),
             "candidate_selection_seconds": candidate_seconds,
+            "candidate_selection_peak_task_heap_megabytes": round(max(
+                (t["peak_anonymous_memory_bytes"] for t in candidate_selection_tasks), default=0) * megabytes, 1),
             "delivery_seconds": round(delivery_finished - delivery_started, 1),
         },
         "details": {"scenario": scenario, "customer_code": settings.customer_code, "dead_lettered": sorted(dead_lettered),

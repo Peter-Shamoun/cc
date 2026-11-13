@@ -39,8 +39,13 @@ log = logging.getLogger("claim_clarity_pipeline.candidate_selection_task")
 
 def silver_query_session(lake: SilverLake, spill_directory: Path) -> duckdb.DuckDBPyConnection:
     """DuckDB with every silver table as a lazy view over its Parquet files, ref.* seeded, and the semantic views
-    on top. Queries spill to spill_directory (Fargate ephemeral storage)."""
-    con = duckdb.connect(config={"temp_directory": str(spill_directory)})
+    on top. Queries spill to spill_directory (Fargate ephemeral storage) past half the task's memory."""
+    # DuckDB sizes itself by the machine, not by the task: left alone, a year of silver takes 4.6 GB here and the
+    # need grows with silver. Half the task's memory for DuckDB, the rest for the Parquet readers and Python; a
+    # query that needs more spills.
+    con = duckdb.connect(config={"temp_directory": str(spill_directory),
+                                 "memory_limit": f"{lake.settings.candidate_task_memory_mib // 2}MiB",
+                                 "threads": lake.settings.candidate_task_vcpu_count})
     con.execute("ATTACH ':memory:' AS ddl; USE ddl")
     con.execute(DDL_LOSSLESS)
     seed_ref(con)
