@@ -55,7 +55,7 @@ def timed(con, sql: str, repeats: int) -> tuple[list[tuple], float]:
 
 
 def run(working_directory: Path, cache_directory: Path, days: int, compact_every_batches: int,
-        compare_with_silver: bool) -> dict:
+        compare_with_silver: bool, compare_with_full_build: bool) -> dict:
     silver_path = cache_directory / f"silver-{days}d.duckdb"
     if not silver_path.exists():
         build_silver_database(MOCK_EDI_CACHE / f"acme_labs-{days}d-5mb" / "raw", silver_path)
@@ -69,10 +69,13 @@ def run(working_directory: Path, cache_directory: Path, days: int, compact_every
                          warehouse=f"file://{working_directory}/warehouse")
     gold = IncrementalGold(working_directory, catalog, NAMESPACE)
     batches, compactions = [], []
-    for number, batch_id in enumerate(batch_ids, start=1):
-        batches.append(gold.apply_batch(batch_id, batch_table_files(batches_directory, batch_id)))
-        if number % compact_every_batches == 0:
-            compactions.append(gold.compact())
+    with open(working_directory / "batches.jsonl", "w") as batch_log:      # kept if a later step fails
+        for number, batch_id in enumerate(batch_ids, start=1):
+            batches.append(gold.apply_batch(batch_id, batch_table_files(batches_directory, batch_id)))
+            batch_log.write(json.dumps(batches[-1]) + "\n")
+            batch_log.flush()
+            if number % compact_every_batches == 0:
+                compactions.append(gold.compact())
     compactions.append(gold.compact())
     gold.close()
     data_files = list((working_directory / "warehouse").rglob("*.parquet"))
@@ -82,10 +85,12 @@ def run(working_directory: Path, cache_directory: Path, days: int, compact_every
     # the semantic views over a large silver at once: one thread, no insertion order, spill to disk
     silver.execute(f"SET memory_limit = '5GB'; SET threads = 1; SET preserve_insertion_order = false; "
                    f"SET temp_directory = '{working_directory / 'spill'}'")
-    full_build = build_gold_from_scratch(silver, working_directory / "full")
-    incremental, full = open_incremental_gold(catalog, NAMESPACE), open_gold(working_directory / "full")
-    differing_rows = {}
-    for name in [*EVENT_RELATIONS, *STATE_RELATIONS]:
+    incremental = open_incremental_gold(catalog, NAMESPACE)
+    differing_rows, full_build, full = {}, {}, None
+    if compare_with_full_build:
+        full_build = build_gold_from_scratch(silver, working_directory / "full")
+        full = open_gold(working_directory / "full")
+    for name in [*EVENT_RELATIONS, *STATE_RELATIONS] if compare_with_full_build else []:
         full_file = working_directory / "full" / f"{name}.parquet"
         columns = ", ".join(row[0] for row in incremental.execute(f"DESCRIBE gold.{name}").fetchall())
         differing_rows[name] = incremental.execute(
@@ -101,7 +106,8 @@ def run(working_directory: Path, cache_directory: Path, days: int, compact_every
         canonical[name] = {"seconds": round(seconds, 4), "rows": len(rows)}
     # 3. the benchmark's queries, through the compatibility views
     view_columns = create_compatibility_views(incremental)
-    create_compatibility_views(full)
+    if full is not None:
+        create_compatibility_views(full)
     available = {(relation, column) for relation, columns in view_columns.items() for column in columns}
     workload = load_workload(silver)
     covered = [query for query in workload if query.columns_read <= available]
@@ -110,7 +116,7 @@ def run(working_directory: Path, cache_directory: Path, days: int, compact_every
         sql = query.sql.replace("sem.", "benchmark.")
         rows, seconds = timed(incremental, sql, repeats=3)
         benchmark_seconds.append(seconds)
-        if comparable_rows(rows) != comparable_rows(full.execute(sql).fetchall()):
+        if full is not None and comparable_rows(rows) != comparable_rows(full.execute(sql).fetchall()):
             other_rows_than_full_build.append(query.query_id)
         if compare_with_silver and comparable_rows(rows) != comparable_rows(silver.execute(query.sql).fetchall()):
             other_rows_than_silver.append(query.query_id)
@@ -120,8 +126,8 @@ def run(working_directory: Path, cache_directory: Path, days: int, compact_every
                        for name in [*EVENT_RELATIONS, *STATE_RELATIONS])
     scorecard = {
         "silver_days": days, "batches": len(batches),
-        "gold_rows": sum(relation["rows"] for relation in full_build.values()),
-        "1_subset": {"incremental_equals_full_build": not any(differing_rows.values()),
+        "1_subset": {"incremental_equals_full_build": (not any(differing_rows.values())) if compare_with_full_build
+                     else "not checked",
                      "differing_rows": differing_rows},
         "2_easy": {"relations": len(EVENT_RELATIONS) + len(STATE_RELATIONS), "columns": column_count,
                    "canonical_questions": len(canonical)},
@@ -143,13 +149,13 @@ def run(working_directory: Path, cache_directory: Path, days: int, compact_every
                                          for step in batches[0]["seconds"]},
             "step_seconds_last_third": {step: round(statistics.mean(b["seconds"][step] for b in batches[-third:]), 3)
                                         for step in batches[0]["seconds"]},
-            "full_build_seconds": round(sum(relation["seconds"] for relation in full_build.values()), 1),
+            "full_build_seconds": round(sum(relation["seconds"] for relation in full_build.values()), 1) or None,
             "compact_every_batches": compact_every_batches, "compactions": len(compactions),
             "compaction_seconds_total": round(sum(c["seconds"] for c in compactions), 1),
             "compaction_seconds_max": max(c["seconds"] for c in compactions),
             "data_files": len(data_files),
             "data_megabytes": round(sum(f.stat().st_size for f in data_files) / 1e6, 1),
-            "full_build_megabytes": round(sum(relation["bytes"] for relation in full_build.values()) / 1e6, 1),
+            "full_build_megabytes": round(sum(relation["bytes"] for relation in full_build.values()) / 1e6, 1) or None,
             "key_index_megabytes": round((working_directory / "_key_index.sqlite").stat().st_size / 1e6, 1)},
         "per_batch": batches,
     }
@@ -166,10 +172,12 @@ def main():
     arguments.add_argument("--compare-with-silver", action="store_true",
                            help="also run each benchmark query on the semantic views over silver (minutes per "
                                 "query on a large silver)")
+    arguments.add_argument("--skip-full-build", action="store_true",
+                           help="do not build gold from scratch to compare with (about 15 minutes and 5 GB on a year)")
     options = arguments.parse_args()
     options.working_directory.mkdir(parents=True, exist_ok=False)
     scorecard = run(options.working_directory, options.cache_directory, options.days, options.compact_every_batches,
-                    options.compare_with_silver)
+                    options.compare_with_silver, not options.skip_full_build)
     print(json.dumps({k: v for k, v in scorecard.items() if k != "per_batch"}, indent=2, default=str))
 
 
