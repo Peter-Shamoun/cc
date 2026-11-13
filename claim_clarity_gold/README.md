@@ -112,6 +112,9 @@ What a batch costs depends on how many state month partitions it touches (a clai
 first activity, and a batch touches the months of the claims it names): 3.7 s at 2, 5.0 s at 4, 5.9 to 7.2 s at
 6, the same in the first half of the year as in the second. An earlier figure (4.4 s in the first third, 5.7 s in
 the last) came from a sample of batches and is withdrawn. Compaction: 8 to 14 s per run.
+Questions on a year of gold (the 14 that do not need 277CA data, which the year set lacks): median 19 ms; the
+slowest are top denial reasons (137 ms) and allowed and paid by procedure (89 ms), the two that read the current
+adjudication's adjustments and lines; joining them to `claim_payers` instead took 233 ms and 277 ms.
 The result equals the full build in all nine relations (17.4 million rows); 272 MB in 115 files (silver: 748 MB);
 key index 194 MB.
 
