@@ -7,6 +7,60 @@ A materialized subset of silver for the queries people actually ask. Developed a
 python -m claim_clarity_gold.benchmark_gold --working-directory /tmp/gold-1 --days 30
 ```
 
+## Design from first principles (v2, being built)
+
+The schema below is derived from what people ask of 837, 835 and 277CA data, not from which columns the
+benchmark's queries read. The benchmark stays as a check (can gold answer it, how fast), not as the source of the
+schema. The sections after this one describe v1, which was derived from the benchmark and is what the code builds
+today.
+
+**What people ask.** A claim goes through a life: submitted (837), acknowledged or rejected at the front end
+(277CA), adjudicated by each payer in turn (835: paid, denied, adjusted), sometimes reversed or reworked, and the
+money arrives in payments that have to reconcile. The questions fall into five groups:
+
+| Question | Examples | Grain it needs |
+|---|---|---|
+| Where is the claim now? | open claims by age, days to pay, awaiting acknowledgment, timely filing | one row per claim, per claim and payer |
+| How much did we get? | billed / allowed / paid / patient share by payer, test, provider, month | claim and payer; service line |
+| Why not? | denial rate and reasons by payer, test, diagnosis; front-end rejections | claim and payer; adjustment; acknowledgment |
+| What happened along the way? | resubmissions, reversals and takebacks, secondary payers | each submission, each remittance |
+| Does the cash reconcile? | payments, provider-level adjustments | payment |
+
+**Two kinds of table.** The first three groups ask for the claim's current state; the last two ask for history.
+So gold has state tables, one row per thing holding the current truth, and event tables, one row per thing that
+happened, never changed after it is written.
+
+| Relation | Kind | One row is | From |
+|---|---|---|---|
+| `claims` | state | a claim: its latest submission, its primary payer's answer, totals over all payers | 837, 835, 277CA |
+| `claim_payers` | state | a claim and a payer: what was sent, whether it was acknowledged, the current adjudication | 837, 835, 277CA |
+| `claim_submissions` | event | one 837 claim submission (CLM) | 837 |
+| `claim_lines` | event | one 837 service line (SV1) of a submission | 837 |
+| `claim_acknowledgments` | event | one 277CA claim status (STC) | 277CA |
+| `remit_claims` | event | one 835 claim payment (CLP) | 835 |
+| `remit_lines` | event | one 835 service line (SVC) | 835 |
+| `adjustments` | event | one 835 adjustment (CAS group, reason, amount) | 835 |
+| `payments` | event | one 835 payment (BPR / TRN) | 835 |
+| `provider_adjustments` | event | one 835 provider-level adjustment (PLB) | 835 |
+
+Most questions are answered by a state table alone. History and detail join an event table to it by `claim_key`,
+or by `remit_claim_id = claim_payers.current_remit_claim_id` for "the current adjudication's lines / reasons".
+
+**What changes from v1.**
+
+- Event rows carry no flag that a later file can flip (`is_current_adjudication`, `is_latest_submission`,
+  `adjudication_state`). "Current" lives in the state tables. Event tables are then append-only, which is the
+  cheapest thing an Iceberg table can be, and v1's largest build cost (demoting older rows) disappears.
+- State tables are small (a row per claim, per claim and payer) and partitioned by the month of the claim's first
+  activity. A batch replaces the partitions of the claims it names: its cost follows the batch and the size of a
+  month, not the size of silver.
+- Columns are chosen by grain: identifiers, parties (payer, providers), dates on each basis (service, submission,
+  acknowledgment, payment), codes (procedure, modifiers, diagnosis, status, reason) and amounts. Envelopes,
+  control numbers, addresses and contacts stay in silver.
+- Storage is Iceberg tables in the customer's S3 bucket, like silver.
+- `claims` in v1 was one row per submission; that relation is `claim_submissions` here, and `claims` is what the
+  name says.
+
 ## What gold is
 
 1. **A subset of silver.** Each gold relation is a projection of the semantic view of the same name
