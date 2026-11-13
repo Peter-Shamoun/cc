@@ -18,6 +18,13 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
+
+if __name__ == "__main__" and "--on-emulator-s3" in sys.argv:
+    # Arrow reads the emulator's endpoint and certificate when pyarrow.fs is first imported, which the imports
+    # below do
+    from claim_clarity_pipeline.emulator_connection import configure_process_for_emulator
+    configure_process_for_emulator()
 import json
 import statistics
 import time
@@ -39,11 +46,10 @@ NAMESPACE = "gold"
 
 def emulator_s3_catalog(name: str):
     """A Glue catalog with its warehouse in a new S3 bucket on the AWS Emulator, as silver is stored, and the
-    filesystem to read the data files with."""
+    filesystem to read the data files with. The process must have been configured for the emulator first
+    (see the top of this module)."""
     from urllib.parse import urlparse
 
-    from claim_clarity_pipeline.emulator_connection import configure_process_for_emulator
-    configure_process_for_emulator()
     import boto3
     import pyarrow.fs
     from pyiceberg.catalog import load_catalog
