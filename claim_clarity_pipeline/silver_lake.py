@@ -27,6 +27,7 @@ import pyarrow.dataset
 import pyarrow.fs
 import pyarrow.parquet as pq
 from pyiceberg.catalog import Catalog, load_catalog
+from pyiceberg.manifest import clear_manifest_cache
 from pyiceberg.exceptions import NamespaceAlreadyExistsError, NoSuchTableError
 from pyiceberg.expressions import EqualTo, In
 from pyiceberg.io.pyarrow import _pyarrow_to_schema_without_ids, schema_to_pyarrow
@@ -271,6 +272,10 @@ class SilverLake:
         result["rows_by_table"] = {table: rows for table, rows in appended if rows}
         self.s3.delete_object(Bucket=self.settings.bucket_name, Key=journal_key)
         lap("journal")
+        # What the commits loaded is not needed again: each export reads the tables' metadata afresh. Kept, it adds
+        # about 45 MB to the task's memory per export.
+        self._tables.clear()
+        clear_manifest_cache()
         return result
 
     def recover_interrupted_exports(self) -> list[str]:
