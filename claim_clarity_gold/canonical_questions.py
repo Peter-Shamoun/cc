@@ -6,6 +6,10 @@ the design, not taken from the benchmark's queries.
 """
 CANONICAL_QUESTIONS: dict[str, str] = {
     # --- where is the claim now? -----------------------------------------------------------------------------------
+    "submitted_but_not_acknowledged": """
+        SELECT payer_name, count(*) AS claims, min(first_submission_date) AS oldest_submission
+        FROM gold.claims WHERE first_submission_date IS NOT NULL AND NOT is_acknowledged
+          AND first_submission_date <= DATE '{as_of}' - 2 GROUP BY 1 ORDER BY claims DESC""",
     "open_claims_by_age": """
         SELECT CASE WHEN age_days <= 30 THEN '0-30' WHEN age_days <= 60 THEN '31-60' WHEN age_days <= 90 THEN '61-90'
                     ELSE '91+' END AS age_bucket, count(*) AS open_claims, sum(charge_amount) AS billed
@@ -43,6 +47,12 @@ CANONICAL_QUESTIONS: dict[str, str] = {
         SELECT a.carc_code, a.carc_description, count(DISTINCT a.claim_key) AS claims, sum(a.adjustment_amount) AS amount
         FROM gold.adjustments a JOIN gold.claim_payers p ON a.remit_claim_id = p.current_remit_claim_id
         WHERE a.is_denial_carc GROUP BY 1, 2 ORDER BY claims DESC LIMIT 20""",
+    "front_end_rejections_by_payer_and_reason": """
+        SELECT payer_name, status_code, count(DISTINCT claim_key) AS claims, sum(total_charge_amount) AS billed
+        FROM gold.claim_acknowledgments WHERE is_rejected GROUP BY 1, 2 ORDER BY claims DESC LIMIT 20""",
+    "rejected_claims_not_yet_resubmitted": """
+        SELECT count(*) AS claims, sum(charge_amount) AS billed
+        FROM gold.claims WHERE is_rejected AND last_submission_date <= last_acknowledgment_date""",
     "denial_rate_by_principal_diagnosis": """
         SELECT principal_diagnosis_code, count(*) AS adjudicated, count(*) FILTER (WHERE is_denied) AS denied
         FROM gold.claims WHERE is_adjudicated GROUP BY 1 HAVING count(*) >= 50 ORDER BY denied / count(*) DESC LIMIT 20""",
