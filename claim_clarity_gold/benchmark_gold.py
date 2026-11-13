@@ -41,7 +41,6 @@ from .query_workload import load_workload
 from .silver_dataset import batch_table_files, build_silver_database, export_silver_batches, open_silver
 
 MOCK_EDI_CACHE = Path.home() / ".cache" / "claim-clarity-mock-edi"
-NAMESPACE = "gold"
 
 
 def emulator_s3_catalog(name: str):
@@ -97,7 +96,10 @@ def run(working_directory: Path, cache_directory: Path, days: int, compact_every
     catalog, filesystem = (emulator_s3_catalog(working_directory.name) if on_emulator_s3 else
                            (SqlCatalog("gold", uri=f"sqlite:///{working_directory}/catalog.sqlite",
                                        warehouse=f"file://{working_directory}/warehouse"), None))
-    gold = IncrementalGold(working_directory, catalog, NAMESPACE)
+    # a run's own namespace: a catalog outlives a working directory (the emulator's Glue does), and appending a
+    # second run's batches to the first run's event tables would double their rows
+    namespace = "gold_" + working_directory.name.lower().replace("-", "_")
+    gold = IncrementalGold(working_directory, catalog, namespace)
     batches, compactions = [], []
     with open(working_directory / "batches.jsonl", "w") as batch_log:      # kept if a later step fails
         for number, batch_id in enumerate(batch_ids, start=1):
@@ -115,7 +117,7 @@ def run(working_directory: Path, cache_directory: Path, days: int, compact_every
     # the semantic views over a large silver at once: one thread, no insertion order, spill to disk
     silver.execute(f"SET memory_limit = '5GB'; SET threads = 1; SET preserve_insertion_order = false; "
                    f"SET temp_directory = '{working_directory / 'spill'}'")
-    incremental = open_incremental_gold(catalog, NAMESPACE, filesystem)
+    incremental = open_incremental_gold(catalog, namespace, filesystem)
     differing_rows, full_build, full = {}, {}, None
     if compare_with_full_build:
         full_build = build_gold_from_scratch(silver, working_directory / "full")
