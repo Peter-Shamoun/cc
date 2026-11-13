@@ -79,7 +79,9 @@ def run(working_directory: Path, cache_directory: Path, days: int, compact_every
 
     # 1. the incremental build against the full build
     silver = open_silver(silver_path)
-    silver.execute("SET memory_limit = '8GB'")
+    # the semantic views over a large silver at once: one thread, no insertion order, spill to disk
+    silver.execute(f"SET memory_limit = '5GB'; SET threads = 1; SET preserve_insertion_order = false; "
+                   f"SET temp_directory = '{working_directory / 'spill'}'")
     full_build = build_gold_from_scratch(silver, working_directory / "full")
     incremental, full = open_incremental_gold(catalog, NAMESPACE), open_gold(working_directory / "full")
     differing_rows = {}
