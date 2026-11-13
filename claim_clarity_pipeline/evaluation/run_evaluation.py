@@ -22,9 +22,11 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import hashlib
+import tempfile
 import json
 import logging
 import shutil
+import statistics
 import subprocess
 import sys
 import time
@@ -39,7 +41,8 @@ from ..run_emulation import (EMULATED_QUEUE_METRIC_NAMESPACE, EXAMPLE_CANDIDATE_
                              Observer, lake_summary)
 
 log = logging.getLogger("claim_clarity_pipeline.evaluation")
-SCENARIOS = ("control_plane", "export_failure", "task_crash", "throughput")
+SCENARIOS = ("control_plane", "export_failure", "task_crash", "throughput", "daily")
+DEFAULT_SCENARIOS = SCENARIOS[:4]                     # daily runs the service once per day: minutes per day
 SILVER_TABLE_COUNT = 25
 
 
@@ -141,9 +144,12 @@ def _parquet_files_by_table(data_files: list[dict]) -> dict[str, dict]:
 
 def run_data_plane_scenario(scenario: str, working_directory: Path, settings: CustomerPipelineSettings,
                             raw_directory: Path, parser_task_extra_environment: dict[str, str],
-                            run_candidate_selection: bool, timeout_seconds: float) -> dict:
+                            run_candidate_selection: bool, timeout_seconds: float,
+                            deliver_a_day_at_a_time: bool = False) -> dict:
     """Onboard, deliver every file under raw_directory (every 10th twice), run the parser service until the queue
-    is empty, stop it. Returns {"gates": ..., "scores": ..., "details": ...}."""
+    is empty, stop it. deliver_a_day_at_a_time: as in production, each received_date=<day> directory on its own,
+    the service started for it and stopped once its queue is empty, before the next day. Returns
+    {"gates": ..., "scores": ..., "details": ...}."""
     import boto3
 
     from ..emulator_stand_ins import EmulatorStandIns, fire_schedule_now, move_sftp_incoming_to_s3_input
@@ -161,10 +167,6 @@ def run_data_plane_scenario(scenario: str, working_directory: Path, settings: Cu
     stand_ins.start()
     observer = Observer(settings, stand_ins)
     try:
-        delivery_started = time.time()
-        mover = move_sftp_incoming_to_s3_input(settings, raw_directory, redeliver_every_nth_file=10)
-        delivery_finished = time.time()
-        ecs.update_service(desiredCount=1, **service)     # what the queue alarm does, without its delay
         max_in_flight = 0
 
         def drained(state: dict) -> bool:
@@ -172,11 +174,27 @@ def run_data_plane_scenario(scenario: str, working_directory: Path, settings: Cu
             max_in_flight = max(max_in_flight, state["queue_in_flight"] or 0)
             return (state["queue_visible"] == 0 and state["queue_in_flight"] == 0
                     and state["local_parser_tasks_running"] == 1)
-        observer.wait_until("delivered files are in the queue", lambda s: (s["queue_visible"] or 0) > 0
-                            or (s["queue_in_flight"] or 0) > 0, 120)
-        observer.wait_until("queue empty and nothing in flight", drained, timeout_seconds)
-        ecs.update_service(desiredCount=0, **service)     # what the idle alarm does
-        observer.wait_until("task stopped", lambda s: s["local_parser_tasks_running"] == 0, 300)
+        deliveries = (sorted(path for path in raw_directory.iterdir() if path.is_dir())
+                      if deliver_a_day_at_a_time else [None])
+        delivery_started, delivery_seconds, movers = time.time(), 0.0, []
+        for day_directory in deliveries:
+            started = time.time()
+            if day_directory is None:
+                movers.append(move_sftp_incoming_to_s3_input(settings, raw_directory, redeliver_every_nth_file=10))
+            else:                                         # the day's directory alone, under its own name
+                with tempfile.TemporaryDirectory() as one_day:
+                    shutil.copytree(day_directory, Path(one_day) / day_directory.name)
+                    movers.append(move_sftp_incoming_to_s3_input(settings, Path(one_day),
+                                                                 redeliver_every_nth_file=10))
+            delivery_seconds += time.time() - started
+            ecs.update_service(desiredCount=1, **service)     # what the queue alarm does, without its delay
+            observer.wait_until("delivered files are in the queue", lambda s: (s["queue_visible"] or 0) > 0
+                                or (s["queue_in_flight"] or 0) > 0, 120)
+            observer.wait_until("queue empty and nothing in flight", drained, timeout_seconds)
+            ecs.update_service(desiredCount=0, **service)     # what the idle alarm does
+            observer.wait_until("task stopped", lambda s: s["local_parser_tasks_running"] == 0, 300)
+        delivery_finished = delivery_started + delivery_seconds
+        mover = {key: sum(m[key] for m in movers) for key in movers[0]}
 
         dead_lettered = []
         while messages := sqs.receive_message(QueueUrl=observer.dead_letter_queue_url,
@@ -213,6 +231,7 @@ def run_data_plane_scenario(scenario: str, working_directory: Path, settings: Cu
                      and "peak_resident_memory_bytes" in e]
     parser_tasks = [e for e in stopped_tasks if family_of_task[e["task"]].endswith("-parser")]
     candidate_selection_tasks = [e for e in stopped_tasks if e not in parser_tasks]
+    started_at = {e["task"]: e["at"] for e in stand_ins.fargate.events if e["event"] == "task started"}
     raw_megabytes = sum(path.stat().st_size for path in raw_directory.rglob("*") if path.is_file()) / 1e6
     last_commit = exports[-1]["committed_at"] if exports else None
     task_started = min(datetime.fromisoformat(e["at"]).timestamp() for e in stand_ins.fargate.events
@@ -273,6 +292,11 @@ def run_data_plane_scenario(scenario: str, working_directory: Path, settings: Cu
                                                   default=0) * megabytes, 1),
             "peak_task_heap_megabytes_main_process": round(max(
                 (t["peak_main_process_anonymous_memory_bytes"] for t in parser_tasks), default=0) * megabytes, 1),
+            # how long each parser task ran, from start to stop (the daily scenario runs one per day)
+            "parser_task_runs": len(parser_tasks),
+            "parser_task_seconds_mean": round(statistics.mean(task_seconds), 1) if (task_seconds := [
+                datetime.fromisoformat(stop["at"]).timestamp() - datetime.fromisoformat(started_at[stop["task"]]).timestamp()
+                for stop in parser_tasks]) else None,
             "max_messages_in_flight": max_in_flight,
             "dead_lettered_files": len(dead_lettered),
             "candidate_selection_seconds": candidate_seconds,
@@ -314,7 +338,7 @@ def run_control_plane_scenario(working_directory: Path, customer_code: str) -> d
 def main():
     arguments = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     arguments.add_argument("--working-directory", type=Path, required=True)
-    arguments.add_argument("--scenarios", default=",".join(SCENARIOS))
+    arguments.add_argument("--scenarios", default=",".join(DEFAULT_SCENARIOS))
     arguments.add_argument("--throughput-days", type=int, default=7)
     arguments.add_argument("--throughput-megabytes-per-day", type=float, default=5.0)
     arguments.add_argument("--throughput-raw-directory", type=Path,
@@ -384,6 +408,11 @@ def main():
                                              "peak_task_memory_megabytes", "peak_ephemeral_storage_megabytes",
                                              "candidate_selection_seconds") for statistic in (min, max)},
                             "details": {"per_customer": per_customer}}
+                elif scenario == "daily":                 # as in production: a day's files, a run, scale to zero
+                    raw_directory = options.throughput_raw_directory or mock_edi_directory(
+                        options.mock_cache_directory, options.throughput_days, options.throughput_megabytes_per_day)
+                    result = run_data_plane_scenario(scenario, directory, settings, raw_directory, {}, False,
+                                                     options.throughput_timeout_seconds, deliver_a_day_at_a_time=True)
                 else:
                     raise ValueError(f"unknown scenario {scenario!r}; choose from {SCENARIOS}")
         except Exception as error:                        # noqa: BLE001 - a scenario that cannot finish fails its gate
