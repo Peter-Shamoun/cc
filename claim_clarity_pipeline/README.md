@@ -39,10 +39,11 @@ scorecards. `evaluation/fault_injecting_ingestion_task.py` is the parser task wi
 | Module | What it is |
 |---|---|
 | `customer_settings.py` | One customer's resource names and tunables. The pipeline is cloned per customer from this. |
-| `provision_customer.py` | Onboarding: bucket, S3 event -> SQS queue + DLQ (redrive after 3 receives), the two CloudWatch alarms, App Auto Scaling policies, ECS cluster / service / task definitions, the candidate schedule, the Iceberg tables. |
+| `provision_customer.py` | Onboarding: bucket, S3 event -> SQS queue + DLQ (redrive after 3 receives), the two CloudWatch alarms, App Auto Scaling policies, ECS cluster / service / task definitions, the candidate and compaction schedules, the Iceberg tables. |
 | `ingestion_task.py` | The ECS parser task: SQS manager thread, downloader threads, parser processes (vCPUs - 1) that stage small files together in units, stager, two slots, exporter. |
 | `silver_lake.py` | Silver as Iceberg tables in a Glue catalog: one per lossless table, `edi_source_file` appended last as the commit record, plus the candidate tables. Slot export with dedup and an export journal. |
 | `candidate_selection_task.py` | The one-shot task: re-export unexported runs, load the preset, query silver in DuckDB, commit candidates with the run id, write the CSV, record the export. |
+| `compaction_task.py` | The nightly one-shot task: rewrite each table's small Parquet files in groups, one atomic replace commit per group; expire old snapshots and delete data files no retained snapshot references. |
 | `emulator_stand_ins.py` | What is outside the pipeline or missing from the emulator (below). |
 | `emulator_connection.py` | Sets the standard AWS environment variables for the emulator. The pipeline code never mentions it. |
 | `run_emulation.py` | The end-to-end run and its checks. |
@@ -150,15 +151,6 @@ Changes made to the design, each verified by the suite:
 
 Open design points:
 
-- **Silver compaction is not built.** Every slot export writes one Parquet file per table. A year delivered at
-  once (the throughput scenario) leaves 8 exports: 196 files, 930 MB, from 50 MB (`edi.segment`) to a few KB per
-  file (`edi_ingest_run`, the envelopes); the evaluation's `silver_parquet_files_by_table` lists them. Delivered a
-  day at a time, as in production, the task runs once a day and each run exports at least once, so a year is at
-  least 365 files per table, about 10,000 files, most of them small: that is what a compaction schedule has to work
-  on. The `daily` scenario (`--scenarios daily`) runs it that way: on 30 days (21 received days, 95 MB) every gate
-  passes, a day's run takes 23.5 s on average from task start to stop, and silver ends with 525 Parquet files
-  averaging 0.18 MB (`edi.segment`: 21 files, median 1.1 MB; a dozen tables: 21 files of about 5 KB each). At that
-  rate a year is about 6,400 files.
 - **The parsers are the limit**: about 1.9 MB/s for a parser process with a core to itself, 3 MB per second of
   parser time on large files. With small files staged together, what is left beside the parsing itself is
   turning the rows into Arrow: about a quarter of a parser's time, of which turning row dicts into columns is
@@ -169,7 +161,90 @@ Open design points:
 - **Alarm periods**: `AWS/SQS` metrics are per minute, so start-up and scale-down each take a minute or more in
   production; the runs here use 10 s periods on high-resolution metrics.
 
-Limits of the emulator for this work:
+## Silver compaction (`compaction_task.py`)
+
+Why: every slot export writes one Parquet file per table. Delivered a day at a time, as in production, the
+`daily` scenario on 30 days (21 received days, 95 MB) left 525 Parquet files averaging 0.18 MB (`edi.segment`:
+21 files, median 1.1 MB; a dozen tables: 21 files of about 5 KB each); a year would be about 6,400. A year
+delivered at once leaves 196 files (8 exports).
+
+What: a third per-customer task, provisioned like candidate selection (its own task definition, 1 vCPU / 2 GiB,
+and an EventBridge schedule, `compaction_schedule_expression`, nightly at 07:00 UTC, before candidate selection).
+Per customer because silver is per customer (one bucket, one Glue database) and volumes differ; the thresholds
+are customer settings. For each Iceberg table of the customer's database:
+
+1. List the current snapshot's data files in the order they were committed. Exports commit in received order,
+   so this is received order.
+2. Files of `compaction_target_file_bytes` (128 MiB) or more are left alone for good. The smaller ones are packed,
+   consecutively, into groups that reach the target; a group is rewritten only if it has
+   `compaction_minimum_files_per_group` (8) files. On most nights most tables do nothing, and the work follows the
+   new small data, not the size of the lake. Grouping by received month or week was considered: silver is
+   unpartitioned and commit order already is received order, so packing consecutive files keeps the same time
+   locality without a partition scheme.
+3. A group is streamed, file after file and in row order, into one new Parquet file (the exporter's writer:
+   zstd, 64 MB row groups; `SilverLake.write_parquet_file` is shared), then one atomic Iceberg commit replaces
+   exactly the group's files by it: `table.transaction()` + `update_snapshot().overwrite()` with
+   `delete_data_file` per old file and `append_data_file` for the new one (pyiceberg 0.12). That is an
+   `overwrite` snapshot, marked `claim-clarity.compaction-run-id`, whose manifests carry every other data file over
+   unchanged; pyiceberg refuses it if one of the files is no longer in the table. The test checks the snapshot
+   summaries: one file added and exactly the group's files deleted per commit, nothing else removed.
+4. No ingestion pause. Commits are optimistic: if an export (append) or recovery (delete) committed first, the
+   commit fails; the task reloads the table, and if every file of the group is still live (same path, added by
+   the same snapshot) it commits again on top. If one is gone, the group is abandoned and its new file deleted:
+   rows that recovery deleted must not come back. (pyiceberg 0.12 retries internally too, but under its default
+   serializable isolation any concurrently added file fails validation, so the task's own retry is what lets
+   compaction commit beside a daily export.) Recovery still works on compacted rows: it deletes an interrupted
+   export's rows by `file_id`, wherever they now live.
+5. A crash between writing the new file and committing it leaves that file, referenced by no snapshot, and
+   nothing else. Old data is never deleted by the rewrite: each run expires snapshots older than
+   `snapshot_retention_seconds` (7 days; the current one always stays), then deletes the table's data files that
+   no retained snapshot references and that are older than `compaction_unreferenced_file_minimum_age_seconds`
+   (1 day, so an export's file written but not yet committed is never touched). One sweep removes replaced files a
+   week after compaction (a week of time travel to roll back), files replaced by recovery deletes, and files of
+   crashed compactions or exports.
+
+Ingestion is unchanged except that the Parquet writer moved into `SilverLake.write_parquet_file`. Dedup reads
+`edi_source_file`, which is compacted like the rest.
+
+Proof that nothing is lost or duplicated: a table's fingerprint is its row count and the sum of DuckDB's hash of
+every whole row over its data files (`evaluation/silver_fingerprint.py`): order-independent, and it counts
+duplicates. The `daily` scenario now fires the compaction schedule together with the last day's ingestion (the
+parser service started and the task fired at once), then once more alone. Gates: after the first run every
+table's fingerprint is the one before plus that of the files the last day's exports committed; after the second
+it is unchanged; fewer data files; no data file left that no snapshot references; no group abandoned; the task
+within its memory; and the existing gates (each good file in the lake exactly once, segments match the parser's
+counts) after compaction.
+
+Measured on 30 days delivered a day at a time (2026-11-13, all gates pass):
+
+| | Before | After |
+|---|---|---|
+| Data files in the current snapshots | 500 (+ the last day's export during the run) | 30 (one per non-empty table) |
+| `edi.segment` | 20 files, 23.5 MB | 1 file, 20.4 MB |
+| `edi.reference` / `edi.entity` | 20 files, 10.6 / 9.7 MB | 1 file, 7.2 / 8.0 MB |
+| DuckDB read of `edi.segment` through Iceberg | 0.54 s | 0.45 s |
+
+The run beside ingestion rewrote 25 groups (every non-empty table) in 64 s, read 95 MB and wrote 72 MB, at 661 MB
+peak memory of its 2 GiB; one commit (`c837.other_payer`) met an export's append and committed on its second
+attempt. The run after it found nothing to do: 20 s, about 0.7 s per table for listing, snapshot expiry and the
+unreferenced-file sweep.
+
+What it costs over time: the tail of a table (its small files after the last full group) is rewritten whenever
+it again holds 8 files, until it reaches 128 MiB. At `edi.segment`'s 1.1 MB a day that is about once a week, and
+a 128 MiB file is written about 8 times over before it is left alone: a few seconds a week per table. Not built:
+expiring the metadata files (old manifest lists and manifests) that snapshot expiry leaves behind; they are a few
+KB per commit.
+
+Tests (`tests/test_claim_clarity_pipeline.py`, `evaluation/compaction_checks.py`, each against the emulator in
+its own process): groups and rows identical, a large file and a short tail left alone, one overwrite snapshot per
+group removing exactly its files, dedup's view unchanged, a second run idle; an export appended between the
+rewrite and the commit (kept, the group commits on top of it); recovery's delete between the rewrite and the
+commit (group abandoned, the deleted rows stay deleted, the new file removed); an interrupted export's rows
+compacted together with others and then removed by recovery, every other row kept; the task killed between the
+write and the commit (`evaluation/fault_injecting_compaction_task.py`): table unchanged, one unreferenced file,
+kept while young, deleted by a later run, and with a retention of 0 only the current snapshot's files remain.
+
+## Limits of the emulator for this work
 
 - **The emulator's capacity limits are constants in its source**, sized for small tests: S3 1,000 objects and
   64 MB per bucket (128 MB in total), SQS 1,000 messages per queue (further S3 events are dropped silently), 32

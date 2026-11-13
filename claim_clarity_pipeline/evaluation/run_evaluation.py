@@ -13,6 +13,9 @@ Scenarios
     export_failure   lake appends fail part-way through the first export, twice: no file may be dead-lettered
     task_crash       the task dies part-way through an export: its replacement must leave each file in once
     throughput       N days at ~5 MB per business day through the data plane, then candidate selection: the scores
+    daily            the same N days, each received day delivered and run on its own; silver compaction fired
+                     together with the last day's ingestion and once more alone: every table's rows must stay the
+                     same multiset (silver_fingerprint.py)
 
 The data-plane scenarios start and stop the parser service themselves instead of waiting for the alarms, so their
 time is the pipeline's, not CloudWatch's. Mock data is cached per (days, MB/day) under --mock-cache-directory.
@@ -142,14 +145,115 @@ def _parquet_files_by_table(data_files: list[dict]) -> dict[str, dict]:
             for table, sizes in sorted(sizes_by_table.items(), key=lambda item: -sum(item[1]))}
 
 
+def wait_for_one_shot_task(stand_ins, task_arn: str, description: str, timeout_seconds: float = 900):
+    started = time.time()
+    while task_arn not in stand_ins.fargate.exit_codes:
+        if time.time() - started > timeout_seconds:
+            raise TimeoutError(f"{description} task did not finish")
+        time.sleep(1)
+    if stand_ins.fargate.exit_codes[task_arn] != 0:
+        raise RuntimeError(f"{description} task failed; see task-logs")
+
+
+class SilverBeforeCompaction:
+    """Silver just before a compaction task is fired: each table's data files and fingerprint, and the time."""
+
+    def __init__(self, settings: CustomerPipelineSettings):
+        from ..silver_lake import SilverLake
+        from .silver_fingerprint import current_data_file_uris, fingerprint_of_data_files
+        self.lake = SilverLake(settings)
+        self.identifiers = sorted(".".join(i) for i in self.lake.catalog.list_tables(settings.glue_database_name))
+        self.data_files = {table: current_data_file_uris(self.lake, table) for table in self.identifiers}
+        self.fingerprints = {table: fingerprint_of_data_files(self.lake, uris) for table, uris in self.data_files.items()}
+        self.edi_segment_scan_seconds = time_a_scan_of_edi_segment(self.lake)
+        self.fired_at_milliseconds = int(time.time() * 1000)
+        self.task_arn = None
+        self.task_seconds = None
+
+    def wait_for_task(self, stand_ins):
+        wait_for_one_shot_task(stand_ins, self.task_arn, "compaction")
+        self.task_seconds = round(time.time() - self.fired_at_milliseconds / 1000, 1)
+
+
+def time_a_scan_of_edi_segment(lake) -> float:
+    """Seconds for DuckDB to read edi.segment through the table's current data files, the way candidate
+    selection reads silver."""
+    import duckdb
+    started = time.time()
+    connection = duckdb.connect()
+    connection.register("edi_segment", lake.lazy_dataset("edi.segment"))
+    connection.execute("SELECT count(*), count(DISTINCT file_id), max(segment_id) FROM edi_segment").fetchall()
+    return round(time.time() - started, 2)
+
+
+def silver_compaction_result(settings: CustomerPipelineSettings, while_ingesting: SilverBeforeCompaction,
+                             alone: SilverBeforeCompaction, task_log_directory: Path) -> dict:
+    """Gates and scores of the two compaction runs: the first fired together with the last day's ingestion, the
+    second alone once everything was in."""
+    from .silver_fingerprint import (current_data_file_uris, data_file_uris_added_by_exports_since,
+                                     fingerprint_of_data_files, unreferenced_data_file_uris)
+    lake = alone.lake
+    after = {table: fingerprint_of_data_files(lake, current_data_file_uris(lake, table)) for table in alone.identifiers}
+    # what the last day's exports added, read from their own files (compacted since or not); sums of disjoint sets
+    # of rows add up
+    added_while_compacting = {table: fingerprint_of_data_files(lake, data_file_uris_added_by_exports_since(
+        lake, table, while_ingesting.fired_at_milliseconds)) for table in alone.identifiers}
+    expected_after_ingesting = {table: tuple(map(sum, zip(while_ingesting.fingerprints.get(table, (0, 0)),
+                                                          added_while_compacting[table])))
+                                for table in alone.identifiers}
+    summaries = sorted((json.loads(line.split("compaction done: ", 1)[1])
+                        for task_log in task_log_directory.glob("*-compaction-*.log")
+                        for line in task_log.read_text().splitlines() if "compaction done: " in line),
+                       key=lambda summary: summary["compaction_run_id"])
+    megabytes = 1 / 1e6
+
+    def file_sizes(uris: list[str]) -> list[int]:
+        return [lake.filesystem.get_file_info(uri.removeprefix("s3://")).size for uri in uris]
+    files_before = {table: file_sizes(uris) for table, uris in while_ingesting.data_files.items()}
+    files_after = {table: file_sizes(current_data_file_uris(lake, table)) for table in alone.identifiers}
+    return {
+        "gates": {
+            "compaction_every_table_holds_the_same_rows_with_ingestion_running":
+                alone.fingerprints == expected_after_ingesting,
+            "compaction_every_table_holds_the_same_rows": after == alone.fingerprints,
+            "compaction_reduced_the_data_files":
+                sum(map(len, files_after.values())) < sum(map(len, files_before.values())),
+            "compaction_left_no_unreferenced_data_file": not any(
+                unreferenced_data_file_uris(lake, table) for table in alone.identifiers),
+            "compaction_abandoned_no_group": all(t["groups_abandoned"] == 0 for s in summaries
+                                                 for t in s["tables"].values()),
+        },
+        "scores": {
+            "compaction_runs": [{
+                "fired": "with the last day's ingestion" if run is while_ingesting else "alone",
+                "task_seconds": run.task_seconds, "compaction_seconds": summary["seconds"],
+                "groups_rewritten": sum(t["groups_rewritten"] for t in summary["tables"].values()),
+                "failed_commit_attempts": sum(t["failed_commit_attempts"] for t in summary["tables"].values()),
+                "megabytes_read": round(sum(t["bytes_read"] for t in summary["tables"].values()) * megabytes, 1),
+                "megabytes_written": round(sum(t["bytes_written"] for t in summary["tables"].values()) * megabytes, 1),
+            } for run, summary in zip((while_ingesting, alone), summaries, strict=True)],
+            "silver_data_files_before_and_after_compaction": [sum(map(len, files_before.values())),
+                                                              sum(map(len, files_after.values()))],
+            # per table: [files, MB] in the current snapshot before the first compaction and after the second
+            "silver_data_files_and_megabytes_by_table_before_and_after_compaction": {
+                table.rsplit(".", 1)[-1]: [[len(files_before[table]), round(sum(files_before[table]) * megabytes, 3)],
+                                           [len(files_after[table]), round(sum(files_after[table]) * megabytes, 3)]]
+                for table in sorted(alone.identifiers, key=lambda t: -sum(files_before[t]))},
+            "edi_segment_scan_seconds_before_and_after_compaction": [
+                while_ingesting.edi_segment_scan_seconds, time_a_scan_of_edi_segment(lake)],
+        },
+    }
+
+
 def run_data_plane_scenario(scenario: str, working_directory: Path, settings: CustomerPipelineSettings,
                             raw_directory: Path, parser_task_extra_environment: dict[str, str],
                             run_candidate_selection: bool, timeout_seconds: float,
-                            deliver_a_day_at_a_time: bool = False) -> dict:
+                            deliver_a_day_at_a_time: bool = False, compaction: bool = False) -> dict:
     """Onboard, deliver every file under raw_directory (every 10th twice), run the parser service until the queue
     is empty, stop it. deliver_a_day_at_a_time: as in production, each received_date=<day> directory on its own,
-    the service started for it and stopped once its queue is empty, before the next day. Returns
-    {"gates": ..., "scores": ..., "details": ...}."""
+    the service started for it and stopped once its queue is empty, before the next day. compaction (with
+    deliver_a_day_at_a_time): the compaction schedule is fired together with the last day's ingestion, and again
+    once everything is in (silver_compaction_result). Returns {"gates": ..., "scores": ..., "details": ...}."""
     import boto3
 
     from ..emulator_stand_ins import EmulatorStandIns, fire_schedule_now, move_sftp_incoming_to_s3_input
@@ -177,6 +281,7 @@ def run_data_plane_scenario(scenario: str, working_directory: Path, settings: Cu
         deliveries = (sorted(path for path in raw_directory.iterdir() if path.is_dir())
                       if deliver_a_day_at_a_time else [None])
         delivery_started, delivery_seconds, movers = time.time(), 0.0, []
+        compaction_while_ingesting = None
         for day_directory in deliveries:
             started = time.time()
             if day_directory is None:
@@ -187,7 +292,11 @@ def run_data_plane_scenario(scenario: str, working_directory: Path, settings: Cu
                     movers.append(move_sftp_incoming_to_s3_input(settings, Path(one_day),
                                                                  redeliver_every_nth_file=10))
             delivery_seconds += time.time() - started
+            if compaction and day_directory == deliveries[-1]:     # silver as it is before, then both at once
+                compaction_while_ingesting = SilverBeforeCompaction(settings)
             ecs.update_service(desiredCount=1, **service)     # what the queue alarm does, without its delay
+            if compaction_while_ingesting:
+                compaction_while_ingesting.task_arn = fire_schedule_now(settings, settings.compaction_schedule_name)
             observer.wait_until("delivered files are in the queue", lambda s: (s["queue_visible"] or 0) > 0
                                 or (s["queue_in_flight"] or 0) > 0, 120)
             observer.wait_until("queue empty and nothing in flight", drained, timeout_seconds)
@@ -201,17 +310,20 @@ def run_data_plane_scenario(scenario: str, working_directory: Path, settings: Cu
                                               MaxNumberOfMessages=10).get("Messages", []):
             dead_lettered += [unquote_plus(record["s3"]["object"]["key"]) for message in messages
                               for record in json.loads(message["Body"])["Records"]]
+        compaction_result = {"gates": {}, "scores": {}}
+        if compaction_while_ingesting:
+            compaction_while_ingesting.wait_for_task(stand_ins)
+            alone = SilverBeforeCompaction(settings)
+            alone.task_arn = fire_schedule_now(settings, settings.compaction_schedule_name)
+            alone.wait_for_task(stand_ins)
+            compaction_result = silver_compaction_result(settings, compaction_while_ingesting, alone,
+                                                         working_directory / "task-logs")
         lake = lake_summary(settings)
         candidate_seconds = None
         if run_candidate_selection:
             started = time.time()
             task_arn = fire_schedule_now(settings)
-            while task_arn not in stand_ins.fargate.exit_codes:
-                if time.time() - started > 900:
-                    raise TimeoutError("candidate selection task did not finish")
-                time.sleep(1)
-            if stand_ins.fargate.exit_codes[task_arn] != 0:
-                raise RuntimeError("candidate selection task failed; see task-logs")
+            wait_for_one_shot_task(stand_ins, task_arn, "candidate selection")
             candidate_seconds = round(time.time() - started, 1)
     finally:
         stand_ins.stop()
@@ -230,7 +342,8 @@ def run_data_plane_scenario(scenario: str, working_directory: Path, settings: Cu
     stopped_tasks = [e for e in stand_ins.fargate.events if e["event"].startswith("task stopped")
                      and "peak_resident_memory_bytes" in e]
     parser_tasks = [e for e in stopped_tasks if family_of_task[e["task"]].endswith("-parser")]
-    candidate_selection_tasks = [e for e in stopped_tasks if e not in parser_tasks]
+    candidate_selection_tasks = [e for e in stopped_tasks if family_of_task[e["task"]] == settings.candidate_task_family]
+    compaction_tasks = [e for e in stopped_tasks if family_of_task[e["task"]] == settings.compaction_task_family]
     started_at = {e["task"]: e["at"] for e in stand_ins.fargate.events if e["event"] == "task started"}
     raw_megabytes = sum(path.stat().st_size for path in raw_directory.rglob("*") if path.is_file()) / 1e6
     last_commit = exports[-1]["committed_at"] if exports else None
@@ -253,8 +366,10 @@ def run_data_plane_scenario(scenario: str, working_directory: Path, settings: Cu
             "each_task_stays_within_its_task_memory":
                 all(t["peak_resident_memory_bytes"] < settings.parser_task_memory_mib * 2**20 for t in parser_tasks)
                 and all(t["peak_resident_memory_bytes"] < settings.candidate_task_memory_mib * 2**20
-                        for t in candidate_selection_tasks),
-        },
+                        for t in candidate_selection_tasks)
+                and all(t["peak_resident_memory_bytes"] < settings.compaction_task_memory_mib * 2**20
+                        for t in compaction_tasks),
+        } | compaction_result["gates"],
         "scores": {
             "raw_megabytes": round(raw_megabytes, 1),
             "files_delivered": mover["files_moved"] + mover["duplicate_deliveries"],
@@ -303,7 +418,9 @@ def run_data_plane_scenario(scenario: str, working_directory: Path, settings: Cu
             "candidate_selection_peak_task_heap_megabytes": round(max(
                 (t["peak_anonymous_memory_bytes"] for t in candidate_selection_tasks), default=0) * megabytes, 1),
             "delivery_seconds": round(delivery_finished - delivery_started, 1),
-        },
+            "compaction_peak_task_memory_megabytes": round(max(
+                (t["peak_resident_memory_bytes"] for t in compaction_tasks), default=0) * megabytes, 1),
+        } | compaction_result["scores"],
         "details": {"scenario": scenario, "customer_code": settings.customer_code, "dead_lettered": sorted(dead_lettered),
                     "exports": exports, "parser_tasks_run": len(parser_tasks)},
     }
@@ -412,7 +529,8 @@ def main():
                     raw_directory = options.throughput_raw_directory or mock_edi_directory(
                         options.mock_cache_directory, options.throughput_days, options.throughput_megabytes_per_day)
                     result = run_data_plane_scenario(scenario, directory, settings, raw_directory, {}, False,
-                                                     options.throughput_timeout_seconds, deliver_a_day_at_a_time=True)
+                                                     options.throughput_timeout_seconds, deliver_a_day_at_a_time=True,
+                                                     compaction=True)
                 else:
                     raise ValueError(f"unknown scenario {scenario!r}; choose from {SCENARIOS}")
         except Exception as error:                        # noqa: BLE001 - a scenario that cannot finish fails its gate

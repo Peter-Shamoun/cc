@@ -2,7 +2,7 @@
 
     S3 bucket (input/, silver/, candidate-config/, output/) -> S3 event -> SQS queue (+ dead-letter queue)
     CloudWatch alarms on the queue -> App Auto Scaling -> ECS service desired count 0 or 1 (Fargate parser task)
-    EventBridge Scheduler -> one-shot Fargate task (candidate selection)
+    EventBridge Scheduler -> one-shot Fargate tasks (candidate selection, silver compaction)
     Glue database with the Iceberg silver tables
 
 Idempotent. Encryption, access keys and IAM permissions are out of scope of this design: the roles exist only
@@ -27,16 +27,20 @@ CONTAINER_IMAGE = "claimclarity/pipeline:emulated"       # the local Fargate sta
 
 def provision_customer(settings: CustomerPipelineSettings, candidate_selection_preset: dict | None = None,
                        parser_task_module: str = "ingestion_task",
-                       parser_task_extra_environment: dict[str, str] | None = None):
-    """parser_task_module and parser_task_extra_environment let the evaluation suite run the parser task under
-    fault injection (evaluation/fault_injecting_ingestion_task.py)."""
+                       parser_task_extra_environment: dict[str, str] | None = None,
+                       compaction_task_module: str = "compaction_task"):
+    """parser_task_module, parser_task_extra_environment and compaction_task_module let the evaluation suite run
+    the tasks under fault injection (evaluation/fault_injecting_*.py)."""
     session = boto3.Session(region_name=settings.aws_region)
     _bucket(session, settings)
     queue_arn = _queues_and_s3_events(session, settings)
     SilverLake(settings).create_tables()
-    network = _ecs(session, settings, parser_task_module, parser_task_extra_environment or {})
+    network = _ecs(session, settings, parser_task_module, parser_task_extra_environment or {}, compaction_task_module)
     _alarms_and_scaling(session, settings)
-    _candidate_selection_schedule(session, settings, network)
+    _one_shot_task_schedule(session, settings, network, settings.candidate_schedule_name,
+                            settings.candidate_selection_schedule_expression, settings.candidate_task_family)
+    _one_shot_task_schedule(session, settings, network, settings.compaction_schedule_name,
+                            settings.compaction_schedule_expression, settings.compaction_task_family)
     if candidate_selection_preset is not None:
         session.client("s3").put_object(Bucket=settings.bucket_name, Key=CANDIDATE_PRESET_KEY,
                                         Body=json.dumps(candidate_selection_preset, indent=2).encode())
@@ -112,7 +116,8 @@ def _task_network(session, settings) -> dict:
     return {"subnets": [subnet["SubnetId"] for subnet in subnets], "assignPublicIp": "ENABLED"}
 
 
-def _ecs(session, settings, parser_task_module: str, parser_task_extra_environment: dict[str, str]) -> dict:
+def _ecs(session, settings, parser_task_module: str, parser_task_extra_environment: dict[str, str],
+         compaction_task_module: str) -> dict:
     ecs = session.client("ecs")
     ecs.create_cluster(clusterName=settings.ecs_cluster_name)
     task_role_arn = _role(session, f"{settings.resource_name_prefix}-task", "ecs-tasks.amazonaws.com")
@@ -136,6 +141,8 @@ def _ecs(session, settings, parser_task_module: str, parser_task_extra_environme
              settings.parser_task_memory_mib, parser_task_extra_environment)
     register(settings.candidate_task_family, "candidate_selection_task", settings.candidate_task_vcpu_count,
              settings.candidate_task_memory_mib, {})
+    register(settings.compaction_task_family, compaction_task_module, settings.compaction_task_vcpu_count,
+             settings.compaction_task_memory_mib, {})
     network = _task_network(session, settings)
     services = ecs.describe_services(cluster=settings.ecs_cluster_name, services=[settings.parser_service_name])
     if not [s for s in services["services"] if s["status"] == "ACTIVE"]:
@@ -185,15 +192,15 @@ def _alarms_and_scaling(session, settings):
         ComparisonOperator="LessThanThreshold", TreatMissingData="notBreaching")
 
 
-def _candidate_selection_schedule(session, settings, network: dict):
+def _one_shot_task_schedule(session, settings, network: dict, schedule_name: str, schedule_expression: str,
+                            task_family: str):
     scheduler = session.client("scheduler")
     schedule = dict(
-        Name=settings.candidate_schedule_name, FlexibleTimeWindow={"Mode": "OFF"},
-        ScheduleExpression=settings.candidate_selection_schedule_expression,
+        Name=schedule_name, FlexibleTimeWindow={"Mode": "OFF"}, ScheduleExpression=schedule_expression,
         Target={"Arn": settings.arn("ecs", f"cluster/{settings.ecs_cluster_name}"),
                 "RoleArn": _role(session, f"{settings.resource_name_prefix}-scheduler", "scheduler.amazonaws.com"),
                 "EcsParameters": {
-                    "TaskDefinitionArn": settings.arn("ecs", f"task-definition/{settings.candidate_task_family}"),
+                    "TaskDefinitionArn": settings.arn("ecs", f"task-definition/{task_family}"),
                     "LaunchType": "FARGATE", "TaskCount": 1,
                     "NetworkConfiguration": {"awsvpcConfiguration": {
                         "Subnets": network["subnets"], "AssignPublicIp": network["assignPublicIp"]}}}})

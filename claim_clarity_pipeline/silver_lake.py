@@ -201,6 +201,24 @@ class SilverLake:
             return table.schema().as_arrow().empty_table()
         return pa.dataset.dataset(paths, filesystem=self.filesystem, format="parquet")
 
+    def write_parquet_file(self, data_file_uri: str, schema: pa.Schema, batches) -> int:
+        """Stream record batches into one Parquet file, a row group at a time: memory does not grow with the
+        file. Returns the row count. Used by the slot export and by compaction, so their files are alike."""
+        row_count = 0
+        with pq.ParquetWriter(data_file_uri.removeprefix("s3://"), schema, filesystem=self.filesystem,
+                              compression="zstd") as writer:
+            row_group, row_group_bytes = [], 0
+            for batch in batches:
+                row_group.append(batch)
+                row_group_bytes += batch.nbytes
+                row_count += batch.num_rows
+                if row_group_bytes >= PARQUET_ROW_GROUP_BYTES:
+                    writer.write_table(pa.Table.from_batches(row_group))
+                    row_group, row_group_bytes = [], 0
+            if row_group:
+                writer.write_table(pa.Table.from_batches(row_group))
+        return row_count
+
     # --- slot export ---------------------------------------------------------------------------------------------
     def loaded_file_ids_by_sha256(self) -> dict[str, str]:
         rows = self.read(COMMIT_RECORD_TABLE, ("sha256", "file_id"))
@@ -272,19 +290,7 @@ class SilverLake:
                        for unit in units for batch in arrow_file_batches(unit / f"{table}.arrow"))
             iceberg_table = self.table(table)
             data_file_uri = f"{iceberg_table.location()}/data/{export_id}.parquet"
-            row_count = 0
-            with pq.ParquetWriter(data_file_uri.removeprefix("s3://"), LOSSLESS_ARROW_SCHEMAS[table],
-                                  filesystem=self.filesystem, compression="zstd") as writer:
-                row_group, row_group_bytes = [], 0
-                for batch in batches:
-                    row_group.append(batch)
-                    row_group_bytes += batch.nbytes
-                    row_count += batch.num_rows
-                    if row_group_bytes >= PARQUET_ROW_GROUP_BYTES:
-                        writer.write_table(pa.Table.from_batches(row_group))
-                        row_group, row_group_bytes = [], 0
-                if row_group:
-                    writer.write_table(pa.Table.from_batches(row_group))
+            row_count = self.write_parquet_file(data_file_uri, LOSSLESS_ARROW_SCHEMAS[table], batches)
             self.add_data_file(table, data_file_uri, {EXPORT_ID_SNAPSHOT_PROPERTY: export_id})
             return table, row_count
 

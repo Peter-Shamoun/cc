@@ -89,16 +89,17 @@ def publish_queue_depth_metrics(settings: CustomerPipelineSettings, sqs, cloudwa
 
 
 # --- EventBridge Scheduler -------------------------------------------------------------------------------------
-def fire_schedule_now(settings: CustomerPipelineSettings) -> str:
-    """Do what the schedule does when its time comes: ECS RunTask with the schedule's own target. Returns the
-    task ARN."""
+def fire_schedule_now(settings: CustomerPipelineSettings, schedule_name: str | None = None) -> str:
+    """Do what the schedule (by default candidate selection's) does when its time comes: ECS RunTask with the
+    schedule's own target. Returns the task ARN."""
+    schedule_name = schedule_name or settings.candidate_schedule_name
     session = boto3.Session(region_name=settings.aws_region)
-    target = session.client("scheduler").get_schedule(Name=settings.candidate_schedule_name)["Target"]
+    target = session.client("scheduler").get_schedule(Name=schedule_name)["Target"]
     parameters = target["EcsParameters"]
     network = parameters["NetworkConfiguration"]["awsvpcConfiguration"]
     task = session.client("ecs").run_task(
         cluster=target["Arn"], taskDefinition=parameters["TaskDefinitionArn"], launchType=parameters["LaunchType"],
-        count=parameters.get("TaskCount", 1), startedBy=f"scheduler/{settings.candidate_schedule_name}"[:36],
+        count=parameters.get("TaskCount", 1), startedBy=f"scheduler/{schedule_name}"[:36],
         networkConfiguration={"awsvpcConfiguration": {"subnets": network["Subnets"],
                                                       "assignPublicIp": network["AssignPublicIp"]}})["tasks"][0]
     return task["taskArn"]

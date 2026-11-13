@@ -47,6 +47,18 @@ class CustomerPipelineSettings:
     candidate_selection_schedule_expression: str = "cron(0 9 * * ? *)"    # nightly, 09:00 UTC
     candidate_task_vcpu_count: int = 2
     candidate_task_memory_mib: int = 8192
+    # --- silver compaction (compaction_task.py) -----------------------------------------------------------------
+    compaction_schedule_expression: str = "cron(0 7 * * ? *)"           # nightly, 07:00 UTC, before candidates
+    compaction_task_vcpu_count: int = 1
+    compaction_task_memory_mib: int = 2048
+    # Parquet files of a table at or above this size are left alone; smaller ones, in the order they were added,
+    # are packed into groups that reach it, and each group is rewritten as one file.
+    compaction_target_file_bytes: int = 128 * 1024 ** 2
+    compaction_minimum_files_per_group: int = 8      # a group of fewer small files is left for a later night
+    # Data files no retained snapshot references are deleted only once this old: an export writes its Parquet
+    # file before it commits it.
+    compaction_unreferenced_file_minimum_age_seconds: int = 24 * 3600
+    snapshot_retention_seconds: int = 7 * 24 * 3600  # time travel kept; replaced data files are deleted after it
 
     # --- names ---------------------------------------------------------------------------------------------------
     @property
@@ -84,6 +96,14 @@ class CustomerPipelineSettings:
     @property
     def candidate_schedule_name(self) -> str:
         return f"{self.resource_name_prefix}-candidate-selection"
+
+    @property
+    def compaction_task_family(self) -> str:
+        return f"{self.resource_name_prefix}-compaction"
+
+    @property
+    def compaction_schedule_name(self) -> str:
+        return f"{self.resource_name_prefix}-compaction"
 
     @property
     def queue_has_files_alarm_name(self) -> str:

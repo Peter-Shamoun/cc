@@ -8,6 +8,7 @@ task and its ephemeral storage are gone after the idle alarm, and a second candi
 import hashlib
 import json
 import multiprocessing
+import os
 import subprocess
 import sys
 import time
@@ -234,3 +235,39 @@ def test_a_parser_process_does_not_hold_files_back_when_no_more_arrive(tmp_path,
         raw_file_queue.put(None)
         parser.join(timeout=30)
     assert parser.exitcode == 0
+
+
+# --- silver compaction -------------------------------------------------------------------------------------------
+def test_compaction_packs_consecutive_small_files_and_leaves_large_files_and_short_groups_alone():
+    from types import SimpleNamespace
+
+    from claim_clarity_pipeline.compaction_task import groups_of_small_files_to_rewrite
+
+    def files(*sizes):
+        return [SimpleNamespace(data_file=SimpleNamespace(file_size_in_bytes=size), name=f"{n}:{size}")
+                for n, size in enumerate(sizes)]
+
+    def names(groups):
+        return [[entry.name for entry in group] for group in groups]
+    # target 100, at least 3 files: [40 30 30] reaches it; 500 is left alone; [60 50] reaches it with 2 files only;
+    # the tail [10 10 10] is rewritten, [10 10] would not be
+    assert names(groups_of_small_files_to_rewrite(files(40, 30, 500, 30, 60, 50, 10, 10, 10), 100, 3)) == [
+        ["0:40", "1:30", "3:30"], ["6:10", "7:10", "8:10"]]
+    assert groups_of_small_files_to_rewrite(files(10, 10), 100, 3) == []
+    assert groups_of_small_files_to_rewrite(files(100, 200), 100, 1) == []
+
+
+@pytest.mark.parametrize("check", [
+    "small_files_are_rewritten_with_identical_rows",
+    "a_concurrent_append_is_kept_and_the_group_still_commits",
+    "a_group_whose_file_was_deleted_meanwhile_is_abandoned",
+    "recovery_removes_an_interrupted_exports_rows_after_they_were_compacted",
+    "a_crash_before_the_commit_leaves_only_an_unreferenced_file_which_a_later_run_deletes"])
+def test_compaction_on_the_emulator(check):
+    """claim_clarity_pipeline/evaluation/compaction_checks.py, each check in its own process."""
+    if not (Path.home() / ".aws" / "emulator" / str(EMULATOR_PORT) / "emulator_credentials").exists():
+        pytest.skip(f"no AWS Emulator running on port {EMULATOR_PORT} (start one: aws-emulator --telemetry off)")
+    completed = subprocess.run([sys.executable, "-m", "claim_clarity_pipeline.evaluation.compaction_checks", check],
+                               cwd=REPOSITORY_ROOT, capture_output=True, text=True, timeout=600,
+                               env=os.environ | {"CLAIM_CLARITY_EMULATOR_PORT": str(EMULATOR_PORT)})
+    assert completed.returncode == 0, completed.stdout[-2000:] + completed.stderr[-4000:]
