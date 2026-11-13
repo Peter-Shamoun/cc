@@ -38,6 +38,10 @@ Its rows change as files arrive, so the incremental build keeps each row in the 
 rows of the claims and payers the batch names, and replaces those rows in gold. It is partitioned by
 `first_activity_month`, so a replacement opens only the months the replaced rows are in.
 
+Over a year of daily batches it equals its definition computed from scratch, and keeping it current takes 0.5 s
+of a 3 s batch, the same early in the year and late. It adds 139 MB to the key index (357 MB in all, against
+219 MB of gold data).
+
 Two workload queries rewritten against it return the same rows on a year of gold: days-to-pay by payer class in
 29 ms instead of 209 ms, open claims by age in 14 ms instead of 302 ms, each in about half the SQL. The workload's
 queries are not yet rewritten as a whole, so the scorecards below still time the seven-relation queries.
@@ -100,8 +104,8 @@ What the year runs ruled out:
 
 Open points:
 
-- **The key index is 218 MB**, about the size of gold's data: a row per claim and payer, and per claim. It is
-  build state, read by key.
+- **The key index is 357 MB**, more than gold's data: the top event per claim and payer and per claim, and a copy
+  of every `claim_payers` row. It is build state, read by key.
 - **Two workload queries** (`a_bafe309836`, `a_258e64fde0`) return other rows on the month-partitioned layout than
   on a single file while the relations are equal: their `row_number()` orderings have ties, so their results
   depend on row order.
