@@ -7,12 +7,10 @@ A materialized subset of silver for the queries people actually ask. Developed a
 python -m claim_clarity_gold.benchmark_gold --working-directory /tmp/gold-1 --days 30
 ```
 
-## Design from first principles (v2, being built)
+## Design from first principles
 
-The schema below is derived from what people ask of 837, 835 and 277CA data, not from which columns the
-benchmark's queries read. The benchmark stays as a check (can gold answer it, how fast), not as the source of the
-schema. The sections after this one describe v1, which was derived from the benchmark and is what the code builds
-today.
+The schema is derived from what people ask of 837, 835 and 277CA data, not from which columns the benchmark's
+queries read. The benchmark stays as a check (can gold answer it, how fast), not as the source of the schema.
 
 **What people ask.** A claim goes through a life: submitted (837), acknowledged or rejected at the front end
 (277CA), adjudicated by each payer in turn (835: paid, denied, adjusted), sometimes reversed or reworked, and the
@@ -61,122 +59,48 @@ or by `remit_claim_id = claim_payers.current_remit_claim_id` for "the current ad
 - `claims` in v1 was one row per submission; that relation is `claim_submissions` here, and `claims` is what the
   name says.
 
-## What gold is
+## Code
 
-1. **A subset of silver.** Each gold relation is a projection of the semantic view of the same name
-   (`claude/schema/02_semantic_layer_views.sql`), which is defined over silver. Gold holds the columns the query
-   workload reads, the identifiers that join the relations, and `source_file_id`.
-2. **Easy to query.** Seven relations named after what they hold; one row is one EDI thing (a CLP, an SVC, a CLM,
-   an SV1, a CAS, a BPR/TRN, a PLB). An eighth, `claim_payers`, is merged from `claims` and `remit_claims`: one
-   row per claim and payer with what was submitted and what the payer has answered (see below).
-3. **Fast.** Sorted Parquet, no joins to silver.
-4. **Cheap to keep current.** `incremental_build.py` applies one silver batch at a time: the batch's gold rows
-   from the batch's silver rows, a key-index lookup for the top-ranked event each claim had before, a flag flip on
-   whichever side loses, an insert. Only two flags ever change on an existing row (`is_current_adjudication` and
-   `is_latest_submission`).
+| File | What it is |
+|---|---|
+| `gold_relations.py` | the relations: event relations as column lists of the semantic views, state relations as SQL |
+| `full_build.py` | gold from scratch, one Parquet file per relation: the definition the incremental build must equal |
+| `incremental_gold.py` | gold kept current a silver batch at a time, as Iceberg tables; `compact()` |
+| `canonical_questions.py` | questions of each group, written against gold |
+| `benchmark_compatibility.py` | views that put the flags the benchmark's queries read back onto the event relations |
+| `benchmark_gold.py` | the scorecard for the four criteria |
+| `query_workload.py`, `silver_dataset.py` | the benchmark's queries; silver data sets and their daily batches |
 
-Gold is stored as merge-on-read tables partitioned by month: an UPDATE writes the changed rows and a delete marker
-and leaves the data file alone, and `compact()` merges the small files of daily inserts into one per relation per
-month. The store here is DuckLake (Parquet plus a catalog, read and written by DuckDB); it stands in for any
-merge-on-read format, Iceberg included, and is not a decision about gold's production format.
+```bash
+python -m claim_clarity_gold.benchmark_gold --working-directory /tmp/gold-1 --days 30 [--compare-with-silver]
+```
 
-## claim_payers
+A batch: append the batch's event rows (the seven tables commit side by side); compute the batch's part of the
+state; read the previous state of the claims it names from the month partitions they are in (a key index says
+which month, and the rank of each key's top event); fold; replace those month partitions. Its cost follows the batch
+and the size of a month. `compact()` merges each month partition's files into one sorted file, expires old
+snapshots and deletes unused data files.
 
-55 of the 156 workload queries join `claims` to `remit_claims` per claim and payer, most to ask when the claim was
-first submitted, whether it has a current adjudication, and what was paid. `claim_payers` holds those answers
-(`gold_schema.CLAIM_PAYERS_SQL` is its definition over the two relations): the payer's responsibility, first and last submission dates and
-count, the claim's latest charge and frequency code, first remit date and count, and the current adjudication's
-payment date, amounts and denial flag: 20 columns.
-
-Its rows change as files arrive, so the incremental build keeps each row in the key index, folds a batch into the
-rows of the claims and payers the batch names, and replaces those rows in gold. It is partitioned by
-`first_activity_month`, so a replacement opens only the months the replaced rows are in.
-
-Over a year of daily batches it equals its definition computed from scratch, and keeping it current takes 0.5 s
-of a 2.8 s batch, the same early in the year and late. It adds 168 MB to the key index (386 MB in all, against
-223 MB of gold data).
-
-`claim_payers_rewrites.json` holds 25 of those 55 queries rewritten against it, each returning the same rows as
-the original on a year of gold: 1.9 s in total instead of 4.6 s, median 63 ms instead of 160 ms, in 29% less SQL.
-The benchmarks ask gold those 25 in their rewritten form. Of the other 30, 12 compare individual remits or
-submissions and do not fit a row per claim and payer; the rest each need a column it does not have.
-
-Two things to know when querying it: `claim_charge_amount` and `claim_frequency_code` are the claim's, repeated on
-every payer row, so summing the charge over rows counts a multi-payer claim more than once; and
-`first_remit_date` counts every remit, reversals and duplicate-claim denials included.
-
-Gold is not a fallback and not a de-identified copy. A query gold cannot answer goes to silver.
-
-## The workload
-
-`query_workload.py` reads the benchmark's 156 authored questions (`bench/authored_questions.json`), whose queries
-are written against the semantic views, and finds the relations and columns each one reads.
-
-| Semantic relation | Queries that read it | Columns read / columns it has | In gold |
-|---|---|---|---|
-| remit_claims | 111 | 28 / 37 | yes |
-| claims | 69 | 16 / 39 | yes |
-| remit_lines | 33 | 21 / 39 | yes |
-| payments | 11 | 9 / 16 | yes |
-| adjustments | 10 | 10 / 25 | yes |
-| claim_lines | 9 | 12 / 38 | yes |
-| provider_adjustments | 4 | 6 / 11 | yes |
-| diagnoses | 1 | 1 / 11 | no |
-| payers, remarks | 0 | 0 | no |
-
-Underneath, those queries reach 16 of silver's 24 tables and about 80 of their 370 columns; no query reaches
-`edi.segment`, the envelopes, contacts or the miscellaneous segments.
-
-## Scorecard
-
-On 30 days of silver (95 MB of raw EDI), full build:
+## Scorecard (30 days of silver, 95 MB of raw EDI)
 
 | Criterion | Result |
 |---|---|
-| 1. Subset | every gold column is a semantic-view column over silver; gold answers 155 of 156 queries |
-| 2. Easy | 7 relations, 111 columns (semantic layer: 10 and 236; silver: 24 tables) |
-| 3. Fast | all 155 queries return the same rows as the views over silver; median 23 ms against 837 ms |
-| 4. Build cost | gold is 15.1 MB, 26% of silver's 58.1 MB |
+| 1. Subset | every relation is defined over the semantic views over silver; the incremental build (21 daily batches) equals the full build in all nine relations |
+| 2. Easy | 9 relations, 197 columns (10 with 277CA acknowledgments, in progress); the 14 canonical questions are 3 to 15 lines each |
+| 3. Fast | canonical questions: median 6 ms, at most 39 ms. The benchmark's 156 queries: gold covers 149 (median 55 ms through the compatibility views, against 343 ms on the views over silver); all 149 equal the full build, and 148 equal silver (`a_838170f50b` sums floating-point values, and the order of summation shows in the last digit) |
+| 4. Build cost | 2.3 s per batch in the first third, 3.4 s in the last; gold is 21.4 MB in 18 files after compaction (silver: 58 MB); key index 17 MB |
 
-On a year of silver (1.2 GB of raw EDI, 16.4 million gold rows), applied one day at a time (255 batches,
-compaction every 30):
+Over a year (255 daily batches, local catalog): 4.4 s per batch in the first third, 5.7 s in the last. A batch's
+cost follows how many state month partitions it touches (about 2 s at 2, 3.5 to 4 s at 4, 5 to 6.5 s at 6), and
+the partition step at 6 partitions took 2.6 / 2.3 / 2.0 / 2.0 / 2.2 s from February to December. Why the last third
+averages 30% more than the first is not explained yet. Compaction: 8 to 14 s per run.
 
-| Measure | Result |
-|---|---|
-| Equals a full rebuild | yes, in all eight relations |
-| A whole batch | 2.8 s on average in the first third of the year, 2.7 s in the last, `claim_payers` included |
-| Computing a batch's rows | 1.15 s per batch, the same in the first month and the last |
-| Key index | 0.06 s per batch |
-| Inserting the batch | 0.15 s per batch |
-| Demoting older rows | 0.6 to 1.9 s per batch: 4 to 6 ms per demoted row all year (a batch demotes 116 to 428) |
-| Compaction | 43 s over the year in nine runs, 7 s at most |
-| Queries | median 77 ms over 90 files, 15.0 s for all 155 (100 ms and 20.0 s before `claim_payers`) |
-| Size | 223 MB of data and a 14 MB catalog; silver is 748 MB |
+On the emulator's S3 and Glue (four batches): build, compaction and read-back work; about 5 to 6 s per batch.
 
-What the year runs ruled out:
+Open:
 
-- **Plain Parquet files, rewritten to flip a flag**: 233 MB written for new rows and 5.1 GB rewritten to demote
-  59,669 older rows (0.4% of gold).
-- **The store's default compaction**: it rewrites a file only when most of its rows are deleted, which left 2,186
-  files, a median query of 178 ms and a demotion cost that crept up through the year. `compact()` rewrites any
-  file with a delete marker.
-
-Open points:
-
-- **The key index is 386 MB**, more than gold's data: the top event per claim and payer and per claim, and a copy
-  of every `claim_payers` row. It is build state, read by key.
-- **Two workload queries** (`a_bafe309836`, `a_258e64fde0`) return other rows on the month-partitioned layout than
-  on a single file while the relations are equal: their `row_number()` orderings have ties, so their results
-  depend on row order.
-
-## Modules
-
-| Module | What it is |
-|---|---|
-| `query_workload.py` | The workload and what each query reads |
-| `gold_schema.py` | The seven relations and their columns |
-| `silver_dataset.py` | Silver in a DuckDB file, parsed from mock EDI |
-| `build_gold.py` | The full build, and a session over a gold directory |
-| `incremental_build.py` | The per-batch build, the merge-on-read store and its key index |
-| `benchmark_gold.py` | The scorecard |
-| `benchmark_incremental.py` | Seconds per batch against gold's size, and the check against a full rebuild |
+- The year comparison against a full build: building the semantic views over a year at once runs out of memory
+  at 8 GB; a spilling run is in progress.
+- 277CA acknowledgments (`claim_acknowledgments`, and acknowledgment columns on `claims` and `claim_payers`) wait
+  for 277CA in silver.
+- The storage format of the key index: build state beside the catalog, read by key.
