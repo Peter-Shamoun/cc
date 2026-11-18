@@ -1,4 +1,4 @@
-"""The ECS parser task: SQS -> download -> parse -> stage in a DuckDB slot -> export to the Iceberg silver lake.
+"""The ECS parser task: SQS -> download -> parse -> stage on ephemeral disk -> export to the Iceberg silver lake.
 
     SQS manager thread   receives S3 event messages, keeps them hidden while their files are in flight, deletes
                          them once their files are committed

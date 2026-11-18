@@ -71,7 +71,7 @@ CREATE TABLE edi.ingest_run (
 
 -- The S3 location table. One row per physical object version ingested.
 CREATE TABLE edi.source_file (
-    file_id              VARCHAR PRIMARY KEY,      -- sha256 of raw bytes (hex). Content address => dedupe.
+    file_id              VARCHAR PRIMARY KEY,      -- 16 hex of sha1(s3_key || '#' || s3_version_id): one per object version
     tenant_code          VARCHAR NOT NULL,         -- e.g. 'LABCORP' (redundant w/ bucket, useful in exports)
     file_kind            VARCHAR NOT NULL,         -- '835' | '837P' | '277CA' | 'UNKNOWN'
     s3_uri               VARCHAR NOT NULL,         -- s3://bucket/key (canonical, for engineers)
@@ -86,7 +86,7 @@ CREATE TABLE edi.source_file (
     original_filename    VARCHAR,                  -- name as delivered by SFTP / clearinghouse
     source_system        VARCHAR,                  -- e.g. 'SFTP', 'CLEARINGHOUSE_X', 'CONVERSION_DUMP'
     size_bytes           BIGINT NOT NULL,
-    sha256               VARCHAR NOT NULL,         -- same as file_id, kept explicit
+    sha256               VARCHAR NOT NULL,         -- of the raw bytes: dedup by content (a file whose bytes are loaded is skipped)
     compression          VARCHAR,                  -- none | gzip | zip (member name in original_filename)
     character_encoding   VARCHAR,                  -- detected (ASCII / UTF-8 / latin-1)
     received_at          TIMESTAMP,                -- when it landed in S3
